@@ -1,0 +1,47 @@
+import { useEffect, useState } from 'react';
+
+interface DataAgeBadgeProps {
+  /** When the data was last fetched. */
+  date: Date;
+  className?: string;
+}
+
+const MIN = 60_000;
+const HOUR = 3_600_000;
+const DAY = 86_400_000;
+
+function formatAge(ms: number): string {
+  if (ms < MIN) return 'just now';
+  if (ms < HOUR) return `${Math.floor(ms / MIN)}m ago`;
+  if (ms < DAY) return `${Math.floor(ms / HOUR)}h ago`;
+  return `${Math.floor(ms / DAY)}d ago`;
+}
+
+function toneFor(ms: number): string {
+  if (ms < HOUR) return 'text-text-dim';
+  if (ms < DAY) return 'text-warning';
+  return 'text-danger';
+}
+
+/** Relative age of API-derived data. Required on every ESI-backed view. */
+export function DataAgeBadge({ date, className = '' }: DataAgeBadgeProps) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const ms = Math.max(0, now - date.getTime());
+
+  return (
+    <time
+      dateTime={date.toISOString()}
+      title={date.toLocaleString()}
+      className={`inline-flex items-center gap-1.5 text-[11px] tabular-nums ${toneFor(ms)} ${className}`}
+    >
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
+      {formatAge(ms)}
+    </time>
+  );
+}

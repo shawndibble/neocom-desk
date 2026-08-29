@@ -1,11 +1,54 @@
 @import 'tailwindcss';
 
-/* Theme tokens filled in by design-system pass (docs/DESIGN.md) */
+/* Design tokens — see docs/DESIGN.md. Photon-UI-inspired dark theme. */
 @theme {
-  --color-bg: #0d1117;
-  --color-panel: #161b22;
-  --color-line: #30363d;
-  --color-text: #e6edf3;
-  --color-text-dim: #8b949e;
-  --color-accent: #58a6ff;
+  /* Background layers (darkest -> lightest) */
+  --color-bg: #0a0e14;
+  --color-panel: #11161d;
+  --color-panel-2: #161d27;
+
+  /* Hairlines (always 1px) */
+  --color-line: #2a3442;
+  --color-line-bright: #3d4c5f;
+
+  /* Text hierarchy */
+  --color-text: #dee7ee;
+  --color-text-dim: #95a3b4;
+  --color-text-faint: #5c6b7a; /* decorative only — below AA */
+
+  /* Accent (interactive/selected) */
+  --color-accent: #57c7f4;
+  --color-accent-dim: #2e7da3; /* borders/fills only — not text */
+  --color-accent-contrast: #04181f; /* text on accent fills */
+
+  /* Status */
+  --color-success: #5fd584;
+  --color-warning: #f5b94a;
+  --color-danger: #ff7369;
+
+  /* ISK / market deltas */
+  --color-isk-pos: #4fd98a;
+  --color-isk-neg: #ff8177;
+
+  /* Type — system stack approximating EVE's condensed sans */
+  --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-dim);
+    color: var(--color-text);
+  }
 }
