@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import type { SkillType } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -16,14 +17,87 @@ vi.mock('virtual:pwa-register/react', () => ({
   }),
 }));
 
+const FIXTURE_SKILLS: SkillType[] = [
+  {
+    typeID: 3300,
+    name: 'Gunnery',
+    groupID: 10,
+    groupName: 'Gunnery',
+    rank: 1,
+    primaryAttr: 'perception',
+    secondaryAttr: 'willpower',
+    prereqs: [],
+  },
+];
+
+vi.mock('@/sde/loadSde', () => ({
+  loadSkills: vi.fn(async () => FIXTURE_SKILLS),
+  loadTypes: vi.fn(async () => ({})),
+  loadBlueprints: vi.fn(async () => ({})),
+}));
+
 const CHAR_ID = 91;
 let lastAuthHeader: string | null = null;
+
+const skillsPayload = {
+  skills: [
+    { skill_id: 3300, trained_skill_level: 4, active_skill_level: 4, skillpoints_in_skill: 90000 },
+  ],
+  total_sp: 5_000_000,
+  unallocated_sp: 12_000,
+};
+
+const queuePayload = [
+  {
+    skill_id: 3300,
+    queue_position: 0,
+    finished_level: 5,
+    start_date: '2026-08-01T00:00:00Z',
+    finish_date: '2026-09-01T00:00:00Z',
+  },
+];
 
 const server = setupServer(
   http.get('https://esi.evetech.net/characters/:id/wallet', ({ request }) => {
     lastAuthHeader = request.headers.get('authorization');
     return HttpResponse.json(1234567.89);
-  })
+  }),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+    HttpResponse.json(skillsPayload)
+  ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+    HttpResponse.json(queuePayload)
+  ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}`, () =>
+    HttpResponse.json({
+      name: 'Pilot One',
+      corporation_id: 1001,
+      alliance_id: 2001,
+      birthday: '2015-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'female',
+      race_id: 1,
+    })
+  ),
+  http.get('https://esi.evetech.net/corporations/1001', () =>
+    HttpResponse.json({
+      name: 'Test Corp',
+      ticker: 'TC',
+      ceo_id: 1,
+      creator_id: 1,
+      member_count: 5,
+      tax_rate: 0.1,
+    })
+  ),
+  http.get('https://esi.evetech.net/alliances/2001', () =>
+    HttpResponse.json({
+      name: 'Test Alliance',
+      ticker: 'TA',
+      creator_corporation_id: 1,
+      creator_id: 1,
+      date_founded: '2016-01-01T00:00:00Z',
+    })
+  )
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -34,6 +108,7 @@ beforeEach(async () => {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
+  await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
 
@@ -54,8 +129,17 @@ describe('Overview', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Pilot One' })).toBeInTheDocument();
     expect(await screen.findByText(/1,234,567\.89/)).toBeInTheDocument();
-    expect(screen.getByText('just now')).toBeInTheDocument();
+    expect(screen.getAllByText('just now').length).toBeGreaterThan(0);
     expect(lastAuthHeader).toBe('Bearer access-token-91');
+  });
+
+  it('shows corp/alliance, total/unallocated SP, and the active training skill', async () => {
+    render(<App />);
+    expect(await screen.findByText(/Training Gunnery/)).toBeInTheDocument();
+    expect(await screen.findByText(/Test Corp/)).toBeInTheDocument();
+    expect(screen.getByText(/Test Alliance/)).toBeInTheDocument();
+    expect(screen.getByText('5,000,000')).toBeInTheDocument();
+    expect(screen.getByText('12,000')).toBeInTheDocument();
   });
 
   it('falls back gracefully when the wallet fetch fails offline', async () => {

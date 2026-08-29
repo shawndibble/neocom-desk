@@ -13,6 +13,12 @@ import { Overview } from '@/routes/Overview';
 import { Skills } from '@/routes/Skills';
 import { SkillPlans } from '@/routes/SkillPlans';
 import { Industry } from '@/routes/Industry';
+import { Wallet } from '@/routes/Wallet';
+import { Assets } from '@/routes/Assets';
+import { Mail } from '@/routes/Mail';
+import { Calendar } from '@/routes/Calendar';
+import { Contracts } from '@/routes/Contracts';
+import { Orders } from '@/routes/Orders';
 import { Styleguide } from '@/routes/Styleguide';
 import { Layout } from './Layout';
 import { ReloadPrompt } from './ReloadPrompt';
@@ -56,6 +62,12 @@ export function App() {
           <Route path="/skills" element={<Skills />} />
           <Route path="/skills/plans" element={<SkillPlans />} />
           <Route path="/industry" element={<Industry />} />
+          <Route path="/wallet" element={<Wallet />} />
+          <Route path="/assets" element={<Assets />} />
+          <Route path="/mail" element={<Mail />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/contracts" element={<Contracts />} />
+          <Route path="/orders" element={<Orders />} />
         </Route>
         <Route path="/styleguide" element={<Styleguide />} />
         <Route path="*" element={<Navigate to="/" replace />} />

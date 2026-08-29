@@ -49,6 +49,27 @@ export function Layout() {
           <NavLink to="/industry" className={navClass}>
             {t('nav.industry')}
           </NavLink>
+          <p className="mt-3 px-3 text-[10px] font-semibold tracking-widest text-text-faint uppercase">
+            {t('nav.characterSection')}
+          </p>
+          <NavLink to="/wallet" className={navClass}>
+            {t('nav.wallet')}
+          </NavLink>
+          <NavLink to="/assets" className={navClass}>
+            {t('nav.assets')}
+          </NavLink>
+          <NavLink to="/mail" className={navClass}>
+            {t('nav.mail')}
+          </NavLink>
+          <NavLink to="/calendar" className={navClass}>
+            {t('nav.calendar')}
+          </NavLink>
+          <NavLink to="/contracts" className={navClass}>
+            {t('nav.contracts')}
+          </NavLink>
+          <NavLink to="/orders" className={navClass}>
+            {t('nav.orders')}
+          </NavLink>
         </nav>
         {activeCharacter && (
           <Link

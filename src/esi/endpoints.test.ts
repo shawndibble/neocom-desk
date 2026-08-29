@@ -15,6 +15,18 @@ import {
   getCorporationPublicInfo,
   getAlliancePublicInfo,
   getUniverseType,
+  getCharacterWalletJournal,
+  getCharacterWalletTransactions,
+  getCharacterAssets,
+  getUniverseStation,
+  getCharacterMailHeaders,
+  getCharacterMail,
+  postUniverseNames,
+  getCharacterCalendar,
+  getCharacterCalendarEvent,
+  getCharacterContracts,
+  getCharacterOrders,
+  getCharacterOrderHistory,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
 
@@ -282,5 +294,341 @@ describe('public info endpoints', () => {
     expect(auth).toBeNull();
     expect(result.data?.name).toBe('Ocular Filter - Basic');
     expect(result.data?.description).toContain('ocular filter');
+  });
+
+  it('getUniverseStation is unauthenticated and returns the station name', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json({
+          station_id: 60003760,
+          name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+          type_id: 1531,
+          system_id: 30000142,
+        });
+      })
+    );
+
+    const result = await getUniverseStation(60003760);
+
+    expect(result.data?.name).toBe('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+  });
+});
+
+describe('wallet journal + transactions', () => {
+  it('getCharacterWalletJournal fetches every page', async () => {
+    const page1 = [
+      { id: 1, date: '2026-08-01T00:00:00Z', ref_type: 'player_donation', description: 'a' },
+    ];
+    const page2 = [
+      { id: 2, date: '2026-08-02T00:00:00Z', ref_type: 'player_donation', description: 'b' },
+    ];
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/wallet/journal`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? page2 : page1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+
+    const entries = await getCharacterWalletJournal(CHARACTER_ID);
+
+    expect(entries).toEqual([...page1, ...page2]);
+  });
+
+  it('getCharacterWalletTransactions cursors through from_id until a page is empty', async () => {
+    const fromIds: (string | null)[] = [];
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/wallet/transactions`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const fromId = new URL(request.url).searchParams.get('from_id');
+        fromIds.push(fromId);
+        if (fromId === null) {
+          return HttpResponse.json([
+            {
+              transaction_id: 20,
+              date: '2026-08-02T00:00:00Z',
+              location_id: 1,
+              type_id: 34,
+              unit_price: 5,
+              quantity: 10,
+              client_id: 1,
+              is_buy: true,
+              is_personal: true,
+              journal_ref_id: 1,
+            },
+          ]);
+        }
+        if (fromId === '19') {
+          return HttpResponse.json([
+            {
+              transaction_id: 10,
+              date: '2026-08-01T00:00:00Z',
+              location_id: 1,
+              type_id: 34,
+              unit_price: 4,
+              quantity: 5,
+              client_id: 1,
+              is_buy: true,
+              is_personal: true,
+              journal_ref_id: 2,
+            },
+          ]);
+        }
+        return HttpResponse.json([]);
+      })
+    );
+
+    const transactions = await getCharacterWalletTransactions(CHARACTER_ID);
+
+    expect(fromIds).toEqual([null, '19', '9']);
+    expect(transactions.map((t) => t.transaction_id)).toEqual([20, 10]);
+  });
+});
+
+describe('assets', () => {
+  it('getCharacterAssets fetches every page', async () => {
+    const page1 = [
+      {
+        item_id: 1,
+        type_id: 34,
+        quantity: 100,
+        location_id: 60003760,
+        location_type: 'station' as const,
+        location_flag: 'Hangar',
+        is_singleton: false,
+      },
+    ];
+    const page2 = [
+      {
+        item_id: 2,
+        type_id: 35,
+        quantity: 5,
+        location_id: 60003760,
+        location_type: 'station' as const,
+        location_flag: 'Hangar',
+        is_singleton: true,
+      },
+    ];
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/assets`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? page2 : page1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+
+    const assets = await getCharacterAssets(CHARACTER_ID);
+
+    expect(assets).toEqual([...page1, ...page2]);
+  });
+});
+
+describe('mail', () => {
+  it('getCharacterMailHeaders returns recent headers', async () => {
+    server.use(
+      authedJson(`/characters/${CHARACTER_ID}/mail`, [
+        {
+          mail_id: 1,
+          from: 90000001,
+          subject: 'Hello',
+          timestamp: '2026-08-01T00:00:00Z',
+          is_read: false,
+          labels: [],
+        },
+      ])
+    );
+
+    const result = await getCharacterMailHeaders(CHARACTER_ID);
+
+    expect(result.data?.[0].subject).toBe('Hello');
+    expect(result.data?.[0].is_read).toBe(false);
+  });
+
+  it('getCharacterMail returns the body, using `read` not `is_read`', async () => {
+    server.use(
+      authedJson(`/characters/${CHARACTER_ID}/mail/1`, {
+        from: 90000001,
+        subject: 'Hello',
+        body: 'Hi <b>there</b>',
+        read: true,
+      })
+    );
+
+    const result = await getCharacterMail(CHARACTER_ID, 1);
+
+    expect(result.data?.body).toBe('Hi <b>there</b>');
+    expect(result.data?.read).toBe(true);
+  });
+});
+
+describe('postUniverseNames', () => {
+  it('POSTs the id array and returns resolved names, sending the ESI headers', async () => {
+    let capturedBody: unknown;
+    let capturedHeaders: Headers | null = null;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        capturedHeaders = request.headers;
+        capturedBody = await request.json();
+        return HttpResponse.json([{ id: 90000001, name: 'Some Pilot', category: 'character' }]);
+      })
+    );
+
+    const names = await postUniverseNames([90000001]);
+
+    expect(names).toEqual([{ id: 90000001, name: 'Some Pilot', category: 'character' }]);
+    expect(capturedBody).toEqual([90000001]);
+    const headers = capturedHeaders as Headers | null;
+    expect(headers?.get('content-type')).toContain('application/json');
+  });
+
+  it('returns an empty array without a request when given no ids', async () => {
+    let called = false;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => {
+        called = true;
+        return HttpResponse.json([]);
+      })
+    );
+
+    const names = await postUniverseNames([]);
+
+    expect(names).toEqual([]);
+    expect(called).toBe(false);
+  });
+});
+
+describe('calendar', () => {
+  it('getCharacterCalendar returns event summaries', async () => {
+    server.use(
+      authedJson(`/characters/${CHARACTER_ID}/calendar`, [
+        {
+          event_id: 1,
+          event_date: '2026-09-01T18:00:00Z',
+          title: 'Fleet Op',
+          importance: 1,
+          event_response: 'accepted',
+        },
+      ])
+    );
+
+    const result = await getCharacterCalendar(CHARACTER_ID);
+
+    expect(result.data?.[0].title).toBe('Fleet Op');
+  });
+
+  it('getCharacterCalendarEvent returns full detail', async () => {
+    server.use(
+      authedJson(`/characters/${CHARACTER_ID}/calendar/1`, {
+        event_id: 1,
+        title: 'Fleet Op',
+        date: '2026-09-01T18:00:00Z',
+        duration: 60,
+        importance: 1,
+        owner_id: 1,
+        owner_name: 'Fleet Commander',
+        owner_type: 'character',
+        response: 'accepted',
+        text: 'Bring your ship',
+      })
+    );
+
+    const result = await getCharacterCalendarEvent(CHARACTER_ID, 1);
+
+    expect(result.data?.text).toBe('Bring your ship');
+  });
+});
+
+describe('contracts', () => {
+  it('getCharacterContracts fetches every page', async () => {
+    const base = {
+      issuer_id: 1,
+      issuer_corporation_id: 2,
+      assignee_id: 3,
+      acceptor_id: 0,
+      type: 'item_exchange' as const,
+      status: 'outstanding' as const,
+      for_corporation: false,
+      availability: 'personal' as const,
+      date_issued: '2026-08-01T00:00:00Z',
+      date_expired: '2026-08-10T00:00:00Z',
+    };
+    const page1 = [{ ...base, contract_id: 1 }];
+    const page2 = [{ ...base, contract_id: 2 }];
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/contracts`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? page2 : page1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+
+    const contracts = await getCharacterContracts(CHARACTER_ID);
+
+    expect(contracts.map((c) => c.contract_id)).toEqual([1, 2]);
+  });
+});
+
+describe('orders', () => {
+  it('getCharacterOrders returns open orders (single call)', async () => {
+    server.use(
+      authedJson(`/characters/${CHARACTER_ID}/orders`, [
+        {
+          order_id: 1,
+          type_id: 34,
+          region_id: 10000002,
+          location_id: 60003760,
+          is_buy_order: false,
+          is_corporation: false,
+          price: 5.5,
+          volume_remain: 100,
+          volume_total: 200,
+          issued: '2026-08-01T00:00:00Z',
+          duration: 90,
+          range: 'region',
+        },
+      ])
+    );
+
+    const result = await getCharacterOrders(CHARACTER_ID);
+
+    expect(result.data?.[0].order_id).toBe(1);
+  });
+
+  it('getCharacterOrderHistory fetches every page', async () => {
+    const base = {
+      type_id: 34,
+      region_id: 10000002,
+      location_id: 60003760,
+      is_corporation: false,
+      price: 5.5,
+      volume_remain: 0,
+      volume_total: 200,
+      issued: '2026-08-01T00:00:00Z',
+      duration: 90,
+      range: 'region',
+      state: 'expired' as const,
+    };
+    const page1 = [{ ...base, order_id: 1 }];
+    const page2 = [{ ...base, order_id: 2 }];
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/orders/history`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? page2 : page1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+
+    const history = await getCharacterOrderHistory(CHARACTER_ID);
+
+    expect(history.map((o) => o.order_id)).toEqual([1, 2]);
   });
 });

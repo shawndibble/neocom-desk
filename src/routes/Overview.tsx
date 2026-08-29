@@ -3,21 +3,29 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { getCharacterWallet } from '@/esi/endpoints';
 import { DataAgeBadge, EmptyState, Panel, Spinner, StatChip } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { usePublicInfo } from '@/stores/publicInfo';
+import { characterPortraitUrl } from '@/app/images';
+import {
+  loadCharacterSkills,
+  loadCharacterSkillQueue,
+  type CachedResult,
+} from '@/features/skills/data';
+import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
+import { loadWalletBalance } from '@/features/character/wallet';
+import { formatIsk } from '@/features/character/format';
+import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 
-interface WalletSnapshot {
-  balance: number;
-  fetchedAt: Date;
+interface Snapshot {
+  requestKey: string;
+  walletResult: CachedResult<number> | null;
+  skillsResult: CachedResult<CharacterSkills> | null;
+  queueResult: CachedResult<SkillQueueEntry[]> | null;
+  catalog: SkillCatalog;
 }
 
-const ISK_FORMAT = new Intl.NumberFormat('en', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-/** Minimal dashboard for the active character. Grows with later milestones. */
+/** Dashboard for the active character: identity, SP, wallet, training queue snippet. */
 export function Overview() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -26,36 +34,36 @@ export function Overview() {
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
     [activeCharacterId]
   );
+  const loadPublicInfo = usePublicInfo((state) => state.load);
+  const publicInfo = usePublicInfo((state) =>
+    activeCharacterId === null ? undefined : state.byCharacterId[activeCharacterId]
+  );
 
-  // Keyed by character so a stale result (or reset) never needs a sync setState in the effect.
-  const [walletResult, setWalletResult] = useState<{
-    characterId: number;
-    snapshot: WalletSnapshot | null;
-  } | null>(null);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const requestKey = `${activeCharacterId}`;
 
   useEffect(() => {
     if (activeCharacterId === null) return;
     let cancelled = false;
-    getCharacterWallet(activeCharacterId)
-      .then((result) => {
-        if (!cancelled && result.data !== null) {
-          setWalletResult({
-            characterId: activeCharacterId,
-            snapshot: { balance: result.data, fetchedAt: new Date() },
-          });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setWalletResult({ characterId: activeCharacterId, snapshot: null });
-      });
+    void loadPublicInfo(activeCharacterId);
+    void (async () => {
+      const [walletResult, skillsResult, queueResult, catalog] = await Promise.all([
+        loadWalletBalance(activeCharacterId),
+        loadCharacterSkills(activeCharacterId),
+        loadCharacterSkillQueue(activeCharacterId),
+        loadSkillCatalog(),
+      ]);
+      if (cancelled) return;
+      setSnapshot({ requestKey, walletResult, skillsResult, queueResult, catalog });
+    })();
     return () => {
       cancelled = true;
     };
-  }, [activeCharacterId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from activeCharacterId
+  }, [activeCharacterId, loadPublicInfo]);
 
-  const current = walletResult?.characterId === activeCharacterId ? walletResult : null;
-  const wallet = current?.snapshot ?? null;
-  const walletFailed = current !== null && current.snapshot === null;
+  const current = snapshot?.requestKey === requestKey ? snapshot : null;
+  const loading = current === null;
 
   if (!hydrated) {
     return (
@@ -66,34 +74,100 @@ export function Overview() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  const walletResult = current?.walletResult ?? null;
+  const skillsResult = current?.skillsResult ?? null;
+  const queueResult = current?.queueResult ?? null;
+  const catalog = current?.catalog ?? null;
+
+  const activeEntry = queueResult?.data.find((e) => e.finish_date) ?? null;
+  const activeSkillName =
+    activeEntry && catalog
+      ? (catalog.bySkillTypeID.get(activeEntry.skill_id)?.name ?? `#${activeEntry.skill_id}`)
+      : null;
+
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">
-          {character?.name ?? t('common.unknown')}
-        </h1>
-        <div className="flex gap-2">
-          <StatChip label={t('nav.skills')} value={t('nav.soon')} className="opacity-60" />
-          <StatChip label={t('nav.industry')} value={t('nav.soon')} className="opacity-60" />
+      <header className="flex flex-wrap items-center gap-3">
+        <img
+          src={characterPortraitUrl(activeCharacterId, 128)}
+          alt={t('characters.portraitAlt', { name: character?.name ?? '' })}
+          width={64}
+          height={64}
+          className="size-16 shrink-0 rounded-xs border border-line"
+        />
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-xl font-semibold tracking-widest uppercase">
+            {character?.name ?? t('common.unknown')}
+          </h1>
+          <p className="truncate text-xs text-text-dim">
+            {publicInfo?.corporationName ?? t('common.unknown')}
+            {publicInfo?.allianceName ? ` / ${publicInfo.allianceName}` : ''}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <StatChip
+            label={t('skills.totalSp')}
+            value={
+              skillsResult?.data ? skillsResult.data.total_sp.toLocaleString() : t('common.unknown')
+            }
+          />
+          <StatChip
+            label={t('skills.unallocatedSp')}
+            value={
+              skillsResult?.data?.unallocated_sp !== undefined
+                ? skillsResult.data.unallocated_sp.toLocaleString()
+                : t('common.unknown')
+            }
+          />
         </div>
       </header>
 
-      <Panel
-        title={t('overview.wallet')}
-        actions={wallet ? <DataAgeBadge date={wallet.fetchedAt} /> : undefined}
-      >
-        {wallet ? (
-          <p className="text-lg font-medium tabular-nums text-isk-pos">
-            {ISK_FORMAT.format(wallet.balance)} {t('overview.isk')}
-          </p>
-        ) : walletFailed ? (
-          <EmptyState title={t('overview.walletEmpty')} className="py-4" />
-        ) : (
-          <div className="flex justify-center py-4">
-            <Spinner size="sm" label={t('common.loading')} />
-          </div>
-        )}
-      </Panel>
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Spinner label={t('common.loading')} />
+        </div>
+      ) : (
+        <>
+          <Panel
+            title={t('overview.wallet')}
+            actions={walletResult ? <DataAgeBadge date={walletResult.fetchedAt} /> : undefined}
+          >
+            {walletResult ? (
+              <p className="text-lg font-medium tabular-nums text-isk-pos">
+                {formatIsk(walletResult.data)} {t('overview.isk')}
+              </p>
+            ) : (
+              <EmptyState title={t('overview.walletEmpty')} className="py-4" />
+            )}
+            {walletResult?.fromCache && (
+              <p className="mt-1 text-[11px] text-warning uppercase">{t('skills.offlineTitle')}</p>
+            )}
+          </Panel>
+
+          <Panel
+            title={t('overview.queue')}
+            actions={queueResult ? <DataAgeBadge date={queueResult.fetchedAt} /> : undefined}
+          >
+            {activeSkillName ? (
+              <p className="text-sm">
+                {t('overview.training', { name: activeSkillName })}
+                {activeEntry?.finish_date && (
+                  <span className="ml-2 text-xs text-text-dim">
+                    {t('overview.finishes', {
+                      date: new Date(activeEntry.finish_date).toLocaleString(),
+                    })}
+                  </span>
+                )}
+              </p>
+            ) : (
+              <EmptyState title={t('overview.queueEmpty')} className="py-4" />
+            )}
+            {queueResult?.fromCache && (
+              <p className="mt-1 text-[11px] text-warning uppercase">{t('skills.offlineTitle')}</p>
+            )}
+          </Panel>
+        </>
+      )}
     </div>
   );
 }
