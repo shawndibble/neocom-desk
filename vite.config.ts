@@ -7,9 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   base: '/neocom-desk/',
-  // Port pinned: Docker occupies 5173 on this machine and the EVE SSO dev
-  // callback URL must match exactly, so the port cannot be allowed to drift.
-  server: { port: 5174, strictPort: true },
+  // Port pinned: the EVE SSO dev callback URL must match exactly, so the
+  // port cannot be allowed to drift when 5173 happens to be busy.
+  server: { port: 5173, strictPort: true },
   plugins: [
     react(),
     tailwindcss(),
