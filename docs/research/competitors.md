@@ -1,0 +1,123 @@
+# EVE Online third-party tool landscape (2026) — feature-gap analysis vs NeoCom Desk
+
+Scope check against `CONTEXT.md`/`README.md`: character views, skill plans (remap
+optimizer, ESI queue import, clipboard export), industry build plans (manufacturing
+only, no invention/reactions), offline PWA, multi-character, no fitting module.
+
+## 1. Tool summaries
+
+| Tool | Category | What it does well |
+|---|---|---|
+| [EveLens](https://evelens.dev/) ([GitHub](https://github.com/aliacollins/EveLens)) | Skill planning (desktop, EVEMon successor) | .NET/Avalonia rewrite of EVEMon, no ~50-char ceiling (100+ chars), GPU skill-tree visualization, Doctrine Designer w/ clipboard+file fit import, batch training schedules, privacy/streaming mode, per-character ESI scope presets. Actively released (4 releases since Mar 2026). |
+| "EveNova" | — | Not a real/current tool. Likely conflation of **EveLens** (EVEMon successor, above) and **Evanova** (long-running Android companion app: fittings, mail, industry jobs, route planning). Treating both as covered. |
+| [EVE Workbench](https://eveworkbench.com/) | Fitting + market + misc | Fit browser w/ community fits + avg market price per item, market browser, appraisal tool, refinery calculator, trade-route tool, fleet browser for NPSI fleets. |
+| [pyfa](https://github.com/pyfa-org/Pyfa) | Fitting (desktop) | Deep offline fitting sim: DPS/range graphs, multi-ship comparison, target profile (sig/speed/angle/distance) modeling, self-updatable SDE. The depth ceiling for fitting tools. |
+| [jEveAssets](https://github.com/GoldenGnu/jeveassets) | Assets/net worth (desktop) | Cross-account/corp asset manager, net worth + P&L tracking, industry job tracking w/ time-left column, tree-map asset view, new (2026) skill-plan-with-import tool, journal/loyalty-point/npc-standing tools, restock/shopping-list alerts. |
+| [Adam4EVE](https://www.adam4eve.eu/) | Market + industry analytics | Margin finder, market-hub trend graphs, contract price/profit stats, manufacturing/reprocessing profitability, cost-index history, PI profitability & chains. |
+| [Fuzzwork](https://market.fuzzwork.co.uk/) | Market data API | 30-min market order-book scrapes → aggregated price API (already our price source per README); reaction cost/material pages; 2-day order history. |
+| [EVE Tycoon](https://evetycoon.com/) | Industry + trading | ESI-driven profit tracking matching sell↔buy/job completions, industry calculator (manufacturing + reactions; research planned), production-line cost tracking w/ manual overrides. |
+| [Ravworks](https://ravworks.com/) | Industry planning | Full production-tree planner: per-job ME/TE/decryptor fields, buy-vs-build per intermediate, profitability ranking across all buildable items, invention tab (decryptor/relic outcome + expected cost/success). End-to-end multi-step chain planning. |
+| [EVE Cookbook](https://evecookbook.com/) | Industry (reactions) | Build calculator w/ reaction support and step-by-step build breakdowns. |
+| [SeAT](https://github.com/eveseat/seat) | Corp/alliance ops (self-hosted) | Full corp/alliance ESI dashboard (wallets, mail, assets, member audit), RBAC, plugin ecosystem (SRP, Discord linking, industry). Out of our scope (CONTEXT.md: no director tooling) but sets the bar for "everything" tools. |
+| [Alliance Auth](https://allianceauth.readthedocs.io/) | Corp/alliance auth (self-hosted) | SSO-gated access control tying game group membership to Discord/Mumble/web-app access; Corp Stats app for member auditing. Out of scope, same reason. |
+| [Janice](https://janice.e-351.com/) | Appraisal | Paste any item list / contract contents / evepraisal URL → instant ISK value split by buy/sell, plus reprocessing & compression value. |
+| Abyssal tools (mutamarket.com, abysstracker.com) | Niche/loot pricing | Contract search + pricing for mutated (abyssal) modules; niche, low relevance to our scope. |
+
+## 2. Gap analysis
+
+Legend: **Value** = value to a new/casual player. **Effort** = build cost against our existing modules (SDE pipeline, market prices, industry engine, skill engine, Dexie cache, Firebase sync).
+
+### 2.1 Skill planning
+
+| Gap | Have? | Value | Effort | Notes |
+|---|---|---|---|---|
+| Skill plan **sharing** (export a plan as a link/code others import) | No | Med | Low | We already have `exportPlanToClipboard`; add a shareable encoded-string or Firestore public-doc variant. |
+| **Character comparison** (side-by-side skill/SP diff across owned chars) | No | Med | Low | Pure read of cached skill data we already store; UI-only work. |
+| **Cerebral accelerator (booster) planning** | Partial — CONTEXT.md defines "Booster" toggle w/ expiry for training-time math | Check impl. | — | Glossary entry exists; verify `optimizer`/`schedule` engine actually consumes it — if not, small gap. |
+| **Skill farm / extractor economics** (SP farming ISK/day, extraction vs. injection math) | No | Low–Med | Low | Simple calc against Fuzzwork prices we already pull; low urgency for a "new player" companion (farming is an endgame/alt-account behavior). |
+| **Notifications when skill queue empties** | No | High | Med | Needs background check — PWA push notifications or at minimum an in-app "queue near empty" banner on data refresh. True push needs a service worker + backend trigger (Firebase Cloud Messaging), non-trivial for our free-tier Firebase setup. |
+| **EFT/fit → skill-plan import** ("what do I need to train to fly this fit") | No | High | Med | See §2.2 — this is the highest-value cross-module win, sits at the fitting/skill boundary. |
+
+### 2.2 Ship fitting (we have none)
+
+We have zero fitting capability today. Full pyfa/EVE Workbench depth (DPS graphs, tank/resist modeling, drone/ammo swaps, stacking penalties, target-profile sim) is out of scope for a v1 companion app — that's a dedicated tool's whole job, not a bolt-on.
+
+**Minimal viable fitting interop** (interop only, not a fitting simulator):
+
+| Feature | Value | Effort | Notes |
+|---|---|---|---|
+| **EFT format import** (paste a fit, parse hull + modules) | High | Low–Med | Format is documented (developers.eveonline.com/docs/guides/fitting) — plain text, well-specified. Parser is a self-contained function, same shape as our existing `queueImport.ts`/`clipboardExport.ts`. |
+| **Fit → required-skills → skill plan pipeline** | High | Med | Parse EFT → map module/hull typeIDs to skill prereqs via SDE → diff against character's trained skills → generate a Skill Plan. This is our single best differentiator: no tool in the list above does "paste a fit, get a skill plan," because EveLens/pyfa live in different apps. |
+| **EFT export** (from a hypothetical saved fit) | Low | — | Only matters once we have any fit storage; skip until there's a reason to store fits at all. |
+| **eveship.fit / EVE Workbench embed or link-out** | Med | Low | Cheapest option: "paste EFT → show read-only stats via link-out to eveworkbench.com or pyfa web, plus our skill-gap panel." Avoids reimplementing a fitting engine. |
+| Full fitting simulator (pyfa-depth) | Low (for us) | Very High | Explicitly not recommended — matches CONTEXT.md's "no director tooling"-style scope discipline: stay out of another tool's core competency. |
+
+### 2.3 Industry / crafting
+
+| Gap | Have? | Value | Effort | Notes |
+|---|---|---|---|---|
+| Multi-step production chains (build intermediates, not just top-level item) | Partial — `buildVsBuy.ts`/`materials.ts` exist; verify recursion depth | Check impl. | Med if missing | Ravworks/EVE Tycoon both do full recursive trees w/ per-tier buy-vs-build. If ours is single-level, this is the biggest industry gap. |
+| Invention planning (decryptor/relic outcome, expected cost/success) | No (explicit v1 non-scope per CONTEXT.md: "manufacturing only") | Med | Med | Model is "shaped so invention bolts on later" per CONTEXT.md — defer, but Ravworks shows the shape to copy when we do. |
+| Reactions planning | No (same v1 scope note) | Med | Med | EVE Cookbook/EVE Industry/Fuzzwork all cover this; same bolt-on note applies. |
+| **Stockpile / inventory-aware build plans** ("I already have 3 of these 10 minerals") | No | Med | Med | Needs ESI assets read + matching against BOM; jEveAssets does this well. |
+| **Job tracking from ESI `/characters/{id}/industry/jobs`** | No | High | Low–Med | Endpoint fields: `job_id, activity_id, blueprint_type_id, product_type_id, runs, start_date, end_date, status, facility_id, cost`, scope `esi-industry.read_character_jobs.v1`, 300s cache. Straightforward addition alongside our existing character-view ESI reads; gives "jobs completing soon" list matching our skill-queue pattern. |
+| Profit dashboards (buy↔sell/job matching, P&L over time) | No | Med | Med–High | EVE Tycoon/jEveAssets territory — needs wallet transaction history + job-cost matching logic; real but not urgent for v1 "planner," more a bookkeeping app. |
+| Ravworks-style end-to-end "most profitable item to build right now" ranker | No | Low–Med | High | Nice-to-have, computationally heavier (scans whole buildable catalog); low priority vs. targeted build-plan flow we already have. |
+
+### 2.4 Market/trading
+
+| Gap | Have? | Value | Effort | Notes |
+|---|---|---|---|---|
+| Margin finder (station trading arbitrage scan) | No | Low (for our new-player scope) | Med | Adam4EVE's core feature; more a trader-alt tool than a companion-app feature — low priority. |
+| Price history charts | No | Med | Low | We already pull Fuzzwork aggregates for build plans; a sparkline/chart view on Market Browser reuses that data, no new pipeline. |
+| Order management + alerts (order about to expire, undercut) | No | Med | Med | Needs periodic ESI order poll + notification plumbing — same push-notification dependency as skill-queue-empty alert (§2.1); bundle both under one "background alerts" investment. |
+
+### 2.5 Assets / other
+
+| Gap | Have? | Value | Effort | Notes |
+|---|---|---|---|---|
+| Net worth tracking | No | Med | Low–Med | Once assets/wallet views exist (roadmap milestone: "remaining character views... assets, wallet"), summing is cheap; jEveAssets' bar to clear. |
+| Asset search across characters | No | Med | Low | Same dependency — multi-character asset cache we're already building toward (Dexie, multi-char by design) makes this close to free once assets view lands. |
+| Contract appraisal (Janice-style: paste contents, get ISK value) | No | Med–High | Low | Pure function over item-list + Fuzzwork prices, no ESI write scope needed — good fit for our "read-only" constraint. Natural extension of clipboard-paste work in §2.6. |
+
+### 2.6 Clipboard interop (critical)
+
+Catalog of EVE-native and third-party-adopted paste formats:
+
+| Format | Direction | Spec source | Do we support it? |
+|---|---|---|---|
+| **Skill plan / queue** — `<Skill Name> <Roman numeral>` per line | Game skill-queue "Import from clipboard" ↔ tools | In-game feature (2016-era "Import Clipboard Skill Queue" patch) | **Export: yes** (`clipboardExport.ts`, matches exact in-game import format). **Import (paste): no** — our only import path is ESI (`queueImport.ts`), not a pasted-text parser. |
+| **EFT fit format** — `[Hull, Fit Name]` header + slot-grouped module list, `x2`/`/offline` suffixes | Game fitting window ↔ pyfa/EVE Workbench/etc. | developers.eveolne.com/docs/guides/fitting | No. |
+| **DNA format** — `hullID:modID:modID:...:` compact single-line | In-game chat fitting links | Same doc | No. |
+| **Fitting XML** — `<hardware>` elements, file import/export | Game "export fit to file" | Same doc | No. |
+| **Multibuy** — `Item Name Quantity` or `Quantity Item Name` per line | Game Multibuy window paste | In-game since Mar 2016 | No — but directly reusable for a shopping-list/BOM-to-multibuy export from a Build Plan. |
+| **Contract contents / inventory item list paste** — tab/name-qty rows from in-game item hangar or contract window | Game → appraisal tools (Janice, evepraisal, EVE Workbench) | Standard in-game "select items, Ctrl+C" behavior | No. |
+| **Appraisal paste flow** (Janice/evepraisal): raw pasted item list → priced breakdown, buy/sell split | Third-party convention, not game-native | janice.e-351.com | No — but same parser as multibuy/inventory paste, different output (price instead of cart). |
+
+**Priority ranking for paste-parsers** (by value × reuse of existing pipeline):
+
+1. **Skill-plan paste import** — closes our own export loop (we write it, we should read it back); trivial parser (one skill-name/level regex per line), reuses SDE skill-name lookup we already have for export.
+2. **EFT fit paste** — unlocks the whole fitting-interop pipeline (§2.2); single most leveraged new parser given our SDE + skill-engine already exist.
+3. **Multibuy/inventory-list paste → appraisal** — reuses the exact same tokenizer as EFT cargo lines and skill-plan lines (`name` + `qty`/`level` pairs); pairs with Fuzzwork prices we already pull. Gets us contract appraisal (§2.5) and shopping-list export "for free."
+4. **Contract-contents paste** — same tokenizer as above; mainly a UI entry point difference (contract appraisal vs. general appraisal).
+5. DNA / fitting-XML — lower priority; EFT alone covers the paste-a-fit use case, DNA is chat-link-oriented and XML is file-based, not clipboard-based.
+
+## 3. Sources
+
+- https://evelens.dev/ , https://evelens.dev/eve-skill-planner , https://github.com/aliacollins/EveLens
+- https://github.com/Destidom/evanova (Evanova — likely source of "EveNova" confusion)
+- https://eveworkbench.com/ , https://eveworkbench.com/tools/appraisal , https://wiki.eveuniversity.org/EVE_Workbench
+- https://github.com/pyfa-org/Pyfa , https://wiki.eveuniversity.org/PYFA
+- https://github.com/GoldenGnu/jeveassets , https://forums.eveonline.com/t/jeveassets-8-2-0-2026-07-28/13255
+- https://www.adam4eve.eu/ , https://www.adam4eve.eu/margin_finder.php
+- https://market.fuzzwork.co.uk/ , https://market.fuzzwork.co.uk/about/ , https://www.fuzzwork.co.uk/reactions/
+- https://evetycoon.com/ , https://evetycoon.com/industryCalculator
+- https://ravworks.com/ , https://ravworks.com/planner
+- https://evecookbook.com/
+- https://github.com/eveseat/seat
+- https://allianceauth.readthedocs.io/en/latest/features/apps/corpstats.html
+- https://janice.e-351.com/
+- https://abysstracker.com/ (mutamarket.com referenced, not directly fetched)
+- https://developers.eveonline.com/docs/guides/fitting/ (EFT/DNA/XML fitting formats)
+- https://docs.esi.evetech.net/ (ESI industry jobs endpoint fields, scope `esi-industry.read_character_jobs.v1`)
+- In-game multibuy clipboard paste: documented since March 2016 patch; confirmed via forum/search, not a single canonical URL.
