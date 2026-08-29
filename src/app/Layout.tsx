@@ -14,17 +14,6 @@ function navClass({ isActive }: { isActive: boolean }): string {
   return `${NAV_LINK} ${isActive ? NAV_ACTIVE : NAV_IDLE}`;
 }
 
-function DisabledNavItem({ label, soon }: { label: string; soon: string }) {
-  return (
-    <span aria-disabled="true" className={`${NAV_LINK} cursor-not-allowed text-text-faint`}>
-      {label}
-      <span className="ml-auto rounded-xs border border-line px-1 text-[10px] normal-case">
-        {soon}
-      </span>
-    </span>
-  );
-}
-
 /** App chrome: Neocom-style left rail on desktop, bottom tab bar on mobile. */
 export function Layout() {
   const { t } = useTranslation();
@@ -57,7 +46,9 @@ export function Layout() {
           <NavLink to="/skills" className={navClass}>
             {t('nav.skills')}
           </NavLink>
-          <DisabledNavItem label={t('nav.industry')} soon={t('nav.soon')} />
+          <NavLink to="/industry" className={navClass}>
+            {t('nav.industry')}
+          </NavLink>
         </nav>
         {activeCharacter && (
           <Link
@@ -91,6 +82,9 @@ export function Layout() {
         </NavLink>
         <NavLink to="/skills" className={navClass}>
           {t('nav.skills')}
+        </NavLink>
+        <NavLink to="/industry" className={navClass}>
+          {t('nav.industry')}
         </NavLink>
         {activeCharacter && (
           <Link

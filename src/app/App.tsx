@@ -12,6 +12,7 @@ import { Characters } from '@/routes/Characters';
 import { Overview } from '@/routes/Overview';
 import { Skills } from '@/routes/Skills';
 import { SkillPlans } from '@/routes/SkillPlans';
+import { Industry } from '@/routes/Industry';
 import { Styleguide } from '@/routes/Styleguide';
 import { Layout } from './Layout';
 import { ReloadPrompt } from './ReloadPrompt';
@@ -54,6 +55,7 @@ export function App() {
           <Route path="/overview" element={<Overview />} />
           <Route path="/skills" element={<Skills />} />
           <Route path="/skills/plans" element={<SkillPlans />} />
+          <Route path="/industry" element={<Industry />} />
         </Route>
         <Route path="/styleguide" element={<Styleguide />} />
         <Route path="*" element={<Navigate to="/" replace />} />

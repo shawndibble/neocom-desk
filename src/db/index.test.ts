@@ -7,6 +7,7 @@ beforeEach(async () => {
   await db.settings.clear();
   await db.skillPlans.clear();
   await db.esiCache.clear();
+  await db.buildPlans.clear();
 });
 
 describe('neocom database', () => {
@@ -80,6 +81,49 @@ describe('neocom database', () => {
 
     const forCharacter = await db.skillPlans.where('characterId').equals(2112625428).toArray();
     expect(forCharacter.map((p) => p.id)).toEqual(['plan-1']);
+  });
+
+  it('adds, gets, and indexes build plans by characterId', async () => {
+    await db.buildPlans.add({
+      id: 'bp-1',
+      characterId: 2112625428,
+      name: 'Rifter run',
+      blueprintTypeID: 638,
+      runs: 10,
+      me: 10,
+      te: 20,
+      facility: 'npcStation',
+      rigLevel: 'none',
+      security: 'highsec',
+      hubId: 'jita',
+      updatedAt: 1000,
+    });
+    await db.buildPlans.add({
+      id: 'bp-2',
+      characterId: 999,
+      name: 'Other character',
+      blueprintTypeID: 640,
+      runs: 1,
+      me: 0,
+      te: 0,
+      facility: 'raitaru',
+      rigLevel: 't2',
+      security: 'nullsec',
+      hubId: 'amarr',
+      facilityTaxPct: 1.5,
+      updatedAt: 1000,
+    });
+
+    const plan = await db.buildPlans.get('bp-1');
+    expect(plan?.name).toBe('Rifter run');
+    expect(plan?.blueprintTypeID).toBe(638);
+    expect(plan?.facilityTaxPct).toBeUndefined();
+
+    const forCharacter = await db.buildPlans.where('characterId').equals(2112625428).toArray();
+    expect(forCharacter.map((p) => p.id)).toEqual(['bp-1']);
+
+    const structurePlan = await db.buildPlans.get('bp-2');
+    expect(structurePlan?.facilityTaxPct).toBe(1.5);
   });
 
   it('caches ESI values per character+key, keyed compositely', async () => {

@@ -5,6 +5,7 @@
  */
 import { esiFetch } from './client';
 import type { EsiResult } from './client';
+import { fetchAllPages } from './paginated';
 
 /** Options a caller may tune per request (conditional GET, cancellation). */
 export interface EndpointOptions {
@@ -94,6 +95,29 @@ export function getCharacterImplants(
   options: EndpointOptions = {}
 ): Promise<EsiResult<number[]>> {
   return esiFetch<number[]>(`/characters/${characterId}/implants`, {
+    ...options,
+    characterId,
+  });
+}
+
+// --- GET /characters/{character_id}/blueprints (esi-characters.read_blueprints.v1) ---
+
+export interface CharacterBlueprint {
+  item_id: number;
+  type_id: number;
+  /** -1 for an original (BPO); -2 or run count for a copy (BPC). */
+  runs: number;
+  material_efficiency: number;
+  time_efficiency: number;
+  quantity: number;
+}
+
+/** Paginated; every page is fetched sequentially (see fetchAllPages). */
+export function getCharacterBlueprints(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<CharacterBlueprint[]> {
+  return fetchAllPages<CharacterBlueprint>(`/characters/${characterId}/blueprints`, {
     ...options,
     characterId,
   });

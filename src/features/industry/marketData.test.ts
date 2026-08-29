@@ -1,0 +1,102 @@
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { ESI_BASE_URL } from '@/esi/client';
+import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
+import { clearMarketPriceCache } from '@/market/prices';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { loadMarketSnapshot, clearCostIndexCache } from './marketData';
+
+const server = setupServer();
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => {
+  server.resetHandlers();
+  clearMarketPriceCache();
+  clearCostIndexCache();
+});
+afterAll(() => server.close());
+
+function fuzzworkHandler() {
+  return http.get(FUZZWORK_AGGREGATES_URL, ({ request }) => {
+    const types = new URL(request.url).searchParams.get('types')?.split(',') ?? [];
+    const body: Record<string, unknown> = {};
+    for (const t of types) {
+      if (t === '34') {
+        body[t] = { sell: { min: '5.5', volume: '100', orderCount: '2' } };
+      } else {
+        body[t] = { sell: { orderCount: '0' } }; // no orders -> unpriceable
+      }
+    }
+    return HttpResponse.json(body);
+  });
+}
+
+function adjustedPricesHandler() {
+  return http.get(`${ESI_BASE_URL}/markets/prices`, () =>
+    HttpResponse.json([{ type_id: 34, adjusted_price: 4.2, average_price: 4.5 }])
+  );
+}
+
+function costIndexHandler() {
+  return http.get(`${ESI_BASE_URL}/industry/systems`, () =>
+    HttpResponse.json([
+      {
+        solar_system_id: DEFAULT_TRADE_HUB.systemId,
+        cost_indices: [{ activity: 'manufacturing', cost_index: 0.0464 }],
+      },
+    ])
+  );
+}
+
+describe('loadMarketSnapshot', () => {
+  it('assembles hub prices (unpriced types omitted), adjusted prices, and the hub system cost index', async () => {
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
+
+    const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34, 587]);
+
+    expect(snapshot.hubPrices).toEqual({ 34: 5.5 });
+    expect(snapshot.hubPrices[587]).toBeUndefined();
+    expect(snapshot.adjustedPrices).toEqual({ 34: 4.2 });
+    expect(snapshot.systemCostIndex).toBe(0.0464);
+  });
+
+  it('reports adjustedPrices and systemCostIndex as null when the ESI calls fail (offline signal)', async () => {
+    server.use(
+      fuzzworkHandler(),
+      http.get(`${ESI_BASE_URL}/markets/prices`, () => HttpResponse.error()),
+      http.get(`${ESI_BASE_URL}/industry/systems`, () => HttpResponse.error())
+    );
+
+    const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+
+    expect(snapshot.hubPrices).toEqual({ 34: 5.5 });
+    expect(snapshot.adjustedPrices).toBeNull();
+    expect(snapshot.systemCostIndex).toBeNull();
+  });
+
+  it('caches the cost index across calls within the TTL, refetching only after clearing', async () => {
+    let hits = 0;
+    server.use(
+      fuzzworkHandler(),
+      adjustedPricesHandler(),
+      http.get(`${ESI_BASE_URL}/industry/systems`, () => {
+        hits += 1;
+        return HttpResponse.json([
+          {
+            solar_system_id: DEFAULT_TRADE_HUB.systemId,
+            cost_indices: [{ activity: 'manufacturing', cost_index: 0.01 }],
+          },
+        ]);
+      })
+    );
+
+    await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+    await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+    expect(hits).toBe(1);
+
+    clearCostIndexCache();
+    await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+    expect(hits).toBe(2);
+  });
+});

@@ -1,5 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { PlanEntry } from '@/engine/types';
+import type { FacilityKind, RigLevel, SecurityBand } from '@/engine/industry/types';
+import type { TradeHub } from '@/market/hubs';
 
 export interface CharacterRecord {
   characterId: number;
@@ -50,12 +52,34 @@ export interface EsiCacheRecord {
   fetchedAt: number;
 }
 
+/** User-editable Build Plan: manufacturing inputs for one blueprint (CONTEXT.md). */
+export interface BuildPlanRecord {
+  id: string;
+  characterId: number;
+  name: string;
+  blueprintTypeID: number;
+  runs: number;
+  /** Blueprint material efficiency, 0..10. */
+  me: number;
+  /** Blueprint time efficiency, 0..20. */
+  te: number;
+  facility: FacilityKind;
+  rigLevel: RigLevel;
+  security: SecurityBand;
+  hubId: TradeHub['id'];
+  /** Facility tax, percent of EIV. Structures only — NPC station tax is fixed. */
+  facilityTaxPct?: number;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
   settings: EntityTable<SettingRecord, 'key'>;
   skillPlans: EntityTable<SkillPlanRecord, 'id'>;
   esiCache: Dexie.Table<EsiCacheRecord, [number, string]>;
+  buildPlans: EntityTable<BuildPlanRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -71,4 +95,14 @@ db.version(2).stores({
   settings: 'key',
   skillPlans: 'id, characterId',
   esiCache: '[characterId+key]',
+});
+
+// Additive: v1/v2 stores unchanged, plus Build Plans.
+db.version(3).stores({
+  characters: 'characterId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
 });

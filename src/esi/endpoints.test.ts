@@ -10,6 +10,7 @@ import {
   getCharacterAttributes,
   getCharacterImplants,
   getCharacterWallet,
+  getCharacterBlueprints,
   getCharacterPublicInfo,
   getCorporationPublicInfo,
   getAlliancePublicInfo,
@@ -142,6 +143,46 @@ describe('clone and wallet endpoints', () => {
     const result = await getCharacterWallet(CHARACTER_ID);
 
     expect(result.data).toBe(29500000.01);
+  });
+
+  it('getCharacterBlueprints fetches every page and returns owned blueprints', async () => {
+    const page1 = [
+      {
+        item_id: 1,
+        type_id: 638,
+        runs: -1,
+        material_efficiency: 10,
+        time_efficiency: 20,
+        quantity: 1,
+      },
+    ];
+    const page2 = [
+      {
+        item_id: 2,
+        type_id: 640,
+        runs: 5,
+        material_efficiency: 4,
+        time_efficiency: 6,
+        quantity: 1,
+      },
+    ];
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/blueprints`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        if (request.headers.get('authorization') !== `Bearer token-${CHARACTER_ID}`) {
+          return HttpResponse.json({ error: 'authentication needed' }, { status: 401 });
+        }
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? page2 : page1, {
+          headers: { 'X-Pages': '2' },
+        });
+      })
+    );
+
+    const blueprints = await getCharacterBlueprints(CHARACTER_ID);
+
+    expect(blueprints).toEqual([...page1, ...page2]);
   });
 });
 
