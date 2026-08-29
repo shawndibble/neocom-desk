@@ -1,5 +1,6 @@
 # NeoCom Desk — agent instructions
 
+- Architecture map: docs/ARCHITECTURE.md — read before locating or adding features.
 - Read `CONTEXT.md` first: glossary + scope decisions. Use its terms exactly.
 - Design tokens/components: `docs/DESIGN.md`. Decisions: `docs/adr/`.
 - TDD for all calculation/logic modules (`src/engine`, `src/auth`, industry
