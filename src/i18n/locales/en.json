@@ -1,3 +1,45 @@
 {
-  "app": { "name": "NeoCom Desk" }
+  "app": {
+    "name": "NeoCom Desk",
+    "tagline": "EVE Online character, skill planning, and industry companion"
+  },
+  "nav": {
+    "characters": "Characters",
+    "overview": "Overview",
+    "skills": "Skills",
+    "industry": "Industry",
+    "soon": "Soon",
+    "switchCharacter": "Switch character"
+  },
+  "login": {
+    "button": "Log in with EVE Online"
+  },
+  "callback": {
+    "completing": "Completing login…",
+    "errorTitle": "Login failed",
+    "retry": "Try again"
+  },
+  "characters": {
+    "title": "Characters",
+    "add": "Add character",
+    "emptyTitle": "No characters yet",
+    "emptyHint": "Log in with EVE Online to add your first character.",
+    "portraitAlt": "Portrait of {{name}}",
+    "select": "Select {{name}}"
+  },
+  "overview": {
+    "title": "Overview",
+    "wallet": "Wallet",
+    "walletEmpty": "No wallet data cached. Reconnect to fetch it.",
+    "isk": "ISK"
+  },
+  "common": {
+    "loading": "Loading",
+    "unknown": "—"
+  },
+  "pwa": {
+    "updateReady": "A new version is available.",
+    "reload": "Reload",
+    "dismiss": "Dismiss"
+  }
 }
