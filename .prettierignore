@@ -1,0 +1,7 @@
+dist
+dev-dist
+coverage
+public/data
+package-lock.json
+playwright-report
+test-results
