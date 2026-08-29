@@ -152,7 +152,28 @@
     "productUnpriced": "{{name}} has no hub sell price; no build-vs-buy verdict.",
     "verdictBuild": "BUILD saves {{amount}} ISK",
     "verdictBuy": "BUY is cheaper by {{amount}} ISK",
-    "verdictUnknown": "Not enough price data for a build-vs-buy verdict."
+    "verdictUnknown": "Not enough price data for a build-vs-buy verdict.",
+    "jobsTitle": "Active jobs",
+    "jobsRefresh": "Refresh",
+    "jobsEmptyTitle": "No active jobs cached",
+    "jobsEmptyHint": "Reconnect to fetch this character's running industry jobs.",
+    "jobsNoneActiveTitle": "No active jobs",
+    "jobsNoneActiveHint": "This character has no industry jobs running right now.",
+    "jobsReauthTitle": "Log in again to see jobs",
+    "jobsReauthHint": "This character logged in before industry job tracking was added. Log this character in again to grant the new permission.",
+    "jobsRuns": "{{count}} run(s)",
+    "jobsDone": "Done",
+    "jobsCompletingSoon": "Completing soon",
+    "jobsProgress": "{{name}} progress",
+    "activity": {
+      "manufacturing": "Manufacturing",
+      "timeEfficiencyResearch": "Time efficiency research",
+      "materialEfficiencyResearch": "Material efficiency research",
+      "copying": "Copying",
+      "invention": "Invention",
+      "reaction": "Reaction",
+      "unknown": "Activity #{{id}}"
+    }
   },
   "login": {
     "button": "Log in with EVE Online"

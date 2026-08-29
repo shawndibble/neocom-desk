@@ -27,6 +27,7 @@ import {
   getCharacterContracts,
   getCharacterOrders,
   getCharacterOrderHistory,
+  getCharacterIndustryJobs,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
 
@@ -657,5 +658,51 @@ describe('orders', () => {
     const history = await getCharacterOrderHistory(CHARACTER_ID);
 
     expect(history.map((o) => o.order_id)).toEqual([1, 2]);
+  });
+});
+
+describe('industry jobs', () => {
+  it('getCharacterIndustryJobs sends include_completed=false by default (single call, not paginated)', async () => {
+    let query: URLSearchParams | undefined;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/industry/jobs`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        query = new URL(request.url).searchParams;
+        return HttpResponse.json([
+          {
+            job_id: 1,
+            activity_id: 1,
+            blueprint_type_id: 638,
+            facility_id: 60003760,
+            station_id: 60003760,
+            runs: 1,
+            start_date: '2026-08-01T00:00:00Z',
+            end_date: '2026-08-01T01:00:00Z',
+            status: 'active',
+          },
+        ]);
+      })
+    );
+
+    const result = await getCharacterIndustryJobs(CHARACTER_ID);
+
+    expect(query?.get('include_completed')).toBe('false');
+    expect(result.data?.[0].job_id).toBe(1);
+    expect(result.pages).toBe(1);
+  });
+
+  it('getCharacterIndustryJobs forwards includeCompleted: true', async () => {
+    let query: URLSearchParams | undefined;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/industry/jobs`, ({ request }) => {
+        query = new URL(request.url).searchParams;
+        return HttpResponse.json([]);
+      })
+    );
+
+    await getCharacterIndustryJobs(CHARACTER_ID, { includeCompleted: true });
+
+    expect(query?.get('include_completed')).toBe('true');
   });
 });

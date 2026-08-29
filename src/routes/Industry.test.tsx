@@ -80,6 +80,9 @@ const server = setupServer(
     HttpResponse.json(emptySkillsPayload)
   ),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
+    HttpResponse.json([])
+  ),
   http.get('https://esi.evetech.net/markets/prices', () =>
     HttpResponse.json([
       { type_id: 34, adjusted_price: 8 },

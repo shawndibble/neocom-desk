@@ -15,6 +15,7 @@ import {
   type BlueprintCatalogEntry,
 } from '@/features/industry/blueprintCatalog';
 import { findOwnedBlueprint, loadCharacterBlueprints } from '@/features/industry/data';
+import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import { BuildPlanDetail } from '@/features/industry/BuildPlanDetail';
 
@@ -146,6 +147,8 @@ export function Industry() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
+      <ActiveJobsPanel characterId={activeCharacterId} />
+
       {!plans || !catalog ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />

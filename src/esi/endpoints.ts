@@ -593,3 +593,44 @@ export function getCharacterOrderHistory(
     characterId,
   });
 }
+
+// --- GET /characters/{character_id}/industry/jobs (esi-industry.read_character_jobs.v1) ---
+
+/**
+ * Modeled fields only (not the full response): this app shows active jobs,
+ * not installer/blueprint-location/output-location bookkeeping. Verified
+ * against the live schema (2026-08) — two corrections vs. the original spec
+ * sketch: `station_id` is actually a required field (every job has one), and
+ * this endpoint is NOT X-Pages paginated (only the corporation variant is).
+ */
+export interface IndustryJob {
+  job_id: number;
+  activity_id: number;
+  blueprint_type_id: number;
+  facility_id: number;
+  station_id: number;
+  runs: number;
+  start_date: string;
+  end_date: string;
+  status: 'active' | 'cancelled' | 'delivered' | 'paused' | 'ready' | 'reverted';
+  cost?: number;
+  licensed_runs?: number;
+  product_type_id?: number;
+}
+
+/**
+ * Not paginated (character variant, unlike the corp one). `include_completed`
+ * has no documented server-side default here, so it's always sent explicitly;
+ * defaults to false (active jobs only) since that's this app's v1 use.
+ */
+export function getCharacterIndustryJobs(
+  characterId: number,
+  options: EndpointOptions & { includeCompleted?: boolean } = {}
+): Promise<EsiResult<IndustryJob[]>> {
+  const { includeCompleted, ...rest } = options;
+  return esiFetch<IndustryJob[]>(`/characters/${characterId}/industry/jobs`, {
+    ...rest,
+    characterId,
+    query: { include_completed: includeCompleted ?? false },
+  });
+}
