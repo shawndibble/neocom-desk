@@ -46,7 +46,7 @@ function EntryRow({ entry, name, onRemove }: EntryRowProps) {
         type="button"
         {...attributes}
         {...listeners}
-        aria-label={`Reorder ${name}`}
+        aria-label={t('plans.reorderEntry', { name })}
         className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
       >
         ⠿

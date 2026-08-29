@@ -390,7 +390,7 @@ describe('wallet journal + transactions', () => {
             },
           ]);
         }
-        if (fromId === '19') {
+        if (fromId === '20') {
           return HttpResponse.json([
             {
               transaction_id: 10,
@@ -412,7 +412,7 @@ describe('wallet journal + transactions', () => {
 
     const transactions = await getCharacterWalletTransactions(CHARACTER_ID);
 
-    expect(fromIds).toEqual([null, '19', '9']);
+    expect(fromIds).toEqual([null, '20', '10']);
     expect(transactions.map((t) => t.transaction_id)).toEqual([20, 10]);
   });
 });
@@ -529,6 +529,37 @@ describe('postUniverseNames', () => {
 
     expect(names).toEqual([]);
     expect(called).toBe(false);
+  });
+
+  it('retries once on 429, same as every other ESI endpoint (BUG #12)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let attempts = 0;
+      server.use(
+        http.post(`${ESI_BASE_URL}/universe/names`, () => {
+          attempts += 1;
+          if (attempts === 1) {
+            return HttpResponse.json(
+              { error: 'rate limited' },
+              { status: 429, headers: { 'Retry-After': '2' } }
+            );
+          }
+          return HttpResponse.json([{ id: 90000001, name: 'Some Pilot', category: 'character' }]);
+        })
+      );
+
+      const promise = postUniverseNames([90000001]);
+      while (vi.getTimerCount() === 0) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      await vi.advanceTimersByTimeAsync(2000);
+      const names = await promise;
+
+      expect(attempts).toBe(2);
+      expect(names).toEqual([{ id: 90000001, name: 'Some Pilot', category: 'character' }]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

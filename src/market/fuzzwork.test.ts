@@ -125,6 +125,28 @@ describe('fetchAggregates', () => {
     });
   });
 
+  it('reports null price (not 0) when orderCount is positive but the price field is missing or NaN (BUG #5)', async () => {
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () =>
+        HttpResponse.json({
+          34: {
+            buy: { max: 'not-a-number', volume: '100', orderCount: '5' },
+            sell: { volume: '200', orderCount: '3' }, // min field missing entirely
+          },
+        })
+      )
+    );
+
+    const result = await fetchAggregates(60003760, [34]);
+
+    expect(result.get(34)).toEqual({
+      sellMin: null,
+      buyMax: null,
+      sellVolume: 200,
+      buyVolume: 100,
+    });
+  });
+
   it('throws when the response is not ok', async () => {
     server.use(http.get(FUZZWORK_AGGREGATES_URL, () => new HttpResponse('boom', { status: 500 })));
 

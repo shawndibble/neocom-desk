@@ -4,14 +4,19 @@
 // No deps; Node 24 built-ins only.
 
 import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(ROOT, 'public', 'data');
-const CACHE_DIR = process.env.SDE_CACHE_DIR || join(tmpdir(), 'neocom-sde-cache');
+// Default cache lives inside the repo (gitignored), not the world-shared
+// /tmp: a shared tmpdir is writable by any local user/process, so a
+// world-readable-and-writable cache dir there is a poisoning risk (another
+// process could plant a malicious CSV at the exact cache path this script
+// will trust on the next run). SDE_CACHE_DIR still overrides for CI/custom
+// setups.
+const CACHE_DIR = process.env.SDE_CACHE_DIR || join(ROOT, '.cache', 'sde');
 
 const FILES = [
   'invTypes.csv',
@@ -252,7 +257,11 @@ async function main() {
     }
     return map;
   };
-  const bpMaterials = collectActivity('industryActivityMaterials.csv', 'materialTypeID', 'quantity');
+  const bpMaterials = collectActivity(
+    'industryActivityMaterials.csv',
+    'materialTypeID',
+    'quantity'
+  );
   const bpProducts = collectActivity('industryActivityProducts.csv', 'productTypeID', 'quantity');
   const bpSkills = new Map();
   {

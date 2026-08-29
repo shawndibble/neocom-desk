@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
@@ -87,15 +87,12 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           <Spinner size="sm" label={t('common.loading')} />
         </div>
       ) : result?.needsReauth ? (
-        <div className="space-y-2 py-2">
-          <p className="text-xs font-semibold tracking-widest text-warning uppercase">
-            {t('industry.jobsReauthTitle')}
-          </p>
-          <p className="text-xs text-text-dim">{t('industry.jobsReauthHint')}</p>
-          <Button variant="primary" size="sm" onClick={() => void beginEveLogin()}>
-            {t('industry.jobsReauthAction')}
-          </Button>
-        </div>
+        <ReauthBanner
+          title={t('industry.jobsReauthTitle')}
+          hint={t('industry.jobsReauthHint')}
+          actionLabel={t('industry.jobsReauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
       ) : jobs.length === 0 ? (
         // Distinguish "ESI/cache answered, character just has none running"
         // (the common case) from "no data at all" (never fetched, offline).

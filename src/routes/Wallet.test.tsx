@@ -10,6 +10,8 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
 import type { TypeMap } from '@/sde/types';
 
+vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
+
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
     needRefresh: [false, vi.fn()],
@@ -205,5 +207,21 @@ describe('Wallet', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
     expect(await screen.findByText('Refresh failed — showing cached data')).toBeInTheDocument();
+  });
+
+  it('shows a re-login banner (not a silent offline empty state) on a 401 (BUG #3)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: /log in again/i })).toBeInTheDocument();
+    expect(screen.queryByText(/no wallet data cached/i)).not.toBeInTheDocument();
+    const { beginEveLogin } = await import('@/app/loginFlow');
+    screen.getByRole('button', { name: /log in again/i }).click();
+    expect(beginEveLogin).toHaveBeenCalled();
   });
 });

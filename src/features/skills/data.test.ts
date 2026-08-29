@@ -5,6 +5,7 @@ import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import {
   loadCharacterSkills,
+  loadCharacterSkillsWithStatus,
   loadCharacterAttributes,
   loadCharacterImplants,
   loadCharacterSkillQueue,
@@ -75,6 +76,67 @@ describe('loadCharacterSkills', () => {
   });
 });
 
+describe('loadCharacterSkillsWithStatus (BUG #3)', () => {
+  const payload = {
+    skills: [],
+    total_sp: 0,
+    unallocated_sp: 0,
+  };
+
+  it('reports needsReauth: true on a 401, without discarding cached data (regression: needsReauth must not shadow the cache read)', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: 'skills', value: payload, fetchedAt: 1234 });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+
+    const result = await loadCharacterSkillsWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached?.data).toEqual(payload);
+    expect(result.cached?.fromCache).toBe(true);
+  });
+
+  it('reports needsReauth: true on a 403 (missing scope), and null cached when nothing was ever cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadCharacterSkillsWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
+  });
+
+  it('still falls back to cache (needsReauth: false) for a non-auth failure', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: 'skills', value: payload, fetchedAt: 1234 });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/skills`, () => HttpResponse.error())
+    );
+
+    const result = await loadCharacterSkillsWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual(payload);
+    expect(result.cached?.fromCache).toBe(true);
+  });
+
+  it('reports live data with needsReauth: false on success', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/skills`, () => HttpResponse.json(payload))
+    );
+
+    const result = await loadCharacterSkillsWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual(payload);
+    expect(result.cached?.fromCache).toBe(false);
+  });
+});
+
 describe('loadCharacterAttributes', () => {
   it('fetches attributes and caches them', async () => {
     const attrs = { charisma: 19, intelligence: 20, memory: 20, perception: 20, willpower: 21 };
@@ -107,6 +169,21 @@ describe('loadCharacterSkillQueue', () => {
     const result = await loadCharacterSkillQueue(CHAR_ID);
     expect(result?.data).toEqual(queue);
     expect(result?.fromCache).toBe(false);
+  });
+
+  it('still falls back to cache on a 401 (regression pin: a plain loadWithCache caller must not lose its cache just because loadWithCacheStatus exists)', async () => {
+    const queue = [{ skill_id: 3300, queue_position: 0, finished_level: 5 }];
+    await db.esiCache.put({ characterId: CHAR_ID, key: 'skillqueue', value: queue, fetchedAt: 1 });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+
+    const result = await loadCharacterSkillQueue(CHAR_ID);
+
+    expect(result?.data).toEqual(queue);
+    expect(result?.fromCache).toBe(true);
   });
 });
 

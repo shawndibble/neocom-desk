@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 /** 5-segment skill level indicator: filled accent squares = trained, hairline = untrained. */
 interface SkillBarProps {
   level: number;
@@ -7,10 +9,11 @@ interface SkillBarProps {
 const LEVELS = [1, 2, 3, 4, 5] as const;
 
 export function SkillBar({ level, className = '' }: SkillBarProps) {
+  const { t } = useTranslation();
   return (
     <span
       role="img"
-      aria-label={`Level ${level} of 5`}
+      aria-label={t('skills.levelOfFive', { level })}
       className={`inline-flex items-center gap-0.5 ${className}`}
     >
       {LEVELS.map((segment) => (

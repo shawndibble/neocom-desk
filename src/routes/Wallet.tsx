@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner, Tabs } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
-  loadWalletBalance,
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  Panel,
+  ReauthBanner,
+  Spinner,
+  Tabs,
+} from '@/components/ui';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { beginEveLogin } from '@/app/loginFlow';
+import {
+  loadWalletBalanceWithStatus,
   loadWalletJournal,
   loadWalletTransactions,
 } from '@/features/character/wallet';
@@ -16,6 +25,8 @@ import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 interface Snapshot {
   requestKey: string;
   balanceResult: CachedResult<number> | null;
+  /** BUG #3: 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  balanceNeedsReauth: boolean;
   journalResult: CachedResult<WalletJournalEntry[]> | null;
   transactionsResult: CachedResult<WalletTransaction[]> | null;
   typeNames: Map<number, string>;
@@ -36,16 +47,24 @@ export function Wallet() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [balanceResult, journalResult, transactionsResult] = await Promise.all([
-        loadWalletBalance(activeCharacterId),
+      const [balanceStatus, journalResult, transactionsResult] = await Promise.all([
+        loadWalletBalanceWithStatus(activeCharacterId),
         loadWalletJournal(activeCharacterId),
         loadWalletTransactions(activeCharacterId),
       ]);
       if (cancelled) return;
+      const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
       const typeIds = [...new Set((transactionsResult?.data ?? []).map((t) => t.type_id))];
       const typeNames = await loadTypeNames(typeIds);
       if (cancelled) return;
-      setSnapshot({ requestKey, balanceResult, journalResult, transactionsResult, typeNames });
+      setSnapshot({
+        requestKey,
+        balanceResult,
+        balanceNeedsReauth,
+        journalResult,
+        transactionsResult,
+        typeNames,
+      });
     })();
     return () => {
       cancelled = true;
@@ -61,6 +80,7 @@ export function Wallet() {
   const offlineTitleKey = refreshKey > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle';
 
   const balanceResult = current?.balanceResult ?? null;
+  const balanceNeedsReauth = current?.balanceNeedsReauth ?? false;
   const journalResult = current?.journalResult ?? null;
   const transactionsResult = current?.transactionsResult ?? null;
   const typeNames = current?.typeNames ?? new Map<number, string>();
@@ -112,7 +132,14 @@ export function Wallet() {
           title={t('wallet.balanceTab')}
           actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
         >
-          {balanceResult ? (
+          {balanceNeedsReauth ? (
+            <ReauthBanner
+              title={t('wallet.reauthTitle')}
+              hint={t('wallet.reauthHint')}
+              actionLabel={t('wallet.reauthAction')}
+              onLogin={() => void beginEveLogin()}
+            />
+          ) : balanceResult ? (
             <>
               <p className={`text-lg font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}>
                 {formatIsk(balanceResult.data)} {t('wallet.isk')}

@@ -142,6 +142,54 @@ describe('loadTypeNames', () => {
     expect(names.get(999999)).toBe('Type #999999');
   });
 
+  it('bounds concurrent per-id fallback lookups instead of firing them all at once (BUG #6)', async () => {
+    const ids = Array.from({ length: 30 }, (_, i) => 5000 + i);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const pending: Array<() => void> = [];
+
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${ESI_BASE_URL}/universe/types/:id`, async ({ params }) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise<void>((resolve) => pending.push(resolve));
+        inFlight -= 1;
+        const id = Number(params.id);
+        return HttpResponse.json({
+          type_id: id,
+          name: `Widget ${id}`,
+          description: '',
+          group_id: 1,
+          published: true,
+        });
+      })
+    );
+
+    const namesPromise = loadTypeNames(ids);
+
+    // Drain the deferred requests in waves: release whatever has arrived so
+    // far, then give the event loop a turn for the next wave to be
+    // dispatched. A concurrency-limited implementation never has more than
+    // its cap in flight at once; an unbounded one would show up here as a
+    // single wave of `ids.length` requests all arriving before any resolve.
+    let released = 0;
+    for (let guard = 0; guard < 200 && released < ids.length; guard += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const wave = pending.splice(0, pending.length);
+      released += wave.length;
+      wave.forEach((resolve) => resolve());
+    }
+
+    const names = await namesPromise;
+
+    expect(released).toBe(ids.length);
+    expect(names.get(5000)).toBe('Widget 5000');
+    expect(names.get(5029)).toBe('Widget 5029');
+    expect(maxInFlight).toBeLessThanOrEqual(10);
+    expect(maxInFlight).toBeGreaterThan(1);
+  });
+
   it('falls back to cached names when ESI is unreachable (offline)', async () => {
     await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
     server.use(http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()));

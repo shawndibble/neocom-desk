@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner, StatChip } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  Panel,
+  ReauthBanner,
+  Spinner,
+  StatChip,
+} from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { SkillBar } from '@/features/skills/SkillBar';
 import { ImplantChip } from '@/features/skills/ImplantChip';
@@ -10,7 +19,7 @@ import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap'
 import {
   loadCharacterAttributes,
   loadCharacterImplants,
-  loadCharacterSkills,
+  loadCharacterSkillsWithStatus,
   loadUniverseType,
 } from '@/features/skills/data';
 import type { CachedResult } from '@/features/skills/data';
@@ -36,6 +45,8 @@ interface Snapshot {
   requestKey: string;
   catalog: SkillCatalog;
   skillsResult: CachedResult<CharacterSkills> | null;
+  /** BUG #3: 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  skillsNeedsReauth: boolean;
   attributesResult: CachedResult<CharacterAttributes> | null;
   implantsResult: CachedResult<number[]> | null;
   implantDetails: ImplantDetail[];
@@ -57,13 +68,14 @@ export function Skills() {
     let cancelled = false;
 
     void (async () => {
-      const [skillsResult, attributesResult, implantsResult, catalog] = await Promise.all([
-        loadCharacterSkills(activeCharacterId),
+      const [skillsStatus, attributesResult, implantsResult, catalog] = await Promise.all([
+        loadCharacterSkillsWithStatus(activeCharacterId),
         loadCharacterAttributes(activeCharacterId),
         loadCharacterImplants(activeCharacterId),
         loadSkillCatalog(),
       ]);
       if (cancelled) return;
+      const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
 
       const implantIds = implantsResult?.data ?? [];
       const implantTypes = await Promise.all(implantIds.map((id) => loadUniverseType(id)));
@@ -84,6 +96,7 @@ export function Skills() {
         requestKey,
         catalog,
         skillsResult,
+        skillsNeedsReauth,
         attributesResult,
         implantsResult,
         implantDetails,
@@ -99,9 +112,17 @@ export function Skills() {
 
   // Only trust the snapshot when it answers the current (character, refresh) request.
   const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const { catalog, skillsResult, attributesResult, implantDetails, implantBonuses } = current ?? {
+  const {
+    catalog,
+    skillsResult,
+    skillsNeedsReauth,
+    attributesResult,
+    implantDetails,
+    implantBonuses,
+  } = current ?? {
     catalog: null,
     skillsResult: undefined,
+    skillsNeedsReauth: false,
     attributesResult: undefined,
     implantDetails: [],
     implantBonuses: {},
@@ -173,6 +194,13 @@ export function Skills() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : skillsNeedsReauth ? (
+        <ReauthBanner
+          title={t('skills.reauthTitle')}
+          hint={t('skills.reauthHint')}
+          actionLabel={t('skills.reauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
       ) : !skillsResult ? (
         <EmptyState title={t('skills.emptyTitle')} hint={t('skills.emptyHint')} />
       ) : (
@@ -192,7 +220,7 @@ export function Skills() {
                   return (
                     <StatChip
                       key={name}
-                      label={name}
+                      label={t(`skills.attr.${name}`)}
                       value={
                         bonus ? t('skills.attributeEffective', { base, bonus, effective }) : base
                       }

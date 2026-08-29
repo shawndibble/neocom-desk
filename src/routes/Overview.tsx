@@ -16,6 +16,7 @@ import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap'
 import { loadWalletBalance } from '@/features/character/wallet';
 import { formatIsk } from '@/features/character/format';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
+import { selectActiveQueueEntry } from './overviewQueue';
 
 interface Snapshot {
   requestKey: string;
@@ -79,7 +80,11 @@ export function Overview() {
   const queueResult = current?.queueResult ?? null;
   const catalog = current?.catalog ?? null;
 
-  const activeEntry = queueResult?.data.find((e) => e.finish_date) ?? null;
+  // Reads the wall clock to pick "the entry training right now" — unavoidably
+  // impure (no ticking-clock store to subscribe to instead); harmless since
+  // it only affects which row is shown, not any computed/cached value.
+  // eslint-disable-next-line react-hooks/purity -- see comment above
+  const activeEntry = queueResult ? selectActiveQueueEntry(queueResult.data, Date.now()) : null;
   const activeSkillName =
     activeEntry && catalog
       ? (catalog.bySkillTypeID.get(activeEntry.skill_id)?.name ?? `#${activeEntry.skill_id}`)

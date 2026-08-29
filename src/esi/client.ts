@@ -5,6 +5,7 @@
  * Every request pins X-Compatibility-Date and identifies the app via
  * X-User-Agent, per ESI guidelines.
  */
+import { AuthError } from '@/auth/sso';
 
 export const ESI_BASE_URL = 'https://esi.evetech.net';
 export const COMPATIBILITY_DATE = '2026-08-01';
@@ -31,6 +32,10 @@ export interface EsiFetchOptions {
   /** Previously seen ETag; sent as If-None-Match. A 304 yields data: null. */
   etag?: string;
   signal?: AbortSignal;
+  /** HTTP method; defaults to GET. */
+  method?: 'GET' | 'POST';
+  /** JSON-serialized as the request body when `method` is 'POST'. */
+  body?: unknown;
 }
 
 export interface EsiResult<T> {
@@ -41,6 +46,22 @@ export interface EsiResult<T> {
   pages: number;
   /** Raw Expires header, for cache-freshness display. */
   expires: string | null;
+}
+
+/**
+ * BUG #3: distinguishes "not logged in / needs re-login" from "offline /
+ * ESI down" so read-through caches can surface a re-auth affordance instead
+ * of silently going stale forever. Two shapes cover it:
+ *  - EsiError with 401 (bad/expired token) or 403 (token valid but missing
+ *    the scope this endpoint needs — same reasoning as
+ *    src/features/industry/jobs.ts's existing needsReauth handling).
+ *  - AuthError (src/auth/sso): getValidAccessToken's own refresh call fails
+ *    (e.g. a revoked/expired refresh token) *before* esiFetch ever makes a
+ *    request, so it never becomes an EsiError at all.
+ */
+export function isAuthFailure(err: unknown): boolean {
+  if (err instanceof EsiError) return err.status === 401 || err.status === 403;
+  return err instanceof AuthError;
 }
 
 export class EsiError extends Error {
@@ -124,15 +145,16 @@ export async function esiFetch<T>(
   path: string,
   options: EsiFetchOptions = {}
 ): Promise<EsiResult<T>> {
-  const { characterId, query, page, etag, signal } = options;
+  const { characterId, query, page, etag, signal, method = 'GET', body } = options;
   const url = buildUrl(path, query, page);
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'X-Compatibility-Date': COMPATIBILITY_DATE,
-    'X-User-Agent': USER_AGENT
+    'X-User-Agent': USER_AGENT,
   };
   if (etag !== undefined) headers['If-None-Match'] = etag;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (characterId !== undefined) {
     if (!tokenProvider) {
       throw new Error('esiFetch: authenticated call without a configured getToken (configureEsi)');
@@ -140,10 +162,11 @@ export async function esiFetch<T>(
     headers.Authorization = `Bearer ${await tokenProvider(characterId)}`;
   }
 
-  let response = await fetch(url, { headers, signal });
+  const requestBody = body !== undefined ? JSON.stringify(body) : undefined;
+  let response = await fetch(url, { method, headers, body: requestBody, signal });
   if (response.status === 429 || response.status === 420) {
     await sleep(retryWaitMs(response), signal);
-    response = await fetch(url, { headers, signal });
+    response = await fetch(url, { method, headers, body: requestBody, signal });
   }
 
   if (response.status === 304) {
@@ -151,7 +174,7 @@ export async function esiFetch<T>(
       data: null,
       etag: response.headers.get('etag') ?? etag ?? null,
       pages: parsePages(response),
-      expires: response.headers.get('expires')
+      expires: response.headers.get('expires'),
     };
   }
   if (!response.ok) throw await errorFromResponse(response);
@@ -160,6 +183,6 @@ export async function esiFetch<T>(
     data: (await response.json()) as T,
     etag: response.headers.get('etag'),
     pages: parsePages(response),
-    expires: response.headers.get('expires')
+    expires: response.headers.get('expires'),
   };
 }

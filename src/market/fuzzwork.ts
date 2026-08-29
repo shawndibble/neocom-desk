@@ -40,13 +40,22 @@ function toNumber(value: string | number | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** No orders on this side (missing entry or orderCount 0) reports as null, not 0. */
+/**
+ * No orders on this side (missing entry or orderCount 0) reports as null,
+ * not 0. Same for a malformed/missing price field even when orderCount is
+ * positive (BUG #5) — a bad price must never silently coerce to 0 and flow
+ * into build-vs-buy as "free."
+ */
 function parseSide(
   side: RawSide | undefined,
   priceField: 'min' | 'max'
 ): { price: number | null; volume: number } {
   if (!side || toNumber(side.orderCount) <= 0) return { price: null, volume: 0 };
-  return { price: toNumber(side[priceField]), volume: toNumber(side.volume) };
+  const price = Number(side[priceField]);
+  return {
+    price: Number.isFinite(price) && price > 0 ? price : null,
+    volume: toNumber(side.volume),
+  };
 }
 
 function chunk<T>(items: readonly T[], size: number): T[][] {

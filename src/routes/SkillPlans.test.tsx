@@ -361,6 +361,22 @@ describe('SkillPlans editor: import / export', () => {
       'Gunnery I\nGunnery II\nGunnery III\nSpaceship Command I'
     );
   });
+
+  it('shows an inline error (no unhandled rejection) when the in-game queue import fails to parse (BUG #3)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        // Missing finished_level: parseSkillQueue throws synchronously.
+        HttpResponse.json([{ skill_id: 1, queue_position: 0 }])
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid finished_level/);
+  });
 });
 
 describe('SkillPlans editor: optimize remaps', () => {
@@ -419,6 +435,36 @@ describe('SkillPlans editor: optimize remaps', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/Segment 1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Remapping saves/)).not.toBeInTheDocument();
+  });
+
+  it('clears the stale optimize result when an entry is removed, instead of crashing on an out-of-range segment index (BUG #1)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount: 1,
+      })
+    );
+    render(<App />);
+
+    await screen.findByText('Computed queue');
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    expect(await screen.findByRole('heading', { name: 'Optimize remaps' })).toBeInTheDocument();
+
+    const entriesPanel = screen.getByText('Your entries').closest('section')!;
+    // Remove enough entries to shrink the scheduled queue below the stale
+    // segment's startIndex — must not throw, and must drop the stale panel
+    // rather than render against the old (now out-of-range) schedule.
+    await user.click(within(entriesPanel).getAllByRole('button', { name: 'Remove' })[0]);
+
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Optimize remaps' })).not.toBeInTheDocument()
+    );
+    // The rest of the app must still be usable — no crash boundary tripped.
+    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
   });
 });
 

@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import { selectActiveQueueEntry } from './overviewQueue';
 import type { SkillType } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -154,5 +155,82 @@ describe('Overview', () => {
     await db.settings.clear();
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Characters' })).toBeInTheDocument();
+  });
+});
+
+describe('selectActiveQueueEntry (BUG #10)', () => {
+  const NOW = Date.parse('2026-08-29T12:00:00Z');
+
+  it('picks the entry whose window spans now, not just the first with a finish_date', () => {
+    const entries = [
+      // finish_date is set but this one already finished — must not win just
+      // because Array#find would hit it first in insertion order.
+      {
+        skill_id: 1,
+        queue_position: 0,
+        finished_level: 1,
+        start_date: '2026-08-01T00:00:00Z',
+        finish_date: '2026-08-10T00:00:00Z',
+      },
+      {
+        skill_id: 2,
+        queue_position: 1,
+        finished_level: 2,
+        start_date: '2026-08-10T00:00:00Z',
+        finish_date: '2026-09-01T00:00:00Z',
+      },
+    ];
+    expect(selectActiveQueueEntry(entries, NOW)?.skill_id).toBe(2);
+  });
+
+  it('is resilient to entries arriving out of queue_position order', () => {
+    const entries = [
+      {
+        skill_id: 2,
+        queue_position: 1,
+        finished_level: 2,
+        start_date: '2026-08-10T00:00:00Z',
+        finish_date: '2026-09-01T00:00:00Z',
+      },
+      {
+        skill_id: 1,
+        queue_position: 0,
+        finished_level: 1,
+        start_date: '2026-08-01T00:00:00Z',
+        finish_date: '2026-08-10T00:00:00Z',
+      },
+    ];
+    expect(selectActiveQueueEntry(entries, NOW)?.skill_id).toBe(2);
+  });
+
+  it('falls back to the first future entry when none currently spans now', () => {
+    const entries = [
+      {
+        skill_id: 1,
+        queue_position: 0,
+        finished_level: 1,
+        start_date: '2026-09-01T00:00:00Z',
+        finish_date: '2026-09-10T00:00:00Z',
+      },
+    ];
+    expect(selectActiveQueueEntry(entries, NOW)?.skill_id).toBe(1);
+  });
+
+  it('skips paused entries with no start/finish date', () => {
+    const entries = [
+      { skill_id: 1, queue_position: 0, finished_level: 1 },
+      {
+        skill_id: 2,
+        queue_position: 1,
+        finished_level: 2,
+        start_date: '2026-08-10T00:00:00Z',
+        finish_date: '2026-09-01T00:00:00Z',
+      },
+    ];
+    expect(selectActiveQueueEntry(entries, NOW)?.skill_id).toBe(2);
+  });
+
+  it('returns null for an empty queue', () => {
+    expect(selectActiveQueueEntry([], NOW)).toBeNull();
   });
 });

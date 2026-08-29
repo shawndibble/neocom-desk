@@ -48,6 +48,13 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
     expect(document.getElementById(sccTooltipId)?.textContent).not.toBe('');
   });
 
+  it('gives the ISK/hour chip an accessible tooltip explaining its basis (UX-REVIEW #13)', () => {
+    renderSummary();
+    const iskPerHourButton = screen.getByRole('button', { name: /about isk\/hour/i });
+    const tooltipId = iskPerHourButton.getAttribute('aria-describedby')!;
+    expect(document.getElementById(tooltipId)?.textContent).not.toBe('');
+  });
+
   it('makes the cost-index system explicit in its label, distinct per trade hub', () => {
     renderSummary({ costIndexSystemName: 'Jita' });
     expect(screen.getByText('Cost index (Jita)')).toBeInTheDocument();

@@ -9,6 +9,11 @@ describe('formatIsk', () => {
   it('formats negative values with a leading minus', () => {
     expect(formatIsk(-11724000)).toBe('-11,724,000.00');
   });
+
+  it('clamps a rounding-noise negative near zero to "0.00" instead of "-0.00" (BUG #9)', () => {
+    expect(formatIsk(-0.004)).toBe('0.00');
+    expect(formatIsk(-0.006)).toBe('-0.01');
+  });
 });
 
 describe('iskToneClass', () => {
@@ -19,6 +24,10 @@ describe('iskToneClass', () => {
   it('is the positive token for zero and positive values', () => {
     expect(iskToneClass(0)).toBe('text-isk-pos');
     expect(iskToneClass(1)).toBe('text-isk-pos');
+  });
+
+  it('is the positive token for a rounding-noise negative near zero (BUG #9)', () => {
+    expect(iskToneClass(-0.004)).toBe('text-isk-pos');
   });
 });
 

@@ -3,7 +3,12 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadWalletBalance, loadWalletJournal, loadWalletTransactions } from './wallet';
+import {
+  loadWalletBalance,
+  loadWalletBalanceWithStatus,
+  loadWalletJournal,
+  loadWalletTransactions,
+} from './wallet';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -41,6 +46,75 @@ describe('loadWalletBalance', () => {
     );
     const result = await loadWalletBalance(CHAR_ID);
     expect(result).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+  });
+
+  it('still falls back to cache on a 401 (regression pin: plain loadWithCache callers must not lose their cache just because loadWithCacheStatus exists)', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:balance',
+      value: 500,
+      fetchedAt: 1,
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+
+    const result = await loadWalletBalance(CHAR_ID);
+
+    expect(result).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+  });
+});
+
+describe('loadWalletBalanceWithStatus (BUG #3)', () => {
+  it('reports needsReauth: true on a 401, without discarding cached data (regression: needsReauth must not shadow the cache read)', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:balance',
+      value: 500,
+      fetchedAt: 1,
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+
+    const result = await loadWalletBalanceWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+  });
+
+  it('reports needsReauth: true and null cached when nothing was ever cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+
+    const result = await loadWalletBalanceWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
+  });
+
+  it('still falls back to cache (needsReauth: false) for a non-auth failure', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:balance',
+      value: 500,
+      fetchedAt: 1,
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
+    );
+
+    const result = await loadWalletBalanceWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
   });
 });
 

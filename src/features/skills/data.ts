@@ -16,6 +16,7 @@ import {
   type SkillQueueEntry,
   type UniverseType,
 } from '@/esi/endpoints';
+import { isAuthFailure } from '@/esi/client';
 import type { Implants } from '@/engine/types';
 import { extractAttributeBonuses, sumAttributeBonuses } from './dogma';
 
@@ -23,6 +24,13 @@ export interface CachedResult<T> {
   data: T;
   fetchedAt: Date;
   fromCache: boolean;
+}
+
+/** BUG #3: distinguishes "needs re-login" from "offline" (see StatusResult callers). */
+export interface StatusResult<T> {
+  cached: CachedResult<T> | null;
+  /** True when the live call failed with 401/403 (or refresh itself failed): re-login is the fix, not a refresh. */
+  needsReauth: boolean;
 }
 
 const KEYS = {
@@ -39,24 +47,55 @@ const KEYS = {
  */
 const GLOBAL_CACHE_CHARACTER_ID = 0;
 
-async function loadWithCache<T>(
+/**
+ * BUG #3: like loadWithCache below, but surfaces an auth failure
+ * (401/expired token, 403/missing scope, or a failed token refresh) as
+ * `needsReauth: true` instead of silently falling back to cache — mirrors
+ * src/features/industry/jobs.ts's existing needsReauth handling. Any other
+ * failure (offline, 5xx, timeout) still falls through to the cache below.
+ *
+ * Unlike jobs.ts's needsReauth (which has nothing to fall back to — a
+ * character that never granted that scope has never cached a response),
+ * this function is shared with plain loadWithCache callers that DO have
+ * prior cached data. So needsReauth never short-circuits the cache read:
+ * a caller still using loadWithCache (which only reads `.cached`) must not
+ * regress from stale-but-present to null just because a status-aware
+ * sibling exists.
+ */
+async function loadWithCacheStatus<T>(
   characterId: number,
   key: string,
   fetchLive: () => Promise<T | null>
-): Promise<CachedResult<T> | null> {
+): Promise<StatusResult<T>> {
+  let needsReauth = false;
   try {
     const data = await fetchLive();
     if (data !== null) {
       const fetchedAt = Date.now();
       await db.esiCache.put({ characterId, key, value: data, fetchedAt });
-      return { data, fetchedAt: new Date(fetchedAt), fromCache: false };
+      return {
+        cached: { data, fetchedAt: new Date(fetchedAt), fromCache: false },
+        needsReauth: false,
+      };
     }
-  } catch {
-    // Offline or ESI failure: fall back to whatever is cached below.
+  } catch (err) {
+    if (isAuthFailure(err)) needsReauth = true;
+    // Any other failure (offline, 5xx, timeout): fall through to the cache below.
   }
   const cached = await db.esiCache.get([characterId, key]);
-  if (!cached) return null;
-  return { data: cached.value as T, fetchedAt: new Date(cached.fetchedAt), fromCache: true };
+  if (!cached) return { cached: null, needsReauth };
+  return {
+    cached: { data: cached.value as T, fetchedAt: new Date(cached.fetchedAt), fromCache: true },
+    needsReauth,
+  };
+}
+
+async function loadWithCache<T>(
+  characterId: number,
+  key: string,
+  fetchLive: () => Promise<T | null>
+): Promise<CachedResult<T> | null> {
+  return (await loadWithCacheStatus(characterId, key, fetchLive)).cached;
 }
 
 /** Trained skills + total/unallocated SP for a character. ESI or cache. */
@@ -64,6 +103,21 @@ export function loadCharacterSkills(
   characterId: number
 ): Promise<CachedResult<CharacterSkills> | null> {
   return loadWithCache(
+    characterId,
+    KEYS.skills,
+    async () => (await getCharacterSkills(characterId)).data
+  );
+}
+
+/**
+ * Same data as loadCharacterSkills, but with the auth-failure state exposed
+ * (BUG #3) for views that show a re-login affordance instead of a silent
+ * "offline" state.
+ */
+export function loadCharacterSkillsWithStatus(
+  characterId: number
+): Promise<StatusResult<CharacterSkills>> {
+  return loadWithCacheStatus(
     characterId,
     KEYS.skills,
     async () => (await getCharacterSkills(characterId)).data

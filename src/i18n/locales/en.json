@@ -33,7 +33,18 @@
     "emptyTitle": "No skill data cached",
     "emptyHint": "Reconnect to fetch this character's trained skills.",
     "offlineTitle": "Showing cached data",
-    "sp": "{{value}} SP"
+    "sp": "{{value}} SP",
+    "levelOfFive": "Level {{level}} of 5",
+    "attr": {
+      "intelligence": "Intelligence",
+      "memory": "Memory",
+      "perception": "Perception",
+      "willpower": "Willpower",
+      "charisma": "Charisma"
+    },
+    "reauthTitle": "Log in again to see skills",
+    "reauthHint": "Log in again to fetch this character's trained skills.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "plans": {
     "title": "Skill Plans",
@@ -102,7 +113,9 @@
     "importLine": "Line {{line}}: {{text}} — {{reason}}",
     "alreadyTrained": "Already trained",
     "importAddedCount": "Added {{count}} skill(s)",
-    "importAddedNone": "0 added — all trained"
+    "importAddedNone": "0 added — all trained",
+    "reorderEntry": "Reorder {{name}}",
+    "importError": "Couldn't import the skill queue: {{message}}"
   },
   "industry": {
     "title": "Build Plans",
@@ -166,6 +179,7 @@
     "profit": "Profit",
     "margin": "Margin",
     "iskPerHour": "ISK/hour",
+    "iskPerHourTooltip": "Profit divided by build time (job-slot occupancy time, not wall-clock wait) — an hourly-rate comparison across builds.",
     "pricesUnavailableTitle": "Price data unavailable",
     "pricesUnavailableHint": "Reconnect to fetch job cost, profit, and the build-vs-buy verdict. Materials and time above don't need it.",
     "unpricedMaterialsWarning": "{{count}} material(s) have no hub price; totals below are underestimated.",
@@ -228,7 +242,13 @@
     "unknown": "—",
     "aboutLabel": "About {{label}}",
     "offlineTitle": "Showing cached data",
-    "refreshFailedTitle": "Refresh failed — showing cached data"
+    "refreshFailedTitle": "Refresh failed — showing cached data",
+    "age": {
+      "justNow": "just now",
+      "minutes": "{{count}}m ago",
+      "hours": "{{count}}h ago",
+      "days": "{{count}}d ago"
+    }
   },
   "wallet": {
     "title": "Wallet",
@@ -253,7 +273,10 @@
     "total": "Total",
     "side": "Side",
     "buy": "Buy",
-    "sell": "Sell"
+    "sell": "Sell",
+    "reauthTitle": "Log in again to see your wallet",
+    "reauthHint": "Log in again to fetch this character's wallet balance.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "assets": {
     "title": "Assets",

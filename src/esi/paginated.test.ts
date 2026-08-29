@@ -45,7 +45,7 @@ describe('fetchAllPages', () => {
         await delay(10);
         inFlight -= 1;
         return HttpResponse.json([`item-${page}a`, `item-${page}b`], {
-          headers: { 'X-Pages': '3' }
+          headers: { 'X-Pages': '3' },
         });
       })
     );
@@ -64,16 +64,41 @@ describe('fetchAllPages', () => {
       http.get(`${ESI_BASE_URL}/characters/123/assets`, ({ request }) => {
         authHeaders.push(request.headers.get('authorization'));
         return HttpResponse.json([{ item_id: authHeaders.length }], {
-          headers: { 'X-Pages': '2' }
+          headers: { 'X-Pages': '2' },
         });
       })
     );
 
     const items = await fetchAllPages<{ item_id: number }>('/characters/123/assets', {
-      characterId: 123
+      characterId: 123,
     });
 
     expect(items).toHaveLength(2);
     expect(authHeaders).toEqual(['Bearer token-123', 'Bearer token-123']);
+  });
+
+  it('treats a 404 on a page after the first as end-of-data, keeping pages already fetched (BUG #7)', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page'));
+        if (page >= 2) return new HttpResponse(null, { status: 404 });
+        return HttpResponse.json([`item-${page}a`], { headers: { 'X-Pages': '3' } });
+      })
+    );
+
+    const items = await fetchAllPages<string>('/markets/10000002/orders');
+
+    expect(items).toEqual(['item-1a']);
+  });
+
+  it('still throws on a 404 for the first page', async () => {
+    server.use(
+      http.get(
+        `${ESI_BASE_URL}/markets/10000002/orders`,
+        () => new HttpResponse(null, { status: 404 })
+      )
+    );
+
+    await expect(fetchAllPages<string>('/markets/10000002/orders')).rejects.toThrow();
   });
 });

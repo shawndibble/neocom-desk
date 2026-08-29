@@ -6,6 +6,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCalendarEvents, loadCalendarEvent } from '@/features/character/calendar';
 import type { CachedResult } from '@/features/character/cache';
 import type { CalendarEventDetail, CalendarEventSummary } from '@/esi/endpoints';
+import { stripEveMarkup } from '@/features/skills/typeDisplay';
 
 interface Snapshot {
   requestKey: string;
@@ -139,7 +140,9 @@ export function Calendar() {
                   {new Date(detail.data.date).toLocaleString()} ·{' '}
                   {t('calendar.importance', { value: detail.data.importance })}
                 </p>
-                <p className="whitespace-pre-wrap text-text-dim">{detail.data.text}</p>
+                <p className="whitespace-pre-wrap text-text-dim">
+                  {stripEveMarkup(detail.data.text)}
+                </p>
               </div>
             )}
           </Panel>

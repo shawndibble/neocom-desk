@@ -10,11 +10,19 @@
  * already does — that module is read-only territory for this feature).
  */
 import { db } from '@/db';
+import { isAuthFailure } from '@/esi/client';
 
 export interface CachedResult<T> {
   data: T;
   fetchedAt: Date;
   fromCache: boolean;
+}
+
+/** BUG #3: distinguishes "needs re-login" from "offline" (see loadWithCacheStatus). */
+export interface StatusResult<T> {
+  cached: CachedResult<T> | null;
+  /** True when the live call failed with 401/403 (or refresh itself failed): re-login is the fix, not a refresh. */
+  needsReauth: boolean;
 }
 
 /**
@@ -29,17 +37,48 @@ export async function loadWithCache<T>(
   key: string,
   fetchLive: () => Promise<T | null>
 ): Promise<CachedResult<T> | null> {
+  return (await loadWithCacheStatus(characterId, key, fetchLive)).cached;
+}
+
+/**
+ * BUG #3: like loadWithCache, but surfaces an auth failure (401/expired
+ * token, 403/missing scope, or a failed token refresh) as
+ * `needsReauth: true` instead of silently falling back to cache — mirrors
+ * src/features/industry/jobs.ts's existing needsReauth handling. Any other
+ * failure (offline, 5xx, timeout) still falls through to the cache below.
+ *
+ * Unlike jobs.ts's needsReauth (which has nothing to fall back to — a
+ * character that never granted that scope has never cached a response),
+ * this function is shared with plain loadWithCache callers that DO have
+ * prior cached data. So needsReauth never short-circuits the cache read:
+ * a view can show "log in again" AND keep the last-known cached value
+ * available (e.g. for a caller still using loadWithCache, which only reads
+ * `.cached` and would otherwise regress from stale-but-present to null).
+ */
+export async function loadWithCacheStatus<T>(
+  characterId: number,
+  key: string,
+  fetchLive: () => Promise<T | null>
+): Promise<StatusResult<T>> {
+  let needsReauth = false;
   try {
     const data = await fetchLive();
     if (data !== null) {
       const fetchedAt = Date.now();
       await db.esiCache.put({ characterId, key, value: data, fetchedAt });
-      return { data, fetchedAt: new Date(fetchedAt), fromCache: false };
+      return {
+        cached: { data, fetchedAt: new Date(fetchedAt), fromCache: false },
+        needsReauth: false,
+      };
     }
-  } catch {
-    // Offline or ESI failure: fall back to whatever is cached below.
+  } catch (err) {
+    if (isAuthFailure(err)) needsReauth = true;
+    // Any other failure (offline, 5xx, timeout): fall through to the cache below.
   }
   const cached = await db.esiCache.get([characterId, key]);
-  if (!cached) return null;
-  return { data: cached.value as T, fetchedAt: new Date(cached.fetchedAt), fromCache: true };
+  if (!cached) return { cached: null, needsReauth };
+  return {
+    cached: { data: cached.value as T, fetchedAt: new Date(cached.fetchedAt), fromCache: true },
+    needsReauth,
+  };
 }

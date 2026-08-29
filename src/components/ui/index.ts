@@ -10,3 +10,4 @@ export type { TabItem } from './Tabs';
 export { Spinner } from './Spinner';
 export type { SpinnerSize } from './Spinner';
 export { Tooltip, InfoTooltip } from './Tooltip';
+export { ReauthBanner } from './ReauthBanner';

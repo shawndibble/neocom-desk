@@ -92,6 +92,30 @@ describe('Calendar', () => {
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
   });
 
+  it('strips EVE markup from the event detail text (BUG #4)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar/1`, () =>
+        HttpResponse.json({
+          event_id: 1,
+          title: 'Fleet Op',
+          date: '2026-09-01T18:00:00Z',
+          duration: 60,
+          importance: 1,
+          owner_id: 1,
+          owner_name: 'FC',
+          owner_type: 'character',
+          response: 'accepted',
+          text: 'Bring your <b>ship</b><br>Tank &amp; gank',
+        })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet Op'));
+    const detail = await screen.findByText(/Bring your ship/);
+    expect(detail.textContent).toBe('Bring your ship\nTank & gank');
+  });
+
   it('falls back to cached events offline', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,

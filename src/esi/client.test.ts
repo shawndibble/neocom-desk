@@ -5,10 +5,12 @@ import {
   esiFetch,
   configureEsi,
   EsiError,
+  isAuthFailure,
   ESI_BASE_URL,
   COMPATIBILITY_DATE,
-  USER_AGENT
+  USER_AGENT,
 } from './client';
+import { AuthError } from '@/auth/sso';
 import { rejectBadEsiHeaders } from './test-helpers';
 
 const server = setupServer();
@@ -63,7 +65,7 @@ describe('esiFetch — public requests', () => {
 
     await esiFetch('/markets/10000002/orders', {
       query: { type_id: 34, order_type: 'sell' },
-      page: 2
+      page: 2,
     });
 
     const parsed = url as URL | null;
@@ -144,7 +146,10 @@ describe('esiFetch — rate limiting', () => {
       http.get(`${ESI_BASE_URL}/alliances/99000001`, () => {
         attempts += 1;
         if (attempts === 1) {
-          return HttpResponse.json({ error: 'rate limited' }, { status: 429, headers: { 'Retry-After': '3' } });
+          return HttpResponse.json(
+            { error: 'rate limited' },
+            { status: 429, headers: { 'Retry-After': '3' } }
+          );
         }
         return HttpResponse.json({ name: 'Test Alliance' });
       })
@@ -165,7 +170,10 @@ describe('esiFetch — rate limiting', () => {
       http.get(`${ESI_BASE_URL}/alliances/99000001`, () => {
         attempts += 1;
         if (attempts === 1) {
-          return HttpResponse.json({ error: 'rate limited' }, { status: 429, headers: { 'Retry-After': '60' } });
+          return HttpResponse.json(
+            { error: 'rate limited' },
+            { status: 429, headers: { 'Retry-After': '60' } }
+          );
         }
         return HttpResponse.json({ name: 'Test Alliance' });
       })
@@ -189,7 +197,10 @@ describe('esiFetch — rate limiting', () => {
         if (attempts === 1) {
           return HttpResponse.json(
             { error: 'error limited' },
-            { status: 420, headers: { 'X-ESI-Error-Limit-Reset': '2', 'X-ESI-Error-Limit-Remain': '0' } }
+            {
+              status: 420,
+              headers: { 'X-ESI-Error-Limit-Reset': '2', 'X-ESI-Error-Limit-Remain': '0' },
+            }
           );
         }
         return HttpResponse.json({ name: 'Test Alliance' });
@@ -210,7 +221,10 @@ describe('esiFetch — rate limiting', () => {
     server.use(
       http.get(`${ESI_BASE_URL}/alliances/99000001`, () => {
         attempts += 1;
-        return HttpResponse.json({ error: 'rate limited' }, { status: 429, headers: { 'Retry-After': '1' } });
+        return HttpResponse.json(
+          { error: 'rate limited' },
+          { status: 429, headers: { 'Retry-After': '1' } }
+        );
       })
     );
 
@@ -253,7 +267,103 @@ describe('esiFetch — errors', () => {
 
     await expect(esiFetch('/characters/999')).rejects.toMatchObject({
       status: 500,
-      message: expect.stringContaining('500')
+      message: expect.stringContaining('500'),
     });
+  });
+});
+
+describe('esiFetch — POST (BUG #12)', () => {
+  it('sends a JSON body with Content-Type and the standard compat/user-agent headers', async () => {
+    let captured: Headers | null = null;
+    let body: unknown;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        captured = request.headers;
+        body = await request.json();
+        return HttpResponse.json([{ id: 34, name: 'Tritanium', category: 'inventory_type' }]);
+      })
+    );
+
+    const result = await esiFetch<unknown>('/universe/names', {
+      method: 'POST',
+      body: [34],
+    });
+
+    expect(body).toEqual([34]);
+    expect(result.data).toEqual([{ id: 34, name: 'Tritanium', category: 'inventory_type' }]);
+    const headers = captured as Headers | null;
+    expect(headers?.get('content-type')).toContain('application/json');
+    expect(headers?.get('x-compatibility-date')).toBe(COMPATIBILITY_DATE);
+    expect(headers?.get('x-user-agent')).toBe(USER_AGENT);
+  });
+
+  it('throws a typed EsiError on a POST error response', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 404 }))
+    );
+
+    await expect(
+      esiFetch('/universe/names', { method: 'POST', body: [999999999] })
+    ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('esiFetch — POST rate limiting (BUG #12)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('retries a POST once after 429, resending the body', async () => {
+    let attempts = 0;
+    const bodies: unknown[] = [];
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        attempts += 1;
+        bodies.push(await request.json());
+        if (attempts === 1) {
+          return HttpResponse.json(
+            { error: 'rate limited' },
+            { status: 429, headers: { 'Retry-After': '3' } }
+          );
+        }
+        return HttpResponse.json([{ id: 34, name: 'Tritanium', category: 'inventory_type' }]);
+      })
+    );
+
+    const promise = esiFetch('/universe/names', { method: 'POST', body: [34] });
+    await untilTimerScheduled();
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await promise;
+
+    expect(attempts).toBe(2);
+    expect(bodies).toEqual([[34], [34]]);
+    expect(result.data).toEqual([{ id: 34, name: 'Tritanium', category: 'inventory_type' }]);
+  });
+});
+
+describe('isAuthFailure (BUG #3)', () => {
+  it('is true for a 401 EsiError', () => {
+    expect(isAuthFailure(new EsiError(401, 'bad token'))).toBe(true);
+  });
+
+  it('is true for a 403 EsiError', () => {
+    expect(isAuthFailure(new EsiError(403, 'missing scope'))).toBe(true);
+  });
+
+  it('is false for other EsiError statuses (offline-ish/5xx should still fall back to cache)', () => {
+    expect(isAuthFailure(new EsiError(500, 'boom'))).toBe(false);
+    expect(isAuthFailure(new EsiError(404, 'not found'))).toBe(false);
+  });
+
+  it('is true for an AuthError (refresh-token failure, never reaches esiFetch)', () => {
+    expect(isAuthFailure(new AuthError('invalid_grant', 'token revoked', 400))).toBe(true);
+  });
+
+  it('is false for a plain network error', () => {
+    expect(isAuthFailure(new TypeError('Failed to fetch'))).toBe(false);
+    expect(isAuthFailure(new Error('boom'))).toBe(false);
   });
 });

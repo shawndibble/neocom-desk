@@ -119,7 +119,11 @@ export function ResultsSummary({
             <StatChip label={t('industry.margin')} value={formatPercent(result.marginPct)} />
           )}
           {result.iskPerHour !== null && (
-            <StatChip label={t('industry.iskPerHour')} value={formatIsk(result.iskPerHour)} />
+            <StatChip
+              label={t('industry.iskPerHour')}
+              value={formatIsk(result.iskPerHour)}
+              tooltip={t('industry.iskPerHourTooltip')}
+            />
           )}
         </div>
       )}

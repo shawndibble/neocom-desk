@@ -3,7 +3,7 @@
  * Field names verified against https://esi.evetech.net/meta/openapi.json
  * (2026-08). Optional fields mirror the spec's non-required properties.
  */
-import { esiFetch, ESI_BASE_URL, COMPATIBILITY_DATE, USER_AGENT, EsiError } from './client';
+import { esiFetch } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPages } from './paginated';
 
@@ -304,7 +304,10 @@ export async function getCharacterWalletTransactions(
     const page_ = result.data ?? [];
     if (page_.length === 0) break;
     items.push(...page_);
-    fromId = Math.min(...page_.map((t) => t.transaction_id)) - 1;
+    // from_id is exclusive ("transactions before this id"): passing the
+    // lowest id seen so far already excludes it from the next page, so
+    // subtracting 1 would skip the transaction with id `minId - 1`.
+    fromId = Math.min(...page_.map((t) => t.transaction_id));
   }
   return items;
 }
@@ -424,32 +427,22 @@ export interface UniverseName {
     | 'faction';
 }
 
+/**
+ * BUG #12: previously called `fetch` directly, bypassing esiFetch's
+ * rate-limit retry (429/420) and its shared header/error handling. Routed
+ * through esiFetch (POST support) instead, same as every other endpoint.
+ */
 export async function postUniverseNames(
   ids: number[],
   options: { signal?: AbortSignal } = {}
 ): Promise<UniverseName[]> {
   if (ids.length === 0) return [];
-  const response = await fetch(new URL('/universe/names', ESI_BASE_URL), {
+  const result = await esiFetch<UniverseName[]>('/universe/names', {
     method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-Compatibility-Date': COMPATIBILITY_DATE,
-      'X-User-Agent': USER_AGENT,
-    },
-    body: JSON.stringify(ids),
+    body: ids,
     signal: options.signal,
   });
-  if (!response.ok) {
-    let body: unknown;
-    try {
-      body = await response.json();
-    } catch {
-      // Non-JSON error body.
-    }
-    throw new EsiError(response.status, `ESI request failed with status ${response.status}`, body);
-  }
-  return (await response.json()) as UniverseName[];
+  return result.data ?? [];
 }
 
 // --- GET /characters/{character_id}/calendar (esi-calendar.read_calendar_events.v1) ---

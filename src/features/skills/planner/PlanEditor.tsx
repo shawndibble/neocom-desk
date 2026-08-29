@@ -110,6 +110,7 @@ export function PlanEditor({
   const [reorderPreview, setReorderPreview] = useState<PlanStep[] | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // What-If Implants (CONTEXT.md): swap the clone's real implants for a
   // hypothetical set, for optimizer/schedule exploration only — never
@@ -167,6 +168,23 @@ export function PlanEditor({
     [plan.entries, catalog, trainedSkills, attributes, effectiveImplants, activeBoosters]
   );
 
+  // BUG #1: optimizeResult/reorderPreview index into `scheduled` by position.
+  // Once entries change (add/remove/reorder) or the plan itself is swapped,
+  // those positions are stale and can point past the end of the new
+  // `scheduled` array — clear both rather than render or crash against
+  // outdated data. Derived-and-cleared during render (React's sanctioned
+  // "adjusting state when a prop changes" pattern) instead of an effect, so
+  // the clear lands in the same commit as the prop change rather than one
+  // tick later.
+  const [prevPlanId, setPrevPlanId] = useState(plan.id);
+  const [prevEntries, setPrevEntries] = useState(plan.entries);
+  if (prevPlanId !== plan.id || prevEntries !== plan.entries) {
+    setPrevPlanId(plan.id);
+    setPrevEntries(plan.entries);
+    setOptimizeResult(null);
+    setReorderPreview(null);
+  }
+
   const userSkillTypeIDs = useMemo(
     () => new Set(plan.entries.map((e) => e.skillTypeID)),
     [plan.entries]
@@ -178,9 +196,19 @@ export function PlanEditor({
   }
 
   async function handleImport() {
-    const result = await loadCharacterSkillQueue(characterId);
-    if (!result) return;
-    update(dedupeEntries(parseSkillQueue(result.data)));
+    setImportError(null);
+    try {
+      const result = await loadCharacterSkillQueue(characterId);
+      if (!result) return;
+      update(dedupeEntries(parseSkillQueue(result.data)));
+    } catch (err) {
+      // BUG #3: malformed/corrupted queue data (parseSkillQueue validates
+      // and throws) must surface as a visible, i18n'd note — not an
+      // unhandled rejection swallowed by the `void handleImport()` caller.
+      setImportError(
+        t('plans.importError', { message: err instanceof Error ? err.message : String(err) })
+      );
+    }
   }
 
   async function handleExport() {
@@ -303,6 +331,12 @@ export function PlanEditor({
         </p>
       )}
 
+      {importError && (
+        <p role="alert" className="text-xs text-danger">
+          {importError}
+        </p>
+      )}
+
       <Panel title={t('plans.trainingOptions')}>
         <div className="flex flex-wrap items-start gap-6">
           <label className="flex items-center gap-2 text-xs">
@@ -376,25 +410,33 @@ export function PlanEditor({
                 })}
               </p>
               <ul className="space-y-1">
-                {optimizeResult.segments.map((segment, index) => (
-                  <li
-                    key={index}
-                    className="flex flex-wrap items-center gap-2 border-b border-line pb-1 last:border-b-0"
-                  >
-                    <span className="font-semibold">
-                      {t('plans.segment', { index: index + 1 })}
-                    </span>
-                    <span className="flex-1">
-                      {t('plans.segmentRemap', {
-                        skill: stepLabel(scheduled[segment.startIndex]),
-                        attributes: remapInstruction(segment.attributes),
-                      })}
-                    </span>
-                    <span className="tabular-nums text-text-dim">
-                      {formatDuration(segment.seconds)}
-                    </span>
-                  </li>
-                ))}
+                {optimizeResult.segments.map((segment, index) => {
+                  // Defensive: optimizeResult should already be cleared
+                  // whenever plan.entries changes (see effect above), but
+                  // guard the index anyway so a stale/mismatched result can
+                  // never crash the route.
+                  const anchor = scheduled[segment.startIndex];
+                  if (!anchor) return null;
+                  return (
+                    <li
+                      key={index}
+                      className="flex flex-wrap items-center gap-2 border-b border-line pb-1 last:border-b-0"
+                    >
+                      <span className="font-semibold">
+                        {t('plans.segment', { index: index + 1 })}
+                      </span>
+                      <span className="flex-1">
+                        {t('plans.segmentRemap', {
+                          skill: stepLabel(anchor),
+                          attributes: remapInstruction(segment.attributes),
+                        })}
+                      </span>
+                      <span className="tabular-nums text-text-dim">
+                        {formatDuration(segment.seconds)}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

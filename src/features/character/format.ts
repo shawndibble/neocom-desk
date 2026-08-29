@@ -5,14 +5,25 @@ const ISK_FORMAT = new Intl.NumberFormat('en', {
   maximumFractionDigits: 2,
 });
 
+/**
+ * Below this magnitude, treat the value as zero (BUG #9): floating-point
+ * rounding noise (e.g. -0.004 from a chain of divisions) would otherwise
+ * display as "-0.00" and tone red, reading as a loss that isn't real.
+ */
+const ZERO_EPSILON = 0.005;
+
+function clampZero(value: number): number {
+  return Math.abs(value) < ZERO_EPSILON ? 0 : value;
+}
+
 /** ISK amount with 2 decimals, thousands-separated (e.g. "1,234,567.89"). */
 export function formatIsk(value: number): string {
-  return ISK_FORMAT.format(value);
+  return ISK_FORMAT.format(clampZero(value));
 }
 
 /** Tailwind text color token for a signed ISK amount (journal entries, profit/loss). */
 export function iskToneClass(value: number): string {
-  return value < 0 ? 'text-isk-neg' : 'text-isk-pos';
+  return clampZero(value) < 0 ? 'text-isk-neg' : 'text-isk-pos';
 }
 
 /**

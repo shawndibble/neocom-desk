@@ -6,7 +6,7 @@ import {
   type WalletJournalEntry,
   type WalletTransaction,
 } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from './cache';
+import { loadWithCache, loadWithCacheStatus, type CachedResult, type StatusResult } from './cache';
 
 const KEYS = {
   balance: 'wallet:balance',
@@ -17,6 +17,19 @@ const KEYS = {
 /** ISK balance. ESI or cache. */
 export function loadWalletBalance(characterId: number): Promise<CachedResult<number> | null> {
   return loadWithCache(
+    characterId,
+    KEYS.balance,
+    async () => (await getCharacterWallet(characterId)).data
+  );
+}
+
+/**
+ * Same data as loadWalletBalance, but with the auth-failure state exposed
+ * (BUG #3) for views that show a re-login affordance instead of a silent
+ * "offline" state.
+ */
+export function loadWalletBalanceWithStatus(characterId: number): Promise<StatusResult<number>> {
+  return loadWithCacheStatus(
     characterId,
     KEYS.balance,
     async () => (await getCharacterWallet(characterId)).data
