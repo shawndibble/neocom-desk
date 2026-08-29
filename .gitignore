@@ -7,3 +7,4 @@ test-results
 *.local
 .env
 .DS_Store
+.auth-profile
