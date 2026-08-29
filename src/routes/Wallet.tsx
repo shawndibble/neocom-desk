@@ -10,7 +10,7 @@ import {
 } from '@/features/character/wallet';
 import type { CachedResult } from '@/features/character/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { formatIsk, iskToneClass } from '@/features/character/format';
+import { formatIsk, humanizeRefType, iskToneClass } from '@/features/character/format';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
 interface Snapshot {
@@ -162,7 +162,9 @@ export function Wallet() {
                       <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
                         {new Date(entry.date).toLocaleString()}
                       </td>
-                      <td className="px-3 py-1.5 whitespace-nowrap">{entry.ref_type}</td>
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        {humanizeRefType(entry.ref_type)}
+                      </td>
                       <td className="px-3 py-1.5">{entry.description}</td>
                       <td
                         className={`px-3 py-1.5 text-right tabular-nums ${
@@ -222,28 +224,33 @@ export function Wallet() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {transactions.map((txn) => (
-                    <tr key={txn.transaction_id}>
-                      <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
-                        {new Date(txn.date).toLocaleString()}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        {txn.is_buy ? t('wallet.buy') : t('wallet.sell')}
-                      </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">
-                        {txn.quantity.toLocaleString()}
-                      </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">
-                        {formatIsk(txn.unit_price)}
-                      </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">
-                        {formatIsk(txn.unit_price * txn.quantity)}
-                      </td>
-                    </tr>
-                  ))}
+                  {transactions.map((txn) => {
+                    const total = txn.unit_price * txn.quantity * (txn.is_buy ? -1 : 1);
+                    return (
+                      <tr key={txn.transaction_id}>
+                        <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
+                          {new Date(txn.date).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          {txn.is_buy ? t('wallet.buy') : t('wallet.sell')}
+                        </td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">
+                          {txn.quantity.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">
+                          {formatIsk(txn.unit_price)}
+                        </td>
+                        <td
+                          className={`px-3 py-1.5 text-right tabular-nums ${iskToneClass(total)}`}
+                        >
+                          {formatIsk(total)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </>

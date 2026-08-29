@@ -20,6 +20,7 @@ vi.mock('virtual:pwa-register/react', () => ({
 
 const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
+  '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
 };
 
 vi.mock('@/sde/loadSde', () => ({
@@ -63,6 +64,18 @@ const transactions = [
     is_buy: false,
     is_personal: true,
     journal_ref_id: 1,
+  },
+  {
+    transaction_id: 2,
+    date: '2026-08-01T00:00:01Z',
+    location_id: 60003760,
+    type_id: 35,
+    unit_price: 12,
+    quantity: 10,
+    client_id: 2,
+    is_buy: true,
+    is_personal: true,
+    journal_ref_id: 2,
   },
 ];
 
@@ -120,12 +133,33 @@ describe('Wallet', () => {
     expect(screen.getByText('Donation')).toBeInTheDocument();
   });
 
+  it('humanizes the raw ESI ref_type into readable text', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText('Bounty prize')).toBeInTheDocument();
+    expect(screen.getByText('Player donation')).toBeInTheDocument();
+    expect(screen.queryByText('bounty_prize')).not.toBeInTheDocument();
+  });
+
   it('shows transactions with SDE item names resolved', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('tab', { name: 'Transactions' }));
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Sell')).toBeInTheDocument();
+  });
+
+  it('signs and colors transaction totals: buy negative red, sell positive green', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Transactions' }));
+
+    const sellTotal = await screen.findByText('500.00');
+    expect(sellTotal.className).toContain('text-isk-pos');
+
+    const buyTotal = await screen.findByText('-120.00');
+    expect(buyTotal.className).toContain('text-isk-neg');
   });
 
   it('falls back to cached data when ESI is unreachable, showing the offline banner', async () => {

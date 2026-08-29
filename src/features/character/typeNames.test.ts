@@ -1,5 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
 import type { TypeMap } from '@/sde/types';
+import { ESI_BASE_URL } from '@/esi/client';
+import { db } from '@/db';
 
 const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
@@ -11,19 +15,147 @@ vi.mock('@/sde/loadSde', () => ({
 
 const { loadTypeName, loadTypeNames } = await import('./typeNames');
 
+const server = setupServer();
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeEach(async () => {
+  await db.esiCache.clear();
+});
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
 describe('loadTypeName', () => {
   it('returns the SDE name for a known typeID', async () => {
     expect(await loadTypeName(34)).toBe('Tritanium');
   });
 
-  it('falls back to "Type #id" for an unknown typeID', async () => {
+  it('falls back to "Type #id" when the id is unresolvable everywhere', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 404 }))
+    );
+    server.use(
+      http.get(
+        `${ESI_BASE_URL}/universe/types/99999`,
+        () => new HttpResponse(null, { status: 404 })
+      )
+    );
+
     expect(await loadTypeName(99999)).toBe('Type #99999');
   });
 });
 
 describe('loadTypeNames', () => {
-  it('resolves a batch, mixing known and unknown ids', async () => {
+  it('resolves SDE-known ids locally, without hitting ESI', async () => {
+    let called = false;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => {
+        called = true;
+        return HttpResponse.json([]);
+      })
+    );
+
+    const names = await loadTypeNames([34]);
+
+    expect(names.get(34)).toBe('Tritanium');
+    expect(called).toBe(false);
+  });
+
+  it('batches every SDE-missing id into a single POST /universe/names call', async () => {
+    let calls = 0;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        calls += 1;
+        const ids = (await request.json()) as number[];
+        return HttpResponse.json(
+          ids.map((id) => ({ id, name: `Widget ${id}`, category: 'inventory_type' as const }))
+        );
+      })
+    );
+
+    const names = await loadTypeNames([34, 100, 200]);
+
+    expect(calls).toBe(1);
+    expect(names.get(34)).toBe('Tritanium');
+    expect(names.get(100)).toBe('Widget 100');
+    expect(names.get(200)).toBe('Widget 200');
+  });
+
+  it('caches resolved names under the global sentinel so they persist offline', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([{ id: 100, name: 'Widget 100', category: 'inventory_type' as const }])
+      )
+    );
+
+    await loadTypeNames([100]);
+    expect((await db.esiCache.get([0, 'type:100']))?.value).toBe('Widget 100');
+
+    server.use(http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()));
+    const names = await loadTypeNames([100]);
+    expect(names.get(100)).toBe('Widget 100');
+  });
+
+  it('splits more than 1000 missing ids across multiple batched requests', async () => {
+    const ids = Array.from({ length: 1500 }, (_, i) => 1000 + i);
+    let calls = 0;
+    let maxBatchSize = 0;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        calls += 1;
+        const batch = (await request.json()) as number[];
+        maxBatchSize = Math.max(maxBatchSize, batch.length);
+        return HttpResponse.json(
+          batch.map((id) => ({ id, name: `Widget ${id}`, category: 'inventory_type' as const }))
+        );
+      })
+    );
+
+    const names = await loadTypeNames(ids);
+
+    expect(calls).toBe(2);
+    expect(maxBatchSize).toBeLessThanOrEqual(1000);
+    expect(names.get(1000)).toBe('Widget 1000');
+    expect(names.get(2499)).toBe('Widget 2499');
+  });
+
+  it('falls back to per-id GET /universe/types/{id} when the batch 404s', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${ESI_BASE_URL}/universe/types/100`, () =>
+        HttpResponse.json({
+          type_id: 100,
+          name: 'Widget 100',
+          description: '',
+          group_id: 1,
+          published: true,
+        })
+      ),
+      http.get(
+        `${ESI_BASE_URL}/universe/types/999999`,
+        () => new HttpResponse(null, { status: 404 })
+      )
+    );
+
+    const names = await loadTypeNames([100, 999999]);
+
+    expect(names.get(100)).toBe('Widget 100');
+    expect(names.get(999999)).toBe('Type #999999');
+  });
+
+  it('falls back to cached names when ESI is unreachable (offline)', async () => {
+    await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
+    server.use(http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()));
+
+    const names = await loadTypeNames([100]);
+
+    expect(names.get(100)).toBe('Widget 100');
+  });
+
+  it('falls back to "Type #id" for ids with neither a live nor cached name', async () => {
+    server.use(http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()));
+
     const names = await loadTypeNames([34, 99999]);
+
     expect(names.get(34)).toBe('Tritanium');
     expect(names.get(99999)).toBe('Type #99999');
   });

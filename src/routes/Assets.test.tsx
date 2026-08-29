@@ -21,6 +21,7 @@ vi.mock('virtual:pwa-register/react', () => ({
 const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
+  '650': { name: 'Drake', groupID: 27, volume: 92150 },
 };
 
 vi.mock('@/sde/loadSde', () => ({
@@ -103,6 +104,61 @@ describe('Assets', () => {
     expect(await screen.findByText('Structure #1000000000001')).toBeInTheDocument();
     expect(screen.getByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
+  });
+
+  it('labels a container/ship parent with its resolved type name instead of a raw item id', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: 'Drake' })).toBeInTheDocument();
+  });
+
+  it('falls back to the generic "Container" label when the parent item is unresolvable', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 20,
+              type_id: 34,
+              quantity: 50,
+              location_id: 999999999,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Container')).toBeInTheDocument();
   });
 
   it('filters items via the search box', async () => {

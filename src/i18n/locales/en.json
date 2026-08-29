@@ -242,7 +242,7 @@
     "stationLabel": "Station #{{id}}",
     "structureLabel": "Structure #{{id}}",
     "inSpaceLabel": "In space (system #{{id}})",
-    "itemLabel": "Item #{{id}}"
+    "containerLabel": "Container"
   },
   "mail": {
     "title": "Mail",

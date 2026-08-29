@@ -14,3 +14,15 @@ export function formatIsk(value: number): string {
 export function iskToneClass(value: number): string {
   return value < 0 ? 'text-isk-neg' : 'text-isk-pos';
 }
+
+/**
+ * Humanizes a raw ESI wallet journal `ref_type` (e.g. "contract_price_payment_corp")
+ * into readable text ("Contract price payment corp"). Generic underscore→space
+ * + sentence-case transform, no per-ref-type translation map: ESI adds new ref
+ * types over time and this reads fine for all of them.
+ */
+export function humanizeRefType(refType: string): string {
+  const words = refType.split('_').join(' ');
+  if (words.length === 0) return words;
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}

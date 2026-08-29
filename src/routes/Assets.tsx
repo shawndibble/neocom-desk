@@ -20,12 +20,24 @@ function locationLabel(
   locationId: number,
   locationType: CharacterAsset['location_type'],
   locationNames: Map<number, string>,
+  assetsByItemId: Map<number, CharacterAsset>,
+  typeNames: Map<number, string>,
   t: (key: string, opts?: Record<string, unknown>) => string
 ): string {
   if (locationType === 'station')
     return locationNames.get(locationId) ?? t('assets.stationLabel', { id: locationId });
   if (locationType === 'solar_system') return t('assets.inSpaceLabel', { id: locationId });
-  if (locationType === 'item') return t('assets.itemLabel', { id: locationId });
+  if (locationType === 'item') {
+    // The parent is another asset (a container or ship) in this same
+    // character's asset list; label the group with ITS resolved type name
+    // ("Drake", "Freight Container") instead of a raw item id.
+    const parent = assetsByItemId.get(locationId);
+    if (parent) {
+      const parentName = typeNames.get(parent.type_id);
+      if (parentName && parentName !== `Type #${parent.type_id}`) return parentName;
+    }
+    return t('assets.containerLabel');
+  }
   return t('assets.structureLabel', { id: locationId });
 }
 
@@ -78,6 +90,7 @@ export function Assets() {
   const groups = useMemo(() => {
     const items = assetsResult?.data ?? [];
     const query = search.trim().toLowerCase();
+    const assetsByItemId = new Map(items.map((asset) => [asset.item_id, asset]));
     const byLocation = new Map<number, { asset: CharacterAsset; name: string }[]>();
     for (const asset of items) {
       const name = typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
@@ -89,7 +102,14 @@ export function Assets() {
     return [...byLocation.entries()]
       .map(([locationId, entries]) => ({
         locationId,
-        label: locationLabel(locationId, entries[0].asset.location_type, locationNames, t),
+        label: locationLabel(
+          locationId,
+          entries[0].asset.location_type,
+          locationNames,
+          assetsByItemId,
+          typeNames,
+          t
+        ),
         entries: entries.sort((a, b) => a.name.localeCompare(b.name)),
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
