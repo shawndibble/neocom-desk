@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
+import { Button, InfoTooltip, Panel } from '@/components/ui';
 import { normalizePlan } from '@/engine/plan';
 import { computeSchedule } from '@/engine/schedule';
 import { parseSkillQueue } from '@/engine/queueImport';
@@ -60,6 +60,8 @@ interface PlanEditorProps {
 interface ComputeResult {
   scheduled: ScheduledStep[];
   error: string | null;
+  /** At least one entry refers to a skill the current catalog knows about (UX-REVIEW #9's empty-state discriminator). */
+  hasValidEntries: boolean;
 }
 
 function computeQueue(
@@ -72,6 +74,7 @@ function computeQueue(
 ): ComputeResult {
   // Guard against unknown typeIDs (stale plan, imported skill not in the current SDE snapshot).
   const validEntries = entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
+  const hasValidEntries = validEntries.length > 0;
   try {
     const steps = normalizePlan(validEntries, catalog.engineSkills, trainedSkills);
     // startDate is "now" at compute time — only relevant when a booster is
@@ -82,9 +85,13 @@ function computeQueue(
       { attributes, implants, boosters, startDate: boosters.length > 0 ? new Date() : undefined },
       catalog.engineSkills
     );
-    return { scheduled, error: null };
+    return { scheduled, error: null, hasValidEntries };
   } catch (err) {
-    return { scheduled: [], error: err instanceof Error ? err.message : String(err) };
+    return {
+      scheduled: [],
+      error: err instanceof Error ? err.message : String(err),
+      hasValidEntries,
+    };
   }
 }
 
@@ -102,6 +109,7 @@ export function PlanEditor({
   const [optimizeResult, setOptimizeResult] = useState<PlaceRemapsResult | null>(null);
   const [reorderPreview, setReorderPreview] = useState<PlanStep[] | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [importConfirm, setImportConfirm] = useState<string | null>(null);
 
   // What-If Implants (CONTEXT.md): swap the clone's real implants for a
   // hypothetical set, for optimizer/schedule exploration only — never
@@ -146,7 +154,7 @@ export function PlanEditor({
     [catalog]
   );
 
-  const { scheduled, error } = useMemo(
+  const { scheduled, error, hasValidEntries } = useMemo(
     () =>
       computeQueue(
         plan.entries,
@@ -227,20 +235,23 @@ export function PlanEditor({
       <Panel
         title={t('plans.toolbar')}
         actions={
-          <span className="flex items-center gap-2 text-[11px] text-text-dim">
-            <label className="flex items-center gap-1">
-              {t('plans.remapCount')}
-              <input
-                type="number"
-                min={0}
-                max={5}
-                value={plan.remapCount}
-                onChange={(e) =>
-                  onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
-                }
-                className="h-6 w-12 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
-              />
-            </label>
+          <span className="flex items-center gap-1 text-[11px] text-text-dim">
+            <label htmlFor="plan-remap-count">{t('plans.remapCount')}</label>
+            <InfoTooltip
+              label={t('plans.remapCountTooltipLabel')}
+              content={t('plans.remapCountTooltip')}
+            />
+            <input
+              id="plan-remap-count"
+              type="number"
+              min={0}
+              max={5}
+              value={plan.remapCount}
+              onChange={(e) =>
+                onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
+              }
+              className="h-6 w-12 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
+            />
           </span>
         }
       >
@@ -269,11 +280,27 @@ export function PlanEditor({
             update(
               entries.reduce((acc, entry) => upsertEntry(acc, entry), plan.entries as PlanEntry[])
             );
+            const addedCount = entries.filter(
+              (entry) => (trainedSkills.get(entry.skillTypeID)?.level ?? 0) < entry.targetLevel
+            ).length;
+            setImportConfirm(
+              addedCount > 0
+                ? t('plans.importAddedCount', { count: addedCount })
+                : t('plans.importAddedNone')
+            );
+            setTimeout(() => setImportConfirm(null), 4000);
             setImportOpen(false);
           }}
           onClose={() => setImportOpen(false)}
           nameFor={nameFor}
+          trainedSkills={trainedSkills}
         />
+      )}
+
+      {importConfirm && (
+        <p role="status" aria-live="polite" className="text-xs text-success">
+          {importConfirm}
+        </p>
       )}
 
       <Panel title={t('plans.trainingOptions')}>
@@ -404,7 +431,12 @@ export function PlanEditor({
         {error ? (
           <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
         ) : (
-          <ComputedQueue steps={scheduled} nameFor={nameFor} userSkillTypeIDs={userSkillTypeIDs} />
+          <ComputedQueue
+            steps={scheduled}
+            nameFor={nameFor}
+            userSkillTypeIDs={userSkillTypeIDs}
+            hasValidEntries={hasValidEntries}
+          />
         )}
       </Panel>
     </div>

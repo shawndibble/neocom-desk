@@ -1,15 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { subscribeSyncStatus, type SyncStatus } from '@/sync';
 import { characterPortraitUrl } from './images';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
-
-const INITIAL_SYNC_STATUS: SyncStatus = { state: 'idle', lastSyncedAt: null, error: null };
+import { useSyncStatus } from './useSyncStatus';
 
 /**
  * Sync status dot, gated on Firebase being configured at all (see
@@ -18,24 +16,7 @@ const INITIAL_SYNC_STATUS: SyncStatus = { state: 'idle', lastSyncedAt: null, err
  * the "why isn't this working" question.
  */
 function SyncStatusIndicator() {
-  const [status, setStatus] = useState<SyncStatus>(INITIAL_SYNC_STATUS);
-  const [online, setOnline] = useState(() =>
-    typeof navigator === 'undefined' ? true : navigator.onLine
-  );
-
-  useEffect(() => subscribeSyncStatus(setStatus), []);
-
-  useEffect(() => {
-    const goOnline = () => setOnline(true);
-    const goOffline = () => setOnline(false);
-    window.addEventListener('online', goOnline);
-    window.addEventListener('offline', goOffline);
-    return () => {
-      window.removeEventListener('online', goOnline);
-      window.removeEventListener('offline', goOffline);
-    };
-  }, []);
-
+  const { status, online } = useSyncStatus();
   return <SyncStatusDot status={status} online={online} />;
 }
 
@@ -48,6 +29,80 @@ function navClass({ isActive }: { isActive: boolean }): string {
   return `${NAV_LINK} ${isActive ? NAV_ACTIVE : NAV_IDLE}`;
 }
 
+const MORE_SHEET_ID = 'mobile-more-sheet';
+
+interface MobileMoreSheetProps {
+  onClose: () => void;
+  activeCharacter: { characterId: number; name: string } | undefined;
+}
+
+/**
+ * Mobile-only overflow sheet (UX-REVIEW #4/#8): the six Character-section
+ * views that don't fit as primary bottom-tab-bar items, plus the "switch
+ * character" link that used to occupy the tab bar's fifth slot. Closes on
+ * Escape (focus returns to the More trigger, via the effect in Layout) and
+ * on any link click, so it never hangs over the next route.
+ */
+function MobileMoreSheet({ onClose, activeCharacter }: MobileMoreSheetProps) {
+  const { t } = useTranslation();
+  const firstLinkRef = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    firstLinkRef.current?.focus();
+  }, []);
+
+  return (
+    <div
+      id={MORE_SHEET_ID}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('nav.more')}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:hidden"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md space-y-1 rounded-t-xs border-t border-line bg-panel p-2 pb-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {activeCharacter && (
+          <Link
+            to="/characters"
+            onClick={onClose}
+            className="flex items-center gap-2 rounded-xs border border-transparent px-3 py-2 transition-colors hover:bg-panel-2"
+          >
+            <img
+              src={characterPortraitUrl(activeCharacter.characterId, 64)}
+              alt=""
+              width={28}
+              height={28}
+              className="size-7 rounded-xs border border-line"
+            />
+            <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
+          </Link>
+        )}
+        <NavLink ref={firstLinkRef} to="/wallet" onClick={onClose} className={navClass}>
+          {t('nav.wallet')}
+        </NavLink>
+        <NavLink to="/assets" onClick={onClose} className={navClass}>
+          {t('nav.assets')}
+        </NavLink>
+        <NavLink to="/mail" onClick={onClose} className={navClass}>
+          {t('nav.mail')}
+        </NavLink>
+        <NavLink to="/calendar" onClick={onClose} className={navClass}>
+          {t('nav.calendar')}
+        </NavLink>
+        <NavLink to="/contracts" onClick={onClose} className={navClass}>
+          {t('nav.contracts')}
+        </NavLink>
+        <NavLink to="/orders" onClick={onClose} className={navClass}>
+          {t('nav.orders')}
+        </NavLink>
+      </div>
+    </div>
+  );
+}
+
 /** App chrome: Neocom-style left rail on desktop, bottom tab bar on mobile. */
 export function Layout() {
   const { t } = useTranslation();
@@ -56,6 +111,20 @@ export function Layout() {
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
     [activeCharacterId]
   );
+
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      setMoreOpen(false);
+      moreButtonRef.current?.focus();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [moreOpen]);
 
   return (
     <div className="flex min-h-screen bg-bg text-text">
@@ -130,8 +199,11 @@ export function Layout() {
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-panel/95 backdrop-blur-sm md:hidden">
+      {/* Mobile bottom tab bar: 4 primary destinations + More (UX-REVIEW #4). */}
+      <nav
+        aria-label={t('nav.mobileLabel')}
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-panel/95 backdrop-blur-sm md:hidden"
+      >
         <NavLink to="/characters" className={navClass}>
           {t('nav.characters')}
         </NavLink>
@@ -144,22 +216,22 @@ export function Layout() {
         <NavLink to="/industry" className={navClass}>
           {t('nav.industry')}
         </NavLink>
-        {activeCharacter && (
-          <Link
-            to="/characters"
-            aria-label={t('nav.switchCharacter')}
-            className="flex items-center px-3 py-2"
-          >
-            <img
-              src={characterPortraitUrl(activeCharacter.characterId, 64)}
-              alt=""
-              width={28}
-              height={28}
-              className="size-7 rounded-xs border border-line"
-            />
-          </Link>
-        )}
+        <button
+          type="button"
+          ref={moreButtonRef}
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
+          aria-controls={MORE_SHEET_ID}
+          onClick={() => setMoreOpen((open) => !open)}
+          className={`${NAV_LINK} ${moreOpen ? NAV_ACTIVE : NAV_IDLE}`}
+        >
+          {t('nav.more')}
+        </button>
       </nav>
+
+      {moreOpen && (
+        <MobileMoreSheet onClose={() => setMoreOpen(false)} activeCharacter={activeCharacter} />
+      )}
     </div>
   );
 }

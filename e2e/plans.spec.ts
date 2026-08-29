@@ -50,7 +50,7 @@ test('exports the computed queue to the clipboard', async ({ page, context }) =>
 test('optimize remaps shows attribute segments and savings', async ({ page }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByLabel('Remaps').fill('1');
+  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
   await page.getByRole('button', { name: 'Optimize remaps' }).click();
 
   const resultPanel = page.getByRole('heading', { name: 'Optimize remaps' }).locator('../..');

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, InfoTooltip, Panel } from '@/components/ui';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { FacilityKind, RigLevel, SecurityBand, SkillLevels } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -123,17 +123,19 @@ export function BuildPlanDetail({
           </label>
 
           <div className="flex flex-col gap-1 text-xs">
-            <label className="flex flex-col gap-1">
-              {t('industry.me')}
-              <input
-                type="number"
-                min={0}
-                max={10}
-                value={plan.me}
-                onChange={(e) => update({ me: clampInt(Number(e.target.value), 0, 10) })}
-                className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
-              />
-            </label>
+            <span className="flex items-center gap-1">
+              <label htmlFor="build-plan-me">{t('industry.me')}</label>
+              <InfoTooltip label={t('industry.meTooltipLabel')} content={t('industry.meTooltip')} />
+            </span>
+            <input
+              id="build-plan-me"
+              type="number"
+              min={0}
+              max={10}
+              value={plan.me}
+              onChange={(e) => update({ me: clampInt(Number(e.target.value), 0, 10) })}
+              className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
+            />
             {ownedMatch && (
               <span className="text-[11px] text-text-dim">
                 {t('industry.ownedHint', {
@@ -144,9 +146,13 @@ export function BuildPlanDetail({
             )}
           </div>
 
-          <label className="flex flex-col gap-1 text-xs">
-            {t('industry.te')}
+          <div className="flex flex-col gap-1 text-xs">
+            <span className="flex items-center gap-1">
+              <label htmlFor="build-plan-te">{t('industry.te')}</label>
+              <InfoTooltip label={t('industry.teTooltipLabel')} content={t('industry.teTooltip')} />
+            </span>
             <input
+              id="build-plan-te"
               type="number"
               min={0}
               max={20}
@@ -154,7 +160,7 @@ export function BuildPlanDetail({
               onChange={(e) => update({ te: clampInt(Number(e.target.value), 0, 20) })}
               className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
             />
-          </label>
+          </div>
 
           <label className="flex flex-col gap-1 text-xs">
             {t('industry.facility')}
@@ -222,9 +228,16 @@ export function BuildPlanDetail({
           </label>
 
           {facilityPreset.structure && (
-            <label className="flex flex-col gap-1 text-xs">
-              {t('industry.facilityTax')}
+            <div className="flex flex-col gap-1 text-xs">
+              <span className="flex items-center gap-1">
+                <label htmlFor="build-plan-facility-tax">{t('industry.facilityTax')}</label>
+                <InfoTooltip
+                  label={t('industry.facilityTaxTooltipLabel')}
+                  content={t('industry.facilityTaxTooltip')}
+                />
+              </span>
               <input
+                id="build-plan-facility-tax"
                 type="number"
                 min={0}
                 max={100}
@@ -235,7 +248,7 @@ export function BuildPlanDetail({
                 }
                 className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
               />
-            </label>
+            </div>
           )}
         </div>
       </Panel>
@@ -276,6 +289,7 @@ export function BuildPlanDetail({
                 ? (snapshot?.hubPrices[entry.productTypeID] ?? null)
                 : null
             }
+            costIndexSystemName={hub.systemName}
           />
         </Panel>
       )}

@@ -7,6 +7,8 @@ import { EmptyState, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { markPlanDeleted, scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { useSyncStatus } from '@/app/useSyncStatus';
+import { SyncErrorNote } from '@/app/SyncErrorNote';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import {
   loadSkillCatalog,
@@ -48,6 +50,7 @@ export function SkillPlans() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
+  const syncStatus = useSyncStatus();
 
   const plans = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
@@ -151,6 +154,7 @@ export function SkillPlans() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <SkillsSubNav />
+      {isSyncConfigured() && <SyncErrorNote {...syncStatus} />}
 
       {catalog && (
         <CurrentQueuePanel

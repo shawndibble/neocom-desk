@@ -55,6 +55,10 @@ export function Wallet() {
 
   const current = snapshot?.requestKey === requestKey ? snapshot : null;
   const loading = current === null;
+  // A manual Refresh (refreshKey > 0) that still falls back to cache is a
+  // distinct, more alarming case than the initial load finding cache first
+  // (UX-REVIEW #10) — same warning-tone banner, different copy.
+  const offlineTitleKey = refreshKey > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle';
 
   const balanceResult = current?.balanceResult ?? null;
   const journalResult = current?.journalResult ?? null;
@@ -114,9 +118,7 @@ export function Wallet() {
                 {formatIsk(balanceResult.data)} {t('wallet.isk')}
               </p>
               {balanceResult.fromCache && (
-                <p className="mt-1 text-[11px] text-warning uppercase">
-                  {t('common.offlineTitle')}
-                </p>
+                <p className="mt-1 text-[11px] text-warning uppercase">{t(offlineTitleKey)}</p>
               )}
             </>
           ) : (
@@ -138,9 +140,7 @@ export function Wallet() {
           ) : (
             <>
               {journalResult.fromCache && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
-                  {t('common.offlineTitle')}
-                </p>
+                <p className="px-3 pt-2 text-[11px] text-warning uppercase">{t(offlineTitleKey)}</p>
               )}
               <table className="w-full text-xs">
                 <thead>
@@ -202,9 +202,7 @@ export function Wallet() {
           ) : (
             <>
               {transactionsResult.fromCache && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
-                  {t('common.offlineTitle')}
-                </p>
+                <p className="px-3 pt-2 text-[11px] text-warning uppercase">{t(offlineTitleKey)}</p>
               )}
               <table className="w-full text-xs">
                 <thead>

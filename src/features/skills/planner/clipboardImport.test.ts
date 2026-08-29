@@ -120,6 +120,26 @@ describe('previewClipboardImport: EFT fit', () => {
     expect(preview.warnings).toEqual(['Unknown item: Some Unknown Module']);
   });
 
+  it('dedupes repeated unknown-item warnings with a ×N count (UX-REVIEW #7)', async () => {
+    const deps: ClipboardImportDeps = {
+      skillByName: new Map(),
+      typeByName,
+      loadType: loadTypeFixture({
+        [RIFTER_TYPE_ID]: [
+          { attribute_id: 182, value: 3329 },
+          { attribute_id: 277, value: 1 },
+        ],
+      }),
+    };
+
+    const preview = await previewClipboardImport(
+      '[Rifter, My Fit]\nRepublic Fleet EMP S\nRepublic Fleet EMP S\nRepublic Fleet EMP S',
+      deps
+    );
+
+    expect(preview.warnings).toEqual(['Unknown item: Republic Fleet EMP S ×3']);
+  });
+
   it('warns when a resolved type has no cached dogma data, without erroring', async () => {
     const deps: ClipboardImportDeps = {
       skillByName: new Map(),

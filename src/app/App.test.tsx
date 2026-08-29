@@ -33,6 +33,15 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/');
 });
 
+describe('boot gate spinner (UX-REVIEW #1)', () => {
+  it('shows the app name and a visible "Loading…" line, not a bare spinner', () => {
+    render(<App />);
+    expect(screen.getByText('NeoCom Desk')).toBeInTheDocument();
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+});
+
 describe('routing guard', () => {
   it('redirects / to /login when no characters exist', async () => {
     render(<App />);

@@ -226,6 +226,26 @@ describe('Industry: owned-blueprint prefill', () => {
   });
 });
 
+describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
+  it('gives ME, TE, and facility tax inputs an accessible tooltip without polluting their labels', async () => {
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    // Labels stay exact ("ME"/"TE") — the tooltip trigger lives outside the <label>.
+    expect(screen.getByLabelText('ME')).toBeInTheDocument();
+    expect(screen.getByLabelText('TE')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About ME' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About TE' })).toBeInTheDocument();
+
+    expect(screen.queryByRole('button', { name: 'About facility tax' })).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Facility'), 'raitaru');
+    expect(screen.getByLabelText('Facility tax %')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About facility tax' })).toBeInTheDocument();
+  });
+});
+
 const RIFTER_BLUEPRINT = {
   name: 'Rifter Blueprint',
   time: 1200,

@@ -38,8 +38,10 @@ function Root() {
   const characterCount = useLiveQuery(() => db.characters.count());
   if (characterCount === undefined) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-bg">
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg text-text">
+        <h1 className="text-sm font-semibold tracking-widest uppercase">{t('app.name')}</h1>
         <Spinner label={t('common.loading')} />
+        <p className="text-xs text-text-dim">{t('common.loadingEllipsis')}</p>
       </main>
     );
   }

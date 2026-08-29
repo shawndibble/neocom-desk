@@ -38,6 +38,16 @@ describe('TRADE_HUBS', () => {
     expect(new Set(TRADE_HUBS.map((hub) => hub.regionId)).size).toBe(TRADE_HUBS.length);
   });
 
+  it('carries a short system name distinct from the full station name (UX-REVIEW #6)', () => {
+    expect(TRADE_HUBS.map((hub) => hub.systemName)).toEqual([
+      'Jita',
+      'Amarr',
+      'Dodixie',
+      'Rens',
+      'Hek',
+    ]);
+  });
+
   it('defaults to Jita 4-4', () => {
     expect(DEFAULT_TRADE_HUB.id).toBe('jita');
     expect(DEFAULT_TRADE_HUB).toBe(TRADE_HUBS[0]);

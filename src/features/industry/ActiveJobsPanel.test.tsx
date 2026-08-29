@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -7,6 +8,8 @@ import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import type { TypeMap } from '@/sde/types';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
+
+vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
 const TYPES: TypeMap = {
   '100': { name: 'Widget Alpha', groupID: 1, volume: 1 },
@@ -123,14 +126,14 @@ describe('ActiveJobsPanel: rendering', () => {
     ]);
   });
 
-  it('shows a "no active jobs" empty state (not the reconnect one) when ESI answers with zero jobs', async () => {
+  it('shows a "no active jobs" empty state (not the no-data-cached one) when ESI answers with zero jobs', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([])));
     render(<ActiveJobsPanel characterId={CHAR_ID} />);
     expect(await screen.findByText('No active jobs')).toBeInTheDocument();
     expect(screen.queryByText('No active jobs cached')).toBeNull();
   });
 
-  it('shows the "reconnect" empty state when there is no data at all (offline, nothing cached)', async () => {
+  it('shows the "no data cached" empty state when there is no data at all (offline, nothing cached)', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.error()));
     render(<ActiveJobsPanel characterId={CHAR_ID} />);
     expect(await screen.findByText('No active jobs cached')).toBeInTheDocument();
@@ -153,6 +156,46 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
     ).toBeInTheDocument();
     expect(screen.queryByText(/showing cached data/i)).toBeNull();
     expect(screen.queryByText('No active jobs cached')).toBeNull();
+  });
+
+  it('offers a real login action wired to beginEveLogin (UX-REVIEW #3)', async () => {
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json({ error: 'token is not valid for scope' }, { status: 403 })
+      )
+    );
+    const { beginEveLogin } = await import('@/app/loginFlow');
+    const user = userEvent.setup();
+
+    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+
+    const loginButton = await screen.findByRole('button', { name: 'Log in again with EVE Online' });
+    await user.click(loginButton);
+    expect(beginEveLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it('REFRESH while scope is missing re-fetches and re-shows the re-login state, not a silent no-op', async () => {
+    let requestCount = 0;
+    server.use(
+      http.get(jobsUrl(), () => {
+        requestCount += 1;
+        return HttpResponse.json({ error: 'token is not valid for scope' }, { status: 403 });
+      })
+    );
+    const user = userEvent.setup();
+
+    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+
+    await screen.findByText('Log in again to see jobs');
+    expect(requestCount).toBe(1);
+
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(await screen.findByText('Log in again to see jobs')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Log in again with EVE Online' })
+    ).toBeInTheDocument();
+    expect(requestCount).toBe(2);
   });
 });
 
@@ -183,5 +226,38 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
     expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see jobs')).toBeNull();
+  });
+
+  it('distinguishes a failed manual refresh from the initial-load offline banner (UX-REVIEW #10)', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'industryJobs',
+      value: [
+        {
+          job_id: 1,
+          activity_id: 1,
+          blueprint_type_id: 100,
+          facility_id: 60003760,
+          station_id: 60003760,
+          runs: 1,
+          start_date: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+          end_date: new Date(NOW.getTime() + 30 * 60_000).toISOString(),
+          status: 'active',
+        },
+      ],
+      fetchedAt: 1234,
+    });
+    server.use(http.get(jobsUrl(), () => HttpResponse.error()));
+    const user = userEvent.setup();
+
+    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+
+    // Initial load falls back to cache too, but this is the generic banner, not "Refresh failed".
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+    expect(screen.queryByText(/refresh failed/i)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(await screen.findByText('Refresh failed — showing cached data')).toBeInTheDocument();
   });
 });

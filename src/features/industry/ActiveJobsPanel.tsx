@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
 import {
@@ -86,11 +87,14 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           <Spinner size="sm" label={t('common.loading')} />
         </div>
       ) : result?.needsReauth ? (
-        <div className="space-y-1 py-2">
+        <div className="space-y-2 py-2">
           <p className="text-xs font-semibold tracking-widest text-warning uppercase">
             {t('industry.jobsReauthTitle')}
           </p>
           <p className="text-xs text-text-dim">{t('industry.jobsReauthHint')}</p>
+          <Button variant="primary" size="sm" onClick={() => void beginEveLogin()}>
+            {t('industry.jobsReauthAction')}
+          </Button>
         </div>
       ) : jobs.length === 0 ? (
         // Distinguish "ESI/cache answered, character just has none running"
@@ -111,7 +115,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       ) : (
         <div className="space-y-2">
           {result?.cached?.fromCache && (
-            <p className="text-[11px] text-warning uppercase">{t('common.offlineTitle')}</p>
+            <p className="text-[11px] text-warning uppercase">
+              {refreshKey > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
+            </p>
           )}
           <ul className="space-y-2">
             {jobs.map((job) => {

@@ -96,8 +96,20 @@ async function previewEftFit(
   const requiredSkills: RequiredSkillsLookup = (typeId) => requiredByTypeId.get(typeId) ?? [];
   const { entries, errors: fitErrors } = fitToSkills(fit, typeByName, requiredSkills);
 
+  // Fits repeat items across multiple slots (three turrets loaded with the
+  // same unresolvable faction ammo, say), which would otherwise print the
+  // same "Unknown item" line once per slot. Dedupe by item name, keeping
+  // first-occurrence order, and note the repeat count instead.
+  const unknownItemCounts = new Map<string, number>();
+  for (const e of fitErrors) {
+    unknownItemCounts.set(e.itemName, (unknownItemCounts.get(e.itemName) ?? 0) + 1);
+  }
+  const unknownItemWarnings = [...unknownItemCounts.entries()].map(([name, count]) =>
+    count > 1 ? `Unknown item: ${name} ×${count}` : `Unknown item: ${name}`
+  );
+
   const warnings = [
-    ...fitErrors.map((e) => `Unknown item: ${e.itemName}`),
+    ...unknownItemWarnings,
     ...missingDogma
       .sort((a, b) => a - b)
       .map((id) => `Requirements unknown for type #${id} (not cached — reconnect and retry)`),

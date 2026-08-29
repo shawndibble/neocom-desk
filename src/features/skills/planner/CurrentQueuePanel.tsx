@@ -97,7 +97,12 @@ export function CurrentQueuePanel({
       ) : !result?.data || scheduled.length === 0 ? (
         <EmptyState title={t('plans.currentQueueEmpty')} className="py-4" />
       ) : (
-        <ComputedQueue steps={scheduled} nameFor={nameFor} userSkillTypeIDs={queuedSkillTypeIDs} />
+        <ComputedQueue
+          steps={scheduled}
+          nameFor={nameFor}
+          userSkillTypeIDs={queuedSkillTypeIDs}
+          hasValidEntries={queuedSkillTypeIDs.size > 0}
+        />
       )}
     </Panel>
   );

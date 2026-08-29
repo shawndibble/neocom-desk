@@ -184,4 +184,26 @@ describe('Wallet', () => {
     render(<App />);
     expect(await screen.findByText(/no wallet data cached/i)).toBeInTheDocument();
   });
+
+  it('distinguishes a failed manual Refresh from the initial-load offline banner (UX-REVIEW #10)', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:balance',
+      value: 999,
+      fetchedAt: Date.now(),
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    // Initial load succeeds live — no banner at all yet.
+    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(screen.queryByText(/showing cached data/i)).not.toBeInTheDocument();
+
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
+    );
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(await screen.findByText('Refresh failed — showing cached data')).toBeInTheDocument();
+  });
 });

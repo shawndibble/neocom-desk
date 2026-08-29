@@ -12,6 +12,8 @@ interface ResultsSummaryProps {
   productName: string;
   /** Product's lowest hub sell price (per unit); null when unpriced at this hub. */
   productUnitPrice: number | null;
+  /** Short solar-system name the build's cost index applies to (UX-REVIEW #6/#8: makes the trade-hub <-> build-system coupling explicit in the label). */
+  costIndexSystemName: string;
 }
 
 /**
@@ -27,6 +29,7 @@ export function ResultsSummary({
   systemCostIndex,
   productName,
   productUnitPrice,
+  costIndexSystemName,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
 
@@ -54,11 +57,20 @@ export function ResultsSummary({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <StatChip label={t('industry.eiv')} value={formatIsk(result.jobFee.eiv)} />
-        <StatChip label={t('industry.costIndexFee')} value={formatIsk(result.jobFee.grossCost)} />
+        <StatChip
+          label={t('industry.eiv')}
+          value={formatIsk(result.jobFee.eiv)}
+          tooltip={t('industry.eivTooltip')}
+        />
+        <StatChip
+          label={t('industry.costIndexFee')}
+          value={formatIsk(result.jobFee.grossCost)}
+          tooltip={t('industry.costIndexFeeTooltip')}
+        />
         <StatChip
           label={t('industry.sccSurcharge')}
           value={formatIsk(result.jobFee.sccSurcharge)}
+          tooltip={t('industry.sccSurchargeTooltip')}
         />
         <StatChip
           label={t('industry.facilityTaxAmount')}
@@ -80,7 +92,11 @@ export function ResultsSummary({
         />
         <StatChip label={t('industry.time')} value={formatDuration(result.seconds)} />
         {systemCostIndex !== null && (
-          <StatChip label={t('industry.costIndex')} value={formatCostIndex(systemCostIndex)} />
+          <StatChip
+            label={t('industry.costIndexWithSystem', { system: costIndexSystemName })}
+            value={formatCostIndex(systemCostIndex)}
+            tooltip={t('industry.costIndexTooltip')}
+          />
         )}
       </div>
 

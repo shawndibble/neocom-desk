@@ -30,14 +30,15 @@ const scheduleSyncMock = vi.fn();
 const triggerSyncMock = vi
   .fn<(characterId: number) => Promise<void>>()
   .mockResolvedValue(undefined);
+const subscribeSyncStatusMock = vi.fn((listener: (s: unknown) => void) => {
+  listener({ state: 'idle', lastSyncedAt: null, error: null });
+  return () => {};
+});
 vi.mock('@/sync', () => ({
   markPlanDeleted: (characterId: number, id: string) => markPlanDeletedMock(characterId, id),
   scheduleSync: (characterId: number) => scheduleSyncMock(characterId),
   triggerSync: (characterId: number) => triggerSyncMock(characterId),
-  subscribeSyncStatus: (listener: (s: unknown) => void) => {
-    listener({ state: 'idle', lastSyncedAt: null, error: null });
-    return () => {};
-  },
+  subscribeSyncStatus: (listener: (s: unknown) => void) => subscribeSyncStatusMock(listener),
 }));
 
 // isSyncConfigured reads import.meta.env, which is 'test' MODE in this suite
@@ -191,6 +192,10 @@ beforeEach(async () => {
   markPlanDeletedMock.mockClear();
   scheduleSyncMock.mockClear();
   triggerSyncMock.mockClear();
+  subscribeSyncStatusMock.mockClear().mockImplementation((listener: (s: unknown) => void) => {
+    listener({ state: 'idle', lastSyncedAt: null, error: null });
+    return () => {};
+  });
 
   window.history.pushState({}, '', '/skills/plans');
 });
@@ -254,6 +259,23 @@ describe('SkillPlans CRUD', () => {
   });
 });
 
+describe('SkillPlans: sync error visibility (UX-REVIEW #10)', () => {
+  it('shows a visible "Sync error" note (not tooltip-only) when sync is in the error state', async () => {
+    subscribeSyncStatusMock.mockImplementation((listener: (s: unknown) => void) => {
+      listener({ state: 'error', lastSyncedAt: null, error: 'boom' });
+      return () => {};
+    });
+    render(<App />);
+    expect(await screen.findByText('Sync error — changes saved locally')).toBeInTheDocument();
+  });
+
+  it('shows nothing extra when sync is idle', async () => {
+    render(<App />);
+    await screen.findByText('Current skill queue');
+    expect(screen.queryByText(/sync error/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('SkillPlans editor: add-skill picker', () => {
   it('inserts prerequisites into the computed queue, dimmed, ahead of the user entry', async () => {
     const user = userEvent.setup();
@@ -276,9 +298,45 @@ describe('SkillPlans editor: add-skill picker', () => {
     expect(items[0].textContent).toMatch(/prereq/i);
     expect(items[3].textContent).not.toMatch(/prereq/i);
 
+    // Column headers label the two time columns (UX-REVIEW #9).
+    expect(within(panel).getByText('Per-level')).toBeInTheDocument();
+    expect(within(panel).getByText('Cumulative')).toBeInTheDocument();
+
     const stored = await db.skillPlans.get('plan-1');
     expect(stored?.entries).toEqual([{ skillTypeID: 2, targetLevel: 1 }]);
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+  });
+});
+
+describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
+  it('says no entries yet when the plan is empty', async () => {
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    expect(within(panel).getByText('Add a skill to see the training queue.')).toBeInTheDocument();
+  });
+
+  it('says all selected skills are already trained, distinct from the "add a skill" empty state, when every entry is already trained', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({
+          skills: [{ skill_id: 1, trained_skill_level: 5, skillpoints_in_skill: 999_999 }],
+          total_sp: 999_999,
+          unallocated_sp: 0,
+        })
+      )
+    );
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    expect(
+      await within(panel).findByText('All selected skills are already trained.')
+    ).toBeInTheDocument();
+    expect(
+      within(panel).queryByText('Add a skill to see the training queue.')
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -361,6 +419,17 @@ describe('SkillPlans editor: optimize remaps', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/Segment 1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Remapping saves/)).not.toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: Remaps input label (UX-REVIEW #6)', () => {
+  it('labels the remap count input "Remaps available" with a helper tooltip', async () => {
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await screen.findByText('Computed queue');
+    expect(screen.getByLabelText('Remaps available')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About remaps available' })).toBeInTheDocument();
   });
 });
 
@@ -495,9 +564,70 @@ describe('SkillPlans editor: import from clipboard', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
 
     const stored = await db.skillPlans.get('plan-1');
     expect(stored?.entries).toEqual([{ skillTypeID: 1, targetLevel: 3 }]);
+  });
+
+  it('tags an already-trained skill in the preview and excludes it from the "Added N" count (UX-REVIEW #7)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({
+          skills: [{ skill_id: 1, trained_skill_level: 5, skillpoints_in_skill: 999_999 }],
+          total_sp: 999_999,
+          unallocated_sp: 0,
+        })
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
+    // Gunnery III: already trained to V. Spaceship Command I: not trained.
+    await user.type(textarea, 'Gunnery III\nSpaceship Command I');
+    await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
+
+    expect(await within(dialog).findByText('Gunnery III')).toBeInTheDocument();
+    expect(within(dialog).getByText('Already trained')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    // Both entries still get applied (existing behavior) — only the confirmation count excludes the trained one.
+    expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
+
+    const stored = await db.skillPlans.get('plan-1');
+    expect(stored?.entries).toEqual([
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 3, targetLevel: 1 },
+    ]);
+  });
+
+  it('says "0 added — all trained" when every parsed entry is already trained', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({
+          skills: [{ skill_id: 1, trained_skill_level: 5, skillpoints_in_skill: 999_999 }],
+          total_sp: 999_999,
+          unallocated_sp: 0,
+        })
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
+    await user.type(textarea, 'Gunnery III');
+    await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
+    await within(dialog).findByText('Already trained');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    expect(await screen.findByText('0 added — all trained')).toBeInTheDocument();
   });
 });
 
