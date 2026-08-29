@@ -73,7 +73,7 @@ export function SkillPlans() {
       if (cancelled) return;
       setCatalog(cat);
       if (skills?.data) setTrainedSkills(toTrainedSkillsMap(skills.data.skills));
-      if (attrs?.data) setAttributes(toEngineAttributes(attrs.data));
+      if (attrs?.data) setAttributes(toEngineAttributes(attrs.data, implantBonuses));
       setImplants(implantBonuses);
     })();
     return () => {

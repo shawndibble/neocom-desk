@@ -6,7 +6,7 @@
 import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
 import type { CharacterAttributes, CharacterSkill } from '@/esi/endpoints';
-import type { Attributes, EngineSkill, TrainedSkill } from '@/engine/types';
+import type { Attributes, EngineSkill, Implants, TrainedSkill } from '@/engine/types';
 
 export interface SkillCatalog {
   /** All skills, keyed by typeID, in the shape src/engine consumes. */
@@ -46,13 +46,30 @@ export function toTrainedSkillsMap(skills: readonly CharacterSkill[]): Map<numbe
   return map;
 }
 
-/** ESI character attributes -> engine Attributes (drops remap-metadata fields). */
-export function toEngineAttributes(attrs: CharacterAttributes): Attributes {
+/** EVE base-attribute floor (17 before implants, even fully un-remapped). */
+const BASE_ATTRIBUTE_MIN = 17;
+
+/**
+ * ESI character attributes -> engine Attributes (drops remap-metadata fields).
+ *
+ * ESI's /characters/{id}/attributes values already include implant bonuses,
+ * but the engine expects base + remap only — computeSchedule and the
+ * optimizer add implants themselves. Pass the character's implant bonuses to
+ * subtract them back out; otherwise they'd count twice, inflating the
+ * baseline past anything a remap can reach (UX-REVIEW #2's "Savings: 0m"
+ * contradiction). Clamped to the base minimum against stale/mismatched cache.
+ */
+export function toEngineAttributes(
+  attrs: CharacterAttributes,
+  implants: Implants = {}
+): Attributes {
+  const base = (name: keyof Attributes): number =>
+    Math.max(BASE_ATTRIBUTE_MIN, attrs[name] - (implants[name] ?? 0));
   return {
-    intelligence: attrs.intelligence,
-    memory: attrs.memory,
-    perception: attrs.perception,
-    willpower: attrs.willpower,
-    charisma: attrs.charisma,
+    intelligence: base('intelligence'),
+    memory: base('memory'),
+    perception: base('perception'),
+    willpower: base('willpower'),
+    charisma: base('charisma'),
   };
 }

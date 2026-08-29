@@ -54,6 +54,7 @@ test('optimize remaps shows attribute segments and savings', async ({ page }) =>
   await page.getByRole('button', { name: 'Optimize remaps' }).click();
 
   const resultPanel = page.getByRole('heading', { name: 'Optimize remaps' }).locator('../..');
+  await expect(resultPanel.getByText(/Remapping saves (?:\d+[dhm]\s*)+/)).toBeVisible();
   await expect(resultPanel.getByText('Segment 1')).toBeVisible();
-  await expect(resultPanel.getByText(/Savings:\s*(?:\d+[dhm]\s*)+/)).toBeVisible();
+  await expect(resultPanel.getByText(/remap to (?:[A-Z]{3} \d+ \/ ){4}[A-Z]{3} \d+/)).toBeVisible();
 });

@@ -185,16 +185,16 @@ export function Skills() {
             <div className="flex flex-wrap gap-4">
               {attributesResult?.data ? (
                 ATTRIBUTE_ORDER.map((name) => {
-                  const base = attributesResult.data![name];
+                  // ESI attribute values already include implant bonuses.
+                  const effective = attributesResult.data![name];
                   const bonus = implantBonuses[name] ?? 0;
+                  const base = effective - bonus;
                   return (
                     <StatChip
                       key={name}
                       label={name}
                       value={
-                        bonus
-                          ? t('skills.attributeEffective', { base, bonus, effective: base + bonus })
-                          : base
+                        bonus ? t('skills.attributeEffective', { base, bonus, effective }) : base
                       }
                       tone={bonus ? 'accent' : 'default'}
                     />

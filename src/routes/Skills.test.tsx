@@ -127,8 +127,8 @@ describe('Skills', () => {
     // Tooltip content is in the DOM (CSS-revealed on hover/focus), markup stripped.
     expect(screen.getByRole('tooltip')).toHaveTextContent('A basic ocular filter implant.');
 
-    // Effective attribute = base (perception 22) + implant bonus (+3) = 25.
-    expect(await screen.findByText('22 + 3 = 25')).toBeInTheDocument();
+    // ESI perception 22 already includes the +3 implant: base 19 + 3 = 22.
+    expect(await screen.findByText('19 + 3 = 22')).toBeInTheDocument();
     // Unbonused attributes show the base value plainly.
     expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
   });

@@ -36,6 +36,17 @@ import { ImportClipboardDialog } from './ImportClipboardDialog';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
+// Below a minute the remap verdict reads "saves 0m" — treat it as no gain.
+const MIN_MEANINGFUL_SAVINGS_SECONDS = 60;
+
+/** "PER 27 / WIL 21 / INT 17 / …": full remap spread, highest first. */
+function remapInstruction(attributes: Attributes): string {
+  return [...ATTRIBUTE_NAMES]
+    .sort((a, b) => attributes[b] - attributes[a])
+    .map((name) => `${name.slice(0, 3).toUpperCase()} ${attributes[name]}`)
+    .join(' / ');
+}
+
 interface PlanEditorProps {
   characterId: number;
   plan: SkillPlanRecord;
@@ -126,6 +137,9 @@ export function PlanEditor({
 
   const nameFor = (skillTypeID: number): string =>
     catalog.bySkillTypeID.get(skillTypeID)?.name ?? `#${skillTypeID}`;
+
+  const stepLabel = (step: PlanStep): string =>
+    `${nameFor(step.skillTypeID)} ${ROMAN[step.level - 1]}`;
 
   const pickerSkills = useMemo(
     () => [...catalog.bySkillTypeID.values()].sort((a, b) => a.name.localeCompare(b.name)),
@@ -325,33 +339,38 @@ export function PlanEditor({
 
       {optimizeResult && (
         <Panel title={t('plans.optimizeRemaps')}>
-          <ul className="space-y-1 text-xs">
-            {optimizeResult.segments.map((segment, index) => (
-              <li
-                key={index}
-                className="flex flex-wrap items-center gap-2 border-b border-line pb-1"
-              >
-                <span className="font-semibold">{t('plans.segment', { index: index + 1 })}</span>
-                <span className="tabular-nums text-text-dim">
-                  {ATTRIBUTE_NAMES.map(
-                    (name) => `${name.slice(0, 3).toUpperCase()} ${segment.attributes[name]}`
-                  ).join(' · ')}
-                </span>
-                <span className="tabular-nums">{formatDuration(segment.seconds)}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-2 flex gap-4 text-xs">
-            <span>
-              {t('plans.totalTime')}: <strong>{formatDuration(optimizeResult.totalSeconds)}</strong>
-            </span>
-            <span>
-              {t('plans.currentTime')}: {formatDuration(optimizeResult.currentSeconds)}
-            </span>
-            <span className="text-success">
-              {t('plans.savings')}: {formatDuration(optimizeResult.savingsSeconds)}
-            </span>
-          </div>
+          {optimizeResult.savingsSeconds < MIN_MEANINGFUL_SAVINGS_SECONDS ? (
+            <p className="text-xs text-text-dim">{t('plans.remapNoGain')}</p>
+          ) : (
+            <div className="space-y-2 text-xs">
+              <p className="font-semibold text-success">
+                {t('plans.remapSaves', {
+                  duration: formatDuration(optimizeResult.savingsSeconds),
+                })}
+              </p>
+              <ul className="space-y-1">
+                {optimizeResult.segments.map((segment, index) => (
+                  <li
+                    key={index}
+                    className="flex flex-wrap items-center gap-2 border-b border-line pb-1 last:border-b-0"
+                  >
+                    <span className="font-semibold">
+                      {t('plans.segment', { index: index + 1 })}
+                    </span>
+                    <span className="flex-1">
+                      {t('plans.segmentRemap', {
+                        skill: stepLabel(scheduled[segment.startIndex]),
+                        attributes: remapInstruction(segment.attributes),
+                      })}
+                    </span>
+                    <span className="tabular-nums text-text-dim">
+                      {formatDuration(segment.seconds)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Panel>
       )}
 

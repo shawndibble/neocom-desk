@@ -2,8 +2,13 @@
  * Optimal remap placement: split an ordered plan into at most `remapCount`
  * contiguous segments, one attribute allocation each, minimizing total time.
  *
- * Model: N remaps = N allocations. N=0 trains the whole plan on the current
- * attributes; N=1 remaps once at the start; N=2 adds one mid-plan boundary; etc.
+ * Model: N remaps = up to N allocations. N=0 trains the whole plan on the
+ * current attributes; N=1 remaps once at the start; N=2 adds one mid-plan
+ * boundary; etc. Remaps are optional: when no reachable allocation beats the
+ * current attributes (they may sit outside the 17..27 base space, e.g. when
+ * fed from ESI values that already include implant or booster bonuses), the
+ * result keeps the current attributes and reports zero savings — the output
+ * is never slower than not remapping at all.
  *
  * DP over pair-runs (maximal step runs sharing one attribute pair): segment
  * boundaries inside a run are dominated by boundaries at its edges, so only
@@ -54,7 +59,7 @@ interface Run {
 export function placeRemaps(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
-  options: PlaceRemapsOptions,
+  options: PlaceRemapsOptions
 ): PlaceRemapsResult {
   const { remapCount, currentAttributes, implants = {} } = options;
 
@@ -67,7 +72,7 @@ export function placeRemaps(
     const sp = spBetween(skill.rank, step.level - 1, step.level);
     const rate = trainingRate(
       currentAttributes[skill.primary] + (implants[skill.primary] ?? 0),
-      currentAttributes[skill.secondary] + (implants[skill.secondary] ?? 0),
+      currentAttributes[skill.secondary] + (implants[skill.secondary] ?? 0)
     );
     currentSeconds += timeToTrain(sp, rate);
     const pair = pairKey(skill.primary, skill.secondary);
@@ -84,21 +89,21 @@ export function placeRemaps(
     return { segments: [], totalSeconds: 0, currentSeconds: 0, savingsSeconds: 0 };
   }
 
-  if (remapCount <= 0) {
-    return {
-      segments: [
-        {
-          startIndex: 0,
-          endIndex: steps.length - 1,
-          attributes: { ...currentAttributes },
-          seconds: currentSeconds,
-        },
-      ],
-      totalSeconds: currentSeconds,
-      currentSeconds,
-      savingsSeconds: 0,
-    };
-  }
+  const noRemapResult = (): PlaceRemapsResult => ({
+    segments: [
+      {
+        startIndex: 0,
+        endIndex: steps.length - 1,
+        attributes: { ...currentAttributes },
+        seconds: currentSeconds,
+      },
+    ],
+    totalSeconds: currentSeconds,
+    currentSeconds,
+    savingsSeconds: 0,
+  });
+
+  if (remapCount <= 0) return noRemapResult();
 
   const runCount = runs.length;
   const maxSegments = Math.min(remapCount, runCount);
@@ -151,6 +156,12 @@ export function placeRemaps(
   for (let k = 1; k <= maxSegments; k++) bestSeconds = Math.min(bestSeconds, dp[k][runCount]);
   let bestK = maxSegments;
   const tieBound = bestSeconds + Math.max(TIE_EPSILON, bestSeconds * 1e-9);
+
+  // Not remapping at all is always a candidate: if the current attributes are
+  // at least as fast as the best reachable allocation (possible when they lie
+  // outside the remap search space), keep them and spend no remap.
+  if (currentSeconds <= tieBound) return noRemapResult();
+
   for (let k = 1; k <= maxSegments; k++) {
     if (dp[k][runCount] <= tieBound) {
       bestK = k;

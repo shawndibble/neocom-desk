@@ -7,7 +7,7 @@ const skill = (
   typeID: number,
   primary: AttributeName,
   secondary: AttributeName,
-  rank = 1,
+  rank = 1
 ): EngineSkill => ({ typeID, name: `Skill ${typeID}`, rank, primary, secondary, prereqs: [] });
 
 const skillMap = (...list: EngineSkill[]): Map<number, EngineSkill> =>
@@ -60,7 +60,10 @@ describe('placeRemaps', () => {
   });
 
   it('splits a two-phase plan at the pair boundary with two remaps', () => {
-    const skills = skillMap(skill(1, 'perception', 'willpower'), skill(2, 'intelligence', 'memory'));
+    const skills = skillMap(
+      skill(1, 'perception', 'willpower'),
+      skill(2, 'intelligence', 'memory')
+    );
     const steps = [...levels(1, 3), ...levels(2, 3)]; // 8000 SP each phase
     const result = placeRemaps(steps, skills, { remapCount: 2, currentAttributes: CURRENT });
     expect(result.segments).toHaveLength(2);
@@ -83,7 +86,10 @@ describe('placeRemaps', () => {
     expect(result.segments).toHaveLength(1);
     expect(result.segments[0].attributes.perception).toBe(27);
 
-    const skills2 = skillMap(skill(1, 'perception', 'willpower'), skill(2, 'intelligence', 'memory'));
+    const skills2 = skillMap(
+      skill(1, 'perception', 'willpower'),
+      skill(2, 'intelligence', 'memory')
+    );
     const result2 = placeRemaps([...levels(1, 3), ...levels(2, 3)], skills2, {
       remapCount: 5,
       currentAttributes: CURRENT,
@@ -95,7 +101,7 @@ describe('placeRemaps', () => {
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
       skill(2, 'intelligence', 'memory', 2),
-      skill(3, 'charisma', 'intelligence', 3),
+      skill(3, 'charisma', 'intelligence', 3)
     );
     const steps = [...levels(1, 2), ...levels(2, 3), ...levels(3, 2), ...levels(1, 4).slice(2)];
     const result = placeRemaps(steps, skills, {
@@ -126,7 +132,7 @@ describe('placeRemaps', () => {
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
       skill(2, 'intelligence', 'memory'),
-      skill(3, 'charisma', 'willpower'),
+      skill(3, 'charisma', 'willpower')
     );
     const steps: PlanStep[] = [
       { skillTypeID: 1, level: 1 },
@@ -167,5 +173,95 @@ describe('placeRemaps', () => {
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
     expect(result.segments.length).toBeLessThanOrEqual(3);
     expect(result.savingsSeconds).toBeGreaterThan(0);
+  });
+});
+
+// Regression for the live-review contradiction (UX-REVIEW #2): a real
+// character's ESI attributes already include implant bonuses, so the baseline
+// fed as `currentAttributes` can sit outside the 17..27 remap search space.
+// The optimizer must never return a plan slower than those current attributes.
+import { computeSchedule } from '@/engine/schedule';
+
+describe('placeRemaps never beats itself with the current attributes', () => {
+  // Mixed attribute pairs, multi-level steps — shaped like a real plan.
+  const skills = skillMap(
+    skill(1, 'perception', 'willpower'),
+    skill(2, 'intelligence', 'memory', 3),
+    skill(3, 'willpower', 'perception', 2),
+    skill(4, 'memory', 'intelligence'),
+    skill(5, 'charisma', 'willpower', 2)
+  );
+  const steps: PlanStep[] = [
+    ...levels(1, 4),
+    ...levels(2, 3),
+    ...levels(3, 2),
+    ...levels(4, 5),
+    ...levels(5, 2),
+  ];
+  const implants: Partial<Attributes> = {
+    intelligence: 4,
+    memory: 4,
+    perception: 4,
+    willpower: 4,
+    charisma: 4,
+  };
+  // ESI-style values: implant bonuses baked in (sum 129 > 99, unreachable by remap).
+  const inflated: Attributes = {
+    intelligence: 29,
+    memory: 27,
+    perception: 31,
+    willpower: 25,
+    charisma: 17,
+  };
+
+  it.each([1, 2, 3])(
+    'with %i remap(s): totalSeconds <= the computeSchedule baseline, savings consistent',
+    (remapCount) => {
+      const schedule = computeSchedule(steps, { attributes: inflated, implants }, skills);
+      const scheduleTotal = schedule[schedule.length - 1].cumulativeSeconds;
+
+      const result = placeRemaps(steps, skills, {
+        remapCount,
+        currentAttributes: inflated,
+        implants,
+      });
+
+      expect(result.currentSeconds).toBeCloseTo(scheduleTotal, 6);
+      expect(result.totalSeconds).toBeLessThanOrEqual(scheduleTotal + 1e-6);
+      expect(result.savingsSeconds).toBeCloseTo(result.currentSeconds - result.totalSeconds, 6);
+      expect(result.savingsSeconds).toBeGreaterThanOrEqual(0);
+    }
+  );
+
+  it('reports zero savings via a single current-attributes segment when no remap helps', () => {
+    const result = placeRemaps(steps, skills, {
+      remapCount: 2,
+      currentAttributes: inflated,
+      implants,
+    });
+    expect(result.savingsSeconds).toBe(0);
+    expect(result.totalSeconds).toBe(result.currentSeconds);
+    expect(result.segments).toHaveLength(1);
+    expect(result.segments[0]).toMatchObject({ startIndex: 0, endIndex: steps.length - 1 });
+    expect(result.segments[0].attributes).toEqual(inflated);
+  });
+
+  it('still remaps when the current attributes are a reachable allocation', () => {
+    // Legal remap spread (sum 99, each 17..27): the optimizer can only match
+    // or beat it, and here the plan is perception-heavy so it must beat it.
+    const reachable: Attributes = {
+      intelligence: 27,
+      memory: 21,
+      perception: 17,
+      willpower: 17,
+      charisma: 17,
+    };
+    const result = placeRemaps(steps, skills, {
+      remapCount: 2,
+      currentAttributes: reachable,
+      implants,
+    });
+    expect(result.savingsSeconds).toBeGreaterThan(0);
+    expect(result.totalSeconds).toBeLessThan(result.currentSeconds);
   });
 });

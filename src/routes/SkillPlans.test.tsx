@@ -306,7 +306,7 @@ describe('SkillPlans editor: import / export', () => {
 });
 
 describe('SkillPlans editor: optimize remaps', () => {
-  it('renders remap segments with attribute spreads and timing', async () => {
+  it('renders a savings verdict and readable remap instructions per segment', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(
       seedPlan({
@@ -323,9 +323,44 @@ describe('SkillPlans editor: optimize remaps', () => {
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
     expect(await screen.findByRole('heading', { name: 'Optimize remaps' })).toBeInTheDocument();
+    // Single verdict line (UX-REVIEW #2), not the Total/Current/Savings triple.
+    expect(screen.getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
+    expect(screen.queryByText(/Total time/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Current attributes/)).not.toBeInTheDocument();
+    // Actionable per-segment instruction (UX-REVIEW #6): the plan is
+    // perception/willpower-heavy, so the remap maxes PER.
     expect(screen.getByText(/Segment 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Total time/)).toBeInTheDocument();
-    expect(screen.getByText(/Savings/)).toBeInTheDocument();
+    expect(screen.getByText(/Before Gunnery I, remap to PER 27 \/ WIL 21 \/ /)).toBeInTheDocument();
+  });
+
+  it('says no remap helps (and hides segments) when current attributes are already optimal', async () => {
+    // The optimal spread for this perception/willpower-heavy plan: the
+    // optimizer can only match it, so savings must be zero, never negative.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          charisma: 17,
+          intelligence: 17,
+          memory: 17,
+          perception: 27,
+          willpower: 21,
+        })
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }], remapCount: 2 })
+    );
+    render(<App />);
+
+    await screen.findByText('Computed queue');
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+
+    expect(
+      await screen.findByText('No remap improves this plan \u2014 keeping current attributes.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Segment 1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Remapping saves/)).not.toBeInTheDocument();
   });
 });
 
