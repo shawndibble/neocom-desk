@@ -1,0 +1,25 @@
+{
+  "name": "neocom-desk-functions",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^6.5.0",
+    "jose": "^6.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.9",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

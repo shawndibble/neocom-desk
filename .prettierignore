@@ -5,3 +5,5 @@ public/data
 package-lock.json
 playwright-report
 test-results
+firestore.rules
+functions/lib
