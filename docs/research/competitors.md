@@ -87,7 +87,7 @@ Catalog of EVE-native and third-party-adopted paste formats:
 | Format | Direction | Spec source | Do we support it? |
 |---|---|---|---|
 | **Skill plan / queue** — `<Skill Name> <Roman numeral>` per line | Game skill-queue "Import from clipboard" ↔ tools | In-game feature (2016-era "Import Clipboard Skill Queue" patch) | **Export: yes** (`clipboardExport.ts`, matches exact in-game import format). **Import (paste): no** — our only import path is ESI (`queueImport.ts`), not a pasted-text parser. |
-| **EFT fit format** — `[Hull, Fit Name]` header + slot-grouped module list, `x2`/`/offline` suffixes | Game fitting window ↔ pyfa/EVE Workbench/etc. | developers.eveolne.com/docs/guides/fitting | No. |
+| **EFT fit format** — `[Hull, Fit Name]` header + slot-grouped module list, `x2`/`/offline` suffixes | Game fitting window ↔ pyfa/EVE Workbench/etc. | developers.eveonline.com/docs/guides/fitting | No. |
 | **DNA format** — `hullID:modID:modID:...:` compact single-line | In-game chat fitting links | Same doc | No. |
 | **Fitting XML** — `<hardware>` elements, file import/export | Game "export fit to file" | Same doc | No. |
 | **Multibuy** — `Item Name Quantity` or `Quantity Item Name` per line | Game Multibuy window paste | In-game since Mar 2016 | No — but directly reusable for a shopping-list/BOM-to-multibuy export from a Build Plan. |
