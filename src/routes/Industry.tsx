@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
+import { markBuildPlanDeleted, scheduleSync } from '@/sync';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -107,6 +108,7 @@ export function Industry() {
     const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
     const plan = newBuildPlan(activeCharacterId, entry, owned);
     await db.buildPlans.add(plan);
+    scheduleSync(activeCharacterId);
     setSelectedId(plan.id);
   }
 
@@ -120,17 +122,22 @@ export function Industry() {
       updatedAt: Date.now(),
     };
     await db.buildPlans.add(copy);
+    scheduleSync(activeCharacterId);
     setSelectedId(copy.id);
   }
 
   async function handleDelete(id: string) {
     // No explicit selection reset needed: effectiveSelectedId falls back
     // automatically once `plans` no longer contains the deleted id.
-    await db.buildPlans.delete(id);
+    // Tombstoned (not plain-deleted) so the remote copy can't resurrect it.
+    if (activeCharacterId === null) return;
+    await markBuildPlanDeleted(activeCharacterId, id);
+    scheduleSync(activeCharacterId);
   }
 
   async function handleRename(id: string, name: string) {
     await db.buildPlans.update(id, { name, updatedAt: Date.now() });
+    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
   async function handleUpdate(
@@ -143,6 +150,7 @@ export function Industry() {
   ) {
     if (!selectedPlan) return;
     await db.buildPlans.put({ ...selectedPlan, ...patch, updatedAt: Date.now() });
+    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
   return (
