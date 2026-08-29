@@ -5,6 +5,8 @@ beforeEach(async () => {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
+  await db.skillPlans.clear();
+  await db.esiCache.clear();
 });
 
 describe('neocom database', () => {
@@ -17,7 +19,7 @@ describe('neocom database', () => {
       characterId: 2112625428,
       name: 'CCP Alpha',
       ownerHash: 'hash-1',
-      addedAt: 1000
+      addedAt: 1000,
     });
     const c = await db.characters.get(2112625428);
     expect(c?.name).toBe('CCP Alpha');
@@ -31,7 +33,7 @@ describe('neocom database', () => {
       accessToken: 'a1',
       refreshToken: 'r1',
       expiresAt: 5000,
-      scopes: ['esi-skills.read_skills.v1']
+      scopes: ['esi-skills.read_skills.v1'],
     });
     expect((await db.tokens.get(2112625428))?.refreshToken).toBe('r1');
 
@@ -40,7 +42,7 @@ describe('neocom database', () => {
       accessToken: 'a2',
       refreshToken: 'r2',
       expiresAt: 9000,
-      scopes: ['esi-skills.read_skills.v1']
+      scopes: ['esi-skills.read_skills.v1'],
     });
     const t = await db.tokens.get(2112625428);
     expect(t?.accessToken).toBe('a2');
@@ -52,5 +54,43 @@ describe('neocom database', () => {
   it('stores settings by key', async () => {
     await db.settings.put({ key: 'theme', value: 'dark' });
     expect((await db.settings.get('theme'))?.value).toBe('dark');
+  });
+
+  it('adds, gets, and indexes skill plans by characterId', async () => {
+    await db.skillPlans.add({
+      id: 'plan-1',
+      characterId: 2112625428,
+      name: 'PvP fit',
+      entries: [{ skillTypeID: 3300, targetLevel: 5 }],
+      remapCount: 1,
+      updatedAt: 1000,
+    });
+    await db.skillPlans.add({
+      id: 'plan-2',
+      characterId: 999,
+      name: 'Other character',
+      entries: [],
+      remapCount: 0,
+      updatedAt: 1000,
+    });
+
+    const plan = await db.skillPlans.get('plan-1');
+    expect(plan?.name).toBe('PvP fit');
+    expect(plan?.entries).toEqual([{ skillTypeID: 3300, targetLevel: 5 }]);
+
+    const forCharacter = await db.skillPlans.where('characterId').equals(2112625428).toArray();
+    expect(forCharacter.map((p) => p.id)).toEqual(['plan-1']);
+  });
+
+  it('caches ESI values per character+key, keyed compositely', async () => {
+    await db.esiCache.put({ characterId: 91, key: 'skills', value: { total_sp: 1 }, fetchedAt: 5 });
+    await db.esiCache.put({ characterId: 92, key: 'skills', value: { total_sp: 2 }, fetchedAt: 6 });
+
+    expect((await db.esiCache.get([91, 'skills']))?.value).toEqual({ total_sp: 1 });
+    expect((await db.esiCache.get([92, 'skills']))?.value).toEqual({ total_sp: 2 });
+
+    await db.esiCache.put({ characterId: 91, key: 'skills', value: { total_sp: 3 }, fetchedAt: 7 });
+    expect(await db.esiCache.count()).toBe(2);
+    expect((await db.esiCache.get([91, 'skills']))?.value).toEqual({ total_sp: 3 });
   });
 });

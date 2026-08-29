@@ -34,7 +34,7 @@ export function getCharacterSkills(
 ): Promise<EsiResult<CharacterSkills>> {
   return esiFetch<CharacterSkills>(`/characters/${characterId}/skills`, {
     ...options,
-    characterId
+    characterId,
   });
 }
 
@@ -58,7 +58,7 @@ export function getCharacterSkillQueue(
 ): Promise<EsiResult<SkillQueueEntry[]>> {
   return esiFetch<SkillQueueEntry[]>(`/characters/${characterId}/skillqueue`, {
     ...options,
-    characterId
+    characterId,
   });
 }
 
@@ -82,7 +82,7 @@ export function getCharacterAttributes(
 ): Promise<EsiResult<CharacterAttributes>> {
   return esiFetch<CharacterAttributes>(`/characters/${characterId}/attributes`, {
     ...options,
-    characterId
+    characterId,
   });
 }
 
@@ -95,7 +95,7 @@ export function getCharacterImplants(
 ): Promise<EsiResult<number[]>> {
   return esiFetch<number[]>(`/characters/${characterId}/implants`, {
     ...options,
-    characterId
+    characterId,
   });
 }
 
@@ -108,7 +108,7 @@ export function getCharacterWallet(
 ): Promise<EsiResult<number>> {
   return esiFetch<number>(`/characters/${characterId}/wallet`, {
     ...options,
-    characterId
+    characterId,
   });
 }
 
@@ -159,6 +159,23 @@ export function getCorporationPublicInfo(
   options: EndpointOptions = {}
 ): Promise<EsiResult<CorporationPublicInfo>> {
   return esiFetch<CorporationPublicInfo>(`/corporations/${corporationId}`, options);
+}
+
+// --- GET /universe/types/{type_id} (public) ---
+
+export interface UniverseType {
+  type_id: number;
+  name: string;
+  description: string;
+  group_id: number;
+  published: boolean;
+}
+
+export function getUniverseType(
+  typeId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<UniverseType>> {
+  return esiFetch<UniverseType>(`/universe/types/${typeId}`, options);
 }
 
 // --- GET /alliances/{alliance_id} (public) ---

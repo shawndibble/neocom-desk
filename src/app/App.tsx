@@ -10,6 +10,8 @@ import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import { Characters } from '@/routes/Characters';
 import { Overview } from '@/routes/Overview';
+import { Skills } from '@/routes/Skills';
+import { SkillPlans } from '@/routes/SkillPlans';
 import { Styleguide } from '@/routes/Styleguide';
 import { Layout } from './Layout';
 import { ReloadPrompt } from './ReloadPrompt';
@@ -50,6 +52,8 @@ export function App() {
         <Route element={<Layout />}>
           <Route path="/characters" element={<Characters />} />
           <Route path="/overview" element={<Overview />} />
+          <Route path="/skills" element={<Skills />} />
+          <Route path="/skills/plans" element={<SkillPlans />} />
         </Route>
         <Route path="/styleguide" element={<Styleguide />} />
         <Route path="*" element={<Navigate to="/" replace />} />

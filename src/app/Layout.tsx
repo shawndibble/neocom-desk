@@ -54,7 +54,9 @@ export function Layout() {
           <NavLink to="/overview" className={navClass}>
             {t('nav.overview')}
           </NavLink>
-          <DisabledNavItem label={t('nav.skills')} soon={t('nav.soon')} />
+          <NavLink to="/skills" className={navClass}>
+            {t('nav.skills')}
+          </NavLink>
           <DisabledNavItem label={t('nav.industry')} soon={t('nav.soon')} />
         </nav>
         {activeCharacter && (
@@ -86,6 +88,9 @@ export function Layout() {
         </NavLink>
         <NavLink to="/overview" className={navClass}>
           {t('nav.overview')}
+        </NavLink>
+        <NavLink to="/skills" className={navClass}>
+          {t('nav.skills')}
         </NavLink>
         {activeCharacter && (
           <Link

@@ -12,7 +12,8 @@ import {
   getCharacterWallet,
   getCharacterPublicInfo,
   getCorporationPublicInfo,
-  getAlliancePublicInfo
+  getAlliancePublicInfo,
+  getUniverseType,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
 
@@ -44,11 +45,21 @@ describe('character skill endpoints', () => {
   it('getCharacterSkills returns the typed skills payload', async () => {
     const payload: CharacterSkills = {
       skills: [
-        { skill_id: 3300, trained_skill_level: 5, active_skill_level: 5, skillpoints_in_skill: 256000 },
-        { skill_id: 3301, trained_skill_level: 4, active_skill_level: 3, skillpoints_in_skill: 45255 }
+        {
+          skill_id: 3300,
+          trained_skill_level: 5,
+          active_skill_level: 5,
+          skillpoints_in_skill: 256000,
+        },
+        {
+          skill_id: 3301,
+          trained_skill_level: 4,
+          active_skill_level: 3,
+          skillpoints_in_skill: 45255,
+        },
       ],
       total_sp: 5000000,
-      unallocated_sp: 150000
+      unallocated_sp: 150000,
     };
     server.use(authedJson(`/characters/${CHARACTER_ID}/skills`, payload, { ETag: '"sk1"' }));
 
@@ -85,9 +96,9 @@ describe('character skill endpoints', () => {
         finish_date: '2026-09-01T00:00:00Z',
         level_start_sp: 45255,
         level_end_sp: 256000,
-        training_start_sp: 50000
+        training_start_sp: 50000,
       },
-      { skill_id: 3301, queue_position: 1, finished_level: 1 }
+      { skill_id: 3301, queue_position: 1, finished_level: 1 },
     ];
     server.use(authedJson(`/characters/${CHARACTER_ID}/skillqueue`, queue));
 
@@ -106,7 +117,7 @@ describe('character skill endpoints', () => {
       willpower: 21,
       bonus_remaps: 2,
       accrued_remap_cooldown_date: '2027-01-01T00:00:00Z',
-      last_remap_date: '2026-01-01T00:00:00Z'
+      last_remap_date: '2026-01-01T00:00:00Z',
     };
     server.use(authedJson(`/characters/${CHARACTER_ID}/attributes`, attributes));
 
@@ -150,7 +161,7 @@ describe('public info endpoints', () => {
           bloodline_id: 3,
           gender: 'male',
           race_id: 2,
-          security_status: 5.0
+          security_status: 5.0,
         });
       })
     );
@@ -175,7 +186,7 @@ describe('public info endpoints', () => {
           creator_id: 180548812,
           member_count: 226,
           tax_rate: 0.256,
-          alliance_id: 434243723
+          alliance_id: 434243723,
         });
       })
     );
@@ -197,7 +208,7 @@ describe('public info endpoints', () => {
           creator_corporation_id: 109299958,
           creator_id: 180548812,
           date_founded: '2016-06-26T21:00:00Z',
-          executor_corporation_id: 98356193
+          executor_corporation_id: 98356193,
         });
       })
     );
@@ -206,5 +217,29 @@ describe('public info endpoints', () => {
 
     expect(result.data?.name).toBe('C C P Alliance');
     expect(result.data?.executor_corporation_id).toBe(98356193);
+  });
+
+  it('getUniverseType is unauthenticated and returns name + description', async () => {
+    let auth: string | null = 'unset';
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/9899`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        auth = request.headers.get('authorization');
+        return HttpResponse.json({
+          type_id: 9899,
+          name: 'Ocular Filter - Basic',
+          description: 'A basic <b>ocular filter</b> implant.',
+          group_id: 300,
+          published: true,
+        });
+      })
+    );
+
+    const result = await getUniverseType(9899);
+
+    expect(auth).toBeNull();
+    expect(result.data?.name).toBe('Ocular Filter - Basic');
+    expect(result.data?.description).toContain('ocular filter');
   });
 });
