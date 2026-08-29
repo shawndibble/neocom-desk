@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SkillPlanRecord } from '@/db';
 import {
-  mergePlans,
+  mergeRecords,
   mergeSettings,
   TOMBSTONE_TTL_MS,
   type LocalTombstone,
@@ -36,21 +36,21 @@ function remotePlan(overrides: Partial<RemotePlanDoc> = {}): RemotePlanDoc {
   };
 }
 
-describe('mergePlans', () => {
+describe('mergeRecords', () => {
   it('pushes a plan that only exists locally', () => {
-    const result = mergePlans([localPlan()], [], [], NOW);
+    const result = mergeRecords([localPlan()], [], [], NOW);
     expect(result.pushUpserts.map((p) => p.id)).toEqual(['p1']);
     expect(result.pullUpserts).toEqual([]);
   });
 
   it('pulls a plan that only exists remotely', () => {
-    const result = mergePlans([], [], [remotePlan()], NOW);
+    const result = mergeRecords([], [], [remotePlan()], NOW);
     expect(result.pullUpserts.map((p) => p.id)).toEqual(['p1']);
     expect(result.pushUpserts).toEqual([]);
   });
 
   it('LWW: newer local edit wins', () => {
-    const result = mergePlans(
+    const result = mergeRecords(
       [localPlan({ updatedAt: NOW - 10 })],
       [],
       [remotePlan({ updatedAt: NOW - 500 })],
@@ -61,7 +61,7 @@ describe('mergePlans', () => {
   });
 
   it('LWW: newer remote edit wins', () => {
-    const result = mergePlans(
+    const result = mergeRecords(
       [localPlan({ updatedAt: NOW - 500 })],
       [],
       [remotePlan({ updatedAt: NOW - 10 })],
@@ -72,7 +72,7 @@ describe('mergePlans', () => {
   });
 
   it('does nothing when timestamps are equal (already in sync)', () => {
-    const result = mergePlans([localPlan()], [], [remotePlan()], NOW);
+    const result = mergeRecords([localPlan()], [], [remotePlan()], NOW);
     expect(result).toEqual({
       pushUpserts: [],
       pushTombstones: [],
@@ -85,27 +85,27 @@ describe('mergePlans', () => {
 
   it('pushes a local tombstone when the remote copy is older than the delete', () => {
     const tombstone: LocalTombstone = { id: 'p1', deletedAt: NOW - 100 };
-    const result = mergePlans([], [tombstone], [remotePlan({ updatedAt: NOW - 500 })], NOW);
+    const result = mergeRecords([], [tombstone], [remotePlan({ updatedAt: NOW - 500 })], NOW);
     expect(result.pushTombstones).toEqual([tombstone]);
     expect(result.pullUpserts).toEqual([]);
   });
 
   it('a remote edit newer than the local delete resurrects the plan', () => {
     const tombstone: LocalTombstone = { id: 'p1', deletedAt: NOW - 500 };
-    const result = mergePlans([], [tombstone], [remotePlan({ updatedAt: NOW - 100 })], NOW);
+    const result = mergeRecords([], [tombstone], [remotePlan({ updatedAt: NOW - 100 })], NOW);
     expect(result.pullUpserts.map((p) => p.id)).toEqual(['p1']);
     expect(result.pushTombstones).toEqual([]);
     expect(result.clearLocalTombstones).toContain('p1');
   });
 
   it('clears a local tombstone with no remote counterpart', () => {
-    const result = mergePlans([], [{ id: 'p1', deletedAt: NOW - 100 }], [], NOW);
+    const result = mergeRecords([], [{ id: 'p1', deletedAt: NOW - 100 }], [], NOW);
     expect(result.clearLocalTombstones).toEqual(['p1']);
     expect(result.pushTombstones).toEqual([]);
   });
 
   it('remote tombstone deletes the local plan', () => {
-    const result = mergePlans(
+    const result = mergeRecords(
       [localPlan({ updatedAt: NOW - 500 })],
       [],
       [remotePlan({ updatedAt: NOW - 100, deleted: true })],
@@ -116,7 +116,7 @@ describe('mergePlans', () => {
   });
 
   it('a local edit newer than a remote tombstone resurrects the plan', () => {
-    const result = mergePlans(
+    const result = mergeRecords(
       [localPlan({ updatedAt: NOW - 100 })],
       [],
       [remotePlan({ updatedAt: NOW - 500, deleted: true })],
@@ -127,7 +127,7 @@ describe('mergePlans', () => {
   });
 
   it('purges remote tombstones older than 30 days', () => {
-    const result = mergePlans(
+    const result = mergeRecords(
       [],
       [],
       [remotePlan({ updatedAt: NOW - TOMBSTONE_TTL_MS - 1, deleted: true })],
@@ -137,7 +137,7 @@ describe('mergePlans', () => {
   });
 
   it('keeps remote tombstones younger than 30 days', () => {
-    const result = mergePlans(
+    const result = mergeRecords(
       [],
       [],
       [remotePlan({ updatedAt: NOW - TOMBSTONE_TTL_MS + 1000, deleted: true })],
@@ -149,7 +149,7 @@ describe('mergePlans', () => {
 
   it('ignores and clears expired local tombstones (remote live copy gets pulled)', () => {
     const tombstone: LocalTombstone = { id: 'p1', deletedAt: NOW - TOMBSTONE_TTL_MS - 1 };
-    const result = mergePlans(
+    const result = mergeRecords(
       [],
       [tombstone],
       [remotePlan({ updatedAt: NOW - TOMBSTONE_TTL_MS })],
@@ -160,13 +160,13 @@ describe('mergePlans', () => {
   });
 
   it('a live local row supersedes its own stale tombstone', () => {
-    const result = mergePlans([localPlan()], [{ id: 'p1', deletedAt: NOW - 5000 }], [], NOW);
+    const result = mergeRecords([localPlan()], [{ id: 'p1', deletedAt: NOW - 5000 }], [], NOW);
     expect(result.clearLocalTombstones).toEqual(['p1']);
     expect(result.pushUpserts.map((p) => p.id)).toEqual(['p1']);
   });
 
   it('merges independent plans on both sides', () => {
-    const result = mergePlans([localPlan({ id: 'a' })], [], [remotePlan({ id: 'b' })], NOW);
+    const result = mergeRecords([localPlan({ id: 'a' })], [], [remotePlan({ id: 'b' })], NOW);
     expect(result.pushUpserts.map((p) => p.id)).toEqual(['a']);
     expect(result.pullUpserts.map((p) => p.id)).toEqual(['b']);
   });

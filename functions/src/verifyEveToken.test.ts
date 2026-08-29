@@ -20,6 +20,7 @@ import {
 } from './verifyEveToken.js';
 
 const ISSUER = 'https://login.eveonline.com';
+const CLIENT_ID = '0fcb066da13a4bae873716ccaa7ff674';
 const CHARACTER_ID = 94832766;
 const OWNER_HASH = 'aK1zLbmSepUgLYDkq2fnLZK0MnA=';
 
@@ -32,6 +33,7 @@ interface TokenOverrides {
   owner?: string | null;
   issuer?: string;
   audience?: string | string[];
+  azp?: string;
   expiresAt?: number;
   key?: CryptoKey;
 }
@@ -41,11 +43,12 @@ async function makeToken(overrides: TokenOverrides = {}): Promise<string> {
     scp: ['esi-skills.read_skills.v1'],
     name: 'Test Pilot',
     ...(overrides.owner !== null ? { owner: overrides.owner ?? OWNER_HASH } : {}),
+    ...(overrides.azp !== undefined ? { azp: overrides.azp } : {}),
   })
     .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
     .setIssuer(overrides.issuer ?? ISSUER)
     // Real EVE tokens carry aud: [client_id, "EVE Online"].
-    .setAudience(overrides.audience ?? ['0fcb066da13a4bae873716ccaa7ff674', 'EVE Online'])
+    .setAudience(overrides.audience ?? [CLIENT_ID, 'EVE Online'])
     .setIssuedAt()
     .setExpirationTime(overrides.expiresAt ?? Math.floor(Date.now() / 1000) + 1200);
   if (overrides.sub !== null) jwt.setSubject(overrides.sub ?? `CHARACTER:EVE:${CHARACTER_ID}`);
@@ -57,7 +60,12 @@ beforeAll(async () => {
   privateKey = pair.privateKey;
   const jwk = await exportJWK(pair.publicKey);
   jwks = { keys: [{ ...jwk, kid: 'test-key', alg: 'RS256', use: 'sig' }] };
-  opts = { getKey: createLocalJWKSet(jwks), issuer: DEFAULT_ISSUERS, audience: DEFAULT_AUDIENCE };
+  opts = {
+    getKey: createLocalJWKSet(jwks),
+    issuer: DEFAULT_ISSUERS,
+    audience: DEFAULT_AUDIENCE,
+    clientId: CLIENT_ID,
+  };
 });
 
 describe('verifyEveAccessToken', () => {
@@ -93,6 +101,25 @@ describe('verifyEveAccessToken', () => {
     await expect(verifyEveAccessToken(token, opts)).rejects.toThrow();
   });
 
+  it('rejects a token minted for a different EVE application', async () => {
+    // Valid EVE token ("EVE Online" audience present), but issued to some
+    // OTHER app's client_id — must not mint a Firebase credential here.
+    const token = await makeToken({ audience: ['other-apps-client-id', 'EVE Online'] });
+    await expect(verifyEveAccessToken(token, opts)).rejects.toThrow(/client/i);
+  });
+
+  it('accepts a token whose azp matches when aud carries only "EVE Online"', async () => {
+    const token = await makeToken({ audience: 'EVE Online', azp: CLIENT_ID });
+    await expect(verifyEveAccessToken(token, opts)).resolves.toMatchObject({
+      characterId: CHARACTER_ID,
+    });
+  });
+
+  it('rejects when neither aud nor azp carries the configured client_id', async () => {
+    const token = await makeToken({ audience: 'EVE Online', azp: 'other-apps-client-id' });
+    await expect(verifyEveAccessToken(token, opts)).rejects.toThrow(/client/i);
+  });
+
   it('rejects an expired token', async () => {
     const token = await makeToken({ expiresAt: Math.floor(Date.now() / 1000) - 60 });
     await expect(verifyEveAccessToken(token, opts)).rejects.toThrow();
@@ -125,10 +152,12 @@ describe('verifyOptionsFromEnv', () => {
     await once(server, 'listening');
     const { port } = server.address() as AddressInfo;
     process.env.EVE_JWKS_URL = `http://127.0.0.1:${port}/oauth/jwks`;
+    process.env.EVE_CLIENT_ID = CLIENT_ID;
   });
 
   afterAll(async () => {
     delete process.env.EVE_JWKS_URL;
+    delete process.env.EVE_CLIENT_ID;
     server.close();
     await once(server, 'close');
   });
@@ -143,6 +172,21 @@ describe('verifyOptionsFromEnv', () => {
     const rogue = await generateKeyPair('RS256');
     const token = await makeToken({ key: rogue.privateKey });
     await expect(verifyEveAccessToken(token, verifyOptionsFromEnv())).rejects.toThrow();
+  });
+
+  it('rejects tokens minted for another app when using env-derived options', async () => {
+    const token = await makeToken({ audience: ['other-apps-client-id', 'EVE Online'] });
+    await expect(verifyEveAccessToken(token, verifyOptionsFromEnv())).rejects.toThrow(/client/i);
+  });
+
+  it('fails closed: throws at construction when EVE_CLIENT_ID is not set', () => {
+    const saved = process.env.EVE_CLIENT_ID;
+    delete process.env.EVE_CLIENT_ID;
+    try {
+      expect(() => verifyOptionsFromEnv()).toThrow(/EVE_CLIENT_ID/);
+    } finally {
+      process.env.EVE_CLIENT_ID = saved;
+    }
   });
 });
 

@@ -1,42 +1,56 @@
 // Pure merge logic for two-way sync (no firebase imports — unit-testable).
 //
-// Policy (CONTEXT.md): last-write-wins per plan id, compared by updatedAt
+// Policy (CONTEXT.md): last-write-wins per record id, compared by updatedAt
 // (epoch ms). Deletes propagate via tombstones: a remote doc with
 // deleted: true kept for TOMBSTONE_TTL_MS (30 days), then purged.
+//
+// mergeRecords is generic over the record shape so the same policy covers
+// every editable collection (Skill Plans, Build Plans, ...).
 
-import type { SkillPlanRecord } from '@/db';
+import type { BuildPlanRecord, SkillPlanRecord } from '@/db';
 
 export const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** Remote Firestore doc at /characters/{uid}/plans/{planId}. */
-export interface RemotePlanDoc {
+/** Minimum shape a locally stored syncable record must have. */
+export interface SyncRecord {
   id: string;
-  characterId: number;
-  name: string;
-  entries: SkillPlanRecord['entries'];
-  remapCount: number;
-  /** Epoch ms of last edit (or of deletion, for tombstones). */
+  /** Epoch ms of last edit. */
   updatedAt: number;
+}
+
+/** Minimum shape of a remote Firestore doc in an editable collection. */
+export interface RemoteDoc extends SyncRecord {
   /** Owner hash the doc was written under; checked by Firestore rules. */
   ownerHash: string;
   deleted?: boolean;
 }
 
+/** Remote Firestore doc at /characters/{uid}/plans/{planId}. */
+export interface RemotePlanDoc extends RemoteDoc {
+  characterId: number;
+  name: string;
+  entries: SkillPlanRecord['entries'];
+  remapCount: number;
+}
+
+/** Remote Firestore doc at /characters/{uid}/buildPlans/{planId}. */
+export type RemoteBuildPlanDoc = BuildPlanRecord & RemoteDoc;
+
 /** Locally recorded deletion awaiting propagation to the remote store. */
 export interface LocalTombstone {
   id: string;
-  /** Epoch ms when the user deleted the plan on this device. */
+  /** Epoch ms when the user deleted the record on this device. */
   deletedAt: number;
 }
 
-export interface PlanMergeResult {
-  /** Local plans to write (create/overwrite) remotely. */
-  pushUpserts: SkillPlanRecord[];
+export interface MergeResult<L extends SyncRecord, R extends RemoteDoc> {
+  /** Local records to write (create/overwrite) remotely. */
+  pushUpserts: L[];
   /** Local deletions to write remotely as deleted: true docs. */
   pushTombstones: LocalTombstone[];
-  /** Remote plans to write into the local store. */
-  pullUpserts: RemotePlanDoc[];
-  /** Local plan ids to delete (remote tombstone won). */
+  /** Remote records to write into the local store. */
+  pullUpserts: R[];
+  /** Local record ids to delete (remote tombstone won). */
   deleteLocal: string[];
   /** Remote tombstone doc ids past TTL, to delete remotely. */
   purgeRemote: string[];
@@ -44,13 +58,13 @@ export interface PlanMergeResult {
   clearLocalTombstones: string[];
 }
 
-export function mergePlans(
-  local: SkillPlanRecord[],
+export function mergeRecords<L extends SyncRecord, R extends RemoteDoc>(
+  local: L[],
   localTombstones: LocalTombstone[],
-  remote: RemotePlanDoc[],
+  remote: R[],
   now: number
-): PlanMergeResult {
-  const result: PlanMergeResult = {
+): MergeResult<L, R> {
+  const result: MergeResult<L, R> = {
     pushUpserts: [],
     pushTombstones: [],
     pullUpserts: [],

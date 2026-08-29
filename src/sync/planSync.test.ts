@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { deleteDoc, getDocs, setDoc } from 'firebase/firestore';
-import { db, type SkillPlanRecord } from '@/db';
+import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore';
+import { db, type BuildPlanRecord, type SkillPlanRecord } from '@/db';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
+  getSyncStatus,
+  markBuildPlanDeleted,
   markPlanDeleted,
   scheduleSync,
   setSyncedSetting,
@@ -13,25 +15,52 @@ import {
 
 type DocData = Record<string, unknown>;
 
-// In-memory Firestore double: collection path -> doc id -> data.
-const remoteStore = vi.hoisted(() => new Map<string, Map<string, DocData>>());
-
 interface FakeCol {
   path: string;
+}
+interface FakeFilter {
+  field: string;
+  op: string;
+  value: unknown;
+}
+interface FakeQuery {
+  col: FakeCol;
+  filters: FakeFilter[];
 }
 interface FakeRef {
   col: FakeCol;
   id: string;
 }
 
+// In-memory Firestore double: collection path -> doc id -> data. getDocs
+// applies '==' where-filters like the real backend (and like the deployed
+// rules, which only allow filtered list queries).
+const fake = vi.hoisted(() => {
+  const remoteStore = new Map<string, Map<string, Record<string, unknown>>>();
+  const getDocsImpl = async (target: {
+    path?: string;
+    col?: { path: string };
+    filters?: { field: string; op: string; value: unknown }[];
+  }) => {
+    const path = target.col?.path ?? target.path ?? '';
+    const filters = target.filters ?? [];
+    const docs = [...(remoteStore.get(path)?.values() ?? [])]
+      .filter((d) => filters.every((f) => (f.op === '==' ? d[f.field] === f.value : true)))
+      .map((data) => ({ data: () => data }));
+    return { docs };
+  };
+  return { remoteStore, getDocsImpl };
+});
+const remoteStore = fake.remoteStore;
+
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_firestore: unknown, ...segments: string[]): FakeCol => ({
     path: segments.join('/'),
   })),
   doc: vi.fn((col: FakeCol, id: string): FakeRef => ({ col, id })),
-  getDocs: vi.fn(async (col: FakeCol) => ({
-    docs: [...(remoteStore.get(col.path)?.values() ?? [])].map((data) => ({ data: () => data })),
-  })),
+  query: vi.fn((col: FakeCol, ...filters: FakeFilter[]): FakeQuery => ({ col, filters })),
+  where: vi.fn((field: string, op: string, value: unknown): FakeFilter => ({ field, op, value })),
+  getDocs: vi.fn(fake.getDocsImpl),
   setDoc: vi.fn(async (ref: FakeRef, data: DocData) => {
     let colMap = remoteStore.get(ref.col.path);
     if (!colMap) {
@@ -55,6 +84,7 @@ vi.mock('./syncAuth', () => ({
 }));
 
 const PLANS_PATH = 'characters/char:1/plans';
+const BUILD_PLANS_PATH = 'characters/char:1/buildPlans';
 const SETTINGS_PATH = 'characters/char:1/settings';
 const HASH = 'hash-a';
 
@@ -70,8 +100,30 @@ function plan(overrides: Partial<SkillPlanRecord> = {}): SkillPlanRecord {
   };
 }
 
+function buildPlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
+  return {
+    id: 'b1',
+    characterId: 1,
+    name: 'Rifter run',
+    blueprintTypeID: 638,
+    runs: 10,
+    me: 10,
+    te: 20,
+    facility: 'raitaru',
+    rigLevel: 't1',
+    security: 'highsec',
+    hubId: 'jita',
+    updatedAt: Date.now() - 1000,
+    ...overrides,
+  };
+}
+
 function remoteDoc(overrides: DocData = {}): DocData {
   return { ...plan(), ownerHash: HASH, deleted: false, ...overrides };
+}
+
+function remoteBuildDoc(overrides: DocData = {}): DocData {
+  return { ...buildPlan(), ownerHash: HASH, deleted: false, ...overrides };
 }
 
 function seedRemote(path: string, docs: DocData[]): void {
@@ -81,7 +133,13 @@ function seedRemote(path: string, docs: DocData[]): void {
 beforeEach(async () => {
   remoteStore.clear();
   vi.clearAllMocks();
-  await Promise.all([db.characters.clear(), db.skillPlans.clear(), db.settings.clear()]);
+  vi.mocked(getDocs).mockImplementation(fake.getDocsImpl as never);
+  await Promise.all([
+    db.characters.clear(),
+    db.skillPlans.clear(),
+    db.buildPlans.clear(),
+    db.settings.clear(),
+  ]);
   await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: HASH, addedAt: 1 });
 });
 
@@ -157,10 +215,100 @@ describe('triggerSync: plans', () => {
   it('wipes local plans instead of pushing them when ownerHash changed (character sold)', async () => {
     await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
     await db.skillPlans.put(plan());
+    await db.buildPlans.put(buildPlan());
     await triggerSync(1);
     expect(await db.skillPlans.count()).toBe(0);
+    expect(await db.buildPlans.count()).toBe(0);
     expect(remoteStore.get(PLANS_PATH)?.get('p1')).toBeUndefined();
+    expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')).toBeUndefined();
     expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe(HASH);
+  });
+});
+
+describe('triggerSync: ownerHash-scoped reads', () => {
+  it('queries every collection filtered by the character ownerHash', async () => {
+    await triggerSync(1);
+    // plans + buildPlans + settings, each read through a where clause.
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
+    for (const call of vi.mocked(getDocs).mock.calls) {
+      expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
+    }
+  });
+
+  it('ignores remote docs written under a different ownerHash', async () => {
+    seedRemote(PLANS_PATH, [remoteDoc({ id: 'stale', ownerHash: 'previous-owner' })]);
+    await triggerSync(1);
+    expect(await db.skillPlans.get('stale')).toBeUndefined();
+  });
+});
+
+describe('triggerSync: build plans', () => {
+  it('pushes a local-only build plan with ownerHash and deleted: false', async () => {
+    const p = buildPlan({ facilityTaxPct: 1.5 });
+    await db.buildPlans.put(p);
+    await triggerSync(1);
+    expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')).toEqual({
+      id: 'b1',
+      characterId: 1,
+      name: p.name,
+      blueprintTypeID: p.blueprintTypeID,
+      runs: p.runs,
+      me: p.me,
+      te: p.te,
+      facility: p.facility,
+      rigLevel: p.rigLevel,
+      security: p.security,
+      hubId: p.hubId,
+      facilityTaxPct: 1.5,
+      updatedAt: p.updatedAt,
+      ownerHash: HASH,
+      deleted: false,
+    });
+  });
+
+  it('omits undefined facilityTaxPct from the pushed doc (Firestore rejects undefined)', async () => {
+    await db.buildPlans.put(buildPlan());
+    await triggerSync(1);
+    const doc = remoteStore.get(BUILD_PLANS_PATH)?.get('b1');
+    expect(doc).toBeDefined();
+    expect('facilityTaxPct' in (doc ?? {})).toBe(false);
+  });
+
+  it('pulls a remote-only build plan into Dexie without remote-only fields', async () => {
+    const expected = buildPlan();
+    seedRemote(BUILD_PLANS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    await triggerSync(1);
+    expect(await db.buildPlans.get('b1')).toEqual(expected);
+  });
+
+  it('LWW: newer remote build plan overwrites local', async () => {
+    const now = Date.now();
+    await db.buildPlans.put(buildPlan({ runs: 1, updatedAt: now - 900 }));
+    seedRemote(BUILD_PLANS_PATH, [remoteBuildDoc({ runs: 50, updatedAt: now - 10 })]);
+    await triggerSync(1);
+    expect((await db.buildPlans.get('b1'))?.runs).toBe(50);
+  });
+
+  it('markBuildPlanDeleted pushes a tombstone and clears the local one after sync', async () => {
+    await db.buildPlans.put(buildPlan());
+    seedRemote(BUILD_PLANS_PATH, [remoteBuildDoc()]);
+    await markBuildPlanDeleted(1, 'b1');
+    expect(await db.buildPlans.get('b1')).toBeUndefined();
+
+    await triggerSync(1);
+    const doc = remoteStore.get(BUILD_PLANS_PATH)?.get('b1');
+    expect(doc?.deleted).toBe(true);
+    expect(doc?.ownerHash).toBe(HASH);
+    const tombstones = await db.settings.get('sync.__buildTombstones.1');
+    expect(tombstones?.value).toEqual([]);
+  });
+
+  it('a remote tombstone deletes the local build plan', async () => {
+    await db.buildPlans.put(buildPlan({ updatedAt: Date.now() - 5000 }));
+    seedRemote(BUILD_PLANS_PATH, [remoteBuildDoc({ deleted: true, updatedAt: Date.now() - 100 })]);
+    await triggerSync(1);
+    expect(await db.buildPlans.get('b1')).toBeUndefined();
   });
 });
 
@@ -180,6 +328,22 @@ describe('triggerSync: settings', () => {
     await setSyncedSetting('sync.tradeHub', 'jita');
     await triggerSync(1);
     expect((await db.settings.get('sync.tradeHub'))?.value).toBe('amarr');
+  });
+
+  it('never writes a remote setting with a non-synced key into Dexie', async () => {
+    // A hostile/compromised remote doc must not overwrite arbitrary Dexie keys.
+    seedRemote(SETTINGS_PATH, [
+      { key: 'activeCharacterId', value: 999, updatedAt: Date.now() + 60_000, ownerHash: HASH },
+      {
+        key: 'sync.__tombstones.1',
+        value: 'junk',
+        updatedAt: Date.now() + 60_000,
+        ownerHash: HASH,
+      },
+    ]);
+    await triggerSync(1);
+    expect(await db.settings.get('activeCharacterId')).toBeUndefined();
+    expect(await db.settings.get('sync.__tombstones.1')).toBeUndefined();
   });
 
   it('never syncs internal sync.__ bookkeeping keys', async () => {
@@ -203,6 +367,7 @@ describe('sync orchestration', () => {
     const last = states[states.length - 1];
     expect(last.state).toBe('idle');
     expect(last.lastSyncedAt).not.toBeNull();
+    expect(last.characterId).toBe(1);
   });
 
   it('reports an error state when sync fails', async () => {
@@ -214,14 +379,54 @@ describe('sync orchestration', () => {
     expect(states[states.length - 1].error).toMatch(/Unknown character/);
   });
 
+  it("keeps status per character: B's success does not mask A's error", async () => {
+    await expect(triggerSync(999)).rejects.toThrow(/Unknown character/);
+    await triggerSync(1);
+    expect(getSyncStatus(1).state).toBe('idle');
+    expect(getSyncStatus(999).state).toBe('error');
+    expect(getSyncStatus(999).error).toMatch(/Unknown character/);
+  });
+
+  it('serializes syncs across characters (no interleaving mid-flight)', async () => {
+    await db.characters.put({ characterId: 2, name: 'Alt', ownerHash: HASH, addedAt: 1 });
+    const order: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      order.push(target.col.path);
+      if (target.col.path === 'characters/char:1/plans') await gate;
+      return fake.getDocsImpl(target);
+    }) as never);
+
+    const p1 = triggerSync(1);
+    const p2 = triggerSync(2);
+    // Give character 2 every chance to (incorrectly) start while 1 is blocked.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(order.some((path) => path.includes('char:2'))).toBe(false);
+
+    release();
+    await Promise.all([p1, p2]);
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(3);
+  });
+
+  it('a queued sync still runs after the previous one fails', async () => {
+    const p999 = triggerSync(999);
+    const p1 = triggerSync(1);
+    await expect(p999).rejects.toThrow(/Unknown character/);
+    await p1; // chain not poisoned by the failure
+    expect(getSyncStatus(1).state).toBe('idle');
+  });
+
   it('debounces scheduleSync into a single run', async () => {
     scheduleSync(1, 20);
     scheduleSync(1, 20);
     scheduleSync(1, 20);
-    // One sync = one getDocs per collection (plans + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(2));
+    // One sync = one getDocs per collection (plans + buildPlans + settings).
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(3));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(3);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
   });
 });

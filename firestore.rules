@@ -1,15 +1,22 @@
 rules_version = '2';
 
-// Sync data only: user-editable Skill Plans + synced settings, per character.
-// uid format is "char:{characterId}" (minted by the mintFirebaseToken function
-// after verifying an EVE access token against CCP's JWKS).
+// Sync data only: user-editable Skill Plans, Build Plans + synced settings,
+// per character. uid format is "char:{characterId}" (minted by the
+// mintFirebaseToken function after verifying an EVE access token against
+// CCP's JWKS).
 //
 // Owner-hash guard: every doc stores the ownerHash it was written under, and
 // the auth token carries the current ownerHash as a custom claim. If a
 // character is sold/transferred, EVE issues a new ownerHash, so the new owner
 // authenticates with the same uid but a different claim: existing docs stop
-// being readable or updatable (no data leak). Delete stays uid-only so the new
+// being gettable or updatable (no data leak). Delete stays uid-only so the new
 // owner can purge the stale docs and start fresh.
+//
+// get vs list: single-doc reads stay hash-strict. list is uid-only — with a
+// hash-strict list rule, a single stale-hash doc left over from a transfer
+// would make EVERY query fail (rules must be provable for all possible
+// results), bricking sync. The client always queries with
+// where('ownerHash', '==', <current hash>), so stale docs never reach it.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /characters/{uid} {
@@ -24,14 +31,24 @@ service cloud.firestore {
       }
 
       match /plans/{planId} {
-        allow read: if isOwner() && hashMatches();
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
+      match /buildPlans/{planId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
         allow create: if isOwner() && incomingHashMatches();
         allow update: if isOwner() && hashMatches() && incomingHashMatches();
         allow delete: if isOwner();
       }
 
       match /settings/{key} {
-        allow read: if isOwner() && hashMatches();
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
         allow create: if isOwner() && incomingHashMatches();
         allow update: if isOwner() && hashMatches() && incomingHashMatches();
         allow delete: if isOwner();

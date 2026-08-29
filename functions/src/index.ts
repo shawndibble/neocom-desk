@@ -15,24 +15,32 @@ import {
 
 initializeApp();
 
-export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(async (request) => {
-  const accessToken = request.data?.accessToken;
-  if (typeof accessToken !== 'string' || accessToken.length === 0) {
-    throw new HttpsError('invalid-argument', 'accessToken (string) is required');
-  }
+// Built at cold start so a missing EVE_CLIENT_ID fails deployment/startup
+// loudly instead of silently accepting any EVE app's tokens per request.
+const verifyOptions = verifyOptionsFromEnv();
 
-  let claims: EveTokenClaims;
-  try {
-    claims = await verifyEveAccessToken(accessToken, verifyOptionsFromEnv());
-  } catch {
-    // Deliberately opaque: don't leak which validation step failed.
-    throw new HttpsError('unauthenticated', 'EVE access token rejected');
-  }
+export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
+  // Hobby-scale abuse cap; also bounds the JWKS fetch fan-out.
+  { maxInstances: 5 },
+  async (request) => {
+    const accessToken = request.data?.accessToken;
+    if (typeof accessToken !== 'string' || accessToken.length === 0) {
+      throw new HttpsError('invalid-argument', 'accessToken (string) is required');
+    }
 
-  const uid = uidForCharacter(claims.characterId);
-  // ownerHash rides along as a custom claim; Firestore rules compare it to the
-  // ownerHash field on each doc so a transferred character can't read the
-  // previous owner's data.
-  const token = await getAuth().createCustomToken(uid, { ownerHash: claims.ownerHash });
-  return { token, uid, ownerHash: claims.ownerHash };
-});
+    let claims: EveTokenClaims;
+    try {
+      claims = await verifyEveAccessToken(accessToken, verifyOptions);
+    } catch {
+      // Deliberately opaque: don't leak which validation step failed.
+      throw new HttpsError('unauthenticated', 'EVE access token rejected');
+    }
+
+    const uid = uidForCharacter(claims.characterId);
+    // ownerHash rides along as a custom claim; Firestore rules compare it to the
+    // ownerHash field on each doc so a transferred character can't read the
+    // previous owner's data.
+    const token = await getAuth().createCustomToken(uid, { ownerHash: claims.ownerHash });
+    return { token, uid, ownerHash: claims.ownerHash };
+  }
+);

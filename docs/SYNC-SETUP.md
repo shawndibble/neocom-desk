@@ -1,10 +1,11 @@
 # Sync backend setup (one-time)
 
 The app itself stays on GitHub Pages. Firebase hosts only the sync backend:
-Firestore (editable data: Skill Plans + `sync.`-prefixed settings) and one
-Cloud Function (`mintFirebaseToken`) that exchanges a verified EVE access
-token for a Firebase custom token (uid `char:{characterId}`, custom claim
-`ownerHash`). EVE refresh tokens never reach Firebase (ADR 0001).
+Firestore (editable data: Skill Plans, Build Plans + `sync.`-prefixed
+settings) and one Cloud Function (`mintFirebaseToken`) that exchanges a
+verified EVE access token for a Firebase custom token (uid
+`char:{characterId}`, custom claim `ownerHash`). EVE refresh tokens never
+reach Firebase (ADR 0001).
 
 ## Prerequisites
 
@@ -18,6 +19,32 @@ token for a Firebase custom token (uid `char:{characterId}`, custom claim
 - Firestore database created (Build → Firestore → Create database,
   production mode; rules are deployed below).
 - Node 24 locally (functions runtime is `nodejs24`).
+
+## Function configuration (required)
+
+The function only accepts EVE access tokens minted for **this** application.
+Every EVE token carries the generic `"EVE Online"` audience, so without this
+check a token from _any_ third-party EVE app would be accepted.
+
+Set `EVE_CLIENT_ID` to the app's EVE application client ID (the same value as
+`VITE_EVE_CLIENT_ID` in the root `.env`). Cloud Functions v2 loads it from a
+dotenv file in `functions/`:
+
+```sh
+# functions/.env  (picked up by firebase deploy and the emulator)
+EVE_CLIENT_ID=<your EVE application client_id>
+```
+
+The function **fails closed**: it throws at cold start (and deployment fails)
+when `EVE_CLIENT_ID` is missing, instead of silently accepting any EVE app's
+tokens. The callable is also capped at `maxInstances: 5` — hobby-scale abuse
+ceiling.
+
+Optional hardening (not enabled): Firebase **App Check** can additionally
+require that callable requests come from the deployed web app. It needs
+console setup (reCAPTCHA/attestation provider + client SDK wiring) before
+enforcement, otherwise it locks everyone out — leave it off until that is
+done deliberately.
 
 ## Commands
 
@@ -47,12 +74,16 @@ automatically. To deploy rules alone: `firebase deploy --only firestore:rules`.
    `char:94832766`.
 3. **Rules are live**: Firestore → Rules shows the deployed
    `firestore.rules` (reads/writes only under
-   `/characters/{uid}/plans|settings` for `request.auth.uid == uid`, with the
-   ownerHash-claim check). The Rules Playground can simulate: a get of
-   `/characters/char:1/plans/x` as uid `char:2` must be denied.
+   `/characters/{uid}/plans|buildPlans|settings` for
+   `request.auth.uid == uid`; single-doc `get`/`update` additionally require
+   the doc's `ownerHash` to match the token claim, while `list` is uid-only —
+   the client always queries `where('ownerHash', '==', <hash>)`). The Rules
+   Playground can simulate: a get of `/characters/char:1/plans/x` as uid
+   `char:2` must be denied.
 4. **Data flows**: create a Skill Plan on device A, sync, then sync on
    device B logged into the same character — the plan appears. Deleting a
    plan leaves a `deleted: true` tombstone doc that disappears after 30 days.
+   Build Plans behave identically under `/characters/{uid}/buildPlans`.
 
 ## Client model (for reference)
 
@@ -63,12 +94,14 @@ automatically. To deploy rules alone: `firebase deploy --only firestore:rules`.
 - If a character's ownerHash changes (character sold), the client wipes its
   local plans for that character before syncing, and Firestore rules stop the
   new owner from reading the previous owner's docs.
-- UI must delete plans via `markPlanDeleted()` (records the tombstone) and
-  write synced settings via `setSyncedSetting()`.
+- UI must delete Skill Plans via `markPlanDeleted()` and Build Plans via
+  `markBuildPlanDeleted()` (both record the tombstone that propagates the
+  delete), and write synced settings via `setSyncedSetting()`.
 
 ## Environment overrides (tests only)
 
 `EVE_JWKS_URL`, `EVE_ISSUER`, `EVE_AUDIENCE` override the verification
 defaults (`https://login.eveonline.com/oauth/jwks`, issuer
 `https://login.eveonline.com` or `login.eveonline.com`, audience
-`EVE Online`). Do not set these in production.
+`EVE Online`). Do not set these in production. `EVE_CLIENT_ID` is different:
+it is **required** in every environment (see "Function configuration").

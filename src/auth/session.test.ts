@@ -17,7 +17,7 @@ function makeAccessJwt(expSeconds: number): string {
     name: 'CCP Alpha',
     owner: 'owner-hash-1',
     exp: expSeconds,
-    scp: ['esi-skills.read_skills.v1']
+    scp: ['esi-skills.read_skills.v1'],
   };
   return `${b64url(JSON.stringify({ alg: 'RS256' }))}.${b64url(JSON.stringify(payload))}.sig`;
 }
@@ -35,7 +35,7 @@ const server = setupServer(
         access_token: makeAccessJwt(Math.floor(Date.now() / 1000) + 1200),
         token_type: 'Bearer',
         expires_in: 1199,
-        refresh_token: 'refresh-initial'
+        refresh_token: 'refresh-initial',
       });
     }
     if (body.get('grant_type') === 'refresh_token' && body.get('refresh_token') === 'refresh-old') {
@@ -43,10 +43,13 @@ const server = setupServer(
         access_token: makeAccessJwt(Math.floor(Date.now() / 1000) + 1200),
         token_type: 'Bearer',
         expires_in: 1199,
-        refresh_token: 'refresh-rotated'
+        refresh_token: 'refresh-rotated',
       });
     }
-    return HttpResponse.json({ error: 'invalid_grant', error_description: 'nope' }, { status: 400 });
+    return HttpResponse.json(
+      { error: 'invalid_grant', error_description: 'nope' },
+      { status: 400 }
+    );
   })
 );
 
@@ -143,7 +146,7 @@ describe('getValidAccessToken', () => {
       accessToken: 'cached-access',
       refreshToken: 'refresh-old',
       expiresAt: Date.now() + 120_000,
-      scopes: []
+      scopes: [],
     });
     await expect(getValidAccessToken(CHAR_ID, cfg)).resolves.toBe('cached-access');
     expect(tokenRequests).toHaveLength(0);
@@ -155,7 +158,7 @@ describe('getValidAccessToken', () => {
       accessToken: 'stale-access',
       refreshToken: 'refresh-old',
       expiresAt: Date.now() + 30_000, // < 60s buffer
-      scopes: ['esi-skills.read_skills.v1']
+      scopes: ['esi-skills.read_skills.v1'],
     });
     const access = await getValidAccessToken(CHAR_ID, cfg);
     expect(access).not.toBe('stale-access');
@@ -172,11 +175,11 @@ describe('getValidAccessToken', () => {
       accessToken: 'stale-access',
       refreshToken: 'refresh-old',
       expiresAt: Date.now() + 30_000,
-      scopes: []
+      scopes: [],
     });
     const [a, b] = await Promise.all([
       getValidAccessToken(CHAR_ID, cfg),
-      getValidAccessToken(CHAR_ID, cfg)
+      getValidAccessToken(CHAR_ID, cfg),
     ]);
     expect(a).toBe(b);
     expect(tokenRequests).toHaveLength(1); // second concurrent call reuses in-flight refresh
@@ -189,16 +192,78 @@ describe('getValidAccessToken', () => {
       accessToken: 'stale-access',
       refreshToken: 'refresh-old',
       expiresAt: Date.now() + 30_000,
-      scopes: []
+      scopes: [],
     });
     await getValidAccessToken(CHAR_ID, cfg);
     // force stale again with a refreshable token
-    await db.tokens.update(CHAR_ID, { expiresAt: Date.now() + 30_000, refreshToken: 'refresh-old' });
+    await db.tokens.update(CHAR_ID, {
+      expiresAt: Date.now() + 30_000,
+      refreshToken: 'refresh-old',
+    });
     await getValidAccessToken(CHAR_ID, cfg);
     expect(tokenRequests).toHaveLength(2); // map entry cleared on settle
   });
 
   it('throws when no token exists for the character', async () => {
     await expect(getValidAccessToken(999, cfg)).rejects.toThrow();
+  });
+
+  it('regression: token record is read inside the single flight, never before it', async () => {
+    // The old code read db.tokens BEFORE checking for an in-flight refresh: a
+    // caller could snapshot the record, lose the microtask race to a completing
+    // refresh, and then re-send the rotated (burned) refresh token. With the
+    // read inside the flight, concurrent callers perform exactly ONE record
+    // read (plus one inside persistTokens), always post-rotation.
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'stale-access',
+      refreshToken: 'refresh-old',
+      expiresAt: Date.now() + 30_000,
+      scopes: [],
+    });
+    const getSpy = vi.spyOn(db.tokens, 'get');
+    const [a, b, c] = await Promise.all([
+      getValidAccessToken(CHAR_ID, cfg),
+      getValidAccessToken(CHAR_ID, cfg),
+      getValidAccessToken(CHAR_ID, cfg),
+    ]);
+    expect(a).toBe(b);
+    expect(b).toBe(c);
+    expect(tokenRequests).toHaveLength(1);
+    // 1 read inside the shared flight + 1 read by persistTokens.
+    expect(getSpy).toHaveBeenCalledTimes(2);
+    getSpy.mockRestore();
+  });
+
+  it('keeps the stored refresh token when the refresh response omits refresh_token', async () => {
+    server.use(
+      http.post('https://login.eveonline.com/v2/oauth/token', async ({ request }) => {
+        const body = new URLSearchParams(await request.text());
+        tokenRequests.push(body);
+        if (
+          body.get('grant_type') === 'refresh_token' &&
+          body.get('refresh_token') === 'refresh-keeper'
+        ) {
+          // No refresh_token field: SSO chose not to rotate.
+          return HttpResponse.json({
+            access_token: makeAccessJwt(Math.floor(Date.now() / 1000) + 1200),
+            token_type: 'Bearer',
+            expires_in: 1199,
+          });
+        }
+        return HttpResponse.json({ error: 'invalid_grant' }, { status: 400 });
+      })
+    );
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'stale-access',
+      refreshToken: 'refresh-keeper',
+      expiresAt: Date.now() + 30_000,
+      scopes: [],
+    });
+    const access = await getValidAccessToken(CHAR_ID, cfg);
+    const stored = await db.tokens.get(CHAR_ID);
+    expect(stored?.accessToken).toBe(access);
+    expect(stored?.refreshToken).toBe('refresh-keeper'); // NOT clobbered to undefined
   });
 });
