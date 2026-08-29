@@ -20,7 +20,8 @@
 
 ## Glossary (round 2 additions)
 
-- **Optimize Modes**: Skill Plan optimizer actions — "optimize now" (place remaps, keep order), "optimize at remap point", "suggest full reorder" (attribute-grouped reorder honoring prerequisites; user accepts or rejects). Reorder never applies silently.
+- **Optimize Modes**: Skill Plan optimizer actions — "optimize now" (optimizer chooses remap placement, keeps order), "optimize at remap points" (user drags **Remap Markers** into the plan; optimizer computes the best attribute spread for each marker-delimited segment), "suggest full reorder" (attribute-grouped reorder honoring prerequisites; user accepts or rejects). Reorder never applies silently.
+- **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
 - **What-If Implants**: Optimizer override that assumes a hypothetical implant set (+3/+4/+5) instead of the clone's current implants.
 - **Booster**: Cerebral accelerator; user toggles it on manually with an expiry date for training-time math.
 
