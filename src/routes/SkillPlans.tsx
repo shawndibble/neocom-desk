@@ -5,6 +5,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
 import { EmptyState, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { markPlanDeleted, scheduleSync } from '@/sync';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import {
   loadSkillCatalog,
@@ -12,11 +14,15 @@ import {
   toTrainedSkillsMap,
   type SkillCatalog,
 } from '@/features/skills/skillMap';
-import { loadCharacterAttributes, loadCharacterSkills } from '@/features/skills/data';
+import {
+  loadCharacterAttributes,
+  loadCharacterSkills,
+  loadImplantBonuses,
+} from '@/features/skills/data';
 import { PlanList } from '@/features/skills/planner/PlanList';
 import { PlanEditor } from '@/features/skills/planner/PlanEditor';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
-import type { Attributes, TrainedSkill } from '@/engine/types';
+import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
 
 const DEFAULT_ATTRIBUTES: Attributes = {
   intelligence: 20,
@@ -52,20 +58,23 @@ export function SkillPlans() {
   const [catalog, setCatalog] = useState<SkillCatalog | null>(null);
   const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
   const [attributes, setAttributes] = useState<Attributes>(DEFAULT_ATTRIBUTES);
+  const [implants, setImplants] = useState<Implants>({});
 
   useEffect(() => {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [cat, skills, attrs] = await Promise.all([
+      const [cat, skills, attrs, implantBonuses] = await Promise.all([
         loadSkillCatalog(),
         loadCharacterSkills(activeCharacterId),
         loadCharacterAttributes(activeCharacterId),
+        loadImplantBonuses(activeCharacterId),
       ]);
       if (cancelled) return;
       setCatalog(cat);
       if (skills?.data) setTrainedSkills(toTrainedSkillsMap(skills.data.skills));
       if (attrs?.data) setAttributes(toEngineAttributes(attrs.data));
+      setImplants(implantBonuses);
     })();
     return () => {
       cancelled = true;
@@ -94,11 +103,16 @@ export function SkillPlans() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  function syncAfterEdit() {
+    if (activeCharacterId !== null && isSyncConfigured()) scheduleSync(activeCharacterId);
+  }
+
   async function handleCreate() {
     if (activeCharacterId === null) return;
     const plan = newPlan(activeCharacterId, t('plans.newPlanName'));
     await db.skillPlans.add(plan);
     setSelectedId(plan.id);
+    syncAfterEdit();
   }
 
   async function handleDuplicate(id: string) {
@@ -111,21 +125,27 @@ export function SkillPlans() {
     };
     await db.skillPlans.add(copy);
     setSelectedId(copy.id);
+    syncAfterEdit();
   }
 
   async function handleDelete(id: string) {
     // No explicit selection reset needed: effectiveSelectedId falls back
     // automatically once `plans` no longer contains the deleted id.
-    await db.skillPlans.delete(id);
+    // Always goes through markPlanDeleted (records a tombstone): a plain
+    // Dexie delete would let the remote copy resurrect it on next sync.
+    if (activeCharacterId === null) return;
+    await markPlanDeleted(activeCharacterId, id);
   }
 
   async function handleRename(id: string, name: string) {
     await db.skillPlans.update(id, { name, updatedAt: Date.now() });
+    syncAfterEdit();
   }
 
   async function handleUpdate(patch: Partial<Pick<SkillPlanRecord, 'entries' | 'remapCount'>>) {
     if (!selectedPlan) return;
     await db.skillPlans.put({ ...selectedPlan, ...patch, updatedAt: Date.now() });
+    syncAfterEdit();
   }
 
   return (
@@ -137,7 +157,7 @@ export function SkillPlans() {
           characterId={activeCharacterId}
           catalog={catalog}
           attributes={attributes}
-          implants={{}}
+          implants={implants}
         />
       )}
 
@@ -166,7 +186,7 @@ export function SkillPlans() {
               catalog={catalog}
               trainedSkills={trainedSkills}
               attributes={attributes}
-              implants={{}}
+              implants={implants}
               onUpdate={(patch) => void handleUpdate(patch)}
             />
           ) : plans.length > 0 ? (

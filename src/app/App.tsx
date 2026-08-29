@@ -4,7 +4,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { configureEsi } from '@/esi/client';
 import { getValidAccessToken } from '@/auth/session';
+import { triggerSync } from '@/sync';
 import { db } from '@/db';
+import { isSyncConfigured } from './syncStatus';
 import { Spinner } from '@/components/ui';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
@@ -46,9 +48,18 @@ function Root() {
 
 export function App() {
   const hydrate = useActiveCharacter((state) => state.hydrate);
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  // Fire-and-forget: runs on app start (once hydration resolves an active
+  // character) and again on every character switch. Errors (offline, no
+  // Firebase config) are swallowed — surfaced instead via subscribeSyncStatus.
+  useEffect(() => {
+    if (activeCharacterId === null || !isSyncConfigured()) return;
+    void triggerSync(activeCharacterId).catch(() => {});
+  }, [activeCharacterId]);
 
   return (
     <BrowserRouter basename={BASENAME}>

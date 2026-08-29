@@ -187,12 +187,24 @@ export function getCorporationPublicInfo(
 
 // --- GET /universe/types/{type_id} (public) ---
 
+/**
+ * One dogma attribute value on a type. Verified against a live ESI response
+ * (2026-08): both `attribute_id` and `value` are numbers, `value` as a float
+ * even for integer-valued attributes (e.g. a skill requirement typeID).
+ */
+export interface DogmaAttribute {
+  attribute_id: number;
+  value: number;
+}
+
 export interface UniverseType {
   type_id: number;
   name: string;
   description: string;
   group_id: number;
   published: boolean;
+  /** Absent for types with no dogma (most non-item types). */
+  dogma_attributes?: DogmaAttribute[];
 }
 
 export function getUniverseType(

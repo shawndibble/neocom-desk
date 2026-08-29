@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -17,6 +17,36 @@ vi.mock('virtual:pwa-register/react', () => ({
     offlineReady: [false, vi.fn()],
     updateServiceWorker: vi.fn(),
   }),
+}));
+
+// Real src/sync would attempt actual Firebase network calls (this repo's
+// .env carries a real dev project config). markPlanDeleted is faked down to
+// its local-delete effect only — the tombstone/remote bookkeeping is src/sync's
+// own responsibility and is covered by its own test suite.
+const markPlanDeletedMock = vi.fn(async (_characterId: number, id: string) => {
+  await db.skillPlans.delete(id);
+});
+const scheduleSyncMock = vi.fn();
+const triggerSyncMock = vi
+  .fn<(characterId: number) => Promise<void>>()
+  .mockResolvedValue(undefined);
+vi.mock('@/sync', () => ({
+  markPlanDeleted: (characterId: number, id: string) => markPlanDeletedMock(characterId, id),
+  scheduleSync: (characterId: number) => scheduleSyncMock(characterId),
+  triggerSync: (characterId: number) => triggerSyncMock(characterId),
+  subscribeSyncStatus: (listener: (s: unknown) => void) => {
+    listener({ state: 'idle', lastSyncedAt: null, error: null });
+    return () => {};
+  },
+}));
+
+// isSyncConfigured reads import.meta.env, which is 'test' MODE in this suite
+// and would otherwise disable the scheduleSync-after-edit wiring under test.
+// Force it on so that wiring is exercised (against the mocked src/sync above,
+// never real Firebase).
+vi.mock('@/app/syncStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/syncStatus')>()),
+  isSyncConfigured: () => true,
 }));
 
 // Small hand-made fixture, not the real SDE: a prereq chain (Small Hybrid
@@ -66,9 +96,14 @@ const FIXTURE_SKILLS: SkillType[] = [
   },
 ];
 
+const RIFTER_TYPE_ID = 587;
+const FIXTURE_TYPES = {
+  [RIFTER_TYPE_ID]: { name: 'Rifter', groupID: 25, volume: 27_000 },
+};
+
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => FIXTURE_SKILLS),
-  loadTypes: vi.fn(async () => ({})),
+  loadTypes: vi.fn(async () => FIXTURE_TYPES),
   loadBlueprints: vi.fn(async () => ({})),
 }));
 
@@ -94,6 +129,19 @@ const server = setupServer(
       { skill_id: 1, queue_position: 0, finished_level: 3 },
       { skill_id: 3, queue_position: 1, finished_level: 1 },
     ])
+  ),
+  http.get(`https://esi.evetech.net/universe/types/${RIFTER_TYPE_ID}`, () =>
+    HttpResponse.json({
+      type_id: RIFTER_TYPE_ID,
+      name: 'Rifter',
+      description: '',
+      group_id: 25,
+      published: true,
+      dogma_attributes: [
+        { attribute_id: 182, value: 1.0 }, // requires Gunnery (typeID 1)...
+        { attribute_id: 277, value: 3.0 }, // ...level III
+      ],
+    })
   )
 );
 
@@ -140,6 +188,10 @@ beforeEach(async () => {
   configureClipboard(clipboardWriteText);
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 
+  markPlanDeletedMock.mockClear();
+  scheduleSyncMock.mockClear();
+  triggerSyncMock.mockClear();
+
   window.history.pushState({}, '', '/skills/plans');
 });
 
@@ -172,6 +224,33 @@ describe('SkillPlans CRUD', () => {
     expect(remaining).toHaveLength(1);
     expect(remaining[0].name).toBe('PvP Fit (copy)');
     expect(window.confirm).toHaveBeenCalled();
+
+    // Deletes MUST go through markPlanDeleted (records a tombstone) — a plain
+    // Dexie delete would let the remote copy resurrect it on next sync.
+    expect(markPlanDeletedMock).toHaveBeenCalledWith(CHAR_ID, planId);
+  });
+
+  it('schedules a sync after create, rename, and duplicate', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'New plan' }));
+    expect(await screen.findByText('Untitled plan')).toBeInTheDocument();
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+    scheduleSyncMock.mockClear();
+
+    await user.click(screen.getByRole('button', { name: 'Rename Untitled plan' }));
+    const input = screen.getByRole('textbox', { name: 'Rename' });
+    await user.clear(input);
+    await user.type(input, 'Renamed{Enter}');
+    expect(await screen.findByText('Renamed')).toBeInTheDocument();
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+    scheduleSyncMock.mockClear();
+
+    const row = screen.getByText('Renamed').closest('li')!;
+    await user.click(within(row).getByRole('button', { name: 'Duplicate' }));
+    expect(await screen.findByText('Renamed (copy)')).toBeInTheDocument();
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 });
 
@@ -199,6 +278,7 @@ describe('SkillPlans editor: add-skill picker', () => {
 
     const stored = await db.skillPlans.get('plan-1');
     expect(stored?.entries).toEqual([{ skillTypeID: 2, targetLevel: 1 }]);
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 });
 
@@ -275,6 +355,114 @@ describe('SkillPlans editor: suggest reorder', () => {
       { skillTypeID: 4, targetLevel: 1 },
       { skillTypeID: 3, targetLevel: 1 },
     ]);
+  });
+});
+
+describe('SkillPlans editor: what-if implants and booster', () => {
+  it('recomputes training time when switching what-if implants mode', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    render(<App />);
+
+    const queuePanel = (await screen.findByText('Computed queue')).closest('section')!;
+    await within(queuePanel).findAllByRole('listitem');
+    const durationHeader = () =>
+      within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
+    const durationBefore = durationHeader().textContent;
+
+    const select = screen.getByRole('combobox', { name: 'What-if implants' });
+    expect(select).toHaveValue('current');
+    await user.selectOptions(select, '+5');
+
+    await waitFor(() => {
+      expect(durationHeader().textContent).not.toBe(durationBefore);
+    });
+  });
+
+  it('shows the bonus/expiry inputs only once the booster is enabled, and flags a past expiry as expired', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+    await screen.findByText('Training options');
+
+    expect(screen.queryByLabelText('Expires')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    const expiresInput = screen.getByLabelText('Expires');
+    expect(screen.queryByText('Expired')).not.toBeInTheDocument();
+
+    await user.type(expiresInput, '2000-01-01T00:00');
+    expect(await screen.findByText('Expired')).toBeInTheDocument();
+  });
+
+  it('an active (non-expired) booster reaches computeSchedule and changes training time', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    render(<App />);
+
+    const queuePanel = (await screen.findByText('Computed queue')).closest('section')!;
+    await within(queuePanel).findAllByRole('listitem');
+    const durationHeader = () =>
+      within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
+    const durationBefore = durationHeader().textContent;
+
+    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
+    expect(screen.queryByText('Expired')).not.toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(durationHeader().textContent).not.toBe(durationBefore);
+    });
+  });
+});
+
+describe('SkillPlans editor: import from clipboard', () => {
+  it('previews and applies a pasted skill plan, and reports unresolvable lines', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
+    await user.type(textarea, 'Gunnery III\nNot A Real Skill II');
+    await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
+
+    expect(await within(dialog).findByText('Detected: skill plan')).toBeInTheDocument();
+    expect(within(dialog).getByText('Gunnery III')).toBeInTheDocument();
+    expect(within(dialog).getByText(/unknown skill: Not A Real Skill/)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const stored = await db.skillPlans.get('plan-1');
+    expect(stored?.entries).toEqual([{ skillTypeID: 1, targetLevel: 3 }]);
+  });
+
+  it('previews and applies a pasted EFT fit, resolving required skills from ESI dogma_attributes', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
+    await user.click(textarea);
+    // user.type() treats [ ] { } as special key syntax — paste() takes the
+    // literal fit text as-is instead.
+    await user.paste('[Rifter, Test Fit]\n[Empty High slot]');
+    await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
+
+    expect(await within(dialog).findByText('Detected: EFT fit')).toBeInTheDocument();
+    // Rifter's fixture dogma requires skill typeID 1 (Gunnery) at level 3.
+    expect(within(dialog).getByText('Gunnery III')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/unknown item/i)).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const stored = await db.skillPlans.get('plan-1');
+    expect(stored?.entries).toEqual([{ skillTypeID: 1, targetLevel: 3 }]);
   });
 });
 

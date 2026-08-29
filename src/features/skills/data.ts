@@ -16,6 +16,8 @@ import {
   type SkillQueueEntry,
   type UniverseType,
 } from '@/esi/endpoints';
+import type { Implants } from '@/engine/types';
+import { extractAttributeBonuses, sumAttributeBonuses } from './dogma';
 
 export interface CachedResult<T> {
   data: T;
@@ -106,4 +108,17 @@ export function loadUniverseType(typeId: number): Promise<CachedResult<UniverseT
     `type:${typeId}`,
     async () => (await getUniverseType(typeId)).data
   );
+}
+
+/**
+ * Aggregate attribute bonuses across a character's fitted implants: implant
+ * typeIDs (ESI or cache) -> per-type dogma attributes (ESI or cache) -> summed
+ * into one Implants map (engine's computeSchedule/optimizer input). Returns
+ * `{}` when there's no implant data cached or fetchable (offline first-load).
+ */
+export async function loadImplantBonuses(characterId: number): Promise<Implants> {
+  const implants = await loadCharacterImplants(characterId);
+  const typeIds = implants?.data ?? [];
+  const types = await Promise.all(typeIds.map((typeId) => loadUniverseType(typeId)));
+  return sumAttributeBonuses(types.map((t) => extractAttributeBonuses(t?.data?.dogma_attributes)));
 }

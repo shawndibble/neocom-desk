@@ -9,6 +9,7 @@ import {
   loadCharacterImplants,
   loadCharacterSkillQueue,
   loadUniverseType,
+  loadImplantBonuses,
 } from './data';
 
 const CHAR_ID = 91;
@@ -106,6 +107,55 @@ describe('loadCharacterSkillQueue', () => {
     const result = await loadCharacterSkillQueue(CHAR_ID);
     expect(result?.data).toEqual(queue);
     expect(result?.fromCache).toBe(false);
+  });
+});
+
+describe('loadImplantBonuses', () => {
+  it('sums attribute bonuses across every fitted implant', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/implants`, () =>
+        HttpResponse.json([10209, 9899])
+      ),
+      http.get(`${ESI_BASE_URL}/universe/types/10209`, () =>
+        HttpResponse.json({
+          type_id: 10209,
+          name: 'Memory Augmentation - Improved',
+          description: '',
+          group_id: 745,
+          published: true,
+          dogma_attributes: [
+            { attribute_id: 177, value: 5.0 },
+            { attribute_id: 176, value: 0.0 },
+          ],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/universe/types/9899`, () =>
+        HttpResponse.json({
+          type_id: 9899,
+          name: 'Ocular Filter - Basic',
+          description: '',
+          group_id: 300,
+          published: true,
+          dogma_attributes: [{ attribute_id: 178, value: 1.0 }],
+        })
+      )
+    );
+
+    expect(await loadImplantBonuses(CHAR_ID)).toEqual({ memory: 5, perception: 1 });
+  });
+
+  it('returns {} when the character has no implants fitted', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/implants`, () => HttpResponse.json([]))
+    );
+    expect(await loadImplantBonuses(CHAR_ID)).toEqual({});
+  });
+
+  it('returns {} when implants are unfetchable and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/implants`, () => HttpResponse.error())
+    );
+    expect(await loadImplantBonuses(CHAR_ID)).toEqual({});
   });
 });
 

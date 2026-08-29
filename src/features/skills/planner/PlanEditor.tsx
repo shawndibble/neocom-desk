@@ -9,6 +9,7 @@ import { placeRemaps, suggestReorder, ATTRIBUTE_NAMES } from '@/engine/optimizer
 import type { PlaceRemapsResult } from '@/engine/optimizer';
 import type {
   Attributes,
+  Booster,
   Implants,
   PlanEntry,
   PlanStep,
@@ -30,6 +31,8 @@ import {
   upsertEntry,
   applyReorderSuggestion,
 } from './reorder';
+import { whatIfImplants, WHAT_IF_IMPLANT_MODES, type WhatIfImplantMode } from './whatIfImplants';
+import { ImportClipboardDialog } from './ImportClipboardDialog';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
@@ -53,13 +56,21 @@ function computeQueue(
   catalog: SkillCatalog,
   trainedSkills: ReadonlyMap<number, TrainedSkill>,
   attributes: Attributes,
-  implants: Implants
+  implants: Implants,
+  boosters: Booster[]
 ): ComputeResult {
   // Guard against unknown typeIDs (stale plan, imported skill not in the current SDE snapshot).
   const validEntries = entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
   try {
     const steps = normalizePlan(validEntries, catalog.engineSkills, trainedSkills);
-    const scheduled = computeSchedule(steps, { attributes, implants }, catalog.engineSkills);
+    // startDate is "now" at compute time — only relevant when a booster is
+    // active (computeSchedule requires it in that case, for the
+    // booster-expiry breakpoint).
+    const scheduled = computeSchedule(
+      steps,
+      { attributes, implants, boosters, startDate: boosters.length > 0 ? new Date() : undefined },
+      catalog.engineSkills
+    );
     return { scheduled, error: null };
   } catch (err) {
     return { scheduled: [], error: err instanceof Error ? err.message : String(err) };
@@ -79,6 +90,39 @@ export function PlanEditor({
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<PlaceRemapsResult | null>(null);
   const [reorderPreview, setReorderPreview] = useState<PlanStep[] | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+
+  // What-If Implants (CONTEXT.md): swap the clone's real implants for a
+  // hypothetical set, for optimizer/schedule exploration only — never
+  // persisted (plan.remapCount etc. stay the source of truth for the plan
+  // itself; this is a "what if" lens on top of it).
+  const [whatIfMode, setWhatIfMode] = useState<WhatIfImplantMode>('current');
+  const effectiveImplants = useMemo(
+    () => whatIfImplants(whatIfMode, implants),
+    [whatIfMode, implants]
+  );
+
+  // Booster (CONTEXT.md): a single optional cerebral accelerator, applying a
+  // uniform bonus to every attribute until its expiry. Session-local only.
+  const [boosterEnabled, setBoosterEnabled] = useState(false);
+  const [boosterBonus, setBoosterBonus] = useState(3);
+  const [boosterExpiresAt, setBoosterExpiresAt] = useState('');
+  const booster = useMemo<Booster | null>(() => {
+    if (!boosterEnabled || !boosterExpiresAt) return null;
+    const expiresAt = new Date(boosterExpiresAt);
+    if (Number.isNaN(expiresAt.getTime())) return null;
+    const bonus: Partial<Attributes> = {};
+    for (const name of ATTRIBUTE_NAMES) bonus[name] = boosterBonus;
+    return { bonus, expiresAt };
+  }, [boosterEnabled, boosterExpiresAt, boosterBonus]);
+  const activeBoosters = useMemo<Booster[]>(() => (booster ? [booster] : []), [booster]);
+
+  // Display-only "expired" hint: reads the wall clock, which is unavoidably
+  // impure (there's no ticking-clock store in this codebase to subscribe to
+  // instead). computeSchedule itself is unaffected — it already treats a
+  // past expiry as "no bonus" regardless of this flag.
+  // eslint-disable-next-line react-hooks/purity -- see comment above
+  const boosterExpired = booster !== null && booster.expiresAt.getTime() <= Date.now();
 
   const nameFor = (skillTypeID: number): string =>
     catalog.bySkillTypeID.get(skillTypeID)?.name ?? `#${skillTypeID}`;
@@ -89,8 +133,16 @@ export function PlanEditor({
   );
 
   const { scheduled, error } = useMemo(
-    () => computeQueue(plan.entries, catalog, trainedSkills, attributes, implants),
-    [plan.entries, catalog, trainedSkills, attributes, implants]
+    () =>
+      computeQueue(
+        plan.entries,
+        catalog,
+        trainedSkills,
+        attributes,
+        effectiveImplants,
+        activeBoosters
+      ),
+    [plan.entries, catalog, trainedSkills, attributes, effectiveImplants, activeBoosters]
   );
 
   const userSkillTypeIDs = useMemo(
@@ -125,7 +177,7 @@ export function PlanEditor({
       placeRemaps(scheduled, catalog.engineSkills, {
         remapCount: plan.remapCount,
         currentAttributes: attributes,
-        implants,
+        implants: effectiveImplants,
       })
     );
   }
@@ -182,6 +234,9 @@ export function PlanEditor({
           <Button size="sm" onClick={() => void handleImport()}>
             {t('plans.importQueue')}
           </Button>
+          <Button size="sm" onClick={() => setImportOpen(true)}>
+            {t('plans.importClipboard')}
+          </Button>
           <Button size="sm" onClick={() => void handleExport()}>
             {copyConfirm ? t('plans.exportCopied') : t('plans.exportClipboard')}
           </Button>
@@ -191,6 +246,80 @@ export function PlanEditor({
           <Button size="sm" onClick={handleSuggestReorder} disabled={scheduled.length === 0}>
             {t('plans.suggestReorder')}
           </Button>
+        </div>
+      </Panel>
+
+      {importOpen && (
+        <ImportClipboardDialog
+          onApply={(entries) => {
+            update(
+              entries.reduce((acc, entry) => upsertEntry(acc, entry), plan.entries as PlanEntry[])
+            );
+            setImportOpen(false);
+          }}
+          onClose={() => setImportOpen(false)}
+          nameFor={nameFor}
+        />
+      )}
+
+      <Panel title={t('plans.trainingOptions')}>
+        <div className="flex flex-wrap items-start gap-6">
+          <label className="flex items-center gap-2 text-xs">
+            {t('plans.whatIfImplants')}
+            <select
+              value={whatIfMode}
+              onChange={(e) => setWhatIfMode(e.target.value as WhatIfImplantMode)}
+              className="h-7 rounded-xs border border-line bg-panel-2 px-1 text-text"
+            >
+              {WHAT_IF_IMPLANT_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {mode === 'none'
+                    ? t('plans.whatIfNone')
+                    : mode === 'current'
+                      ? t('plans.whatIfCurrent')
+                      : mode}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={boosterEnabled}
+                onChange={(e) => setBoosterEnabled(e.target.checked)}
+              />
+              {t('plans.booster')}
+            </label>
+            {boosterEnabled && (
+              <>
+                <label className="flex items-center gap-1">
+                  {t('plans.boosterBonus')}
+                  <input
+                    type="number"
+                    min={1}
+                    max={9}
+                    value={boosterBonus}
+                    onChange={(e) => setBoosterBonus(Number(e.target.value) || 0)}
+                    className="h-7 w-14 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
+                  />
+                </label>
+                <label className="flex items-center gap-1">
+                  {t('plans.boosterExpiresAt')}
+                  <input
+                    type="datetime-local"
+                    value={boosterExpiresAt}
+                    onChange={(e) => setBoosterExpiresAt(e.target.value)}
+                    className="h-7 rounded-xs border border-line bg-panel-2 px-1 text-text"
+                  />
+                </label>
+                {boosterExpired && (
+                  <span className="text-warning">{t('plans.boosterExpired')}</span>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </Panel>
 

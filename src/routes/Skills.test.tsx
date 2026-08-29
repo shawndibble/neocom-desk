@@ -82,6 +82,7 @@ const server = setupServer(
       description: 'A basic <b>ocular filter</b> implant.',
       group_id: 300,
       published: true,
+      dogma_attributes: [{ attribute_id: 178, value: 3.0 }], // +3 perception
     })
   )
 );
@@ -125,6 +126,11 @@ describe('Skills', () => {
     expect(await screen.findByText('Ocular Filter - Basic')).toBeInTheDocument();
     // Tooltip content is in the DOM (CSS-revealed on hover/focus), markup stripped.
     expect(screen.getByRole('tooltip')).toHaveTextContent('A basic ocular filter implant.');
+
+    // Effective attribute = base (perception 22) + implant bonus (+3) = 25.
+    expect(await screen.findByText('22 + 3 = 25')).toBeInTheDocument();
+    // Unbonused attributes show the base value plainly.
+    expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
   });
 
   it('falls back to cached skills when ESI is unreachable', async () => {

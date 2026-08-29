@@ -26,7 +26,7 @@ const FILES = [
 // Dogma attribute IDs (verified against fuzzwork dgmAttributeTypes.csv):
 // 275 skillTimeConstant (rank), 180 primaryAttribute, 181 secondaryAttribute
 // requiredSkillN -> requiredSkillNLevel pairs:
-// 182->277, 183->278, 184->279, 1285->1286, 1289->1288, 1290->1287
+// 182->277, 183->278, 184->279, 1285->1286, 1289->1287, 1290->1288 (verified: dgmAttributeTypes — 1287=requiredSkill5Level, 1288=requiredSkill6Level)
 const RANK_ATTR = 275;
 const PRIMARY_ATTR = 180;
 const SECONDARY_ATTR = 181;
@@ -35,8 +35,8 @@ const PREREQ_PAIRS = [
   [183, 278],
   [184, 279],
   [1285, 1286],
-  [1289, 1288],
-  [1290, 1287],
+  [1289, 1287],
+  [1290, 1288],
 ];
 const CHAR_ATTR_NAMES = {
   164: 'charisma',

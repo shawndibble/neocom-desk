@@ -296,6 +296,33 @@ describe('public info endpoints', () => {
     expect(result.data?.description).toContain('ocular filter');
   });
 
+  it('getUniverseType passes through dogma_attributes when present', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/10209`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json({
+          type_id: 10209,
+          name: 'Memory Augmentation - Improved',
+          description: 'Grants a bonus to memory.',
+          group_id: 745,
+          published: true,
+          dogma_attributes: [
+            { attribute_id: 177, value: 5.0 },
+            { attribute_id: 176, value: 0.0 },
+          ],
+        });
+      })
+    );
+
+    const result = await getUniverseType(10209);
+
+    expect(result.data?.dogma_attributes).toEqual([
+      { attribute_id: 177, value: 5.0 },
+      { attribute_id: 176, value: 0.0 },
+    ]);
+  });
+
   it('getUniverseStation is unauthenticated and returns the station name', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/60003760`, ({ request }) => {

@@ -26,6 +26,14 @@ export default defineConfig({
     command: `npm run dev -- --port ${PORT} --strictPort`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    env: { VITE_EVE_CLIENT_ID: 'e2e-fake-client' },
+    env: {
+      VITE_EVE_CLIENT_ID: 'e2e-fake-client',
+      // Blank out Firebase so isSyncConfigured() is false in E2E — otherwise
+      // triggerSync would hit the real cloud function and trip the network guard.
+      VITE_FIREBASE_API_KEY: '',
+      VITE_FIREBASE_AUTH_DOMAIN: '',
+      VITE_FIREBASE_PROJECT_ID: '',
+      VITE_FIREBASE_APP_ID: '',
+    },
   },
 });

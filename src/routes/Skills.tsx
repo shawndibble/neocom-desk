@@ -15,7 +15,9 @@ import {
 } from '@/features/skills/data';
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
+import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
+import type { Implants } from '@/engine/types';
 
 const ATTRIBUTE_ORDER = ['intelligence', 'memory', 'perception', 'willpower', 'charisma'] as const;
 
@@ -37,6 +39,7 @@ interface Snapshot {
   attributesResult: CachedResult<CharacterAttributes> | null;
   implantsResult: CachedResult<number[]> | null;
   implantDetails: ImplantDetail[];
+  implantBonuses: Implants;
 }
 
 /** Trained skills for the active character: grouped by SDE group, with SP + attributes/implants. */
@@ -73,6 +76,9 @@ export function Skills() {
           description: info?.description ? stripEveMarkup(info.description) : null,
         };
       });
+      const implantBonuses = sumAttributeBonuses(
+        implantTypes.map((r) => extractAttributeBonuses(r?.data?.dogma_attributes))
+      );
 
       setSnapshot({
         requestKey,
@@ -81,6 +87,7 @@ export function Skills() {
         attributesResult,
         implantsResult,
         implantDetails,
+        implantBonuses,
       });
     })();
 
@@ -92,11 +99,12 @@ export function Skills() {
 
   // Only trust the snapshot when it answers the current (character, refresh) request.
   const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const { catalog, skillsResult, attributesResult, implantDetails } = current ?? {
+  const { catalog, skillsResult, attributesResult, implantDetails, implantBonuses } = current ?? {
     catalog: null,
     skillsResult: undefined,
     attributesResult: undefined,
     implantDetails: [],
+    implantBonuses: {},
   };
 
   const groups = useMemo<SkillGroup[]>(() => {
@@ -176,9 +184,22 @@ export function Skills() {
           <Panel title={t('skills.attributes')}>
             <div className="flex flex-wrap gap-4">
               {attributesResult?.data ? (
-                ATTRIBUTE_ORDER.map((name) => (
-                  <StatChip key={name} label={name} value={attributesResult.data![name]} />
-                ))
+                ATTRIBUTE_ORDER.map((name) => {
+                  const base = attributesResult.data![name];
+                  const bonus = implantBonuses[name] ?? 0;
+                  return (
+                    <StatChip
+                      key={name}
+                      label={name}
+                      value={
+                        bonus
+                          ? t('skills.attributeEffective', { base, bonus, effective: base + bonus })
+                          : base
+                      }
+                      tone={bonus ? 'accent' : 'default'}
+                    />
+                  );
+                })
               ) : (
                 <span className="text-xs text-text-dim">{t('common.unknown')}</span>
               )}
@@ -202,7 +223,6 @@ export function Skills() {
               ) : (
                 <p className="mt-1 text-xs text-text-dim">{t('skills.implantsNone')}</p>
               )}
-              <p className="mt-2 text-[11px] text-text-faint">{t('skills.implantsCaveat')}</p>
             </div>
           </Panel>
 

@@ -1,9 +1,43 @@
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { subscribeSyncStatus, type SyncStatus } from '@/sync';
 import { characterPortraitUrl } from './images';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { isSyncConfigured } from './syncStatus';
+import { SyncStatusDot } from './SyncStatusDot';
+
+const INITIAL_SYNC_STATUS: SyncStatus = { state: 'idle', lastSyncedAt: null, error: null };
+
+/**
+ * Sync status dot, gated on Firebase being configured at all (see
+ * syncStatus.ts) — hidden entirely rather than shown permanently idle, since
+ * an unconfigured app never syncs and a dot with nothing behind it just begs
+ * the "why isn't this working" question.
+ */
+function SyncStatusIndicator() {
+  const [status, setStatus] = useState<SyncStatus>(INITIAL_SYNC_STATUS);
+  const [online, setOnline] = useState(() =>
+    typeof navigator === 'undefined' ? true : navigator.onLine
+  );
+
+  useEffect(() => subscribeSyncStatus(setStatus), []);
+
+  useEffect(() => {
+    const goOnline = () => setOnline(true);
+    const goOffline = () => setOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
+
+  return <SyncStatusDot status={status} online={online} />;
+}
 
 const NAV_LINK =
   'flex items-center gap-2 rounded-xs border border-transparent px-3 py-2 text-xs font-semibold tracking-widest uppercase transition-colors';
@@ -34,7 +68,10 @@ export function Layout() {
           >
             N
           </span>
-          <span className="text-xs font-semibold tracking-widest uppercase">{t('app.name')}</span>
+          <span className="flex-1 text-xs font-semibold tracking-widest uppercase">
+            {t('app.name')}
+          </span>
+          {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-2">
           <NavLink to="/characters" className={navClass}>
