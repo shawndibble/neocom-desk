@@ -52,7 +52,12 @@
     },
     "reauthTitle": "Log in again to see skills",
     "reauthHint": "Log in again to fetch this character's trained skills.",
-    "reauthAction": "Log in again with EVE Online"
+    "reauthAction": "Log in again with EVE Online",
+    "exportCsv": "Export CSV",
+    "csvGroup": "Group",
+    "csvSkill": "Skill",
+    "csvLevel": "Level",
+    "csvSp": "Skill points"
   },
   "plans": {
     "title": "Skill Plans",
@@ -132,7 +137,15 @@
     "markersNoGain": "Remapping at these markers doesn't save time — try moving them.",
     "segmentCurrent": "From {{skill}}, keep current attributes",
     "remapFromEveReady": "From EVE: {{bonus}} bonus + yearly ready",
-    "remapFromEveCooldown": "From EVE: {{bonus}} bonus + yearly on cooldown until {{date}}"
+    "remapFromEveCooldown": "From EVE: {{bonus}} bonus + yearly on cooldown until {{date}}",
+    "exportCsvQueue": "Export CSV",
+    "csvSkill": "Skill",
+    "csvLevel": "Level",
+    "csvSeconds": "Seconds",
+    "csvCumulativeSeconds": "Cumulative seconds",
+    "csvPrereq": "Prerequisite",
+    "csvYes": "yes",
+    "csvNo": "no"
   },
   "industry": {
     "title": "Build Plans",
@@ -225,7 +238,21 @@
       "invention": "Invention",
       "reaction": "Reaction",
       "unknown": "Activity #{{id}}"
-    }
+    },
+    "exportCsvMaterials": "Export CSV",
+    "exportCsvJobs": "Export CSV",
+    "csvMaterial": "Material",
+    "csvQuantity": "Quantity",
+    "csvUnitPriceIsk": "Unit price (ISK)",
+    "csvLineTotalIsk": "Line total (ISK)",
+    "csvJobActivity": "Activity",
+    "csvJobBlueprint": "Blueprint",
+    "csvJobBlueprintTypeId": "Blueprint type ID",
+    "csvJobRuns": "Runs",
+    "csvJobStart": "Start date",
+    "csvJobEnd": "End date",
+    "csvJobCostIsk": "Cost (ISK)",
+    "csvJobStatus": "Status"
   },
   "login": {
     "button": "Log in with EVE Online"

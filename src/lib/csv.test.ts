@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toCsv } from './csv';
+import { toCsv, csvFilename } from './csv';
 
 interface Row {
   name: string;
@@ -82,5 +82,18 @@ describe('toCsv', () => {
   it('emits only the header row for empty rows', () => {
     const csv = toCsv([], columns);
     expect(csv).toBe('﻿Name,Qty\r\n');
+  });
+});
+
+describe('csvFilename', () => {
+  it('stamps the local calendar date, zero-padded, onto a neocom- prefix', () => {
+    expect(csvFilename('skills', new Date(2026, 7, 5))).toBe('neocom-skills-2026-08-05.csv');
+  });
+
+  it('uses local calendar parts, not the UTC date', () => {
+    // 2026-01-01T00:30 local is still 2025-12-31 in UTC for any negative
+    // offset — the file is named for the user's day, not Greenwich's.
+    const localNewYear = new Date(2026, 0, 1, 0, 30);
+    expect(csvFilename('jobs', localNewYear)).toBe('neocom-jobs-2026-01-01.csv');
   });
 });

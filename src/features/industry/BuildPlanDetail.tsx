@@ -11,7 +11,10 @@ import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { formatDuration } from '@/lib/duration';
+import { toCsv, csvFilename } from '@/lib/csv';
+import { downloadTextFile } from '@/lib/download';
 import { MaterialsTable } from './MaterialsTable';
+import { materialsCsvColumns } from './materialsCsv';
 import { ResultsSummary } from './ResultsSummary';
 
 type PlanPatch = Partial<
@@ -103,6 +106,22 @@ export function BuildPlanDetail({
 
   function update(patch: PlanPatch) {
     onUpdate(patch);
+  }
+
+  function exportMaterialsCsv() {
+    if (!result) return;
+    downloadTextFile(
+      csvFilename('materials', new Date()),
+      toCsv(
+        result.materials,
+        materialsCsvColumns(
+          t,
+          (typeID) => nameForType(catalog, typeID),
+          snapshot?.hubPrices ?? {},
+          pricesReady
+        )
+      )
+    );
   }
 
   return (
@@ -258,6 +277,13 @@ export function BuildPlanDetail({
         actions={
           <span className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
             {fetchedAt && <DataAgeBadge date={fetchedAt} />}
+            <Button
+              size="sm"
+              onClick={exportMaterialsCsv}
+              disabled={!!error || !result || result.materials.length === 0}
+            >
+              {t('industry.exportCsvMaterials')}
+            </Button>
             <Button size="sm" onClick={() => setRefreshTick((v) => v + 1)}>
               {t('industry.refresh')}
             </Button>

@@ -24,7 +24,10 @@ import {
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
+import { skillCsvColumns, skillCsvRows } from '@/features/skills/skillsCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { csvFilename, toCsv } from '@/lib/csv';
+import { downloadTextFile } from '@/lib/download';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
@@ -156,6 +159,18 @@ export function Skills() {
         </div>
         <div className="flex items-center gap-2">
           {skillsResult?.fetchedAt && <DataAgeBadge date={skillsResult.fetchedAt} />}
+          <Button
+            size="sm"
+            disabled={groups.length === 0}
+            onClick={() =>
+              downloadTextFile(
+                csvFilename('skills', new Date()),
+                toCsv(skillCsvRows(groups), skillCsvColumns(t))
+              )
+            }
+          >
+            {t('skills.exportCsv')}
+          </Button>
           <Button size="sm" onClick={refresh}>
             {t('skills.refresh')}
           </Button>

@@ -28,6 +28,9 @@ import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { ComputedQueue } from './ComputedQueue';
+import { queueCsvColumns } from './queueCsv';
+import { csvFilename, toCsv } from '@/lib/csv';
+import { downloadTextFile } from '@/lib/download';
 import { formatDuration } from '@/lib/duration';
 import { dedupeEntries, removeEntry, upsertEntry, applyReorderSuggestion } from './reorder';
 import {
@@ -235,6 +238,13 @@ export function PlanEditor({
     setTimeout(() => setCopyConfirm(false), 2000);
   }
 
+  function handleExportCsv() {
+    downloadTextFile(
+      csvFilename('skill-queue', new Date()),
+      toCsv(scheduled, queueCsvColumns(t, nameFor, userSkillTypeIDs))
+    );
+  }
+
   function handleOptimizeRemaps() {
     if (scheduled.length === 0) return;
     setOptimizeResult(
@@ -381,6 +391,9 @@ export function PlanEditor({
           </Button>
           <Button size="sm" onClick={() => void handleExport()}>
             {copyConfirm ? t('plans.exportCopied') : t('plans.exportClipboard')}
+          </Button>
+          <Button size="sm" onClick={handleExportCsv} disabled={scheduled.length === 0}>
+            {t('plans.exportCsvQueue')}
           </Button>
           <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
             {t('plans.optimizeRemaps')}

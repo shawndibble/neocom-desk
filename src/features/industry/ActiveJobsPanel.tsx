@@ -15,6 +15,9 @@ import {
   type JobsLoadResult,
 } from './jobs';
 import { formatDuration } from '@/lib/duration';
+import { toCsv, csvFilename } from '@/lib/csv';
+import { downloadTextFile } from '@/lib/download';
+import { jobsCsvColumns } from './jobsCsv';
 
 interface ActiveJobsPanelProps {
   characterId: number;
@@ -84,6 +87,21 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       actions={
         <span className="flex items-center gap-2">
           {result?.cached?.fetchedAt && <DataAgeBadge date={result.cached.fetchedAt} />}
+          <Button
+            size="sm"
+            disabled={jobs.length === 0}
+            onClick={() =>
+              downloadTextFile(
+                csvFilename('industry-jobs', new Date()),
+                toCsv(
+                  jobs,
+                  jobsCsvColumns(t, (id) => types[String(id)]?.name ?? `#${id}`)
+                )
+              )
+            }
+          >
+            {t('industry.exportCsvJobs')}
+          </Button>
           <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
             {t('industry.jobsRefresh')}
           </Button>
