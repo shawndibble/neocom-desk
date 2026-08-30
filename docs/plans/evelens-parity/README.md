@@ -416,7 +416,13 @@ also feeds the CSV) and `routes/Industry.tsx` (industry math). Two notes:
 
 - **SP only rises when ESI supplies `level_end_sp`,** which is optional. The
   engine schedules from `level` alone, so a raised level beside a stale `sp`
-  costs display precision, not a wrong plan.
+  costs display precision, not a wrong plan. Where ESI withheld it, `/skills`
+  shows the level and "Unknown" for the SP rather than a made-up figure.
+- **`total_sp` is stale by the same amount** and is corrected with
+  `completedSpGain`, on `/skills` and `/overview` both — otherwise a page
+  shows a raised per-skill SP inside a total that still counts the old one.
+  The correction covers exactly the entries whose per-skill SP rose, so the
+  total is never more precise than the rows it sums.
 - **`features/character/roster.ts` was left alone.** It holds raw
   `CharacterSkills` but has no importer outside its own test, so nothing
   renders it. Fold it in when it gains a consumer.

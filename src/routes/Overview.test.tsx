@@ -143,6 +143,29 @@ describe('Overview', () => {
     expect(screen.getByText('12,000')).toBeInTheDocument();
   });
 
+  it('adds SP the queue finished to the total, which /skills has not counted', async () => {
+    // ESI's total_sp comes from the same payload as the per-skill rows and
+    // goes stale with them until the character next logs in.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 3300,
+            queue_position: 0,
+            finished_level: 5,
+            start_date: '2026-07-01T00:00:00Z',
+            finish_date: '2026-07-20T00:00:00Z',
+            level_end_sp: 512_000,
+          },
+        ])
+      )
+    );
+    render(<App />);
+
+    expect(await screen.findByText('5,422,000')).toBeInTheDocument(); // + (512,000 - 90,000)
+    expect(screen.queryByText('5,000,000')).not.toBeInTheDocument();
+  });
+
   it('falls back gracefully when the wallet fetch fails offline', async () => {
     server.use(
       http.get('https://esi.evetech.net/characters/:id/wallet', () => HttpResponse.error())

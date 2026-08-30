@@ -162,6 +162,34 @@ describe('Skills', () => {
     // The stale /skills reading is gone, not shown alongside.
     expect(screen.queryByRole('img', { name: 'Level 3 of 5' })).not.toBeInTheDocument();
     expect(screen.queryByText('8,000 SP')).not.toBeInTheDocument();
+    // The total moves with the row. Leaving ESI's total_sp alone would show
+    // 45,255 SP on a skill inside a 264,000 SP total that still counts 8,000.
+    expect(screen.getByText('301,255')).toBeInTheDocument(); // 264,000 + 37,255
+    expect(screen.queryByText('264,000')).not.toBeInTheDocument();
+  });
+
+  it('credits the level but not the SP when ESI withheld level_end_sp', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 2,
+            queue_position: 0,
+            finished_level: 4,
+            start_date: '2026-08-20T00:00:00Z',
+            finish_date: '2026-08-25T00:00:00Z',
+          },
+        ])
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
+    // The last known SP stands, and so does the total. Neither is guessed up.
+    expect(screen.getByText('8,000 SP')).toBeInTheDocument();
+    expect(screen.getByText('264,000')).toBeInTheDocument();
   });
 
   it('falls back to cached skills when ESI is unreachable', async () => {

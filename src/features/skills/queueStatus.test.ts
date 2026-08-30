@@ -3,7 +3,9 @@ import {
   applyCompletedQueueEntries,
   classifySkillQueue,
   completedQueueLevels,
+  completedSpGain,
   isQueuePaused,
+  type CompletedLevel,
 } from './queueStatus';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 
@@ -248,5 +250,34 @@ describe('applyCompletedQueueEntries', () => {
     const merged = applyCompletedQueueEntries(trained, queue, NOW);
     expect(merged.get(3301)).toEqual({ level: 2, sp: 2000 });
     expect(trained.get(3300)).toEqual({ level: 3, sp: 16000 });
+  });
+});
+
+describe('completedSpGain', () => {
+  const done = (over: Partial<CompletedLevel> = {}): CompletedLevel => ({
+    level: 4,
+    sp: 45255,
+    ...over,
+  });
+
+  it('adds the SP a credited level gained over what /skills reports', () => {
+    const gain = completedSpGain(new Map([[3300, 8000]]), new Map([[3300, done()]]));
+    expect(gain).toBe(37255);
+  });
+
+  it('counts the whole amount for a skill /skills does not list', () => {
+    expect(completedSpGain(new Map(), new Map([[3300, done({ sp: 500 })]]))).toBe(500);
+  });
+
+  it('adds nothing when ESI omitted level_end_sp — it will not guess', () => {
+    expect(completedSpGain(new Map([[3300, 8000]]), new Map([[3300, done({ sp: null })]]))).toBe(0);
+  });
+
+  it('never subtracts when the reported SP already exceeds the entry', () => {
+    expect(completedSpGain(new Map([[3300, 90000]]), new Map([[3300, done()]]))).toBe(0);
+  });
+
+  it('is zero with nothing completed', () => {
+    expect(completedSpGain(new Map([[3300, 8000]]), new Map())).toBe(0);
   });
 });

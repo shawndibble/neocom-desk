@@ -22,7 +22,11 @@ import {
   loadCharacterSkillsWithStatus,
   loadUniverseType,
 } from '@/features/skills/data';
-import { completedQueueLevels, type CompletedLevel } from '@/features/skills/queueStatus';
+import {
+  completedQueueLevels,
+  completedSpGain,
+  type CompletedLevel,
+} from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
@@ -51,6 +55,8 @@ interface Snapshot {
    * to apply these on top; computed here so the render stays free of a clock.
    */
   completedLevels: Map<number, CompletedLevel>;
+  /** SP those credited levels add to ESI's total_sp, which is stale by the same amount. */
+  completedSp: number;
   implantDetails: ImplantDetail[];
   implantBonuses: Implants;
 }
@@ -67,6 +73,11 @@ async function loadSkillsSnapshot(
     loadSkillCatalog(),
   ]);
   const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
+  const completedLevels = completedQueueLevels(queueResult?.data ?? [], Date.now());
+  const completedSp = completedSpGain(
+    new Map((skillsResult?.data?.skills ?? []).map((s) => [s.skill_id, s.skillpoints_in_skill])),
+    completedLevels
+  );
 
   // Already superseded: skip the per-implant type lookups, their results would
   // be discarded.
@@ -89,7 +100,8 @@ async function loadSkillsSnapshot(
     skillsResult,
     skillsNeedsReauth,
     attributesResult,
-    completedLevels: completedQueueLevels(queueResult?.data ?? [], Date.now()),
+    completedLevels,
+    completedSp,
     implantDetails,
     implantBonuses,
   };
@@ -106,6 +118,7 @@ export function Skills() {
   const skillsNeedsReauth = data?.skillsNeedsReauth ?? false;
   const attributesResult = data?.attributesResult ?? null;
   const completedLevels = data?.completedLevels ?? null;
+  const completedSp = data?.completedSp ?? 0;
   const implantDetails = data?.implantDetails ?? [];
   const implantBonuses = data?.implantBonuses ?? {};
 
@@ -113,7 +126,7 @@ export function Skills() {
     if (!skillsResult?.data || !catalog) return [];
     const byGroup = new Map<string, SkillGroup['skills']>();
     const done = new Map(completedLevels ?? []);
-    const add = (skillTypeID: number, level: number, sp: number) => {
+    const add = (skillTypeID: number, level: number, sp: number | null) => {
       const info = catalog.bySkillTypeID.get(skillTypeID);
       const groupName = info?.groupName ?? t('common.unknown');
       const list = byGroup.get(groupName) ?? [];
@@ -133,7 +146,9 @@ export function Skills() {
         beatsEsi ? (finished.sp ?? skill.skillpoints_in_skill) : skill.skillpoints_in_skill
       );
     }
-    for (const [skillTypeID, finished] of done) add(skillTypeID, finished.level, finished.sp ?? 0);
+    // sp stays null rather than 0 when ESI withheld level_end_sp: the level
+    // is known, the SP is not, and a literal 0 would read as broken.
+    for (const [skillTypeID, finished] of done) add(skillTypeID, finished.level, finished.sp);
     return [...byGroup.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([groupName, skills]) => ({
@@ -159,7 +174,9 @@ export function Skills() {
           <StatChip
             label={t('skills.totalSp')}
             value={
-              skillsResult?.data ? skillsResult.data.total_sp.toLocaleString() : t('common.unknown')
+              skillsResult?.data
+                ? (skillsResult.data.total_sp + completedSp).toLocaleString()
+                : t('common.unknown')
             }
           />
           <StatChip
@@ -263,7 +280,9 @@ export function Skills() {
                     <span className="flex-1 truncate">{skill.name}</span>
                     <SkillBar level={skill.level} />
                     <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
-                      {t('skills.sp', { value: skill.sp.toLocaleString() })}
+                      {skill.sp === null
+                        ? t('common.unknown')
+                        : t('skills.sp', { value: skill.sp.toLocaleString() })}
                     </span>
                   </li>
                 ))}

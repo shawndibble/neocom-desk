@@ -24,12 +24,15 @@ import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { selectActiveQueueEntry } from './overviewQueue';
+import { completedQueueLevels, completedSpGain } from '@/features/skills/queueStatus';
 
 interface Snapshot {
   walletResult: CachedResult<number> | null;
   walletNeedsReauth: boolean;
   skillsResult: CachedResult<CharacterSkills> | null;
   queueResult: CachedResult<SkillQueueEntry[]> | null;
+  /** SP the queue finished but /skills has not counted, since total_sp is stale too. */
+  completedSp: number;
   catalog: SkillCatalog;
 }
 
@@ -48,6 +51,10 @@ async function loadOverviewSnapshot(characterId: number): Promise<Snapshot> {
     walletNeedsReauth: wallet.needsReauth,
     skillsResult,
     queueResult,
+    completedSp: completedSpGain(
+      new Map((skillsResult?.data?.skills ?? []).map((s) => [s.skill_id, s.skillpoints_in_skill])),
+      completedQueueLevels(queueResult?.data ?? [], Date.now())
+    ),
     catalog,
   };
 }
@@ -78,6 +85,7 @@ export function Overview() {
   const walletNeedsReauth = data?.walletNeedsReauth ?? false;
   const skillsResult = data?.skillsResult ?? null;
   const queueResult = data?.queueResult ?? null;
+  const completedSp = data?.completedSp ?? 0;
   const catalog = data?.catalog ?? null;
 
   // Reads the wall clock to pick "the entry training right now" — unavoidably
@@ -110,7 +118,9 @@ export function Overview() {
           <StatChip
             label={t('skills.totalSp')}
             value={
-              skillsResult?.data ? skillsResult.data.total_sp.toLocaleString() : t('common.unknown')
+              skillsResult?.data
+                ? (skillsResult.data.total_sp + completedSp).toLocaleString()
+                : t('common.unknown')
             }
           />
           <StatChip

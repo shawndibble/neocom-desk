@@ -116,3 +116,23 @@ export function applyCompletedQueueEntries(
   }
   return merged;
 }
+
+/**
+ * Total SP the credited levels add on top of what `/skills` reports, so a
+ * page cannot show a raised per-skill SP beside a total that contradicts it.
+ *
+ * Only entries carrying `level_end_sp` contribute — the same entries whose
+ * per-skill SP rises — so the total stays exactly as precise as the rows it
+ * sums, never guessing a figure ESI withheld.
+ */
+export function completedSpGain(
+  knownSp: ReadonlyMap<number, number>,
+  completed: ReadonlyMap<number, CompletedLevel>
+): number {
+  let gain = 0;
+  for (const [skillId, done] of completed) {
+    if (done.sp === null) continue;
+    gain += Math.max(0, done.sp - (knownSp.get(skillId) ?? 0));
+  }
+  return gain;
+}
