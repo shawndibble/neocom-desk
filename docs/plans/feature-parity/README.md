@@ -299,7 +299,7 @@ its own and blocks on `DataTable` + `CharacterAvatar`.
 
 These change what gets built. They are yours, not the implementer's.
 
-1. **Sync scope (blocks items 07 and 09).** Firebase uid is `char:{characterId}` — sync is **per Character, not per user**. A "synced setting" only reaches devices that have activated that same Character. CONTEXT.md's **Account** concept has no storage representation. Options: (a) accept per-Character duplication and document the caveat — keeps 09 at M; (b) build real account-level sync — pushes 09 to L. Additionally, `mergeSettings` has **no tombstones**, so deleted keys resurrect from remote: saved comparisons and groupings must be stored as one array-valued key, never one key per item.
+1. ~~**Sync scope (blocks items 07 and 09).**~~ **DECIDED 2026-08-30 — see §5.7. Items 07 and 09 are unblocked and store device-local; no account sync, no uid change.**
 2. **The PI consent string.** `esi-planets.manage_planets.v1` is read-only in practice — it grants only two GETs in the current surface — but the SSO consent screen will read _"manage your planetary installations"_ to users of an app that advertises itself as read-only (CONTEXT.md, "Read-only: no ESI write scopes"). Product call.
 3. ~~**Item 05's badge at `remapCount ≥ 2`.**~~ **Resolved 2026-08-30 by §5.6**, both branches, at different thresholds: exact placement now ships up to `remapCount` = 2, and above that `plans.remapCapNote` states the cap honestly instead of guessing. Reopen only if 5 moves off the main thread.
 4. **Which niche tabs (item 20).** Recommended first batch: employment history (free), contacts, loyalty points. Recommended never: notifications (the `text` field is raw YAML needing per-type templates for 150+ types, sourced from neither ESI nor the SDE) and kill log (link zKillboard instead).
@@ -360,6 +360,99 @@ These change what gets built. They are yours, not the implementer's.
 
    Binding on items 01 and 05: they render one number, computed one way. The
    "excludes booster" note option (a) called for must not ship.
+
+---
+
+## 5.7 Sync scope — decided, and why the obvious answer is wrong
+
+**Decided 2026-08-30.** Items 07 and 09 store their state **device-local**.
+Neither the Firebase uid nor the Firestore layout changes.
+
+### What the original framing got wrong
+
+It offered (a) accept per-Character duplication, or (b) build account-level
+sync at cost L. Both rest on assumptions that do not hold.
+
+- **Crossing Characters is already free.** `db.settings` is a flat key-value
+  table with no `characterId` column, so on one device a grouping made under
+  Character A is already visible under B. Sync buys exactly one thing:
+  the same value on a second device.
+- **There is nothing to migrate.** No production `sync.`-prefixed key exists.
+  The settings sync path is built and has no producers. The trade-hub
+  preference people assume is synced is device-local (`marketHub`).
+- **Option (b) is not an L. It is a rewrite of the trust boundary.** EVE SSO
+  exposes **no account identifier** — `sub` is per-Character and `owner` is
+  the ownerHash, which changes on transfer. So an account grouping would be
+  app-invented and **client-asserted**, strictly weaker than today, where
+  `mintFirebaseToken` derives the uid from a JWT verified against CCP's JWKS.
+  Worse, `firestore.rules` gates every read on
+  `resource.data.ownerHash == request.auth.token.ownerHash`, a claim minted
+  from one Character's token. Under an account uid, sibling Characters' docs
+  carry different hashes and are excluded by both the client query and the
+  rules. Option (b) therefore means replacing the ownership model and
+  rebuilding the transfer-privacy story that D1 exists to protect.
+
+### The decision
+
+Ship 07 and 09 device-local, as `marketHub` already is. Both are then correct
+on any single device, item 09 drops from L, and both unblock immediately.
+
+Store each as **one object-or-array-valued key carrying its own `updatedAt`**,
+shaped as a synced key would be but **without** the `sync.` prefix — that
+prefix is what `isSyncedSettingKey` gates on, and using it would silently turn
+sync on. A later flip is then a rename plus a one-time copy, not a reshape.
+
+**Known cost, accepted:** a grouping made on your desktop does not reach your
+phone.
+
+### If sync is wanted later, build fan-out — not account scoping
+
+Write the key under **every Character the device knows**, and take
+`max(updatedAt)` on pull. No new identity, no rules change, no trust-boundary
+rewrite, and it matches the local model, which is already flat. Its cost is
+write amplification, and a Character never activated on that device never
+receives the value.
+
+**Option (b), account-level sync, is REJECTED, not merely unchosen** — for the
+SSO and ownerHash reasons above. Recorded because it is the intuitive answer,
+and the next person to reach for it will not otherwise know what it breaks.
+
+### Consequences, each its own ticket
+
+1. **Give `mergeSettings` tombstones.** Today any remote key absent locally is
+   pulled straight back, so a deleted setting resurrects. Copy the tested
+   pattern from `mergeRecords`, reusing `TOMBSTONE_TTL_MS` (30 days) for the
+   remote doc. The **local** tombstone is not TTL'd: it persists and is
+   superseded by a newer write to that key. Done now, while there are no
+   producers and it is cheap — a known-broken merge left in the tree behind an
+   explanatory comment is exactly the shape of brief E's BOM instruction.
+   This also retires the old "never one key per item" rule.
+2. **Guard the `sync.` prefix with an allow-list test.** `planSync.ts` already
+   throws if a synced key lacks the prefix; nothing guards the reverse, and
+   adding one is a one-line change whose failure only shows up on a second
+   device weeks later. A colocated test asserting the production `sync.` key
+   set matches an explicit allow-list makes it a deliberate two-file edit.
+3. **Character removal, with its purge.** No removal flow exists today —
+   `Characters.tsx` has none. Design, for when it is built: purge that
+   Character's remote docs inline at removal, and if its refresh token is dead
+   (the common case for a sold Character) record a pending purge and run it
+   the next time that Character authenticates. This needs no new privileged
+   endpoint: `firestore.rules` grants `delete` on uid alone, deliberately, so
+   a purge must hold a session as that Character. **Caveat:** if the user never
+   signs in as it again, the remote data stays. Only a privileged Cloud
+   Function would guarantee the purge, and that is a new trust surface.
+   Closes the asymmetry D1 leaves open — D1 handles a Character sold out from
+   under you; nothing handles one you deliberately drop.
+
+### CONTEXT.md change, not yet applied
+
+`CONTEXT.md` was checked out by another session when this was decided, so its
+**Account** line is left for whoever holds that file. Replace it with:
+
+> - **Account**: UI-level grouping of a user's Characters. Has **no storage,
+>   no sync and no server-side identity** — EVE SSO exposes no account
+>   identifier, so one cannot be verified. Groupings are device-local by
+>   decision (§5.7), not by omission.
 
 ---
 
