@@ -45,6 +45,8 @@ export const ROUTE_REQUIREMENTS = {
   '/market': UNGATED,
   // Skill Plans are local, editable data; the ESI reads only decorate them.
   '/skills/plans': UNGATED,
+  // Device-local display preferences only — no ESI endpoint to gate on.
+  '/settings': UNGATED,
 
   // Multi-scope pages: a page gate would hide panels that still work (Overview
   // mixes skills, queue and wallet; Skills adds implants; Industry adds

@@ -14,3 +14,8 @@ export { ReauthBanner } from './ReauthBanner';
 export { SkillBar } from './SkillBar';
 export { Modal } from './Modal';
 export type { ModalPlacement } from './Modal';
+export { DataTable } from './DataTable';
+export type { DataTableColumn } from './DataTable';
+export { CharacterAvatar } from './CharacterAvatar';
+export type { CharacterAvatarSize } from './CharacterAvatar';
+export { FilterChip } from './FilterChip';

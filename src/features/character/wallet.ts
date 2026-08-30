@@ -14,7 +14,7 @@ import {
   type StatusResult,
 } from '@/esi/cache';
 
-const KEYS = {
+export const KEYS = {
   balance: 'wallet:balance',
   journal: 'wallet:journal',
   transactions: 'wallet:transactions',

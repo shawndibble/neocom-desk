@@ -424,5 +424,10 @@
     "title": "Something went wrong",
     "hint": "Reloading usually fixes this. Your Skill Plans and Build Plans are stored locally and are not affected.",
     "reload": "Reload"
+  },
+  "settings": {
+    "title": "Settings",
+    "emptyTitle": "No preferences yet",
+    "emptyHint": "Display and account preferences will appear here as they are added."
   }
 }
