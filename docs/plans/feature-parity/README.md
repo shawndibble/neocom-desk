@@ -1,8 +1,9 @@
-# EveLens parity — implementation plan
+# Feature parity — implementation plan
 
-Source: the "EveLens vs NeoCom Desk" competitive teardown, items 01–18 and 20
-(item 19, second language, is explicitly excluded — it waits for a stable
-English UI).
+Source: a competitive teardown of NeoCom Desk against a rival skill planner,
+items 01–18 and 20 (item 19, second language, is explicitly excluded — it
+waits for a stable English UI). The rival is named only in
+`docs/research/competitors.md`; nothing downstream of this plan needs it.
 
 **Phases 0 and 1 have shipped** (see the status notes under each below);
 phases 2-4 have not started. This document is the result of ten

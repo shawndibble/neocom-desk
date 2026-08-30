@@ -25,7 +25,7 @@ not as a checklist — every one costs a re-auth prompt."
    per-`type` template table this app doesn't have and ESI/SDE don't provide. That's
    depth, not "a table."
 3. "Every one costs a re-auth prompt" overstates the marginal cost. `SCOPES_STRING`
-   (`src/esi/scopes.ts:23`) is one space-joined authorize-URL parameter — all new
+   (`src/esi/scopes.ts:22`) is one space-joined authorize-URL parameter — all new
    scopes for this batch plus items 13/16 collapse into **one** re-auth prompt, per
    ARCHITECTURE.md §4 and this orchestrator's own batching plan. The real cost isn't
    "one prompt per tab", it's that **every scope on the list — shipped or not — grows
@@ -36,23 +36,30 @@ not as a checklist — every one costs a re-auth prompt."
 **Verified baseline:** No niche tabs exist. `src/features/character/` currently has
 exactly the 6 files ARCHITECTURE.md §2 lists (`assets.ts`, `calendar.ts`,
 `contracts.ts`, `mail.ts`, `orders.ts`, `wallet.ts`, plus `names.ts`/`typeNames.ts`/
-`stations.ts`/`format.ts`) — confirmed via `ls`. `src/esi/scopes.ts:6-18` has 11
-scopes, none of the nine below among them. `src/esi/endpoints.ts` (630 lines) has no
-wrapper for any of the nine paths — confirmed by full read. `docs/DESIGN.md` §4:
-`DataTable` is listed `○` (planned, not built) — confirmed, `grep -rn "DataTable"
-src` returns nothing.
+`stations.ts`/`format.ts`) — confirmed via `ls`. `ESI_REGISTRY` (`src/esi/registry.ts`,
+which `src/esi/scopes.ts` derives `SCOPES` from) has 11 distinct scopes, none of the
+nine below among them. `src/esi/endpoints.ts` (625 lines) has no wrapper for any of the
+nine paths — confirmed by full read.
 
-Read end-to-end for cost baseline: `src/features/character/wallet.ts` (59 lines) +
-`src/routes/Wallet.tsx` (287 lines) + `src/features/character/wallet.test.ts` (174
-lines); `src/features/character/contracts.ts` (11 lines) + `src/routes/Contracts.tsx`
-(150 lines) + `contracts.test.ts` (66 lines). Both routes hand-roll the identical
-~50-line `Snapshot`/`requestKey`/`cancelled`-guard/`loading`/`fromCache` lifecycle
-(`Wallet.tsx:25-73`, `Contracts.tsx:12-60`) and identical raw `<table>` markup
-(`Wallet.tsx:172-186`, `Contracts.tsx:107-119`: `<table className="w-full text-xs">`,
-`thead` row `border-b border-line text-left text-text-dim`, `th` `px-3 py-2
-font-semibold uppercase`, `tbody className="divide-y divide-line"`, cells `px-3
-py-1.5`, numerics `text-right tabular-nums`). Neither route paginates in the UI —
-both fetch every ESI page and render the full set client-side.
+**Now false — shipped since this brief was written:** `DataTable` (DESIGN.md §4) is
+built and exported from `src/components/ui/index.ts`
+(`src/components/ui/DataTable.tsx`). So is the shared route-lifecycle hook this brief
+asks for below — it shipped as `useRouteSnapshot` (`src/lib/useRouteSnapshot.ts`) and
+is already used by eight routes (`Mail`, `Calendar`, `Assets`, `Skills`, `Contracts`,
+`Wallet`, `Overview`, `Orders`). **Both of this brief's prerequisites are already
+done** — see "Shared primitives needed" below for the real (narrower) column contract
+`DataTable` shipped with.
+
+Read end-to-end for cost baseline: `src/features/character/wallet.ts` (60 lines) +
+`src/routes/Wallet.tsx` (321 lines) + `src/features/character/wallet.test.ts` (198
+lines); `src/features/character/contracts.ts` (10 lines) + `src/routes/Contracts.tsx`
+(159 lines) + `contracts.test.ts` (70 lines). **Both routes have since migrated** to
+`useRouteSnapshot` for the fetch lifecycle and `DataTable` for markup — neither
+hand-rolls a `Snapshot`/`requestKey`/`cancelled`-guard lifecycle or a raw `<table>`
+anymore. What each route still hand-rolls per-instance is the `fromCache` warning
+paragraph (`Contracts.tsx:144`, `Wallet.tsx:243,265,270,300,305`: `text-[0.6875rem]
+text-warning uppercase`) — `DataTable` has no slot for it; see below. Neither route
+paginates in the UI — both fetch every ESI page and render the full set client-side.
 
 ### Per-tab table
 
@@ -92,18 +99,25 @@ no i18n, no tests exist for any of the nine.
   wrapper per shipped tab, exactly the `wallet.ts`/`contracts.ts` shape (10-40 lines
   each).
 - `src/routes/*.tsx`: one route per shipped tab, composing `Panel`/`DataAgeBadge`/
-  `EmptyState`/`Spinner`, ideally via the shared hook + `DataTable` recommended below
+  `EmptyState`/`Spinner`, via the already-shipped `useRouteSnapshot` + `DataTable`
   instead of another hand-rolled `<table>`.
 
 **Files touched:**
 
 - `src/esi/endpoints.ts` — add one wrapper per shipped tab (follows existing shape,
   e.g. `getCharacterContacts`/`getCharacterContactLabels` paginated via
-  `fetchAllPages`, matching `getCharacterContracts`).
-- `src/esi/scopes.ts` — append only the scopes for tabs actually shipped this round
-  (see batched list below) — not all nine.
-- `src/app/App.tsx` — route registration per shipped tab.
-- `src/components/Layout.tsx` (nav) — nav entry per shipped tab.
+  `fetchAllPagesStatus`, matching `getCharacterContracts`).
+- `src/esi/registry.ts` — add one `ESI_REGISTRY` entry per shipped tab's endpoint
+  (route + scope). **Do not hand-edit `scopes.ts`** — `SCOPES`/`SCOPES_STRING` are
+  derived from `ESI_REGISTRY`, so a new registry entry is the only change needed for
+  the scope to reach the authorize URL.
+- `src/app/routeScopes.ts` — add a `ROUTE_REQUIREMENTS` entry per shipped tab's route,
+  listing its `ESI_REGISTRY` endpoint id(s). Required, not optional: `App.tsx`'s
+  `ROUTE_ELEMENTS` is `satisfies Record<AppRoutePath, ReactElement>`, and
+  `AppRoutePath` is derived from this file's keys — a route added to `App.tsx` without
+  a matching entry here does not compile.
+- `src/app/App.tsx` — route registration per shipped tab (`ROUTE_ELEMENTS`).
+- `src/app/Layout.tsx` (nav) — nav entry per shipped tab.
 - `src/i18n/locales/en.json` — keys per shipped tab (see below).
 - `e2e/support/mockEsi.ts` — intercept per shipped tab's endpoint(s), or e2e will
   fail the network guard the moment a route under test calls it.
@@ -115,44 +129,57 @@ no i18n, no tests exist for any of the nine.
 - `src/routes/<Tab>.tsx` — route component.
 - Colocated `src/features/character/<tab>.test.ts` and `src/routes/<Tab>.test.tsx`.
 
-**Shared primitives needed (build BEFORE the first shipped tab, not per-tab):**
+**Shared primitives needed — both already shipped, use as-is, do not rebuild:**
 
-1. **`DataTable`** (DESIGN.md §4, currently `○`). Interface derived directly from
-   what `Wallet.tsx`/`Contracts.tsx` already do by hand, not invented:
-   - `columns: { key; header; align?: 'left' | 'right'; format?: (row) => ReactNode; sortable?: boolean }[]`
-   - `rows: T[]`, `getRowKey: (row) => string | number`
-   - `initialSort?: { key; direction }` — DESIGN.md §4 already says "dense
-     **sortable**", and both existing routes already sort in-route with `useMemo` +
-     `localeCompare`, so sorting belongs in the component, not left to callers.
-   - `emptyState`: reuse `EmptyState`, don't reinvent.
-   - A slot/prop for the `fromCache` warning banner both routes currently hand-roll
-     (`Wallet.tsx:169-170`, `Contracts.tsx:102-105` — identical `text-[11px]
-text-warning uppercase` paragraph).
-   - **Explicitly no built-in pagination** — neither existing route paginates in the
-     UI (both fetch every ESI page and render the full set); adding UI pagination to
-     v1's interface would be speculative, not observed need. Add it later if a tab's
-     row count actually demands it.
-2. **A shared route-lifecycle hook** (not a component) — e.g.
-   `useEsiViewSnapshot(characterId, loaders)` — factoring out the `Snapshot`/
-   `requestKey`/`cancelled`-guard/`loading`/`refreshKey`/reauth boilerplate
-   (`Wallet.tsx:25-104`, `Contracts.tsx:12-80`, ~50 nearly-identical lines each).
-   This is genuine, observed repetition (two real instances, identical shape) —
-   worth factoring now, before a third and fourth copy land.
+1. **`DataTable`** (`src/components/ui/DataTable.tsx`, exported from
+   `src/components/ui/index.ts`). Already built and already used by `Wallet.tsx` and
+   `Contracts.tsx` — do not design a new interface for it, use the shipped one. The
+   real, deliberately-narrowed contract (do not prescribe `key`/`format`/`sortable`/
+   `initialSort`/`emptyState` — those were considered and rejected; four call sites
+   already depend on the shape below):
+   - `columns: { id; header; align?: 'left' | 'right'; className?: string;
+cellClassName?: (row: T) => string | undefined; render: (row: T) => ReactNode }[]`
+     — `id` not `key` (React's `key` prop is supplied internally by the table), no
+     `format`, cells are rendered via `render` and toned via `cellClassName`.
+   - `rows: readonly T[]`, `rowKey: (row) => string | number` (not `getRowKey`),
+     `rowClassName?: (row) => string | undefined` (e.g. `Contracts.tsx` dims expired
+     rows with `opacity-50`), `label: string` (the table's accessible name).
+   - **No `sortable`/`initialSort` prop.** Sorting is presentational-free by design:
+     every caller pre-sorts its own `rows` in a `useMemo` before passing them in (see
+     `Contracts.tsx`'s `useMemo` sort by `date_issued`). Keep doing that per-tab —
+     do not add a sort prop to the shared component.
+   - **No `emptyState` prop.** Callers branch to `EmptyState` themselves outside
+     `DataTable` (see `Contracts.tsx`) rather than the table rendering it internally.
+   - **No `fromCache` slot.** Both existing callers still hand-roll that warning
+     paragraph outside the table (`Contracts.tsx:144`; `Wallet.tsx:243` etc.,
+     `text-[0.6875rem] text-warning uppercase`) — match that pattern per new tab
+     rather than inventing a table prop for it.
+   - **No built-in pagination**, unchanged from the original recommendation: neither
+     existing caller paginates in the UI (both fetch every ESI page and render the
+     full set). Add it later only if a tab's row count actually demands it.
+2. **The shared route-lifecycle hook** — shipped as `useRouteSnapshot`
+   (`src/lib/useRouteSnapshot.ts`), not the `useEsiViewSnapshot` name originally
+   proposed here. Already used by eight routes including `Wallet` and `Contracts`.
+   Signature: `useRouteSnapshot(load: (characterId, signal: RouteSnapshotSignal) =>
+Promise<T>)`, returning `{ data, error, loading, hydrated, activeCharacterId,
+refreshCount, refresh }`. Each new tab writes its own `load...Snapshot` loader
+   function (mirrors `loadContractsSnapshot` in `Contracts.tsx`) and passes it in —
+   the hook owns lifecycle only, never fetching.
 3. Do **NOT** build a generic "ESI list view" full-page component. Wallet is three
    tabs plus a scalar balance plus two tables; Contracts is one table. A component
    trying to cover both shapes would either grow escape hatches until it's not
    simpler than the route, or force Contracts-shaped tabs (most of these nine) into
    a Wallet-shaped abstraction they don't need. The honest split is: `DataTable` for
-   markup, the lifecycle hook for data-fetching boilerplate, and the route itself
-   stays a real component that composes them — that's deep enough without being
-   generic to the point of hurting readability.
+   markup, `useRouteSnapshot` for data-fetching lifecycle, and the route itself stays
+   a real component that composes them — that's deep enough without being generic to
+   the point of hurting readability.
 
 **Design tokens/components used:** `Panel`, `DataAgeBadge` (required, every tab is
 API-derived), `EmptyState`, `Spinner`, `ReauthBanner` (any tab whose auth can fail
 independently — all except employment history), `Tabs` only if a tab groups sub-views
-(none of the nine obviously need it). Table styling per the `Wallet`/`Contracts`
-conventions cited above, ideally through the new `DataTable` rather than another
-hand-rolled `<table>`.
+(none of the nine obviously need it). Table markup through the shipped `DataTable`
+(see above), matching how `Wallet`/`Contracts` already use it — no hand-rolled
+`<table>`.
 
 **Tests:** Per shipped tab, mirror `wallet.test.ts`/`contracts.test.ts`: MSW-mocked
 fetch-and-cache test, offline-fallback test, and (where the endpoint is scoped)
@@ -207,9 +234,9 @@ not just "a scope and a table."
 
 **Depends on:** Nothing structurally blocking — no dependency on items 13/16 beyond
 sharing one re-auth batch window (do it now while a re-auth prompt is already
-planned, not because of a technical dependency). `DataTable` and the lifecycle hook
-should land before the first shipped tab, not as a prerequisite item number — they're
-small enough to build alongside tab #1 and reuse for tab #2 onward.
+planned, not because of a technical dependency). `DataTable` and `useRouteSnapshot`
+are already shipped, so there is no primitive to build before the first tab — start
+straight in on tab #1.
 
 **Risks / open questions:**
 

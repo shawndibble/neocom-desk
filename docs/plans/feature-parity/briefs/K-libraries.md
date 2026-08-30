@@ -1,26 +1,44 @@
 # K — Build-vs-Buy Library Survey
 
-Repo: `/Users/shawndibble/Documents/neocom-desk` @ `feat/evelens-parity-plan` (c38389f)
-Investigation only. No repo files were created, edited, or staged.
+Repo: `/Users/shawndibble/Documents/neocom-desk` @ commit `c38389f`.
+Investigation only. No repo files were created, edited, or staged. The bundle
+measurements below (§1, §10a, §10b) were taken at that commit; several of the
+findings have since shipped — each is marked ALREADY DONE where that's the case.
 
 ---
 
 ## Headline
 
-**Recommended new dependencies: none. Total BUY cost: 0 KB gzip.**
+**One new dependency has since been accepted, not yet installed: `radix-ui`
+(size unmeasured). Everything else on this list is a BUILD/NATIVE call, 0 KB.**
 
-The single largest bundle finding on this list is not a library to add — it is a
-library already installed and shipping ~3× more than it needs to. Aliasing
-`firebase/firestore` → `firebase/firestore/lite` removes **102.5 KB gzip, ~30%
-of the entire JS payload** (measured, §10a). That is worth more than every other
-item in this survey combined, and it is a two-line change.
+The single largest bundle finding on this list was not a library to add — it
+was a library already installed and shipping ~3× more than it needed to. That
+finding has already been acted on: aliasing `firebase/firestore` →
+`firebase/firestore/lite` (§10a, **shipped**) and deferring the rest of
+Firebase off the entry-chunk critical path (§10b, **shipped**) together
+removed roughly the 102.5 + 58 KB gzip this survey measured at commit
+`c38389f`, before either fix landed — see §10a/§10b for the as-shipped state.
+
+Since this survey, `docs/adr/0004-radix-for-menu-primitives-only.md` (Accepted
+2026-08-30) adopted the single `radix-ui` package for ContextMenu, DropdownMenu
+and Select — three surfaces this survey didn't anticipate needing a listbox for
+row-by-row. `radix-ui` is not yet in `package.json`, so there is no code
+contradiction today, but this brief's headline can no longer say "recommended
+new dependencies: none." See the Radix note under §4 for how that ADR's choice
+relates to (and does not overturn) this survey's native-first verdicts.
 
 ---
 
-## 1. Measured baseline — what actually ships today
+## 1. Measured baseline — what shipped at commit `c38389f`
 
-`dist/assets/index-D0GV_9Lb.js` is **1,125,510 bytes raw / 334.2 KB gzip in a
-single chunk** (no code splitting). To attribute it, I built the real
+**Superseded by §10a/§10b, both since shipped** — this attribution predates the
+`firestore/lite` swap and the Firebase entry-chunk deferral, so it no longer
+describes the current bundle. Kept as the historical baseline the rest of this
+survey's savings figures were measured against.
+
+`dist/assets/index-D0GV_9Lb.js` was **1,125,510 bytes raw / 334.2 KB gzip in a
+single chunk** (no code splitting) at that commit. To attribute it, I built the real
 `vite.config.ts` with a `manualChunks` overlay from a scratch config
 (`--outDir` pointed outside the repo; the repo config was not touched):
 
@@ -44,7 +62,7 @@ gzip dictionary. Use 334 KB as the real baseline.)
 
 Plus `public/data/*.json`: **2.29 MB** — `blueprints.json` 1.42 MB,
 `types.json` 712 KB, `skills.json` 106 KB. All precached by the PWA
-(`vite.config.ts:37-42`, `globPatterns` includes `json`), so first load is
+(vite.config.ts's PWA `globPatterns` includes `json`), so first load is
 already ~2.6 MB before any new dependency.
 
 ### Candidate library costs (measured, not looked up)
@@ -86,74 +104,69 @@ Two compat notes that matter:
 
 ## Recommendation table
 
-| #   | Surface                                     | Verdict                   | Library + version                           |    gzip KB | Why                                                                                                                            |
-| --- | ------------------------------------------- | ------------------------- | ------------------------------------------- | ---------: | ------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Dense sortable `DataTable`                  | **BUILD**                 | — (TanStack Table 9.2.4 declined)           |          0 | Headless table emits no markup; the duplication is markup, not logic. Sorting is already 6 lines of `.sort()`.                 |
-| 2   | List virtualization                         | **BUILD / NATIVE**        | — (`content-visibility: auto`)              |          0 | 511 skills × 10 chars is not a virtualization problem. Assets is unbounded — fix with a cap, not a virtualizer.                |
-| 3   | Keyboard shortcuts                          | **BUILD**                 | — (`react-hotkeys-hook` 5.3.3 declined)     |          0 | Lib gives the easy half (matcher, input guard). The registry, OS labels, i18next routing, and help sheet are yours regardless. |
-| 4a  | Dialogs (shortcuts sheet, settings, import) | **NATIVE**                | `<dialog>.showModal()`                      |          0 | Focus containment + inert + Escape + top layer + `::backdrop`, free. Fixes two live a11y bugs.                                 |
-| 4b  | Popovers (bell, filter chips)               | **NATIVE**                | Popover API (`popover` attr)                |          0 | Light dismiss + Escape + top layer, Baseline widely available Apr 2025.                                                        |
-| 4c  | Checkbox                                    | **NATIVE**                | `<input type=checkbox>` + `appearance-none` |          0 | Radix Checkbox only restyles a box Tailwind v4 already restyles. Native keeps form semantics.                                  |
-| 4d  | Scope picker                                | **NATIVE, conditional**   | — (Radix if true listbox)                   |   0 / 27.5 | Checkbox list in a `<dialog>` = native. Only a real `aria-activedescendant` listbox justifies Radix.                           |
-| 5   | CSV serialization                           | **BUILD**                 | — (`papaparse` 5.7.0 declined)              |          0 | No CSV library does formula-injection sanitization or BOM. The hard 2/3 stays yours.                                           |
-| 6   | XML parsing (`.emp`)                        | **NATIVE**                | `DOMParser` at a feature-layer seam         |          0 | Browser `DOMParser` cannot do XXE at all; `fast-xml-parser` has 4 CVEs. Native wins the _security_ axis.                       |
-| 7   | Gzip decompression                          | **NATIVE**                | `DecompressionStream('gzip')`               |          0 | Baseline widely available since May 2023. `pako` buys nothing and is worse for bomb defence.                                   |
-| 8   | "What's new" panel                          | **BUILD**                 | — (structured JSON)                         |          0 | A Markdown body cannot go through i18next — a renderer fights CLAUDE.md, costs 18–40 KB, and adds XSS surface.                 |
-| 9   | Date / duration formatting                  | **ALREADY HAVE / NATIVE** | `Intl.NumberFormat` + `src/lib/duration.ts` |          0 | Everything needed is `Date.parse` + `toLocaleString` + `Intl.NumberFormat`. A date lib would be a regression.                  |
-| 10a | Firestore SDK size                          | **SWAP (removal)**        | `firebase/firestore/lite`                   | **−102.5** | No `onSnapshot` anywhere; every API used exists in `lite`. Measured.                                                           |
-| 10b | Firebase in entry chunk                     | **DEFER (removal)**       | `await import('@/sync')`                    |    **−58** | `App.tsx:7` pulls all of Firebase into the critical path.                                                                      |
-| 10c | Route code splitting                        | **BUILD**                 | `React.lazy`                                |   −(large) | 14 routes, one 334 KB chunk.                                                                                                   |
-| 10d | Triplicated `formatIsk`                     | **BUILD**                 | consolidate into `src/lib/isk.ts`           |         ~0 | Three copies, one of which documents the duplication in its own header.                                                        |
+| #   | Surface                                      | Verdict                       | Library + version                           |    gzip KB | Why                                                                                                                                                                                                                              |
+| --- | -------------------------------------------- | ----------------------------- | ------------------------------------------- | ---------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Dense sortable `DataTable`                   | **BUILD — SHIPPED**           | — (TanStack Table 9.2.4 declined)           |          0 | Built as `components/ui/DataTable.tsx`, adopted by Wallet (journal + transactions), Contracts, Orders. `Market.tsx` and `MaterialsTable.tsx` are the two remaining hand-written tables.                                          |
+| 2   | List virtualization                          | **BUILD / NATIVE**            | — (`content-visibility: auto`)              |          0 | 511 skills × 10 chars is not a virtualization problem. Assets is unbounded — fix with a cap, not a virtualizer.                                                                                                                  |
+| 3   | Keyboard shortcuts                           | **BUILD**                     | — (`react-hotkeys-hook` 5.3.3 declined)     |          0 | Lib gives the easy half (matcher, input guard). The registry, OS labels, i18next routing, and help sheet are yours regardless.                                                                                                   |
+| 4a  | Dialogs (shortcuts sheet, settings, import)  | **NATIVE — SHIPPED**          | `<dialog>.showModal()`                      |          0 | Built as `components/ui/Modal.tsx`; `ImportClipboardDialog` and the mobile "More" sheet in `Layout.tsx` both use it now.                                                                                                         |
+| 4b  | Popovers (bell, filter chips)                | **NATIVE**                    | Popover API (`popover` attr)                |          0 | Light dismiss + Escape + top layer, Baseline widely available Apr 2025.                                                                                                                                                          |
+| 4c  | Checkbox                                     | **NATIVE**                    | `<input type=checkbox>` + `appearance-none` |          0 | Radix Checkbox only restyles a box Tailwind v4 already restyles. Native keeps form semantics.                                                                                                                                    |
+| 4d  | Scope picker                                 | **NATIVE, conditional**       | — (Radix if true listbox)                   |   0 / 27.5 | Checkbox list in a `<dialog>` = native. Only a real `aria-activedescendant` listbox justifies Radix.                                                                                                                             |
+| 4e  | Menu-family (context menu, dropdown, select) | **BUY — accepted (ADR 0004)** | `radix-ui`                                  | unmeasured | Not covered by this survey (Market Browser context menu wasn't scoped here). Decided separately; doesn't overturn 4a–4c's native verdicts, which the ADR itself keeps.                                                           |
+| 5   | CSV serialization                            | **BUILD — SHIPPED**           | — (`papaparse` 5.7.0 declined)              |          0 | Built as `src/lib/csv.ts`, BOM and formula-injection guard included. `toCsv` owns the BOM — do not prepend one at the call site.                                                                                                 |
+| 6   | XML parsing (`.emp`)                         | **NATIVE**                    | `DOMParser` at a feature-layer seam         |          0 | Browser `DOMParser` cannot do XXE at all; `fast-xml-parser` has 4 CVEs. Native wins the _security_ axis.                                                                                                                         |
+| 7   | Gzip decompression                           | **NATIVE**                    | `DecompressionStream('gzip')`               |          0 | Baseline widely available since May 2023. `pako` buys nothing and is worse for bomb defence.                                                                                                                                     |
+| 8   | "What's new" panel                           | **BUILD**                     | — (structured JSON)                         |          0 | A Markdown body cannot go through i18next — a renderer fights CLAUDE.md, costs 18–40 KB, and adds XSS surface.                                                                                                                   |
+| 9   | Date / duration formatting                   | **ALREADY HAVE / NATIVE**     | `Intl.NumberFormat` + `src/lib/duration.ts` |          0 | Everything needed is `Date.parse` + `toLocaleString` + `Intl.NumberFormat`. A date lib would be a regression.                                                                                                                    |
+| 10a | Firestore SDK size                           | **SWAP — SHIPPED**            | `firebase/firestore/lite`                   | **−102.5** | No `onSnapshot` anywhere; every API used exists in `lite`. `firebaseApp.ts` and `planSync.ts` both import from `firebase/firestore/lite` now.                                                                                    |
+| 10b | Firebase in entry chunk                      | **DEFER — SHIPPED**           | `await import('./planSync')`                |    **−58** | `src/sync/index.ts` is now the code-splitting boundary it recommends: every Firebase-reaching export is a thin `await import('./planSync')` wrapper; `App.tsx`'s `triggerSync` import resolves to that wrapper, not to Firebase. |
+| 10c | Route code splitting                         | **BUILD**                     | `React.lazy`                                |   −(large) | Still no route-level splitting anywhere in the repo — one entry chunk for all routes.                                                                                                                                            |
+| 10d | Triplicated `formatIsk`                      | **BUILD — SHIPPED**           | consolidate into `src/lib/isk.ts`           |         ~0 | Done for `formatIsk`/`clampIskZero`. `formatPercent`/`formatSignedPercent` (§10e) have not followed yet — still duplicated between `features/industry/format.ts` and `features/market/format.ts`.                                |
 
-**Aggregate gzip cost of everything recommended for purchase: 0 KB.**
-**Aggregate gzip saved by the removals in §10: ~100–160 KB (30–48% of current JS).**
+**Aggregate gzip cost of everything recommended for purchase at survey time: 0
+KB — now one unmeasured exception (`radix-ui`, §4e), decided after this survey
+and outside its scope.**
+**Aggregate gzip saved by the removals in §10: ~100–160 KB (30–48% of the
+pre-Phase-0 JS) — §10a and §10b have both since shipped; §10c has not.**
 
 ---
 
-## 1. Dense sortable `DataTable` — **BUILD**
+## 1. Dense sortable `DataTable` — **BUILD, shipped**
 
-There are **six** near-identical hand-written tables in the repo, all sharing
-byte-for-byte the same Tailwind class strings:
+This shipped as `src/components/ui/DataTable.tsx` (a `DataTableColumn<T>`
+descriptor — `id`, `header`, `align?`, `className?`, `cellClassName?`,
+`render` — plus `rows`, `rowKey`, `rowClassName`, and an accessible `label`).
+It's deliberately presentational: no sort state or `aria-sort` inside it, since
+every call site pre-sorts its own rows in a `useMemo` before handing them to
+the table (see the sort call sites below) — a narrower, and arguably better,
+scope than the `useState`-sort-plus-`aria-sort` design this section originally
+proposed.
 
-- `src/features/industry/MaterialsTable.tsx:24`
-- `src/routes/Wallet.tsx:172` and `src/routes/Wallet.tsx:234`
-- `src/routes/Contracts.tsx:107`
-- `src/routes/Orders.tsx:78`
-- `src/routes/Market.tsx:266`
+Adopted at four of the original six call sites: Wallet's journal and
+transactions tables (`src/routes/Wallet.tsx`, two `DataTable` uses), Contracts
+(`src/routes/Contracts.tsx`), and Orders (`src/routes/Orders.tsx`, two
+`DataTable` uses for current orders and history). **Two remain hand-written
+`<table>` markup and are what's actually left to do here:**
+`src/routes/Market.tsx` and `src/features/industry/MaterialsTable.tsx`.
 
-The repeated string in every one of them is the header
-(`className="px-3 py-2 font-semibold uppercase"`, right-aligned variant for
-numerics) and the cell (`className="px-3 py-1.5 ..."`, plus
-`text-right tabular-nums` on numbers). The wrapper is always
-`<table className="w-full text-xs">` / `<thead><tr className="border-b border-line
-text-left text-text-dim">` / `<tbody className="divide-y divide-line">`.
+The "hard" part TanStack Table would have solved — sorting — was already
+solved without it, 6 lines at a time, with plain `Array.prototype.sort`, and
+still is at the surviving call sites:
 
-That duplication is **markup and class strings**. TanStack Table is headless: it
-returns row models and header objects and you still write every `<th>`, every
-`<td>`, and every Tailwind class by hand. It would remove **zero** of the six
-duplications while adding 13.5 KB gzip and a v9-migration surface.
+- `Wallet.tsx`'s journal/transaction `useMemo`s (date desc)
+- `Mail.tsx`'s header sort
+- `Assets.tsx`'s entries-by-name then groups-by-label sort
+- `features/industry/jobs.ts`'s job-list sort
 
-Meanwhile the "hard" part it does solve — sorting — is already solved, 6 lines
-at a time, with plain `Array.prototype.sort`:
+(`CurrentQueuePanel.tsx`, cited here in the original survey, no longer sorts
+anything — check before reusing that citation.)
 
-- `src/routes/Wallet.tsx:89` and `:93` (journal / transactions by date desc)
-- `src/routes/Mail.tsx:59`
-- `src/routes/Assets.tsx:113-115` (entries by name, then groups by label)
-- `src/features/industry/jobs.ts:40`
-- `src/features/skills/planner/CurrentQueuePanel.tsx:56`
-
-Build `src/components/ui/DataTable.tsx` with a `Column<T>` descriptor
-(`{ id, header, align?: 'left'|'right', sortKey?: (row: T) => string | number,
-render: (row: T) => ReactNode }`), a `useState` sort key + direction, the
-`aria-sort` attribute on the active `<th>`, and `EmptyState`/`Spinner` slots.
-Roughly 90 lines. It owns the class strings the six call sites currently repeat
-— which is the actual deliverable.
-
-**Condition that flips this to BUY:** column pinning, column grouping (multi-row
-headers), column resizing, or faceted filter value sets. I cannot see the 19
-briefs, so I cannot rule those out. If any brief needs two or more of them,
-re-evaluate — but note that even then you would want TanStack v9's new API, not
-the v8 examples most tutorials show.
+**Condition that would flip this to BUY:** column pinning, column grouping
+(multi-row headers), column resizing, or faceted filter value sets. Still
+worth checking against `Market.tsx`'s and `MaterialsTable.tsx`'s actual needs
+before assuming `DataTable` as shipped covers them as-is — but note that even a
+flip would mean TanStack v9's new API, not the v8 examples most tutorials show.
 
 ## 2. List virtualization — **BUILD / NATIVE**, with one real caveat
 
@@ -166,26 +179,25 @@ Honest answer on the row counts:
   measurement, scroll restoration, and sticky headers-inside-a-virtual-list —
   for no user-visible gain.
 - **Wallet journal / transactions.** Transactions are **explicitly bounded in
-  code**: `src/esi/endpoints.ts:284` caps the cursor walk at
-  `MAX_TRANSACTION_PAGES = 5`, with a comment stating full history is unbounded
-  and only recent activity is wanted. The journal
-  (`src/esi/endpoints.ts:255-262`) does fetch every X-Page, but ESI only retains
-  ~30 days of journal, so it lands in the low thousands. Neither needs a
-  virtualizer; if the journal ever feels slow, apply the same explicit page cap
-  the transactions endpoint already sets a precedent for.
+  code**: `src/esi/endpoints.ts`'s `getCharacterWalletTransactions` caps the
+  cursor walk at `MAX_TRANSACTION_PAGES = 5`, with a comment stating full
+  history is unbounded and only recent activity is wanted. The journal fetcher
+  in the same file does fetch every X-Page, but ESI only retains ~30 days of
+  journal, so it lands in the low thousands. Neither needs a virtualizer; if
+  the journal ever feels slow, apply the same explicit page cap the
+  transactions endpoint already sets a precedent for.
 - **Assets — this one is genuinely unbounded.**
-  `src/features/character/assets.ts:8` calls `loadWithCache(…, () =>
-getCharacterAssets(characterId))`, which goes through
-  `src/esi/paginated.ts:11` `fetchAllPages` — which fetches **every** page
-  (1,000 assets each), with no cap of the kind
-  `getCharacterWalletTransactions` sets for itself. `src/routes/Assets.tsx:164`
-  then maps every location group and `:167` maps every asset inside it into an
-  `<li>`, unbounded. A hauler or industry alt with 20k+ assets renders 20k list
-  items on one page.
+  `src/features/character/assets.ts` calls `loadWithCache(…, () =>
+getCharacterAssets(characterId))`, which goes through `src/esi/paginated.ts`'s
+  `fetchAllPages` — which fetches **every** page (1,000 assets each), with no
+  cap of the kind `getCharacterWalletTransactions` sets for itself.
+  `src/routes/Assets.tsx` then maps every location group, and every asset
+  inside each group, into an `<li>`, unbounded. A hauler or industry alt with
+  20k+ assets renders 20k list items on one page.
 
 For assets, reach for virtualization **last**, not first. Cheaper fixes in order:
 
-1. The search input at `src/routes/Assets.tsx:139` already filters — default to
+1. `Assets.tsx`'s search input already filters — default to
    showing only the top N location groups, expand on click.
 2. `content-visibility: auto` + `contain-intrinsic-size: auto 26px` on each
    `<li>` (or on each location `<Panel>`). Zero JS, zero dependency, and the
@@ -265,18 +277,12 @@ behind is clickable, tabbable, or reachable by a screen reader, and the implicit
 browser chrome) — it makes the rest of the page inert, which is the behavior you
 actually want and is _more_ correct than a JS focus-trap library.
 
-This is not hypothetical improvement — it fixes two live defects:
-
-- `src/features/skills/planner/ImportClipboardDialog.tsx:61-64` renders
-  `role="dialog" aria-modal="true"` on a plain `<div>` with **no focus
-  containment, no inert background, and no Escape handler at all**. A screen
-  reader user can tab straight out of it into the page behind.
-- `src/app/Layout.tsx:60-64` (the mobile "More" sheet) has the same
-  `role="dialog" aria-modal="true"` `<div>` and **no focus containment**; it
-  bolts on a manual Escape listener at `src/app/Layout.tsx:126-132`, a manual
-  initial-focus effect at `src/app/Layout.tsx:53-55` (`firstLinkRef.current
-?.focus()`), and a manual backdrop-click handler at `:64`. All of those
-  hand-rolled behaviors are free with `<dialog>` + `::backdrop`.
+**This has already shipped as `src/components/ui/Modal.tsx`**, built on
+`<dialog>`/`showModal()` exactly as recommended. Both of the surfaces this
+section flagged as live defects when written now render through it:
+`ImportClipboardDialog` and the mobile "More" sheet in `Layout.tsx` both import
+and use `Modal`, so the hand-rolled `role="dialog"` divs with no focus
+containment no longer exist. Nothing left to do here.
 
 **Popover API** (`popover` attribute + `popovertarget` on the trigger) is
 Baseline **widely available** since April 2025 (Chrome/Edge 2023, Safari 17.4,
@@ -288,13 +294,12 @@ a filter dropdown, both of which should stay non-modal. Position it with plain
 `position: absolute` inside a `position: relative` wrapper; do **not** depend on
 CSS anchor positioning yet (still not cross-browser).
 
-**One caveat on "filter chips":** the brief lists them under popovers, but chips
-are often a _selection state_ surface rather than an overlay. If the 19 briefs
-mean multi-select toggle chips (click to include/exclude a ref type, a status, a
-hub), that is a row of `<button type="button" aria-pressed={on}>` styled with the
-existing `StatChip` tones — **no overlay, no Popover API, no dependency**. Only
-the "chip opens a menu of values" variant needs the Popover verdict above. Worth
-confirming which one the brief means before anyone builds an overlay.
+**One caveat on "filter chips":** the toggle form shipped, and it went the way
+this section recommended: `src/components/ui/FilterChip.tsx` is exactly
+`<button type="button" aria-pressed={selected}>` styled with `StatChip`-like
+tones — no overlay, no Popover API, no dependency. Only the "chip opens a menu
+of values" variant (a dropdown, not a toggle) would still need the Popover
+verdict above; nothing in the repo builds that variant today.
 
 **Checkbox: use `<input type="checkbox">`.** Radix Checkbox exists to let you
 style a box that historically could not be styled. Tailwind v4 styles a real
@@ -324,7 +329,21 @@ current releases. Headless UI and Ark UI both bundle equivalent Floating UI
 machinery and were not measured because neither could beat 27.5 KB, and 27.5 KB
 is already more than the native path costs (zero).
 
-## 5. CSV serialization — **BUILD**. Clean kill.
+**Since this survey: `docs/adr/0004-radix-for-menu-primitives-only.md`
+(Accepted 2026-08-30)** made this exact "if you must buy, buy Radix" call — but
+for a different surface than anything measured above. The ADR adopts the
+single `radix-ui` package for ContextMenu, DropdownMenu and Select (a
+right-click context menu and a real listbox for the Market Browser), none of
+which this survey's dialog/popover/checkbox table above covers. The
+`@radix-ui/react-popover`/`-dialog`/`-checkbox` numbers measured here (27.5 KB
+combined) are the wrong figure to cite for that decision — they're different
+packages. `radix-ui` isn't in `package.json` yet, so its actual bundle cost is
+unmeasured. The ADR does not overturn any verdict in this section: it keeps the
+native `Modal` and CSS-based `Tooltip` as-is and reaches for Radix only where
+this survey's own criteria (roving `tabindex`, typeahead,
+`aria-activedescendant`) are actually met.
+
+## 5. CSV serialization — **BUILD, shipped**. Clean kill.
 
 The three stated requirements are RFC 4180 escaping, formula-injection
 sanitization, and a BOM. `papaparse` 5.7.0 (7.3 KB gzip) is a _parser_ — its
@@ -334,23 +353,27 @@ sanitization, and a BOM. `papaparse` 5.7.0 (7.3 KB gzip) is a _parser_ — its
   Excel/Sheets behavior (a cell starting `=`, `+`, `-`, `@`, tab, or CR is
   evaluated as a formula), not anything the CSV spec addresses. Papa will
   happily write `=cmd|'/c calc'!A1`.
-- **No BOM by default.** You prepend `﻿` yourself either way.
+- **No BOM by default.** Something has to prepend one.
 
 So buying the library solves one of three requirements, and it is the one that
-is a 6-line function. The whole thing is ~40 lines in `src/lib/csv.ts`, pure,
-no DOM, TDD-able exactly like `src/lib/duration.ts`:
+is a 6-line function. This shipped as `src/lib/csv.ts` (67 lines, pure, no
+DOM, TDD-able exactly like `src/lib/duration.ts`):
 
 - quote a field iff it contains `"`, `,`, `\r`, or `\n`; double any inner `"`
 - prefix `'` when the raw value's first character is in `= + - @ \t \r`
-  (apply _before_ quoting, and apply to header cells too)
+  (applied before quoting, and to header cells too)
 - join rows with `\r\n` per RFC 4180
-- caller prepends `﻿` when building the `Blob`
+- **`toCsv` owns the BOM** — it prepends `﻿` itself before returning the
+  string. Do not prepend a second one when building the `Blob`; that writes two
+  BOMs into every exported file.
 
-Download without a dependency: `new Blob(['﻿' + csv, { type:
-'text/csv;charset=utf-8' })` → `URL.createObjectURL` → a synthetic `<a download>`
-click → `URL.revokeObjectURL`. The Blob/`URL` half is DOM, so it lives in a
-component or `src/app`, while the serializer stays pure in `src/lib` — same
-split the codebase already uses.
+Download without a dependency: `src/lib/download.ts`'s `downloadTextFile`
+wraps `toCsv`'s output straight into `new Blob([text], { type:
+'text/csv;charset=utf-8' })` → `URL.createObjectURL` → a synthetic `<a
+download>` click → a deferred `URL.revokeObjectURL`. `src/lib/downloadCsv.ts`
+composes the two, with a closed `CsvSurface` union naming every export
+surface. The Blob/`URL` half is DOM, the serializer stays pure in `src/lib` —
+same split the codebase already uses.
 
 ## 6. XML parsing of untrusted `.emp` / plan `.xml` — **NATIVE `DOMParser`**
 
@@ -392,7 +415,7 @@ src/engine/import/empPlan.ts            ← pure. DTO → PlanEntry[], validatio
                                           TDD, same shape as skillPlanPaste.ts
 ```
 
-Both halves stay testable — Vitest already runs jsdom (`vite.config.ts:47`
+Both halves stay testable — Vitest already runs jsdom (vite.config.ts's test
 `environment: 'jsdom'`), which provides `DOMParser`, so even the adapter has
 real unit tests without a browser.
 
@@ -471,11 +494,13 @@ a design system built on hairlines and `rounded-xs`.
 
 ## 9. Date / duration formatting — **ALREADY HAVE / NATIVE**
 
-**`Intl.NumberFormat` is already in use and used correctly** — three modules
-build a memoized formatter at module scope rather than per render:
-`src/features/character/format.ts:3`, `src/features/industry/format.ts:1`,
-`src/features/market/format.ts:8`. Nothing to change there except the
-duplication (§10d).
+**`Intl.NumberFormat` is already in use and used correctly** — every formatter
+is built once at module scope rather than per render: `src/lib/isk.ts`'s
+`formatIsk` (post-§10d consolidation), plus `features/industry/format.ts`'s and
+`features/market/format.ts`'s own `PERCENT_FORMAT`/`VOLUME_FORMAT` constants —
+the percent/volume formatters §10d's "not done yet" leaves still duplicated.
+Nothing to change on the memoization pattern itself, only the remaining
+duplication (§10d/§10e).
 
 **Nothing in the codebase is hand-rolling something `Intl` does better.** I
 checked all 20 `toLocale*` call sites and both formatter families. Two
@@ -528,7 +553,11 @@ sideways, for a project that needs none.
 
 ## 10. Other findings
 
-### (a) THE FINDING: Firestore full SDK where `lite` suffices — **−102.5 KB gzip**
+### (a) THE FINDING: Firestore full SDK where `lite` suffices — **−102.5 KB gzip — SHIPPED**
+
+`src/sync/firebaseApp.ts` and `src/sync/planSync.ts` both import from
+`firebase/firestore/lite` today. The measurement and reasoning below describe
+the state at commit `c38389f`, before the swap.
 
 `firebase/firestore` is **109.25 KB gzip, 32% of the entire JS bundle** — the
 single largest thing this app ships. It is the full realtime SDK, including the
@@ -539,10 +568,11 @@ snapshot listener machinery.
 
 - `grep -rn "onSnapshot" src functions/src` → **zero matches**. No realtime
   listeners anywhere.
-- `src/sync/planSync.ts:32-42` imports exactly:
-  `collection, deleteDoc, doc, getDocs, query, setDoc, where`, plus the
-  `CollectionReference` and `Firestore` types.
-- `src/sync/firebaseApp.ts:7` imports `getFirestore`.
+- `planSync.ts`'s Firestore import block (at the time of this measurement)
+  imports exactly: `collection, deleteDoc, doc, getDocs, query, setDoc, where`,
+  plus the `CollectionReference` and `Firestore` types.
+- `firebaseApp.ts`'s `getFirebaseApp`/`getSyncFirestore` accessors import
+  `getFirestore`.
 - `docs/ARCHITECTURE.md:86-92` describes sync as an explicit on-demand
   fetch → merge → push cycle — by design, not by accident.
 
@@ -570,72 +600,76 @@ in a scratch Vite config and rebuilding:
 | **total JS bundle**                 |    **342.70** |  **240.23** | **−102.47** |
 
 **−102.5 KB gzip — a 30% reduction of the entire JavaScript payload — from
-changing two import specifiers** (`src/sync/firebaseApp.ts:7` and
-`src/sync/planSync.ts:42`). The core chunk shrinks too because the full SDK
-pulls `@firebase/webchannel-wrapper` and the gRPC-ish transport into shared
-code.
+changing two import specifiers** in `firebaseApp.ts` and `planSync.ts`. The
+core chunk shrinks too because the full SDK pulls `@firebase/webchannel-wrapper`
+and the gRPC-ish transport into shared code.
 
-The one thing to confirm before merging: `firebase/firestore/lite` has no
-offline persistence. Given `docs/ARCHITECTURE.md:12-14` states editable data is
-Dexie-authoritative and Firestore is a sync transport only, that is a non-issue —
-but it deserves an explicit line in an ADR alongside 0001/0002.
+The one thing to confirm before merging (now merged): `firebase/firestore/lite`
+has no offline persistence. Given `docs/ARCHITECTURE.md` states editable data
+is Dexie-authoritative and Firestore is a sync transport only, that was a
+non-issue — worth confirming an ADR (alongside 0001/0002) or `ARCHITECTURE.md`
+itself now records this choice, since it shipped without one being cited here.
 
-### (b) Firebase is in the entry chunk — a further **~−58 KB gzip** off first load
+### (b) Firebase is in the entry chunk — a further **~−58 KB gzip** off first load — **SHIPPED**
 
-Lazy _initialization_ in `src/sync/firebaseApp.ts` does not keep Firebase out of
-the initial bundle, because the module graph reaches it eagerly:
+This section originally found that lazy _initialization_ in
+`src/sync/firebaseApp.ts` did not keep Firebase out of the initial bundle,
+because the module graph reached it eagerly from `App.tsx`, `Industry.tsx`, and
+`SkillPlans.tsx` importing the sync barrel statically.
 
-`src/app/App.tsx:7` → `import { triggerSync } from '@/sync'` →
-`src/sync/index.ts:4-14` re-exports from `./planSync` →
-`src/sync/planSync.ts:32-42` top-level `import … from 'firebase/firestore'`.
+**That's fixed now.** `src/sync/index.ts`'s own header comment states the
+intent directly: it is "the Firebase code-splitting boundary" — `planSync.ts`
+statically imports Firebase, so every export that can reach it
+(`triggerSync`, `scheduleSync`, `markPlanDeleted`, `markBuildPlanDeleted`,
+`setSyncedSetting`) is a thin `async`/`await import('./planSync')` wrapper.
+`status.ts` and `uid.ts` (Firebase-free) stay synchronous exports, so
+`useSyncStatus`'s `subscribeSyncStatus` and the nav sync dot still work at
+first paint without pulling Firebase in — exactly the further split this
+section flagged as a prerequisite, also done.
 
-Two other eager entry points: `src/routes/Industry.tsx:6` and
-`src/routes/SkillPlans.tsx:8`.
+`App.tsx`'s `import { triggerSync } from '@/sync'` therefore no longer reaches
+Firebase statically; the Firebase weight loads on first sync, not first paint,
+same outcome this section recommended.
 
-Converting those three to `await import('@/sync')` inside the handlers that
-actually fire a sync moves the remaining Firebase weight (post-(a): 21.5 lite
-firestore + 29.4 auth + 6.8 core ≈ **57.7 KB gzip**) entirely off the critical
-path — it would load on first sync, not first paint. Note
-`src/app/syncStatus.ts:18`, `SyncErrorNote.tsx:2`, `SyncStatusDot.tsx:2` import
-only _types_ from `@/sync`, which are erased at build and do not pull anything
-in; `src/app/useSyncStatus.ts:2` imports the runtime `subscribeSyncStatus`, so
-that one needs the status subscription split out of `planSync.ts` first (it has
-no Firebase dependency of its own).
+**Combined (a) + (b), both shipped: first-load JS dropped from the ~334 KB
+gzip measured at `c38389f` toward the ~175 KB this section estimated** (not
+re-measured post-ship for this brief — re-measuring is a good sanity check but
+not required to close this item).
 
-**Combined (a) + (b): first-load JS goes from ~334 KB gzip to roughly 175 KB.**
+### (c) No route-level code splitting — still open
 
-### (c) No route-level code splitting
-
-`dist/` is one 1.13 MB / 334 KB gzip chunk for 14 routes. `React.lazy` +
+Still true: no `React.lazy` anywhere in the repo (grepped). The exact chunk
+size cited in the original measurement (1.13 MB / 334 KB gzip) predates the
+Phase-0 work in (a)/(b) and the added `Settings`/`Styleguide` routes, so don't
+cite it — the qualitative finding stands, the number doesn't. `React.lazy` +
 `<Suspense>` around the route elements in `src/app/App.tsx` is free and already
-supported by React Router 7. The highest-value split is `@dnd-kit` (**15.7 KB
-gzip**), which is reachable only from `src/features/skills/planner/` —
-`EntryList.tsx`, `reorder.ts`, `markers.ts` — i.e. exactly one route
-(`/skills/plans`). Every other route pays for a drag-and-drop library it cannot
-use.
+supported by React Router 7. The highest-value split is still `@dnd-kit`
+(**15.7 KB gzip**), reachable only from `src/features/skills/planner/` — i.e.
+exactly the `/skills/plans` route. Every other route pays for a drag-and-drop
+library it cannot use.
 
-### (d) `formatIsk` exists three times
+### (d) `formatIsk` existed three times — **SHIPPED**
 
-- `src/features/character/format.ts:21` — 2 decimals, with a `ZERO_EPSILON`
-  clamp for float noise
-- `src/features/industry/format.ts:8` — 0 decimals
-- `src/features/market/format.ts:14` — 0 decimals
+Consolidated into `src/lib/isk.ts`'s `formatIsk(value, decimals = 0)` plus an
+exported `clampIskZero` epsilon clamp. `features/character/format.ts` no longer
+has its own copy — it now imports `clampIskZero` from `@/lib/isk` for
+`iskToneClass` and documents in its own comment that the two must agree.
+`features/industry/format.ts` and `features/market/format.ts` both import
+`formatIsk` from `@/lib/isk` rather than defining it locally; the header
+comment that used to call out the duplication in `features/market/format.ts`
+is gone along with the duplication.
 
-`src/features/market/format.ts:1-6` **explicitly documents the duplication in
-its own header comment** ("Kept local to this feature … which already duplicate
-each other"). `src/lib/` already exists as the home for exactly this kind of
-shared formatter — `duration.ts` was consolidated there in commit 117eab0 for
-the same reason. One `src/lib/isk.ts` with
-`formatIsk(value, { decimals = 0 } = {})` plus the epsilon clamp (which the
-other two silently lack, so they can render `-0` today) retires all three, and
-`formatPercent`/`formatSignedPercent` should follow.
+**Not done yet:** `formatPercent`/`formatSignedPercent` are still duplicated
+between `features/industry/format.ts` and `features/market/format.ts` — this
+recommendation's other half is still open.
 
-### (e) `formatCostIndex` bypasses `Intl`
+### (e) `formatCostIndex` bypasses `Intl` — still open
 
-`src/features/industry/format.ts:19` uses `(index * 100).toFixed(2)` while its
-immediate neighbour `formatPercent` uses `Intl.NumberFormat`. Harmless today
-(cost indices are < 1), but inconsistent and it will not group thousands if the
-input shape ever changes. Fold it into the shared formatter from (d).
+`features/industry/format.ts`'s `formatCostIndex` still uses
+`(index * 100).toFixed(2)` while its neighbour `formatPercent` uses
+`Intl.NumberFormat`. Harmless today (cost indices are < 1), but inconsistent
+and it will not group thousands if the input shape ever changes. Fold it into
+the shared formatter alongside the `formatPercent` consolidation from (d).
 
 ### (f) Reverse check — any dependency droppable?
 
@@ -657,8 +691,9 @@ knowing:
   a hand-rolled `t()` would save ~14 KB and cost the plural handling that
   `DataAgeBadge` (§9) already depends on. **Not recommended** — listed only
   because the brief asked for the reverse check to be honest.
-- **`firebase`** — see (a) and (b). The action is to shrink and defer it, not
-  drop it.
+- **`firebase`** — see (a) and (b), both shipped: `firestore/lite` and deferred
+  off the entry chunk. Not droppable — it's the sync transport (ADR 0001) —
+  but it's now shrunk and deferred as recommended.
 
 ---
 

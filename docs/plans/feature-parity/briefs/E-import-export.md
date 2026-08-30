@@ -23,7 +23,7 @@ investigation; `docs/ARCHITECTURE.md:36` enumerates the full current importer se
 
 - **Return shape convention**: every parser returns a plain result object, never throws for
   malformed _content_ (only throws `TypeError`/`RangeError` for programmer-error inputs like
-  a non-array queue — `src/engine/queueImport.ts:19-25`). Shape is `{ entries: PlanEntry[],
+  a non-array queue — `src/engine/queueImport.ts:24-27`). Shape is `{ entries: PlanEntry[],
 errors: E[] }` (`skillPlanPaste.ts:23-26`) or `{ ...fields, errors: E[] }` for a
   structural parse (`eftFit.ts:34-39`), with a separate `warnings: string[]` layered on top
   at the orchestration level (`clipboardImport.ts:27-36`), not inside the pure parser.
@@ -50,9 +50,9 @@ reason }` (`fitToSkills.ts:34-37`) for name-resolution-oriented aggregation. An 
   (`skillPlanPaste.ts:84-87`) — same rule applies to duplicate `<entry>` elements for the
   same skill in a plan XML.
 
-**Verified schema — `.emp` / plan XML** (EVEMon is the origin format; EveLens is a
-compatible successor, same underlying container). Source: EVEMon's public GitHub repo,
-`evemondevteam/evemon` (MIT-ish OSS), fetched 2026-08-29:
+**Verified schema — `.emp` / plan XML** (EVEMon is the origin format; a popular, actively
+maintained successor tool is format-compatible with it, same underlying container). Source:
+EVEMon's public GitHub repo, `evemondevteam/evemon` (MIT-ish OSS), fetched 2026-08-29:
 
 - **Compression**: confirmed gzip. `src/EVEMon.Common/Helpers/UIHelper.cs:186` — `.emp` is
   written as `new GZipStream(fs, CompressionMode.Compress)` wrapping a `StreamWriter` writing
@@ -118,11 +118,12 @@ compatible successor, same underlying container). Source: EVEMon's public GitHub
     https://raw.githubusercontent.com/evemondevteam/evemon/master/src/EVEMon.Common/Serialization/Settings/SerializablePlanEntry.cs ,
     https://raw.githubusercontent.com/evemondevteam/evemon/master/src/EVEMon.Common/Serialization/Exportation/OutputPlan.cs ,
     https://raw.githubusercontent.com/evemondevteam/evemon/master/src/EVEMon.Common/Helpers/PlanIOHelper.cs (confirms `.emp` == gzip(XML), that plain `.xml` files from EVEMon are the _same_ `<plan>` schema just uncompressed, and the exact `Name`/`Owner`/`Revision`/`Entries`-only copy shown above).
-  - Not independently confirmed: EveLens's own export, since EveLens's own repo wasn't
-    fetched in this pass (time-boxed to EVEMon, which is the format's origin and what corps
-    circulate as ".emp"). Recommend a smoke-test against one real EveLens export file before
-    calling this item done — if EveLens diverges, it's likely additive (extra elements), and
-    a lenient parser (unknown attributes/elements ignored) already tolerates that.
+  - Not independently confirmed: the compatible successor tool's own export, since its repo
+    wasn't fetched in this pass (time-boxed to EVEMon, which is the format's origin and what
+    corps circulate as ".emp"). Recommend a smoke-test against one real export file from that
+    tool before calling this item done — if it diverges, it's likely additive (extra
+    elements), and a lenient parser (unknown attributes/elements ignored) already tolerates
+    that.
 
 **Gap:** No gzip decompression, no XML parsing, no file-input UI, no `.emp`/`.xml` route
 into `previewClipboardImport`'s preview pipeline.
@@ -166,11 +167,18 @@ This split is deliberate: DOMParser output (a live `Document`) never crosses int
 by construction, not by convention alone (a `Document` argument couldn't even be constructed
 without importing DOM lib types).
 
-**Design tokens/components used:** No new primitives. The dialog stays a single `Panel`
-(✓) with the existing preview/warnings/errors sub-sections unchanged
-(`ImportClipboardDialog.tsx:97-174`); the only new visual surface is the file/drop mode
-described under "File input UX" below, which reuses `Tabs` (✓) and `Button` (`ghost`, ✓) —
-no new component needed, stays consistent with the dense, hairline-bordered, one-`ghost`-row
+**Design tokens/components used:** No new primitives. **Correction: the dialog is a `Modal`
+(✓), not a `Panel`** — `ImportClipboardDialog.tsx` already renders `<Modal open onClose={...}
+title={...}>`, built on the native `<dialog>` element (`showModal()`, per `Modal.tsx`'s own
+doc comment: "platform inertness is correct and free," no hand-rolled focus trap). That
+matters for this item specifically: the new file input and drop target must be added inside
+that `<Modal>`, not as a sibling element outside it — anything outside the `<dialog>` is
+inert while the dialog is open (native `<dialog>`'s top-layer/inert-background behavior), so
+a drop target rendered outside it would never receive drag/drop events or a click. The
+existing preview/warnings/errors sub-sections stay unchanged; the only new visual surface is
+the file/drop mode described under "File input UX" below, which reuses `Tabs` (✓) and
+`Button` (`ghost`, ✓) — no new component needed, stays consistent with the dense,
+hairline-bordered, one-`ghost`-row
 Photon-UI feel already established in this dialog.
 
 **Files touched:**
@@ -220,10 +228,11 @@ crashing, for the vanishingly small fraction of pre-2023 browsers.
 
 **Security — untrusted third-party file:**
 
-- **Lead mitigation, load-bearing regardless of parser internals**: legitimate
-  EVEMon/EveLens plan exports never contain a `<!DOCTYPE` (confirmed by the export code path
-  above — `OutputPlan`/`SerializablePlan` have no DTD). **Reject any input containing the
-  literal substring `<!DOCTYPE` before it ever reaches `DOMParser`** (case-insensitive check
+- **Lead mitigation, load-bearing regardless of parser internals**: legitimate EVEMon-format
+  plan exports (including from the compatible successor tool) never contain a `<!DOCTYPE`
+  (confirmed by the export code path above — `OutputPlan`/`SerializablePlan` have no DTD).
+  **Reject any input containing the literal substring `<!DOCTYPE` before it ever reaches
+  `DOMParser`** (case-insensitive check
   on the decoded text, a pure unit-testable string guard). This is the primary defense, not
   a belt-and-suspenders extra — it removes both XXE and internal-entity-expansion (billion
   laughs) as live concerns without depending on any particular browser's parser behavior.
@@ -249,22 +258,23 @@ crashing, for the vanishingly small fraction of pre-2023 browsers.
   logic worth unit-testing anyway (`planXmlDocument.test.ts`: "rejects DOCTYPE", "rejects
   oversized compressed input", "rejects oversized decompressed input").
 
-**File input UX** (existing import is clipboard-paste only —
-`ImportClipboardDialog.tsx:66-95`): add a second mode to the same dialog rather than a new
-route/page — density and "one dialog per concern" match the existing Photon-UI feel.
-Concretely:
+**File input UX** (existing import is clipboard-paste only, via a `<textarea>` inside the
+`Modal`): add a second mode to the same dialog rather than a new route/page — density and
+"one dialog per concern" match the existing Photon-UI feel. Concretely:
 
-- A `Tabs` (✓ DESIGN.md component) inside the existing dialog `Panel`: "Paste" (today's
-  `textarea`) / "File" (new). Reuses the ✓ `Tabs` primitive rather than inventing a toggle.
+- A `Tabs` (✓ DESIGN.md component) inside the existing `Modal`: "Paste" (today's `textarea`)
+  / "File" (new). Reuses the ✓ `Tabs` primitive rather than inventing a toggle, and — per the
+  correction above — both tabs' content must render inside the `Modal`, not beside it.
 - File tab: a `panel-2`-filled drop target (`rounded-xs`, `border border-line`, dashed via
   `border-dashed` on drag-over → `border-line-bright`/`border-accent` per DESIGN.md's
   hover/focus-adjacent token), containing a hidden `<input type="file" accept=".emp,.xml"
 />` triggered by a `Button` (`ghost`, matches "one primary button per view" — the
   primary/accent button stays "Import"/"Apply" as today) plus native drag-and-drop handlers
   (`onDragOver`/`onDrop`) reading `event.dataTransfer.files[0]`.
-- Same preview list, same `warnings`/`errors` panels below it — reuses
-  `ImportClipboardDialog.tsx:97-174` verbatim, since `ClipboardImportPreview`'s shape doesn't
-  need to change (mode gains a third value, `'planXml'`, alongside `'skillPlan'`/`'eftFit'`).
+- Same preview list, same `warnings`/`errors` panels below it — reuses the existing preview
+  rendering in `ImportClipboardDialog.tsx` verbatim, since `ClipboardImportPreview`'s shape
+  doesn't need to change (mode gains a third value, `'planXml'`, alongside
+  `'skillPlan'`/`'eftFit'`).
 - No `DataAgeBadge` needed — this isn't ESI-derived data, it's a local file the user just
   picked, same as clipboard paste today.
 
@@ -273,7 +283,8 @@ Concretely:
 - `src/engine/import/skillPlanXml.test.ts` (TDD-required, write first): "resolves entries by
   skill name", "dedupes duplicate entries keeping highest level", "reports unknown skill
   name as an error not a throw", "case-insensitive name match", "ignores unrecognized
-  fields on the intermediate object (forward-compat with an EveLens divergence)" (mirrors
+  fields on the intermediate object (forward-compat with a divergence from the compatible
+  successor tool)" (mirrors
   `skillPlanPaste.test.ts` structure).
 - `src/features/skills/planner/planXmlDocument.test.ts`: parses a real (small, hand-built)
   gzip `.emp` fixture and a plain `.xml` fixture to the same intermediate shape; rejects
@@ -291,8 +302,9 @@ Concretely:
   is a nice-to-have, not core-path coverage) — flag as an open question for the orchestrator
   rather than deciding unilaterally.
 
-**i18n keys** (new, under `plans.*` to match existing `plans.import*` naming
-— `src/i18n/locales/en.json:94,103-114`):
+**i18n keys** (new, under `plans.*` to match existing `plans.import*` naming, e.g.
+`plans.importQueue`, `plans.importClipboard`, `plans.importDialogTitle` in
+`src/i18n/locales/en.json`):
 
 - `plans.importFileTab` ("File"), `plans.importPasteTab` ("Paste")
 - `plans.importFileDrop` ("Drop a .emp or .xml file here, or")
@@ -324,9 +336,9 @@ starting (ARCHITECTURE.md flags this dir as "two agents editing concurrently").
 
 **Risks / open questions:**
 
-- EveLens's own `.emp`/plan-XML export wasn't independently verified (only EVEMon's origin
-  format was, since EveLens's repo wasn't fetched this pass) — confirm compatibility with one
-  real EveLens-exported file before shipping; if it diverges, the lenient
+- The compatible successor tool's own `.emp`/plan-XML export wasn't independently verified
+  (only EVEMon's origin format was, since that tool's repo wasn't fetched this pass) — confirm
+  compatibility with one real export file from it before shipping; if it diverges, the lenient
   unknown-element/attribute tolerance recommended above should absorb small additive
   differences, but a structural divergence (different root element name, say) would not be
   caught by this brief.
@@ -347,163 +359,95 @@ starting (ARCHITECTURE.md flags this dir as "two agents editing concurrently").
 **Artifact claim:** "Missing. One shared helper; a blob download in the browser. Our
 build-plan material list is the more valuable export."
 
-**Verdict:** CONFIRMED — nothing similar exists. `grep -rn "csv\|CSV" src --include=*.ts
---include=*.tsx -i` returns zero hits outside a Fuzzwork API URL comment
-(`src/market/fuzzwork.ts:3`, unrelated). `src/lib/` contains only `duration.ts`
-(`src/lib/duration.ts` — `formatDuration` only). `src/engine/clipboardExport.ts` is
-skill-plan-specific (EVE-clipboard-format text, not CSV, `clipboardExport.ts:9-23`).
+**Verdict: ALREADY SHIPPED IN FULL for the 4 surfaces originally scoped.** This is the
+single biggest correction in this brief — do not re-open a build task for what's below; the
+only real remaining work is the new surfaces listed at the end of this section.
 
-**Verified baseline:** No blob-download helper anywhere (`grep -rn "Blob\|createObjectURL"
-src` — zero hits). This is a genuinely new capability, not a variant of something existing.
+**Shipped shared helpers:**
 
-**Gap:** CSV serialization (with correct escaping/injection-safety) + a download trigger +
-one button per export surface.
+- `src/lib/csv.ts` — `toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): string`,
+  where `CsvColumn<T> = { header: string; value: (row: T) => string | number | null |
+undefined }`. **Not** the `(string | number)[][]`-plus-`headers?` shape this brief
+  originally proposed — the shipped signature takes column definitions (header + accessor),
+  which is what every consumer below actually calls. Also exports `csvFilename(base: string,
+date: Date): string` → `neocom-<base>-<YYYY-MM-DD>.csv` (local calendar date, so a caller's
+  test can pin the name via an injected `Date` instead of freezing the clock) — this resolves
+  the filename-convention question the original brief left open, uniformly across all
+  surfaces.
+- `src/lib/download.ts` — `downloadTextFile(filename, text, mimeType = 'text/csv;charset=utf-8')`,
+  the DOM-touching blob → `URL.createObjectURL` → `<a download>` click → deferred
+  `URL.revokeObjectURL` trigger. Has **no BOM handling and no BOM-related test** — the BOM is
+  entirely `csv.ts`'s concern (see below).
+- `src/lib/downloadCsv.ts` — `downloadCsv(surface: CsvSurface, rows, columns, now = new
+Date())` composes the two: `downloadTextFile(csvFilename(surface, now), toCsv(rows,
+columns))`. `CsvSurface` is a closed union (currently `'skills' | 'skill-queue' |
+'build-materials' | 'industry-jobs'`) so a new export surface is a deliberate edit to that
+  type, not a stringly-typed call site.
+- Each helper has a colocated test file (`csv.test.ts`, `download.test.ts`,
+  `downloadCsv.test.ts`).
 
-**Engine vs UI split:** the task explicitly asks for this as two paths — "a pure CSV
-serializer ... plus a thin DOM download trigger. Give exact paths for the split" — so give
-two files, not one:
+**BOM — corrected, this matters:** `toCsv` **already prepends the UTF-8 BOM** (`﻿`) to
+every string it returns — confirmed by `csv.test.ts`'s "emits a leading UTF-8 BOM" test and
+`downloadCsv.test.ts`'s "passes the serialized CSV through, BOM and all" test. **Never
+prepend a second BOM at a call site** (e.g. `downloadTextFile('skills.csv', '﻿' +
+toCsv(rows), ...)`) — every existing consumer calls `downloadCsv`/`toCsv` directly and gets
+exactly one BOM; manually prepending another would double it, and every unit test would still
+pass since none of them assert there's only one.
 
-- **Pure CSV serializer** → `src/lib/csv.ts`, `toCsv(rows: readonly (string | number)[][],
-headers?: string[]): string`. Not `src/engine` — CSV serialization is a generic formatting
-  concern like `duration.ts`, not skill/industry domain math; it takes already-computed
-  rows, doesn't calculate anything. `src/lib`'s stated purpose is "small pure formatters
-  shared across features with no other natural home" (`docs/ARCHITECTURE.md` module-map row
-  for `src/lib`) — exact fit. No fetch/DOM/Dexie import, fully unit-testable. Returns clean
-  CSV text only — **no BOM here** (see below for why).
-- **Thin DOM download trigger** → a separate file, `src/lib/download.ts`,
-  `downloadTextFile(filename: string, content: string, mimeType: string): void` (blob →
-  `URL.createObjectURL` → `<a download>` click → `URL.revokeObjectURL`, ~10 lines). This is
-  the _only_ place `document.createElement`/`URL.createObjectURL` appear — it's DOM-touching
-  so cannot be `src/engine`, and keeping it out of `csv.ts` means `toCsv` stays reusable by
-  a non-download consumer later (e.g. a future "copy CSV to clipboard" action, which would
-  want clean text, not a BOM-prefixed string built for a file).
-- **BOM placement**: prepend the UTF-8 BOM (`﻿`) at the call site building the Blob for
-  download (`downloadTextFile('skills.csv', '﻿' + toCsv(rows), 'text/csv;charset=utf-8')`
-  or inside `downloadTextFile` itself gated by mimeType), not inside `toCsv`. `toCsv`
-  producing a BOM-free string keeps the "genuinely shared" serializer honest — a BOM is a
-  file-encoding concern, not a CSV-content concern, and baking it into the serializer would
-  leak into every future non-file consumer of `toCsv`.
-- Per-surface column mapping (skills → rows, materials → rows, etc.) lives in each
-  `features/*` module, not in either shared helper — the helpers only know about
-  `(string|number)[][]` → CSV text → Blob download, never about skills or ISK.
+**Escaping / formula-injection / raw-numbers — already implemented, not just planned:**
 
-**Files touched:** `src/i18n/locales/en.json` (new keys, below) plus one button + handler
-added in each of the 4 surfaces listed in the table below — no other existing file needs
-structural changes.
+- RFC 4180 quoting: any field containing a comma, double-quote, CR, or LF is wrapped in
+  `"..."` with internal `"` doubled to `""` (`NEEDS_QUOTING_RE` in `csv.ts`).
+- Formula-injection guard: a string cell starting with `=`, `+`, `-`, `@` (after skipping
+  leading whitespace), or a leading tab/CR, gets a single leading `'` prefix
+  (`FORMULA_PREFIX_RE`) — applied only to string cells; `number` values are always emitted
+  bare so spreadsheet math still works.
+- Raw numbers, not display strings: every consumer's column mapper passes the underlying
+  `number` (raw ISK float, raw seconds) rather than `formatIsk`/`formatDuration` output — e.g.
+  `jobsCsvColumns` emits `job.cost ?? null` (blank, not `0` or a placeholder string, when
+  ESI's `cost?: number` field, `src/esi/endpoints.ts:606`, is absent) and
+  `materialsCsvColumns` emits `null` for an unpriced material rather than a display fallback
+  string, so `SUM()` on the column still works.
 
-**New modules:**
+**Surfaces wired (all 4 of the originally-scoped ones):**
 
-- `src/lib/csv.ts` — pure serializer, `toCsv(...)`.
-- `src/lib/csv.test.ts` — colocated, see Tests below.
-- `src/lib/download.ts` — DOM download trigger, `downloadTextFile(...)`.
-- `src/lib/download.test.ts` — colocated (jsdom `URL.createObjectURL`/`revokeObjectURL` are
-  mockable the same way `src/features/skills/clipboard.ts` injects a clipboard writer for
-  testability — consider an equivalent injectable seam here rather than spying on global
-  `document`/`URL`, for consistency with this codebase's existing pattern).
+| Surface                 | Wired in                                                                        | Column mapper                                                          | i18n key                      |
+| ----------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------- |
+| Trained skills list     | `src/routes/Skills.tsx`, header actions row next to `DataAgeBadge`              | `src/features/skills/skillsCsv.ts` (`skillCsvRows`, `skillCsvColumns`) | `skills.exportCsv`            |
+| Computed training queue | `src/features/skills/planner/PlanEditor.tsx`, existing button row               | `src/features/skills/planner/queueCsv.ts` (`queueCsvColumns`)          | `plans.exportCsvQueue`        |
+| Build-plan materials    | `src/features/industry/BuildPlanDetail.tsx`, Materials `Panel`'s `actions` slot | `src/features/industry/materialsCsv.ts` (`materialsCsvColumns`)        | `industry.exportCsvMaterials` |
+| Job costs               | `src/features/industry/ActiveJobsPanel.tsx`, header actions row                 | `src/features/industry/jobsCsv.ts` (`jobsCsvColumns`)                  | `industry.exportCsvJobs`      |
 
-**Shared primitives needed:** `src/lib/csv.ts` (`toCsv`) and `src/lib/download.ts`
-(`downloadTextFile`) themselves **are** the shared primitives this item produces — flagging
-per the brief's instructions rather than assuming ownership: both become cross-cutting
-dependencies once built. **Consumers who should adopt them beyond this item's 4 surfaces**:
-any future export surface (wallet journal/transactions, assets list, contracts) —
-`docs/ARCHITECTURE.md` §6 lists `/wallet`/`/assets`/`/contracts` as shipped views with
-tabular ESI data, natural CSV-export candidates later; `downloadTextFile` specifically is
-also reusable for any future non-CSV file download (e.g. a raw-JSON export of a build plan).
-No existing code needs retrofitting today (nothing currently exports anything), so this is a
-forward-looking note, not a refactor task.
-
-**CSV correctness (the part that goes wrong if rushed):**
-
-- **Escaping**: RFC 4180 quoting — any field containing a comma, double-quote, or newline
-  gets wrapped in `"..."` with internal `"` doubled to `""`. Always test cases: plain field,
-  field with comma, field with embedded quote, field with embedded `\n`.
-- **Formula-injection sanitization**: a cell whose value starts with `=`, `+`, `-`, or `@`
-  is interpreted as a formula by Excel/Sheets/LibreOffice on open — a malicious skill/item
-  name (rare but not impossible — SDE names are CCP-controlled so low risk for skills/items,
-  but this helper must be safe generically since callers may feed user-entered text like plan
-  names or job-cost notes later) triggers arbitrary formula execution. Mitigation: prefix
-  such cells with a single leading `'` (apostrophe) or a leading tab, per the standard
-  OWASP-documented technique — apply this **only to string cells**, never to numeric cells
-  (a leading `'` on a number cell defeats the "raw numbers" requirement below by turning it
-  into a text cell).
-- **BOM for Excel UTF-8**: prepend `﻿` to the file content — without it, Excel
-  (Windows especially) mis-detects encoding for any non-ASCII character (item/skill names
-  with accented characters, e.g. faction items).
-- **Raw numbers, not display strings**: ISK amounts and durations in this app render through
-  `formatIsk`(`src/features/industry/format.ts`)/`formatDuration`
-  (`src/lib/duration.ts`) which produce strings like `"1,234,567 ISK"` or `"3d 4h"` with
-  `tabular-nums` styling for display only. **CSV export must carry the underlying `number`
-  (raw ISK float, raw seconds), not these formatted strings** — explicitly call this out
-  because it's the easy mistake (reusing a display formatter for export data) and it breaks
-  spreadsheet math (`SUM()` on a string column). `toCsv`'s type signature
-  (`(string | number)[][]`) enforces numbers stay numbers through serialization; only the
-  final stringification inside `toCsv` turns a `number` into its `toString()`, with no
-  thousands-separator/unit suffix.
-
-**Export surfaces, columns, and button placement:**
-
-| Surface                 | Route/component                                                                       | Columns                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Button placement                                                                                                                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Trained skills list     | `src/routes/Skills.tsx` (flattens `groups` state, `Skills.tsx:257-274`)               | Group, Skill name, Level (1-5 int), SP (raw number)                                                                                                                                                                                                                                                                                                                                                                                                                | Page header actions row, next to the existing Refresh button (`Skills.tsx:185-189`, ghost `Button`, same row as `DataAgeBadge`)                                                                                                                               |
-| Computed training queue | `src/features/skills/planner/ComputedQueue.tsx` steps (`ScheduledStep[]`)             | Skill name, Level (roman or int — recommend int for spreadsheet sort), Per-level seconds (raw), Cumulative seconds (raw), Is-prereq (bool)                                                                                                                                                                                                                                                                                                                         | `PlanEditor.tsx`'s existing button row (`PlanEditor.tsx:376-403`, alongside `plans.importQueue`/`plans.exportClipboard`/optimizer buttons) — ghost `Button`, this row already has no primary (all ghost except the reorder-accept dialog), so it's consistent |
-| Build-plan materials    | `src/features/industry/MaterialsTable.tsx` data (`EffectiveMaterial[]` + `HubPrices`) | Material name, Quantity (raw int), Unit price ISK (raw number, blank if unpriced — not `"Unpriced"` string, so a spreadsheet SUM skips blanks correctly), Line total ISK (raw number, blank if unpriced)                                                                                                                                                                                                                                                           | `BuildPlanDetail.tsx`'s Materials `Panel`'s `actions` slot (`BuildPlanDetail.tsx:256-266`), next to the existing Refresh button + `DataAgeBadge` — **this is the teardown's called-out "more valuable export," build it with the most care of the four**      |
-| Job costs               | `src/features/industry/ActiveJobsPanel.tsx` data (`IndustryJob[]`)                    | Activity (translated `activityI18nKey`, or raw `activity_id` — recommend translated string since it's more spreadsheet-readable, at the cost of not being stable across locales, which doesn't matter since this app is English-only per CLAUDE.md), Blueprint type ID, Runs, Start date (ISO 8601 string, not localized), End date (ISO 8601 string), Cost (raw ISK number, blank if absent since `cost?: number` is optional per `esi/endpoints.ts:609`), Status | `ActiveJobsPanel.tsx` header row, next to its own Refresh/`DataAgeBadge` (`ActiveJobsPanel.tsx:78-81`)                                                                                                                                                        |
-
-**Design tokens/components used:** Plain `Button` (`ghost`, `size="sm"`) in each surface's
-existing header/actions row — no new component. No primary-button conflict: every target
-row already has at most a `ghost` Refresh button, adding another ghost Export button doesn't
-violate "one primary per view." No new Panel/Tabs/DataTable needed — export reads data
-already rendered, doesn't need its own display surface.
-
-**Tests:**
-
-- `src/lib/csv.test.ts` (write test-first though not `engine`-mandated — this module is
-  small and correctness-critical): "escapes commas", "escapes embedded quotes (doubling)",
-  "escapes embedded newlines", "prefixes formula-triggering leading chars (`=`,`+`,`-`,`@`)
-  on string cells only, not numeric cells", "round-trips a mixed number/string row", "handles
-  empty rows array (headers only)", "output contains no BOM" (guards the split — BOM
-  belongs to `download.ts`, not here).
-- `src/lib/download.test.ts`: "builds a blob with the given mimeType", "revokes the object
-  URL after triggering the download", "prepends BOM for `text/csv` content" (or wherever the
-  BOM line is finally drawn per the call-site decision above — pin it in the test either
-  way).
-- Per-surface: a thin `buildXxxCsvRows(...)`-style pure mapper colocated with each feature
-  module (e.g. `src/features/industry/materialsCsv.ts` or inline in the component test) —
-  each gets its own small test asserting the exact column order/values, especially the
-  "blank not 'Unpriced'" rule for unpriced materials.
-- e2e: not needed — `downloadTextFile`'s blob-URL/anchor-click mechanics aren't meaningfully
-  testable in Playwright without extra download-interception plumbing, and the CSV content
-  itself is already covered by the pure unit tests above. Skip unless the orchestrator wants
-  file-download e2e coverage generally (a cross-cutting call, not specific to this item).
-
-**i18n keys** (new, under each surface's existing namespace):
-
-- `skills.exportCsv`, `plans.exportCsvQueue` (distinct from existing `plans.exportClipboard`
-  — different action, needs its own label), `industry.exportCsvMaterials`,
-  `industry.exportCsvJobs`.
+Each mapper takes a `CsvTranslate` (`csv.ts`'s structural stand-in for i18next's `TFunction`)
+so column headers go through i18next, same as any other UI string — resolves the original
+brief's open question in favor of i18next, consistently across all 4 surfaces.
 
 **Sync / Dexie impact:** none. Pure read + local file download, no Editable Data touched, no
 `db.version` bump, no `src/sync/` change.
 
-**New ESI scopes:** none — reads data this app already fetches for each existing view; no
-new endpoint calls introduced.
+**New ESI scopes:** none — reads data this app already fetches for each existing view.
 
-**Cost:** CONFIRMED S. The shared helper is genuinely small (~40 lines + tests), and each of
-the 4 per-surface wire-ups is a button + a pure row-mapper + a test, repeated 4x — a few
-days total, no architectural novelty. The teardown's characterization ("one shared helper; a
-blob download") is accurate once the escaping/BOM/injection details are counted in, since
-none of those add structural complexity, just careful test cases.
+**Remaining scope — the only real ticket content left in this item:** wallet, assets,
+contracts, orders, mail, calendar, market do not export CSV yet. Extending coverage to any of
+them is now a small, well-worn pattern, not new design: add the surface to `CsvSurface` in
+`downloadCsv.ts`, write a `<surface>Csv.ts` column mapper (mirroring `jobsCsv.ts`/
+`materialsCsv.ts` — raw numbers, blank not placeholder-string for optional/derived fields,
+`CsvTranslate`-routed headers), add one `ghost` `Button` next to the surface's existing
+Refresh/`DataAgeBadge`, and add the surface's `exportCsv`-style i18n key. No new shared
+helper work — `toCsv`/`downloadTextFile`/`downloadCsv` already cover it.
 
-**Depends on:** none.
+**Cost:** Revise down from the original S — the shared-helper cost is already sunk. Each
+remaining surface is a column mapper + a button + a test, the same increment `jobsCsv.ts`/
+`materialsCsv.ts` already prove out; no architectural novelty, no BOM/escaping/injection work
+left to redo.
+
+**Depends on:** none — `toCsv`/`downloadTextFile`/`downloadCsv` are already built and stable.
 
 **Risks / open questions:**
 
-- Column header i18n: should CSV header row text go through i18next (consistent with
-  CLAUDE.md's "all UI strings through i18next") or stay hardcoded English (CSV is a
-  data-interchange format, not UI chrome, and this app is English-only anyway per
-  CONTEXT.md round 2)? Recommend routing through i18next for consistency with the rule's
-  letter, but flagging since it's a defensible judgment call either way — low stakes since
-  the catalog is English-only regardless.
-- Filename convention (e.g. `neocom-desk-skills-{characterName}-{date}.csv` vs. something
-  shorter) isn't specified anywhere in DESIGN.md — orchestrator should pick one convention
-  applied across all 4 surfaces for consistency.
+- Some of the remaining surfaces have data shapes worth a moment's thought before copying the
+  pattern blind: wallet journal/transaction rows and contract prices have the same
+  "optional/derived numeric field" shape `materialsCsvColumns`/`jobsCsvColumns` already
+  solved (blank cell via `??`, never a placeholder string) — reuse that precedent rather than
+  re-deriving it. Mail and calendar are less obviously tabular; confirm with the orchestrator
+  that a CSV export is still the right shape for those two before wiring them the same way.

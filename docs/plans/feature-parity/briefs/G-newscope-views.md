@@ -7,13 +7,17 @@ CCP primary sources (see "Primary sources checked" at the end).
 
 # ⚠ CROSS-CUTTING — READ FIRST: the batched re-auth
 
-Adding any scope to `src/esi/scopes.ts:6-18` changes `SCOPES_STRING`
-(`scopes.ts:23`), which changes the SSO authorize URL. Every existing token was
-minted with the old scope set, so **every character must log in again** before
-any new endpoint stops 403-ing (`docs/ARCHITECTURE.md:135`; the concrete pattern
-is already in the codebase for `esi-industry.read_character_jobs.v1` —
-`src/features/industry/jobs.ts:1-34`). Items 13, 16 and 20 must ship their scope
-additions as **one** `scopes.ts` edit and one re-auth prompt.
+A scope is added by adding an entry to `ESI_REGISTRY` in `src/esi/registry.ts` for the new
+endpoint wrapper — **never by hand-editing `src/esi/scopes.ts`**. `scopes.ts`'s `SCOPES` (and
+`SCOPES_STRING`) are derived from `ESI_REGISTRY`, not hand-maintained; editing them directly would
+be immediately overwritten in spirit and drift from the registry that `e2e/support/fixtureData.ts`
+and `app/routeScopes.ts` also derive from. Adding a registry entry with a new scope changes
+`SCOPES_STRING`, which changes the SSO authorize URL. Every existing token was minted with the
+old scope set, so **every character must log in again** before any new endpoint stops 403-ing
+(`docs/ARCHITECTURE.md` §4; the concrete pattern is already in the codebase for
+`esi-industry.read_character_jobs.v1` — `src/features/industry/jobs.ts`, `loadCharacterIndustryJobs`).
+Items 13, 16 and 20 must ship their scope additions as **one** `registry.ts` edit (one new entry
+per new endpoint wrapper) and one re-auth prompt.
 
 ## EXACT SCOPE STRINGS — merge these into the single batch
 
@@ -55,14 +59,14 @@ and the re-auth copy should pre-empt it.
 
 ## Data available WITHOUT any new scope (ships with no re-auth prompt)
 
-| Endpoint                                  | Public?                                                                           | Used for                                                                                               |
-| ----------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `GET /characters/{id}/implants`           | scope `esi-clones.read_implants.v1` — **already granted** (`src/esi/scopes.ts:9`) | Item 13's active-clone implant half                                                                    |
-| `GET /universe/planets/{planet_id}`       | **public, no scope**                                                              | Planet name + system_id + type_id for PI colonies                                                      |
-| `GET /universe/systems/{system_id}`       | **public, no scope**                                                              | Solar-system name (alternative: `POST /universe/names`, already wrapped at `src/esi/endpoints.ts:435`) |
-| `GET /universe/stations/{station_id}`     | **public, no scope** — already wrapped (`endpoints.ts:348`)                       | NPC-station clone locations                                                                            |
-| `GET /universe/schematics/{schematic_id}` | **public, no scope**                                                              | PI factory schematic — **but insufficient**, see below                                                 |
-| `GET /universe/types/{type_id}`           | **public, no scope** — already wrapped (`endpoints.ts:210`)                       | Item names/icons/descriptions                                                                          |
+| Endpoint                                  | Public?                                                                                                                  | Used for                                                                                               |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `GET /characters/{id}/implants`           | scope `esi-clones.read_implants.v1` — **already granted** (`ESI_REGISTRY.getCharacterImplants` in `src/esi/registry.ts`) | Item 13's active-clone implant half                                                                    |
+| `GET /universe/planets/{planet_id}`       | **public, no scope**                                                                                                     | Planet name + system_id + type_id for PI colonies                                                      |
+| `GET /universe/systems/{system_id}`       | **public, no scope**                                                                                                     | Solar-system name (alternative: `POST /universe/names`, already wrapped at `src/esi/endpoints.ts:435`) |
+| `GET /universe/stations/{station_id}`     | **public, no scope** — already wrapped (`endpoints.ts:348`)                                                              | NPC-station clone locations                                                                            |
+| `GET /universe/schematics/{schematic_id}` | **public, no scope**                                                                                                     | PI factory schematic — **but insufficient**, see below                                                 |
+| `GET /universe/types/{type_id}`           | **public, no scope** — already wrapped (`endpoints.ts:210`)                                                              | Item names/icons/descriptions                                                                          |
 
 Two traps worth stating up front:
 
@@ -87,7 +91,7 @@ every new path reports `x-compatibility-date: 2020-01-01`.
 it with any other new scope."
 
 **Verdict:** CONFIRMED — every clause checks out. Implants are read today under
-`esi-clones.read_implants.v1` (`src/esi/scopes.ts:9`); the clones endpoint needs
+`esi-clones.read_implants.v1` (`ESI_REGISTRY.getCharacterImplants` in `src/esi/registry.ts`); the clones endpoint needs
 exactly `esi-clones.read_clones.v1` (spec-verified); and the re-auth cost is real
 (`docs/ARCHITECTURE.md:135`). One addition the teardown misses: **clone
 _locations_ need a second scope** to be human-readable.
@@ -98,8 +102,8 @@ _locations_ need a second scope** to be human-readable.
   (`getCharacterImplants`, returns `number[]` — bare implant type IDs; spec
   schema `CharactersCharacterIdImplantsGet` is `array of int64`, confirming the
   wrapper is correct).
-- Scope: `esi-clones.read_implants.v1`, `src/esi/scopes.ts:9`. Already granted by
-  every existing character.
+- Scope: `esi-clones.read_implants.v1`, declared on `ESI_REGISTRY.getCharacterImplants`
+  (`src/esi/registry.ts`). Already granted by every existing character.
 - Read-through cache wrapper: `src/features/skills/data.ts:74-80`
   (`loadCharacterImplants`, cache key `'implants'` from `data.ts:32`), plus
   `loadUniverseType` at `data.ts:94-100` keyed `type:{typeId}` under
@@ -248,10 +252,36 @@ that would silently swallow real 401s.
 
 ### Files touched
 
-- `src/esi/scopes.ts` — add `'esi-clones.read_clones.v1'` (+ `'esi-universe.read_structures.v1'` if batched). **Batch with items 16/20.**
-- `src/esi/endpoints.ts` — add `getCharacterClones` + `CharacterClones` types; add `getUniverseStructure` + `UniverseStructure` (`{name, owner_id, solar_system_id, type_id?, position?}`; `name`/`solar_system_id`/`owner_id` required).
-- `src/app/App.tsx` — import + `<Route path="/clones">` (mirrors `App.tsx:79`).
-- `src/app/Layout.tsx` — nav entry in the Character section (`Layout.tsx:170-187`) **and** in `MobileMoreSheet` (`Layout.tsx:89-106`). The mobile bottom bar is already full at 4 + More (`Layout.tsx:216-238`) — this goes in the sheet, not the bar.
+- `src/esi/registry.ts` — the `ESI_REGISTRY` entries for `getCharacterClones` (scope
+  `esi-clones.read_clones.v1`) and, if batched, `getUniverseStructure` (scope
+  `esi-universe.read_structures.v1`) carry the new scopes; `src/esi/scopes.ts`'s `SCOPES` picks
+  them up automatically, no edit needed there. **Batch with items 16/20.**
+- `src/esi/endpoints.ts` — add `getCharacterClones` + `CharacterClones` types; add
+  `getUniverseStructure` + `UniverseStructure` (`{name, owner_id, solar_system_id, type_id?,
+position?}`; `name`/`solar_system_id`/`owner_id` required). **Each new wrapper must land with
+  both** a `// --- METHOD /route (scope) ---` marker comment above it and a matching entry in
+  `ESI_REGISTRY` (`src/esi/registry.ts`): `ESI_REGISTRY` is declared
+  `as const satisfies Record<EndpointName, EsiEndpointSpec>` where `EndpointName` is computed from
+  every exported function in `endpoints.ts`, so a wrapper without a registry entry **fails to
+  compile**; a registry entry without the matching marker comment **fails `registry.test.ts`**
+  (its marker-parity check). Both are required, not just the registry row.
+- `src/app/App.tsx` — **do not hand-write a `<Route path="/clones">`.** `App.tsx` builds its
+  routes from `ROUTE_ELEMENTS`, declared `satisfies Record<AppRoutePath, ReactElement>` where
+  `AppRoutePath = keyof typeof ROUTE_REQUIREMENTS` (`src/app/routeScopes.ts`), and every element
+  in `ROUTE_ELEMENTS` is wrapped in `<ScopeGate path={path}>` automatically. A literal
+  hand-written `<Route>` bypasses `ScopeGate` entirely and fails `routeScopes.test.ts`, which
+  scans `App.tsx`'s source for exactly this. The correct change is two edits that must land
+  together: add `'/clones': <Clones />` to `ROUTE_ELEMENTS` in `App.tsx`, **and** add a
+  `'/clones'` entry to `ROUTE_REQUIREMENTS` in `src/app/routeScopes.ts` (as `UNGATED` if the
+  route mixes panels the way `/skills`/`/industry` do, or as a `GatedRoute` naming its
+  endpoints if a missing scope should replace the whole page). Either half missing without the
+  other fails to compile — `ROUTE_ELEMENTS`'s `satisfies` requires every key of
+  `ROUTE_REQUIREMENTS` and no others.
+- `src/app/Layout.tsx` — nav entry in the Character section of the desktop rail **and** in the
+  `MobileMoreSheet` function. The mobile bottom bar is already full at 4 primary tabs + More —
+  this goes in the sheet, not the bar. Use `useLockedRoutes`/`NavItem`'s `locked` prop the same
+  way the existing nav entries do, so a missing-scope Clones link grays out consistently with
+  every other nav item.
 - `src/i18n/locales/en.json` — new `clones.*` block + `nav.clones`.
 - `e2e/support/mockEsi.ts` + `e2e/support/fixtureData.ts` — see Tests.
 - `docs/ARCHITECTURE.md` §2/§6 — new feature row (also fix the §6 staleness noted in the orchestrator baseline).
@@ -277,9 +307,9 @@ Naming these rather than building private one-offs — orchestrator assigns owne
    Wanted: one module that dispatches station vs structure and returns the
    `#id` fallback. **This should be one shared module, not a Clones-private
    copy.**
-2. **`DataTable`** (`docs/DESIGN.md` §4, still ○ / not in `src/components/ui/`).
-   The jump-clone list is card-shaped, so this is a _nice-to-have_ here — but
-   Item 16's pin table genuinely wants it. Same primitive, two consumers.
+2. **`DataTable`** — shipped in `src/components/ui/` (`DataTable.tsx`, exported from
+   `components/ui/index.ts`). The jump-clone list is card-shaped, so it's optional here — but
+   Item 16's pin table genuinely wants it. Reuse the existing component; do not build a second one.
 3. **A countdown/relative-time display.** `src/lib/duration.ts:6-17`
    `formatDuration(totalSeconds)` → "Xd Yh Zm" already exists and covers the
    cooldown remaining. No new primitive needed; just reuse it (don't re-copy —
@@ -362,8 +392,9 @@ module, one route, plus the structure resolver. The genuinely new work is the
 
 ### Depends on
 
-- **The batched-scope decision** (items 13/16/20) — must land as one `scopes.ts`
-  edit; nothing here can ship until that call is made.
+- **The batched-scope decision** (items 13/16/20) — must land as one coordinated set of
+  `ESI_REGISTRY` entries in `src/esi/registry.ts` (one per new endpoint wrapper); nothing here
+  can ship until that call is made.
 - Shared **station-or-structure location resolver** — if the orchestrator assigns
   it to the Assets/UX item instead, Item 13 consumes it rather than owning it.
 - Not blocked by anything else.
@@ -398,7 +429,7 @@ is deliberately stale**, which reshapes what v1 should promise.
 
 ### Verified baseline
 
-- No `esi-planets.*` scope (`src/esi/scopes.ts:6-18`).
+- No `esi-planets.*` scope anywhere in `ESI_REGISTRY` (`src/esi/registry.ts`).
 - No planets endpoint wrapper (`src/esi/endpoints.ts` — nothing).
 - No engine module (`find src/engine -type f` → plan/schedule/sp, optimizer/\*, industry/\*, import/\*; no PI).
 - `scripts/build-sde.mjs:21-29` downloads 7 CSVs and emits exactly three files (`build-sde.mjs:322-326`): `skills.json`, `blueprints.json`, `types.json`. No planet tables.
@@ -661,14 +692,23 @@ idle at time T" testable without fake timers.
 
 ### Files touched
 
-- `src/esi/scopes.ts` — `'esi-planets.manage_planets.v1'`. **Batch it.**
-- `src/esi/endpoints.ts` — `getCharacterPlanets`, `getCharacterPlanet`, `getUniversePlanet` (public).
+- `src/esi/registry.ts` — the `ESI_REGISTRY` entries for `getCharacterPlanets` /
+  `getCharacterPlanet` carry scope `esi-planets.manage_planets.v1`; `src/esi/scopes.ts`'s
+  `SCOPES` derives it automatically. **Batch it.**
+- `src/esi/endpoints.ts` — `getCharacterPlanets`, `getCharacterPlanet`, `getUniversePlanet`
+  (public). Same compile/test requirement as Item 13's new wrappers: each needs a marker comment
+  plus an `ESI_REGISTRY` entry in `src/esi/registry.ts`, or it fails to compile / fails
+  `registry.test.ts` respectively (see Item 13's Files touched for why).
 - `scripts/build-sde.mjs` — 2 `FILES` entries, PI category inclusion rule in the `typeMap` loop (`:299-318`), 4th output (`:322-326`). **⚠ conflicts with the skill-descriptions agent.**
 - `src/sde/types.ts` + `src/sde/loadSde.ts` — `PlanetSchematicMap` + `loadPlanetSchematics`.
-- `src/app/App.tsx`, `src/app/Layout.tsx` — route + nav (mobile → `MobileMoreSheet`, `Layout.tsx:89-106`).
+- `src/app/App.tsx` — add the new route to **both** `ROUTE_ELEMENTS` (`App.tsx`) and
+  `ROUTE_REQUIREMENTS` (`src/app/routeScopes.ts`) together, same as Item 13's Clones route above
+  — one without the other fails to compile.
+- `src/app/Layout.tsx` — nav entry, desktop rail and the `MobileMoreSheet` function (mobile bottom
+  bar is already full at 4 primary + More).
 - `src/i18n/locales/en.json` — `pi.*` block.
 - `e2e/support/mockEsi.ts` + `fixtureData.ts` — mandatory (fail-closed, `mockEsi.ts:108-110`).
-- `docs/ARCHITECTURE.md` §2/§6, `docs/DESIGN.md` if `DataTable` lands.
+- `docs/ARCHITECTURE.md` §2/§6.
 - `CONTEXT.md` — **round-4 glossary block** (same shared block as Item 13). New terms: **Colony**, **Pin**, **Extractor**, **Schematic**, and — if the v1 boundary is accepted — a scope-decisions line stating that PI v1 is colony health only, production-chain graph deferred.
 
 ### New modules
@@ -680,13 +720,13 @@ idle at time T" testable without fake timers.
 
 ### Shared primitives needed
 
-1. **`mapWithConcurrencyLimit` → shared module** (e.g. `src/lib/concurrency.ts`).
-   Currently private at `src/features/character/typeNames.ts:35-49`. PI's
-   per-planet fan-out is the second consumer; do not copy it (commit `117eab0`
-   already had to de-duplicate `formatDuration` for exactly this reason).
-2. **`DataTable`** (`docs/DESIGN.md` §4, ○ — confirmed still absent from
-   `src/components/ui/`). The pin table (dense, sortable, `tabular-nums`) is its
-   natural first consumer. Shared with Item 13 and item 20's tabs.
+1. **`mapWithConcurrencyLimit`** — already shared, in `src/lib/concurrency.ts` alongside
+   `ESI_FANOUT_CONCURRENCY`; `src/features/character/typeNames.ts` already imports it from there
+   rather than defining it locally. PI's per-planet fan-out is simply a second consumer — reuse
+   directly, no extraction needed. Pick a concurrency cap appropriate to the `char-industry`
+   bucket (see below) rather than reusing `ESI_FANOUT_CONCURRENCY` unchanged.
+2. **`DataTable`** — shipped in `src/components/ui/`. The pin table (dense, sortable,
+   `tabular-nums`) is a natural consumer. Shared with Item 13 and item 20's tabs.
 3. **New SDE payload field: `planetSchematics.json`** + the PI type-category
    inclusion rule in `types.json`. **Same shared artifact as the
    skill-descriptions item — assign one owner for `build-sde.mjs`.**
@@ -698,7 +738,7 @@ idle at time T" testable without fake timers.
 
 ### Design tokens / components used
 
-`Panel` per colony (or `DataTable` rows once it exists) · `StatChip` for
+`Panel` per colony (or `DataTable` rows — already available in `src/components/ui/`) · `StatChip` for
 `upgrade_level`, pin count, time-to-idle · `DataAgeBadge` **required** ·
 `EmptyState` "No planetary colonies" · `Spinner` · `ReauthBanner` for the 403 ·
 `InfoTooltip` on the `last_update` staleness rule and on "extractor output decays
@@ -831,9 +871,9 @@ are simply wrong.
 - **`scripts/build-sde.mjs` ownership**, shared with the skill-descriptions item.
   Sequence, or one owner. The PI change is small; land it in whichever order
   minimizes conflict.
-- **`mapWithConcurrencyLimit` extraction** from `typeNames.ts:35-49` — small, can
-  be done as part of this item if unowned.
-- `DataTable` is desirable but not blocking (`Panel` + a plain table works).
+- ~~`mapWithConcurrencyLimit` extraction~~ — not needed; already lives in `src/lib/concurrency.ts`.
+- `DataTable` — already shipped in `src/components/ui/`; use it directly rather than `Panel` +
+  a plain table.
 
 ### Risks / open questions
 

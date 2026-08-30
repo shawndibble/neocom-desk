@@ -11,198 +11,162 @@ Area: `src/auth/`, `src/esi/{scopes,client,cache}.ts`, `src/components/ui/Reauth
 Missing: choosing scopes at login, and purging `esiCache` on revoke. Do the purge even if the
 picker waits — stale data behind a revoked scope is a privacy bug."
 
-**Verdict:** CONFIRMED — the failure path exists (`src/esi/client.ts:62-65`,
-`src/components/ui/ReauthBanner.tsx:16`); the revoke path does not exist at all. Granted scopes
-are persisted (`src/db/index.ts:22`, written at `src/auth/session.ts:68`) but **nothing in
-`src/` ever reads them back** — a repo-wide grep for `scope` returns only the declaration, the
-write, and test fixtures. There is no diff, no purge, and no logout.
+**STATUS: SHIPPED.** This is done, not a gap. `src/esi/scopes.ts` exports pure
+`revokedScopes(previous, next)` (order-independent, additive-safe — a widened grant purges
+nothing). `src/auth/session.ts`'s `persistTokens` — the single funnel for both `completeLogin`
+and the refresh path inside `getValidAccessToken` — calls a purge helper before the token record
+write, covering a scope revoke, an `ownerHash` change, and a previously-suppressed purge
+retrying. `src/sync/planSync.ts`'s `handleOwnerHashChange` purges the same way for the
+sold/transferred-character case. `src/esi/cachePurge.ts` holds the single purge primitive
+(`purgeCharacterCache` / `purgeCharacterCacheOrSuppress`) with a three-tier degrade — targeted
+range-delete, then full `esiCache.clear()`, then suppress-and-retry recorded in `db.settings` so
+a broken store can't leak a stale read after reload. None of it throws out of `persistTokens`, so
+a purge failure never costs the user their login.
+
+What follows is the original investigation, corrected where the shipped code has moved past it.
+One real gap remains (no logout/character-removal) and one real decision is still open (blunt
+purge vs. surgical).
 
 ### Verified baseline
 
 - **Scopes are decoded correctly.** `decodeAccessToken` reads the JWT `scp` claim and
-  normalizes string-or-array to `string[]` (`src/auth/jwt.ts:37-38,45`). Covered by
-  `src/auth/jwt.test.ts:29-40`.
-- **Correction to the task's premise:** the granted scope set lives on **`TokenRecord`**
-  (`src/db/index.ts:16-23`, field `scopes: string[]`), **not** on `CharacterRecord`
-  (`src/db/index.ts:6-12`, which is only `characterId`/`name`/`ownerHash`/`addedAt`).
-- **Never compared across logins.** `persistTokens` already reads the prior state it would
-  need — `existing` character at `src/auth/session.ts:46` and `previous` token record at
-  `:47` — then blindly overwrites `scopes` at `:68`. The old set is discarded unread.
-- **`persistTokens` is the single funnel and it is called twice**: from `completeLogin`
-  (`src/auth/session.ts:87`) and from the refresh path inside `getValidAccessToken`
-  (`src/auth/session.ts:115`). A hook placed in `routes/Callback.tsx` would miss the refresh
-  path — refresh grants also carry a fresh JWT whose `scp` reflects a revocation made in the
-  EVE account portal.
-- **No endpoint → scope mapping exists anywhere.** `src/esi/endpoints.ts` (629 lines, ~25
-  wrappers) declares zero scope metadata; wrappers pass raw path strings to `esiFetch`
-  (e.g. `src/esi/endpoints.ts:36,60,133,378,624`). `src/esi/scopes.ts` is a flat 11-element
-  list with no structure (`src/esi/scopes.ts:6-18`).
-- **The scope list is already duplicated three times and has already drifted.**
-  `src/esi/scopes.ts:6-18` (11 scopes) · `src/esi/scopes.test.ts:5-21` hardcodes the same 11 ·
-  `e2e/support/fixtureData.ts:21-31` lists only **10** — it is missing
-  `esi-industry.read_character_jobs.v1`. That drift is the empirical argument for a single
-  source of truth rather than a comment.
+  normalizes string-or-array to `string[]` (`src/auth/jwt.ts`). Covered by `src/auth/jwt.test.ts`.
+- The granted scope set lives on **`TokenRecord`** (`src/db/index.ts`, field `scopes: string[]`),
+  not on `CharacterRecord`.
+- **`persistTokens` is the single funnel**, called from both `completeLogin` and the refresh path
+  inside `getValidAccessToken` — exactly why the purge hook lives there rather than in
+  `routes/Callback.tsx`, which would miss the refresh path (a refresh grant carries a fresh JWT
+  whose `scp` reflects a portal-side revoke).
+- **DONE — an endpoint→scope mapping now exists.** `src/esi/registry.ts`'s `ESI_REGISTRY` maps
+  all 24 endpoint wrappers in `endpoints.ts` to `{route, scope}`, declared
+  `as const satisfies Record<EndpointName, EsiEndpointSpec>` so a wrapper without a matching entry
+  fails to compile. `src/esi/scopes.ts`'s `SCOPES` is derived from it (deduplicated scopes across
+  every registry entry), not hand-maintained.
+- **DONE — the drift is closed.** `e2e/support/fixtureData.ts` re-exports `SCOPES` from
+  `src/esi/scopes.ts` instead of re-listing it. One source of truth, not three.
 - **Cache-key inventory (all character-scoped keys today):** `skills`, `attributes`,
-  `implants`, `skillqueue` (`src/features/skills/data.ts:29-34`); `wallet:balance`,
-  `wallet:journal`, `wallet:transactions` (`src/features/character/wallet.ts:16-20`);
-  `assets` (`assets.ts:5`); `mail:headers`, `mail:{mailId}` (`mail.ts:10-13`);
-  `calendar`, `calendar:{eventId}` (`calendar.ts:10-13`); `contracts` (`contracts.ts:5`);
-  `orders`, `orders:history` (`orders.ts:10-13`); `blueprints`
-  (`src/features/industry/data.ts:5`); `industryJobs` (`src/features/industry/jobs.ts:19`).
-- **Global (public) keys — confirmed must NOT be purged:** `name:{id}`
-  (`src/features/character/names.ts:9-10`), `type:{id}`
-  (`src/features/character/typeNames.ts:51-52`, also `src/features/skills/data.ts:97`),
-  `station:{id}` (`src/features/character/stations.ts:10-11`). All written under
-  `GLOBAL_CACHE_CHARACTER_ID = 0` (`src/esi/cache.ts:32`). These are public universe data
-  behind no scope; purging them is pure cache churn with zero privacy benefit. A
-  `characterId !== GLOBAL_CACHE_CHARACTER_ID` guard is sufficient and must be asserted by test.
-- **No full-purge path to reuse — there is no logout at all.** Grep for
-  `db.characters.delete` / `db.tokens.delete` / `esiCache.clear` finds nothing.
-  `src/routes/Characters.tsx` only lists and switches (`:16,25-28`); there is no remove button.
-- **Second instance of the same privacy bug, same class, same primitive:**
-  `handleOwnerHashChange` (`src/sync/planSync.ts:253-263`) wipes `skillPlans` and `buildPlans`
-  when a character's `ownerHash` changes (sold/transferred) but leaves `esiCache` intact — the
-  previous owner's cached wallet balance, journal, mail headers, mail bodies, assets and
-  contracts survive into the new owner's session.
+  `implants`, `skillqueue` (`src/features/skills/data.ts`); `wallet:balance`,
+  `wallet:journal`, `wallet:transactions` (`src/features/character/wallet.ts`);
+  `assets` (`assets.ts`); `mail:headers`, `mail:{mailId}` (`mail.ts`);
+  `calendar`, `calendar:{eventId}` (`calendar.ts`); `contracts` (`contracts.ts`);
+  `orders`, `orders:history` (`orders.ts`); `blueprints`
+  (`src/features/industry/data.ts`); `industryJobs` (`src/features/industry/jobs.ts`).
+- **Global (public) keys — must NOT be purged:** `name:{id}` (`src/features/character/names.ts`),
+  `type:{id}` (`src/features/character/typeNames.ts`, also `src/features/skills/data.ts`),
+  `station:{id}` (`src/features/character/stations.ts`). All written under
+  `GLOBAL_CACHE_CHARACTER_ID` (`src/esi/cache.ts`). `purgeCharacterCache` guards this explicitly
+  and it is asserted by test.
+- **DONE — the ownerHash instance of the bug is fixed.** `handleOwnerHashChange`
+  (`src/sync/planSync.ts`) purges `esiCache` via `purgeCharacterCacheOrSuppress` alongside
+  `skillPlans`/`buildPlans` when a character's `ownerHash` changes.
+- **Remaining real gap — no logout/character-removal.** A repo-wide grep for
+  `db.characters.delete` / `db.tokens.delete` still finds nothing in `src/`.
+  `src/routes/Characters.tsx` only lists and switches characters; there is no remove button. This
+  is the one item from the original investigation still open.
 
-### Gap
+### Gap (revised)
 
-1. No scope diff on login/refresh.
-2. No purge primitive on `esiCache`.
-3. No key→scope mapping, and no mechanism that would force a new endpoint to declare one.
-4. `handleOwnerHashChange` does not purge API-derived cache.
-5. No logout/character-removal, so no place a purge would otherwise already live.
+1. ~~No scope diff on login/refresh.~~ **DONE** — `revokedScopes` + the `persistTokens` hook.
+2. ~~No purge primitive on `esiCache`.~~ **DONE** — `purgeCharacterCache` /
+   `purgeCharacterCacheOrSuppress` in `src/esi/cachePurge.ts`.
+3. No key→scope mapping at the cache-key level, so the shipped purge is blunt (whole-character)
+   rather than surgical (revoked-scope-only). This is a decision to make, not an omission to fill
+   — see below.
+4. ~~`handleOwnerHashChange` does not purge API-derived cache.~~ **DONE.**
+5. **Still open:** no logout/character-removal, so `purgeCharacterCache` still has only two
+   callers (scope-revoke, ownerHash-change) rather than the three the original design anticipated.
 
-### Recommended shape — ship in two moves
+### Blunt vs. surgical — a decision to revisit, not a gap to fill
 
-**15a-i (ship first, days):** blunt purge. On any _removal_ from the granted scope set for a
-character, delete **every** `esiCache` row for that `characterId`, sparing
-`GLOBAL_CACHE_CHARACTER_ID`. Justification: `esiCache` is 100% re-derivable API-derived data
-(CONTEXT.md), so the entire cost of over-purging is one refetch, while the cost of
-under-purging is a privacy bug. This needs **no** key→scope mapping and can land this week.
+`src/esi/cachePurge.ts`'s own header comment documents the blunt choice as deliberate: `esiCache`
+is 100% re-derivable API-derived data, so over-purging costs one refetch while under-purging is a
+privacy bug; and "Precision would need a cache-key → scope map; `registry.ts` keys on endpoint
+_name_ and cache keys are string literals in `features/*` with no link back to it." So the
+question for the orchestrator is whether to reverse that decision — not whether to build the
+mechanism from scratch, since part of it already exists.
 
-**15a-ii (follow-up):** make the purge surgical _and_ make the mapping unforgeable.
+If reversing it: **do not add a second registry (a new `src/esi/cacheKeys.ts`)**.
+`src/esi/registry.ts` already is "one registry, two consumers" (`scopes.ts` and
+`app/routeScopes.ts` both derive from it today) and already carries `route` per entry. The
+natural extension is a third field — a `cacheKeyPrefix` or similar — on `EsiEndpointSpec`, so one
+row keeps serving every consumer instead of a second hand-maintained table drifting from the
+first. `registry.ts`'s own docstring already states the "must never grow auth state... must
+never be imported by `src/engine`" constraints that would apply to this extension too.
 
-Mechanism recommendation (concrete, type-level, better than a comment): stop passing bare
-strings into the cache. Introduce a cache-key registry whose entries carry the scope, and
-change the `esi/cache` signatures to accept only registry-derived keys:
+The mapping would need to be **prefix→scope, not exact-key→scope**: `mail:{id}`, `calendar:{id}`,
+`type:{id}` are key _families_, and `type:{id}` under `GLOBAL_CACHE_CHARACTER_ID` must stay
+outside any scope mapping (public, no consent to revoke).
 
-```ts
-// src/esi/cacheKeys.ts
-export interface CacheKeySpec {
-  readonly prefix: string;
-  readonly scope: Scope | null;
-}
-export interface CacheKey {
-  readonly key: string;
-  readonly scope: Scope | null;
-}
-export const CACHE_KEYS = {
-  walletJournal: { prefix: 'wallet:journal', scope: 'esi-wallet.read_character_wallet.v1' },
-  mailBody: { prefix: 'mail:', scope: 'esi-mail.read_mail.v1' },
-  typeName: { prefix: 'type:', scope: null }, // public → global sentinel only
-  // ...
-} as const satisfies Record<string, CacheKeySpec>;
-```
+**Dexie mechanics, unchanged by this decision:** the only index on `esiCache` is the compound
+`[characterId+key]` — no standalone `characterId` index — which is exactly why the shipped purge
+(`purgeCharacterCache`) is a full range-delete rather than an equality match. A surgical purge
+would still range-delete per character, filtering the resulting rows by prefix before deleting.
 
-`loadWithCache`/`loadWithCacheStatus`/`readCached`/`writeCached` take a `CacheKey`, not a
-`string`. A new ESI-backed view then _cannot_ write a cache row without naming its scope — the
-compiler rejects it. Purge becomes: revoked scope → matching prefixes → range-delete.
-Note the mapping must be **prefix→scope, not exact-key→scope**: `mail:{id}`, `calendar:{id}`,
-`type:{id}` are key _families_.
-
-Backstop test (cheap, catches the drift that already happened): assert every `Scope` in
-`SCOPES` is referenced by at least one `CACHE_KEYS` entry and vice versa, and make
-`e2e/support/fixtureData.ts` import `SCOPES` from `src/esi/scopes.ts` instead of re-listing it.
-
-**Dexie mechanics for the purge (non-obvious):** the only index is the compound
-`[characterId+key]` (`src/db/index.ts:103,112`) — there is no standalone `characterId` index.
-Range-delete is therefore required:
-
-```ts
-db.esiCache
-  .where('[characterId+key]')
-  .between([characterId, Dexie.minKey], [characterId, Dexie.maxKey])
-  .delete();
-```
-
-**Diff semantics (easy to get wrong when the 13/16/20 batch lands):** only _removals_ trigger a
-purge. `previous ⊄ next` → purge; `previous ⊂ next` (scopes added) → **no-op**. Adding four new
-scopes must not nuke every character's cache. This deserves its own named test.
-
-### Engine vs UI split
-
-Nothing goes in `src/engine`. The scope diff is a two-line set operation with no domain
-meaning, and the purge is inherently Dexie I/O — `src/engine` forbids Dexie imports
-(CLAUDE.md, ARCHITECTURE §2). The one genuinely pure piece is
-`revokedScopes(previous, next): Scope[]`; it belongs colocated in `src/esi/scopes.ts` (pure,
-no imports) and is unit-tested there. `src/auth/` is TDD-required per CLAUDE.md, so the
-`persistTokens` hook is failing-test-first regardless.
+**Recommendation:** leave the blunt purge as shipped unless a specific over-purge cost shows up in
+practice (e.g. a character with many scopes losing everything on one narrow revoke). The
+mechanism to go surgical is cheaper to build than the original investigation assumed — a field on
+an existing table, not a new module — but it is still work to spend deliberately, not a default.
 
 ### Files touched
 
-- `src/auth/session.ts` — in `persistTokens` (`:44-71`), compute `revokedScopes(previous?.scopes
-?? [], decoded.scopes)` **before** the `db.tokens.put` at `:63`, and call the purge when
-  non-empty. Placing it here covers both `completeLogin` (`:87`) and the refresh path (`:115`).
-- `src/esi/cache.ts` — export `purgeCharacterCache(characterId, scopes?)`; must guard
-  `GLOBAL_CACHE_CHARACTER_ID`. (15a-ii: signature change from `string` key to `CacheKey`.)
-- `src/esi/scopes.ts` — add pure `revokedScopes()`; 15a-ii adds the prefix→scope registry (or a
-  new `cacheKeys.ts`, see below).
-- `src/sync/planSync.ts:253-263` — add the `esiCache` purge to `handleOwnerHashChange`. Same
-  primitive, same bug class; do not let this ship separately.
-- `e2e/support/fixtureData.ts:21-31` — import `SCOPES` rather than re-listing (kills the
-  existing drift).
-- 15a-ii only: every `features/*` data module listed in the key inventory above, mechanically,
-  to pass `CACHE_KEYS.x` instead of a string literal.
+Already done (for reference — no further action needed):
+
+- `src/auth/session.ts` — the purge hook, called from `persistTokens` before the `db.tokens.put`.
+- `src/esi/cachePurge.ts` — `purgeCharacterCache`, `purgeCharacterCacheOrSuppress`, the
+  suppression-marker tiering.
+- `src/esi/scopes.ts` — `revokedScopes`.
+- `src/sync/planSync.ts` — `handleOwnerHashChange` purges `esiCache` alongside plans.
+- `e2e/support/fixtureData.ts` — imports `SCOPES` rather than re-listing it.
+
+If pursuing the blunt→surgical reversal:
+
+- `src/esi/registry.ts` — add the cache-key-prefix field to `EsiEndpointSpec`.
+- `src/esi/cachePurge.ts` — `purgeCharacterCache` gains a scope-filtered path.
 
 ### New modules
 
-- `src/esi/cacheKeys.ts` — registry of cache-key families with their required scope; the
-  single place a new ESI-backed view declares what scope its cached data sits behind.
-  (15a-ii only; 15a-i needs no new file.)
+None currently needed. The original investigation proposed a new `src/esi/cacheKeys.ts` —
+superseded; see "Blunt vs. surgical" above for why extending `registry.ts` is the right shape if
+this is ever pursued.
 
 ### Shared primitives needed
 
-- **`purgeCharacterCache(characterId)`** in `src/esi/cache.ts` — one purge primitive with three
-  callers: scope revoke, ownerHash change, and a future "remove character"/logout. Orchestrator
-  should assign it to whoever lands 15a-i first and forbid a second copy.
-- **A single `SCOPES` source of truth** consumed by `loginFlow`, `scopes.test.ts` and the e2e
-  fixture. Currently three copies, already drifted.
+- **`purgeCharacterCache`** — done, in `src/esi/cachePurge.ts`, with two callers today
+  (scope-revoke via `session.ts`, ownerHash-change via `planSync.ts`) and room for a third
+  (a future logout/remove-character).
+- **A single `SCOPES` source of truth** — done, consumed by `loginFlow`, `scopes.test.ts`, and the
+  e2e fixture, all deriving from `registry.ts`.
 
 ### Design tokens / components used
 
-None — 15a is entirely non-visual. It does not change what `ReauthBanner` renders. (Purging on
-revoke makes existing views fall to `EmptyState`/`ReauthBanner` naturally, which is correct.)
+None — 15a is entirely non-visual. Purging on revoke makes existing views fall to
+`EmptyState`/`ReauthBanner` naturally, which is correct.
 
 ### Tests
 
-TDD-required (`src/auth`, CLAUDE.md):
+Already shipped (TDD, per CLAUDE.md):
 
-- `src/esi/scopes.test.ts` — `revokedScopes`: pure, order-independent, empty on additive diff,
-  empty on identical sets, returns only removals on a mixed add+remove diff.
-- `src/auth/session.test.ts` — re-login with a **narrower** scope set purges that character's
-  `esiCache` rows; re-login with a **wider** set purges nothing; a token _refresh_ whose JWT
-  has fewer scopes also purges (guards the `:115` path); another character's rows are
-  untouched; `GLOBAL_CACHE_CHARACTER_ID` rows survive (this is the privacy-vs-churn assertion,
-  name it explicitly).
-- `src/esi/cache.test.ts` — `purgeCharacterCache` range-delete correctness across the compound
-  index, including a character whose id sorts adjacent to another's.
+- `src/esi/scopes.test.ts` — `revokedScopes`: pure, order-independent, additive-safe.
+- `src/auth/session.test.ts` — scope-narrowing purges, scope-widening is a no-op, a token
+  _refresh_ with a narrower `scp` also purges, another character's rows are untouched,
+  `GLOBAL_CACHE_CHARACTER_ID` rows survive.
+- `src/esi/cachePurge.test.ts` — range-delete correctness and the escalating degrade tiers.
 - `src/sync/planSync.test.ts` — ownerHash change purges `esiCache` alongside plans.
-- 15a-ii: registry completeness test (every `Scope` mapped, every mapped prefix a real `Scope`).
+
+Still needed only if the blunt→surgical reversal is pursued: a registry-completeness test (every
+`Scope` mapped, every mapped prefix a real `Scope`).
 
 No e2e needed; this is invisible in the UI by design.
 
 ### i18n keys
 
-None. If the orchestrator wants the revoke surfaced to the user (recommended as part of item
-17, not here): `activity.scopeRevoked`.
+None. If the orchestrator wants the revoke surfaced to the user (recommended as part of item 17,
+not here): `activity.scopeRevoked`.
 
 ### Sync / Dexie impact
 
-**None.** No schema bump, no push/pull mapping. `TokenRecord.scopes` already exists
-(`src/db/index.ts:22`) and `esiCache` is API-derived and never synced (CONTEXT.md;
-`src/db/index.ts:48-52`). This is _not_ a d90e417-class change — flagging explicitly because
-the shared spec warns about missing that pattern.
+**None.** No schema bump, no push/pull mapping. `TokenRecord.scopes` already exists and
+`esiCache` is API-derived and never synced (CONTEXT.md).
 
 ### New ESI scopes
 
@@ -210,27 +174,23 @@ None.
 
 ### Cost
 
-**S** (revised down from the teardown's M for this half). 15a-i is a day or two including
-tests. 15a-ii (registry + mechanical call-site migration across ~12 data modules) is a further
-few days — call the pair **S/M**. The teardown's M covered 15a+15b together.
+**Already spent — this item is done.** Any further work here is either the logout/remove-
+character feature (small, and needed anyway as the app's third purge caller) or the blunt→
+surgical reversal (a registry field plus a filtered delete path — smaller than the original
+estimate now that `registry.ts` exists to extend).
 
 ### Depends on
 
-Nothing. Deliberately: this is an independent privacy fix and must not be blocked behind 15b
-or behind items 13/16/20.
+Nothing outstanding.
 
 ### Risks / open questions
 
-- **Blunt vs. surgical.** Orchestrator decision: does 15a-i (purge everything character-scoped)
-  ship alone, or wait for the registry? Recommendation: ship 15a-i now. The only downside is
-  one refetch.
-- **Unmapped keys under 15a-ii.** When a key doesn't match any registry prefix, the fail-safe
-  default must be _purge_, not _keep_. Decide and encode it.
-- **Revoked-and-nothing-else.** If a user revokes a scope in the EVE portal without re-logging
-  in, the next _refresh_ JWT carries the narrower `scp` — that path is covered by hooking
-  `persistTokens`, which is why the hook placement matters more than it looks.
-- **`GLOBAL_CACHE_CHARACTER_ID = 0` is a real-looking characterId.** No EVE character has id 0,
-  so it is safe, but the purge guard must be explicit rather than incidental.
+- **Blunt vs. surgical** — see above; the one live decision left in this item.
+- **No logout/character-removal yet.** When it lands, it should call the existing
+  `purgeCharacterCache` primitive rather than growing a second copy.
+- **`GLOBAL_CACHE_CHARACTER_ID` is a real-looking characterId (0).** No EVE character has id 0, so
+  the guard in `purgeCharacterCache` is safe, but it's explicit rather than incidental — keep it
+  that way in any future edit.
 
 ---
 
@@ -238,53 +198,73 @@ or behind items 13/16/20.
 
 **Artifact claim:** (same teardown quote) "...Missing: choosing scopes at login..."
 
-**Verdict:** CONFIRMED — `SCOPES` is a single fixed `as const` list (`src/esi/scopes.ts:6-18`),
-spread wholesale into `startLogin` with no user input (`src/app/loginFlow.ts:7`). There is no
-scope UI anywhere and no settings route.
+**Verdict:** CONFIRMED — `SCOPES` is a derived, order-cosmetic list (`src/esi/scopes.ts`),
+spread wholesale into `startLogin` with no user input (`src/app/loginFlow.ts`). There is no
+scope UI anywhere. (There is a `/settings` route, `src/routes/Settings.tsx` — routed in
+`App.tsx` — but it holds device-local display preferences only; it is not a place a scope
+picker exists today.)
 
 ### Verified baseline
 
-- `beginEveLogin()` is three lines: `assignLocation(await startLogin([...SCOPES]))`
-  (`src/app/loginFlow.ts:6-8`). It takes no arguments and is called from `Login.tsx:12`,
-  `Characters.tsx:42`, and every `ReauthBanner` `onLogin`.
+- `beginEveLogin()` is one line: `assignLocation(await startLogin([...SCOPES]))`
+  (`src/app/loginFlow.ts`). It takes no arguments and is called from `Login.tsx`,
+  `Characters.tsx`, and every `ReauthBanner` `onLogin`.
 - `startLogin(scopes: string[], config?)` **already accepts an arbitrary scope array**
-  (`src/auth/session.ts:29`) and joins it into the authorize URL (`src/auth/sso.ts:39`). The
-  auth layer needs no change — only the caller does.
-- **Degradation today is uneven, and this is the real cost of 15b.** `ReauthBanner` is wired in
-  exactly **3 of 9** ESI-backed views: `src/features/industry/ActiveJobsPanel.tsx:90`,
-  `src/routes/Wallet.tsx:136`, `src/routes/Skills.tsx:198`. Assets, Mail, Calendar, Contracts,
-  Orders **and Overview** all call `loadWithCache`, which **discards** `needsReauth`
-  (`src/esi/cache.ts:98-104` returns only `.cached`). With a narrower grant those six views
-  render as _empty_, indistinguishable from "you own nothing", with no path back to re-auth.
-- **Overview is the easiest one to miss.** `src/routes/Overview.tsx:16,52` imports the
-  `loadWithCache` variant `loadWalletBalance` (`src/features/character/wallet.ts:23-30`), even
-  though a status-aware sibling `loadWalletBalanceWithStatus` already exists five lines below
-  (`wallet.ts:37-43`) and is used by `Wallet.tsx`. Overview therefore degrades to
-  `EmptyState` (`Overview.tsx:145`) with no re-auth affordance. It is a one-line swap — the
-  cheapest of the six.
-- **The generalizable pattern exists and works.** `loadWithCacheStatus` already takes
-  `detectAuthFailure` / `skipCacheOnAuthFailure` (`src/esi/cache.ts:34-50`).
-  `src/features/industry/jobs.ts:29-32` uses the narrower 403-only detector precisely because
-  "this login predates the scope" is a different condition from "offline" — its header comment
-  (`jobs.ts:5-13`) is the design rationale, already written down.
-  **Do NOT make that config the default.** `src/esi/cache.ts:57-62` documents the current
-  default as a deliberate decision: `needsReauth` must never short-circuit the cache read,
-  because any caller still on `loadWithCache` would regress from stale-but-present to `null`.
-  Flipping it silently degrades offline behavior in every view not yet retrofitted. The correct
-  shape is a **named opt-in** (`SCOPE_GATED`, see Shared primitives) that each retrofitted
-  caller passes explicitly.
+  (`src/auth/session.ts`) and joins it into the authorize URL (`src/auth/sso.ts`). The auth layer
+  needs no change — only the caller does.
+- **Degradation is now structural for single-scope routes, and this narrows what 15b still has
+  to cover.** `src/app/routeScopes.ts`'s `ROUTE_REQUIREMENTS` declares `/assets`, `/mail`,
+  `/calendar`, `/contracts`, `/orders` as gated routes, each listing the ESI endpoints its
+  content depends on. `src/app/ScopeGate.tsx` wraps every route in `App.tsx`'s `ROUTE_ELEMENTS`
+  and renders `ReauthBanner` **in place of the route's content** — before any fetch happens —
+  when the active Character's granted scopes don't cover what the route declares. So these five
+  views no longer render empty on a missing scope; they render a re-auth prompt.
+- **`/overview`, `/skills`, `/industry`, `/wallet` are deliberately left `UNGATED`** in
+  `routeScopes.ts` because each mixes panels backed by different scopes — a page-level gate
+  would hide panels that still work. These need panel-level handling instead, and it is
+  uneven:
+  - `Wallet.tsx` and `Skills.tsx` already call the status-aware loader for their primary data
+    (`loadWalletBalanceWithStatus`, `loadCharacterSkillsWithStatus`) and render `ReauthBanner`
+    on `needsReauth`.
+  - `src/features/industry/ActiveJobsPanel.tsx` does the same via `loadCharacterIndustryJobs`.
+  - **Still discarding `needsReauth` today:** Overview's _skills_ and _queue_ panels
+    (`loadCharacterSkills`, `loadCharacterSkillQueue` in `src/features/skills/data.ts`, both
+    plain `loadWithCache`) and Industry's _blueprints_ panel (`loadCharacterBlueprints` in
+    `src/features/industry/data.ts`, `loadPaginatedWithCache`) — none of these expose
+    `needsReauth`, so a narrower grant makes those three panels render `EmptyState`, not
+    `ReauthBanner`. This is the real remaining shape of the gap the original teardown described
+    as "six of nine views" — it is now three panels across two routes, not six routes.
+- **The generalizable pattern exists and works, but has no shared name yet.** `loadWithCacheStatus`
+  already takes `detectAuthFailure` / `skipCacheOnAuthFailure` (`src/esi/cache.ts`).
+  `src/features/industry/jobs.ts`'s `loadCharacterIndustryJobs` uses the narrower 403-only
+  detector precisely because "this login predates the scope" is a different condition from
+  "offline" — its header comment is the design rationale, already written down. **Do NOT make
+  that config the default.** `src/esi/cache.ts` documents the current default as deliberate:
+  `needsReauth` must never short-circuit the cache read for a caller still on plain
+  `loadWithCache`/`loadWithCache`-style loaders, or it would regress from stale-but-present to
+  `null`. The correct shape is still a **named opt-in** (e.g. `SCOPE_GATED`) that each retrofitted
+  caller passes explicitly — this does not yet exist as an exported constant; each of the three
+  current adopters (`jobs.ts`, `wallet.ts`, `skills/data.ts`'s `...WithStatus` variants)
+  re-derives the same object literal.
+- **Nav already reflects scope gaps.** `src/app/useGrantedScopes.ts`'s `useLockedRoutes` computes,
+  once per render, which nav paths the active Character currently lacks scope for (via
+  `requiredScopesForRoute`), and `src/app/Layout.tsx` passes `locked={locked.has(path)}` to every
+  `NavItem` in both the desktop rail and the mobile sheet. So the "gray out unavailable views"
+  risk the original teardown flagged as an open decision is already resolved in code.
 - **Scope state is structurally local already.** `setSyncedSetting` throws unless the key starts
-  with `sync.` (`src/sync/planSync.ts:175-179`), and the sync push filter only collects
-  `sync.`-prefixed, non-`sync.__` keys (`src/sync/planSync.ts:431,436`). A plain
-  `db.settings.put({key: 'scopeSelection', ...})` is therefore _provably_ excluded from
-  Firebase, not merely intended to be.
+  with `sync.` (`src/sync/planSync.ts`), and the sync push filter only collects
+  `sync.`-prefixed, non-`sync.__` keys. A plain `db.settings.put({key: 'scopeSelection', ...})`
+  is therefore _provably_ excluded from Firebase, not merely intended to be.
 
 ### Gap
 
 1. `beginEveLogin` has no scope parameter and no UI to feed it.
 2. No persistence of a per-character scope preference.
-3. No presets/categories (EveLens has 3 presets + 16 categories).
-4. Six of nine ESI views cannot express "you didn't grant this."
+3. No presets/categories (target: 3 presets + 16 categories, sized to the ESI scope surface this
+   app touches).
+4. Three panels across two routes (Overview's skills + queue panels, Industry's blueprints panel)
+   still cannot express "you didn't grant this" — see "Verified baseline" above. The five
+   single-scope routes and the three other multi-scope-route panels already can.
 
 ### Argument: `sync.` setting or strictly local? — **strictly local.**
 
@@ -304,7 +284,7 @@ So: persist the _last picked_ selection as a **local, non-`sync.`-prefixed** `db
 (e.g. `scopeSelection:{characterId}`), and always render the picker's checked state from
 `TokenRecord.scopes` (the truth) rather than the setting (the memory). Add a
 `db.settings`-based e2e/unit assertion that the key never appears in a sync push — the prefix
-guard at `planSync.ts:177` makes that assertion cheap.
+guard in `planSync.ts` makes that assertion cheap.
 
 ### Engine vs UI split
 
@@ -315,9 +295,10 @@ alongside `SCOPES`, unit-tested there. `src/engine` is for EVE domain math decou
 
 ### Files touched
 
-- `src/esi/scopes.ts` — restructure from a flat array into scope _categories_ (label key +
+- `src/esi/scopes.ts` / `src/esi/registry.ts` — restructure into scope _categories_ (label key +
   scopes + which app views it unlocks), plus presets (`minimal` / `recommended` / `everything`).
-  Keep `SCOPES` exported as the union of everything so existing callers and tests don't break.
+  `registry.ts` is the source of the scope set; `scopes.ts` should keep deriving `SCOPES` as the
+  union of everything so existing callers and tests don't break.
 - `src/app/loginFlow.ts` — `beginEveLogin(scopes?: Scope[])`, defaulting to `SCOPES`. Every
   existing `ReauthBanner` caller keeps working unchanged.
 - `src/routes/Login.tsx` — add the picker (collapsed behind a "Choose permissions" disclosure;
@@ -325,15 +306,14 @@ alongside `SCOPES`, unit-tested there. `src/engine` is for EVE domain math decou
 - `src/routes/Characters.tsx` — per-character "Permissions" affordance; this is where a
   _re-auth with different scopes_ naturally starts, and where a future "remove character"
   belongs (see 15a).
-- `src/features/character/{assets,mail,calendar,contracts,orders}.ts` — switch
-  `loadWithCache` → `loadWithCacheStatus` (with the opt-in `SCOPE_GATED` config) and surface
-  `needsReauth`.
-- `src/routes/{Assets,Mail,Calendar,Contracts,Orders}.tsx` — render `ReauthBanner` on
-  `needsReauth`.
-- `src/routes/Overview.tsx:16,52` — swap `loadWalletBalance` → `loadWalletBalanceWithStatus`
-  (already exists, `wallet.ts:37-43`) and render `ReauthBanner` in place of the `EmptyState` at
-  `:145`.
-  **This is six views of work and is the bulk of 15b's cost — not a footnote.**
+- `src/features/skills/data.ts` (`loadCharacterSkills`, `loadCharacterSkillQueue`) and
+  `src/features/industry/data.ts` (`loadCharacterBlueprints`) — switch to a status-aware loader
+  and surface `needsReauth`. This is the retrofit that remains: **three panels, not six views** —
+  the five single-scope routes are already covered by `ScopeGate`.
+- `src/routes/Overview.tsx` — render `ReauthBanner` for the skills and queue panels on
+  `needsReauth` (the wallet panel already does this).
+- `src/routes/Industry.tsx` — render `ReauthBanner` for the blueprints panel on `needsReauth`
+  (`ActiveJobsPanel` already does this for jobs).
 
 ### New modules
 
@@ -347,12 +327,11 @@ alongside `SCOPES`, unit-tested there. `src/engine` is for EVE domain math decou
 
 - **A generalized "missing scope" load path.** Name it: make `jobs.ts`'s
   `{detectAuthFailure: 403-only, skipCacheOnAuthFailure: true}` config a named **opt-in** export
-  from `src/esi/cache.ts` (e.g. `SCOPE_GATED`) so six callers don't each re-derive it. Opt-in,
-  not default — `cache.ts:57-62` explains why changing the default would regress offline views.
-  Assign ownership; this is the seam that makes graceful degradation uniform.
-- **`Checkbox`** — `src/components/ui/` has no checkbox (`components/ui/index.ts` exports
-  Panel, Button, StatChip, DataAgeBadge, EmptyState, Tabs, Spinner, Tooltip, ReauthBanner).
-  A 16-category picker needs one. Do not build a private one.
+  from `src/esi/cache.ts` (e.g. `SCOPE_GATED`) so the three retrofitted callers don't each
+  re-derive it. Opt-in, not default — `cache.ts` explains why changing the default would regress
+  offline views.
+- **`Checkbox`** — `src/components/ui/index.ts` still has no checkbox export. A 16-category
+  picker needs one. Do not build a private one.
 - **`CharacterAvatar`** — DESIGN §4 lists it planned (○); the per-character permissions UI on
   `Characters.tsx` wants it. Flag, don't build.
 
@@ -372,19 +351,18 @@ SSO submit); the preset switcher uses `Tabs` or `ghost` buttons, never a second 
   guarantee that a newly added scope cannot be invisible in the picker); no duplicates across
   categories. **This test is what makes the 13/16/20 batch safe.**
 - `src/features/auth/scopeSelection.test.ts` — selection persists locally; the key is _not_
-  `sync.`-prefixed (assert `setSyncedSetting` would reject it — cite `planSync.ts:177`).
+  `sync.`-prefixed (assert `setSyncedSetting` would reject it).
 - `src/features/auth/ScopePicker.test.tsx` — preset selection toggles categories; deselecting
   every category disables submit; keyboard/`aria` semantics.
-- `src/routes/{Assets,Mail,Calendar,Contracts,Orders,Overview}.test.tsx` — a 403 renders
-  `ReauthBanner`, not `EmptyState`. (`src/features/skills/data.test.ts:101-104` and
-  `src/features/industry/jobs.test.ts:97-116` are the existing templates;
-  `Overview.test.tsx:122` already sets a scopes fixture.)
+- `src/routes/Overview.test.tsx`, `src/routes/Industry.test.tsx` — a 403 on the skills/queue/
+  blueprints panels renders `ReauthBanner`, not `EmptyState`. `src/features/skills/data.test.ts`
+  and `src/features/industry/jobs.test.ts` are the existing templates for the underlying
+  status-aware loader tests.
 - Regression guard: a view _not_ using `SCOPE_GATED` still falls back to stale cache on a 403
-  (locks in `cache.ts:57-62`'s decision so a future retrofit doesn't flip the default).
-- E2E: `e2e/support/mockSso.ts:20-32` currently hardcodes `scp: [...SCOPES]`; parameterize it to
-  echo the _requested_ `scope` query param so a spec can drive a narrow grant and assert the
-  six views degrade to `ReauthBanner`. `e2e/support/fixtureData.ts:21-31` should import
-  `SCOPES` (see 15a — it has already drifted).
+  (locks in `cache.ts`'s decision so a future retrofit doesn't flip the default).
+- E2E: `e2e/support/mockSso.ts` currently hardcodes `scp: [...SCOPES]`; parameterize it to echo
+  the _requested_ `scope` query param so a spec can drive a narrow grant and assert the
+  remaining panels degrade to `ReauthBanner`.
 
 ### i18n keys
 
@@ -392,15 +370,17 @@ SSO submit); the preset switcher uses `Tabs` or `ghost` buttons, never a second 
 `scopes.preset.recommended`, `scopes.preset.everything`, `scopes.category.<n>` ×16 (labels),
 `scopes.categoryHint.<n>` ×16 ("unlocks the Wallet view"), `scopes.required`,
 `scopes.selectedCount`, `characters.permissions`, `characters.permissionsChange`,
-plus `{assets,mail,calendar,contracts,orders,overview}.reauth{Title,Hint,Action}` ×6 views
-(mirroring the existing `skills.reauth*` / `wallet.reauth*` keys).
+plus `overview.reauth{Title,Hint,Action}` for the two Overview panels still missing them and
+`industry.reauth{Title,Hint,Action}` for the blueprints panel (mirroring the existing
+`skills.reauth*` / `wallet.reauth*` keys, and the per-route-namespace keys `routeScopes.ts`
+already expects for the five gated routes).
 
 ### Sync / Dexie impact
 
 **No schema bump.** Selection is a plain `db.settings` row (the `settings` table exists since
-`db.version(1)`, `src/db/index.ts:93`). **No** push/pull mapping — deliberately non-`sync.`
--prefixed, which the filter at `planSync.ts:436` structurally excludes. Not a d90e417-class
-change; the argument for local-only is above.
+`db.version(1)`). **No** push/pull mapping — deliberately non-`sync.`-prefixed, which the filter
+in `planSync.ts` structurally excludes. Not a d90e417-class change; the argument for local-only
+is above.
 
 ### New ESI scopes
 
@@ -408,19 +388,20 @@ None. 15b _narrows_ what is requested; it never adds.
 
 ### Cost
 
-**M**, at the upper end — revise the teardown's implied split. The picker itself is small
-(`startLogin` already takes an array). The cost is (a) restructuring `SCOPES` into 16
-categories with labels and "what this unlocks" copy, and (b) the six-view degradation retrofit
-plus its i18n and tests. If the orchestrator wants to cut scope, split (b) out as its own item
-— it has standalone value even without a picker, because item 15a's purge and the 13/16/20
-batch both produce exactly the "narrower grant than the app expects" state today.
+**S/M** — smaller than the original M estimate. The picker itself is small (`startLogin` already
+takes an array); most of that work is restructuring `SCOPES`/`registry.ts` into 16 categories with
+labels and "what this unlocks" copy. The degradation retrofit is now three panels across two
+routes, not six views — the five single-scope routes are already handled structurally by
+`ScopeGate`. If the orchestrator wants to cut scope further, the three-panel retrofit has
+standalone value even without a picker, because item 15a's purge and the 13/16/20 batch both
+produce exactly the "narrower grant than the app expects" state today.
 
 ### Depends on
 
 - **15a** — should land first (independent privacy fix; also, a picker that lets a user drop a
-  scope without purging its cache actively _creates_ the privacy bug).
+  scope without purging its cache actively _creates_ the privacy bug). 15a has shipped.
 - **Items 13, 16, 20** — should land _before_ 15b (see cross-cutting note).
-- The degradation retrofit (six views) is a prerequisite for 15b being honest, whether it's
+- The three-panel degradation retrofit is a prerequisite for 15b being honest, whether it's
   tracked here or split out.
 
 ### Risks / open questions
@@ -428,13 +409,10 @@ batch both produce exactly the "narrower grant than the app expects" state today
 - **16 categories is a lot of UI for a login screen.** Recommend: presets front and center,
   categories behind a disclosure, default = "recommended" (= today's `SCOPES`), so the common
   path is unchanged.
-- **Mixed grants across characters** produce a nav where some views work for character A and
-  not character B. Layout.tsx renders all 11 nav links unconditionally (`Layout.tsx:152-187`).
-  Decide: gray out unavailable views per active character, or leave them and rely on
-  `ReauthBanner`. Recommend the latter for v1 — cheaper and less surprising.
-- **`ReauthBanner` copy is wrong for this case.** It currently says "log in again"; for a
-  never-granted scope the correct message is "this view needs a permission you didn't grant."
-  Consider a `variant` prop rather than 5×3 near-duplicate i18n strings.
+- **`ReauthBanner` copy is per-caller already**, not a shared string — every call site passes its
+  own `title`/`hint`/`actionLabel` (and `routeScopes.ts` names a whole i18n namespace per gated
+  route), so the "never granted" vs. "log in again" distinction can already be worded per view
+  without a new `variant`. Just remember to write it that way for the three panels above.
 - **Interaction with item 17.** A scope-revoke and a scope-gated 403 are exactly the events the
   activity log should carry. Coordinate the event kinds.
 
@@ -611,11 +589,14 @@ Call sites: `cache.ts` for #1-#5, `client.ts` for #6 (the retry, invisible above
 status, `paginated.ts:24` for #8. Keep `src/engine` entirely out of it — engine forbids
 non-pure imports and this is ESI plumbing, not domain math.
 
-**Route plumbing:** the emitter needs the route _template_. Cleanest is to pass it explicitly
-into `esiFetch`/`loadWithCache` alongside the path — which pairs naturally with 15a-ii's cache
-key registry, since both want the same "a new endpoint must declare its metadata" property.
-Coordinate: **one registry, two consumers** (scope for the purge, route template for the log).
-Flag this to the orchestrator as the single most valuable cross-item consolidation.
+**Route plumbing:** the emitter needs the route _template_, and this is easier than it was when
+this brief was first written. `src/esi/registry.ts`'s `ESI_REGISTRY` already carries a `route`
+field per endpoint — today it's read only by `registry.test.ts` to pin it against `endpoints.ts`'s
+marker comments (its own docstring says so explicitly: "The `route` template has no runtime
+consumer"). Item 17 is the first runtime consumer: thread the endpoint id (or its registry entry)
+into `esiFetch`/`loadWithCache`/`loadPaginatedWithCache` alongside the path, and derive the route
+template from `ESI_REGISTRY[id].route` at the call site instead of adding a new field anywhere.
+No second registry needed — just a new import from a type-only reference to a runtime one.
 
 ### Noise filtering — pure, unit-testable
 
@@ -690,7 +671,8 @@ the same testability with correct layering.
   (hover/focus only, wrong semantics — needs click-to-open, Escape-to-close, focus trap,
   `aria-haspopup`). **Do not build a private one inside `ActivityBell`.** Assign ownership; the
   scope picker (15b) and a future character menu both want it too.
-- **The route-template registry** shared with 15a-ii (one declaration, two consumers).
+- **The route-template field already exists** on `ESI_REGISTRY` in `src/esi/registry.ts`; it
+  just has no runtime consumer yet (see "Route plumbing" above). No new registry to build.
 - **`Badge`/count affordance** — `StatChip` (`components/ui/StatChip.tsx`) can carry the "×12"
   coalesce count; confirm it renders at 11px inside a dense row before assuming.
 
@@ -772,15 +754,14 @@ the security test. If `Popover` and the route registry are assigned elsewhere, 1
 
 ### Depends on
 
-- **15a-ii's registry** (soft) — 17 needs route templates threaded to the same places 15a-ii
-  threads scopes. Either build the registry once for both, or 17 ships with a
-  route-template-only union and 15a-ii extends it. Recommend the former; flag the coupling.
-  **This also halves 17's biggest cost:** if each registry entry carries `{ prefix, scope,
-route }`, then `cache.ts` already receives the cache key and can derive the route template
-  itself — outcome points 1-5 need **no** signature change at all. Only `esiFetch` needs a new
-  route parameter, for points 6-7 (`client.ts:167-170`, `:180`) plus `paginated.ts` for point 8.
-  That is ~25 wrappers gaining one field in a registry rather than ~25 call-site signature
-  changes in two layers.
+- **`src/esi/registry.ts` already has the route field** — 17 needs it wired into
+  `cache.ts`/`client.ts`/`paginated.ts` at runtime, which it isn't today (see "Route plumbing"
+  above). This is smaller than the original estimate: no registry to design, just a new call-site
+  parameter (the endpoint id) threaded through `esiFetch` and friends, from which the route
+  template is looked up. If item 15a-ii (the blunt→surgical cache-purge reversal, see
+  `F-scopes-activity.md`'s Item 15a) also lands, both it and this item are extending the same
+  `EsiEndpointSpec` shape — coordinate so `route`/`scope`/a future cache-key field don't get
+  designed twice.
 - **A `Popover` owner** — must be decided before 17 starts, or it will grow a private one.
 - **15a** (soft) — supplies the `scope.revoked` event; 17 works without it.
 
@@ -804,34 +785,37 @@ route }`, then `cache.ts` already receives the cache key and can derive the rout
 Every added scope forces **all** characters to re-authorize (ARCHITECTURE §4). Design and
 ordering implications:
 
-1. **15a must land BEFORE the 13/16/20 batch.** It is an independent privacy fix with no
-   dependencies, and it makes the batch's forced re-auth safe: today, a user who re-auths and
-   _declines_ one of the new consent items leaves stale cached data behind with no purge. Ship
-   15a-i (blunt purge) immediately; it is a two-day change.
-2. **15a's diff must be additive-safe.** Adding four scopes must be a **no-op**, not a purge.
-   Only removals purge. This is the single most likely bug when the batch lands — give it a
-   named test (`does not purge when scopes are only added`).
+1. ~~**15a must land BEFORE the 13/16/20 batch.**~~ **DONE.** 15a shipped: `persistTokens`
+   (`src/auth/session.ts`) purges `esiCache` on any scope revoke, so a user who re-auths and
+   declines one of the batch's new consent items no longer leaves stale cached data behind.
+2. ~~**15a's diff must be additive-safe.**~~ **DONE and tested.** `revokedScopes`
+   (`src/esi/scopes.ts`) purges only on removals; `src/auth/session.test.ts` names this case
+   explicitly. Adding four scopes for items 13/16/20 is a no-op for the purge.
 3. **15b must land AFTER the batch.** Its 16-category grouping, its labels, its
    "what this unlocks" copy and its `SCOPES`-union test all get redone when four scopes arrive.
    Building the picker first means building it twice.
-4. **Land the single-source-of-truth cleanup with the batch, whoever does it.** The scope list
-   exists in three places today and has _already_ drifted —
-   `e2e/support/fixtureData.ts:21-31` is missing `esi-industry.read_character_jobs.v1` while
-   `src/esi/scopes.ts:6-18` and `src/esi/scopes.test.ts:5-21` have it. Four more scopes across
-   three hand-maintained copies will drift again. Make the e2e fixture and the test import from
-   `src/esi/scopes.ts`.
-5. **The batch will expose the degradation gap immediately.** `ReauthBanner` is wired in only
-   3 of 9 ESI-backed views (`ActiveJobsPanel.tsx:90`, `Wallet.tsx:136`, `Skills.tsx:198`); the
-   other six — Assets, Mail, Calendar, Contracts, Orders **and Overview** — discard
-   `needsReauth` via `loadWithCache` (`cache.ts:98-104`; `Overview.tsx:16,52` even has a
-   status-aware sibling sitting unused at `wallet.ts:37-43`). Every character on the old token
-   will 403 the new endpoints and those six will render as _empty_. Whether or not 15b ships,
-   adopting `jobs.ts`'s `loadWithCacheStatus` config (`jobs.ts:29-32`) as a named **opt-in**
-   across the six remaining views is a prerequisite for the batch, not for the picker. Consider
-   promoting it to its own item. Do not implement it by changing the shared default —
-   `cache.ts:57-62` records why that would regress offline behavior.
-6. **One registry, two consumers.** 15a-ii wants endpoint→scope; item 17 wants
-   endpoint→route-template. Both want the property "a new endpoint cannot be added without
-   declaring its metadata." Build it once. This is the highest-leverage consolidation across
-   these three items and should be assigned explicitly rather than left to whoever gets there
-   first.
+4. ~~**Land the single-source-of-truth cleanup with the batch.**~~ **DONE.** The scope list is a
+   single source of truth today: `src/esi/registry.ts`'s `ESI_REGISTRY` declares each endpoint's
+   scope, `src/esi/scopes.ts`'s `SCOPES` derives from it, and `e2e/support/fixtureData.ts`
+   re-exports `SCOPES` rather than re-listing it. Items 13/16/20 add their new scopes as
+   `ESI_REGISTRY` entries for their new endpoint wrappers; `SCOPES` and the e2e fixture pick them
+   up automatically — no second edit needed.
+5. **The batch's degradation gap is smaller than it was.** `src/app/ScopeGate.tsx` +
+   `src/app/routeScopes.ts` now gate `/assets`, `/mail`, `/calendar`, `/contracts`, `/orders`
+   at the route level — before any fetch — so a missing scope on those five renders
+   `ReauthBanner`, not empty. What's left: Overview's _skills_ and _queue_ panels
+   (`src/features/skills/data.ts`'s `loadCharacterSkills`/`loadCharacterSkillQueue`) and
+   Industry's _blueprints_ panel (`src/features/industry/data.ts`'s `loadCharacterBlueprints`)
+   still use a plain, non-status-aware cache loader and so still discard `needsReauth` — three
+   panels across two routes, not "six views." Every character on an old token will still 403 a
+   newly-scoped endpoint on those three panels and render `EmptyState`. Whether or not 15b ships,
+   retrofitting those three to a named **opt-in** status-aware config (matching
+   `jobs.ts`'s `loadCharacterIndustryJobs`) is a prerequisite for the batch, not for the picker.
+   Do not implement it by changing `loadWithCache`'s shared default — `src/esi/cache.ts` records
+   why that would regress offline behavior for every other caller.
+6. **"One registry, two consumers" is mostly built.** `src/esi/registry.ts`'s `ESI_REGISTRY`
+   already carries both `scope` and `route` per entry, and `scopes.ts` / `routeScopes.ts` already
+   derive from it at runtime. What item 17 still needs is a **runtime** (not type-only) consumer
+   of the `route` field inside `cache.ts`/`client.ts`/`paginated.ts` — see Item 17's "Route
+   plumbing" above, which no longer needs a _new_ registry, just a new import path into an
+   existing one.

@@ -96,7 +96,7 @@ type) and `dgmTypeAttributes.csv` (16.4MB), filtered exactly the way
 **Shared primitives needed:**
 
 - `Tabs` (exists, `components/ui/Tabs.tsx`) — good fit for prereqs/unlocks/items-enabled as three sub-views inside the panel.
-- `DataTable` (listed `○` planned, not yet built per `docs/DESIGN.md:97`) — if the items-enabled list is more than a handful of rows, this item and Market Browser (`features/market`) both want the same dense sortable table; flag for orchestrator to assign single ownership rather than building a one-off list here.
+- `DataTable` (shipped — `components/ui/DataTable.tsx`) — presentational only, callers pre-sort and branch to `EmptyState` themselves; if the items-enabled list needs sorting, item 03 and Market Browser (`features/market`) both want it, so flag for orchestrator to assign single ownership of that follow-up rather than each view bolting on sorting separately.
 - No new design token needed; `Panel` + `panel-2` nesting per existing convention.
 
 **Design tokens/components used:** `Panel` (the inspector is a panel, don't nest another Panel inside — use `panel-2` fill per DESIGN.md convention), `Tabs` for the three sub-sections, `Button` for jump-to-position (one primary action per view — this panel already lives inside the Skill Plan view, so treat jump-to-position as the panel's one primary button, not a second competing CTA against the plan editor's own primary action). Uppercase micro-heading for the panel title. `Spinner` while the lazy item-index fetch is in flight (first open only — cached after).
@@ -134,49 +134,79 @@ type) and `dgmTypeAttributes.csv` (16.4MB), filtered exactly the way
 
 **Verified baseline:**
 
-- `SkillPicker.tsx:22-28` — `results` filters `s.name.toLowerCase().includes(q) || s.groupName.toLowerCase().includes(q)`, capped `MAX_RESULTS = 20` (`SkillPicker.tsx:8`), **no relevance ranking** — results stay in whatever order `skills` (the prop) arrives in, unlike Market Browser's search.
-- `src/features/market/search.ts:30-48` (`searchTypes`) — case-insensitive substring match over `TypeMap` (name only; `TypeInfo` has no description field, `src/sde/types.ts:46-51`), ranked exact(0) > prefix(1) > substring(2), then alphabetical, capped `SEARCH_RESULT_LIMIT = 50` (`search.ts:16`).
-- `scripts/build-sde.mjs:220-230` — skill objects built with `typeID/name/groupID/groupName/rank/primaryAttr/secondaryAttr/prereqs`; no `description` field read from `invTypes.csv`'s `description` column (confirmed present in the real CSV — see payload budget).
-- No filter-chip UI primitive exists yet (`ls src/components/ui/` — no `Chip`/toggle component; `StatChip` is a display-only chip, not an interactive filter toggle. No `aria-pressed` usage found anywhere in `src/`).
+- `SkillPicker.tsx` already uses the shared `rankedSearch` helper
+  (`src/lib/rankedSearch.ts`) — `primary: name`, `secondary: [groupName]`,
+  capped `MAX_RESULTS = 20`. Ranking (exact > prefix > substring, alphabetical
+  tiebreak) is no longer missing; that was the "real, separate bug" the
+  original teardown found, and it's fixed.
+- `src/features/market/search.ts` (`searchTypes`) already calls the same
+  `rankedSearch` helper too — name-only (`TypeInfo` has no description
+  field), capped `SEARCH_RESULT_LIMIT = 50`. The "should they share one
+  ranked-search helper" question below is already answered: yes, and it
+  shipped.
+- `scripts/build-sde.mjs` — skill objects built with
+  `typeID/name/groupID/groupName/rank/primaryAttr/secondaryAttr/prereqs`; no
+  `description` field read from `invTypes.csv`'s `description` column
+  (confirmed present in the real CSV — see payload budget). This half of the
+  item is still open work.
+- `FilterChip` now exists (`components/ui/FilterChip.tsx`, exported from
+  `components/ui/index.ts`), but it has exactly one consumer today
+  (`routes/Styleguide.tsx`) — not yet wired into `SkillPicker`. Wiring it up,
+  plus the filter predicates, is the remaining item 04 UI work.
 
 **Gap:**
 
-1. `skills.json` needs a `description: string` field (cheap — see payload budget (a)).
-2. `SkillPicker`'s filter needs to also match description text, and needs relevance ranking (it currently has none — a real, separate bug from "missing description search").
-3. Filter chips: trained / untrained / has-prerequisites / hide-maxed — no chip component exists; needs both a UI primitive and the filter predicates.
-4. `searchTypes` (Market Browser) and `SkillPicker`'s picker are two independent, differently-behaved implementations of "substring search over an SDE-derived list" — worth consolidating.
+1. `skills.json` needs a `description: string` field (cheap — see payload budget (a)), plus a `SkillType.description` type and a `build-sde.mjs` read of `invTypes.csv`'s `description` column. This is the real remaining work: one accessor.
+2. `SkillPicker`'s search needs to also match description text — a one-line addition to its existing `rankedSearch` call (widen `secondary` to `[groupName, description]`), not a new ranking implementation.
+3. Filter chips: trained / untrained / has-prerequisites / hide-maxed — `FilterChip` (`components/ui/FilterChip.tsx`) already exists as a primitive; it needs wiring into `SkillPicker` plus the filter predicates.
 
-**Should they share one ranked-search helper?** Yes, extract one. Evidence: `searchTypes`'s ranking logic (`relevanceRank`: exact/prefix/substring, `search.ts:18-22`) is exactly what `SkillPicker` is silently missing today — it's not a stylistic choice, `SkillPicker` has a real relevance-ordering gap that copying `searchTypes`'s pattern fixes for free. The two differ only in: (a) what fields they match against (name only vs. name+group+description), (b) the result cap (50 vs 20), (c) input shape (`TypeMap` record vs `SkillType[]` array). A generic `rankedSearch<T>(items: T[], query: string, getFields: (item: T) => string[], limit: number): T[]` closes both gaps at once and gives Market Browser item-description search "for free" later if item descriptions are ever added to `types.json`. This is exactly a "shared primitive," not a private one-off — flag for orchestrator ownership, candidate home `src/lib/search.ts` (fits the existing `src/lib` charter: "small pure formatters shared across features with no other natural home," `docs/ARCHITECTURE.md` module table) or a new `src/search/` if it grows beyond one function.
+**Should they share one ranked-search helper?** Already answered, and already
+shipped: `src/lib/rankedSearch.ts` — an options-object
+`rankedSearch<T>(items, query, { primary, secondary?, limit })` — is exactly
+that helper, and it already has two consumers: `searchTypes`
+(`features/market/search.ts`) and `SkillPicker`. The two differ only in which
+fields they search (name-only vs. name+group, soon +description) and their
+result cap (50 vs 20) — both already expressed as call-site options, not
+duplicated ranking logic. There is no `src/lib/search.ts` and none should be
+created; the shared primitive already lives at `src/lib/rankedSearch.ts`.
 
 **Engine vs UI split:**
 
-- Not `src/engine` — this is search/filter, not training-time calculation math, and CLAUDE.md's TDD-required list is `src/engine`, `src/auth`, industry math specifically. It's still pure and colocated-testable; put it in `src/lib/search.ts` (or `src/search/rankedSearch.ts`).
+- Not `src/engine` — this is search/filter, not training-time calculation math, and CLAUDE.md's TDD-required list is `src/engine`, `src/auth`, industry math specifically. The shared ranked-search logic already lives, correctly, in `src/lib/rankedSearch.ts` — no new module needed for it.
 - Filter predicates (trained/untrained/has-prerequisites/hide-maxed) are pure functions over `(SkillType, TrainedSkill|undefined)` → boolean; colocate in `src/features/skills/` (e.g. `skillFilters.ts`), not engine — they're UI-facing display filters, not part of the training-schedule calculation the engine owns.
-- UI: `SkillPicker.tsx` wiring the new search + chip state; the new chip component in `components/ui` if promoted to a design-system primitive (recommended, since item 03's inspector and any future filterable list will want the same interactive-chip pattern).
+- UI: `SkillPicker.tsx` wiring the description field into its existing `rankedSearch` call, plus chip state; wiring the existing `FilterChip` primitive into the picker.
 
 **Files touched:**
 
-- `scripts/build-sde.mjs:220-230` — add `description: t.description` (or via a new `descriptions` lookup keyed off `invTypes.csv`'s `description` column) to the skill object.
-- `src/sde/types.ts:14-21` — add `description: string` to `SkillType`.
-- `src/features/skills/planner/SkillPicker.tsx` — replace the inline filter with the shared ranked-search helper (matching name+groupName+description), add chip row + filter state, wire trained-skill lookups (needs a `Map<number, TrainedSkill>` prop it doesn't currently take — check caller).
-- `src/features/market/search.ts` — refactor `searchTypes` to call the new shared helper instead of reimplementing ranking (keep its own file for the `TypeSearchResult`/volume-specific shape and `SEARCH_RESULT_LIMIT`).
+- `scripts/build-sde.mjs` — add `description: t.description` (or via a new `descriptions` lookup keyed off `invTypes.csv`'s `description` column) to the skill object.
+- `src/sde/types.ts` — add `description: string` to `SkillType`.
+- `src/features/skills/planner/SkillPicker.tsx` — widen its existing `rankedSearch` call's `secondary` array to include `description` (one line — the ranking helper itself needs no change), add chip row + filter state, wire trained-skill lookups (needs a `Map<number, TrainedSkill>` prop it doesn't currently take — check caller).
 
 **New modules:**
 
-- `src/lib/search.ts` — `rankedSearch<T>()`, colocated `search.test.ts`.
 - `src/features/skills/skillFilters.ts` — `isTrained`, `isUntrained`, `hasPrerequisites`, `isMaxed` predicates + a combinator the picker calls.
-- `src/components/ui/FilterChip.tsx` (recommend promoting to design-system primitive rather than a one-off in `planner/`) — interactive toggle chip, `aria-pressed`, tone variants matching `StatChip`'s existing tone system for visual consistency.
 
-**Shared primitives needed:** the `rankedSearch` helper (named above, needed by both this item and existing Market Browser code — do not let this item build a private copy); a `FilterChip`/toggle-chip primitive (doesn't exist anywhere in `components/ui` today — name it for the orchestrator rather than inventing it silently in `planner/`).
+No new search module and no new chip primitive: `rankedSearch`
+(`src/lib/rankedSearch.ts`) and `FilterChip` (`components/ui/FilterChip.tsx`)
+both already exist — this item wires them in, it doesn't build them.
 
-**Design tokens/components used:** new `FilterChip` should reuse `panel-2` fill (chips use `panel-2` per `docs/DESIGN.md:19`), `rounded-xs`, 11px chip type scale (`docs/DESIGN.md:71`), uppercase micro-heading style is NOT needed here (chip labels are short words, not headings) — but keep them visually consistent with `StatChip`'s tone palette (default/accent/success/warning/danger) so an active "trained" chip and a `StatChip` elsewhere in the same view read as the same chip language. `SkillPicker`'s existing input styling (`border-line`, `bg-panel-2`, `focus-visible:outline-accent`, `SkillPicker.tsx:47`) stays unchanged.
+**Shared primitives needed:** none new. `rankedSearch` and `FilterChip` are
+both already shared-owned; this item is a consumer of both, not a builder.
+
+**Design tokens/components used:** `FilterChip` (`components/ui/FilterChip.tsx`)
+is already shipped and already implements what this item would otherwise have
+asked for: `panel-2` fill when unselected, `accent`-tinted fill when selected
+(binary on/off, not `StatChip`'s five-tone palette — a filter chip only needs
+"active or not"), `rounded-xs`, `aria-pressed`, and an optional trailing
+match-`count`. Item 04 consumes it as-is; no new chip variant needed.
+`SkillPicker`'s existing input styling (`border-line`, `bg-panel-2`,
+`focus-visible:outline-accent`) stays unchanged.
 
 **Tests:**
 
-- `src/lib/search.test.ts` — TDD-style: exact > prefix > substring ranking, alphabetical tiebreak, cap enforcement, empty-query returns empty (matches both existing modules' "no dump-all-types" behavior), multi-field matching (name miss but description hit still matches).
+- `src/lib/rankedSearch.test.ts` already exists and already covers exact > prefix > substring ranking, alphabetical tiebreak, cap enforcement, empty-query returns empty, and multi-field (`secondary`) matching — no new ranked-search test infrastructure needed; add a `description`-specific case if the generic multi-field coverage doesn't already exercise it.
 - `src/features/skills/skillFilters.test.ts` — each predicate against fixtures: trained at level ≥1, untrained (no entry in trained map), has-prerequisites (prereqs.length > 0), hide-maxed (trained at level 5 excluded).
-- `SkillPicker.test.tsx` (if one exists — check; component currently has no colocated test file found) — description-text match surfaces a skill whose name doesn't contain the query (the literal "powergrid" → "Power Grid Management" case from the spec), chip combination narrows results correctly.
-- `src/features/market/search.test.ts` (check if exists) — regression test that the refactor to use the shared helper doesn't change `searchTypes`'s existing ranked/capped behavior.
+- `SkillPicker.test.tsx` already exists — extend it: description-text match surfaces a skill whose name doesn't contain the query (the literal "powergrid" → "Power Grid Management" case from the spec), chip combination narrows results correctly.
 
 **i18n keys:** `plans.filters.trained`, `plans.filters.untrained`, `plans.filters.hasPrerequisites`, `plans.filters.hideMaxed` (chip labels); no new copy needed for search itself (`plans.searchPlaceholder` already exists, `en.json:76`).
 
@@ -184,14 +214,14 @@ type) and `dgmTypeAttributes.csv` (16.4MB), filtered exactly the way
 
 **New ESI scopes:** none.
 
-**Cost:** Confirm **S** — description field is a one-line CSV-column read already-downloaded, chips are a new small component + pure predicates, ranked-search extraction is a small refactor of existing logic. The only judgment call inflating this slightly is whether `FilterChip` becomes a proper reusable design-system primitive (recommended) vs. a one-off in `planner/` (faster but creates the debt item 07/14 would hit again). Either way stays S.
+**Cost:** Confirm **S**, and smaller than the original teardown estimated — the ranked-search extraction and the `FilterChip` primitive are both already shipped, so what's left is: one CSV-column read into `skills.json`, a one-line `secondary`-array extension in `SkillPicker`'s existing `rankedSearch` call, the filter predicates, and wiring `FilterChip` into the picker. No new shared infrastructure to design or own.
 
 **Depends on:** none. Can ship independently of Item 03 and before/after it in any order.
 
 **Risks / open questions:**
 
 - `SkillPicker` doesn't currently receive a `trainedSkills` map as a prop (`SkillPicker.tsx:11-14` — props are `skills, onAdd, className`), but its only caller, `PlanEditor.tsx`, already holds `trainedSkills: ReadonlyMap<number, TrainedSkill>` (`PlanEditor.tsx:61,111`) and already threads it to sibling components (e.g. `trainedSkills={trainedSkills}` at `PlanEditor.tsx:426`). Verified: this is a one-line prop pass-through, not new wiring — confirmed trivial, not a real risk.
-- `features/market/search.ts`'s current scope gap (only searches the 9,193 _referenced_ types, not all 26,981 published types) is a pre-existing, separate issue from this item — flagging it here only because the shared-search-helper refactor touches that file; do not silently expand its scope as part of this item unless the orchestrator wants that bundled in.
+- `features/market/search.ts`'s current scope gap (only searches the 9,193 _referenced_ types, not all 26,981 published types) is a pre-existing, separate issue from this item — noted here only because it's the other consumer of the same `rankedSearch` helper this item extends; do not silently expand its scope as part of this item unless the orchestrator wants that bundled in.
 - Confirm whether "has-prerequisites" chip means "this skill requires other skills" (i.e., `prereqs.length > 0`, trivial) or "this skill is itself a prerequisite for something" (i.e., needs the Item 03 unlocks index) — the spec wording is ambiguous. I read it as the former (cheaper, no dependency on Item 03); if the orchestrator means the latter, this item gains a dependency on Item 03's skill→skill reverse index (still free, per payload budget (b), just a sequencing note).
 
 ---

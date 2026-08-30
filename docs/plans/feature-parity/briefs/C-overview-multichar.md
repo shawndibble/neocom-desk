@@ -4,24 +4,24 @@
 
 **The predicted hazard ("global mutable token provider") does not exist in the ESI path — verified FALSE.**
 
-- `configureEsi({ getToken })` is called exactly once, at module load (`src/app/App.tsx:31`), with `getToken: (characterId) => getValidAccessToken(characterId)`.
-- The injected type is `GetToken = (characterId: number) => Promise<string>` (`src/esi/client.ts:20`) — parameterized per call, not a snapshot of "the active character."
-- `esiFetch` consumes it per-request: `headers.Authorization = Bearer ${await tokenProvider(characterId)}` (`src/esi/client.ts:157-162`), where `characterId` comes from the caller's own `EsiFetchOptions`, never from a store.
-- `getValidAccessToken` single-flights refreshes **per character** via `const inflightRefresh = new Map<number, Promise<string>>()` (`src/auth/session.ts`) — two different characters refresh concurrently with no collision; only same-character concurrent calls are coalesced (correctly — EVE rotates refresh tokens).
+- `configureEsi({ getToken })` is called exactly once, at module load in `src/app/App.tsx`, with `getToken: (characterId) => getAccessTokenReportingFailures(characterId)` (`src/app/tokenProvider.ts`, which wraps `getValidAccessToken`).
+- The injected type is `GetToken = (characterId: number) => Promise<string>` (`src/esi/client.ts`) — parameterized per call, not a snapshot of "the active character."
+- `esiFetch` consumes it per-request via `tokenProvider(characterId)` (`src/esi/client.ts`), where `characterId` comes from the caller's own `EsiFetchOptions`, never from a store.
+- `getValidAccessToken` single-flights refreshes **per character** via an `inflightRefresh` map (`src/auth/session.ts`) — two different characters refresh concurrently with no collision; only same-character concurrent calls are coalesced (correctly — EVE rotates refresh tokens).
 - `loadWithCache`/`loadWithCacheStatus` (`src/esi/cache.ts`) and every `features/*/data.ts` loader (`loadCharacterSkills`, `loadCharacterSkillQueue`, `loadWalletBalance`, ...) take `characterId` as an explicit parameter, not from `useActiveCharacter`.
-- Precedent already in the repo: `usePublicInfo` (`src/stores/publicInfo.ts`) is fetched for **every** character in the roster today — `Characters.tsx:21-23` does `characters?.forEach((character) => void loadPublicInfo(character.characterId))`. Multi-character concurrent ESI fetching is a shipped pattern, not a hypothetical.
+- Precedent already in the repo: `usePublicInfo` (`src/stores/publicInfo.ts`) is fetched for **every** character in the roster today — `Characters.tsx` does `characters?.forEach((character) => void loadPublicInfo(character.characterId))`. Multi-character concurrent ESI fetching is a shipped pattern, not a hypothetical.
 
 **Conclusion: fetching N characters' skill queues (or wallets) concurrently is not an architectural problem in the ESI/token layer.** `src/stores/activeCharacter.ts` only decides which character's data is _displayed by default on Overview_; it has zero coupling to which character's data _can be fetched_.
 
 **The real global-slot hazard is one module over, in sync, not ESI.** `ensureSignedIn` (`src/sync/syncAuth.ts`) signs the single shared Firebase Auth session in/out per character (`uid = char:{characterId}`), and `planSync.ts`'s header comment states why syncs are serialized **globally** via one `syncChain` promise, not per character: "two concurrent syncs for different characters would race the auth state mid-flight." This constrains item 09's saved-setting sync (see below) but not item 02/07's read-only ESI fetches, which never touch Firebase.
 
-**Real remaining constraint: no concurrency cap on ESI fan-out.** Nothing caps how many characters' requests are in flight at once. 20 characters × (queue + wallet) = 40 concurrent requests against ESI's global error-limit budget, and CLAUDE.md requires respecting `X-Ratelimit-*`/`Retry-After`. Precedent for the fix already exists: `features/character/typeNames.ts` caps concurrency at 10 (`docs/ARCHITECTURE.md` §4). Any new "fetch all characters" helper must reuse that pattern (or the same constant), not add a second concurrency policy.
+**Concurrency cap on ESI fan-out: already shipped, reuse it.** `src/lib/concurrency.ts` exports `ESI_FANOUT_CONCURRENCY` (10) and `mapWithConcurrencyLimit`, a single policy so there is one number to tune across every ESI fan-out. 20 characters × (queue + wallet) = 40 concurrent requests against ESI's global error-limit budget, and CLAUDE.md requires respecting `X-Ratelimit-*`/`Retry-After` — any new "fetch all characters" helper must reuse this constant/helper, not add a second concurrency policy. (`src/features/character/roster.ts`, described below, already does this.)
 
 ---
 
-## Shared mechanism (build once, items 02/07/09 all consume it)
+## Shared mechanism (already built — items 02/07/09 all consume it)
 
-**New module: `src/features/character/roster.ts`** (singular, sits next to the existing `src/features/character` dir per `docs/ARCHITECTURE.md` §2 — a plural `features/characters/` sibling would be confusing).
+**`src/features/character/roster.ts` — ALREADY SHIPPED**, with a colocated `roster.test.ts`. No build work remains here; items 02/07/09 just consume it.
 
 ```ts
 export interface RosterEntry {
@@ -32,18 +32,18 @@ export interface RosterEntry {
   queue: CachedResult<SkillQueueEntry[]> | null;
 }
 
-/** Cache-only by default (no live ESI call); live:true refreshes with a capped concurrency (reuse typeNames.ts's cap of 10). */
-export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEntry[]>;
+/** Cache-only by default (no live ESI call); `live: true` refreshes with capped concurrency. */
+export async function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEntry[]>;
 ```
 
 - Composes existing per-character loaders (`loadWalletBalance`, `loadCharacterSkills`, `loadCharacterSkillQueue`) — does not reimplement read-through (`docs/ARCHITECTURE.md` §7 step 3).
-- Cache-only mode reads `db.characters.toArray()` then, per character, `db.esiCache.get([characterId, key])` (or a `bulkGet` batch — see Item 02 for why `bulkGet`, not `.where('key')`, is required).
-- `live: true` mode calls the `features/*` loaders directly (they already do ESI-or-cache), capped at 10 concurrent, for an explicit "Refresh all" action.
+- Cache-only mode reads `db.characters.toArray()` then batches all three fields per character through `readCachedRows` (`src/esi/cache.ts`), which wraps `db.esiCache.bulkGet` against the compound `[characterId+key]` primary key — see Item 02 for why `bulkGet`, not `.where('key')`, is required. A character with no cached row for a field gets `null` for that field, kept distinct from a fetched-but-empty value.
+- `live: true` mode calls the `features/*` loaders directly (they already do ESI-or-cache), flattened to one request per field (not per character) and run through `mapWithConcurrencyLimit` at `ESI_FANOUT_CONCURRENCY` (`src/lib/concurrency.ts`) for an explicit "Refresh all" action. Each request settles independently — a failing loader nulls just that field rather than sinking the character or the roster.
 
 **Shared UI primitives needed (do not design private one-offs):**
 
-- `DataTable` (currently ○ planned, `docs/DESIGN.md` §4) — item 07's comparison grid. DESIGN.md §5: "tables are the norm; avoid card grids for data lists."
-- `CharacterAvatar` (currently ○ planned, `docs/DESIGN.md` §4) — three call sites already hand-roll `<img src={characterPortraitUrl(...)} className="rounded-xs ...">`: `Overview.tsx:98-104`, `Characters.tsx:58-64`, plus item 07's column headers and item 09's cards. Strong case for building it once now instead of a fourth hand-roll.
+- `DataTable` (`src/components/ui/DataTable.tsx`) — **already built**, with a colocated test. Item 07's comparison grid consumes it; no item needs to build it.
+- `CharacterAvatar` (`src/components/ui/CharacterAvatar.tsx`) — **already built and adopted**: `Overview.tsx`, `Characters.tsx`, and `Layout.tsx` all use it instead of hand-rolling `<img>`. Item 07's column headers and item 09's cards should consume it too, not add a fourth hand-roll.
 
 **Density flag for the orchestrator:** item 09 asks for a "compact density mode." Item 18 (separate, not in this area) is a font-scaling/density feature. Recommend item 18 owns exactly one `sync.uiDensity` setting; item 09 only _consumes_ it, and must not introduce a second `sync.overviewDensity` key. This is a naming/ownership collision the orchestrator must resolve before either item starts.
 
@@ -55,15 +55,15 @@ export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEnt
 
 **Artifact claim:** "80% built. `src/routes/overviewQueue.ts` already derives the queue state; it only serves the active character today."
 
-**Verdict:** PARTIALLY TRUE — the file is pure and character-agnostic, but it derives a _different_ thing than "queue health." (`src/routes/overviewQueue.ts:12-25`)
+**Verdict:** PARTIALLY TRUE — `src/routes/overviewQueue.ts` is pure and character-agnostic, but it derives a _different_ thing than "queue health."
 
 **Verified baseline:**
 
 - `overviewQueue.ts` holds exactly one function, `selectActiveQueueEntry(entries, nowMs)`. It only imports `SkillQueueEntry`'s type (`@/esi/endpoints`) — no fetch/DOM/Dexie — and takes `nowMs` as a parameter instead of reading the clock itself. It is pure and works for any character's entry array; nothing in it is coupled to the active character.
 - It answers "what is this character training _right now_," not "what is this character's queue health." It returns `null` for **both** an empty queue and a fully-paused queue (`start_date`/`finish_date` both absent on every entry) — those are two different status dots the feature needs (empty vs paused) and the function can't distinguish them.
 - It never looks at the _last_ entry's `finish_date`, which is what "under 24h" / "under 5 days" needs.
-- No existing test file: `ls src/routes/` shows `Overview.test.tsx` but no `overviewQueue.test.ts` — the pure function is currently untested.
-- "It only serves the active character today" is true, but for an unrelated reason: `Overview.tsx:48-63`'s `useEffect` only calls `loadCharacterSkillQueue(activeCharacterId)` — a UI-loop scoping choice, not anything inherent to `overviewQueue.ts`.
+- `selectActiveQueueEntry` is covered today — its tests live in `Overview.test.tsx` (under "BUG #10"), not in a sibling `overviewQueue.test.ts`. Not untested, just colocated with the route instead of the function.
+- "It only serves the active character today" is true, but for an unrelated reason: `Overview.tsx`'s `useEffect` only calls `loadCharacterSkillQueue(activeCharacterId)` — a UI-loop scoping choice, not anything inherent to `overviewQueue.ts`.
 
 **Gap:** A `deriveQueueHealth` function does not exist. Also need: fetching cached queue data for every character (roster module above), and a route/panel that lists all characters sorted worst-first with click-to-jump.
 
@@ -73,21 +73,22 @@ export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEnt
   - Must accept `undefined` (never-fetched / no cache row) distinctly from `[]` (fetched, empty queue) — the caller cannot collapse these before calling or the "unknown" and "urgent/empty" dots become indistinguishable. This is the sharpest correctness trap in this item.
   - `'paused'`: every entry present but none has `start_date`/`finish_date`.
   - `'urgent'`/`'soon'`/`'ok'`: computed off the _last_ entry's `finish_date` vs `nowMs` (thresholds: <24h urgent, <5d soon, else ok — per teardown's stated urgency bands).
-- Placement: **not** `src/engine` — this operates directly on the ESI `SkillQueueEntry` shape, and engine's documented convention (`docs/ARCHITECTURE.md` §2) is engine-native types decoupled from ESI/SDE shapes at the boundary. Recommend `src/features/skills/queueHealth.ts`, colocated with the rest of the skills read-through layer.
-- Latent violation to flag: `src/routes/overviewQueue.ts` already puts reusable logic in `routes/`, which `docs/ARCHITECTURE.md` §2 says routes must NOT do ("Own reusable logic other routes need — push into `features`/`engine`"). Since item 09 also needs per-character queue status for its "needs attention" sort, recommend moving `selectActiveQueueEntry` alongside the new `deriveQueueHealth` into `src/features/skills/queueHealth.ts` as one small shared refactor — flag for orchestrator sign-off since it touches a file item 02 didn't otherwise need to move.
+- Placement: **not** `src/engine` — this operates directly on the ESI `SkillQueueEntry` shape, and engine's documented convention (`docs/ARCHITECTURE.md` §2) is engine-native types decoupled from ESI/SDE shapes at the boundary. **Do not create a new `src/features/skills/queueHealth.ts`** — `src/features/skills/queueStatus.ts` already owns paused-queue detection (`isQueuePaused`, with the EVEMon-bug rationale for why absent dates mean "paused, ETA unknown" rather than "starts now") and per-entry queue classification (`classifySkillQueue`). A second module re-deriving "paused" would duplicate that rule and its rationale. Add `deriveQueueHealth` to `queueStatus.ts` instead, and have it call `isQueuePaused` for the `'paused'` status rather than re-checking `start_date`/`finish_date` itself.
+- Latent violation to flag: `src/routes/overviewQueue.ts` already puts reusable logic in `routes/`, which `docs/ARCHITECTURE.md` §2 says routes must NOT do ("Own reusable logic other routes need — push into `features`/`engine`"). Since item 09 also needs per-character queue status for its "needs attention" sort, recommend moving `selectActiveQueueEntry` into `src/features/skills/queueStatus.ts` alongside the new `deriveQueueHealth` as one small shared refactor — flag for orchestrator sign-off since it touches a file item 02 didn't otherwise need to move.
 - Sort ("worst-first") and click-to-jump are UI: `src/routes/Overview.tsx` (or a new `OverviewRoster` panel) + `useActiveCharacter().setActiveCharacter` + navigate.
 
-**Can this be cached-only, no live multi-character fetch?** Yes — recommended v1. `db.esiCache` is keyed by compound primary key `[characterId, key]` (`src/db/index.ts`: `esiCache: '[characterId+key]'`) with **no secondary index on `key` alone** — `db.esiCache.where('key').equals('skillqueue')` will not work, but `db.esiCache.bulkGet(characterIds.map(id => [id, 'skillqueue']))` works directly against the compound primary key, no schema change needed. So a v1 that reads every character's _last cached_ skill-queue row (no live ESI call) is genuinely free of a Dexie migration. Recommend this exact approach for v1, with a per-character `DataAgeBadge` so a stale row is visibly stale (`docs/DESIGN.md` §4: "Required on every ESI-backed view").
+**Can this be cached-only, no live multi-character fetch?** Yes — recommended v1, and this exact path is already built. `db.esiCache` is keyed by compound primary key `[characterId, key]` (`src/db/index.ts`: `esiCache: '[characterId+key]'`) with **no secondary index on `key` alone** — `db.esiCache.where('key').equals('skillqueue')` would not work, but `readCachedRows` (`src/esi/cache.ts`) calls `db.esiCache.bulkGet` directly against the compound primary key, no schema change needed, and `loadRosterSnapshot`'s cache-only mode already uses it. Recommend this exact approach for v1, with a per-character `DataAgeBadge` so a stale row is visibly stale (`docs/DESIGN.md` §4: "Required on every ESI-backed view").
 
 **Files touched:**
 
 - `src/routes/Overview.tsx` — add a "queue health across characters" panel (or new route section) that renders roster rows.
 - `src/routes/overviewQueue.ts` — either keep as-is (only `selectActiveQueueEntry`, unchanged) or become the moved-out shell if the `features/skills` relocation above is approved.
 
-**New modules:**
+**Changed modules:**
 
-- `src/features/skills/queueHealth.ts` — `deriveQueueHealth` (pure, TDD-required).
-- `src/features/character/roster.ts` — shared roster loader (see cross-cutting section); item 02 only needs the `queue` field, but build the full shape since 07/09 need `wallet`/`skills` too.
+- `src/features/skills/queueStatus.ts` — add `deriveQueueHealth` (pure, TDD-required), reusing `isQueuePaused`. No new file.
+
+**Reused (already shipped):** `src/features/character/roster.ts` — item 02 only needs the `queue` field off `RosterEntry`, but the loader already fetches `wallet`/`skills` too since 07/09 need them.
 
 **Shared primitives needed:** `CharacterAvatar` (roster rows), `DataAgeBadge` (per-row, already ✓ in inventory — just wire it per row instead of once per page).
 
@@ -95,17 +96,16 @@ export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEnt
 
 **Tests:**
 
-- `src/features/skills/queueHealth.test.ts` (new, TDD-required per CLAUDE.md — pure logic module): empty array → `'empty'`; all-paused entries → `'paused'`; undefined → `'nodata'`; last finish_date <24h/<5d/>5d → urgent/soon/ok; mixed paused+active entries.
-- `src/features/character/roster.test.ts`: cache-only mode reads via `bulkGet` on compound keys, skips characters with no cached row, `live: true` mode respects the concurrency cap.
+- `src/features/skills/queueStatus.test.ts` (extend, TDD-required per CLAUDE.md — pure logic module): add `deriveQueueHealth` cases — empty array → `'empty'`; all-paused entries (via `isQueuePaused`) → `'paused'`; undefined → `'nodata'`; last finish_date <24h/<5d/>5d → urgent/soon/ok; mixed paused+active entries.
 - e2e: extend `e2e/support/mockEsi.ts` with a second character's skillqueue fixture (shared need, see cross-cutting).
 
-**i18n keys:** `overview.queueHealth.title`, `overview.queueHealth.status.{nodata,empty,paused,urgent,soon,ok}`, `overview.queueHealth.jumpTo` (aria-label for click-to-jump), reusing existing `overview.*` namespace style (`src/i18n/locales/en.json:239-248`).
+**i18n keys:** `overview.queueHealth.title`, `overview.queueHealth.status.{nodata,empty,paused,urgent,soon,ok}`, `overview.queueHealth.jumpTo` (aria-label for click-to-jump), reusing existing `overview.*` namespace style (`src/i18n/locales/en.json`).
 
 **Sync / Dexie impact:** None. Cached-only v1 needs no `db.version()` bump (confirmed above) and adds no Editable Data field.
 
-**New ESI scopes:** None. Overview already holds `esi-skills.read_skillqueue.v1` and `esi-wallet.read_character_wallet.v1` (`src/esi/scopes.ts:7-8,10`) for every character that's logged in; this item only reads what's already cached under those scopes.
+**New ESI scopes:** None. Overview already holds `esi-skills.read_skillqueue.v1` and `esi-wallet.read_character_wallet.v1` (`src/esi/registry.ts`, which `src/esi/scopes.ts`'s `SCOPES` is derived from) for every character that's logged in; this item only reads what's already cached under those scopes.
 
-**Cost:** Revise **S confirmed**, but for a different reason than the teardown claimed. The teardown credited existing derivation logic that doesn't actually exist for this purpose (`selectActiveQueueEntry` ≠ queue health); the real reason it's cheap is that the _data access_ problem (the task's stated worry) turns out to be free — cached-only via `bulkGet`, no new fetch path, no schema bump, no scope. The work is: one new pure function + tests, one roster loader (shared cost, amortized across 3 items), one UI panel.
+**Cost:** Revise **S confirmed**, but for a different reason than the teardown claimed. The teardown credited existing derivation logic that doesn't actually exist for this purpose (`selectActiveQueueEntry` ≠ queue health); the real reason it's cheap is that the _data access_ problem (the task's stated worry) turns out to be free — cached-only via `readCachedRows`'s `bulkGet`, no new fetch path, no schema bump, no scope, and the roster loader is already built. The work is: one new pure function + tests on `queueStatus.ts`, one UI panel.
 
 **Depends on:** None strictly, but should land before/alongside 09 since 09's "needs attention" sort wants the same `deriveQueueHealth` output.
 
@@ -120,14 +120,14 @@ export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEnt
 
 **Artifact claim:** "New view, existing data. `features/skills/data.ts` already caches per character. Saved sets ride the existing `sync.` settings path."
 
-**Verdict — data half:** CONFIRMED. `loadCharacterSkills(characterId)` (`src/features/skills/data.ts:38-44`) is already keyed by `characterId` and read-through cached; calling it for up to 10 characters is exactly the roster-loader pattern above, no new data-layer work.
+**Verdict — data half:** CONFIRMED. `loadCharacterSkills(characterId)` (`src/features/skills/data.ts:37-44`) is already keyed by `characterId` and read-through cached; calling it for up to 10 characters is exactly the roster-loader pattern above, no new data-layer work.
 
 **Verdict — saved-comparisons half:** PARTIALLY TRUE, with a defect that must shape the design, not just "ride the existing path."
 
 **Verified baseline (sync):**
 
 - `setSyncedSetting(key, value)` (`src/sync/planSync.ts`) requires `key.startsWith('sync.')` and writes to the flat Dexie `settings` table (`db.settings.put({ key, value })`) plus a timestamp in an internal meta map.
-- `syncCharacter(characterId)` pushes **every** `sync.`-prefixed key currently in that flat table, under whichever character is presently syncing, to `/characters/char:{characterId}/settings/{key}` (`src/sync/syncAuth.ts`: `uidForCharacter`). `triggerSync` only ever runs for the **active** character (`src/app/App.tsx:62-65`).
+- `syncCharacter(characterId)` pushes **every** `sync.`-prefixed key currently in that flat table, under whichever character is presently syncing, to `/characters/char:{characterId}/settings/{key}` (`src/sync/syncAuth.ts`: `uidForCharacter`). `triggerSync` only ever runs for the **active** character (`src/app/App.tsx:91-93`).
 - **`mergeSettings` has no tombstones** (`src/sync/merge.ts:149`, "No tombstones: keys are a stable set") — `for (const r of remote) if (!localKeys.has(r.key)) result.pull.push(r)` (`src/sync/merge.ts:163-165`) means a locally-deleted `sync.`-prefixed key is **resurrected** from remote on the next sync, since deletion isn't distinguishable from "never had it."
 - Consequence for design: saved comparisons must NOT be stored one Dexie/Firestore key per saved set (e.g. `sync.skillComparison.{id}`), because deleting a saved comparison would just delete the local key, and the next sync would silently pull it back from the remote copy. **Required key shape: one key holding the whole collection as an array**, e.g. `sync.skillComparisons` = `SavedComparison[]` where `SavedComparison = { id, name, characterIds: number[], diffOnly: boolean, updatedAt }`. Add/remove/rename all go through one `setSyncedSetting('sync.skillComparisons', updatedArray)` call, so the whole-array LWW at that single key is well-defined (same pattern d90e417 uses for `markers?: number[]` living _inside_ a `SkillPlanRecord`, not as its own key).
 - Same account-vs-character-scope defect as item 09 applies here too (a comparison naming 5 characters is account-level data): see item 09's writeup for the full analysis; recommendation carries over unchanged — accept per-character-remote-doc duplication for v1 with a documented caveat, do not build a new account-level Firestore path just for this.
@@ -136,7 +136,7 @@ export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEnt
 
 **Engine vs UI split:**
 
-- Nothing belongs in `src/engine` — comparing trained skill levels across characters is a display/grouping concern over already-loaded data (`toTrainedSkillsMap`, `src/features/skills/skillMap.ts:39-45`), not new calculation logic.
+- Nothing belongs in `src/engine` — comparing trained skill levels across characters is a display/grouping concern over already-loaded data (`toTrainedSkillsMap`, `src/features/skills/skillMap.ts:41-47`), not new calculation logic.
 - `src/features/skills/comparison.ts` (new, not engine): pure function `buildComparisonRows(catalog: SkillCatalog, perCharacterSkills: Map<characterId, CharacterSkills>, diffOnly: boolean): ComparisonRow[]`, grouping by `SkillType.groupName` (already present on `SkillCatalog.bySkillTypeID` rows, `src/features/skills/skillMap.ts:14`) and filtering to rows where levels differ when `diffOnly` is set. This is pure enough to unit test without Dexie/fetch, though it's not "engine" per the architecture doc's definition (engine = ESI/SDE-decoupled types) — keep it in `features/skills`.
 - Route: new `src/routes/SkillComparison.tsx` (or a tab under `Skills.tsx`'s `SkillsSubNav`), wired into `App.tsx`.
 
@@ -153,7 +153,7 @@ export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEnt
 - `src/routes/SkillComparison.tsx` — the view.
 - (shared) `src/features/character/roster.ts` — reused, not duplicated.
 
-**Shared primitives needed:** `DataTable` (○ in DESIGN.md §4) for the grid itself — this is the strongest single use case for finally building it. `CharacterAvatar` for column headers.
+**Shared primitives needed:** `DataTable` (`src/components/ui/DataTable.tsx`, already built) for the grid itself — this is the strongest single use case for it. `CharacterAvatar` for column headers.
 
 **Design tokens/components used:** `DataTable` (dense sortable, panel-2 header, tabular-nums), colour-coded level blocks should reuse existing status/accent tone tokens (`docs/DESIGN.md` §1) rather than a new palette — confirm exact level→color mapping is a design decision, not an engineering one. One primary button per view (`docs/DESIGN.md` §5) → "Save comparison" is the one primary action; diff-only is a toggle, not a button.
 
@@ -171,25 +171,25 @@ export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEnt
 
 **Cost:** Confirm **M**. Data layer is genuinely free (roster reuse); the cost is the new `DataTable`-based view, grouping/diff logic, and getting the saved-comparison key shape right (nontrivial given the tombstone gap above — a naive per-item-key design would ship a silent data-loss bug).
 
-**Depends on:** `src/features/character/roster.ts` (shared with 02/09) — build once. `DataTable` component — if not yet built for another item, item 07 becomes the one that builds it; flag to orchestrator so it's not built twice.
+**Depends on:** `src/features/character/roster.ts` (already built, shared with 02/09) and `DataTable` (already built) — item 07 only consumes both, no build-order coordination needed.
 
 **Risks / open questions:**
 
 - Account-scope sync defect (shared with item 09) — same open decision, see item 09.
-- Whether `DataTable` needs a "grouped/collapsible rows" mode as a first-class feature or whether item 07 hand-rolls grouping on top of a flat `DataTable` — affects `DataTable`'s own scope/cost if another item is building it concurrently.
+- Whether `DataTable` needs a "grouped/collapsible rows" mode as a first-class feature or whether item 07 hand-rolls grouping on top of a flat `DataTable` — affects whether this item's cost also carries a `DataTable` extension.
 
 ---
 
 ## Item 09 — Overview groups, sort and density (teardown cost: M)
 
-**Artifact claim:** "Missing. Only pays off once several characters are in. Store as a synced setting so grouping follows the user across devices — something EveLens cannot do."
+**Artifact claim:** "Missing. Only pays off once several characters are in. Store as a synced setting so grouping follows the user across devices."
 
 **Verdict:** PARTIALLY TRUE on "missing" (confirmed, no grouping/sort/density code exists in `Overview.tsx`/`Characters.tsx`), but the **"store as a synced setting so it follows across devices" claim is not reliably true given how sync is scoped today** — this is the headline finding for this item, not a footnote.
 
 **Verified baseline — the sync-scope defect:**
 
 - `uidForCharacter(characterId) => 'char:' + characterId` (`src/sync/syncAuth.ts`) — the Firebase identity is **per character**, not per app-user/account, despite CONTEXT.md defining **Account** as "implicit app-level grouping of linked Characters, used only to sync editable data across devices" (`CONTEXT.md` glossary). That grouping concept is documented but has **no storage representation anywhere in the sync architecture** — there is no account-level Firestore path, only `/characters/char:{id}/...`.
-- `triggerSync(characterId)` is invoked only for the currently-active character, on login/character-switch (`src/app/App.tsx:62-65`).
+- `triggerSync(characterId)` is invoked only for the currently-active character, on login/character-switch (`src/app/App.tsx:91-93`).
 - Locally, `db.settings` is a **flat table, no characterId column** (`src/db/index.ts`: `settings: 'key'`) — so on one device, all characters already share one local value for any `sync.`-prefixed key. Reading/writing it doesn't care which character is active.
 - But `syncCharacter` (`src/sync/planSync.ts`, "Synced settings" section) pushes **whichever `sync.`-prefixed keys exist in that flat table** to `/characters/char:{activeCharacterAtSyncTime}/settings/{key}` — i.e., the remote copy of an account-level setting like "overview grouping" ends up parked under one arbitrary character's remote doc, decided by sync-timing accident, not by design.
 - **Failure mode:** same device, same browser profile → works by accident (flat table, single shared local value). **Second device**, user logs in as character B _first_ (character A never activated on that device) → `syncCharacter(B)` pulls only `char:B`'s settings docs → never sees the grouping value that was pushed under `char:A` on device 1. Silent, and the user has no way to notice — the grouping setting just quietly reverts to default on the new device.
@@ -217,7 +217,7 @@ export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEnt
 
 **Files touched:**
 
-- `src/routes/Overview.tsx` — becomes multi-character-aware (today it's single-active-character only, `activeCharacterId` gate at `Overview.tsx:41`); needs to grow a "roster" section alongside (not replacing) the existing active-character detail view.
+- `src/routes/Overview.tsx` — becomes multi-character-aware (today it's single-active-character only, gated on `activeCharacterId === null` redirecting to `/characters`); needs to grow a "roster" section alongside (not replacing) the existing active-character detail view.
 - `src/stores/activeCharacter.ts` — no change needed; grouping is orthogonal to which character is "active" for the detail view.
 
 **New modules:**
@@ -239,7 +239,7 @@ export function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEnt
 
 **Sync / Dexie impact:** New synced setting `sync.overviewGroups` = `Record<characterId, groupId>` plus `sync.overviewGroupNames` = `Record<groupId, name>` (or one combined object) — single-key-per-collection, per the same `mergeSettings` tombstone-resurrection constraint as item 07. No `db.version()` bump (flat `settings` table, no new columns).
 
-**New ESI scopes:** None — wallet + skills scopes already granted (`src/esi/scopes.ts:7,10`).
+**New ESI scopes:** None — wallet + skills scopes already granted (`src/esi/registry.ts`, surfaced via `src/esi/scopes.ts`'s `SCOPES`).
 
 **Cost:** Report as **conditional, not a single number**: **M under option (1)** (accept per-character duplication, document caveat) — matches teardown. **L under option (3)** (real account-level sync) — do not let this item silently absorb that infrastructure cost. Recommend the orchestrator explicitly pick (1) vs (3) before sizing sign-off.
 

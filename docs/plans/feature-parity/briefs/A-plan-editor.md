@@ -1,9 +1,11 @@
 # Brief A — Skill Plan editor & remap optimizer UX
 
-Branch `feat/evelens-parity-plan`. Items 01, 05, 08, 10.
-Read-only investigation. All measurements below were run against the real
-`src/engine/optimizer` code via a throwaway vitest config in the scratchpad
-(not committed).
+Items 01, 05, 08, 10.
+Read-only investigation. Optimizer performance numbers below are drawn from
+this plan's `README.md` §5.6 ("D5 — the O(R²) segment grid, and why it is
+gone"), measured against the real `src/engine/optimizer` code and now the
+source of truth; earlier ad hoc scratchpad measurements in this brief have
+been superseded and removed.
 
 ---
 
@@ -33,73 +35,57 @@ Read-only investigation. All measurements below were run against the real
    from `d90e417` is the Firestore-rejects-`undefined` hazard, which now
    applies **inside array elements**. See item 08 for the exact rule.
 
-Two further doc-vs-code staleness findings (both refuted by `main`):
-`docs/ARCHITECTURE.md` §6 still calls Remap Markers "in flight — no `Marker`
-implementation found in `src/` yet" (contradicted by
-`src/features/skills/planner/markers.ts`, 142 lines, shipped in `954eb16`), and
-`src/engine/optimizer/placeRemaps.ts:18` claims the memoization keeps
-"~200-step plans fast" — measured below, that is false for realistic plans.
+Two further doc-vs-code staleness findings from the original teardown are now
+fixed on `main`, not still open: `docs/ARCHITECTURE.md`'s route table used to
+call Remap Markers "in flight" — it now marks `/skills/plans` "shipped"
+(`src/features/skills/planner/markers.ts`, shipped in `954eb16`). And
+`placeRemaps.ts`'s docstring used to claim a single blanket "~200-step plans
+fast" figure — it has been rewritten (see §5.6 below) to state the real,
+per-`remapCount` cost instead.
 
 ---
 
-## Measured optimizer cost (drives items 01 and 05)
+## Measured optimizer cost (drives items 01 and 05) — already fixed, not open work
 
-`placeRemaps` is O(R²) segment evaluations where **R = number of maximal
-attribute-pair runs**, not number of steps (`placeRemaps.ts:86-93` merges
-consecutive same-pair steps into one run). Each segment evaluation brute-forces
-2,885 attribute allocations (`bestAttributes.ts:63-75`; verified by counting).
-Signature memoization (`placeRemaps.ts:121-139`) rarely hits, because every
-`[i,j)` interval has a distinct SP-per-pair signature.
+The O(R²) segment-evaluation cost this section used to document is gone.
+Fixed already, per README §5.6 ("D5 — the O(R²) segment grid, and why it is
+gone", shipped 2026-08-30):
 
-Randomized realistic plans, Node, warm, mean of 3 (`remapCount: 3`):
+- `placeRemaps` used to evaluate an R×R grid of segments — R being the number
+  of maximal attribute-pair runs, not step count — each cell brute-forcing
+  `bestAttributes`'s 2,885 attribute allocations before running the DP. That
+  is the mechanism the original version of this section measured at 624 ms
+  at 46 pair runs and 3.1 s at 91. The grid no longer exists: segment cost is
+  linear in SP, so `bestAttributes.ts`'s `allocationCostTable` prices every
+  allocation once and the DP picks boundaries against that table, instead of
+  brute-forcing an allocation per boundary pair.
+- **`remapCount === 1`** takes its own O(R) suffix scan (unaffected by the
+  identity above, and unchanged since it shipped): **~59-81 ms at 200 steps**,
+  Booster-blind vs. boosted. This is the common case — `SkillPlans.tsx`
+  prefills new plans from `remapInfo.available`.
+- **`remapCount >= 2`** now costs **~6-13 ms Booster-blind, ~419-902 ms
+  boosted** at 200 steps (`remapCount` 2 through 5) — down from ~2-2.7 s. The
+  boosted cost "cannot be restructured away" (README §5.6): a mid-segment
+  Booster expiry defeats aggregation, so those segments still have to be
+  priced one at a time.
+- **`MAX_SUPPORTED_REMAPS` is 2** (`placeRemaps.ts`, raised from 1 on
+  2026-08-30), and `PlanEditor` clamps any stored `plan.remapCount` to it
+  (`Math.min(plan.remapCount, MAX_SUPPORTED_REMAPS)`) before calling the
+  optimizer. So the worst case items 01 and 05 ever render is
+  `remapCount = 2`: ~6 ms blind, ~419 ms boosted — cheap enough for a live
+  badge behind a debounce, no bounding approximation and no Web Worker
+  required (see item 05).
+- The signature memoization this section used to describe (keyed on the
+  SP-per-pair signature of every `[i,j)` interval) is gone along with the
+  O(R²) grid it memoized. The only cache left in `placeRemaps.ts` is
+  `boostedCost`, a `Map` keyed on segment-plus-start — needed because a
+  Booster's remaining life depends on when a segment starts, not on the
+  segment's SP alone.
 
-| pair runs R | steps | `placeRemaps` |
-| ----------- | ----- | ------------- |
-| 25          | 25    | 145 ms        |
-| 46          | 50    | 624 ms        |
-| 91          | 100   | 3,141 ms      |
-| 145         | 150   | 9,006 ms      |
-
-Confirmed independent of step count: 100 entries × 5 levels each = 500 steps but
-only 100 runs → 3,119 ms; 20 entries × 5 levels = 100 steps / 20 runs → 70 ms.
-`optimizeAtMarkers` is cheap by comparison (1–2 ms at every size) because it
-does one `bestAttributesForPairs` per user-placed marker, not O(R²).
-
-**`placeRemaps` is quadratic even when it needn't be.** For `remapCount === 1`
-only the last DP column is needed (`dp[1][R] = min_i (currentPrefix[i] + segment[i][R])`),
-i.e. R+1 suffix evaluations, O(R). `placeRemaps.ts:120-140` builds the whole
-O(R²) table regardless of `remapCount`. Measured, exact-equal savings in every
-case:
-
-| pair runs R | O(R) suffix scan | `placeRemaps(remapCount: 1)` | savings identical? |
-| ----------- | ---------------- | ---------------------------- | ------------------ |
-| 24          | 16 ms            | 103 ms                       | yes                |
-| 48          | 31 ms            | 641 ms                       | yes                |
-| 97          | 86 ms            | 3,325 ms                     | yes                |
-| 145         | 125 ms           | 8,175 ms                     | yes                |
-| 236         | 223 ms           | 24,061 ms                    | yes                |
-
-CONTEXT.md round 2 names the single-remap case as the one the optimizer "must
-support", and `SkillPlans.tsx:123` prefills new plans from
-`remapInfo.available`, so this is the common path. `remapCount ≥ 2` genuinely
-needs the full table (`dp[2][j]` depends on `dp[1][i]` for all `i`), so the
-split is exactly at K = 1.
-
-**Cheap bounds for the K ≥ 2 case** (verified empirically, see item 05):
-
-| R   | whole-plan best (lower bound) | per-run best (upper bound) | exact `placeRemaps` |
-| --- | ----------------------------- | -------------------------- | ------------------- |
-| 25  | 2.1 ms                        | 2.7 ms                     | 145 ms              |
-| 46  | 1.0 ms                        | 3.2 ms                     | 624 ms              |
-| 91  | 1.1 ms                        | 6.4 ms                     | 3,141 ms            |
-| 145 | 1.2 ms                        | 11.0 ms                    | 9,006 ms            |
-
-In all four runs `lowerBound ≤ actualSavings ≤ upperBound` held. **But the upper
-bound is far too loose to prove "optimized"** — at R = 91 it read 11.1 Ms
-against an actual 4.1 Ms. `Σ perRunBest` assumes every run gets its own private
-remap, so for any plan spanning more than one attribute pair the bound never
-approaches `currentSeconds`. It is useful as a "how much headroom might exist"
-signal, never as proof that no remap helps.
+None of the above is open work for items 01/05 to schedule — it already
+shipped. What it changes is what those items need to build: no bounding math,
+no Web Worker, just an exact number cheap enough to compute live (see the
+corrected item 05 below).
 
 ---
 
@@ -107,19 +93,19 @@ signal, never as proof that no remap helps.
 
 **Artifact claim:** "We have the engine, not the story. `engine/optimizer/placeRemaps` and `bestAttributes` already compute this, and `PlaceRemapsResult` already returns per-segment attributes and duration, `savingsSeconds`, and a no-remap segment when a remap gains nothing — every value the timeline needs. Pure UI work, no engine change."
 
-**Verdict:** PARTIALLY TRUE — the per-field claims are all correct, but "every value the timeline needs" is not: the projected finish date and the step-index→plan-row mapping for inline dividers do not exist anywhere (`src/engine/optimizer/placeRemaps.ts:39-45`). Neither forces an _engine_ change; both need new non-engine code.
+**Verdict:** PARTIALLY TRUE — the per-field claims are all correct, but "every value the timeline needs" is not: the projected finish date and the step-index→plan-row mapping for inline dividers do not exist anywhere on `RemapSegment` or `PlaceRemapsResult` (`src/engine/optimizer/placeRemaps.ts`). Neither forces an _engine_ change; both need new non-engine code.
 
 **Verified baseline (field by field):**
 
 | Timeline value                                                  | Present?  | Citation                                                                                                                                                                                  |
 | --------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| per-segment attributes                                          | YES       | `placeRemaps.ts:32` (`RemapSegment.attributes: Attributes`)                                                                                                                               |
-| per-segment duration                                            | YES       | `placeRemaps.ts:33` (`seconds`)                                                                                                                                                           |
-| per-segment start/end step                                      | YES       | `placeRemaps.ts:30-32` (`startIndex`/`endIndex`, inclusive)                                                                                                                               |
-| "this segment is a remap" flag                                  | YES       | `placeRemaps.ts:36` (`remap: boolean`; leading current-attrs segment is `false`)                                                                                                          |
-| `savingsSeconds`                                                | YES       | `placeRemaps.ts:44`                                                                                                                                                                       |
-| no-remap-is-better case                                         | YES       | `placeRemaps.ts:100-113` `noRemapResult()`, taken at `:115` (`remapCount<=0`) and `:181` (current attrs already ≥ best reachable)                                                         |
-| baseline for "% faster"                                         | YES       | `placeRemaps.ts:43` `currentSeconds` — `savings/currentSeconds` is the percentage, no new field needed                                                                                    |
+| per-segment attributes                                          | YES       | `RemapSegment.attributes: Attributes` (`placeRemaps.ts`)                                                                                                                                  |
+| per-segment duration                                            | YES       | `RemapSegment.seconds` (`placeRemaps.ts`)                                                                                                                                                 |
+| per-segment start/end step                                      | YES       | `RemapSegment.startIndex`/`endIndex`, inclusive (`placeRemaps.ts`)                                                                                                                        |
+| "this segment is a remap" flag                                  | YES       | `RemapSegment.remap: boolean` (`placeRemaps.ts`; leading current-attrs segment is `false`)                                                                                                |
+| `savingsSeconds`                                                | YES       | `PlaceRemapsResult.savingsSeconds` (`placeRemaps.ts`)                                                                                                                                     |
+| no-remap-is-better case                                         | YES       | `noRemapResult()` (`placeRemaps.ts`), taken when `remapCount <= 0` and when current attrs already beat the best reachable allocation                                                      |
+| baseline for "% faster"                                         | YES       | `PlaceRemapsResult.currentSeconds` (`placeRemaps.ts`) — `savings/currentSeconds` is the percentage, no new field needed                                                                   |
 | **projected finish date**                                       | **NO**    | nothing in `src/engine` touches `Date`; `ScheduledStep` (`engine/types.ts:57-61`) carries only `seconds`/`cumulativeSeconds`                                                              |
 | **"REMAP BEFORE \<skill\>" divider position in the entry list** | **NO**    | `segment.startIndex` indexes the _computed queue_; `markers.ts:132` `markerStepIndices` maps entry→step, never step→entry                                                                 |
 | per-segment "why here" evidence                                 | DERIVABLE | `aggregateSpByPair` is exported (`optimizer/index.ts:3`); counterfactual seconds computable from `engine/sp.ts` `spBetween`/`trainingRate`/`timeToTrain` (all exported, `sp.ts:31/39/47`) |
@@ -262,16 +248,14 @@ step→entry mapping with **item 08**.
 
 **Risks / open questions:**
 
-- **Booster/optimizer disagreement becomes visible. RESOLVED — (a).** `bestAttributes.ts:7`
-  states boosters are ignored by design and "the schedule layer applies those
-  separately", but `computeSchedule` _does_ apply them
-  (`PlanEditor.tsx:92-96`). Today `optimizeResult.currentSeconds` and the
-  computed-queue `totalSeconds` (`PlanEditor.tsx:206`) sit in different panels
-  so the mismatch is invisible. Items 01 and 05 put them side by side.
-  Ruled (README §5.5): **option (b) — teach the optimizer about Boosters.**
-  Long accelerators run to weeks, so an optimizer blind to them is wrong, not
-  merely undisclosed. Engine change, **M**, gated on D5. Items 01 and 05 render
-  one number computed one way; the "excludes booster" note must not ship.
+- **Booster/optimizer disagreement — ALREADY FIXED, not a risk anymore.**
+  `bestAttributes.ts`'s docstring used to say boosters were ignored by design;
+  it now states Boosters are accounted for whenever a `BoosterContext` is
+  supplied, matching `computeSchedule` (`PlanEditor.tsx` passes a `booster`
+  context whenever the character has one enabled). D5 shipped 2026-08-30
+  (README §5.6): the optimizer and the computed queue now agree, so items 01
+  and 05 can put both numbers side by side without an "excludes booster"
+  caveat.
 - Segment results are cleared on every plan edit (`PlanEditor.tsx:190-200`). A
   timeline that vanishes on each keystroke reads as a bug. Either keep the clear
   and add an "out of date — re-run" affordance, or adopt item 05's cheap live
@@ -287,130 +271,96 @@ step→entry mapping with **item 08**.
 
 **Artifact claim:** "Values exist in the computed queue. Surfacing only."
 
-**Verdict:** PARTIALLY TRUE — total time is genuinely one line away, the badge is not. A live "optimized / would still save X" verdict requires running `placeRemaps`, which I measured at 624 ms at 46 pair runs and 3.1 s at 91 (`src/engine/optimizer/placeRemaps.ts:120-170`). "Surfacing only" is wrong about half the feature.
+**Verdict:** MOSTLY TRUE now. Total time was already one line away, and the
+live badge — the harder half — got cheap for free: the O(R) `remapCount === 1`
+path and the `MAX_SUPPORTED_REMAPS = 2` cap (both shipped 2026-08-30, README
+§5.6) mean the worst case the badge ever computes is `remapCount = 2` at
+~6 ms Booster-blind / ~419 ms boosted for a 200-step plan, not the O(R^2)
+multi-second pass this brief originally measured. What is left is UI wiring
+plus a trailing debounce for the boosted case, not new engine approximation
+machinery.
 
 **Verified baseline:**
 
 - Total training time already exists as
   `const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0`
-  (`PlanEditor.tsx:206`) and is already rendered — as an 11px dim string in the
-  computed-queue Panel's `actions` slot (`PlanEditor.tsx:560-562`). "Large type"
-  is a move + a type-scale change, nothing more.
+  (`PlanEditor.tsx`) and is already rendered — as an 11px dim string in the
+  computed-queue Panel's `actions` slot. "Large type" is a move + a type-scale
+  change, nothing more.
 - `scheduled` is properly memoized on
-  `[plan.entries, catalog, trainedSkills, attributes, effectiveImplants, activeBoosters]`
-  (`PlanEditor.tsx:169-180`). `computeSchedule` is O(steps) and cheap.
-- Optimizer results are **not** live: they only exist after a button press
-  (`:238-258`) and are explicitly wiped on any entries/markers change
-  (`:190-200`). Item 05 inverts that invalidation design.
+  `[plan.entries, catalog, trainedSkills, attributes, effectiveImplants, activeBoosters]`.
+  `computeSchedule` is O(steps) and cheap.
+- Optimizer results are **not** live today: they only exist after a button
+  press and are explicitly wiped on any entries/markers change. Item 05
+  inverts that invalidation design for the badge only (the detailed segment
+  list can stay on-demand — see item 01's risks).
+- `PlanEditor` already clamps `plan.remapCount` to `MAX_SUPPORTED_REMAPS`
+  (`Math.min(plan.remapCount, MAX_SUPPORTED_REMAPS)`) before calling the
+  optimizer; the badge should reuse that same clamped value, not the raw
+  stored one.
 - No `Worker`, `requestIdleCallback`, or debounce utility exists anywhere in
-  `src/` — checked.
+  `src/` — checked, still true.
 
-**Gap:** the badge, the type-scale/placement change, and a recompute strategy
-that does not block the main thread.
+**Gap:** the badge component, the type-scale/placement change for the total,
+and a trailing debounce so a fast reorder streak doesn't run `placeRemaps` on
+every keystroke.
 
-**Recompute / perf — the actual finding:**
+**Recompute / perf — the actual finding, corrected:**
 
-Debouncing does not fix the O(R²) pass — it only delays a 3-second freeze;
-`useMemo` never helps either, because every reorder mints a fresh `entries`
-array. The fix is to not run the O(R²) pass for the badge at all.
+The O(R²) pass this brief used to warn about is gone (see "Measured optimizer
+cost" above). At the current cap of `MAX_SUPPORTED_REMAPS = 2`:
 
-**`remapCount === 1` (the common case, and the default from `SkillPlans.tsx:123`):
-compute the EXACT answer in O(R).** Only the last DP column is needed; a
-right-to-left suffix scan gives R+1 `bestAttributesForPairs` calls instead of
-O(R²). Measured **86 ms at R = 97**, 125 ms at R = 145, 223 ms at R = 236, with
-savings **identical to `placeRemaps(remapCount: 1)`** at every size (table
-above). At that cost a trailing debounce (~150 ms) is genuinely sufficient. All
-three badge states are then provable, because the number is exact:
+- **`remapCount === 1`** (the common case, and the default from
+  `SkillPlans.tsx`'s `remapInfo.available` prefill): the O(R) suffix scan
+  costs ~59-81 ms at 200 steps. Cheap enough for a live badge with a light
+  debounce.
+- **`remapCount === 2`**: ~6 ms Booster-blind, but **~419 ms with a Booster
+  active** (`PlanEditor` passes a `booster` context whenever one is enabled).
+  419 ms is too slow to run on every keystroke but fine behind a trailing
+  debounce (~150-200 ms) — the number the user sees is exact either way, not
+  a bound.
+- No approximation, bound, or Web Worker is needed at this cap. If
+  `MAX_SUPPORTED_REMAPS` is ever raised past 2, revisit — the boosted cost at
+  higher `remapCount` was measured at ~900 ms (README §5.6) and does not
+  improve with restructuring (a mid-segment Booster expiry defeats
+  aggregation).
+
+Badge states, both exact — no third "unproven" state needed:
 
 - savings < `MIN_MEANINGFUL_SAVINGS_SECONDS` → **"optimized"**
 - savings ≥ threshold → **"saves {{duration}}"**
-- (no third state needed)
-
-**`remapCount ≥ 2`: the exact answer is not cheaply available.** Fall back to
-the bounds, and be honest about what they prove:
-
-- **Lower bound on savings** = `currentSeconds − bestAttributesForPairs(whole plan).seconds`.
-  Sound because a single whole-plan segment is always a feasible DP solution
-  (`placeRemaps.ts:163`, `k = 1`), so `totalSeconds ≤ bestWholePlan`. **1–2 ms.**
-  Supports **"saves at least {{duration}}"**.
-- **Upper bound** = `currentSeconds − Σ bestAttributesForPairs(run).seconds`.
-  Sound, but far too loose to prove "optimized" (11.1 Ms vs an actual 4.1 Ms at
-  R = 91) — `Σ perRunBest` assumes a private remap per run, which no real plan
-  approaches. **Do not wire "optimized" to it.**
-- So for K ≥ 2 the honest states are **"saves at least X"** or **"a remap pass
-  may help"** + the existing on-demand button. If the K ≥ 2 badge must also say
-  "optimized", note that the K = 1 exact value is a valid _lower_ bound on the
-  K ≥ 2 savings (more remaps never hurt): if K = 1 already finds a real gain,
-  the badge can state it without running the full pass. Only the case "K = 1
-  finds nothing, K ≥ 2 might" stays genuinely unknown — and that is a narrow,
-  honestly-labelled third state, not the common one.
-
-Do **not** claim "optimized" from the whole-plan lower bound alone:
-`currentAttributes` can sit outside the 17..27 remap space (ESI attributes
-include implants — `docs/ARCHITECTURE.md` §4), so a multi-segment plan can beat
-current even when the single-segment best does not.
-
-If the orchestrator wants the exact number live for **K ≥ 2 as well**: that is a
-Web Worker (none in the repo — new infrastructure, new test harness) and the
-item becomes **M**.
-
-**Bonus engine win, cheap and independent:** teaching `placeRemaps` itself to
-take the O(R) path when `remapCount === 1` turns 24 s into 223 ms at R = 236 for
-the _existing_ "Optimize remaps" button, with provably identical output. Worth
-doing regardless of the badge.
 
 **Engine vs UI split:**
 
-- `src/engine/optimizer/placeRemaps.ts` — **new O(R) fast path for
-  `remapCount === 1`, TDD-required.** Either as an internal branch in
-  `placeRemaps` or as an exported `placeSingleRemap`. Its correctness test is
-  cheap and total: for generated plans, `placeSingleRemap` must equal
-  `placeRemaps(..., { remapCount: 1 })` field for field (verified true at
-  R = 24/48/97/145/236 in the scratchpad harness).
-- `src/engine/optimizer/savingsBounds.ts` — **new, pure, TDD-required**, for the
-  `remapCount ≥ 2` fallback only. `savingsBounds(steps, skills, { currentAttributes, implants })` →
-  `{ currentSeconds, lowerBoundSavings, upperBoundSavings }`. Belongs in engine:
-  same math as `placeRemaps`, and its soundness is a property that must be
-  tested against `placeRemaps` itself.
-- Both need the private run segmentation from `placeRemaps.ts:74-94`. Extract it
-  once as `pairRuns(steps, skills, currentAttributes, implants)` →
-  `{ pair, sp, currentSeconds, startStep, endStep }[]` — note the **baseline
-  seconds per run depend on `currentAttributes` and `implants`**, so a
-  `pairRuns(steps, skills)` signature cannot reproduce what that loop produces;
-  either widen the signature as shown, or split into a pure grouping pass plus a
-  separate baseline pass.
-- `src/features/skills/planner` — header component, badge, threshold constant.
+- `src/engine` — **nothing new required.** `placeRemaps` (clamped to
+  `MAX_SUPPORTED_REMAPS`) is cheap enough to call directly from the badge; no
+  bounding module, no fast-path extraction, no Web Worker.
+- `src/features/skills/planner` — header component, badge, threshold
+  constant, the debounce.
 - `src/routes/SkillPlans.tsx` — unchanged.
 
 **Files touched:**
 
-- `src/engine/optimizer/placeRemaps.ts` — extract the run-building loop
-  (`:74-94`) into `pairRuns`; add the O(R) `remapCount === 1` path. Keep
-  `placeRemaps.test.ts` green as the regression net. **Also fix the stale
-  docstring at `:18`** ("keeping ~200-step plans fast") — measured false: 9.0 s
-  at R = 145, 24 s at R = 236.
-- `src/engine/optimizer/index.ts` — export `savingsBounds` (+ `placeSingleRemap`
-  if it lands as a separate function) and their result types.
-- `src/features/skills/planner/PlanEditor.tsx` — move `totalSeconds` into a new
-  header component; drop the duration from the computed-queue `actions` slot
-  (`:562`); export/relocate `MIN_MEANINGFUL_SAVINGS_SECONDS` (`:47`).
+- `src/features/skills/planner/PlanEditor.tsx` — move `totalSeconds` into a
+  new header component; drop the duration from the computed-queue `actions`
+  slot; export/relocate `MIN_MEANINGFUL_SAVINGS_SECONDS`; call `placeRemaps`
+  (clamped) behind a trailing debounce for the badge instead of only on
+  button press.
 
 **New modules:**
 
-- `src/engine/optimizer/savingsBounds.ts` (+ `.test.ts`) — cheap sound bracket
-  on remap savings.
 - `src/features/skills/planner/PlanHeader.tsx` — plan name, hero total time,
   optimization badge, count of entries.
 - `src/features/skills/planner/optimizerThresholds.ts` — the shared
   "meaningful savings" constant (or fold into the engine module).
+- A small debounce hook (e.g. `src/lib/useDebouncedValue.ts`) — no debounce
+  utility exists anywhere in `src/` today; this is genuinely new, small,
+  shared plumbing.
 
 **Shared primitives needed:**
 
-- `MIN_MEANINGFUL_SAVINGS_SECONDS` promoted out of `PlanEditor.tsx:47` — items
+- `MIN_MEANINGFUL_SAVINGS_SECONDS` promoted out of `PlanEditor.tsx` — items
   01 and 05 both branch on it.
-- `pairRuns(steps, skills, currentAttributes, implants)` shared between
-  `placeRemaps`, the K = 1 fast path, and `savingsBounds` (see the signature
-  caveat above — the per-run baseline is attribute-dependent).
 - A **badge/pill** primitive. `StatChip` (`components/ui/StatChip.tsx`) is
   label+value; the badge is a single toned word/phrase. `DataAgeBadge` is the
   closest shape but is API-age-specific. Ask the design owner for a generic
@@ -418,65 +368,54 @@ doing regardless of the badge.
   label — one decision, one owner.
 
 **Design tokens / components used:** hero total in `text-3xl tabular-nums`
-(`DESIGN.md` §2 reserves `text-3xl` for hero numbers only — this is the plan
-editor's one hero, so item 01's headline must stay `text-xl`). Label above it in
-uppercase `text-[10px] tracking-widest text-text-dim`. Badge: `success` tone for
-"optimized", `warning` tone for "saves ≥ X", `text-dim` for "may help" —
-paired with words, never colour alone (`DESIGN.md` §6). `rounded-xs`, 1px
-`border-line`, `bg-panel-2`. Sits inside the existing `Panel`, not a new nested
-Panel. No `DataAgeBadge` (Editable Data). No new `primary` button.
+(`DESIGN.md` reserves `text-3xl` for hero numbers only — this is the plan
+editor's one hero, so item 01's headline must stay `text-xl`). Label above it
+in uppercase `text-[10px] tracking-widest text-text-dim`. Badge: `success`
+tone for "optimized", `warning` tone for "saves ≥ X" — paired with words,
+never colour alone (`DESIGN.md` §6). `rounded-xs`, 1px `border-line`,
+`bg-panel-2`. Sits inside the existing `Panel`, not a new nested Panel. No
+`DataAgeBadge` (Editable Data). No new `primary` button.
 
 **Tests:**
 
-- `src/engine/optimizer/placeRemaps.test.ts` — **TDD-required.** Add: for
-  generated plans of increasing R, the `remapCount === 1` fast path returns a
-  result field-for-field equal to the existing full-DP path.
-- `src/engine/optimizer/savingsBounds.test.ts` — **TDD-required.** Key
-  assertions: (1) property test over several generated plans that
-  `lowerBoundSavings ≤ placeRemaps(...).savingsSeconds ≤ upperBoundSavings`;
-  (2) empty plan → all zeros; (3) current attributes already optimal → lower
-  bound ≤ 0; (4) attributes outside 17..27 (implant-inflated, the case
-  `placeRemaps.ts:178-181` guards) do not make the bounds unsound.
+- `src/engine/optimizer/placeRemaps.test.ts` already has an equivalence suite
+  for the `remapCount === 1` fast path (`describe('placeRemaps single-remap
+fast path', ...)`) — no new engine test needed for item 05.
 - `src/features/skills/planner/PlanHeader.test.tsx` — renders `formatDuration`
-  of the total; badge reads "optimized" when the upper bound is below threshold;
-  badge reads the savings when the lower bound is above it; badge re-renders
-  after a reorder.
+  of the total; badge reads "optimized" when savings are below threshold;
+  badge reads the savings when above it; badge re-renders after a reorder,
+  debounced.
 - e2e: add to `e2e/plans.spec.ts` — after `addCaldariCruiserToNewPlan`
   (`e2e/support/planHelpers.ts`), assert the header total is visible and the
-  badge has one of the three states. No `mockEsi.ts` additions.
+  badge shows one of the two states. No `mockEsi.ts` additions.
 
 **i18n keys:** `plans.totalTrainingTime`, `plans.badgeOptimized`,
-`plans.badgeSaves` ("Saves {{duration}}" — exact, K = 1),
-`plans.badgeCouldSave` ("Saves at least {{duration}}" — bounded, K ≥ 2),
-`plans.badgeMayHelp`, `plans.badgeTooltip` (says whether the number is exact or
-a floor, and that the button computes the full placement),
+`plans.badgeSaves` ("Saves {{duration}}"), `plans.badgeTooltip`,
 `plans.headerEntryCount`.
 
 **Sync / Dexie impact:** none — derived display only.
 
 **New ESI scopes:** none.
 
-**Cost:** confirm **S**. The O(R) single-remap path is a contained engine change
-with a trivial equivalence test, and it makes the badge exact for the default
-`remapCount`. **M** only if the orchestrator requires an exact live number for
-`remapCount ≥ 2` too (Web Worker + new test infrastructure).
+**Cost:** confirm **S**. The engine-side work (O(R) fast path, Booster
+support, the `MAX_SUPPORTED_REMAPS = 2` cap) already shipped; what is left is
+a header component, a badge, and a debounce. No Web Worker fork remains —
+that was only needed for an exact live number at unbounded `remapCount`,
+which the current cap makes moot.
 
 **Depends on:** shares `RemapTimeline` and the savings threshold with **item
 01** — land 01 first or together. No hard blocker.
 
 **Risks / open questions:**
 
-- Same booster/optimizer mismatch as item 01: the hero total _includes_ booster
-  effects (`computeSchedule`, `PlanEditor.tsx:92-96`) while the badge's engine
-  math _excludes_ them (`bestAttributes.ts:7`). **RESOLVED — (b)**, README §5.5:
-  the engine learns about Boosters, so both numbers agree and no note is needed.
-  Blocks on the D5 measurement — see §5.5 for the fast-path/slow-path split.
-- For `remapCount ≥ 2` the badge can only say "saves at least X" or "may help" —
-  **"optimized" is not cheaply provable there**. Acceptable, or does the badge
-  need the exact number at every `remapCount`? That is the S-vs-M fork.
-- The badge contradicts the deliberate invalidation at `PlanEditor.tsx:182-200`.
-  Confirm the badge is allowed to stay live while the detailed segment list
-  still clears — otherwise the two go stale at different rates and look broken.
+- Booster/optimizer disagreement: **already fixed**, not a risk (README
+  §5.6, D5 shipped 2026-08-30) — the optimizer accounts for Boosters when a
+  `BoosterContext` is supplied, matching `computeSchedule`, so the hero total
+  and the badge agree.
+- The badge contradicts the deliberate invalidation of the detailed segment
+  list on every plan edit. Confirm the badge is allowed to stay live while
+  the detailed segment list still clears on-demand — otherwise the two go
+  stale at different rates and look broken.
 
 ---
 
@@ -678,13 +617,17 @@ juggling drag handles, Remap Markers, and remove buttons —
 
 **Artifact claim:** "Missing entirely."
 
-**Verdict:** PARTIALLY TRUE — no shortcut _system_ exists, but scattered key handling does, and two of the four named shortcuts have **no target to bind to**.
+**Verdict:** PARTIALLY TRUE — no shortcut _system_ exists, but scattered key handling does. The two blockers the original teardown named ("settings" and "close" have no target) are now both resolved on `main`.
 
 **Verified baseline — every key handler in `src/`:**
 
-- `src/app/Layout.tsx:124-133` — window `keydown` listener, Escape closes the
-  mobile More sheet and restores focus. The only window-level handler in the app,
-  and the closest thing to a precedent.
+- `src/app/Layout.tsx`'s mobile More sheet renders through `Modal`
+  (`components/ui/Modal.tsx`) — Escape/backdrop-close/focus-restore come from
+  the native `<dialog>` (`showModal()`), not a hand-rolled window `keydown`
+  listener. There is **no** app-level window `keydown` listener anywhere in
+  `src/` today — a genuinely new piece of chrome for item 10's global
+  shortcuts (new plan, move up/down), separate from Escape/focus-return,
+  which `Modal` already owns for anything that opens through it.
 - `src/components/ui/Tabs.tsx:21-36` — arrow-key roving tabstop.
 - `src/features/skills/planner/PlanList.tsx:51-53` and
   `src/features/industry/BuildPlanList.tsx:54-56` — Enter/Escape on the rename
@@ -696,19 +639,22 @@ juggling drag handles, Remap Markers, and remove buttons —
 That is all. No registry, no shortcut help, no `Cmd`/`Ctrl` platform detection
 anywhere in `src/`.
 
-**Gap, and two blockers:**
+**Gap, and two blockers from the original teardown — both resolved on `main`:**
 
-- **"Settings" has no target.** There is no settings route
-  (`src/app/App.tsx:69-89` lists every route: login, callback, characters,
-  overview, skills, skills/plans, industry, market, wallet, assets, mail,
-  calendar, contracts, orders, styleguide), no settings panel, no settings
-  component. Descope, or declare a dependency on whichever item introduces one.
-- **"Close" is ambiguous.** There is no modal system: `components/ui/index.ts`
-  has no `Modal`/`Dialog`, and `ImportClipboardDialog.tsx` is a one-off
-  (`role`/focus-trap not centralized). "Close" could mean close the dialog,
-  close the plan, or close the More sheet. Orchestrator must define it.
-- Shippable today without new dependencies: **new plan**, **move skill up/down**,
-  and the **shortcuts sheet**.
+- **"Settings" now has a target.** `/settings` is routed (`src/app/App.tsx`,
+  `src/routes/Settings.tsx`) — deliberately empty today ("the controls that
+  will live here … each ship with their own feature"), but a real navigable
+  route, not a dead binding. The shortcut can ship now: it just navigates.
+- **"Close" is no longer ambiguous.** A `Modal` primitive exists
+  (`components/ui/Modal.tsx`, exported from `components/ui/index.ts`) built on
+  the native `<dialog>` (`showModal()`), and both existing overlays —
+  `ImportClipboardDialog.tsx` and `Layout.tsx`'s `MobileMoreSheet` — already
+  render through it rather than hand-rolling `role="dialog"`. "Close" means
+  "close whichever `Modal` is currently open"; Escape already does this
+  natively via the dialog's `cancel` event, so a global "close" shortcut only
+  needs to know which `Modal.onClose` is active, if any.
+- Shippable today without new dependencies: **new plan**, **move skill
+  up/down**, the **shortcuts sheet**, **and now settings/close too**.
 
 **Engine vs UI split:**
 
@@ -745,13 +691,14 @@ Every unit test is then a plain object literal — no `KeyboardEvent`
 construction, no jsdom quirks, and platform is a parameter rather than a
 `navigator` sniff (which would be untestable and impure).
 
-- `src/app/useShortcuts.ts` — one `window.addEventListener('keydown')`
-  (mirroring `Layout.tsx:131`), consults `isTypingTarget` first, then dispatches
-  through a registry of `{ id, chord, scope, run }`.
-- `src/app/ShortcutsSheet.tsx` — the help sheet, rendering
-  `formatChord` labels. Reuse the `MobileMoreSheet` structure
-  (`Layout.tsx:49-110`): `role="dialog" aria-modal="true"`, focus the first
-  element on mount, Escape closes and returns focus to the trigger.
+- `src/app/useShortcuts.ts` — one `window.addEventListener('keydown')` (new —
+  no window-level `keydown` listener exists anywhere in `src/` today),
+  consults `isTypingTarget` first, then dispatches through a registry of
+  `{ id, chord, scope, run }`.
+- `src/app/ShortcutsSheet.tsx` — the help sheet, rendering `formatChord`
+  labels inside the existing `Modal` (`components/ui/Modal.tsx`), the same way
+  `MobileMoreSheet` (`Layout.tsx`) already does. Escape, backdrop-close, and
+  focus return come from `Modal` for free.
 
 **Move up/down — reuse, don't rebuild.** `reorderRows(entries, markers, activeId, overId)`
 (`markers.ts:75-88`) is a **pure two-string-id function**: it never touches
@@ -784,11 +731,11 @@ reorder code drives cleanly from a keyboard handler, no refactor required.
 
 **Shared primitives needed:**
 
-- A **`Modal`/`Dialog`** primitive in `components/ui/`. Three ad-hoc overlays
-  now exist (`ImportClipboardDialog.tsx`, `MobileMoreSheet` in `Layout.tsx`, and
-  the shortcuts sheet would be the third), each hand-rolling `role="dialog"`,
-  Escape, and focus return. Ask the design owner. Also unblocks the "close"
-  shortcut.
+- No new `Modal`/`Dialog` primitive needed — it already exists
+  (`components/ui/Modal.tsx`), and both current overlays
+  (`ImportClipboardDialog.tsx`, `MobileMoreSheet` in `Layout.tsx`) already
+  render through it. The shortcuts sheet should be a third `Modal` consumer,
+  not a new hand-rolled overlay.
 - A **help-menu affordance** in `Layout.tsx` — new chrome, needs a design owner.
 - **Platform detection** (`'mac' | 'other'`) as a single injected value so
   nothing sniffs `navigator` at three call sites.
@@ -816,8 +763,10 @@ a `ghost` `Button size="sm"`. No new `primary` button. No `DataAgeBadge`.
   announce them; a reorder announcement should go through an
   `aria-live="polite"` region (the pattern already exists at
   `PlanEditor.tsx:431` for the import confirmation).
-- Escape/focus-return behaviour must match the existing precedent at
-  `Layout.tsx:124-133`.
+- Escape/focus-return behaviour is already handled natively for any `Modal`
+  (`Modal.tsx`: `showModal()` + `onCancel` + focus restore on close) — the
+  shortcuts sheet should render through `Modal` rather than reimplementing
+  Escape/focus handling.
 
 **Tests:**
 
@@ -841,8 +790,7 @@ a `ghost` `Button size="sm"`. No new `primary` button. No `DataAgeBadge`.
 `shortcuts.close`, `shortcuts.groupGlobal`, `shortcuts.groupPlan`,
 `shortcuts.newPlan`, `shortcuts.moveUp`, `shortcuts.moveDown`,
 `shortcuts.movedAnnouncement` ("Moved {{name}} to position {{position}}"),
-`shortcuts.hint`, plus `shortcuts.settings` **only if** item 10 keeps the
-settings binding.
+`shortcuts.hint`, `shortcuts.settings`.
 
 **Sync / Dexie impact:** none as scoped. If shortcuts ever become
 user-remappable, that is Editable Data and must go through a
@@ -851,17 +799,15 @@ out of scope, worth a note in the module docstring.
 
 **New ESI scopes:** none.
 
-**Cost:** confirm **S** for {new plan, move up/down, shortcuts sheet, registry,
-OS labels}. The "settings" and "close" bindings are **not** S — they are blocked
-on infrastructure that does not exist, and should be split out.
+**Cost:** confirm **S** for the whole item — {new plan, move up/down,
+shortcuts sheet, registry, OS labels, settings, close}. Neither "settings" nor
+"close" is blocked on missing infrastructure anymore (`/settings` is routed,
+`Modal` exists), so there's no reason to split them out as a separate,
+larger-cost follow-up.
 
-**Depends on:**
-
-- A `Modal`/`Dialog` primitive (or an explicit decision to hand-roll a third
-  overlay) before the "close" shortcut can mean anything.
-- Whatever item introduces a Settings surface, before the settings shortcut can
-  be bound.
-- No dependency on 01, 05, or 08.
+**Depends on:** nothing hard. `Modal` already exists and `/settings` is
+already routed, so neither the "close" nor "settings" binding is blocked on
+another item anymore. No dependency on 01, 05, or 08.
 
 **Risks / open questions:**
 
@@ -887,20 +833,17 @@ on infrastructure that does not exist, and should be split out.
   Both optimize modes already return the identical type
   (`optimizeAtMarkers.ts:14` imports `PlaceRemapsResult` rather than defining
   its own), so this is free.
-- **A shared "always run `placeRemaps`" hook would be a mistake.** Item 01 is
-  on-demand and can afford the full O(R²) pass at any `remapCount`; item 05 is
-  live-on-every-drag, and the full pass measures 624 ms / 3.1 s / 9.0 s at
-  R = 46 / 91 / 145. One hook forces either a frozen UI or a lazy timeline.
-  Give item 05 the O(R) single-remap path (86 ms at R = 97, exact) plus
-  `savingsBounds` for `remapCount ≥ 2`, and let item 01 keep the exact call.
-- **Four things they must genuinely share**, and the orchestrator should assign
-  one owner each: `MIN_MEANINGFUL_SAVINGS_SECONDS` (`PlanEditor.tsx:47`), the
-  `pairRuns` segmentation extracted from `placeRemaps.ts:74-94`, the O(R)
-  single-remap path (item 05 needs it live, item 01 benefits from it on the
-  existing button — 24 s → 223 ms at R = 236), and the step→entry index mapping
-  (also needed by item 08).
-- **One shared bug they both expose:** the optimizer ignores boosters by design
-  (`bestAttributes.ts:7`) while the computed queue applies them
-  (`PlanEditor.tsx:92-96`). Invisible today because the numbers live in separate
-  panels; items 01 and 05 put them in the same header. **Resolved — README §5.5
-  option (b): teach the optimizer. The engine changes; the numbers then agree.**
+- **A shared "always run `placeRemaps`" hook is no longer a risk.** Both the
+  O(R) `remapCount === 1` path and the `MAX_SUPPORTED_REMAPS = 2` cap already
+  shipped (README §5.6), so `placeRemaps` itself is now cheap enough for item
+  05's live badge (~6-419 ms at the current cap) as well as item 01's
+  on-demand call — no separate bounding module, no Web Worker. Item 05 can
+  call the same `placeRemaps` item 01 does, just behind a trailing debounce.
+- **Two things they must genuinely share**, and the orchestrator should assign
+  one owner each: `MIN_MEANINGFUL_SAVINGS_SECONDS` (`PlanEditor.tsx`), and the
+  step→entry index mapping (also needed by item 08).
+- **The booster/optimizer disagreement this used to flag is fixed.** The
+  optimizer now accounts for Boosters whenever a `BoosterContext` is supplied
+  (`bestAttributes.ts`'s docstring), matching what the computed queue already
+  applied. Shipped as D5, README §5.6 — items 01 and 05 can put both numbers
+  in the same header without a caveat.

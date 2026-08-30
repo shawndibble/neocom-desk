@@ -1,6 +1,6 @@
 # Item 14 — Doctrine Designer
 
-Investigation brief. Read-only pass over `feat/evelens-parity-plan` @ `c38389f`.
+Investigation brief. Read-only pass @ `c38389f`.
 
 **Artifact claim:** "Their strongest original feature. Fits us better than them: a
 doctrine is editable data, so ours would sync across a corp member's devices. Big UI,
@@ -11,8 +11,9 @@ than the teardown implies (EFT fit → required skills is already shipped end-to
 `src/engine/import/fitToSkills.ts:53`, wired at
 `src/features/skills/planner/clipboardImport.ts:97`), but the sync claim is wrong in
 its premise. Sync is scoped **per character**, not per user/account
-(`src/sync/planSync.ts:305,345`), and only the _active_ character is ever synced
-(`src/app/App.tsx:62-65`). A Doctrine is inherently not per-character, so "which
+(`skillPlanSpec.loadLocal` and `handleOwnerHashChange` in `src/sync/planSync.ts`), and
+only the _active_ character is ever synced (the `triggerSync` effect in
+`src/app/App.tsx`). A Doctrine is inherently not per-character, so "which
 character owns this record" is the load-bearing design decision, and cross-**user**
 (corp-mate) sharing is out of scope by CONTEXT.md's own rule.
 
@@ -81,8 +82,8 @@ useless as a _training order_. See Q2.
 
 Rejected option — _Doctrine as a Skill Plan with a sentinel `characterId`_: it would
 never sync. `skillPlanSpec.loadLocal` is
-`db.skillPlans.where('characterId').equals(characterId)` (`src/sync/planSync.ts:345`)
-and `handleOwnerHashChange` wipes by the same key (`planSync.ts:257`). A sentinel id
+`db.skillPlans.where('characterId').equals(characterId)` (`src/sync/planSync.ts`)
+and `handleOwnerHashChange` wipes by the same key (`planSync.ts`). A sentinel id
 matches no real character, so the record is invisible to every sync pass. Also
 pollutes the plan list UI (`PlanList.tsx:94`) and the `markPlanDeleted` tombstone
 space.
@@ -124,7 +125,7 @@ plan whose training order is "ascending typeID" — technically valid, practical
 nonsense (it interleaves attribute pairs and trains cosmetic skills before tackle).
 The generate step must pass the normalized steps through the existing
 `suggestReorder` (`src/engine/optimizer/reorderSuggestion.ts`, exported from
-`src/engine/optimizer/index.ts:20`), which groups by `(primary, secondary)` attribute
+`src/engine/optimizer/index.ts:24`), which groups by `(primary, secondary)` attribute
 pair while honoring prereqs. Reuse, do not write a new sort.
 
 ### Q3: sharing between corp members — what it would actually take
@@ -136,11 +137,12 @@ pair while honoring prereqs. Reuse, do not write a new sort.
    tooling.
 2. **There is no user/account identity anywhere in the backend.** The Firestore root
    is `/characters/{uid}` with `uid = char:{characterId}`
-   (`src/sync/syncAuth.ts:19`, `firestore.rules:22`). CONTEXT.md's **Account**
-   ("implicit app-level grouping of linked Characters") is aspirational — grep finds no
-   implementation. So "share with my corp" has no principal to share _to_.
+   (`uidForCharacter`, `src/sync/uid.ts:5-6`; `firestore.rules:22`). CONTEXT.md's
+   **Account** ("implicit app-level grouping of linked Characters") is aspirational —
+   grep finds no implementation. So "share with my corp" has no principal to share
+   _to_.
 3. **The token carries no corp claim.** `mintFirebaseToken` returns
-   `{ token, uid, ownerHash }` only (`src/sync/syncAuth.ts:23-27`); rules can test
+   `{ token, uid, ownerHash }` only (`MintResponse`, `src/sync/syncAuth.ts:22-26`); rules can test
    `request.auth.uid` and `request.auth.token.ownerHash` and nothing else
    (`firestore.rules:23-31`).
 
@@ -196,9 +198,9 @@ A Doctrine is cross-character but the sync spine is per-character. Options:
   while char A is active is readable when char B is active (just don't filter the
   Dexie query by `characterId`). Two real defects: (i) a fresh device signed in only as
   char B never pulls char A's doctrines — `triggerSync` is called only for the active
-  character (`src/app/App.tsx:62-65`); (ii) `handleOwnerHashChange` wipes
-  by `characterId` (`src/sync/planSync.ts:257`), so selling the author character
-  deletes doctrines the user's other characters still use.
+  character (the `triggerSync` effect, `src/app/App.tsx:91-94`); (ii)
+  `handleOwnerHashChange` wipes by `characterId` (`src/sync/planSync.ts:196-217`), so
+  selling the author character deletes doctrines the user's other characters still use.
 - **(b) Replicate a copy under every character.** N copies of the same logical record,
   N-way LWW churn, no canonical id. Reject.
 - **(c) (a) + sync every logged-in character, not only the active one.**
@@ -208,12 +210,12 @@ unwired:
 
 - `triggerSync` is already serialized **globally**, not per character, precisely so
   two characters can't race the single Firebase session
-  (`src/sync/planSync.ts:192-194, 225-244`, header comment lines 16-23).
+  (`src/sync/planSync.ts:160-189`, header comment lines 8-11).
 - `ensureSignedIn` already swaps the Firebase session per character and is a no-op when
-  it already matches (`src/sync/syncAuth.ts:35-38`).
+  it already matches (`src/sync/syncAuth.ts:34-37`).
 - So `for (const c of await db.characters.toArray()) await triggerSync(c.characterId)`
-  is safe by construction. The change is ~5 lines in `src/app/App.tsx:62-65` plus a
-  test. It is not new infrastructure.
+  is safe by construction. The change is ~5 lines in the `triggerSync` effect
+  (`src/app/App.tsx:91-94`) plus a test. It is not new infrastructure.
 
 Defect (ii) still needs an explicit decision: either (1) keep `handleOwnerHashChange`
 wiping doctrines with the author character (simple, occasionally surprising), or (2)
@@ -229,18 +231,18 @@ doctrine-private one.
 
 ## Verified baseline
 
-| Claim                                           | Verdict                                                                                                                                                                                                                                                                                    | Citation                                                                                                                                                                                                                                          |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| EFT fit → required skills already exists        | CONFIRMED                                                                                                                                                                                                                                                                                  | `src/engine/import/eftFit.ts:47`, `src/engine/import/fitToSkills.ts:53`                                                                                                                                                                           |
-| …and is already wired to a paste-preview dialog | CONFIRMED                                                                                                                                                                                                                                                                                  | `src/features/skills/planner/clipboardImport.ts:141`, `ImportClipboardDialog.tsx:33`                                                                                                                                                              |
-| Training-time math exists and is pure           | CONFIRMED                                                                                                                                                                                                                                                                                  | `src/engine/plan.ts:10`, `src/engine/schedule.ts:28`, `src/engine/sp.ts:23-51`                                                                                                                                                                    |
-| Attribute-grouped reorder exists                | CONFIRMED                                                                                                                                                                                                                                                                                  | `src/engine/optimizer/reorderSuggestion.ts`, exported `src/engine/optimizer/index.ts:20`                                                                                                                                                          |
-| Sync is per-**user** / account-scoped           | **FALSE** — per character                                                                                                                                                                                                                                                                  | `src/sync/planSync.ts:305,345`; `src/sync/syncAuth.ts:19`; `firestore.rules:22`                                                                                                                                                                   |
-| Sync runs for all characters                    | **FALSE** — active character only                                                                                                                                                                                                                                                          | `src/app/App.tsx:62-65`                                                                                                                                                                                                                           |
-| ESI reads work for a non-active character       | CONFIRMED (today, no work needed)                                                                                                                                                                                                                                                          | `src/auth/session.ts:104-119` (`getValidAccessToken(characterId)`), `src/esi/client.ts:23` (global provider), `src/features/skills/data.ts:37` (`loadCharacterSkills(characterId)`), `esiCache` keyed `[characterId+key]` (`src/db/index.ts:103`) |
-| A second synced collection is a proven pattern  | CONFIRMED — `buildPlans` added in `29a8a88`                                                                                                                                                                                                                                                | `src/sync/planSync.ts:371-410`, `firestore.rules:41-47`                                                                                                                                                                                           |
-| `DataTable` / `CharacterAvatar` exist           | **FALSE** — both ○, absent from `src/components/ui/index.ts`                                                                                                                                                                                                                               | `docs/DESIGN.md` §4; `src/components/ui/index.ts`                                                                                                                                                                                                 |
-| Doc staleness (bank these)                      | `/market` **is** routed contra ARCHITECTURE §6 (`src/app/App.tsx:79`); `markers.ts` exists contra §6's "no Marker implementation" (`src/features/skills/planner/markers.ts`); `SkillBar` exists contra DESIGN §4 ○ — but at `src/features/skills/SkillBar.tsx`, **not** in `components/ui` |                                                                                                                                                                                                                                                   |
+| Claim                                           | Verdict                                                                                                                                                                                                                      | Citation                                                                                                                                                                                                                        |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EFT fit → required skills already exists        | CONFIRMED                                                                                                                                                                                                                    | `src/engine/import/eftFit.ts:47`, `src/engine/import/fitToSkills.ts:53`                                                                                                                                                         |
+| …and is already wired to a paste-preview dialog | CONFIRMED                                                                                                                                                                                                                    | `src/features/skills/planner/clipboardImport.ts:141`, `ImportClipboardDialog.tsx:33`                                                                                                                                            |
+| Training-time math exists and is pure           | CONFIRMED                                                                                                                                                                                                                    | `src/engine/plan.ts:10`, `src/engine/schedule.ts:28`, `src/engine/sp.ts:23-51`                                                                                                                                                  |
+| Attribute-grouped reorder exists                | CONFIRMED                                                                                                                                                                                                                    | `src/engine/optimizer/reorderSuggestion.ts`, exported `src/engine/optimizer/index.ts:24`                                                                                                                                        |
+| Sync is per-**user** / account-scoped           | **FALSE** — per character                                                                                                                                                                                                    | `skillPlanSpec.loadLocal`, `handleOwnerHashChange` in `src/sync/planSync.ts`; `uidForCharacter` in `src/sync/uid.ts`; `firestore.rules:22`                                                                                      |
+| Sync runs for all characters                    | **FALSE** — active character only                                                                                                                                                                                            | the `triggerSync` effect, `src/app/App.tsx:91-94`                                                                                                                                                                               |
+| ESI reads work for a non-active character       | CONFIRMED (today, no work needed)                                                                                                                                                                                            | `src/auth/session.ts` (`getValidAccessToken(characterId)`), `src/esi/client.ts` (global provider), `src/features/skills/data.ts` (`loadCharacterSkills(characterId)`), `esiCache` keyed `[characterId+key]` (`src/db/index.ts`) |
+| A second synced collection is a proven pattern  | CONFIRMED — `buildPlans` added in `29a8a88`                                                                                                                                                                                  | `buildPlanSpec` and `syncCharacter` in `src/sync/planSync.ts`, `firestore.rules:41-47`                                                                                                                                          |
+| `DataTable` / `CharacterAvatar` exist           | **FALSE — now shipped.** Both exported                                                                                                                                                                                       | `src/components/ui/index.ts`; `src/components/ui/DataTable.tsx`; `src/components/ui/CharacterAvatar.tsx`                                                                                                                        |
+| Doc staleness (bank these)                      | **Resolved.** All three are now fixed in the docs, not stale: ARCHITECTURE §6 correctly shows `/market` routed and `markers.ts` shipped; DESIGN §4 correctly shows `SkillBar` ✓ inside `components/ui` (promoted, see below) | `docs/ARCHITECTURE.md`; `docs/DESIGN.md` §4                                                                                                                                                                                     |
 
 ## Gap
 
@@ -250,8 +252,10 @@ doctrine-private one.
    No batch "load these N characters' sheets" helper exists.
 3. No gap/missing-SP math. Nothing in `src/engine` answers "which requirement levels
    is this character short of, and by how much SP".
-4. Sync driver never touches non-active characters (`src/app/App.tsx:62-65`).
-5. No `DataTable` primitive; the doctrine comparison grid is exactly what it is for.
+4. Sync driver never touches non-active characters (the `triggerSync` effect,
+   `src/app/App.tsx:91-94`).
+5. `DataTable` is now built (`src/components/ui/DataTable.tsx`); the comparison grid
+   just needs to consume it — no primitive gap remains here.
 6. `normalizePlan` **throws** on unknown typeID and on circular prereqs
    (`src/engine/plan.ts:24,27`). Every other import-path module is never-throw
    (`eftFit.ts:46`, `fitToSkills.ts:50`). A doctrine imported from a fit can carry a
@@ -280,25 +284,26 @@ existing engine types; no fetch/DOM/Dexie.
 
 ## Files touched
 
-| File                                                      | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CONTEXT.md`                                              | Add **Doctrine** (+ _Doctrine Gap_) to glossary, round 4; add scope decision "Doctrines are shared by export/import payload; no cross-user backend sharing in v1 — see ADR 0003".                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `docs/adr/0003-doctrines-shared-by-export-not-backend.md` | **New ADR.** Q3 below is already ADR-shaped (context / decision / consequences / four enumerated rejected alternatives with a security rationale), CLAUDE.md points decisions at `docs/adr/`, and ADR 0001 is the same species of decision. Record it there; keep CONTEXT.md's line as a pointer.                                                                                                                                                                                                                                                                                                                           |
-| `src/db/index.ts`                                         | Add `DoctrineRecord` interface; add `doctrines: EntityTable<DoctrineRecord,'id'>` to the `db` type; **additive** `db.version(4).stores({...v3 stores unchanged..., doctrines: 'id, authorCharacterId'})`. Add optional `sourceDoctrineId?`/`sourceDoctrineUpdatedAt?` to `SkillPlanRecord` (unindexed → no bump needed for those two, same as `markers?` at :43).                                                                                                                                                                                                                                                           |
-| `src/db/index.test.ts`                                    | Assert v4 opens, v3 data survives, `doctrines` queryable by `authorCharacterId`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `src/sync/merge.ts`                                       | Add `RemoteDoctrineDoc extends RemoteDoc`; add `sourceDoctrineId?`/`sourceDoctrineUpdatedAt?` to `RemotePlanDoc` (mirrors the `markers?` line added in `d90e417`). No change to `mergeRecords` — it is already generic (`merge.ts:62`).                                                                                                                                                                                                                                                                                                                                                                                     |
-| `src/sync/planSync.ts`                                    | (1) `doctrineTombstonesKey`; (2) `doctrineSpec: CollectionSpec<DoctrineRecord, RemoteDoctrineDoc>` modelled on `buildPlanSpec` (:371-410) — `name: 'doctrines'`, `loadLocal` by `authorCharacterId`, explicit `toRemoteDoc`/`toLocalRecord` field lists, `...(x !== undefined ? {x} : {})` for optionals; (3) `markDoctrineDeleted`; (4) call `syncEditableCollection(doctrineSpec, ctx)` in `syncCharacter` (:423); (5) wipe `doctrines` in `handleOwnerHashChange` (:257) + clear its tombstones; (6) thread `sourceDoctrineId`/`sourceDoctrineUpdatedAt` through `skillPlanSpec.toRemoteDoc`/`toLocalRecord` (:346-366). |
-| `src/sync/index.ts`                                       | Export `markDoctrineDeleted`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `src/sync/planSync.test.ts`                               | New `describe('triggerSync: doctrines')` mirroring the plans block; plus a `d90e417`-style round-trip test for the two new plan fields (push, pull, and "key omitted when undefined").                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `firestore.rules`                                         | One `match /doctrines/{doctrineId}` block inside `match /characters/{uid}`, copying lines 41-47 verbatim (get hash-strict, list uid-only, create/update hash-strict both ways, delete uid-only). Update the file header comment listing synced collections.                                                                                                                                                                                                                                                                                                                                                                 |
-| `firestore.indexes.json`                                  | **No change.** Currently `{"indexes":[],"fieldOverrides":[]}`; the only query is `where('ownerHash','==',x)` (`planSync.ts:297`), single-field, served by automatic indexes.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `src/app/App.tsx`                                         | Sync **all** logged-in characters on boot, not only the active one (:62-65). Add `/doctrines` route.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `src/app/Layout.tsx`                                      | Nav entry for Doctrines (under the Skills group).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `src/features/skills/planner/ImportClipboardDialog.tsx`   | Reused as-is if possible. Only likely change: make the "already trained" dimming (`:19-24`) optional, since a doctrine is authored without a character context.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `src/i18n/locales/en.json`                                | New `doctrines.*` namespace (below).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `docs/ARCHITECTURE.md`                                    | New `src/features/doctrine` + `src/engine/doctrine` rows in §2; §3 "editable collections" now three; §6 inventory row. (Also worth correcting the known-stale rows while in there.)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `docs/DESIGN.md`                                          | Flip `DataTable`/`CharacterAvatar` to ✓ once built; correct `SkillBar` to ✓ and record its promotion to `components/ui`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `e2e/support/mockEsi.ts`                                  | Multi-character skills/attributes/implants fixtures (today's fixtures are single-character — `e2e/support/fixtureData.ts`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| File                                                      | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CONTEXT.md`                                              | Add **Doctrine** (+ _Doctrine Gap_) to glossary, round 4; add scope decision "Doctrines are shared by export/import payload; no cross-user backend sharing in v1 — see ADR 0003".                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `docs/adr/0003-doctrines-shared-by-export-not-backend.md` | **New ADR.** Q3 below is already ADR-shaped (context / decision / consequences / four enumerated rejected alternatives with a security rationale), CLAUDE.md points decisions at `docs/adr/`, and ADR 0001 is the same species of decision. Record it there; keep CONTEXT.md's line as a pointer.                                                                                                                                                                                                                                                                                       |
+| `src/db/index.ts`                                         | Add `DoctrineRecord` interface; add `doctrines: EntityTable<DoctrineRecord,'id'>` to the `db` type; **additive** `db.version(4).stores({...v3 stores unchanged..., doctrines: 'id, authorCharacterId'})`. Add optional `sourceDoctrineId?`/`sourceDoctrineUpdatedAt?` to `SkillPlanRecord` (unindexed → no bump needed for those two, same as `markers?` at :43).                                                                                                                                                                                                                       |
+| `src/db/index.test.ts`                                    | Assert v4 opens, v3 data survives, `doctrines` queryable by `authorCharacterId`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `src/sync/merge.ts`                                       | Add `RemoteDoctrineDoc extends RemoteDoc`; add `sourceDoctrineId?`/`sourceDoctrineUpdatedAt?` to `RemotePlanDoc` (mirrors the `markers?` line added in `d90e417`). No change to `mergeRecords` — it is already generic (`merge.ts:62`).                                                                                                                                                                                                                                                                                                                                                 |
+| `src/sync/planSync.ts`                                    | (1) `doctrineTombstonesKey`; (2) `doctrineSpec: CollectionSpec<DoctrineRecord, RemoteDoctrineDoc>` modelled on `buildPlanSpec` — `name: 'doctrines'`, `loadLocal` by `authorCharacterId`, explicit `toRemoteDoc`/`toLocalRecord` field lists, `...(x !== undefined ? {x} : {})` for optionals; (3) `markDoctrineDeleted`; (4) call `syncEditableCollection(doctrineSpec, ctx)` in `syncCharacter`; (5) wipe `doctrines` in `handleOwnerHashChange` + clear its tombstones; (6) thread `sourceDoctrineId`/`sourceDoctrineUpdatedAt` through `skillPlanSpec.toRemoteDoc`/`toLocalRecord`. |
+| `src/sync/index.ts`                                       | Export `markDoctrineDeleted`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `src/sync/planSync.test.ts`                               | New `describe('triggerSync: doctrines')` mirroring the plans block; plus a `d90e417`-style round-trip test for the two new plan fields (push, pull, and "key omitted when undefined").                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `firestore.rules`                                         | One `match /doctrines/{doctrineId}` block inside `match /characters/{uid}`, copying lines 41-47 verbatim (get hash-strict, list uid-only, create/update hash-strict both ways, delete uid-only). Update the file header comment listing synced collections.                                                                                                                                                                                                                                                                                                                             |
+| `firestore.indexes.json`                                  | **No change.** Currently `{"indexes":[],"fieldOverrides":[]}`; the only queries are `where('ownerHash','==',x)` (`fetchOwnedDocs`, `syncCharacter` in `src/sync/planSync.ts`), single-field, served by automatic indexes.                                                                                                                                                                                                                                                                                                                                                               |
+| `src/app/App.tsx`                                         | Sync **all** logged-in characters on boot, not only the active one (the `triggerSync` effect, :91-94). Add `/doctrines` route to `ROUTE_ELEMENTS`.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `src/app/routeScopes.ts`                                  | **Required, not optional.** Add a `'/doctrines'` entry to `ROUTE_REQUIREMENTS` (e.g. `UNGATED`, since a Doctrine is local editable data — see the `'/skills/plans'` precedent). `ROUTE_ELEMENTS` in `App.tsx` is `satisfies Record<AppRoutePath, ReactElement>`, and `AppRoutePath` is derived from this file's keys — add `/doctrines` to `App.tsx` without a matching entry here and the build fails.                                                                                                                                                                                 |
+| `src/app/Layout.tsx`                                      | Nav entry for Doctrines (under the Skills group).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `src/features/skills/planner/ImportClipboardDialog.tsx`   | Reused as-is if possible. Only likely change: make the "already trained" dimming (`:19-24`) optional, since a doctrine is authored without a character context.                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `src/i18n/locales/en.json`                                | New `doctrines.*` namespace (below).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `docs/ARCHITECTURE.md`                                    | New `src/features/doctrine` + `src/engine/doctrine` rows in §2; §3 "editable collections" now three; §6 inventory row. (The previously-known-stale rows are already correct — no action there.)                                                                                                                                                                                                                                                                                                                                                                                         |
+| `docs/DESIGN.md`                                          | **No-op.** `DataTable`, `CharacterAvatar`, and `SkillBar` (already in `components/ui`) are all already ✓ — nothing left to flip.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `e2e/support/mockEsi.ts`                                  | Multi-character skills/attributes/implants fixtures (today's fixtures are single-character — `e2e/support/fixtureData.ts`).                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## New modules
 
@@ -387,7 +392,7 @@ export function doctrineToPlanEntries(
   `cumulativeSeconds` per step, with booster-expiry rate breakpoints. `secondsToSatisfy`
   is the last element's `cumulativeSeconds`; `missingSp` is `sum(step.sp)`. No new
   `spBetween` call needed — `computeSchedule:68` already does it.
-- `suggestReorder` (`optimizer/index.ts:20`) for the generated plan's order.
+- `suggestReorder` (`optimizer/index.ts:24`) for the generated plan's order.
 - `toTrainedSkillsMap` / `toEngineAttributes` (`skillMap.ts:41,62`) for ESI → engine.
 - `formatDuration` (`src/lib/duration.ts`) for display.
 - So `doctrineGap` is a _composition plus an error boundary_, ~40 lines. The genuinely
@@ -405,26 +410,27 @@ export function doctrineToPlanEntries(
 
 ## Shared primitives needed
 
-Named asks for the orchestrator to assign — **do not** let this feature build private
-one-offs:
+**Already shipped — no action needed.** All three primitives this brief originally
+flagged as missing are now built and exported from `src/components/ui/index.ts`:
 
-1. **`DataTable`** (`docs/DESIGN.md` §4 ○, confirmed absent from
-   `src/components/ui/index.ts`). Dense sortable table: `panel-2` uppercase header row,
-   hairline row separators, `tabular-nums` right-aligned numerics, row hover `panel-2`,
-   sticky first column (the character column in an N×M grid). The comparison table is
-   the strongest justification in the app for building it; items 02/07/09 want it too.
-2. **`CharacterAvatar`** (§4 ○, absent). `characterPortraitUrl` already exists
-   (`src/app/images.ts:6`) and is inlined ad hoc at `src/routes/Characters.tsx:62` and
-   `src/routes/Overview.tsx:98` — a third inline copy in the doctrine roster is the
-   moment to extract it. Note `DESIGN.md` says `rounded-full`, but both existing call
-   sites use `rounded-xs`; the primitive owner must reconcile.
-3. **`SkillBar` promoted to `src/components/ui`.** It exists at
-   `src/features/skills/SkillBar.tsx` — a doctrine feature importing across feature
-   boundaries is the smell. Move + export from `components/ui/index.ts`.
-4. **Multi-character sheet loader** — owned by whoever is doing items 02/07/09. **This
+- **`DataTable`** (`src/components/ui/DataTable.tsx`) — dense table with a
+  `{id, header, align?, className?, cellClassName?, render}` column contract, hairline
+  row separators, `tabular-nums` right-aligned numerics via `className`, row hover
+  `panel-2`. The comparison table can consume it directly.
+- **`CharacterAvatar`** (`src/components/ui/CharacterAvatar.tsx`) — wraps
+  `characterPortraitUrl` (`src/lib/eveImages.ts:7`), `rounded-xs` (DESIGN §4 has
+  already reconciled the radius question). Already used by `Characters.tsx` and
+  `Overview.tsx` — no inline copies left to extract.
+- **`SkillBar`** — already lives in `src/components/ui/SkillBar.tsx` and is exported
+  from `components/ui/index.ts`; the promotion this brief asked for already happened.
+
+What is still real, unbuilt work for this feature:
+
+1. **Multi-character sheet loader** — owned by whoever is doing items 02/07/09. **This
    is not a blocker; the mechanism already works** (`getValidAccessToken(characterId)`
-   at `session.ts:104`, `loadCharacterSkills(characterId)` at `data.ts:37`, cache keyed
-   `[characterId+key]`). What is missing is one batch helper. Interface I need:
+   in `src/auth/session.ts`, `loadCharacterSkills(characterId)` in
+   `src/features/skills/data.ts`, cache keyed `[characterId+key]`). What is missing is
+   one batch helper. Interface I need:
 
    ```ts
    // proposed: src/features/character/sheets.ts (owner: multi-character item)
@@ -441,15 +447,15 @@ one-offs:
    ```
 
    Two wrinkles the owner must handle: (i) `loadImplantBonuses` does an N+1 type fetch
-   per character (`src/features/skills/data.ts:108-113`) — 10 characters is a lot of
+   per character (`src/features/skills/data.ts`) — 10 characters is a lot of
    round trips; the per-type cache is global (`GLOBAL_CACHE_CHARACTER_ID`) so it
    amortizes, but the first load needs concurrency capping. (ii) One character's
    401/403 must degrade that row only, surfacing `ReauthBanner`
    (`src/components/ui/ReauthBanner.tsx`) or an inline per-row re-auth affordance, not
    fail the batch.
 
-5. **Sync-all-characters on boot** (`src/app/App.tsx:62-65`). Shared change; benefits
-   every multi-character item. Verified safe today (see Q4).
+2. **Sync-all-characters on boot** (the `triggerSync` effect, `src/app/App.tsx:91-94`).
+   Shared change; benefits every multi-character item. Verified safe today (see Q4).
 
 ## Design tokens / components used
 
@@ -483,9 +489,11 @@ one-offs:
 
 ## UI — shippable slices in dependency order
 
-**Slice 0 — sync all characters** (`src/app/App.tsx:62-65`). No UI. Prerequisite for any
-doctrine reaching a second device. The loop itself is ~5 lines and safe by construction
-(`planSync.ts:192-194`, `syncAuth.ts:35-38`), but two things stop it being a one-liner:
+**Slice 0 — sync all characters** (the `triggerSync` effect, `src/app/App.tsx:91-94`).
+No UI. Prerequisite for any doctrine reaching a second device. The loop itself is
+~5 lines and safe by construction (`triggerSync`, `src/sync/planSync.ts:160-189`;
+`ensureSignedIn`, `src/sync/syncAuth.ts:34-37`), but two things stop it being a
+one-liner:
 
 - **Cost per boot.** Every character means one `mintFirebaseToken` invocation plus three
   Firestore collection queries (plans, buildPlans, doctrines) — 10 characters is 10
@@ -494,7 +502,7 @@ doctrine reaching a second device. The loop itself is ~5 lines and safe by const
   minted custom token per character with a TTL, or sync non-active characters lazily /
   on a longer interval than the active one.
 - **Session slot ordering.** `ensureSignedIn` owns a single Firebase session slot
-  (`src/sync/syncAuth.ts:35-38`), so after the loop the session belongs to whichever
+  (`src/sync/syncAuth.ts:34-37`), so after the loop the session belongs to whichever
   character ran last, and the next `scheduleSync(activeCharacterId)` re-mints. **Order
   the loop so the active character runs last.** One line, easily missed.
 
@@ -520,8 +528,9 @@ should stop.**
 `sourceDoctrineId`, navigate to `/skills/plans`. Needs the `suggestReorder` call
 (Q2) and the two new plan fields threaded through sync.
 
-**Slice 6 — N×M comparison grid.** Depends on `DataTable` + `CharacterAvatar` +
-`loadCharacterSheets`. Character rows × requirement columns (or the transpose — with 30+
+**Slice 6 — N×M comparison grid.** `DataTable` and `CharacterAvatar` are already
+shipped; the only remaining dependency is `loadCharacterSheets`. Character rows ×
+requirement columns (or the transpose — with 30+
 requirements, characters-as-rows and _summary_ columns, expanding to per-requirement
 detail, is the readable layout). "Show only missing" filters columns. Per-row
 `DataAgeBadge` + re-auth. This is the expensive slice.
@@ -567,7 +576,7 @@ comparison grid.
   - output entries satisfy every requirement when normalized against the same sheet
   - output is **not** merely typeID-ascending: attribute-paired skills are adjacent
     (asserts `suggestReorder` actually ran — guards the `fitToSkills.ts:77` sort trap)
-  - `isValidOrder` (`optimizer/index.ts:20`) holds on the result
+  - `isValidOrder` (`optimizer/index.ts:24`) holds on the result
   - already-trained requirements are omitted
 - `src/engine/doctrine/payload.test.ts`
   - round-trip serialize → parse is identity
@@ -670,7 +679,7 @@ Always write sorted ascending by `skillTypeID` — the same rationale
 independent of item order"), and `fitToSkills.ts:77` already produces that order for
 free on the import path. Assert it in `gap.test.ts`'s sibling CRUD tests.
 
-Dexie bump — **additive, never mutate a shipped version** (`src/db/index.ts:97,106`):
+Dexie bump — **additive, never mutate a shipped version** (`db.version(1)`/`db.version(3)`, `src/db/index.ts:97,113`):
 
 ```ts
 db.version(4).stores({
@@ -693,17 +702,17 @@ Push/pull mapping — the `d90e417` pattern, three places, all required:
 1. `src/sync/merge.ts` — declare the field on the remote doc interface
    (`RemoteDoctrineDoc`, and the two new keys on `RemotePlanDoc`).
 2. `planSync.ts` `toRemoteDoc` — explicit field list, never a spread
-   (`CollectionSpec` comment, `planSync.ts:274`); optional fields via
+   (`CollectionSpec` comment, `planSync.ts:228`); optional fields via
    `...(x !== undefined ? { x } : {})` because **Firestore rejects `undefined`**
-   (`planSync.ts:352,387`).
+   (`skillPlanSpec.toRemoteDoc`/`toLocalRecord`, `planSync.ts:306,317`).
 3. `planSync.ts` `toLocalRecord` — the mirror, stripping `ownerHash`/`deleted`.
 
 Tombstones: `markDoctrineDeleted` via the existing `recordDeletion` helper
-(`planSync.ts:142`). A plain `db.doctrines.delete()` **resurrects** the record from the
-remote copy — that is the documented failure mode (`planSync.ts:155-160`).
+(`planSync.ts:92-103`). A plain `db.doctrines.delete()` **resurrects** the record from
+the remote copy — same reasoning `recordDeletion`'s tombstone step exists to prevent.
 
 Owner-hash wipe: add `db.doctrines.where('authorCharacterId').equals(id).delete()` +
-clear its tombstones in `handleOwnerHashChange` (`planSync.ts:253-263`).
+clear its tombstones in `handleOwnerHashChange` (`planSync.ts:196-217`).
 
 No `functions/` change: `mintFirebaseToken` is collection-agnostic.
 No `firestore.indexes.json` change (single-field equality only).
@@ -712,8 +721,9 @@ No `firestore.indexes.json` change (single-field equality only).
 
 **None.** Everything the feature reads is already granted:
 `esi-skills.read_skills.v1`, `esi-skills.read_skillqueue.v1`,
-`esi-clones.read_implants.v1` (`src/esi/scopes.ts:7-9`). Character portraits come from
-`images.evetech.net`, unauthenticated (`src/app/images.ts:6`). This is important — a new
+`esi-clones.read_implants.v1` (`ESI_REGISTRY`, `src/esi/registry.ts:59-73`). Character
+portraits come from `images.evetech.net`, unauthenticated
+(`characterPortraitUrl`, `src/lib/eveImages.ts:7`). This is important — a new
 scope would force **every** character to re-authorize (ARCHITECTURE §4).
 
 The only scope that would appear is `esi-characters.read_corporation_roles.v1`, and
@@ -724,16 +734,16 @@ only under the rejected cross-user-sharing design (Q3). Another reason to reject
 **Confirmed: L** for the full feature — the _distribution_ is what the teardown gets
 wrong. Slice-by-slice:
 
-| Slice                        | Cost                    | Note                                                                                                                                                         |
-| ---------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0 — sync all characters      | S (1-2 days)            | `App.tsx:62-65`; serialization is safe by construction (`planSync.ts:192-194`, `syncAuth.ts:35-38`), but see the two caveats below — this is not a one-liner |
-| 1 — storage + sync spine     | S (2-3 days)            | Near-verbatim copy of `buildPlanSpec` (`29a8a88`); the tests are the work                                                                                    |
-| 2 — authoring UI             | S (2-3 days)            | `ImportClipboardDialog` + `SkillPicker` reused unchanged; `DoctrineList` clones `PlanList`                                                                   |
-| 3 — engine gap math          | S (2 days)              | Composition of `normalizePlan`+`computeSchedule`; TDD; the error boundary is the only subtlety                                                               |
-| 4 — single-character readout | S (2-3 days)            | Plain list + `SkillBar` + toggle                                                                                                                             |
-| 5 — generate Skill Plan      | XS-S (1-2 days)         | Must call `suggestReorder`; two new synced plan fields                                                                                                       |
-| 6 — N×M comparison grid      | **M-L (1.5-2.5 weeks)** | `DataTable` + `CharacterAvatar` + `loadCharacterSheets` + per-row data-age/re-auth + a genuinely hard layout problem at 30+ requirements × 10 characters     |
-| 7 — export/import            | S (2-3 days)            | Or ~1 day riding item 06's shell                                                                                                                             |
+| Slice                        | Cost                    | Note                                                                                                                                                                                                                    |
+| ---------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — sync all characters      | S (1-2 days)            | the `triggerSync` effect, `App.tsx:91-94`; serialization is safe by construction (`triggerSync`, `planSync.ts:160-189`; `ensureSignedIn`, `syncAuth.ts:34-37`), but see the two caveats below — this is not a one-liner |
+| 1 — storage + sync spine     | S (2-3 days)            | Near-verbatim copy of `buildPlanSpec` (`29a8a88`); the tests are the work                                                                                                                                               |
+| 2 — authoring UI             | S (2-3 days)            | `ImportClipboardDialog` + `SkillPicker` reused unchanged; `DoctrineList` clones `PlanList`                                                                                                                              |
+| 3 — engine gap math          | S (2 days)              | Composition of `normalizePlan`+`computeSchedule`; TDD; the error boundary is the only subtlety                                                                                                                          |
+| 4 — single-character readout | S (2-3 days)            | Plain list + `SkillBar` + toggle                                                                                                                                                                                        |
+| 5 — generate Skill Plan      | XS-S (1-2 days)         | Must call `suggestReorder`; two new synced plan fields                                                                                                                                                                  |
+| 6 — N×M comparison grid      | **M-L (1.5-2.5 weeks)** | `DataTable` + `CharacterAvatar` + `loadCharacterSheets` + per-row data-age/re-auth + a genuinely hard layout problem at 30+ requirements × 10 characters                                                                |
+| 7 — export/import            | S (2-3 days)            | Or ~1 day riding item 06's shell                                                                                                                                                                                        |
 
 Slices 0-5 ≈ **M, upper end** (10-14 working days — plan for the top of the spec's
 "week or two", not two weeks flat). Adding 6-7 lands the whole feature at
@@ -758,9 +768,9 @@ the teardown implies:
 
 - **Slice 0 (sync all logged-in characters)** — self-owned, but coordinate: this is a
   shared change to `src/app/App.tsx` that items 02/07/09 also want.
-- **`DataTable` + `CharacterAvatar` primitives** (DESIGN §4 ○) — hard blocker for slice
-  6 only. Assign an owner; do not build private versions.
-- **`SkillBar` promotion** to `src/components/ui` — soft blocker for slice 4.
+- **`DataTable` + `CharacterAvatar` primitives** — already shipped
+  (`src/components/ui`); no longer a blocker for slice 6.
+- **`SkillBar` promotion** to `src/components/ui` — already done; no longer a blocker.
 - **Items 02/07/09 multi-character work** — soft dependency: the _mechanism_ exists
   today, so slice 6 could build `loadCharacterSheets` itself if that work slips. State
   the interface (above) and let whoever gets there first own the file.
@@ -771,24 +781,25 @@ the teardown implies:
 ## Risks / open questions — for the orchestrator to decide
 
 1. **Doctrine ownership on character sale.** `handleOwnerHashChange` wipes by
-   character (`planSync.ts:253-263`). If the author character is sold, its doctrines
+   character (`planSync.ts:196-217`). If the author character is sold, its doctrines
    are deleted even though the user's other characters still use them. Options: accept
    (recommended for v1, with an export nudge) vs. re-home to another logged-in
    character. Needs a decision before slice 1 ships.
 2. **Comparison grid layout at scale.** A capital doctrine can hit 40+ requirements; a
-   user can have 10+ characters. Characters-as-columns × requirements-as-rows is the
-   EveLens layout and scrolls horizontally past ~8 characters. Recommend
-   characters-as-rows with summary columns (met / missing SP / time) that expand to
-   per-requirement detail, plus "show only missing" as a _column_ filter. Needs a design
-   call — this is the single biggest UI risk.
+   user can have 10+ characters. Characters-as-columns × requirements-as-rows scrolls
+   horizontally past ~8 characters — a real constraint in this layout, not a
+   hypothetical one. Recommend characters-as-rows with summary columns (met / missing
+   SP / time) that expand to per-requirement detail, plus "show only missing" as a
+   _column_ filter. Needs a design call — this is the single biggest UI risk.
 3. **Is "assigned characters" a persisted concept?** v1 assumption: comparison is over
    _all_ logged-in characters, no per-doctrine roster. If a roster must persist, it is
    another synced field (`assignedCharacterIds?: number[]`) with the same
    cross-character ownership problem as the doctrine itself. Recommend deferring.
-4. **Prereq-inclusion in "missing SP".** Recommended: include (see Tests). If the
-   product wants the EveLens number to match exactly, verify what EveLens reports before
-   locking the assertion — the badge is the headline number and must not be quietly
-   different from a competitor's.
+4. **Prereq-inclusion in "missing SP".** Recommended: include (see Tests). If product
+   ever wants this number to match a figure published by an external tool, verify how
+   that tool defines the number before locking the assertion — never match an external
+   tool's figure without first confirming what it actually measures. The badge is the
+   headline number and must not be quietly wrong.
 5. **Multi-hull doctrines.** A "Muninn fleet" doctrine realistically covers hull + logi
    - boosters. v1: merge all pastes into one requirement set (max wins). If per-role
      sub-sets are wanted, `DoctrineRecord` gains a `roles: { name, requirements }[]`
