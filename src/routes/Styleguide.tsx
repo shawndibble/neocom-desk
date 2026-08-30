@@ -55,8 +55,8 @@ export function Styleguide() {
           {COLOR_TOKENS.map((token) => (
             <div key={token.name} className="rounded-xs border border-line bg-panel p-2">
               <div className={`h-10 rounded-xs border border-line ${token.className}`} />
-              <p className="mt-1.5 text-[11px] font-medium">{token.name}</p>
-              {token.note && <p className="text-[11px] text-text-dim">{token.note}</p>}
+              <p className="mt-1.5 text-[0.6875rem] font-medium">{token.name}</p>
+              {token.note && <p className="text-[0.6875rem] text-text-dim">{token.note}</p>}
             </div>
           ))}
         </div>

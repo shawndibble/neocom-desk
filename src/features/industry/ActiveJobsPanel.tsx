@@ -112,7 +112,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       ) : (
         <div className="space-y-2">
           {result?.cached?.fromCache && (
-            <p className="text-[11px] text-warning uppercase">
+            <p className="text-[0.6875rem] text-warning uppercase">
               {refreshKey > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
             </p>
           )}
@@ -135,7 +135,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                     <span className="font-medium">{name}</span>
                     <span className="flex items-center gap-1.5">
                       {soon && (
-                        <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-widest text-warning uppercase">
+                        <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
                           {t('industry.jobsCompletingSoon')}
                         </span>
                       )}
@@ -144,7 +144,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                       </span>
                     </span>
                   </div>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-text-dim">
+                  <div className="mt-1 flex items-center justify-between gap-2 text-[0.6875rem] text-text-dim">
                     <span>{t('industry.jobsRuns', { count: job.runs })}</span>
                     <time
                       dateTime={endDate.toISOString()}

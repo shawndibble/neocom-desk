@@ -53,28 +53,6 @@ export interface TruncatableCachedResult<T> {
   truncated: boolean;
 }
 
-/** Wallet journal entries (every page). ESI or cache. */
-export function loadWalletJournal(
-  characterId: number
-): Promise<CachedResult<WalletJournalEntry[]> | null> {
-  return loadWithCache(
-    characterId,
-    KEYS.journal,
-    async () => (await getCharacterWalletJournal(characterId)).items
-  );
-}
-
-/** Recent wallet transactions (cursor-followed, see esi/endpoints.ts). ESI or cache. */
-export function loadWalletTransactions(
-  characterId: number
-): Promise<CachedResult<WalletTransaction[]> | null> {
-  return loadWithCache(
-    characterId,
-    KEYS.transactions,
-    async () => (await getCharacterWalletTransactions(characterId)).items
-  );
-}
-
 /** Journal, plus whether pages were missing from the fetch (D4). */
 export async function loadWalletJournalWithStatus(
   characterId: number

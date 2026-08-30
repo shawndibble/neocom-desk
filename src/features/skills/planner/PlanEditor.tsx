@@ -342,7 +342,7 @@ export function PlanEditor({
       <Panel
         title={t('plans.toolbar')}
         actions={
-          <span className="flex items-center gap-1 text-[11px] text-text-dim">
+          <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
             <label htmlFor="plan-remap-count">{t('plans.remapCount')}</label>
             <InfoTooltip
               label={t('plans.remapCountTooltipLabel')}
@@ -559,7 +559,9 @@ export function PlanEditor({
 
       <Panel
         title={t('plans.computedQueue')}
-        actions={<span className="text-[11px] text-text-dim">{formatDuration(totalSeconds)}</span>}
+        actions={
+          <span className="text-[0.6875rem] text-text-dim">{formatDuration(totalSeconds)}</span>
+        }
       >
         {error ? (
           <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>

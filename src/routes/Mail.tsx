@@ -105,7 +105,7 @@ export function Mail() {
       ) : (
         <>
           {headersResult.fromCache && (
-            <p className="text-[11px] text-warning uppercase">{t('common.offlineTitle')}</p>
+            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
           <Panel padded={false}>
             <ul className="divide-y divide-line">

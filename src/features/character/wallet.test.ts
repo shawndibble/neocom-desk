@@ -6,8 +6,8 @@ import { db } from '@/db';
 import {
   loadWalletBalance,
   loadWalletBalanceWithStatus,
-  loadWalletJournal,
-  loadWalletTransactions,
+  loadWalletJournalWithStatus,
+  loadWalletTransactionsWithStatus,
 } from './wallet';
 
 const CHAR_ID = 91;
@@ -118,7 +118,7 @@ describe('loadWalletBalanceWithStatus (BUG #3)', () => {
   });
 });
 
-describe('loadWalletJournal', () => {
+describe('loadWalletJournalWithStatus', () => {
   it('concatenates every page and caches the combined result', async () => {
     const page1 = [{ id: 1, date: '2026-08-01T00:00:00Z', ref_type: 'bounty', description: 'a' }];
     const page2 = [{ id: 2, date: '2026-08-02T00:00:00Z', ref_type: 'bounty', description: 'b' }];
@@ -128,7 +128,7 @@ describe('loadWalletJournal', () => {
         return HttpResponse.json(page === '2' ? page2 : page1, { headers: { 'X-Pages': '2' } });
       })
     );
-    const result = await loadWalletJournal(CHAR_ID);
+    const result = (await loadWalletJournalWithStatus(CHAR_ID)).cached;
     expect(result?.data).toEqual([...page1, ...page2]);
     expect(result?.fromCache).toBe(false);
     expect((await db.esiCache.get([CHAR_ID, 'wallet:journal']))?.value).toEqual([
@@ -141,11 +141,11 @@ describe('loadWalletJournal', () => {
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet/journal`, () => HttpResponse.error())
     );
-    expect(await loadWalletJournal(CHAR_ID)).toBeNull();
+    expect((await loadWalletJournalWithStatus(CHAR_ID)).cached).toBeNull();
   });
 });
 
-describe('loadWalletTransactions', () => {
+describe('loadWalletTransactionsWithStatus', () => {
   it('fetches and caches transactions', async () => {
     const txns = [
       {
@@ -167,7 +167,7 @@ describe('loadWalletTransactions', () => {
         return HttpResponse.json(fromId === null ? txns : []);
       })
     );
-    const result = await loadWalletTransactions(CHAR_ID);
+    const result = (await loadWalletTransactionsWithStatus(CHAR_ID)).cached;
     expect(result?.data).toEqual(txns);
   });
 });

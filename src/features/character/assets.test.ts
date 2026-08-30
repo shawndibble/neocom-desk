@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCharacterAssets } from './assets';
+import { loadCharacterAssetsWithTruncation } from './assets';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -29,7 +29,7 @@ const ASSET = (id: number) => ({
   is_singleton: false,
 });
 
-describe('loadCharacterAssets', () => {
+describe('loadCharacterAssetsWithTruncation', () => {
   it('concatenates every page and caches the combined result', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, ({ request }) => {
@@ -38,7 +38,7 @@ describe('loadCharacterAssets', () => {
       })
     );
 
-    const result = await loadCharacterAssets(CHAR_ID);
+    const result = (await loadCharacterAssetsWithTruncation(CHAR_ID)).cached;
 
     expect(result?.data).toEqual([ASSET(1), ASSET(2)]);
     expect((await db.esiCache.get([CHAR_ID, 'assets']))?.value).toEqual([ASSET(1), ASSET(2)]);
@@ -50,7 +50,7 @@ describe('loadCharacterAssets', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () => HttpResponse.error())
     );
 
-    const result = await loadCharacterAssets(CHAR_ID);
+    const result = (await loadCharacterAssetsWithTruncation(CHAR_ID)).cached;
 
     expect(result).toEqual({ data: [ASSET(1)], fetchedAt: new Date(5), fromCache: true });
   });

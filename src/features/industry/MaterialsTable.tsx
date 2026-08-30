@@ -23,7 +23,7 @@ export function MaterialsTable({
     <div className="overflow-x-auto">
       <table className="w-full text-left text-xs">
         <thead>
-          <tr className="border-b border-line text-[11px] tracking-widest text-text-dim uppercase">
+          <tr className="border-b border-line text-[0.6875rem] tracking-widest text-text-dim uppercase">
             <th className="py-1 pr-2 font-semibold">{t('industry.material')}</th>
             <th className="py-1 pr-2 text-right font-semibold">{t('industry.quantity')}</th>
             <th className="py-1 pr-2 text-right font-semibold">{t('industry.unitPrice')}</th>

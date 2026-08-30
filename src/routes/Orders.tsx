@@ -155,7 +155,7 @@ export function Orders() {
           ) : (
             <>
               {ordersResult.fromCache && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
+                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('common.offlineTitle')}
                 </p>
               )}
@@ -177,7 +177,7 @@ export function Orders() {
           ) : (
             <>
               {historyResult.fromCache && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
+                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('common.offlineTitle')}
                 </p>
               )}

@@ -25,7 +25,7 @@ export function Tooltip({ content, children }: TooltipProps) {
       <span
         id={id}
         role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden w-56 -translate-x-1/2 rounded-xs border border-line bg-panel p-2 text-[11px] font-normal text-text-dim normal-case shadow-lg shadow-black/50 group-hover:block group-focus-within:block"
+        className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden w-56 -translate-x-1/2 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50 group-hover:block group-focus-within:block"
       >
         {content}
       </span>
@@ -48,7 +48,7 @@ export function InfoTooltip({ label, content, className = '' }: InfoTooltipProps
       <button
         type="button"
         aria-label={label}
-        className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line text-[10px] leading-none text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${className}`}
+        className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line text-[0.625rem] leading-none text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${className}`}
       >
         ?
       </button>

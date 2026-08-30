@@ -162,7 +162,9 @@ export function Overview() {
               <EmptyState title={t('overview.walletEmpty')} className="py-4" />
             )}
             {walletResult?.fromCache && (
-              <p className="mt-1 text-[11px] text-warning uppercase">{t('skills.offlineTitle')}</p>
+              <p className="mt-1 text-[0.6875rem] text-warning uppercase">
+                {t('skills.offlineTitle')}
+              </p>
             )}
           </Panel>
 
@@ -185,7 +187,9 @@ export function Overview() {
               <EmptyState title={t('overview.queueEmpty')} className="py-4" />
             )}
             {queueResult?.fromCache && (
-              <p className="mt-1 text-[11px] text-warning uppercase">{t('skills.offlineTitle')}</p>
+              <p className="mt-1 text-[0.6875rem] text-warning uppercase">
+                {t('skills.offlineTitle')}
+              </p>
             )}
           </Panel>
         </>

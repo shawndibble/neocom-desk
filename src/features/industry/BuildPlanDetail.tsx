@@ -137,7 +137,7 @@ export function BuildPlanDetail({
               className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
             />
             {ownedMatch && (
-              <span className="text-[11px] text-text-dim">
+              <span className="text-[0.6875rem] text-text-dim">
                 {t('industry.ownedHint', {
                   me: ownedMatch.material_efficiency,
                   te: ownedMatch.time_efficiency,
@@ -256,7 +256,7 @@ export function BuildPlanDetail({
       <Panel
         title={t('industry.materials')}
         actions={
-          <span className="flex items-center gap-2 text-[11px] text-text-dim">
+          <span className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
             {fetchedAt && <DataAgeBadge date={fetchedAt} />}
             <Button size="sm" onClick={() => setRefreshTick((v) => v + 1)}>
               {t('industry.refresh')}

@@ -156,7 +156,7 @@ export function Wallet() {
                 {formatIsk(balanceResult.data, 2)} {t('wallet.isk')}
               </p>
               {balanceResult.fromCache && (
-                <p className="mt-1 text-[11px] text-warning uppercase">{t(offlineTitleKey)}</p>
+                <p className="mt-1 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
               )}
             </>
           ) : (
@@ -178,10 +178,12 @@ export function Wallet() {
           ) : (
             <>
               {journalResult.fromCache && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">{t(offlineTitleKey)}</p>
+                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                  {t(offlineTitleKey)}
+                </p>
               )}
               {journalTruncated && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
+                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('common.incompleteTitle')}
                 </p>
               )}
@@ -247,10 +249,12 @@ export function Wallet() {
           ) : (
             <>
               {transactionsResult.fromCache && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">{t(offlineTitleKey)}</p>
+                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                  {t(offlineTitleKey)}
+                </p>
               )}
               {transactionsTruncated && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
+                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('wallet.transactionsCapped')}
                 </p>
               )}

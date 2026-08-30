@@ -34,7 +34,7 @@ export function ComputedQueue({
 
   return (
     <div className="rounded-xs border border-line">
-      <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[10px] font-semibold tracking-widest text-text-dim uppercase">
+      <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
         <span className="flex-1" />
         <span className="w-16 text-right">{t('plans.columnPerLevel')}</span>
         <span className="w-16 text-right">{t('plans.columnCumulative')}</span>
@@ -52,7 +52,7 @@ export function ComputedQueue({
               <span className="flex-1 truncate">
                 {nameFor(step.skillTypeID)} {ROMAN[step.level - 1]}
                 {isPrereq && (
-                  <span className="ml-2 text-[10px] uppercase">{t('plans.prereq')}</span>
+                  <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
                 )}
               </span>
               <span className="w-16 text-right tabular-nums text-text-dim">

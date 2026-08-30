@@ -80,7 +80,7 @@ export function CurrentQueuePanel({
     <Panel
       title={t('plans.currentQueueTitle')}
       actions={
-        <span className="flex items-center gap-2 text-[11px] text-text-dim">
+        <span className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
           {result?.fetchedAt && <DataAgeBadge date={result.fetchedAt} />}
           {scheduled.length > 0 && (
             <span className="tabular-nums">{formatDuration(totalSeconds)}</span>

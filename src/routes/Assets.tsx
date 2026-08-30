@@ -160,10 +160,10 @@ export function Assets() {
       ) : (
         <>
           {assetsResult.fromCache && (
-            <p className="text-[11px] text-warning uppercase">{t('common.offlineTitle')}</p>
+            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
           {assetsTruncated && (
-            <p className="text-[11px] text-warning uppercase">{t('common.incompleteTitle')}</p>
+            <p className="text-[0.6875rem] text-warning uppercase">{t('common.incompleteTitle')}</p>
           )}
           {groups.length === 0 ? (
             <EmptyState title={t('assets.noResults')} className="py-8" />

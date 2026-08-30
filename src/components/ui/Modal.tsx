@@ -95,7 +95,7 @@ export function Modal({
           <header className="flex min-h-8 items-center justify-between gap-2 border-b border-line px-3 py-1">
             <h2
               id={titleId}
-              className="text-[11px] font-semibold tracking-widest text-text-dim uppercase"
+              className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
             >
               {title}
             </h2>

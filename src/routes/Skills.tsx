@@ -206,7 +206,7 @@ export function Skills() {
       ) : (
         <>
           {skillsResult.fromCache && (
-            <p className="text-[11px] text-warning uppercase">{t('skills.offlineTitle')}</p>
+            <p className="text-[0.6875rem] text-warning uppercase">{t('skills.offlineTitle')}</p>
           )}
 
           <Panel title={t('skills.attributes')}>
@@ -233,7 +233,7 @@ export function Skills() {
               )}
             </div>
             <div className="mt-3">
-              <p className="text-[11px] font-semibold tracking-widest text-text-dim uppercase">
+              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('skills.implants')}
               </p>
               {implantDetails.length > 0 ? (
