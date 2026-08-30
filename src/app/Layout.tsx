@@ -7,7 +7,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
-import { CharacterAvatar, Modal } from '@/components/ui';
+import { CharacterAvatar, LogoMark, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { useLockedRoutes } from './useGrantedScopes';
 import type { AppRoutePath } from './routeScopes';
@@ -190,12 +190,7 @@ export function Layout() {
       {/* Desktop left rail */}
       <aside className="sticky top-0 hidden h-screen w-48 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
         <div className="flex items-center gap-2 border-b border-line px-3 py-3">
-          <span
-            aria-hidden="true"
-            className="flex size-7 items-center justify-center rounded-xs bg-accent text-sm font-bold text-accent-contrast"
-          >
-            N
-          </span>
+          <LogoMark className="size-7 shrink-0" />
           <span className="flex-1 text-xs font-semibold tracking-widest uppercase">
             {t('app.name')}
           </span>

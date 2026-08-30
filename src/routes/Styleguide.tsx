@@ -6,6 +6,7 @@ import {
   DataTable,
   EmptyState,
   FilterChip,
+  LogoMark,
   Panel,
   Spinner,
   StatChip,
@@ -207,6 +208,17 @@ export function Styleguide() {
             hint="Create a plan or import your in-game skill queue to get started."
             action={<Button variant="primary">New skill plan</Button>}
           />
+        </Panel>
+      </Section>
+
+      <Section title="LogoMark">
+        <Panel>
+          <div className="flex items-end gap-6">
+            <LogoMark className="size-4" />
+            <LogoMark className="size-7" />
+            <LogoMark className="size-10" />
+            <LogoMark className="size-16" />
+          </div>
         </Panel>
       </Section>
 

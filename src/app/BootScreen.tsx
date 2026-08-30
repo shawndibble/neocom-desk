@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Spinner } from '@/components/ui';
+import { LogoMark, Spinner } from '@/components/ui';
 
 /**
  * Full-page "still working out where you are". Shared by `Root` and
@@ -10,6 +10,7 @@ export function BootScreen() {
   const { t } = useTranslation();
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg text-text">
+      <LogoMark className="size-10" />
       <h1 className="text-sm font-semibold tracking-widest uppercase">{t('app.name')}</h1>
       <Spinner label={t('common.loading')} />
       <p className="text-xs text-text-dim">{t('common.loadingEllipsis')}</p>

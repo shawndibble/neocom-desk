@@ -14,8 +14,17 @@ export function Login() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-8 bg-bg p-6 text-text">
-      <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-semibold tracking-widest uppercase">{t('app.name')}</h1>
+      <div className="flex flex-col items-center gap-4 text-center">
+        {/* Decorative: the wordmark is baked into the artwork, and the heading
+            below carries the name for screen readers and for translation. */}
+        <img
+          src={`${import.meta.env.BASE_URL}brand/lockup.png`}
+          alt=""
+          width={374}
+          height={488}
+          className="h-56 w-auto"
+        />
+        <h1 className="sr-only">{t('app.name')}</h1>
         <p className="max-w-sm text-sm text-text-dim">{t('app.tagline')}</p>
       </div>
       {/* Styled after the official EVE SSO dark button. */}

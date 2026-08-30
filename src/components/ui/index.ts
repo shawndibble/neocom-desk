@@ -19,3 +19,4 @@ export type { DataTableColumn } from './DataTable';
 export { CharacterAvatar } from './CharacterAvatar';
 export type { CharacterAvatarSize } from './CharacterAvatar';
 export { FilterChip } from './FilterChip';
+export { LogoMark } from './LogoMark';

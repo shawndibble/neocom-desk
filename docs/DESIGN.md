@@ -75,6 +75,21 @@ Rules:
   `rem`, never `px` — a literal `text-[11px]` would not scale with the root
   and inverts the hierarchy against its `rem` neighbours.
 
+## 2b. Brand assets
+
+Sources live in `assets/brand/` (not shipped). Everything under
+`public/icons/` and `public/brand/` is generated — edit the sources and rerun
+`python3 scripts/generate-brand-assets.py`, never hand-patch the output.
+
+- `LogoMark` (`src/components/ui/`) is the mark for UI use: inline SVG, corner
+  brackets on `currentColor` so `--color-accent` drives them. Simplified from
+  the artwork, because the bevels and glow read as dirt below ~64px.
+- `public/brand/lockup.png` is the full mark-plus-wordmark artwork, login page
+  only. It is the one place the wordmark appears as art rather than as text,
+  which is why the rule above still holds: no font is bundled.
+- App icons carry an opaque `--color-bg` plate. The maskable variant sits at
+  60% of the canvas so Android's mask cannot bite the hexagon corners.
+
 ## 3. Spacing & radius
 
 - Spacing: Tailwind v4's default `rem`-based scale (`--spacing: 0.25rem`;
@@ -105,6 +120,7 @@ Built in `src/components/ui/` (✓) or planned (○):
 | `CharacterAvatar` | ✓      | ESI portrait, `rounded-xs` (house radius, §3), 1px `line` ring; sizes `sm`/`md`/`lg`; accent ring when selected. Decorative by default — pass `alt` only for standalone use.                                                                                                                             |
 | `FilterChip`      | ✓      | Toggleable filter pill. `StatChip`'s dimensions, but interactive: a real `<button>` with `aria-pressed`, accent when on, optional trailing count.                                                                                                                                                        |
 | `SkillBar`        | ✓      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                                                                             |
+| `LogoMark`        | ✓      | The app mark, inline SVG. Decorative (`aria-hidden`) — every placement sits beside the app name. Size it with `size-*`; corner brackets follow `currentColor`, defaulting to accent. Simplified from the artwork, see §2b.                                    |
 
 ## 5. Usage rules
 
