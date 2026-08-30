@@ -349,6 +349,8 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
     name: p.name,
     entries: p.entries,
     remapCount: p.remapCount,
+    // Firestore rejects undefined values, so optional fields are omitted.
+    ...(p.markers !== undefined ? { markers: p.markers } : {}),
     updatedAt: p.updatedAt,
     ownerHash,
     deleted: false,
@@ -359,6 +361,7 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
     name: r.name,
     entries: r.entries,
     remapCount: r.remapCount,
+    ...(r.markers !== undefined ? { markers: r.markers } : {}),
     updatedAt: r.updatedAt,
   }),
   bulkPutLocal: (records) => db.skillPlans.bulkPut(records),

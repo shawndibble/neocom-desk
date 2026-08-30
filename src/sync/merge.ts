@@ -31,6 +31,7 @@ export interface RemotePlanDoc extends RemoteDoc {
   name: string;
   entries: SkillPlanRecord['entries'];
   remapCount: number;
+  markers?: number[];
 }
 
 /** Remote Firestore doc at /characters/{uid}/buildPlans/{planId}. */

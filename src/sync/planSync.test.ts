@@ -143,6 +143,28 @@ beforeEach(async () => {
   await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: HASH, addedAt: 1 });
 });
 
+describe('markers field mapping', () => {
+  it('round-trips plan markers through push and pull', async () => {
+    await db.skillPlans.add(plan({ markers: [1, 3] }));
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote?.markers).toEqual([1, 3]);
+
+    await db.skillPlans.delete('p1');
+    seedRemote(PLANS_PATH, [remoteDoc({ markers: [1, 3], updatedAt: Date.now() + 1000 })]);
+    await triggerSync(1);
+    const local = await db.skillPlans.get('p1');
+    expect(local?.markers).toEqual([1, 3]);
+  });
+
+  it('omits markers key entirely when undefined (Firestore rejects undefined)', async () => {
+    await db.skillPlans.add(plan());
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote && 'markers' in remote).toBe(false);
+  });
+});
+
 describe('triggerSync: plans', () => {
   it('pushes a local-only plan with ownerHash and deleted: false', async () => {
     const p = plan();
