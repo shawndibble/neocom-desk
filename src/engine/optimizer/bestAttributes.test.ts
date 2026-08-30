@@ -274,7 +274,7 @@ describe('allocationCostTable', () => {
     for (const a of [0, 100, 2884]) {
       const attrs = table.attributesAt(a);
       const rate = trainingRate(attrs.perception + 5, attrs.willpower + 3);
-      expect(table.secondsPerSp(a, 0)).toBeCloseTo(timeToTrain(1, rate), 12);
+      expect(table.secondsPerSp[a * table.width]).toBeCloseTo(timeToTrain(1, rate), 12);
     }
   });
 
@@ -295,7 +295,7 @@ describe('allocationCostTable', () => {
     for (let a = 0; a < table.count; a++) {
       let seconds = 0;
       keys.forEach((key, p) => {
-        seconds += spByPair.get(key)! * table.secondsPerSp(a, p);
+        seconds += spByPair.get(key)! * table.secondsPerSp[a * table.width + p];
       });
       if (seconds < bestSeconds) {
         bestSeconds = seconds;

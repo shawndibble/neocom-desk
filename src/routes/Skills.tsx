@@ -74,10 +74,7 @@ async function loadSkillsSnapshot(
   ]);
   const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
   const completedLevels = completedQueueLevels(queueResult?.data ?? [], Date.now());
-  const completedSp = completedSpGain(
-    new Map((skillsResult?.data?.skills ?? []).map((s) => [s.skill_id, s.skillpoints_in_skill])),
-    completedLevels
-  );
+  const completedSp = completedSpGain(skillsResult?.data?.skills ?? [], completedLevels);
 
   // Already superseded: skip the per-implant type lookups, their results would
   // be discarded.
@@ -134,9 +131,8 @@ export function Skills() {
       byGroup.set(groupName, list);
     };
     for (const skill of skillsResult.data.skills) {
-      // /skills is stale until the character next logs in; a finished queue
-      // entry outranks it. Delete as we go so the leftovers below are only
-      // the skills /skills does not list at all.
+      // Delete as we go, so the leftovers below are only the skills /skills
+      // does not list at all.
       const finished = done.get(skill.skill_id);
       done.delete(skill.skill_id);
       const beatsEsi = finished !== undefined && finished.level > skill.trained_skill_level;
@@ -146,8 +142,6 @@ export function Skills() {
         beatsEsi ? (finished.sp ?? skill.skillpoints_in_skill) : skill.skillpoints_in_skill
       );
     }
-    // sp stays null rather than 0 when ESI withheld level_end_sp: the level
-    // is known, the SP is not, and a literal 0 would read as broken.
     for (const [skillTypeID, finished] of done) add(skillTypeID, finished.level, finished.sp);
     return [...byGroup.entries()]
       .sort(([a], [b]) => a.localeCompare(b))

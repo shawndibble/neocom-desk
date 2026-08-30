@@ -10,7 +10,8 @@ import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadCharacterSkillQueue, loadCharacterSkills } from '@/features/skills/data';
-import { completedQueueLevels } from '@/features/skills/queueStatus';
+import { applyCompletedQueueEntries } from '@/features/skills/queueStatus';
+import { toTrainedSkillsMap } from '@/features/skills/skillMap';
 import {
   loadBlueprintCatalog,
   type BlueprintCatalog,
@@ -72,13 +73,15 @@ export function Industry() {
       setCatalog(cat);
       setOwnedBlueprints(owned?.data ?? []);
       if (skillsResult?.data) {
-        const map: SkillLevels = {};
-        for (const skill of skillsResult.data.skills)
-          map[skill.skill_id] = skill.trained_skill_level;
         // /skills lags until the character logs in; completed queue entries
         // are the difference. Without them industry math undercounts skills.
-        for (const [skillId, done] of completedQueueLevels(queue?.data ?? [], Date.now()))
-          map[skillId] = Math.max(map[skillId] ?? 0, done.level);
+        const merged = applyCompletedQueueEntries(
+          toTrainedSkillsMap(skillsResult.data.skills),
+          queue?.data ?? [],
+          Date.now()
+        );
+        const map: SkillLevels = {};
+        for (const [skillId, trained] of merged) map[skillId] = trained.level;
         setSkills(map);
       }
     })();

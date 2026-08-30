@@ -487,16 +487,20 @@ min over i of ( dp[k-1][i] + cost(i, j) )
 The inner minimum is a running scan, and `F` accumulates in O(1) per run. So
 each remap level costs O(allocations x R) instead of O(R² x allocations x
 pairs). `bestAttributes.allocationCostTable` is the seam: it hands out
-seconds-per-SP for every allocation x pair, and brute-forces nothing.
+seconds-per-SP for every allocation x pair, and brute-forces nothing. It and
+`bestAttributesForPairs` share one rate formula — the table picks the segment
+that `bestAttributesForPairs` then re-prices, so a formula edit reaching only
+one of them would make the chosen segment and the reported duration disagree
+in silence.
 
 **Measured, 200 steps, before -> after:**
 
 | `remapCount` | Booster-blind   | 24-day Booster   |
 | ------------ | --------------- | ---------------- |
-| 1            | 56 ms -> 60 ms  | 76 ms -> 79 ms   |
-| 2            | 1.98 s -> 8 ms  | 2.41 s -> 452 ms |
-| 3            | 2.02 s -> 13 ms | 2.68 s -> 637 ms |
-| 5            | 2.04 s -> 21 ms | 2.93 s -> 952 ms |
+| 1            | 56 ms -> 59 ms  | 76 ms -> 81 ms   |
+| 2            | 1.98 s -> 6 ms  | 2.41 s -> 419 ms |
+| 3            | 2.02 s -> 8 ms  | 2.68 s -> 583 ms |
+| 5            | 2.04 s -> 13 ms | 2.93 s -> 902 ms |
 
 Three things worth carrying forward:
 

@@ -1,4 +1,4 @@
-import type { SkillQueueEntry } from '@/esi/endpoints';
+import type { CharacterSkill, SkillQueueEntry } from '@/esi/endpoints';
 import type { TrainedSkill } from '@/engine/types';
 
 /**
@@ -108,7 +108,7 @@ export function completedQueueLevels(
 
 /**
  * Trained skills as of now, with completed-but-unapplied queue entries folded
- * in. Returns a new map; the input is left alone.
+ * in.
  *
  * SP only rises when ESI supplies `level_end_sp` — it is optional. The engine
  * schedules from `level` alone, so a raised level beside a stale `sp` costs
@@ -135,11 +135,16 @@ export function applyCompletedQueueEntries(
  * Only entries carrying `level_end_sp` contribute — the same entries whose
  * per-skill SP rises — so the total stays exactly as precise as the rows it
  * sums, never guessing a figure ESI withheld.
+ *
+ * Takes the ESI rows rather than a lookup: nothing is built when the queue
+ * credits nothing, which is every load between logins.
  */
 export function completedSpGain(
-  knownSp: ReadonlyMap<number, number>,
+  skills: readonly CharacterSkill[],
   completed: ReadonlyMap<number, CompletedLevel>
 ): number {
+  if (completed.size === 0) return 0;
+  const knownSp = new Map(skills.map((skill) => [skill.skill_id, skill.skillpoints_in_skill]));
   let gain = 0;
   for (const [skillId, done] of completed) {
     if (done.sp === null) continue;

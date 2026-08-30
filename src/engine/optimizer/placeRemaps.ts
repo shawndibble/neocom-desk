@@ -15,8 +15,8 @@
  * Booster-aware when `options.booster` is supplied — both placement paths, so
  * the answer cannot change with `remapCount` (a 0..5 user input). A segment's
  * cost then depends on when it starts, which is why costs are resolved lazily
- * against `dp[k-1][i]` rather than read from the signature-memoized table: the
- * sp-per-pair signature stops being a sufficient key. The DP stays valid
+ * against `dp[k-1][i]` rather than aggregated: sp-per-pair stops being a
+ * sufficient key once the start matters. The DP stays valid
  * because segment cost is monotonically non-decreasing in start time — a later
  * start can only mean less Booster — so a minimal prefix is still the best
  * prefix to extend.
@@ -25,25 +25,10 @@
  * boundaries inside a run are dominated by boundaries at its edges, so only
  * run edges are split candidates.
  *
- * Cost: the DP is linear in pair-runs R, not quadratic. It used to fill an
- * R x R segment grid of 2,885-way allocation brute forces (D5); the grid is
- * gone, replaced by a scan that picks the allocation OUTSIDE the search over
- * boundaries — see the DP below for the identity that allows it.
- *
- * MEASURED at 200 steps, before -> after that change:
- *
- *   remapCount | Booster-blind      | 24-day Booster
- *   1          | 56 ms  ->  60 ms   | 76 ms   ->  79 ms
- *   2          | 1.98 s ->   8 ms   | 2.41 s  -> 452 ms
- *   3          | 2.02 s ->  13 ms   | 2.68 s  -> 637 ms
- *   5          | 2.04 s ->  21 ms   | 2.93 s  -> 952 ms
- *
- * Blind totals are unchanged to the last printed digit. What remains at
- * `remapCount >= 2` with a Booster is the ordered walk itself, which no
- * amount of restructuring removes: a mid-segment expiry makes cost depend on
- * when a segment starts, so those segments cannot be priced by aggregation.
- * Costing each (i, j) separately made `remapCount = 5` take 21.7 s; batching
- * every j that shares a start into one pass is what removed that.
+ * Cost: linear in pair-runs R, ~13 ms at 200 steps. With a Booster,
+ * `remapCount >= 2` still costs ~0.4-0.9 s and cannot be made to cost less by
+ * restructuring: a mid-segment expiry defeats aggregation outright. Identity
+ * and measurements are in plan §5.6.
  *
  * `remapCount = 1` keeps its own O(R) suffix scan: with one allocation only
  * the last DP column is reachable, so scanning run edges right-to-left gives
@@ -94,11 +79,10 @@ export interface PlaceRemapsOptions {
 }
 
 /**
- * Remaps the planner offers today. Still 1, but no longer for speed: D5 took
- * the general DP from ~2.0 s to ~20 ms on a 200-step plan, so 2..5 are now
- * affordable. What is left is a product call — the UI has to say what a
- * multi-remap answer means, and §5 decision 3 (the savings badge above one
- * remap) is unanswered. `placeRemaps` itself accepts any count.
+ * Remaps the planner offers today. 1 for product reasons, not speed: the UI
+ * has to say what a multi-remap answer means, and plan §5 decision 3 (the
+ * savings badge above one remap) is unanswered. `placeRemaps` accepts any
+ * count.
  */
 export const MAX_SUPPORTED_REMAPS = 1;
 
@@ -134,12 +118,10 @@ export function placeRemaps(
     booster?.boosters.filter((b) => b.expiresAt.getTime() > booster.startDate.getTime()) ?? [];
   const boosted = booster !== undefined && liveBoosters.length > 0;
   /**
-   * Seconds from plan start until the LAST Booster lapses; -Infinity when
-   * none. It is the cutoff for "is this segment still worth costing against a
-   * Booster", so it has to be the point where every Booster is gone. Taking
-   * the earliest instead stopped at the first lapse while a longer Booster
-   * was still running, and a throwaway Booster could then make the answer
-   * worse than not holding it.
+   * Seconds until the LAST Booster lapses; -Infinity when none. Earliest is
+   * the tempting wrong choice: it stops the cutoff at the first lapse with a
+   * longer Booster still running, letting a throwaway Booster worsen the
+   * answer.
    */
   const expirySeconds = boosted
     ? Math.max(
@@ -347,9 +329,7 @@ export function placeRemaps(
   //   min over i of ( dp[k-1][i] + cost(i, j) )
   //     = min over a of ( F(a, j) + min over i of ( dp[k-1][i] - F(a, i) ) )
   //
-  // where the inner minimum is a running scan. That is O(allocations * R) per
-  // remap in place of the R x R grid of brute forces this used to build, and
-  // it is what makes `remapCount >= 2` usable at all (see the header).
+  // where the inner minimum is a running scan: O(allocations * R) per remap.
   //
   // The prefix subtraction reassociates the float sum, so these costs are
   // used to CHOOSE boundaries, never to report a duration: each chosen
@@ -357,12 +337,15 @@ export function placeRemaps(
   const pairKeys = [...new Set(runs.map((run) => run.pair))];
   const pairIndex = new Map(pairKeys.map((key, index) => [key, index]));
   const runPair = runs.map((run) => pairIndex.get(run.pair)!);
+  /** Exclusive end step of every run — the boosted pass always wants a suffix of this. */
+  const runEnds = runs.map((run) => run.endStep + 1);
   const table = allocationCostTable(pairKeys, implants);
+  const { secondsPerSp, width } = table;
 
   /**
    * Exact cost of runs [i, j) on its own best allocation — the number the user
-   * is shown. Pairs are inserted in ascending run order, as the old segment
-   * grid built them, so the float sum is unchanged.
+   * is shown. Pairs go in in ascending run order; changing that shifts the
+   * float sum, and blind totals are pinned to the last printed digit.
    */
   const exactSegment = (i: number, j: number): BestAttributesResult => {
     const spByPair = new Map<string, number>();
@@ -389,7 +372,11 @@ export function placeRemaps(
   for (let j = 0; j <= runCount; j++) dp[0][j] = currentPrefix[j];
 
   for (let k = 1; k <= maxSegments; k++) {
+    const previous = dp[k - 1];
+    const current = dp[k];
+    const parents = parent[k];
     for (let a = 0; a < table.count; a++) {
+      const base = a * width;
       // `prefixSeconds` is F(a, x): runs [0, x) trained on allocation `a`.
       let prefixSeconds = 0;
       let bestPrefix = Infinity;
@@ -400,21 +387,20 @@ export function placeRemaps(
         if (x >= k && bestPrefixIndex >= 0) {
           const total = bestPrefix + prefixSeconds;
           // Strict `<`, then the lower split index on a tie: the EARLIEST
-          // split wins, as the old ascending scan gave.
-          if (total < dp[k][x] || (total === dp[k][x] && bestPrefixIndex < parent[k][x])) {
-            dp[k][x] = total;
-            parent[k][x] = bestPrefixIndex;
-            chosen[k][x] = null;
+          // split wins.
+          if (total < current[x] || (total === current[x] && bestPrefixIndex < parents[x])) {
+            current[x] = total;
+            parents[x] = bestPrefixIndex;
           }
         }
-        if (x >= k - 1 && dp[k - 1][x] !== Infinity) {
-          const candidate = dp[k - 1][x] - prefixSeconds;
+        if (x >= k - 1 && previous[x] !== Infinity) {
+          const candidate = previous[x] - prefixSeconds;
           if (candidate < bestPrefix) {
             bestPrefix = candidate;
             bestPrefixIndex = x;
           }
         }
-        if (x < runCount) prefixSeconds += runs[x].sp * table.secondsPerSp(a, runPair[x]);
+        if (x < runCount) prefixSeconds += runs[x].sp * secondsPerSp[base + runPair[x]];
       }
     }
 
@@ -426,10 +412,8 @@ export function placeRemaps(
     // costed in one pass; doing it per (i, j) instead cost 21.7 s.
     if (boosted) {
       for (let i = k - 1; i < runCount; i++) {
-        const start = dp[k - 1][i];
+        const start = previous[i];
         if (start === Infinity || start >= expirySeconds) continue;
-        const boundaries: number[] = [];
-        for (let j = i + 1; j <= runCount; j++) boundaries.push(runs[j - 1].endStep + 1);
         const batch = bestAttributesAtBoundaries(
           steps,
           skills,
@@ -439,14 +423,14 @@ export function placeRemaps(
             startDate: new Date(booster!.startDate.getTime() + start * 1000),
           },
           runs[i].startStep,
-          boundaries
+          runEnds.slice(i)
         );
         for (let j = Math.max(k, i + 1); j <= runCount; j++) {
           const seg = batch[j - i - 1];
           const total = start + seg.seconds;
-          if (total < dp[k][j]) {
-            dp[k][j] = total;
-            parent[k][j] = i;
+          if (total < current[j]) {
+            current[j] = total;
+            parents[j] = i;
             chosen[k][j] = seg;
           }
         }

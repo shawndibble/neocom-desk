@@ -31,7 +31,7 @@ interface Snapshot {
   walletNeedsReauth: boolean;
   skillsResult: CachedResult<CharacterSkills> | null;
   queueResult: CachedResult<SkillQueueEntry[]> | null;
-  /** SP the queue finished but /skills has not counted, since total_sp is stale too. */
+  /** SP the finished queue adds to a stale total_sp. */
   completedSp: number;
   catalog: SkillCatalog;
 }
@@ -52,7 +52,7 @@ async function loadOverviewSnapshot(characterId: number): Promise<Snapshot> {
     skillsResult,
     queueResult,
     completedSp: completedSpGain(
-      new Map((skillsResult?.data?.skills ?? []).map((s) => [s.skill_id, s.skillpoints_in_skill])),
+      skillsResult?.data?.skills ?? [],
       completedQueueLevels(queueResult?.data ?? [], Date.now())
     ),
     catalog,

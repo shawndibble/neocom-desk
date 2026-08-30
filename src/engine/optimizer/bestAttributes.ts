@@ -92,6 +92,37 @@ function toAttributes(extras: readonly number[]): Attributes {
   return attributes;
 }
 
+/** `'primary|secondary'` as the two indices into `ATTRIBUTE_NAMES`. */
+function pairIndices(key: string): { primary: number; secondary: number } {
+  const [primary, secondary] = key.split('|') as [AttributeName, AttributeName];
+  return {
+    primary: ATTRIBUTE_NAMES.indexOf(primary),
+    secondary: ATTRIBUTE_NAMES.indexOf(secondary),
+  };
+}
+
+/**
+ * Training rate for one pair under one allocation.
+ *
+ * The one place the formula lives. Both allocation searches call it, and they
+ * have to agree: the table below CHOOSES a segment that
+ * `bestAttributesForPairs` then RE-PRICES for display, so an edit landing in
+ * only one of them would make the chosen segment and the reported duration
+ * disagree silently. Only the rate is shared — how each turns it into seconds
+ * differs, and that difference is load-bearing (see the table's docblock).
+ */
+function rateFor(
+  extras: readonly number[],
+  implantByIndex: readonly number[],
+  primary: number,
+  secondary: number
+): number {
+  return trainingRate(
+    BASE_MIN + extras[primary] + implantByIndex[primary],
+    BASE_MIN + extras[secondary] + implantByIndex[secondary]
+  );
+}
+
 /** Brute-force the best allocation for pre-aggregated segment SP. */
 export function bestAttributesForPairs(
   spByPair: SpByPair,
@@ -100,12 +131,7 @@ export function bestAttributesForPairs(
   const pairs: { primary: number; secondary: number; sp: number }[] = [];
   for (const [key, sp] of spByPair) {
     if (sp <= 0) continue;
-    const [primary, secondary] = key.split('|') as [AttributeName, AttributeName];
-    pairs.push({
-      primary: ATTRIBUTE_NAMES.indexOf(primary),
-      secondary: ATTRIBUTE_NAMES.indexOf(secondary),
-      sp,
-    });
+    pairs.push({ ...pairIndices(key), sp });
   }
   if (pairs.length === 0) return { attributes: { ...DEFAULT_ATTRIBUTES }, seconds: 0 };
 
@@ -115,11 +141,7 @@ export function bestAttributesForPairs(
   for (const extras of allAllocations()) {
     let seconds = 0;
     for (const { primary, secondary, sp } of pairs) {
-      const rate = trainingRate(
-        BASE_MIN + extras[primary] + implantByIndex[primary],
-        BASE_MIN + extras[secondary] + implantByIndex[secondary]
-      );
-      seconds += timeToTrain(sp, rate);
+      seconds += timeToTrain(sp, rateFor(extras, implantByIndex, primary, secondary));
     }
     if (seconds < bestSeconds) {
       bestSeconds = seconds;
@@ -135,9 +157,9 @@ export function bestAttributesForPairs(
  *
  * Segment time is linear in SP — `timeToTrain` is `(sp / rate) * 60`, with no
  * rounding — so for a fixed allocation the cost of a segment is just its
- * SP-per-pair vector dotted with this table's row. `placeRemaps` uses that to
- * turn a quadratic segment grid into a linear scan: it can pull the choice of
- * allocation outside the search over segment boundaries.
+ * SP-per-pair vector dotted with this table's row. That is what lets
+ * `placeRemaps` pull the choice of allocation outside its search over segment
+ * boundaries.
  *
  * The reassociation is deliberate and costs precision: `sp * (60 / rate)`
  * here against `(sp / rate) * 60` there. Callers that report a number to the
@@ -147,8 +169,10 @@ export function bestAttributesForPairs(
 export interface AllocationCostTable {
   /** Candidate allocations — every legal remap spread. */
   count: number;
-  /** Seconds to train one SP of pair `p` under allocation `a`. */
-  secondsPerSp(a: number, p: number): number;
+  /** Row stride: `secondsPerSp[a * width + p]`. */
+  width: number;
+  /** Seconds per SP, allocation-major. Raw, because callers index it in a hot loop. */
+  secondsPerSp: Float64Array;
   /** The attribute spread allocation `a` stands for. */
   attributesAt(a: number): Attributes;
 }
@@ -159,29 +183,22 @@ export function allocationCostTable(
 ): AllocationCostTable {
   const allocations = allAllocations();
   const implantByIndex = ATTRIBUTE_NAMES.map((name) => implants[name] ?? 0);
-  const pairs = pairKeys.map((key) => {
-    const [primary, secondary] = key.split('|') as [AttributeName, AttributeName];
-    return {
-      primary: ATTRIBUTE_NAMES.indexOf(primary),
-      secondary: ATTRIBUTE_NAMES.indexOf(secondary),
-    };
-  });
-
+  const pairs = pairKeys.map(pairIndices);
   const width = pairs.length;
   const secondsPerSp = new Float64Array(allocations.length * width);
   allocations.forEach((extras, a) => {
     pairs.forEach(({ primary, secondary }, p) => {
-      const rate = trainingRate(
-        BASE_MIN + extras[primary] + implantByIndex[primary],
-        BASE_MIN + extras[secondary] + implantByIndex[secondary]
+      secondsPerSp[a * width + p] = timeToTrain(
+        1,
+        rateFor(extras, implantByIndex, primary, secondary)
       );
-      secondsPerSp[a * width + p] = timeToTrain(1, rate);
     });
   });
 
   return {
     count: allocations.length,
-    secondsPerSp: (a, p) => secondsPerSp[a * width + p],
+    width,
+    secondsPerSp,
     attributesAt: (a) => toAttributes(allocations[a]),
   };
 }

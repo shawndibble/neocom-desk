@@ -31,6 +31,6 @@ export function skillCsvColumns(t: CsvTranslate): CsvColumn<SkillCsvRow>[] {
     { header: t('skills.csvGroup'), value: (row) => row.groupName },
     { header: t('skills.csvSkill'), value: (row) => row.name },
     { header: t('skills.csvLevel'), value: (row) => row.level },
-    { header: t('skills.csvSp'), value: (row) => row.sp ?? '' },
+    { header: t('skills.csvSp'), value: (row) => row.sp },
   ];
 }
