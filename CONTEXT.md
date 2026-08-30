@@ -3,7 +3,7 @@
 ## Glossary
 
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
-- **Account**: Implicit app-level grouping of linked Characters, used only to sync editable data across devices. Never surfaced to the user as a thing to manage.
+- **Account**: UI-level grouping of a user's Characters. Has **no storage, no sync and no server-side identity** — EVE SSO exposes no account identifier (`sub` is per-Character; `owner` is the owner hash and changes on transfer), so one cannot be verified. Groupings are device-local by decision, not by omission — see the parity plan §5.7, which also records why account-scoped sync is rejected rather than merely unchosen. Never surfaced to the user as a thing to manage.
 - **Editable Data**: Data created inside the app (Skill Plans, Build Plans, settings). Synced across devices. Everything else is API-derived and re-pulled per device.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
@@ -15,7 +15,13 @@
 
 - Multi-character from day one.
 - Corp/alliance: public info + the member's own view only. No director tooling.
-- Read-only: no ESI write scopes (no mail send, no calendar respond).
+- Read-only: no ESI write scopes (no mail send, no calendar respond). One
+  scope reads otherwise on the consent screen: `esi-planets.manage_planets.v1`
+  (planetary industry) is the only PI scope CCP publishes, and EVE renders it
+  as "manage your planetary installations". The app calls two GETs with it and
+  issues no writes, so this claim holds at the behaviour level; the wording is
+  CCP's, not a widening of ours. Disclosed at login — see the parity plan §5
+  decision 2.
 - Industry: manufacturing only; model shaped so invention bolts on later.
 
 ## Glossary (round 2 additions)
@@ -130,7 +136,9 @@
   a panel that is rarely opened.
 - **Items answer to a context menu** wherever they appear — tree, search
   results, Quickbar, order rows: add to Quickbar, show info, compare, copy
-  name, and jump to a Build Plan.
+  name, and jump to a Build Plan. A sixth candidate action, re-anchoring the
+  Related Items strip on a chosen item, is dropped: clicking a related item
+  already replaces the selection, which re-anchors the strip as a side effect.
 - **Related Items are Market Group siblings.** Meta/tech variants need a
   relation the SDE build does not emit yet; they are a later step.
 - Compare ships with four fixed columns, but user-chosen columns are the
@@ -144,6 +152,10 @@
   Path parameters are not an option: routes are keyed by literal path.
 - Order rows are capped at 15 per side, with "show all (N total)" to expand.
   Sell sorts cheapest first, buy sorts highest first; columns are click-sortable.
+- An order book is fetched when an item is selected and held for the 300
+  seconds ESI itself caches it. The **Data Age** badge states how old the shown
+  book is, and only the manual refresh control refetches — the Market Browser
+  keeps the same refresh promise as every other API-derived view.
 - The Quickbar is **Editable Data** — it syncs across devices. The Location Mode
   is not; it stays a device-local view preference like the current hub setting.
 - A context-menu jump to a Build Plan stays visible for items no blueprint
@@ -151,3 +163,98 @@
 - The rebuild ships in two passes. Pass 1: two-column layout, search, Market
   Group tree, order book, Location Mode. Pass 2: Quickbar sync, Compare,
   Item Detail, context menus, price history.
+
+## Glossary (round 8 additions)
+
+- **Compare Set**: The short-lived selection of items being priced against each
+  other right now — usually variants of one thing. Distinct from the
+  **Quickbar**, which is the durable list of items the user returns to across
+  sessions. Different lifetimes, so two lists, not one.
+- **Market Region**: A region that can actually hold orders. Not every region
+  qualifies — wormhole, Abyssal and the unreachable dev regions never do — and
+  the test is not whether the region has an NPC station: 31 nullsec regions have
+  none and still carry busy player-structure markets.
+
+## Scope decisions (round 8)
+
+- **Compare opens as a resizable bottom drawer**, with a persistent
+  `Compare (N)` handle and an expand-to-full-view control. Comparing happens
+  _while_ browsing — a modal or a tab would hide the order book the user is
+  cross-referencing on every single add.
+- **Recharts draws the price history**, loaded only when its tab is opened.
+  TanStack Charts is pre-alpha and not a production choice.
+- **Search filters the tree in place**: the hierarchy stays, and a branch is
+  hidden when nothing under it matches. It does not become a flat result list.
+- **Narrow screens show one column at a time** — the finder, then the item, with
+  a back control. Desktop keeps both columns side by side.
+- With nothing selected, the item column prompts the user to search or browse.
+  No stand-in default item.
+
+## Scope decisions (round 9)
+
+- Tree filtering starts at 3 characters, then caps the match count and says so
+  on screen rather than truncating silently.
+- Order-book columns follow the reference tool: sellers show quantity, price,
+  location and expiry; buyers add order range and minimum volume. Security
+  status reads inline in the location, not as its own column. No jumps-away
+  column — that needs a pathfinding graph the app does not have.
+- Order-book reduction (best price, spread, totals, per-station grouping) is
+  **pure calculation and lives in the engine**, test-first. The ESI client for
+  order books sits with the other price sources; state and components stay in
+  the feature.
+- Item Detail groups an item's attributes by category and shows all of them.
+  A curated allow-list would silently drop whatever mattered for an item class
+  nobody thought about.
+- The Location Mode control sits in the page header, above both columns — it
+  governs the Compare drawer as well as the order book, so it belongs to
+  neither one.
+
+## Scope decisions (round 10)
+
+- The market catalogue payloads are kept **out of the install precache** and
+  fetched on first visit to the Market Browser. Offline order books are not a
+  thing the network can give us anyway, so paying ~1.2 MB on every install for
+  a page most users never open is the wrong trade.
+- An order row answers to its own context menu — copy the location, copy the
+  price, show the item, and **filter the book down to that one station**, which
+  is the move the whole tool exists to support.
+- The Quickbar is a flat, drag-ordered list. Folders would be a second synced
+  data model for what is a shortcut bar.
+- Market group names and attribute names stay in English: they are game data,
+  not UI copy. Only the app's own labels pass through i18next.
+
+## Scope decisions (round 11) — final
+
+- The list of **Market Regions** is baked at build time. A new region needs new
+  systems and stations in the snapshot too, so the app redeploys either way; a
+  scheduled refresh would keep one list current while the data around it aged.
+- The rebuild ships in two passes:
+  - **Pass 1** — the snapshot gains market groups, market types, solar systems,
+    NPC stations and market regions; order-book math in the engine; the ESI
+    order-book client; the two-column layout, the filtered tree, Location Mode
+    in the header, the two order tables, unknown-structure locations, URL state,
+    and the narrow-screen collapse.
+  - **Pass 2** — the Radix-backed menus, the Quickbar, Compare, Item Detail,
+    Related Items and price history.
+- Sortable tables are the one pass-1 change that reaches outside the Market
+  Browser: the shared table primitive has no sort state today, and giving it one
+  touches every view that uses it.
+
+## Glossary (round 12 addition)
+
+- **Global Market Region**: A region that exists only to hold one item's
+  cluster-wide market. PLEX is the only one today: its orders live in a region
+  of their own, none of them in the normal regional books, yet each order still
+  points at an ordinary station — 267 of them at Jita 4-4. So a global market is
+  a routing quirk, not a separate kind of place.
+
+## Scope decisions (round 12) — final
+
+- **Items that trade in a Global Market Region resolve there automatically.**
+  The build-time probe already learns which items those are, so when one is
+  selected the book is read from its own region whatever the picker says, with
+  a note on screen explaining why. Trade Hub mode keeps working unchanged,
+  because those orders carry real station identifiers.
+- Leaving this to the user was rejected: the picker asks where they want to
+  look, and for PLEX there is exactly one truthful answer. Making them find a
+  region called GPMR-01 is a puzzle, not a choice.
