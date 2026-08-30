@@ -18,9 +18,11 @@ import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap'
 import {
   loadCharacterAttributes,
   loadCharacterImplants,
+  loadCharacterSkillQueue,
   loadCharacterSkillsWithStatus,
   loadUniverseType,
 } from '@/features/skills/data';
+import { completedQueueLevels, type CompletedLevel } from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
@@ -44,6 +46,11 @@ interface Snapshot {
   /** BUG #3: 401/403 (or a failed token refresh) means "log in again", not "offline". */
   skillsNeedsReauth: boolean;
   attributesResult: CachedResult<CharacterAttributes> | null;
+  /**
+   * Levels finished in the queue that /skills has not caught up to. ESI says
+   * to apply these on top; computed here so the render stays free of a clock.
+   */
+  completedLevels: Map<number, CompletedLevel>;
   implantDetails: ImplantDetail[];
   implantBonuses: Implants;
 }
@@ -52,10 +59,11 @@ async function loadSkillsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [skillsStatus, attributesResult, implantsResult, catalog] = await Promise.all([
+  const [skillsStatus, attributesResult, implantsResult, queueResult, catalog] = await Promise.all([
     loadCharacterSkillsWithStatus(characterId),
     loadCharacterAttributes(characterId),
     loadCharacterImplants(characterId),
+    loadCharacterSkillQueue(characterId),
     loadSkillCatalog(),
   ]);
   const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
@@ -81,6 +89,7 @@ async function loadSkillsSnapshot(
     skillsResult,
     skillsNeedsReauth,
     attributesResult,
+    completedLevels: completedQueueLevels(queueResult?.data ?? [], Date.now()),
     implantDetails,
     implantBonuses,
   };
@@ -96,31 +105,42 @@ export function Skills() {
   const skillsResult = data?.skillsResult ?? null;
   const skillsNeedsReauth = data?.skillsNeedsReauth ?? false;
   const attributesResult = data?.attributesResult ?? null;
+  const completedLevels = data?.completedLevels ?? null;
   const implantDetails = data?.implantDetails ?? [];
   const implantBonuses = data?.implantBonuses ?? {};
 
   const groups = useMemo<SkillGroup[]>(() => {
     if (!skillsResult?.data || !catalog) return [];
     const byGroup = new Map<string, SkillGroup['skills']>();
-    for (const skill of skillsResult.data.skills) {
-      const info = catalog.bySkillTypeID.get(skill.skill_id);
+    const done = new Map(completedLevels ?? []);
+    const add = (skillTypeID: number, level: number, sp: number) => {
+      const info = catalog.bySkillTypeID.get(skillTypeID);
       const groupName = info?.groupName ?? t('common.unknown');
       const list = byGroup.get(groupName) ?? [];
-      list.push({
-        skillTypeID: skill.skill_id,
-        name: info?.name ?? `#${skill.skill_id}`,
-        level: skill.trained_skill_level,
-        sp: skill.skillpoints_in_skill,
-      });
+      list.push({ skillTypeID, name: info?.name ?? `#${skillTypeID}`, level, sp });
       byGroup.set(groupName, list);
+    };
+    for (const skill of skillsResult.data.skills) {
+      // /skills is stale until the character next logs in; a finished queue
+      // entry outranks it. Delete as we go so the leftovers below are only
+      // the skills /skills does not list at all.
+      const finished = done.get(skill.skill_id);
+      done.delete(skill.skill_id);
+      const beatsEsi = finished !== undefined && finished.level > skill.trained_skill_level;
+      add(
+        skill.skill_id,
+        beatsEsi ? finished.level : skill.trained_skill_level,
+        beatsEsi ? (finished.sp ?? skill.skillpoints_in_skill) : skill.skillpoints_in_skill
+      );
     }
+    for (const [skillTypeID, finished] of done) add(skillTypeID, finished.level, finished.sp ?? 0);
     return [...byGroup.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([groupName, skills]) => ({
         groupName,
         skills: skills.sort((a, b) => a.name.localeCompare(b.name)),
       }));
-  }, [skillsResult, catalog, t]);
+  }, [skillsResult, catalog, completedLevels, t]);
 
   if (!hydrated) {
     return (

@@ -405,8 +405,21 @@ Three consequences, in ascending order of how much they matter:
 | P4  | **Mark which skills a live Booster actually speeds up**, with an icon. Two conditions, both required: the skill's primary or secondary attribute appears in `Booster.bonus`, _and_ the step trains before `expiresAt`. Falls out of the booster-aware walk in §5.5 — that walk already knows which steps sit inside the window, so this renders engine output rather than adding math. Build with §5.5, not before | S (on top of §5.5) |
 | P3  | **`/skills` is stale until login, everywhere.** `trainedSkills` feeds plan normalization and the optimizer, so a plan can be computed against skill levels the character already trained past. Applying past-`finish_date` queue entries on top is the documented fix                                                                                                                                              | M                  |
 
-P1 and P2 shipped together. P4 is requested and waits on §5.5. P3 was not
-requested and is the largest — recorded, not scheduled.
+P1 and P2 shipped together. P4 shipped with §5.5.
+
+**P3 shipped.** `completedQueueLevels` and `applyCompletedQueueEntries`
+(`features/skills/queueStatus.ts`) fold past-`finish_date` entries on top of
+`/skills`, reusing `classifySkillQueue` so the paused rule is defined once.
+Three surfaces read them: `routes/SkillPlans.tsx` (the defect — plan
+normalization and the optimizer), `routes/Skills.tsx` (levels and SP, which
+also feeds the CSV) and `routes/Industry.tsx` (industry math). Two notes:
+
+- **SP only rises when ESI supplies `level_end_sp`,** which is optional. The
+  engine schedules from `level` alone, so a raised level beside a stale `sp`
+  costs display precision, not a wrong plan.
+- **`features/character/roster.ts` was left alone.** It holds raw
+  `CharacterSkills` but has no importer outside its own test, so nothing
+  renders it. Fold it in when it gains a consumer.
 
 ### Field-level facts that constrain the build
 

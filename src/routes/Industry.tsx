@@ -9,7 +9,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { loadCharacterSkills } from '@/features/skills/data';
+import { loadCharacterSkillQueue, loadCharacterSkills } from '@/features/skills/data';
+import { completedQueueLevels } from '@/features/skills/queueStatus';
 import {
   loadBlueprintCatalog,
   type BlueprintCatalog,
@@ -61,10 +62,11 @@ export function Industry() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [cat, owned, skillsResult] = await Promise.all([
+      const [cat, owned, skillsResult, queue] = await Promise.all([
         loadBlueprintCatalog(),
         loadCharacterBlueprints(activeCharacterId),
         loadCharacterSkills(activeCharacterId),
+        loadCharacterSkillQueue(activeCharacterId),
       ]);
       if (cancelled) return;
       setCatalog(cat);
@@ -73,6 +75,10 @@ export function Industry() {
         const map: SkillLevels = {};
         for (const skill of skillsResult.data.skills)
           map[skill.skill_id] = skill.trained_skill_level;
+        // /skills lags until the character logs in; completed queue entries
+        // are the difference. Without them industry math undercounts skills.
+        for (const [skillId, done] of completedQueueLevels(queue?.data ?? [], Date.now()))
+          map[skillId] = Math.max(map[skillId] ?? 0, done.level);
         setSkills(map);
       }
     })();

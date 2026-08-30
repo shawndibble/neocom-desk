@@ -77,6 +77,7 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () =>
     HttpResponse.json([9899])
   ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () => HttpResponse.json([])),
   http.get('https://esi.evetech.net/universe/types/9899', () =>
     HttpResponse.json({
       type_id: 9899,
@@ -133,6 +134,34 @@ describe('Skills', () => {
     expect(await screen.findByText('19 + 3 = 22')).toBeInTheDocument();
     // Unbonused attributes show the base value plainly.
     expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
+  });
+
+  it('shows the level from a finished queue entry that /skills has not caught up to', async () => {
+    // ESI: "/skills is not updated until the character logs in ... entries
+    // that are in the past need to be applied on top of this list."
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 2,
+            queue_position: 0,
+            finished_level: 4,
+            start_date: '2026-08-20T00:00:00Z',
+            finish_date: '2026-08-25T00:00:00Z',
+            level_end_sp: 45255,
+          },
+        ])
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
+    expect(screen.getByText('45,255 SP')).toBeInTheDocument();
+    // The stale /skills reading is gone, not shown alongside.
+    expect(screen.queryByRole('img', { name: 'Level 3 of 5' })).not.toBeInTheDocument();
+    expect(screen.queryByText('8,000 SP')).not.toBeInTheDocument();
   });
 
   it('falls back to cached skills when ESI is unreachable', async () => {

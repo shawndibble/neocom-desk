@@ -340,6 +340,45 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
   });
 });
 
+describe('SkillPlans: /skills is stale until the character logs in', () => {
+  it('counts a level the queue finished in the past as trained, though /skills omits it', async () => {
+    // ESI: entries "that are in the past need to be applied on top of this
+    // list". Without that, the plan is computed against levels already passed.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 1,
+            queue_position: 0,
+            finished_level: 3,
+            start_date: '2026-01-01T00:00:00Z',
+            finish_date: '2026-01-05T00:00:00Z',
+          },
+        ])
+      )
+    );
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    expect(
+      await within(panel).findByText('All selected skills are already trained.')
+    ).toBeInTheDocument();
+  });
+
+  it('does not credit a paused queue entry, which has no finish date at all', async () => {
+    // peterhaneve/evemon#40 marked skills falsely complete this way. The
+    // default handler's entries are dateless, i.e. paused.
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    expect(
+      within(panel).queryByText('All selected skills are already trained.')
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
   const queuePanel = async () =>
     (await screen.findByText('Current skill queue')).closest('section')!;

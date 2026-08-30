@@ -1,4 +1,5 @@
 import type { SkillQueueEntry } from '@/esi/endpoints';
+import type { TrainedSkill } from '@/engine/types';
 
 /**
  * What a row of the in-game queue is doing as of a given instant.
@@ -61,4 +62,57 @@ export function classifySkillQueue(
     trainingSeen = true;
     return { entry, status, secondsRemaining: (finish - nowMs) / 1000 };
   });
+}
+
+/** A level ESI's /skills has not caught up to yet. `sp` is null when absent. */
+export interface CompletedLevel {
+  level: number;
+  sp: number | null;
+}
+
+/**
+ * The levels the character has actually finished but /skills does not yet
+ * report. ESI's own /skills description says these entries "need to be
+ * applied on top of this list to get an accurate view".
+ *
+ * Built on classifySkillQueue so the past-date and paused rules are defined
+ * once. A paused queue yields nothing: an absent date is not a past date.
+ */
+export function completedQueueLevels(
+  entries: readonly SkillQueueEntry[],
+  nowMs: number
+): Map<number, CompletedLevel> {
+  const levels = new Map<number, CompletedLevel>();
+  for (const row of classifySkillQueue(entries, nowMs)) {
+    if (row.status !== 'completed') continue;
+    const { skill_id, finished_level, level_end_sp } = row.entry;
+    const known = levels.get(skill_id);
+    // Max, not last-write-wins: queue order does not guarantee the highest
+    // level comes last, and a lower level must never overwrite a higher one.
+    if (known && known.level >= finished_level) continue;
+    levels.set(skill_id, { level: finished_level, sp: level_end_sp ?? null });
+  }
+  return levels;
+}
+
+/**
+ * Trained skills as of now, with completed-but-unapplied queue entries folded
+ * in. Returns a new map; the input is left alone.
+ *
+ * SP only rises when ESI supplies `level_end_sp` — it is optional. The engine
+ * schedules from `level` alone, so a raised level beside a stale `sp` costs
+ * display precision, not a wrong plan.
+ */
+export function applyCompletedQueueEntries(
+  trained: ReadonlyMap<number, TrainedSkill>,
+  entries: readonly SkillQueueEntry[],
+  nowMs: number
+): Map<number, TrainedSkill> {
+  const merged = new Map(trained);
+  for (const [skillId, done] of completedQueueLevels(entries, nowMs)) {
+    const known = merged.get(skillId);
+    if (known && known.level >= done.level) continue;
+    merged.set(skillId, { level: done.level, sp: done.sp ?? known?.sp ?? 0 });
+  }
+  return merged;
 }

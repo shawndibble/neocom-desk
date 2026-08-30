@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { classifySkillQueue, isQueuePaused } from './queueStatus';
+import {
+  applyCompletedQueueEntries,
+  classifySkillQueue,
+  completedQueueLevels,
+  isQueuePaused,
+} from './queueStatus';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 
 const NOW = Date.parse('2026-08-30T12:00:00Z');
@@ -103,5 +108,145 @@ describe('isQueuePaused', () => {
 
   it('is false for an empty queue — nothing to pause', () => {
     expect(isQueuePaused([])).toBe(false);
+  });
+});
+
+describe('completedQueueLevels', () => {
+  it('reports a skill whose queue entry finished in the past', () => {
+    const levels = completedQueueLevels(
+      [
+        entry({
+          queue_position: 0,
+          skill_id: 3300,
+          finished_level: 4,
+          finish_date: at('2026-08-29T12:00:00Z'),
+        }),
+      ],
+      NOW
+    );
+    expect(levels.get(3300)).toEqual({ level: 4, sp: null });
+  });
+
+  it('ignores entries still training or queued — they are not trained yet', () => {
+    const levels = completedQueueLevels(
+      [
+        entry({
+          queue_position: 0,
+          skill_id: 3300,
+          finished_level: 4,
+          finish_date: at('2026-08-30T13:00:00Z'),
+        }),
+        entry({
+          queue_position: 1,
+          skill_id: 3301,
+          finished_level: 2,
+          finish_date: at('2026-08-31T12:00:00Z'),
+        }),
+      ],
+      NOW
+    );
+    expect(levels.size).toBe(0);
+  });
+
+  it('ignores a paused queue entirely — an absent date is not a past date', () => {
+    // peterhaneve/evemon#40: synthesizing a time for paused entries marked
+    // skills falsely complete. An absent date means "ETA unknown", never "done".
+    const levels = completedQueueLevels(
+      [entry({ queue_position: 0, skill_id: 3300, finished_level: 5 })],
+      NOW
+    );
+    expect(levels.size).toBe(0);
+  });
+
+  it('keeps the highest finished_level when one skill completed twice', () => {
+    // Queue order does not guarantee ascending level, so last-write-wins is
+    // not the same thing as max.
+    const levels = completedQueueLevels(
+      [
+        entry({
+          queue_position: 0,
+          skill_id: 3300,
+          finished_level: 5,
+          finish_date: at('2026-08-28T12:00:00Z'),
+        }),
+        entry({
+          queue_position: 1,
+          skill_id: 3300,
+          finished_level: 3,
+          finish_date: at('2026-08-29T12:00:00Z'),
+        }),
+      ],
+      NOW
+    );
+    expect(levels.get(3300)?.level).toBe(5);
+  });
+
+  it('carries level_end_sp when ESI supplies it', () => {
+    const levels = completedQueueLevels(
+      [
+        entry({
+          queue_position: 0,
+          skill_id: 3300,
+          finished_level: 4,
+          finish_date: at('2026-08-29T12:00:00Z'),
+          level_end_sp: 90510,
+        }),
+      ],
+      NOW
+    );
+    expect(levels.get(3300)).toEqual({ level: 4, sp: 90510 });
+  });
+});
+
+describe('applyCompletedQueueEntries', () => {
+  const queue = [
+    entry({
+      queue_position: 0,
+      skill_id: 3300,
+      finished_level: 4,
+      finish_date: at('2026-08-29T12:00:00Z'),
+      level_end_sp: 90510,
+    }),
+  ];
+
+  it('raises a level that /skills still reports low', () => {
+    const trained = new Map([[3300, { level: 3, sp: 16000 }]]);
+    const merged = applyCompletedQueueEntries(trained, queue, NOW);
+    expect(merged.get(3300)).toEqual({ level: 4, sp: 90510 });
+  });
+
+  it('adds a skill /skills does not list at all', () => {
+    const merged = applyCompletedQueueEntries(new Map(), queue, NOW);
+    expect(merged.get(3300)).toEqual({ level: 4, sp: 90510 });
+  });
+
+  it('never lowers a level /skills already reports higher', () => {
+    const trained = new Map([[3300, { level: 5, sp: 512000 }]]);
+    const merged = applyCompletedQueueEntries(trained, queue, NOW);
+    expect(merged.get(3300)).toEqual({ level: 5, sp: 512000 });
+  });
+
+  it('keeps the known SP when the completed entry carries none', () => {
+    const trained = new Map([[3300, { level: 3, sp: 16000 }]]);
+    const bare = [
+      entry({
+        queue_position: 0,
+        skill_id: 3300,
+        finished_level: 4,
+        finish_date: at('2026-08-29T12:00:00Z'),
+      }),
+    ];
+    const merged = applyCompletedQueueEntries(trained, bare, NOW);
+    expect(merged.get(3300)).toEqual({ level: 4, sp: 16000 });
+  });
+
+  it('leaves untouched skills alone and does not mutate the input map', () => {
+    const trained = new Map([
+      [3300, { level: 3, sp: 16000 }],
+      [3301, { level: 2, sp: 2000 }],
+    ]);
+    const merged = applyCompletedQueueEntries(trained, queue, NOW);
+    expect(merged.get(3301)).toEqual({ level: 2, sp: 2000 });
+    expect(trained.get(3300)).toEqual({ level: 3, sp: 16000 });
   });
 });
