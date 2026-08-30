@@ -268,9 +268,10 @@ step→entry mapping with **item 08**.
   (`PlanEditor.tsx:92-96`). Today `optimizeResult.currentSeconds` and the
   computed-queue `totalSeconds` (`PlanEditor.tsx:206`) sit in different panels
   so the mismatch is invisible. Items 01 and 05 put them side by side.
-  Ruled (README §5.5): the optimizer keeps ignoring Boosters and says so —
-  an explicit "excludes booster" note wherever the two numbers share a header.
-  No engine change. One wording, shared by both items.
+  Ruled (README §5.5): **option (b) — teach the optimizer about Boosters.**
+  Long accelerators run to weeks, so an optimizer blind to them is wrong, not
+  merely undisclosed. Engine change, **M**, gated on D5. Items 01 and 05 render
+  one number computed one way; the "excludes booster" note must not ship.
 - Segment results are cleared on every plan edit (`PlanEditor.tsx:190-200`). A
   timeline that vanishes on each keystroke reads as a bug. Either keep the clear
   and add an "out of date — re-run" affordance, or adopt item 05's cheap live
@@ -467,9 +468,9 @@ with a trivial equivalence test, and it makes the badge exact for the default
 
 - Same booster/optimizer mismatch as item 01: the hero total _includes_ booster
   effects (`computeSchedule`, `PlanEditor.tsx:92-96`) while the badge's engine
-  math _excludes_ them (`bestAttributes.ts:7`). **RESOLVED — (a)**, README §5.5:
-  the badge carries the "excludes booster" note; the engine is left alone.
-  Same wording as item 01 — write it once, use it in both.
+  math _excludes_ them (`bestAttributes.ts:7`). **RESOLVED — (b)**, README §5.5:
+  the engine learns about Boosters, so both numbers agree and no note is needed.
+  Blocks on the D5 measurement — see §5.5 for the fast-path/slow-path split.
 - For `remapCount ≥ 2` the badge can only say "saves at least X" or "may help" —
   **"optimized" is not cheaply provable there**. Acceptable, or does the badge
   need the exact number at every `remapCount`? That is the S-vs-M fork.
@@ -902,4 +903,4 @@ on infrastructure that does not exist, and should be split out.
   (`bestAttributes.ts:7`) while the computed queue applies them
   (`PlanEditor.tsx:92-96`). Invisible today because the numbers live in separate
   panels; items 01 and 05 put them in the same header. **Resolved — README §5.5
-  option (a): disclose the exclusion, don't change the engine.**
+  option (b): teach the optimizer. The engine changes; the numbers then agree.**

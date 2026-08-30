@@ -4,9 +4,11 @@
  * EVE remap rules (EVE University wiki, "Skills and learning" / Neural Remap):
  * 99 base points across 5 attributes, min 17 / max 27 each, i.e. 14 freely
  * allocatable points. Implants add on top and are unaffected by a remap.
- * Boosters are ignored here (the schedule layer applies them) — they expire,
- * so optimizing a long plan around one picks attributes that are worse once
- * it lapses. UI pairing this with a booster-inclusive total must say so (§5.5).
+ * Boosters are ignored here today; `computeSchedule` applies them, so the two
+ * disagree. That is a known wrong answer, not a safe simplification — long
+ * accelerators run to weeks, so a blind optimum is wrong for weeks of
+ * training. Ruled to be fixed (plan §5.5, option b); do not build on the
+ * exclusion.
  */
 import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
 import type { AttributeName, Attributes, EngineSkill, Implants, PlanStep } from '@/engine/types';
