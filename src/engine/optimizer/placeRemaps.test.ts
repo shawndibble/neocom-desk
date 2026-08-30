@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bestAttributes } from '@/engine/optimizer/bestAttributes';
-import { spBetween } from '@/engine/sp';
+import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
 import { placeRemaps } from '@/engine/optimizer/placeRemaps';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
 
@@ -174,7 +174,7 @@ describe('placeRemaps', () => {
     expect(result.totalSeconds).toBeCloseTo(best, 6);
   });
 
-  it('handles a 200-step plan quickly', () => {
+  it.each([3, 5])('handles a 200-step plan quickly at remapCount %i', (remapCount) => {
     const pairs: [AttributeName, AttributeName][] = [
       ['perception', 'willpower'],
       ['intelligence', 'memory'],
@@ -189,11 +189,15 @@ describe('placeRemaps', () => {
     }
     expect(steps).toHaveLength(200);
     const start = performance.now();
-    const result = placeRemaps(steps, skills, { remapCount: 3, currentAttributes: CURRENT });
-    expect(performance.now() - start).toBeLessThan(3000);
+    const result = placeRemaps(steps, skills, { remapCount, currentAttributes: CURRENT });
+    // 500 ms, not the 3 s this used to allow: the O(R^2) grid took ~2.0 s
+    // here, so the old bound passed before the fix and guarded nothing.
+    // Measured ~13 ms at remapCount 3 and ~21 ms at 5, so this has room for a
+    // slow machine while still failing if the grid ever comes back.
+    expect(performance.now() - start).toBeLessThan(500);
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
-    // Up to 3 remapped segments plus an optional current-attributes prefix.
-    expect(result.segments.length).toBeLessThanOrEqual(4);
+    // Up to `remapCount` remapped segments plus an optional prefix.
+    expect(result.segments.length).toBeLessThanOrEqual(remapCount + 1);
     expect(result.savingsSeconds).toBeGreaterThan(0);
   });
 });
@@ -575,6 +579,100 @@ function generatePlan(
   return { steps, skills };
 }
 
+/**
+ * Seconds to train `steps` on one fixed attribute spread. The reference below
+ * needs a cost function that shares nothing with the DP under test.
+ */
+function trainSeconds(
+  steps: readonly PlanStep[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  attributes: Attributes
+): number {
+  let total = 0;
+  for (const step of steps) {
+    const skill = skills.get(step.skillTypeID)!;
+    total += timeToTrain(
+      spBetween(skill.rank, step.level - 1, step.level),
+      trainingRate(attributes[skill.primary], attributes[skill.secondary])
+    );
+  }
+  return total;
+}
+
+describe('placeRemaps general DP', () => {
+  /**
+   * Every way to cut the plan into a current-attributes prefix plus at most
+   * `remaps` remapped segments, over STEP boundaries rather than run edges —
+   * a strictly wider search than the DP does, so it cannot miss an optimum
+   * the DP finds, and it shares no code with it.
+   */
+  function bruteForce(
+    steps: readonly PlanStep[],
+    skills: ReadonlyMap<number, EngineSkill>,
+    remaps: number
+  ): number {
+    const n = steps.length;
+    let best = trainSeconds(steps, skills, CURRENT); // spend no remap at all
+    for (let i = 0; i <= n; i++) {
+      const prefix = trainSeconds(steps.slice(0, i), skills, CURRENT);
+      if (i === n) continue;
+      best = Math.min(best, prefix + bestAttributes(steps.slice(i), skills).seconds);
+      if (remaps < 2) continue;
+      for (let j = i + 1; j < n; j++) {
+        const head = prefix + bestAttributes(steps.slice(i, j), skills).seconds;
+        best = Math.min(best, head + bestAttributes(steps.slice(j), skills).seconds);
+        if (remaps < 3) continue;
+        for (let k = j + 1; k < n; k++) {
+          best = Math.min(
+            best,
+            head +
+              bestAttributes(steps.slice(j, k), skills).seconds +
+              bestAttributes(steps.slice(k), skills).seconds
+          );
+        }
+      }
+    }
+    return best;
+  }
+
+  for (const remapCount of [2, 3]) {
+    it(`finds the true optimum at remapCount ${remapCount}`, () => {
+      for (let seed = 1; seed <= 6; seed++) {
+        const { steps, skills } = generatePlan(4, seed, 2);
+        const result = placeRemaps(steps, skills, { remapCount, currentAttributes: CURRENT });
+        expect(result.totalSeconds).toBeCloseTo(bruteForce(steps, skills, remapCount), 3);
+
+        // Segments tile the plan exactly, in order.
+        let next = 0;
+        for (const segment of result.segments) {
+          expect(segment.startIndex).toBe(next);
+          next = segment.endIndex + 1;
+        }
+        expect(next).toBe(steps.length);
+        expect(result.totalSeconds).toBeCloseTo(
+          result.segments.reduce((acc, segment) => acc + segment.seconds, 0),
+          6
+        );
+      }
+    });
+  }
+
+  it('spends a second remap only when it earns its place', () => {
+    // A plan of one attribute pair has one optimal spread, so the DP must
+    // report the single segment rather than pad out to `remapCount`.
+    const skills = skillMap(skill(1, 'perception', 'willpower', 5));
+    const steps = levels(1, 5);
+    const result = placeRemaps(steps, skills, { remapCount: 3, currentAttributes: CURRENT });
+    expect(result.segments.filter((segment) => segment.remap)).toHaveLength(1);
+  });
+
+  it('is deterministic across repeated calls', () => {
+    const { steps, skills } = generatePlan(9, 42, 2);
+    const options = { remapCount: 3, currentAttributes: CURRENT };
+    expect(placeRemaps(steps, skills, options)).toEqual(placeRemaps(steps, skills, options));
+  });
+});
+
 describe('placeRemaps single-remap fast path', () => {
   const CURRENT_VARIANTS: { name: string; attributes: Attributes; implants?: Implants }[] = [
     { name: 'fresh-character spread', attributes: CURRENT },
@@ -804,6 +902,32 @@ describe('placeRemaps with Boosters', () => {
     willpower: 12,
     charisma: 12,
   };
+
+  it('does not let a short extra Booster make the answer worse', () => {
+    // The expiry cutoff decides how far into the plan segments are still
+    // worth costing against a Booster. Taking the EARLIEST expiry stopped
+    // that at the first lapse while a longer Booster was still running, so
+    // holding a throwaway Booster made the optimizer pick a worse split.
+    //
+    // remapCount 1 only: above that the answer is still governed by
+    // `bestAttributes` crediting stacked bonuses until the earliest expiry
+    // (its own documented limitation), which no cutoff here can undo. The
+    // planner builds at most one Booster today, so that stays recorded
+    // rather than fixed — see plan §5.6.
+    const long = { bonus, expiresAt: after(5_000_000) };
+    const short = { bonus: { charisma: 3 }, expiresAt: after(60) };
+    const one = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      booster: { boosters: [long], startDate: START },
+    });
+    const two = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      booster: { boosters: [long, short], startDate: START },
+    });
+    expect(two.totalSeconds).toBeLessThanOrEqual(one.totalSeconds + 1e-6);
+  });
 
   it('leaves the Booster-blind result untouched when no context is passed', () => {
     const blind = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });

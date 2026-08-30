@@ -86,11 +86,22 @@ export function completedQueueLevels(
   for (const row of classifySkillQueue(entries, nowMs)) {
     if (row.status !== 'completed') continue;
     const { skill_id, finished_level, level_end_sp } = row.entry;
+    // The entry is a cast over an ESI response, and over whatever Dexie
+    // replays for it — nothing here is guaranteed. A level outside 1..5
+    // throws in the industry engine and silently empties a plan in
+    // normalizePlan, so drop the row rather than pass it on. Dropping falls
+    // back to /skills, which is the conservative answer; clamping would
+    // invent a level the character may not hold.
+    if (!Number.isInteger(finished_level) || finished_level < 1 || finished_level > 5) continue;
     const known = levels.get(skill_id);
     // Max, not last-write-wins: queue order does not guarantee the highest
     // level comes last, and a lower level must never overwrite a higher one.
     if (known && known.level >= finished_level) continue;
-    levels.set(skill_id, { level: finished_level, sp: level_end_sp ?? null });
+    const sp =
+      level_end_sp !== undefined && Number.isFinite(level_end_sp) && level_end_sp >= 0
+        ? level_end_sp
+        : null;
+    levels.set(skill_id, { level: finished_level, sp });
   }
   return levels;
 }

@@ -133,9 +133,16 @@ export function placeRemaps(
   const liveBoosters =
     booster?.boosters.filter((b) => b.expiresAt.getTime() > booster.startDate.getTime()) ?? [];
   const boosted = booster !== undefined && liveBoosters.length > 0;
-  /** Seconds from plan start until the first Booster lapses; -Infinity when none. */
+  /**
+   * Seconds from plan start until the LAST Booster lapses; -Infinity when
+   * none. It is the cutoff for "is this segment still worth costing against a
+   * Booster", so it has to be the point where every Booster is gone. Taking
+   * the earliest instead stopped at the first lapse while a longer Booster
+   * was still running, and a throwaway Booster could then make the answer
+   * worse than not holding it.
+   */
   const expirySeconds = boosted
-    ? Math.min(
+    ? Math.max(
         ...liveBoosters.map((b) => (b.expiresAt.getTime() - booster!.startDate.getTime()) / 1000)
       )
     : -Infinity;
@@ -450,6 +457,9 @@ export function placeRemaps(
   // Fewest segments achieving the minimum (extra remaps stay unused).
   let bestSeconds = Infinity;
   for (let k = 1; k <= maxSegments; k++) bestSeconds = Math.min(bestSeconds, dp[k][runCount]);
+  // A NaN anywhere makes every comparison below false, which would leave
+  // `bestK` pointing at a row with no parent and reconstruct from runs[-1].
+  if (!Number.isFinite(bestSeconds)) return noRemapResult();
   let bestK = maxSegments;
   const bound = tieBound(bestSeconds);
 

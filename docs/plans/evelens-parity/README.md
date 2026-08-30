@@ -410,14 +410,16 @@ P1 and P2 shipped together. P4 shipped with §5.5.
 **P3 shipped.** `completedQueueLevels` and `applyCompletedQueueEntries`
 (`features/skills/queueStatus.ts`) fold past-`finish_date` entries on top of
 `/skills`, reusing `classifySkillQueue` so the paused rule is defined once.
-Three surfaces read them: `routes/SkillPlans.tsx` (the defect — plan
+Four surfaces read them: `routes/SkillPlans.tsx` (the defect — plan
 normalization and the optimizer), `routes/Skills.tsx` (levels and SP, which
-also feeds the CSV) and `routes/Industry.tsx` (industry math). Two notes:
+also feeds the CSV), `routes/Industry.tsx` (industry math) and
+`routes/Overview.tsx` (total SP). Notes:
 
 - **SP only rises when ESI supplies `level_end_sp`,** which is optional. The
   engine schedules from `level` alone, so a raised level beside a stale `sp`
-  costs display precision, not a wrong plan. Where ESI withheld it, `/skills`
-  shows the level and "Unknown" for the SP rather than a made-up figure.
+  costs display precision, not a wrong plan. A skill `/skills` already lists
+  keeps its last known SP beside the raised level; one `/skills` omits
+  entirely has no SP to keep, so the row shows a dash rather than 0.
 - **`total_sp` is stale by the same amount** and is corrected with
   `completedSpGain`, on `/skills` and `/overview` both — otherwise a page
   shows a raised per-skill SP inside a total that still counts the old one.
@@ -426,6 +428,10 @@ also feeds the CSV) and `routes/Industry.tsx` (industry math). Two notes:
 - **`unallocated_sp` is deliberately unchanged.** Training does not draw from
   that pool — it is filled by injectors and event rewards — so a finished
   queue entry leaves it accurate.
+- **`finished_level` is validated, not trusted.** `SkillQueueEntry` is a cast
+  over an ESI response and over whatever Dexie replays for it. A level outside
+  1..5 throws in `engine/industry/time.ts` and silently empties a plan in
+  `normalizePlan`, so such a row is dropped and `/skills` stands.
 - **`features/character/roster.ts` was left alone.** It holds raw
   `CharacterSkills` but has no importer outside its own test, so nothing
   renders it. Fold it in when it gains a consumer.
@@ -510,6 +516,27 @@ Three things worth carrying forward:
 `MAX_SUPPORTED_REMAPS` is still 1, now for product reasons rather than speed:
 the UI has to say what a multi-remap answer means, and §5 decision 3 is
 unanswered. The engine accepts any count.
+
+### Found while reviewing D5, not fixed: stacked Boosters share one expiry
+
+`placeRemaps` took its expiry cutoff from the **earliest** live Booster, so
+segments starting after the first lapse were priced Booster-blind while a
+longer Booster was still running — holding a throwaway Booster could make the
+optimizer return a _worse_ answer than not holding it. Fixed here: the cutoff
+is the last lapse, and a test pins it.
+
+Underneath it sits a second, deeper one that is **not** fixed.
+`bestAttributes` stacks every live Booster's bonus but applies the stack only
+until the earliest expiry — its own docstring says so, calling it
+under-crediting rather than over-crediting. With a long Booster and a short
+one that is a large under-credit, and at `remapCount >= 2` it still picks a
+worse split. Fixing it means giving the ordered walk piecewise bonuses over
+time, which is the multi-Booster model, not D5.
+
+**Unreachable today:** `PlanEditor.tsx` builds `activeBoosters` from a single
+Booster form, so the list never holds two. `BoosterContext.boosters` is
+`readonly Booster[]`, so it is reachable the moment a second Booster becomes
+enterable — schedule this before that UI, not after.
 
 ---
 

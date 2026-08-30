@@ -43,14 +43,17 @@ export const ROUTE_REQUIREMENTS = {
   '/characters': UNGATED,
   // Market Browser is SDE + Fuzzwork only — no character endpoint.
   '/market': UNGATED,
-  // Skill Plans are local, editable data; the ESI reads only decorate them.
+  // Skill Plans are local, editable data. The ESI reads sharpen them — the
+  // queue supplies levels /skills has not caught up to — but a plan without
+  // any of it still edits and still schedules.
   '/skills/plans': UNGATED,
   // Device-local display preferences only — no ESI endpoint to gate on.
   '/settings': UNGATED,
 
   // Multi-scope pages: a page gate would hide panels that still work (Overview
   // mixes skills, queue and wallet; Skills adds implants; Industry adds
-  // blueprints and jobs). These need panel-level gating instead.
+  // blueprints and jobs, and reads the queue for levels /skills has not caught
+  // up to). These need panel-level gating instead.
   '/overview': UNGATED,
   '/skills': UNGATED,
   '/industry': UNGATED,

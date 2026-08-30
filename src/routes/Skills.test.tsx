@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -190,6 +190,32 @@ describe('Skills', () => {
     // The last known SP stands, and so does the total. Neither is guessed up.
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
     expect(screen.getByText('264,000')).toBeInTheDocument();
+  });
+
+  it('shows Unknown SP for a skill only the queue knows about', async () => {
+    // /skills omits the skill entirely and the entry carries no level_end_sp,
+    // so the level is known and the SP is not. A literal 0 would read as
+    // broken rather than as unknown.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 1337,
+            queue_position: 0,
+            finished_level: 1,
+            start_date: '2026-08-20T00:00:00Z',
+            finish_date: '2026-08-25T00:00:00Z',
+          },
+        ])
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('#1337')).toBeInTheDocument();
+    const row = screen.getByText('#1337').closest('li')!;
+    expect(within(row).getByText('—')).toBeInTheDocument(); // common.unknown
+    expect(within(row).queryByText('0 SP')).not.toBeInTheDocument();
   });
 
   it('falls back to cached skills when ESI is unreachable', async () => {

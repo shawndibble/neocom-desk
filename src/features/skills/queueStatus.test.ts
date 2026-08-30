@@ -281,3 +281,40 @@ describe('completedSpGain', () => {
     expect(completedSpGain(new Map([[3300, 8000]]), new Map())).toBe(0);
   });
 });
+
+describe('completedQueueLevels: ESI responses are untrusted input', () => {
+  const past = at('2026-08-29T12:00:00Z');
+
+  it.each([0, 6, 99, -1, 2.5, Number.NaN])(
+    'ignores an entry claiming finished_level %p, rather than passing it to the engine',
+    (finished_level) => {
+      // SkillQueueEntry is a cast over an ESI response and over a Dexie cache
+      // replay, so nothing here is guaranteed. A level outside 1..5 throws in
+      // engine/industry/time.ts and silently empties a plan in normalizePlan.
+      const levels = completedQueueLevels(
+        [entry({ queue_position: 0, skill_id: 3300, finished_level, finish_date: past })],
+        NOW
+      );
+      expect(levels.size).toBe(0);
+    }
+  );
+
+  it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
+    'drops a level_end_sp of %p to unknown, keeping the level',
+    (level_end_sp) => {
+      const levels = completedQueueLevels(
+        [
+          entry({
+            queue_position: 0,
+            skill_id: 3300,
+            finished_level: 4,
+            finish_date: past,
+            level_end_sp,
+          }),
+        ],
+        NOW
+      );
+      expect(levels.get(3300)).toEqual({ level: 4, sp: null });
+    }
+  );
+});
