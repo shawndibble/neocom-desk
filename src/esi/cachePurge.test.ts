@@ -40,9 +40,8 @@ describe('purgeCharacterCache', () => {
   });
 
   it('spares GLOBAL_CACHE_CHARACTER_ID rows — public universe data behind no scope', async () => {
-    // registry.ts marks these endpoints subject: 'global'. They are character-
-    // independent public lookups; purging them is cache churn with zero privacy
-    // benefit (docs/plans/evelens-parity/briefs/F-scopes-activity.md, Item 15a).
+    // Character-independent public lookups; purging them is cache churn with
+    // zero privacy benefit.
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'name:1000035');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'station:60003760');

@@ -118,6 +118,33 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     await user.click(within(sheet).getByRole('link', { name: 'Wallet' }));
     expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument();
   });
+
+  it('never mounts the sheet at desktop widths — no CSS-hidden dialog left inert', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+
+    try {
+      const user = userEvent.setup();
+      renderLayout();
+
+      const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+      await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+      expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
+  });
 });
 
 const CHARACTER_ID = 77;

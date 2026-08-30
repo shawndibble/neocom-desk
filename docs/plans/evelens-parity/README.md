@@ -152,6 +152,23 @@ piece of work in this plan. Item 15a needs endpoint→scope, item 17 needs
 endpoint→route-template, and D9 needs one source of truth for the scope list.
 Built once, it collapses the cost of all three.
 
+**Status: `src/esi/registry.ts` ships endpoint→scope only.** A speculative-
+generality pass (pre-dating both items) removed two fields nothing read yet:
+the `subject: 'character' | 'global'` tag and the `DIRECT_CALL_REGISTRY`
+bucket for `market/{cost-index,esiPrices}.ts`'s unwrapped ESI calls. The
+`route` template field survives — kept for `registry.test.ts`'s marker-comment
+parity check — but has no runtime reader today. Re-add on demand:
+
+- **Item 15a-ii** (surgical per-scope purge, see brief F): re-add the
+  character/global distinction. `cachePurge.ts` currently does the blunt
+  whole-character purge (15a-i) and doesn't need it.
+- **Item 17** (activity log, see brief F): needs endpoint→route for every ESI
+  call, including the two unwrapped ones — either route them through
+  `endpoints.ts` wrappers first, or re-add a direct-call bucket alongside.
+- Either re-add should restore the deleted registry test
+  (`never marks a scoped endpoint as global, so its cached rows stay
+purgeable`) — it was a real invariant, not incidental coverage.
+
 ### Phase 1 — Shared primitives
 
 Build before the features that consume them, or the app fragments — this is

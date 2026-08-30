@@ -1,9 +1,10 @@
 // Reads the active Character's OAuth grant out of Dexie for the scope gate and
 // the nav. Its own module so `ScopeGate.tsx` exports components only.
+import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { missingScopesForRoute, type AppRoutePath } from './routeScopes';
+import { requiredScopesForRoute, type AppRoutePath } from './routeScopes';
 
 /**
  * The active Character's granted OAuth scopes, live from Dexie.
@@ -32,9 +33,23 @@ export function useGrantedScopes(): readonly string[] | undefined {
   return scopes;
 }
 
-/** Which of `paths` the active Character currently cannot use. */
+/**
+ * Which of `paths` the active Character currently cannot use. `Layout` calls
+ * this with all 11 nav paths on every render (character switch, opening the
+ * mobile More sheet, a live-query tick), so this is memoized on `granted` —
+ * and, deliberately not going through `missingScopesForRoute` (which builds
+ * its own `Set` from `granted` on every call), the granted-scope `Set` is
+ * built once here and reused across all `paths` instead of once per path.
+ * Keep this in step with `missingScopesForRoute`'s "missing" definition if
+ * that ever changes.
+ */
 export function useLockedRoutes(paths: readonly AppRoutePath[]): ReadonlySet<AppRoutePath> {
   const granted = useGrantedScopes();
-  if (granted === undefined) return new Set();
-  return new Set(paths.filter((path) => missingScopesForRoute(path, granted).length > 0));
+  return useMemo(() => {
+    if (granted === undefined) return new Set<AppRoutePath>();
+    const held = new Set(granted);
+    return new Set(
+      paths.filter((path) => requiredScopesForRoute(path).some((scope) => !held.has(scope)))
+    );
+  }, [granted, paths]);
 }

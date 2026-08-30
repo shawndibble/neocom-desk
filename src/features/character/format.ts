@@ -1,20 +1,17 @@
 /** Display helpers shared by the Character views (wallet, assets, contracts, orders). */
 
+import { clampIskZero } from '@/lib/isk';
+
 /**
- * Below this magnitude, treat the value as zero (BUG #9): floating-point
- * rounding noise (e.g. -0.004 from a chain of divisions) would otherwise
- * read as a real negative and tone red, reading as a loss that isn't real.
- * Same epsilon `formatIsk` (now `@/lib/isk`) uses at 2-decimal precision.
+ * Tailwind text color token for a signed ISK amount (journal entries,
+ * profit/loss). Clamps float-noise values near zero (e.g. -0.004 from a
+ * chain of divisions) to zero first (BUG #9): otherwise they'd tone red,
+ * reading as a loss that isn't real. Same 2-decimal epsilon `formatIsk`
+ * (`@/lib/isk`) uses for its own text — this view shows amounts at that
+ * precision, so the two must agree.
  */
-const ZERO_EPSILON = 0.005;
-
-function clampZero(value: number): number {
-  return Math.abs(value) < ZERO_EPSILON ? 0 : value;
-}
-
-/** Tailwind text color token for a signed ISK amount (journal entries, profit/loss). */
 export function iskToneClass(value: number): string {
-  return clampZero(value) < 0 ? 'text-isk-neg' : 'text-isk-pos';
+  return clampIskZero(value, 2) < 0 ? 'text-isk-neg' : 'text-isk-pos';
 }
 
 /**

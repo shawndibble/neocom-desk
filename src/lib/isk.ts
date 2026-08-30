@@ -29,8 +29,21 @@ function formatterFor(decimals: number): Intl.NumberFormat {
   return formatter;
 }
 
-export function formatIsk(value: number, decimals = 0): string {
+/**
+ * Zero-clamp threshold is half a unit-in-the-last-place for `decimals` (0.005
+ * at 2 decimals, 0.5 at 0). Exported so a caller that tones/colors a value
+ * independently of `formatIsk`'s own text (`iskToneClass` in
+ * `features/character/format.ts`) clamps the same rounding noise the same
+ * way. `decimals` has no default here — unlike `formatIsk`, a caller of this
+ * function is answering "is this really negative", where a wrong precision
+ * (e.g. forgetting the `2`) silently changes the answer rather than just the
+ * printed digits.
+ */
+export function clampIskZero(value: number, decimals: number): number {
   const epsilon = 0.5 / 10 ** decimals;
-  const clamped = Math.abs(value) < epsilon ? 0 : value;
-  return formatterFor(decimals).format(clamped);
+  return Math.abs(value) < epsilon ? 0 : value;
+}
+
+export function formatIsk(value: number, decimals = 0): string {
+  return formatterFor(decimals).format(clampIskZero(value, decimals));
 }

@@ -67,10 +67,12 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
 
 /**
  * jsdom implements no CSS media queries at all, so `window.matchMedia` is
- * simply absent — anything that subscribes to a breakpoint (Layout closes the
- * mobile "More" sheet when the viewport crosses `md`) throws on mount. Stub the
- * minimum surface: a query that never matches and never changes, which is the
- * right default for a layout-less environment.
+ * simply absent — anything that subscribes to a breakpoint (Layout mounts the
+ * mobile "More" sheet only below `md`) throws on mount. Stub the minimum
+ * surface: a query that never matches and never changes. That "never matches"
+ * default is load-bearing, not incidental — Layout treats a non-matching
+ * `(min-width: 48rem)` as mobile, so this stub is what makes every "Layout
+ * mobile More sheet" test see a mobile viewport and get the sheet at all.
  */
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   window.matchMedia = (media: string): MediaQueryList =>

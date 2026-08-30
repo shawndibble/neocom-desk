@@ -61,6 +61,16 @@ export interface PlaceRemapsOptions {
 
 const TIE_EPSILON = 1e-6;
 
+/**
+ * Upper bound for "as good as the best": absolute epsilon, widened by a
+ * relative term so long plans (totals in the millions of seconds) are not
+ * decided by float noise. Shared by both placement paths so tuning the
+ * tolerance cannot make them disagree on whether a remap is worth taking.
+ */
+function tieBound(bestSeconds: number): number {
+  return bestSeconds + Math.max(TIE_EPSILON, bestSeconds * 1e-9);
+}
+
 interface Run {
   startStep: number;
   endStep: number; // inclusive
@@ -131,6 +141,37 @@ export function placeRemaps(
     currentPrefix[j] = currentPrefix[j - 1] + runs[j - 1].currentSeconds;
   }
 
+  /**
+   * Build the result envelope around already-costed remapped segments,
+   * prepending the leading current-attributes segment (row 0 of the DP) when
+   * runs [0, splitRunIndex) precede the first remap. Shared by both paths;
+   * `remappedSeconds` is the caller's running total so the prefix is still the
+   * last term added, keeping float addition order identical in each.
+   */
+  const resultWithLeadingPrefix = (
+    segments: RemapSegment[],
+    remappedSeconds: number,
+    splitRunIndex: number
+  ): PlaceRemapsResult => {
+    let totalSeconds = remappedSeconds;
+    if (splitRunIndex > 0) {
+      segments.unshift({
+        startIndex: 0,
+        endIndex: runs[splitRunIndex - 1].endStep,
+        attributes: { ...currentAttributes },
+        seconds: currentPrefix[splitRunIndex],
+        remap: false,
+      });
+      totalSeconds += currentPrefix[splitRunIndex];
+    }
+    return {
+      segments,
+      totalSeconds,
+      currentSeconds,
+      savingsSeconds: currentSeconds - totalSeconds,
+    };
+  };
+
   // ---- Fast path: exactly one allocation ("where do I remap?") ------------
   // With one remap the DP collapses to its last column: the total is
   // currentPrefix[i] + cost(runs [i, runCount)) for some run edge i, so only
@@ -139,9 +180,11 @@ export function placeRemaps(
   // first-appearance-scanning-forward order so the resulting cost is
   // bit-identical to the grid's.
   //
-  // Tie-break (must match the DP below): the EARLIEST run edge wins. Scanning
-  // i downwards with `<=` keeps the lowest tied i, exactly as the DP's
-  // ascending scan with a strict `<` does.
+  // Tie-break: the EARLIEST run edge wins. Scanning i downwards with `<=`
+  // keeps the lowest tied i, exactly as the DP's ascending scan with a strict
+  // `<` does — the mirrored scan direction is the only part of the tie-break
+  // still duplicated; the tolerance itself is `tieBound`, shared with the DP,
+  // as is the prefix/result construction in `resultWithLeadingPrefix`.
   if (remapCount === 1) {
     const suffixSp = new Map<string, number>();
     let pairOrder: string[] = [];
@@ -163,8 +206,7 @@ export function placeRemaps(
       }
     }
     // Not remapping at all is always a candidate (see the DP path below).
-    const tieBound = bestSeconds + Math.max(TIE_EPSILON, bestSeconds * 1e-9);
-    if (currentSeconds <= tieBound) return noRemapResult();
+    if (currentSeconds <= tieBound(bestSeconds)) return noRemapResult();
 
     const best = bestSegment as BestAttributesResult;
     const segments: RemapSegment[] = [
@@ -176,24 +218,7 @@ export function placeRemaps(
         remap: true,
       },
     ];
-    let totalSeconds = best.seconds;
-    // Leading current-attributes prefix (row 0 of the DP), if any runs remain.
-    if (bestIndex > 0) {
-      segments.unshift({
-        startIndex: 0,
-        endIndex: runs[bestIndex - 1].endStep,
-        attributes: { ...currentAttributes },
-        seconds: currentPrefix[bestIndex],
-        remap: false,
-      });
-      totalSeconds += currentPrefix[bestIndex];
-    }
-    return {
-      segments,
-      totalSeconds,
-      currentSeconds,
-      savingsSeconds: currentSeconds - totalSeconds,
-    };
+    return resultWithLeadingPrefix(segments, best.seconds, bestIndex);
   }
 
   // Segment cost over runs [i, j), memoized on the sp-per-pair signature.
@@ -247,15 +272,15 @@ export function placeRemaps(
   let bestSeconds = Infinity;
   for (let k = 1; k <= maxSegments; k++) bestSeconds = Math.min(bestSeconds, dp[k][runCount]);
   let bestK = maxSegments;
-  const tieBound = bestSeconds + Math.max(TIE_EPSILON, bestSeconds * 1e-9);
+  const bound = tieBound(bestSeconds);
 
   // Not remapping at all is always a candidate: if the current attributes are
   // at least as fast as the best reachable allocation (possible when they lie
   // outside the remap search space), keep them and spend no remap.
-  if (currentSeconds <= tieBound) return noRemapResult();
+  if (currentSeconds <= bound) return noRemapResult();
 
   for (let k = 1; k <= maxSegments; k++) {
-    if (dp[k][runCount] <= tieBound) {
+    if (dp[k][runCount] <= bound) {
       bestK = k;
       break;
     }
@@ -277,22 +302,5 @@ export function placeRemaps(
     totalSeconds += seconds;
     j = i;
   }
-  // Leading current-attributes prefix (row 0 of the DP), if any runs remain.
-  if (j > 0) {
-    segments.unshift({
-      startIndex: 0,
-      endIndex: runs[j - 1].endStep,
-      attributes: { ...currentAttributes },
-      seconds: currentPrefix[j],
-      remap: false,
-    });
-    totalSeconds += currentPrefix[j];
-  }
-
-  return {
-    segments,
-    totalSeconds,
-    currentSeconds,
-    savingsSeconds: currentSeconds - totalSeconds,
-  };
+  return resultWithLeadingPrefix(segments, totalSeconds, j);
 }

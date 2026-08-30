@@ -109,14 +109,7 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
   const { t } = useTranslation();
 
   return (
-    <Modal
-      open={open}
-      id={MORE_SHEET_ID}
-      onClose={onClose}
-      title={t('nav.more')}
-      placement="sheet"
-      className="md:hidden"
-    >
+    <Modal open={open} id={MORE_SHEET_ID} onClose={onClose} title={t('nav.more')} placement="sheet">
       <div className="space-y-1 pb-3">
         <NavItem
           to="/market"
@@ -190,19 +183,27 @@ export function Layout() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
-  // The sheet is mobile-only (`md:hidden`), but showModal() makes the page
-  // inert regardless of the dialog's own display — a viewport growing past the
-  // md breakpoint while it is open would leave an invisible modal holding the
-  // app hostage. Close it at the breakpoint instead.
+  // The mobile More sheet is mounted only below the `md` breakpoint (see
+  // `!isDesktop &&` below) rather than always-mounted-but-CSS-hidden: a
+  // CSS-hidden `showModal()` dialog is still inert everywhere per the
+  // platform, so growing past `md` while it was open used to leave an
+  // invisible modal holding the whole app hostage. Mounting it conditionally
+  // means it simply isn't there to be inert — crossing the breakpoint is an
+  // unmount, and `Modal`'s own unmount-while-open cleanup already closes the
+  // dialog and returns focus to the trigger. `moreOpen` is reset alongside so
+  // a later resize back to mobile doesn't reopen it unasked.
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 48rem)').matches
+  );
   useEffect(() => {
-    if (!moreOpen) return;
     const desktop = window.matchMedia('(min-width: 48rem)');
     const onChange = (e: MediaQueryListEvent) => {
+      setIsDesktop(e.matches);
       if (e.matches) setMoreOpen(false);
     };
     desktop.addEventListener('change', onChange);
     return () => desktop.removeEventListener('change', onChange);
-  }, [moreOpen]);
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-bg text-text">
@@ -293,12 +294,14 @@ export function Layout() {
         </button>
       </nav>
 
-      <MobileMoreSheet
-        open={moreOpen}
-        onClose={() => setMoreOpen(false)}
-        activeCharacter={activeCharacter}
-        locked={locked}
-      />
+      {!isDesktop && (
+        <MobileMoreSheet
+          open={moreOpen}
+          onClose={() => setMoreOpen(false)}
+          activeCharacter={activeCharacter}
+          locked={locked}
+        />
+      )}
     </div>
   );
 }

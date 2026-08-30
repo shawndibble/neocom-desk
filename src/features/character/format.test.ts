@@ -14,6 +14,10 @@ describe('iskToneClass', () => {
   it('is the positive token for a rounding-noise negative near zero (BUG #9)', () => {
     expect(iskToneClass(-0.004)).toBe('text-isk-pos');
   });
+
+  it('is still the negative token just past the clamp threshold (pins the 2-decimal epsilon)', () => {
+    expect(iskToneClass(-0.006)).toBe('text-isk-neg');
+  });
 });
 
 describe('humanizeRefType', () => {

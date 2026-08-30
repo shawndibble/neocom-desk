@@ -15,8 +15,6 @@ interface ModalProps {
   children: ReactNode;
   /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer. */
   placement?: ModalPlacement;
-  /** Extra classes on the `<dialog>` itself (sizing, responsive visibility). */
-  className?: string;
 }
 
 /**
@@ -38,15 +36,7 @@ interface ModalProps {
  * also makes the backdrop-click test exact, since with `p-0` on the dialog the
  * only clicks that target it are backdrop clicks.
  */
-export function Modal({
-  open,
-  id,
-  onClose,
-  title,
-  children,
-  placement = 'center',
-  className = '',
-}: ModalProps) {
+export function Modal({ open, id, onClose, title, children, placement = 'center' }: ModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -88,7 +78,7 @@ export function Modal({
         // target for clicks that landed on the ::backdrop.
         if (event.target === dialogRef.current) onClose();
       }}
-      className={`fixed inset-0 h-fit overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${placementClass} ${className}`}
+      className={`fixed inset-0 h-fit overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${placementClass}`}
     >
       {open && (
         <div className="flex max-h-[85vh] flex-col">

@@ -35,10 +35,9 @@ import { GLOBAL_CACHE_CHARACTER_ID } from './cache';
  * keys on endpoint *name*, and cache keys are string literals in `features/*`
  * with no link back to it — that mapping is item 15a-ii.)
  *
- * `GLOBAL_CACHE_CHARACTER_ID` rows are never touched: they are the responses
- * of the endpoints `registry.ts` marks `subject: 'global'` — public universe
- * types, entity names and stations, behind no scope and owned by no character.
- * Dropping them is pure cache churn with no privacy benefit.
+ * `GLOBAL_CACHE_CHARACTER_ID` rows are never touched: public universe types,
+ * entity names and stations, behind no scope and owned by no character.
+ * Dropping them is cache churn with no privacy benefit.
  */
 export async function purgeCharacterCache(characterId: number): Promise<number> {
   if (characterId === GLOBAL_CACHE_CHARACTER_ID) return 0;

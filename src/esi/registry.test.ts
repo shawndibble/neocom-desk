@@ -5,13 +5,7 @@ import { describe, it, expect } from 'vitest';
 import * as endpointsModule from './endpoints';
 // Raw source of endpoints.ts, for the marker-comment parity check below.
 import endpointsSource from './endpoints.ts?raw';
-import {
-  ENDPOINT_REGISTRY,
-  DIRECT_CALL_REGISTRY,
-  ESI_REGISTRY,
-  PUBLIC,
-  type EsiEndpointSpec,
-} from './registry';
+import { ESI_REGISTRY, PUBLIC, type EsiEndpointSpec } from './registry';
 
 /** Names of every exported wrapper function in endpoints.ts. */
 const wrapperNames = Object.entries(endpointsModule)
@@ -21,9 +15,9 @@ const wrapperNames = Object.entries(endpointsModule)
 
 const entries = Object.entries(ESI_REGISTRY) as [string, EsiEndpointSpec][];
 
-describe('ENDPOINT_REGISTRY covers endpoints.ts exactly', () => {
+describe('ESI_REGISTRY covers endpoints.ts exactly', () => {
   it('has one entry per exported endpoint wrapper', () => {
-    expect(Object.keys(ENDPOINT_REGISTRY).sort()).toEqual(wrapperNames);
+    expect(Object.keys(ESI_REGISTRY).sort()).toEqual(wrapperNames);
   });
 
   it('finds a non-trivial number of wrappers (guards the reflection above)', () => {
@@ -55,31 +49,6 @@ describe('scope declarations', () => {
       expect(spec.scope, id).toMatch(/^esi-[a-z_]+\.[a-z_]+\.v\d+$/);
     }
   });
-
-  it('never marks a scoped endpoint as global, so its cached rows stay purgeable', () => {
-    for (const [id, spec] of entries) {
-      if (spec.scope === PUBLIC) continue;
-      expect(spec.subject, id).toBe('character');
-    }
-  });
-
-  it('marks every character-independent lookup global (the GLOBAL_CACHE_CHARACTER_ID partition)', () => {
-    // Kept as a positive list so a new public endpoint has to pick a side
-    // deliberately rather than inheriting one.
-    const globals = entries.filter(([, spec]) => spec.subject === 'global').map(([id]) => id);
-    expect(globals.sort()).toEqual(
-      [
-        'getCharacterPublicInfo',
-        'getCorporationPublicInfo',
-        'getAlliancePublicInfo',
-        'getUniverseType',
-        'getUniverseStation',
-        'postUniverseNames',
-        'fetchSystemCostIndices',
-        'fetchAdjustedPrices',
-      ].sort()
-    );
-  });
 });
 
 describe('parity with the endpoints.ts marker comments', () => {
@@ -98,30 +67,16 @@ describe('parity with the endpoints.ts marker comments', () => {
   it('parses one marker comment per wrapper', () => {
     // Also the proof that the non-greedy match above paired each marker with
     // the right wrapper: a skipped or over-consumed block changes this count.
-    expect(markers).toHaveLength(Object.keys(ENDPOINT_REGISTRY).length);
+    expect(markers).toHaveLength(Object.keys(ESI_REGISTRY).length);
   });
 
   it('matches the route and scope declared for each named wrapper', () => {
-    const declared = Object.entries(ENDPOINT_REGISTRY).map(([name, spec]) => ({
+    const declared = Object.entries(ESI_REGISTRY).map(([name, spec]) => ({
       name,
       route: (spec as EsiEndpointSpec).route,
       scope: (spec as EsiEndpointSpec).scope,
     }));
     const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
     expect(declared.sort(byName)).toEqual([...markers].sort(byName));
-  });
-});
-
-describe('DIRECT_CALL_REGISTRY', () => {
-  it('covers the ESI routes called without an endpoints.ts wrapper', () => {
-    expect(Object.keys(DIRECT_CALL_REGISTRY).sort()).toEqual(
-      ['fetchAdjustedPrices', 'fetchSystemCostIndices'].sort()
-    );
-  });
-
-  it('is merged into ESI_REGISTRY alongside the wrapped endpoints', () => {
-    expect(Object.keys(ESI_REGISTRY)).toHaveLength(
-      Object.keys(ENDPOINT_REGISTRY).length + Object.keys(DIRECT_CALL_REGISTRY).length
-    );
   });
 });
