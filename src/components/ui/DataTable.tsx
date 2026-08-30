@@ -1,9 +1,5 @@
 import type { ReactNode } from 'react';
-
-/** Joins present class fragments, so an absent optional never leaves a double space. */
-function cx(...parts: (string | undefined)[]): string {
-  return parts.filter(Boolean).join(' ');
-}
+import { cx } from '@/lib/cx';
 
 export interface DataTableColumn<T> {
   id: string;
@@ -29,16 +25,10 @@ interface DataTableProps<T> {
 }
 
 /**
- * Dense table matching the markup the routes already hand-roll, so migrating a
- * call site is visually a no-op. Headers and cell content arrive already
- * translated — this component adds no i18n keys of its own.
- *
- * Presentational only: no sort state. Every table in the app pre-sorts in its
- * own `useMemo`, so sorting would be unused generality; it lands when a call
- * site asks for it.
- *
- * Renders nothing but the table — callers branch to `EmptyState` when `rows` is
- * empty, per docs/DESIGN.md §4 ("Never show a bare empty table").
+ * Dense table. Headers and cell content arrive already translated — no i18n
+ * here. Presentational: no sort state (every table pre-sorts in its own
+ * `useMemo`), and no empty branch — callers show `EmptyState` instead
+ * (docs/DESIGN.md §4, "Never show a bare empty table").
  */
 export function DataTable<T>({
   columns,
@@ -48,19 +38,21 @@ export function DataTable<T>({
   label,
   className = '',
 }: DataTableProps<T>) {
+  // Per-column classes are invariant across rows, so they are built once
+  // rather than per cell — a 1,000-row journal is 5,000 cells.
+  const headerClass = columns.map((column) =>
+    cx('px-3 py-2 font-semibold uppercase', column.align === 'right' && 'text-right')
+  );
+  const cellClass = columns.map((column) =>
+    cx('px-3 py-1.5', column.align === 'right' && 'text-right', column.className)
+  );
+
   return (
     <table aria-label={label} className={cx('w-full text-xs', className)}>
       <thead>
         <tr className="border-b border-line text-left text-text-dim">
-          {columns.map((column) => (
-            <th
-              key={column.id}
-              scope="col"
-              className={cx(
-                'px-3 py-2 font-semibold uppercase',
-                column.align === 'right' ? 'text-right' : undefined
-              )}
-            >
+          {columns.map((column, i) => (
+            <th key={column.id} scope="col" className={headerClass[i]}>
               {column.header}
             </th>
           ))}
@@ -69,16 +61,8 @@ export function DataTable<T>({
       <tbody className="divide-y divide-line">
         {rows.map((row) => (
           <tr key={rowKey(row)} className={cx('hover:bg-panel-2', rowClassName?.(row))}>
-            {columns.map((column) => (
-              <td
-                key={column.id}
-                className={cx(
-                  'px-3 py-1.5',
-                  column.align === 'right' ? 'text-right' : undefined,
-                  column.className,
-                  column.cellClassName?.(row)
-                )}
-              >
+            {columns.map((column, i) => (
+              <td key={column.id} className={cx(cellClass[i], column.cellClassName?.(row))}>
                 {column.render(row)}
               </td>
             ))}

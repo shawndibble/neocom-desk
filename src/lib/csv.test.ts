@@ -30,9 +30,12 @@ describe('toCsv', () => {
     expect(csv).toContain("'-lookup");
   });
 
+  it('sanitizes past leading whitespace, which a first-character check would miss', () => {
+    const csv = toCsv([{ name: '  =cmd|calc', qty: 1 }], columns);
+    expect(csv).toContain("'  =cmd|calc");
+  });
+
   it('leaves a negative number bare, so numeric columns stay numeric in Excel', () => {
-    // The column's return type is the seam: a `number` cannot carry a
-    // formula, and quote-prefixing it would import every ISK column as text.
     const csv = toCsv([{ name: 'fee', qty: -1500 }], columns);
     expect(csv).toContain('fee,-1500');
     expect(csv).not.toContain("'-1500");

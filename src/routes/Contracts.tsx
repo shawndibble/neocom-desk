@@ -13,7 +13,7 @@ import {
 import { loadContracts } from '@/features/character/contracts';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
-import { useRouteSnapshot, type RouteSnapshotSignal } from '@/features/character/useRouteSnapshot';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import type { Contract } from '@/esi/endpoints';
 

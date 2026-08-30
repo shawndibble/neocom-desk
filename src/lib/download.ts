@@ -14,15 +14,16 @@ export function downloadTextFile(
   mimeType = 'text/csv;charset=utf-8'
 ): void {
   const url = URL.createObjectURL(new Blob([text], { type: mimeType }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.style.display = 'none';
-  document.body.append(anchor);
+  let anchor: HTMLAnchorElement | undefined;
   try {
+    anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.style.display = 'none';
+    document.body.append(anchor);
     anchor.click();
   } finally {
-    anchor.remove();
+    anchor?.remove();
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 }

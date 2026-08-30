@@ -2,14 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCalendarEvents, loadCalendarEvent } from '@/features/character/calendar';
 import type { CachedResult } from '@/esi/cache';
 import type { CalendarEventDetail, CalendarEventSummary } from '@/esi/endpoints';
+import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 
 interface Snapshot {
-  requestKey: string;
   eventsResult: CachedResult<CalendarEventSummary[]> | null;
 }
 
@@ -20,36 +19,24 @@ const RESPONSE_KEY: Record<CalendarEventSummary['event_response'], string> = {
   not_responded: 'calendar.responseNotResponded',
 };
 
+async function loadCalendarSnapshot(characterId: number): Promise<Snapshot> {
+  const eventsResult = await loadCalendarEvents(characterId);
+  return { eventsResult };
+}
+
 /** Calendar: upcoming event list + detail on click. Read-only (no respond), cached for offline. */
 export function Calendar() {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const { data, loading, hydrated, activeCharacterId, refresh } =
+    useRouteSnapshot(loadCalendarSnapshot);
 
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detailSnapshot, setDetailSnapshot] = useState<{
     selectedId: number;
     result: CachedResult<CalendarEventDetail> | null;
   } | null>(null);
-  const requestKey = `${activeCharacterId}:${refreshKey}`;
 
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void loadCalendarEvents(activeCharacterId).then((eventsResult) => {
-      if (!cancelled) setSnapshot({ requestKey, eventsResult });
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [activeCharacterId, refreshKey]);
-
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const loading = current === null;
-  const eventsResult = current?.eventsResult ?? null;
+  const eventsResult = data?.eventsResult ?? null;
 
   const events = useMemo(
     () => [...(eventsResult?.data ?? [])].sort((a, b) => a.event_date.localeCompare(b.event_date)),
@@ -84,7 +71,7 @@ export function Calendar() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('calendar.title')}</h1>
         <div className="flex items-center gap-2">
           {eventsResult && <DataAgeBadge date={eventsResult.fetchedAt} />}
-          <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+          <Button size="sm" onClick={refresh} disabled={loading}>
             {t('calendar.refresh')}
           </Button>
         </div>

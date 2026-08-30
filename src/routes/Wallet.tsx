@@ -21,7 +21,7 @@ import {
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
-import { useRouteSnapshot, type RouteSnapshotSignal } from '@/features/character/useRouteSnapshot';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 

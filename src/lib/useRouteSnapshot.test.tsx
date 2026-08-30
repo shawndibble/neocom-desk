@@ -184,6 +184,65 @@ describe('useRouteSnapshot', () => {
     expect(renders).toBe(rendersAtUnmount);
   });
 
+  it('surfaces a rejecting loader instead of spinning forever', async () => {
+    // The failure mode this guards: no stamp means `loading` never clears, and
+    // every route disables its Refresh button while loading — so the view is
+    // unrecoverable without a page reload.
+    const boom = new Error('offline');
+    const { result } = renderHook(() => useRouteSnapshot(() => Promise.reject(boom)));
+    setCharacter(CHAR_A);
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe(boom);
+    expect(result.current.data).toBeNull();
+  });
+
+  it('recovers when a refresh after a failure succeeds', async () => {
+    let attempt = 0;
+    const { result } = renderHook(() =>
+      useRouteSnapshot(() => {
+        attempt += 1;
+        return attempt === 1 ? Promise.reject(new Error('offline')) : Promise.resolve('ok');
+      })
+    );
+    setCharacter(CHAR_A);
+    await waitFor(() => expect(result.current.error).toBeTruthy());
+
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.data).toBe('ok'));
+    expect(result.current.error).toBeNull();
+  });
+
+  it('does not show a stale snapshot when the character returns to a previous one', async () => {
+    // A -> B -> A. Keying on `characterId:refreshCount` repeats on the return,
+    // so A's first snapshot would read as current for A's second load.
+    const { result } = renderHook(() => useRouteSnapshot((id) => Promise.resolve(`data-${id}`)));
+    setCharacter(CHAR_A);
+    await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_A}`));
+
+    setCharacter(CHAR_B);
+    setCharacter(CHAR_A);
+
+    // Back on A with a load in flight: must report loading, not A's old data.
+    expect(result.current.loading).toBe(true);
+    expect(result.current.data).toBeNull();
+    await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_A}`));
+  });
+
+  it('resets refreshCount when the character changes', async () => {
+    // Wallet picks its offline copy off this: "refresh failed" vs "offline".
+    // A new character's first load is an initial load, not a refresh.
+    const { result } = renderHook(() => useRouteSnapshot((id) => Promise.resolve(id)));
+    setCharacter(CHAR_A);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.refreshCount).toBe(1));
+
+    setCharacter(CHAR_B);
+    expect(result.current.refreshCount).toBe(0);
+  });
+
   it('does not re-run the load when only the loader identity changes', async () => {
     const inner = vi.fn(async (characterId: number) => `data-${characterId}`);
     // Inline arrow: a fresh loader identity on every render must not re-fetch.

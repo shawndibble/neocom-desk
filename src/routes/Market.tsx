@@ -50,10 +50,10 @@ function TypeIcon({ typeId }: { typeId: number }) {
  */
 export function Market() {
   const { t } = useTranslation();
-  const hubId = useMarketHub((state) => state.hubId);
+  const hubId = useMarketHub((state) => state.value);
   const hubHydrated = useMarketHub((state) => state.hydrated);
   const hydrateHub = useMarketHub((state) => state.hydrate);
-  const setHubId = useMarketHub((state) => state.setHubId);
+  const setHubId = useMarketHub((state) => state.setValue);
 
   const [types, setTypes] = useState<TypeMap | null>(null);
   const [rawQuery, setRawQuery] = useState('');

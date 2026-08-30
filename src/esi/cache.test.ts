@@ -6,6 +6,7 @@ import {
   loadWithCache,
   loadWithCacheStatus,
   readCached,
+  readCachedRows,
   writeCached,
   GLOBAL_CACHE_CHARACTER_ID,
 } from './cache';
@@ -253,6 +254,69 @@ describe('read path while a cache purge is pending', () => {
     });
 
     expect(result).toMatchObject({ data: 'fresh', fromCache: true });
+  });
+});
+
+describe('readCachedRows', () => {
+  const OTHER = 92;
+
+  beforeEach(async () => {
+    await db.settings.clear();
+    await clearCachePurgePending(CHAR_ID);
+    await clearCachePurgePending(OTHER);
+  });
+
+  it('reads one key across many characters, keyed by character', async () => {
+    await writeCached(CHAR_ID, KEY, 'a', 1000);
+    await writeCached(OTHER, KEY, 'b', 2000);
+
+    const rows = await readCachedRows<string>([CHAR_ID, OTHER], KEY);
+
+    expect(rows.get(CHAR_ID)?.data).toBe('a');
+    expect(rows.get(OTHER)?.data).toBe('b');
+    expect(rows.get(CHAR_ID)?.fetchedAt).toEqual(new Date(1000));
+    expect(rows.get(CHAR_ID)?.fromCache).toBe(true);
+  });
+
+  it('omits a character with no row, rather than inventing an empty value', async () => {
+    await writeCached(CHAR_ID, KEY, 'a', 1000);
+
+    const rows = await readCachedRows<string>([CHAR_ID, OTHER], KEY);
+
+    expect(rows.has(OTHER)).toBe(false);
+  });
+
+  it('returns an empty map for no characters, without touching Dexie', async () => {
+    const bulkGet = vi.spyOn(db.esiCache, 'bulkGet');
+    expect((await readCachedRows<string>([], KEY)).size).toBe(0);
+    expect(bulkGet).not.toHaveBeenCalled();
+    bulkGet.mockRestore();
+  });
+
+  it('carries the truncated flag through', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: KEY,
+      value: [],
+      fetchedAt: 1,
+      truncated: true,
+    });
+    const rows = await readCachedRows<unknown[]>([CHAR_ID], KEY);
+    expect(rows.get(CHAR_ID)?.truncated).toBe(true);
+  });
+
+  it('suppresses a purge-pending character while still serving the others', async () => {
+    // The batch read must honour the same gate readCachedRow does, or a
+    // previous owner's rows reach a caller that happened to read in bulk.
+    await writeCached(CHAR_ID, KEY, 'previous owner', 1000);
+    await writeCached(OTHER, KEY, 'mine', 1000);
+    await suppressViaFailedPurge(CHAR_ID);
+
+    const rows = await readCachedRows<string>([CHAR_ID, OTHER], KEY);
+
+    expect(await db.esiCache.get([CHAR_ID, KEY])).toBeDefined(); // still on disk
+    expect(rows.has(CHAR_ID)).toBe(false); // but never served
+    expect(rows.get(OTHER)?.data).toBe('mine');
   });
 });
 

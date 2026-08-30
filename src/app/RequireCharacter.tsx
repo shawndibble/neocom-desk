@@ -5,7 +5,7 @@ import { BootScreen } from './BootScreen';
 
 /**
  * Auth gate: the whole feature area sits behind a logged-in Character. A layout
- * route, so all twelve feature routes are wrapped at once.
+ * route, so every feature route is wrapped at once.
  *
  * Two states that are emphatically not "logged out":
  *  - `useLiveQuery` still resolving (`undefined`) — redirecting on that would

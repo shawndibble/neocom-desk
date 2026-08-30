@@ -1,14 +1,8 @@
 /**
- * One concurrency policy for ESI fan-out, so there is a single number to
- * reason about rather than one per call site.
- */
-
-/**
- * Cap on simultaneous ESI requests from a single fan-out. ESI bills against a
- * global error-limit budget and `CLAUDE.md` requires respecting
- * `X-Ratelimit-*`/`Retry-After`, so an unbounded `Promise.all` over a
- * thousand type ids — or over every Character in the roster — is not a
- * theoretical problem.
+ * One ESI fan-out policy, so there is a single number to tune. ESI bills
+ * against a global error-limit budget and `CLAUDE.md` requires respecting
+ * `X-Ratelimit-*`/`Retry-After`, so an unbounded `Promise.all` over a thousand
+ * type ids — or every Character in the roster — is not theoretical.
  */
 export const ESI_FANOUT_CONCURRENCY = 10;
 

@@ -59,7 +59,7 @@ beforeEach(async () => {
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
-  useMarketHub.setState({ hubId: 'jita', hydrated: false });
+  useMarketHub.setState({ value: 'jita', hydrated: false });
   clearMarketPriceCache();
   window.history.pushState({}, '', '/market');
 });

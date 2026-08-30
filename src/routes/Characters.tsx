@@ -60,6 +60,7 @@ export function Characters() {
                   <CharacterAvatar
                     characterId={character.characterId}
                     size="lg"
+                    loading="lazy"
                     alt={t('characters.portraitAlt', { name: character.name })}
                   />
                   <span className="min-w-0">

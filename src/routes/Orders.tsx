@@ -1,60 +1,53 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, DataTable, EmptyState, Panel, Spinner, Tabs } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import type { MarketOrder, MarketOrderHistory } from '@/esi/endpoints';
 
+/** Stable identity, so the fallback doesn't invalidate the column memos every render. */
+const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
+
 interface Snapshot {
-  requestKey: string;
   ordersResult: CachedResult<MarketOrder[]> | null;
   historyResult: CachedResult<MarketOrderHistory[]> | null;
   typeNames: Map<number, string>;
 }
 
+async function loadOrdersSnapshot(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<Snapshot> {
+  const [ordersResult, historyResult] = await Promise.all([
+    loadOrders(characterId),
+    loadOrderHistory(characterId),
+  ]);
+  const typeIds = new Set<number>();
+  // Already superseded: skip the ESI name resolve, its result would be discarded.
+  if (!signal.cancelled) {
+    for (const o of ordersResult?.data ?? []) typeIds.add(o.type_id);
+    for (const o of historyResult?.data ?? []) typeIds.add(o.type_id);
+  }
+  const typeNames = await loadTypeNames([...typeIds]);
+  return { ordersResult, historyResult, typeNames };
+}
+
 /** Orders: open orders + history tabs. Read-only, cached for offline. */
 export function Orders() {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const { data, loading, hydrated, activeCharacterId, refresh } =
+    useRouteSnapshot(loadOrdersSnapshot);
 
   const [tab, setTab] = useState<'open' | 'history'>('open');
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const requestKey = `${activeCharacterId}:${refreshKey}`;
 
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      const [ordersResult, historyResult] = await Promise.all([
-        loadOrders(activeCharacterId),
-        loadOrderHistory(activeCharacterId),
-      ]);
-      if (cancelled) return;
-      const typeIds = new Set<number>();
-      for (const o of ordersResult?.data ?? []) typeIds.add(o.type_id);
-      for (const o of historyResult?.data ?? []) typeIds.add(o.type_id);
-      const typeNames = await loadTypeNames([...typeIds]);
-      if (cancelled) return;
-      setSnapshot({ requestKey, ordersResult, historyResult, typeNames });
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [activeCharacterId, refreshKey]);
-
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const loading = current === null;
-  const ordersResult = current?.ordersResult ?? null;
-  const historyResult = current?.historyResult ?? null;
-  const typeNames = useMemo(() => current?.typeNames ?? new Map<number, string>(), [current]);
+  const ordersResult = data?.ordersResult ?? null;
+  const historyResult = data?.historyResult ?? null;
+  const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
 
   const orders = useMemo(
     () => [...(ordersResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
@@ -70,7 +63,7 @@ export function Orders() {
       {
         id: 'item',
         header: t('orders.item'),
-        render: (order) => typeNames.get(order.type_id) ?? `Type #${order.type_id}`,
+        render: (order) => typeNames.get(order.type_id),
       },
       {
         id: 'side',
@@ -101,14 +94,14 @@ export function Orders() {
     ],
     [t, typeNames]
   );
-  const historyColumns = useMemo<DataTableColumn<MarketOrder>[]>(
+  const historyColumns = useMemo<DataTableColumn<MarketOrderHistory>[]>(
     () => [
       ...baseColumns,
       {
         id: 'state',
         header: t('orders.state'),
         className: 'text-text-dim',
-        render: (order) => ('state' in order ? (order as MarketOrderHistory).state : ''),
+        render: (order) => order.state,
       },
     ],
     [baseColumns, t]
@@ -127,7 +120,7 @@ export function Orders() {
     <div className="mx-auto max-w-3xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('orders.title')}</h1>
-        <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+        <Button size="sm" onClick={refresh} disabled={loading}>
           {t('orders.refresh')}
         </Button>
       </header>

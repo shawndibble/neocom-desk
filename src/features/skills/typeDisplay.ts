@@ -1,5 +1,3 @@
-/** Display helpers for EVE "universe type" data (implants, items): description markup. */
-
 /**
  * ESI type descriptions carry EVE's own light markup (`<a href="showinfo:...">`,
  * `<b>`, `<color=...>`, `<font ...>`) rather than safe HTML. Strip all tags for

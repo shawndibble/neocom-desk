@@ -19,8 +19,6 @@ import { EsiError } from '@/esi/client';
 import { getUniverseType, postUniverseNames } from '@/esi/endpoints';
 import { loadTypes } from '@/sde/loadSde';
 import { GLOBAL_CACHE_CHARACTER_ID, readCached, writeCached } from '@/esi/cache';
-// The 404-batch fallback can be asked to resolve up to NAMES_BATCH_LIMIT ids
-// one at a time (BUG #6); a single Promise.all would be 1000 requests.
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
 /** ESI's documented cap on ids per /universe/names request (maxItems in the spec). */

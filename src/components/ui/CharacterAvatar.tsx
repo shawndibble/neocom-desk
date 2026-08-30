@@ -1,15 +1,20 @@
 import { characterPortraitUrl } from '@/lib/eveImages';
+import { cx } from '@/lib/cx';
 
 export type CharacterAvatarSize = 'sm' | 'md' | 'lg';
 
 interface CharacterAvatarProps {
   characterId: number;
-  /** `sm` 28px (mobile nav) · `md` 32px (sidebar) · `lg` 64px (Overview, Characters). */
   size?: CharacterAvatarSize;
   /** Accent ring for the selected/active Character. */
   selected?: boolean;
   /** Already-translated alt text. Omit for decorative use next to a text label. */
   alt?: string;
+  /**
+   * Defaults to eager: most portraits here are nav chrome or a page header,
+   * where deferring costs a visible late paint. Lists pass `lazy`.
+   */
+  loading?: 'eager' | 'lazy';
   className?: string;
 }
 
@@ -21,21 +26,16 @@ const SIZE: Record<CharacterAvatarSize, { className: string; px: number; source:
 };
 
 /**
- * ESI portrait for a Character.
- *
- * `rounded-xs` is the house radius (docs/DESIGN.md §3), and every portrait in
- * the app is square-cornered — a round one would be the odd element out.
- *
- * Decorative by default: the nav sites sit beside a text label that already
- * names the Character, so a portrait `alt` would repeat it. Overview and
- * Characters pass an explicit `alt` because their portrait is the primary
- * identifier for the row.
+ * ESI portrait. Decorative by default: the nav sites sit beside a text label
+ * that already names the Character, so `alt` would repeat it — pass one only
+ * where the portrait is the row's primary identifier.
  */
 export function CharacterAvatar({
   characterId,
   size = 'md',
   selected = false,
   alt,
+  loading = 'eager',
   className = '',
 }: CharacterAvatarProps) {
   const { className: box, px, source } = SIZE[size];
@@ -46,10 +46,14 @@ export function CharacterAvatar({
       aria-hidden={alt === undefined ? true : undefined}
       width={px}
       height={px}
-      loading="lazy"
-      className={`shrink-0 rounded-xs border ${
-        selected ? 'border-accent' : 'border-line'
-      } ${box} ${className}`}
+      loading={loading}
+      decoding="async"
+      className={cx(
+        'shrink-0 rounded-xs border',
+        selected ? 'border-accent' : 'border-line',
+        box,
+        className
+      )}
     />
   );
 }

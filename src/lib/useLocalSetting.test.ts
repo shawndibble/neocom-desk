@@ -98,13 +98,38 @@ describe('createLocalSetting', () => {
     expect(onApply).toHaveBeenCalledWith(1);
   });
 
-  it('returns the same store for the same key, so writes propagate between consumers', async () => {
+  it('does not memoize by key, so a second call cannot inherit foreign options', async () => {
+    // Two stores for one key would drift, which is why the contract is "call
+    // once at module scope". Memoizing instead would hand the second caller a
+    // store silently wired to the first caller's parse/onApply.
     const key = freshKey();
     const a = createLocalSetting({ key, defaultValue: 1 });
     const b = createLocalSetting({ key, defaultValue: 1 });
-    expect(b).toBe(a);
-    await a.getState().setValue(7);
-    expect(b.getState().value).toBe(7);
+    expect(b).not.toBe(a);
+  });
+
+  it('ignores a hydrate that resolves after a set, rather than reverting it', async () => {
+    const key = freshKey();
+    const useSetting = createLocalSetting({ key, defaultValue: 1 });
+    await db.settings.put({ key, value: 99 });
+
+    const hydrating = useSetting.getState().hydrate();
+    await useSetting.getState().setValue(7);
+    await hydrating;
+
+    expect(useSetting.getState().value).toBe(7);
+  });
+
+  it('still resolves hydrated when Dexie throws', async () => {
+    const key = freshKey();
+    const useSetting = createLocalSetting({ key, defaultValue: 5 });
+    const get = vi.spyOn(db.settings, 'get').mockRejectedValue(new Error('quota'));
+
+    await useSetting.getState().hydrate();
+
+    expect(useSetting.getState().hydrated).toBe(true);
+    expect(useSetting.getState().value).toBe(5);
+    get.mockRestore();
   });
 
   it('rejects a sync.-prefixed key, which belongs to setSyncedSetting', () => {
