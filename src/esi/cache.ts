@@ -9,7 +9,9 @@
  * industry blueprints/jobs) — see docs/ARCHITECTURE.md §3.
  */
 import { db } from '@/db';
+import { reportEsiAuthFailure } from '@/stores/authFailure';
 import { isAuthFailure } from './client';
+import { isCachePurgePending } from './cachePurge';
 
 export interface CachedResult<T> {
   data: T;
@@ -82,11 +84,18 @@ export async function loadWithCacheStatus<T>(
   } catch (err) {
     if (detectAuthFailure(err)) {
       needsReauth = true;
+      // Publish to the shell so a runtime auth failure surfaces once, globally,
+      // instead of each view having to render its own banner. The route scope
+      // gate (src/app/ScopeGate.tsx) catches the knowable-in-advance case from
+      // the stored grant; this catches the window where that grant is stale —
+      // a revoke performed in EVE's third-party-application portal is invisible
+      // locally until the next token refresh.
+      reportEsiAuthFailure(characterId);
       if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
     }
     // Any other failure (offline, 5xx, timeout): fall through to the cache below.
   }
-  const cached = await db.esiCache.get([characterId, key]);
+  const cached = await readCachedRow(characterId, key);
   if (!cached) return { cached: null, needsReauth };
   return {
     cached: { data: cached.value as T, fetchedAt: new Date(cached.fetchedAt), fromCache: true },
@@ -103,9 +112,27 @@ export async function loadWithCache<T>(
   return (await loadWithCacheStatus(characterId, key, fetchLive)).cached;
 }
 
+/**
+ * The single point where a cached row is allowed to reach a caller.
+ *
+ * A character whose purge is still pending (both purge tiers failed — see
+ * `cachePurge.ts`) has rows on disk that we could not delete and are not
+ * allowed to serve, so the cache reads as empty for it. One cheap in-memory
+ * lookup per cache read, not per row: the durable marker is read once per
+ * session. Writes are deliberately left alone — new rows are the *current*
+ * owner's data, and the pending purge sweeps them anyway when it succeeds.
+ */
+async function readCachedRow(
+  characterId: number,
+  key: string
+): Promise<{ value: unknown; fetchedAt: number } | undefined> {
+  if (await isCachePurgePending(characterId)) return undefined;
+  return db.esiCache.get([characterId, key]);
+}
+
 /** Raw cache read, for callers doing their own batch/partial-resolution (names.ts, typeNames.ts). */
 export async function readCached<T>(characterId: number, key: string): Promise<T | undefined> {
-  const row = await db.esiCache.get([characterId, key]);
+  const row = await readCachedRow(characterId, key);
   return row?.value as T | undefined;
 }
 

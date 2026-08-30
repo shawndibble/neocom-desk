@@ -1,13 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useTranslation } from 'react-i18next';
 import { configureEsi } from '@/esi/client';
-import { getValidAccessToken } from '@/auth/session';
 import { triggerSync } from '@/sync';
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
-import { Spinner } from '@/components/ui';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import { Characters } from '@/routes/Characters';
@@ -25,27 +22,56 @@ import { Orders } from '@/routes/Orders';
 import { Styleguide } from '@/routes/Styleguide';
 import { Layout } from './Layout';
 import { ReloadPrompt } from './ReloadPrompt';
+import { BootScreen } from './BootScreen';
+import { RequireCharacter } from './RequireCharacter';
+import { ScopeGate } from './ScopeGate';
+import { AuthFailureRedirect } from './AuthFailureNotice';
+import { getAccessTokenReportingFailures } from './tokenProvider';
+import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-// Wire authenticated ESI calls to stored tokens once, at module load.
-configureEsi({ getToken: (characterId) => getValidAccessToken(characterId) });
+// Wire authenticated ESI calls to stored tokens once, at module load. The
+// provider is wrapped (tokenProvider.ts) so a dead refresh grant is reported
+// centrally instead of surfacing as an empty view in whichever feature
+// happened to ask first.
+configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
 
 // '/neocom-desk/' on GitHub Pages, '/' in dev/tests.
 const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
+/**
+ * Every feature route, keyed by path. `satisfies Record<AppRoutePath, ...>` is
+ * what makes a route without a scope declaration a *compile* error: an entry
+ * missing from `routeScopes.ROUTE_REQUIREMENTS` fails the excess-property
+ * check, and one missing here fails the completeness check. Same trick, same
+ * reason, as `esi/registry.ts`'s endpoint table.
+ *
+ * Do not hand-write a literal `Route` element for a feature route below — it
+ * would slip past both checks. `routeScopes.test.ts` scans this file's source
+ * to keep that honest.
+ */
+const ROUTE_ELEMENTS = {
+  '/characters': <Characters />,
+  '/overview': <Overview />,
+  '/skills': <Skills />,
+  '/skills/plans': <SkillPlans />,
+  '/industry': <Industry />,
+  '/market': <Market />,
+  '/wallet': <Wallet />,
+  '/assets': <Assets />,
+  '/mail': <Mail />,
+  '/calendar': <Calendar />,
+  '/contracts': <Contracts />,
+  '/orders': <Orders />,
+} satisfies Record<AppRoutePath, ReactElement>;
+
+// `Object.entries` widens the key back to `string`; the union is the point.
+const FEATURE_ROUTES = Object.entries(ROUTE_ELEMENTS) as [AppRoutePath, ReactElement][];
+
 /** Index gate: characters exist -> /characters, none -> /login. */
 function Root() {
-  const { t } = useTranslation();
   const characterCount = useLiveQuery(() => db.characters.count());
-  if (characterCount === undefined) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg text-text">
-        <h1 className="text-sm font-semibold tracking-widest uppercase">{t('app.name')}</h1>
-        <Spinner label={t('common.loading')} />
-        <p className="text-xs text-text-dim">{t('common.loadingEllipsis')}</p>
-      </main>
-    );
-  }
+  if (characterCount === undefined) return <BootScreen />;
   return <Navigate to={characterCount > 0 ? '/characters' : '/login'} replace />;
 }
 
@@ -66,23 +92,23 @@ export function App() {
 
   return (
     <BrowserRouter basename={BASENAME}>
+      <AuthFailureRedirect />
       <Routes>
         <Route path="/" element={<Root />} />
         <Route path="/login" element={<Login />} />
         <Route path="/callback" element={<Callback />} />
-        <Route element={<Layout />}>
-          <Route path="/characters" element={<Characters />} />
-          <Route path="/overview" element={<Overview />} />
-          <Route path="/skills" element={<Skills />} />
-          <Route path="/skills/plans" element={<SkillPlans />} />
-          <Route path="/industry" element={<Industry />} />
-          <Route path="/market" element={<Market />} />
-          <Route path="/wallet" element={<Wallet />} />
-          <Route path="/assets" element={<Assets />} />
-          <Route path="/mail" element={<Mail />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/contracts" element={<Contracts />} />
-          <Route path="/orders" element={<Orders />} />
+        {/* Everything below needs a logged-in Character (auth gate), and then
+            per-route, the scopes that route's endpoints need (scope gate). */}
+        <Route element={<RequireCharacter />}>
+          <Route element={<Layout />}>
+            {FEATURE_ROUTES.map(([path, element]) => (
+              <Route
+                key={path}
+                path={path}
+                element={<ScopeGate path={path}>{element}</ScopeGate>}
+              />
+            ))}
+          </Route>
         </Route>
         <Route path="/styleguide" element={<Styleguide />} />
         <Route path="*" element={<Navigate to="/" replace />} />

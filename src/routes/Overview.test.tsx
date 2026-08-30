@@ -151,6 +151,29 @@ describe('Overview', () => {
     expect(await screen.findByText(/no wallet data cached/i)).toBeInTheDocument();
   });
 
+  it('offers a re-login in the wallet panel when the wallet scope is gone', async () => {
+    server.use(
+      http.get(
+        'https://esi.evetech.net/characters/:id/wallet',
+        () => new HttpResponse(null, { status: 403 })
+      )
+    );
+    render(<App />);
+    // Overview spans three scopes, so only the wallet PANEL degrades — the rest
+    // of the page must keep rendering rather than the whole route being gated.
+    expect(await screen.findByText(/log in again to see your wallet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no wallet data cached/i)).not.toBeInTheDocument();
+  });
+
+  it('does not offer a re-login when the wallet is merely unreachable', async () => {
+    server.use(
+      http.get('https://esi.evetech.net/characters/:id/wallet', () => HttpResponse.error())
+    );
+    render(<App />);
+    expect(await screen.findByText(/no wallet data cached/i)).toBeInTheDocument();
+    expect(screen.queryByText(/log in again to see your wallet/i)).not.toBeInTheDocument();
+  });
+
   it('redirects to /characters when no active character is set', async () => {
     await db.settings.clear();
     render(<App />);

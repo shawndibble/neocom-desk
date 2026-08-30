@@ -41,6 +41,7 @@ import {
   type Firestore,
 } from 'firebase/firestore/lite';
 import { db, type BuildPlanRecord, type CharacterRecord, type SkillPlanRecord } from '@/db';
+import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import { getSyncFirestore } from './firebaseApp';
 import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
@@ -213,8 +214,9 @@ export function triggerSync(characterId: number): Promise<void> {
 /**
  * Owner-hash check: EVE changes a character's ownerHash when it is sold or
  * transferred. If it changed since our last sync, the local editable data
- * belongs to the previous owner — wipe it (and pending tombstones) so nothing
- * leaks into or out of the new owner's account.
+ * belongs to the previous owner — wipe it (and pending tombstones, and the
+ * character's cached ESI responses) so nothing leaks into or out of the new
+ * owner's account.
  */
 async function handleOwnerHashChange(character: CharacterRecord): Promise<void> {
   const key = ownerHashKey(character.characterId);
@@ -224,6 +226,19 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     await db.buildPlans.where('characterId').equals(character.characterId).delete();
     await writeTombstones(planTombstonesKey(character.characterId), []);
     await writeTombstones(buildPlanTombstonesKey(character.characterId), []);
+    // API-derived data belongs to the previous owner just as much as the plans
+    // do — cached wallet, mail, assets and contracts would otherwise survive
+    // into the new owner's session. `auth/session` purges on the same signal at
+    // login (the path that also runs when sync is unconfigured); this covers a
+    // transfer noticed between logins.
+    //
+    // Degrades rather than throws (esi/cachePurge.ts): a failing purge must not
+    // fail the sync. The ownerHash bookmark below is then advanced with the
+    // purge still outstanding — that is safe because the escalating fallback
+    // suppresses the character's cache reads instead of relying on this
+    // bookmark to retry, and `auth/session.persistTokens` retries it on the
+    // character's next login or token refresh.
+    await purgeCharacterCacheOrSuppress(character.characterId);
   }
   await db.settings.put({ key, value: character.ownerHash });
 }

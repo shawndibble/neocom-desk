@@ -3,7 +3,13 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { startLogin, completeLogin, getValidAccessToken } from './session';
 import { challengeFromVerifier } from './pkce';
-import { db } from '@/db';
+import { db, type TokenRecord } from '@/db';
+import { GLOBAL_CACHE_CHARACTER_ID, loadWithCache } from '@/esi/cache';
+import {
+  CACHE_PURGE_PENDING_PREFIX,
+  clearCachePurgePending,
+  isCachePurgePending,
+} from '@/esi/cachePurge';
 
 const CHAR_ID = 2112625428;
 
@@ -11,13 +17,16 @@ function b64url(s: string): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function makeAccessJwt(expSeconds: number): string {
+function makeAccessJwt(
+  expSeconds: number,
+  overrides: { scp?: string[]; owner?: string } = {}
+): string {
   const payload = {
     sub: `CHARACTER:EVE:${CHAR_ID}`,
     name: 'CCP Alpha',
-    owner: 'owner-hash-1',
+    owner: overrides.owner ?? 'owner-hash-1',
     exp: expSeconds,
-    scp: ['esi-skills.read_skills.v1'],
+    scp: overrides.scp ?? ['esi-skills.read_skills.v1'],
   };
   return `${b64url(JSON.stringify({ alg: 'RS256' }))}.${b64url(JSON.stringify(payload))}.sig`;
 }
@@ -60,6 +69,9 @@ beforeEach(async () => {
   tokenRequests = [];
   await db.characters.clear();
   await db.tokens.clear();
+  await db.esiCache.clear();
+  await db.settings.clear();
+  await clearCachePurgePending(CHAR_ID);
 });
 afterEach(() => server.resetHandlers());
 
@@ -265,5 +277,345 @@ describe('getValidAccessToken', () => {
     const stored = await db.tokens.get(CHAR_ID);
     expect(stored?.accessToken).toBe(access);
     expect(stored?.refreshToken).toBe('refresh-keeper'); // NOT clobbered to undefined
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Consent changes: a narrower scope grant or a change of owner invalidates
+// every cached ESI response for that character (privacy — see
+// src/esi/cachePurge.ts). persistTokens is the single funnel for both the
+// login and the refresh path, so the check lives there.
+// ---------------------------------------------------------------------------
+
+const SKILLS = 'esi-skills.read_skills.v1';
+const MAIL = 'esi-mail.read_mail.v1';
+const WALLET = 'esi-wallet.read_character_wallet.v1';
+const OTHER_CHAR_ID = 90000001;
+
+const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
+
+/** Make the token endpoint answer every grant with a JWT carrying these claims. */
+function respondWith(claims: { scp?: string[]; owner?: string }): void {
+  server.use(
+    http.post(TOKEN_URL, async ({ request }) => {
+      tokenRequests.push(new URLSearchParams(await request.text()));
+      return HttpResponse.json({
+        access_token: makeAccessJwt(Math.floor(Date.now() / 1000) + 1200, claims),
+        token_type: 'Bearer',
+        expires_in: 1199,
+        refresh_token: 'refresh-rotated',
+      });
+    })
+  );
+}
+
+async function seedCache(characterId: number, key: string): Promise<void> {
+  await db.esiCache.put({ characterId, key, value: 'secret', fetchedAt: 1 });
+}
+
+async function cachedKeys(characterId: number): Promise<string[]> {
+  const rows = await db.esiCache.toArray();
+  return rows
+    .filter((r) => r.characterId === characterId)
+    .map((r) => r.key)
+    .sort();
+}
+
+/** Prior state of a character that already logged in once. */
+async function seedPriorLogin(options: {
+  scopes?: string[];
+  ownerHash?: string;
+  omitScopes?: boolean;
+}): Promise<void> {
+  await db.characters.put({
+    characterId: CHAR_ID,
+    name: 'CCP Alpha',
+    ownerHash: options.ownerHash ?? 'owner-hash-1',
+    addedAt: 1,
+  });
+  const record = {
+    characterId: CHAR_ID,
+    accessToken: 'stale-access',
+    refreshToken: 'refresh-old',
+    expiresAt: Date.now() + 30_000, // inside the 60s buffer: forces a refresh
+    ...(options.omitScopes ? {} : { scopes: options.scopes ?? [SKILLS, MAIL, WALLET] }),
+  };
+  // A record written before `scopes` existed genuinely has no such field.
+  await db.tokens.put(record as TokenRecord);
+}
+
+/** Drive a fresh interactive login whose JWT carries `claims`. */
+async function login(claims: { scp?: string[]; owner?: string }): Promise<void> {
+  respondWith(claims);
+  const url = new URL(await startLogin([SKILLS], cfg));
+  await completeLogin({ code: 'good-code', state: url.searchParams.get('state')! }, cfg);
+}
+
+/** Drive the refresh path (getValidAccessToken) with a JWT carrying `claims`. */
+async function refresh(claims: { scp?: string[]; owner?: string }): Promise<void> {
+  respondWith(claims);
+  await getValidAccessToken(CHAR_ID, cfg);
+}
+
+describe('persistTokens: cache purge on scope revoke', () => {
+  it('purges the character cache when the new grant is NARROWER (scope revoked)', async () => {
+    await seedPriorLogin({ scopes: [SKILLS, MAIL, WALLET] });
+    await seedCache(CHAR_ID, 'mail:headers');
+    await seedCache(CHAR_ID, 'wallet:journal');
+
+    await login({ scp: [SKILLS, WALLET] }); // mail revoked
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+    expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual([SKILLS, WALLET]);
+  });
+
+  it('does NOT purge when scopes are ADDED — a wider grant must never wipe the cache', async () => {
+    // Guards the app-update case: shipping a batch of new scopes widens every
+    // existing grant on the next login. If that purged, every user would lose
+    // their whole cache on deploy.
+    await seedPriorLogin({ scopes: [SKILLS] });
+    await seedCache(CHAR_ID, 'skills');
+    await seedCache(CHAR_ID, 'wallet:journal');
+
+    await login({ scp: [SKILLS, MAIL, WALLET] });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual(['skills', 'wallet:journal']);
+  });
+
+  it('does NOT purge when the granted scope set is unchanged (order ignored)', async () => {
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'skills');
+
+    await login({ scp: [MAIL, SKILLS] });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual(['skills']);
+  });
+
+  it('does NOT purge on FIRST login — no prior token record is not a revocation', async () => {
+    // Nothing seeded: db.tokens.get returns undefined. An undefined prior grant
+    // must not be read as "previously had everything, now has none".
+    await seedCache(CHAR_ID, 'skills');
+
+    await login({ scp: [SKILLS] });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual(['skills']);
+  });
+
+  it('does NOT purge for a LEGACY token record with no scopes field', async () => {
+    await seedPriorLogin({ omitScopes: true });
+    await seedCache(CHAR_ID, 'skills');
+
+    await refresh({ scp: [SKILLS] });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual(['skills']);
+    expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual([SKILLS]);
+  });
+
+  it('purges on a token REFRESH whose JWT carries fewer scopes (portal revocation)', async () => {
+    // A revocation performed in EVE's third-party-app portal never passes
+    // through Callback.tsx — it surfaces only in the refresh grant's JWT.
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'mail:headers');
+
+    await refresh({ scp: [SKILLS] });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+  });
+
+  it('leaves ANOTHER character cached rows untouched when one character revokes', async () => {
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'mail:headers');
+    await seedCache(OTHER_CHAR_ID, 'mail:headers');
+
+    await refresh({ scp: [SKILLS] });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+    expect(await cachedKeys(OTHER_CHAR_ID)).toEqual(['mail:headers']);
+  });
+
+  it('spares GLOBAL_CACHE_CHARACTER_ID rows when purging on revoke', async () => {
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'mail:headers');
+    await seedCache(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
+    await seedCache(GLOBAL_CACHE_CHARACTER_ID, 'name:1000035');
+
+    await refresh({ scp: [SKILLS] });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+    expect(await cachedKeys(GLOBAL_CACHE_CHARACTER_ID)).toEqual(['name:1000035', 'type:587']);
+  });
+
+  it('purges BEFORE overwriting the stored record, so a failed purge is retried', async () => {
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'mail:headers');
+    const cacheSpy = vi.spyOn(db.esiCache, 'where');
+    const tokensSpy = vi.spyOn(db.tokens, 'put');
+    const charactersSpy = vi.spyOn(db.characters, 'put');
+
+    await refresh({ scp: [SKILLS] });
+
+    expect(cacheSpy).toHaveBeenCalled();
+    expect(cacheSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      charactersSpy.mock.invocationCallOrder[0]
+    );
+    expect(cacheSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      tokensSpy.mock.invocationCallOrder[0]
+    );
+    cacheSpy.mockRestore();
+    tokensSpy.mockRestore();
+    charactersSpy.mockRestore();
+  });
+});
+
+describe('persistTokens: cache purge on owner change', () => {
+  it('purges the character cache when the ownerHash changed (character sold or transferred)', async () => {
+    // The sync-path wipe (sync/planSync.handleOwnerHashChange) only runs on a
+    // successful Firebase sync, which never happens when sync is unconfigured.
+    // Login is the owner-change checkpoint that always runs.
+    // Scopes pinned identical on both sides: only the owner change can purge,
+    // so this cannot pass by way of the scope-revoke path.
+    await seedPriorLogin({ ownerHash: 'previous-owner-hash', scopes: [SKILLS] });
+    await seedCache(CHAR_ID, 'wallet:journal');
+    await seedCache(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
+
+    await login({ owner: 'owner-hash-1' });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+    expect(await cachedKeys(GLOBAL_CACHE_CHARACTER_ID)).toEqual(['type:587']);
+    expect((await db.characters.get(CHAR_ID))?.ownerHash).toBe('owner-hash-1');
+  });
+
+  it('leaves the sync ownerHash bookmark alone, so the sync-side plan wipe still fires', async () => {
+    // The two owner-change paths compare against different baselines:
+    // db.characters.ownerHash here, db.settings['sync.__ownerHash.N'] in
+    // sync/planSync. Updating that setting from here would silently disarm the
+    // Skill Plan / Build Plan wipe — the same bug class this fix closes.
+    await seedPriorLogin({ ownerHash: 'previous-owner-hash', scopes: [SKILLS] });
+    await db.settings.put({ key: `sync.__ownerHash.${CHAR_ID}`, value: 'previous-owner-hash' });
+
+    await login({ owner: 'owner-hash-1' });
+
+    expect((await db.settings.get(`sync.__ownerHash.${CHAR_ID}`))?.value).toBe(
+      'previous-owner-hash'
+    );
+  });
+
+  it('does NOT purge when the ownerHash is unchanged', async () => {
+    await seedPriorLogin({ ownerHash: 'owner-hash-1', scopes: [SKILLS] });
+    await seedCache(CHAR_ID, 'wallet:journal');
+
+    await login({ owner: 'owner-hash-1' });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual(['wallet:journal']);
+  });
+
+  it('does NOT purge on first login for a character never seen before', async () => {
+    await seedCache(CHAR_ID, 'wallet:journal');
+
+    await login({ owner: 'owner-hash-1' });
+
+    expect(await cachedKeys(CHAR_ID)).toEqual(['wallet:journal']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Graceful degradation: a broken Dexie must never cost the user their login.
+// ---------------------------------------------------------------------------
+
+describe('persistTokens: a failing purge degrades, it never fails the session', () => {
+  it('login SUCCEEDS when the targeted purge fails, escalating to a full cache clear', async () => {
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'mail:headers');
+    await seedCache(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
+    const where = vi.spyOn(db.esiCache, 'where').mockImplementation(() => {
+      throw new Error('index damaged');
+    });
+
+    await login({ scp: [SKILLS] }); // mail revoked
+    where.mockRestore();
+
+    expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual([SKILLS]);
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+    // Tier 2 is the whole table, global rows included: correctness over churn.
+    expect(await cachedKeys(GLOBAL_CACHE_CHARACTER_ID)).toEqual([]);
+    expect(await isCachePurgePending(CHAR_ID)).toBe(false);
+  });
+
+  it('refresh SUCCEEDS when BOTH purges fail, and the stale rows are NOT served', async () => {
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'mail:headers');
+    const where = vi.spyOn(db.esiCache, 'where').mockImplementation(() => {
+      throw new Error('index damaged');
+    });
+    const clear = vi.spyOn(db.esiCache, 'clear').mockRejectedValue(new Error('QuotaExceeded'));
+
+    await expect(refresh({ scp: [SKILLS] })).resolves.toBeUndefined();
+    where.mockRestore();
+    clear.mockRestore();
+
+    expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual([SKILLS]);
+    // Undeletable, therefore unreadable: offline shows an empty view rather
+    // than data the character no longer consents to us holding.
+    expect(await cachedKeys(CHAR_ID)).toEqual(['mail:headers']);
+    const served = await loadWithCache(CHAR_ID, 'mail:headers', async () => {
+      throw new Error('offline');
+    });
+    expect(served).toBeNull();
+  });
+
+  it('retries the pending purge on the NEXT refresh and clears the marker on success', async () => {
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'mail:headers');
+    const where = vi.spyOn(db.esiCache, 'where').mockImplementation(() => {
+      throw new Error('index damaged');
+    });
+    const clear = vi.spyOn(db.esiCache, 'clear').mockRejectedValue(new Error('QuotaExceeded'));
+    await refresh({ scp: [SKILLS] });
+    where.mockRestore();
+    clear.mockRestore();
+    expect(await isCachePurgePending(CHAR_ID)).toBe(true);
+
+    // Scopes now unchanged and ownerHash unchanged — the retry must be driven
+    // by the marker alone, not by re-detecting the revocation (the evidence is
+    // already overwritten in db.tokens).
+    await db.tokens.update(CHAR_ID, {
+      expiresAt: Date.now() + 30_000,
+      refreshToken: 'refresh-old',
+    });
+    await refresh({ scp: [SKILLS] });
+
+    expect(await isCachePurgePending(CHAR_ID)).toBe(false);
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+    expect(await db.settings.get(`${CACHE_PURGE_PENDING_PREFIX}${CHAR_ID}`)).toBeUndefined();
+  });
+
+  it('a character with NO pending marker and no consent change never touches the cache', async () => {
+    await seedPriorLogin({ scopes: [SKILLS] });
+    await seedCache(CHAR_ID, 'skills');
+    const where = vi.spyOn(db.esiCache, 'where');
+    const clear = vi.spyOn(db.esiCache, 'clear');
+
+    await login({ scp: [SKILLS] });
+
+    expect(where).not.toHaveBeenCalled();
+    expect(clear).not.toHaveBeenCalled();
+    where.mockRestore();
+    clear.mockRestore();
+    expect(await cachedKeys(CHAR_ID)).toEqual(['skills']);
+  });
+
+  it('the ADDITIVE-scopes path still runs no purge of any tier', async () => {
+    await seedPriorLogin({ scopes: [SKILLS] });
+    await seedCache(CHAR_ID, 'skills');
+    const where = vi.spyOn(db.esiCache, 'where');
+    const clear = vi.spyOn(db.esiCache, 'clear');
+
+    await login({ scp: [SKILLS, MAIL, WALLET] });
+
+    expect(where).not.toHaveBeenCalled();
+    expect(clear).not.toHaveBeenCalled();
+    where.mockRestore();
+    clear.mockRestore();
+    expect(await cachedKeys(CHAR_ID)).toEqual(['skills']);
   });
 });

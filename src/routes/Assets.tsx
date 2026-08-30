@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { loadCharacterAssets } from '@/features/character/assets';
+import { loadCharacterAssetsWithTruncation } from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -12,6 +12,8 @@ import type { CharacterAsset } from '@/esi/endpoints';
 interface Snapshot {
   requestKey: string;
   assetsResult: CachedResult<CharacterAsset[]> | null;
+  /** D4: fewer pages came back than ESI advertised — the list below is partial. */
+  assetsTruncated: boolean;
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
 }
@@ -56,7 +58,8 @@ export function Assets() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const assetsResult = await loadCharacterAssets(activeCharacterId);
+      const { cached: assetsResult, truncated: assetsTruncated } =
+        await loadCharacterAssetsWithTruncation(activeCharacterId);
       if (cancelled) return;
       const assets = assetsResult?.data ?? [];
       const typeNames = await loadTypeNames([...new Set(assets.map((a) => a.type_id))]);
@@ -73,7 +76,7 @@ export function Assets() {
         if (name) locationNames.set(id, name);
       });
 
-      setSnapshot({ requestKey, assetsResult, typeNames, locationNames });
+      setSnapshot({ requestKey, assetsResult, assetsTruncated, typeNames, locationNames });
     })();
     return () => {
       cancelled = true;
@@ -84,6 +87,7 @@ export function Assets() {
   const current = snapshot?.requestKey === requestKey ? snapshot : null;
   const loading = current === null;
   const assetsResult = current?.assetsResult ?? null;
+  const assetsTruncated = current?.assetsTruncated ?? false;
   const typeNames = current?.typeNames ?? new Map<number, string>();
   const locationNames = current?.locationNames ?? new Map<number, string>();
 
@@ -157,6 +161,9 @@ export function Assets() {
         <>
           {assetsResult.fromCache && (
             <p className="text-[11px] text-warning uppercase">{t('common.offlineTitle')}</p>
+          )}
+          {assetsTruncated && (
+            <p className="text-[11px] text-warning uppercase">{t('common.incompleteTitle')}</p>
           )}
           {groups.length === 0 ? (
             <EmptyState title={t('assets.noResults')} className="py-8" />

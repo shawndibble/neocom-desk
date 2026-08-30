@@ -34,6 +34,30 @@ against them mis-baselines.
 
 Correcting both documents is part of Phase 0.
 
+### Superseded approach: D3
+
+This plan originally called for wiring `ReauthBanner` into the six views that
+drop the `needsReauth` signal. That was rejected during implementation: it
+duplicates the same logic nine times, and it only discovers the problem
+_after_ a failed fetch, so the user watches a spinner resolve to an empty
+table before any explanation appears.
+
+What shipped instead is two central mechanisms plus one per-panel case:
+
+- A **scope gate** on the route table compares the Character's stored grant
+  against the route's required scopes — derived from `esi/registry.ts`, so
+  scope strings are never copied — and renders the banner in place of the
+  view, before any fetch.
+- A **runtime auth-failure sink** (`stores/authFailure.ts`, fed by
+  `esi/cache.ts`) covers the window where the stored grant is stale, because a
+  revoke performed in EVE's third-party-application portal is invisible
+  locally until the next token refresh.
+- `/overview`, `/skills` and `/industry` span three scopes each, so they
+  degrade **per panel**. Page-gating them would hide panels that still work.
+
+The whole app also moved behind authentication (see `CONTEXT.md` round 4),
+which removes the anonymous-state branch from the gate entirely.
+
 ### Current measurements
 
 - **JS bundle: 334 KB gzip**, single chunk. `firebase/firestore` alone is 109 KB of it (32%).
@@ -112,7 +136,7 @@ a teardown item, which is exactly why the teardown's ranking couldn't surface it
 | Fix `docs/ARCHITECTURE.md` §6 and `docs/DESIGN.md` §4                                   | S    | Any future planning                                 |
 | **Endpoint registry**: one table mapping ESI endpoint → required scope → route template | S    | 15a, 17, D9                                         |
 | Fix D1 — purge `esiCache` on owner-hash change. Start reading the stored scope set (D2) | S    | Privacy; supplies 15a's detection input             |
-| Wire `ReauthBanner` into the other 6 views (D3)                                         | S    | 13, 15b, 16, 20                                     |
+| Central auth gate + route scope gate, replacing per-view `ReauthBanner` wiring (D3)     | S    | 13, 15b, 16, 20                                     |
 | Signal truncation in `paginated.ts` (D4)                                                | S    | 17, 20                                              |
 | `placeRemaps` single-remap O(R) path (D5)                                               | S    | **05** — and speeds up the shipped optimizer button |
 | Decide Booster semantics (D6), one ruling covering optimizer and queue                  | S    | 01, 05                                              |

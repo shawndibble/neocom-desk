@@ -21,6 +21,13 @@
     "more": "More",
     "mobileLabel": "Mobile navigation"
   },
+  "reauth": {
+    "navLocked": "Needs a new login",
+    "staleGrantTitle": "EVE access was refused",
+    "staleGrantHint": "EVE turned down a request for this character's data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
+    "staleGrantAction": "Log in again with EVE Online",
+    "dismiss": "Dismiss"
+  },
   "skills": {
     "trainedTab": "Trained",
     "plansTab": "Plans",
@@ -244,7 +251,10 @@
     "queue": "Training queue",
     "queueEmpty": "No active in-game training queue cached.",
     "training": "Training {{name}}",
-    "finishes": "finishes {{date}}"
+    "finishes": "finishes {{date}}",
+    "reauthTitle": "Log in again to see your wallet",
+    "reauthHint": "Log in again to fetch this character's wallet balance.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "common": {
     "close": "Close",
@@ -254,6 +264,7 @@
     "aboutLabel": "About {{label}}",
     "offlineTitle": "Showing cached data",
     "refreshFailedTitle": "Refresh failed — showing cached data",
+    "incompleteTitle": "Incomplete data — some pages could not be loaded",
     "age": {
       "justNow": "just now",
       "minutes": "{{count}}m ago",
@@ -273,6 +284,7 @@
     "journalEmptyHint": "Reconnect to fetch this character's wallet journal.",
     "transactionsEmptyTitle": "No transactions cached",
     "transactionsEmptyHint": "Reconnect to fetch this character's recent transactions.",
+    "transactionsCapped": "Recent transactions only — older history was not fetched",
     "date": "Date",
     "amount": "Amount",
     "balanceCol": "Balance",
@@ -300,7 +312,10 @@
     "stationLabel": "Station #{{id}}",
     "structureLabel": "Structure #{{id}}",
     "inSpaceLabel": "In space (system #{{id}})",
-    "containerLabel": "Container"
+    "containerLabel": "Container",
+    "reauthTitle": "Log in again to see your assets",
+    "reauthHint": "Log in again to fetch this character's assets.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "mail": {
     "title": "Mail",
@@ -309,7 +324,10 @@
     "emptyHint": "Reconnect to fetch this character's mail.",
     "selectHint": "Select a message to read it.",
     "unknownSender": "Unknown sender",
-    "noSubject": "(no subject)"
+    "noSubject": "(no subject)",
+    "reauthTitle": "Log in again to see your mail",
+    "reauthHint": "Log in again to fetch this character's mail.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "calendar": {
     "title": "Calendar",
@@ -321,7 +339,10 @@
     "responseAccepted": "Accepted",
     "responseDeclined": "Declined",
     "responseTentative": "Tentative",
-    "responseNotResponded": "Not responded"
+    "responseNotResponded": "Not responded",
+    "reauthTitle": "Log in again to see your calendar",
+    "reauthHint": "Log in again to fetch this character's calendar.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "contracts": {
     "title": "Contracts",
@@ -332,7 +353,10 @@
     "type": "Type",
     "price": "Price",
     "expires": "Expires",
-    "issuer": "Issuer"
+    "issuer": "Issuer",
+    "reauthTitle": "Log in again to see your contracts",
+    "reauthHint": "Log in again to fetch this character's contracts.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "orders": {
     "title": "Orders",
@@ -352,7 +376,10 @@
     "total": "Total",
     "issued": "Issued",
     "expires": "Expires",
-    "state": "State"
+    "state": "State",
+    "reauthTitle": "Log in again to see your orders",
+    "reauthHint": "Log in again to fetch this character's market orders.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "sync": {
     "idle": "Synced",

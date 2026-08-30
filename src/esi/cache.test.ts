@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import { EsiError } from './client';
 import {
@@ -8,6 +8,7 @@ import {
   writeCached,
   GLOBAL_CACHE_CHARACTER_ID,
 } from './cache';
+import { clearCachePurgePending, purgeCharacterCacheOrSuppress } from './cachePurge';
 
 const CHAR_ID = 91;
 const KEY = 'thing';
@@ -143,5 +144,99 @@ describe('readCached / writeCached', () => {
 
   it('readCached returns undefined for a miss', async () => {
     expect(await readCached(CHAR_ID, 'nope')).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Purge-pending suppression: when both purge tiers failed, the previous
+// owner's rows are still on disk. The read path must behave as if the cache
+// were empty for that character (see cachePurge.ts).
+// ---------------------------------------------------------------------------
+
+/** Drive cachePurge into tier 3 for real, rather than poking its internals. */
+async function suppressViaFailedPurge(characterId: number): Promise<void> {
+  const where = vi.spyOn(db.esiCache, 'where').mockImplementation(() => {
+    throw new Error('index damaged');
+  });
+  const clear = vi.spyOn(db.esiCache, 'clear').mockRejectedValue(new Error('QuotaExceeded'));
+  await purgeCharacterCacheOrSuppress(characterId);
+  where.mockRestore();
+  clear.mockRestore();
+}
+
+describe('read path while a cache purge is pending', () => {
+  const OTHER_CHAR_ID = 92;
+
+  beforeEach(async () => {
+    await db.settings.clear();
+    await clearCachePurgePending(CHAR_ID);
+    await clearCachePurgePending(OTHER_CHAR_ID);
+  });
+
+  it('loadWithCache returns null instead of the undeleted row when the live call fails', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1234 });
+    await suppressViaFailedPurge(CHAR_ID);
+
+    const result = await loadWithCache(CHAR_ID, KEY, async () => {
+      throw new Error('offline');
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('loadWithCacheStatus reports cached: null while still surfacing needsReauth', async () => {
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1234 });
+    await suppressViaFailedPurge(CHAR_ID);
+
+    const result = await loadWithCacheStatus(CHAR_ID, KEY, async () => {
+      throw new EsiError(401, 'token invalid');
+    });
+
+    expect(result).toEqual({ cached: null, needsReauth: true });
+  });
+
+  it('still serves LIVE data — degradation is live-only, not offline-only', async () => {
+    await suppressViaFailedPurge(CHAR_ID);
+
+    const result = await loadWithCache(CHAR_ID, KEY, async () => 'live-value');
+
+    expect(result).toMatchObject({ data: 'live-value', fromCache: false });
+  });
+
+  it('readCached returns undefined for the suppressed character', async () => {
+    await writeCached(CHAR_ID, KEY, 'stale', 1234);
+    await suppressViaFailedPurge(CHAR_ID);
+
+    expect(await readCached(CHAR_ID, KEY)).toBeUndefined();
+  });
+
+  it('does not suppress a different character', async () => {
+    await db.esiCache.put({ characterId: OTHER_CHAR_ID, key: KEY, value: 'mine', fetchedAt: 1 });
+    await suppressViaFailedPurge(CHAR_ID);
+
+    const result = await loadWithCache(OTHER_CHAR_ID, KEY, async () => {
+      throw new Error('offline');
+    });
+
+    expect(result).toMatchObject({ data: 'mine', fromCache: true });
+  });
+
+  it('does not suppress GLOBAL_CACHE_CHARACTER_ID rows', async () => {
+    await writeCached(GLOBAL_CACHE_CHARACTER_ID, 'type:587', 'Tritanium', 1);
+    await suppressViaFailedPurge(CHAR_ID);
+
+    expect(await readCached(GLOBAL_CACHE_CHARACTER_ID, 'type:587')).toBe('Tritanium');
+  });
+
+  it('serves the cache again once a later purge succeeds and the marker clears', async () => {
+    await suppressViaFailedPurge(CHAR_ID);
+    await purgeCharacterCacheOrSuppress(CHAR_ID);
+    await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'fresh', fetchedAt: 5 });
+
+    const result = await loadWithCache(CHAR_ID, KEY, async () => {
+      throw new Error('offline');
+    });
+
+    expect(result).toMatchObject({ data: 'fresh', fromCache: true });
   });
 });

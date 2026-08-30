@@ -179,6 +179,48 @@ describe('Wallet', () => {
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
 
+  it('warns that the journal is incomplete when a page fails mid-pagination (D4)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        if (page === '2') return new HttpResponse(null, { status: 404 });
+        return HttpResponse.json(journalPage1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText('Bounty')).toBeInTheDocument();
+    expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
+  });
+
+  it('warns that transactions stop at the page cap when every call comes back full (D4)', async () => {
+    let calls = 0;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, () => {
+        calls += 1;
+        return HttpResponse.json([{ ...transactions[0], transaction_id: 1000 - calls }]);
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Transactions' }));
+    expect(await screen.findByText(/recent transactions only/i)).toBeInTheDocument();
+    expect(calls).toBe(5);
+  });
+
+  it('shows no truncation warning when the journal and transactions came back whole', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    expect(await screen.findByText('Bounty')).toBeInTheDocument();
+    expect(screen.queryByText(/incomplete data/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Transactions' }));
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText(/recent transactions only/i)).not.toBeInTheDocument();
+  });
+
   it('shows the empty state when there is no data at all', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())

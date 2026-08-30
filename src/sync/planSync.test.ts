@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
 import { db, type BuildPlanRecord, type SkillPlanRecord } from '@/db';
+import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
   getSyncStatus,
@@ -139,6 +141,7 @@ beforeEach(async () => {
     db.skillPlans.clear(),
     db.buildPlans.clear(),
     db.settings.clear(),
+    db.esiCache.clear(),
   ]);
   await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: HASH, addedAt: 1 });
 });
@@ -232,6 +235,42 @@ describe('triggerSync: plans', () => {
     await triggerSync(1);
     expect(deleteDoc).toHaveBeenCalledTimes(1);
     expect(remoteStore.get(PLANS_PATH)?.has('p1')).toBe(false);
+  });
+
+  it('wipes the character ESI cache when ownerHash changed, sparing global rows', async () => {
+    // The previous owner's cached wallet/mail/assets must not survive into the
+    // new owner's session (src/esi/cachePurge.ts). GLOBAL_CACHE_CHARACTER_ID
+    // rows are public universe data owned by nobody — purging them would be
+    // cache churn with no privacy benefit.
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+    await db.esiCache.bulkPut([
+      { characterId: 1, key: 'wallet:journal', value: 'secret', fetchedAt: 1 },
+      { characterId: 1, key: 'mail:headers', value: 'secret', fetchedAt: 1 },
+      { characterId: 2, key: 'wallet:journal', value: 'other char', fetchedAt: 1 },
+      { characterId: GLOBAL_CACHE_CHARACTER_ID, key: 'type:587', value: 'Rifter', fetchedAt: 1 },
+    ]);
+
+    await triggerSync(1);
+
+    const remaining = (await db.esiCache.toArray()).map((r) => `${r.characterId}:${r.key}`).sort();
+    expect(remaining).toEqual(['0:type:587', '2:wallet:journal']);
+  });
+
+  it('leaves the ESI cache alone when ownerHash is unchanged', async () => {
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: HASH });
+    await db.esiCache.put({ characterId: 1, key: 'wallet:journal', value: 'mine', fetchedAt: 1 });
+
+    await triggerSync(1);
+
+    expect(await db.esiCache.count()).toBe(1);
+  });
+
+  it('leaves the ESI cache alone on a first-ever sync (no recorded ownerHash)', async () => {
+    await db.esiCache.put({ characterId: 1, key: 'wallet:journal', value: 'mine', fetchedAt: 1 });
+
+    await triggerSync(1);
+
+    expect(await db.esiCache.count()).toBe(1);
   });
 
   it('wipes local plans instead of pushing them when ownerHash changed (character sold)', async () => {
@@ -341,6 +380,19 @@ describe('triggerSync: settings', () => {
     const doc = remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub');
     expect(doc).toMatchObject({ key: 'sync.tradeHub', value: 'jita', ownerHash: HASH });
     expect(typeof doc?.updatedAt).toBe('number');
+  });
+
+  it('never pushes the device-local cache-purge-pending marker', async () => {
+    // A stuck purge is one device's storage problem. Syncing the marker would
+    // suppress the ESI cache on every other device — and it is not a 'sync.'
+    // key, which is exactly what keeps it local (src/esi/cachePurge.ts).
+    await db.settings.put({ key: `${CACHE_PURGE_PENDING_PREFIX}1`, value: true });
+    await setSyncedSetting('sync.tradeHub', 'jita');
+
+    await triggerSync(1);
+
+    expect(remoteStore.get(SETTINGS_PATH)?.has(`${CACHE_PURGE_PENDING_PREFIX}1`)).toBe(false);
+    expect(remoteStore.get(SETTINGS_PATH)?.has('sync.tradeHub')).toBe(true);
   });
 
   it('pulls newer remote settings into Dexie', async () => {

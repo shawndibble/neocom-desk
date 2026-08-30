@@ -5,7 +5,8 @@
  */
 import { esiFetch } from './client';
 import type { EsiResult } from './client';
-import { fetchAllPages } from './paginated';
+import { fetchAllPages, fetchAllPagesStatus } from './paginated';
+import type { PaginatedResult, TruncatableResult } from './paginated';
 
 /** Options a caller may tune per request (conditional GET, cancellation). */
 export interface EndpointOptions {
@@ -251,12 +252,16 @@ export interface WalletJournalEntry {
   tax_receiver_id?: number;
 }
 
-/** Paginated (X-Pages); every page is fetched sequentially (see fetchAllPages). */
+/**
+ * Paginated (X-Pages); every page is fetched sequentially (see fetchAllPages).
+ * D4: returns the completeness flag with the entries — a short journal must
+ * not reach the view looking like a whole one.
+ */
 export function getCharacterWalletJournal(
   characterId: number,
   options: EndpointOptions = {}
-): Promise<WalletJournalEntry[]> {
-  return fetchAllPages<WalletJournalEntry>(`/characters/${characterId}/wallet/journal`, {
+): Promise<PaginatedResult<WalletJournalEntry>> {
+  return fetchAllPagesStatus<WalletJournalEntry>(`/characters/${characterId}/wallet/journal`, {
     ...options,
     characterId,
   });
@@ -289,9 +294,14 @@ const MAX_TRANSACTION_PAGES = 5;
 export async function getCharacterWalletTransactions(
   characterId: number,
   options: Omit<EndpointOptions, 'etag'> = {}
-): Promise<WalletTransaction[]> {
+): Promise<TruncatableResult<WalletTransaction>> {
   const items: WalletTransaction[] = [];
   let fromId: number | undefined;
+  // D4: the cap is a deliberate product limit, but the user still has to be
+  // told when it bit. Using every call *and* getting data on the last one is
+  // the only case where history may remain unfetched (it may also have ended
+  // exactly there — ESI gives no way to tell, so this errs toward warning).
+  let truncated = false;
   for (let page = 0; page < MAX_TRANSACTION_PAGES; page += 1) {
     const result = await esiFetch<WalletTransaction[]>(
       `/characters/${characterId}/wallet/transactions`,
@@ -304,12 +314,13 @@ export async function getCharacterWalletTransactions(
     const page_ = result.data ?? [];
     if (page_.length === 0) break;
     items.push(...page_);
+    truncated = page === MAX_TRANSACTION_PAGES - 1;
     // from_id is exclusive ("transactions before this id"): passing the
     // lowest id seen so far already excludes it from the next page, so
     // subtracting 1 would skip the transaction with id `minId - 1`.
     fromId = Math.min(...page_.map((t) => t.transaction_id));
   }
-  return items;
+  return { items, truncated };
 }
 
 // --- GET /characters/{character_id}/assets (esi-assets.read_assets.v1) ---
@@ -325,12 +336,16 @@ export interface CharacterAsset {
   is_blueprint_copy?: boolean;
 }
 
-/** Paginated (X-Pages); every page is fetched sequentially (see fetchAllPages). */
+/**
+ * Paginated (X-Pages); every page is fetched sequentially (see fetchAllPages).
+ * D4: returns the completeness flag with the assets — a short list must not
+ * reach the view looking like a whole one.
+ */
 export function getCharacterAssets(
   characterId: number,
   options: EndpointOptions = {}
-): Promise<CharacterAsset[]> {
-  return fetchAllPages<CharacterAsset>(`/characters/${characterId}/assets`, {
+): Promise<PaginatedResult<CharacterAsset>> {
+  return fetchAllPagesStatus<CharacterAsset>(`/characters/${characterId}/assets`, {
     ...options,
     characterId,
   });

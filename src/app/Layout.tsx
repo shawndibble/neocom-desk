@@ -9,6 +9,9 @@ import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
 import { Modal } from '@/components/ui';
+import { AuthFailureNotice } from './AuthFailureNotice';
+import { useLockedRoutes } from './useGrantedScopes';
+import type { AppRoutePath } from './routeScopes';
 
 /**
  * Sync status dot, gated on Firebase being configured at all (see
@@ -30,12 +33,64 @@ function navClass({ isActive }: { isActive: boolean }): string {
   return `${NAV_LINK} ${isActive ? NAV_ACTIVE : NAV_IDLE}`;
 }
 
+/**
+ * Every feature route reachable from the nav, so `useLockedRoutes` can answer
+ * for all of them in one Dexie read.
+ */
+const NAV_PATHS = [
+  '/characters',
+  '/overview',
+  '/skills',
+  '/industry',
+  '/market',
+  '/wallet',
+  '/assets',
+  '/mail',
+  '/calendar',
+  '/contracts',
+  '/orders',
+] as const satisfies readonly AppRoutePath[];
+
+interface NavItemProps {
+  to: AppRoutePath;
+  label: string;
+  locked: boolean;
+  onClick?: () => void;
+}
+
+/**
+ * Nav link that marks a destination the active Character cannot currently
+ * use. The marker is informational only — the link still navigates, and the
+ * route's `ScopeGate` explains what is missing when the user gets there.
+ * Disabling it would leave no way to reach the explanation.
+ */
+function NavItem({ to, label, locked, onClick }: NavItemProps) {
+  const { t } = useTranslation();
+  // The marker rides on `title`, not on extra text: appending a second string
+  // inside the link would rewrite its accessible name from "Assets" to
+  // "Assets, needs a new login", which is not what the link is called.
+  return (
+    <NavLink
+      to={to}
+      onClick={onClick}
+      className={navClass}
+      title={locked ? t('reauth.navLocked') : undefined}
+    >
+      <span className="min-w-0 truncate">{label}</span>
+      {locked && (
+        <span aria-hidden="true" className="ml-auto size-1.5 shrink-0 rounded-full bg-warning" />
+      )}
+    </NavLink>
+  );
+}
+
 const MORE_SHEET_ID = 'mobile-more-sheet';
 
 interface MobileMoreSheetProps {
   open: boolean;
   onClose: () => void;
   activeCharacter: { characterId: number; name: string } | undefined;
+  locked: ReadonlySet<AppRoutePath>;
 }
 
 /**
@@ -50,7 +105,7 @@ interface MobileMoreSheetProps {
  * backdrop click closes, focus returns to the More trigger. Links also close it
  * on click so it never hangs over the next route.
  */
-function MobileMoreSheet({ open, onClose, activeCharacter }: MobileMoreSheetProps) {
+function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreSheetProps) {
   const { t } = useTranslation();
 
   return (
@@ -63,9 +118,12 @@ function MobileMoreSheet({ open, onClose, activeCharacter }: MobileMoreSheetProp
       className="md:hidden"
     >
       <div className="space-y-1 pb-3">
-        <NavLink to="/market" onClick={onClose} className={navClass}>
-          {t('nav.market')}
-        </NavLink>
+        <NavItem
+          to="/market"
+          label={t('nav.market')}
+          locked={locked.has('/market')}
+          onClick={onClose}
+        />
         {activeCharacter && (
           <Link
             to="/characters"
@@ -82,24 +140,37 @@ function MobileMoreSheet({ open, onClose, activeCharacter }: MobileMoreSheetProp
             <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
           </Link>
         )}
-        <NavLink to="/wallet" onClick={onClose} className={navClass}>
-          {t('nav.wallet')}
-        </NavLink>
-        <NavLink to="/assets" onClick={onClose} className={navClass}>
-          {t('nav.assets')}
-        </NavLink>
-        <NavLink to="/mail" onClick={onClose} className={navClass}>
-          {t('nav.mail')}
-        </NavLink>
-        <NavLink to="/calendar" onClick={onClose} className={navClass}>
-          {t('nav.calendar')}
-        </NavLink>
-        <NavLink to="/contracts" onClick={onClose} className={navClass}>
-          {t('nav.contracts')}
-        </NavLink>
-        <NavLink to="/orders" onClick={onClose} className={navClass}>
-          {t('nav.orders')}
-        </NavLink>
+        <NavItem
+          to="/wallet"
+          label={t('nav.wallet')}
+          locked={locked.has('/wallet')}
+          onClick={onClose}
+        />
+        <NavItem
+          to="/assets"
+          label={t('nav.assets')}
+          locked={locked.has('/assets')}
+          onClick={onClose}
+        />
+        <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} onClick={onClose} />
+        <NavItem
+          to="/calendar"
+          label={t('nav.calendar')}
+          locked={locked.has('/calendar')}
+          onClick={onClose}
+        />
+        <NavItem
+          to="/contracts"
+          label={t('nav.contracts')}
+          locked={locked.has('/contracts')}
+          onClick={onClose}
+        />
+        <NavItem
+          to="/orders"
+          label={t('nav.orders')}
+          locked={locked.has('/orders')}
+          onClick={onClose}
+        />
       </div>
     </Modal>
   );
@@ -113,6 +184,8 @@ export function Layout() {
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
     [activeCharacterId]
   );
+
+  const locked = useLockedRoutes(NAV_PATHS);
 
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
@@ -148,42 +221,24 @@ export function Layout() {
           {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-2">
-          <NavLink to="/characters" className={navClass}>
-            {t('nav.characters')}
-          </NavLink>
-          <NavLink to="/overview" className={navClass}>
-            {t('nav.overview')}
-          </NavLink>
-          <NavLink to="/skills" className={navClass}>
-            {t('nav.skills')}
-          </NavLink>
-          <NavLink to="/industry" className={navClass}>
-            {t('nav.industry')}
-          </NavLink>
-          <NavLink to="/market" className={navClass}>
-            {t('nav.market')}
-          </NavLink>
+          <NavItem
+            to="/characters"
+            label={t('nav.characters')}
+            locked={locked.has('/characters')}
+          />
+          <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
+          <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
+          <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
+          <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
           <p className="mt-3 px-3 text-[10px] font-semibold tracking-widest text-text-faint uppercase">
             {t('nav.characterSection')}
           </p>
-          <NavLink to="/wallet" className={navClass}>
-            {t('nav.wallet')}
-          </NavLink>
-          <NavLink to="/assets" className={navClass}>
-            {t('nav.assets')}
-          </NavLink>
-          <NavLink to="/mail" className={navClass}>
-            {t('nav.mail')}
-          </NavLink>
-          <NavLink to="/calendar" className={navClass}>
-            {t('nav.calendar')}
-          </NavLink>
-          <NavLink to="/contracts" className={navClass}>
-            {t('nav.contracts')}
-          </NavLink>
-          <NavLink to="/orders" className={navClass}>
-            {t('nav.orders')}
-          </NavLink>
+          <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
+          <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
+          <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} />
+          <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
+          <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
+          <NavItem to="/orders" label={t('nav.orders')} locked={locked.has('/orders')} />
         </nav>
         {activeCharacter && (
           <Link
@@ -204,6 +259,7 @@ export function Layout() {
       </aside>
 
       <main className="min-w-0 flex-1 p-4 pb-20 md:pb-4">
+        <AuthFailureNotice />
         <Outlet />
       </main>
 
@@ -241,6 +297,7 @@ export function Layout() {
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
         activeCharacter={activeCharacter}
+        locked={locked}
       />
     </div>
   );

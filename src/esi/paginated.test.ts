@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { setupServer } from 'msw/node';
-import { fetchAllPages } from './paginated';
+import { fetchAllPages, fetchAllPagesStatus } from './paginated';
 import { configureEsi, ESI_BASE_URL } from './client';
 import { rejectBadEsiHeaders } from './test-helpers';
 
@@ -100,5 +100,83 @@ describe('fetchAllPages', () => {
     );
 
     await expect(fetchAllPages<string>('/markets/10000002/orders')).rejects.toThrow();
+  });
+});
+
+/**
+ * D4: a short list used to be indistinguishable from a complete one, so a
+ * truncated view rendered under a fresh DataAgeBadge as if it were whole.
+ */
+describe('fetchAllPagesStatus', () => {
+  function pagedHandler(totalPages: number, failFrom?: number) {
+    return http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get('page'));
+      if (failFrom !== undefined && page >= failFrom)
+        return new HttpResponse(null, { status: 404 });
+      return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': String(totalPages) } });
+    });
+  }
+
+  it('reports a single-page result as complete', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, () => HttpResponse.json(['only-item']))
+    );
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders');
+
+    expect(result).toEqual({
+      items: ['only-item'],
+      truncated: false,
+      pagesFetched: 1,
+      pagesReported: 1,
+    });
+  });
+
+  it('reports a fully fetched multi-page result as complete', async () => {
+    server.use(pagedHandler(3));
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders');
+
+    expect(result).toEqual({
+      items: ['item-1', 'item-2', 'item-3'],
+      truncated: false,
+      pagesFetched: 3,
+      pagesReported: 3,
+    });
+  });
+
+  it('reports truncated when the page cap stops the fetch short', async () => {
+    server.use(pagedHandler(4));
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders', { maxPages: 2 });
+
+    expect(result).toEqual({
+      items: ['item-1', 'item-2'],
+      truncated: true,
+      pagesFetched: 2,
+      pagesReported: 4,
+    });
+  });
+
+  it('reports truncated but keeps the pages it got when a later page fails', async () => {
+    server.use(pagedHandler(3, 3));
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders');
+
+    expect(result).toEqual({
+      items: ['item-1', 'item-2'],
+      truncated: true,
+      pagesFetched: 2,
+      pagesReported: 3,
+    });
+  });
+
+  it('reports complete when the cap is never reached', async () => {
+    server.use(pagedHandler(2));
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders', { maxPages: 5 });
+
+    expect(result.truncated).toBe(false);
+    expect(result.items).toEqual(['item-1', 'item-2']);
   });
 });

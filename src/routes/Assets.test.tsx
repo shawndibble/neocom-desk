@@ -185,6 +185,25 @@ describe('Assets', () => {
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
 
+  it('warns that the list is incomplete when a page fails mid-pagination (D4)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        if (page === '2') return new HttpResponse(null, { status: 404 });
+        return HttpResponse.json(assetPage1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+    render(<App />);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
+  });
+
+  it('shows no incomplete-data warning when every page came back', async () => {
+    render(<App />);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText(/incomplete data/i)).not.toBeInTheDocument();
+  });
+
   it('shows the empty state when there is no data at all', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () => HttpResponse.error())

@@ -41,18 +41,62 @@ export function loadWalletBalanceWithStatus(characterId: number): Promise<Status
   );
 }
 
+/**
+ * D4: a cached list plus whether the live fetch behind it came up short.
+ * Same shape idea as `StatusResult` (data + the one bit the caller can't
+ * recover on its own). `truncated` describes the fetch this call made, so it
+ * is only ever true for a fresh response — a cache hit has no page count to
+ * compare against.
+ */
+export interface TruncatableCachedResult<T> {
+  cached: CachedResult<T> | null;
+  truncated: boolean;
+}
+
 /** Wallet journal entries (every page). ESI or cache. */
 export function loadWalletJournal(
   characterId: number
 ): Promise<CachedResult<WalletJournalEntry[]> | null> {
-  return loadWithCache(characterId, KEYS.journal, () => getCharacterWalletJournal(characterId));
+  return loadWithCache(
+    characterId,
+    KEYS.journal,
+    async () => (await getCharacterWalletJournal(characterId)).items
+  );
 }
 
 /** Recent wallet transactions (cursor-followed, see esi/endpoints.ts). ESI or cache. */
 export function loadWalletTransactions(
   characterId: number
 ): Promise<CachedResult<WalletTransaction[]> | null> {
-  return loadWithCache(characterId, KEYS.transactions, () =>
-    getCharacterWalletTransactions(characterId)
+  return loadWithCache(
+    characterId,
+    KEYS.transactions,
+    async () => (await getCharacterWalletTransactions(characterId)).items
   );
+}
+
+/** Journal, plus whether pages were missing from the fetch (D4). */
+export async function loadWalletJournalWithStatus(
+  characterId: number
+): Promise<TruncatableCachedResult<WalletJournalEntry[]>> {
+  let truncated = false;
+  const cached = await loadWithCache(characterId, KEYS.journal, async () => {
+    const result = await getCharacterWalletJournal(characterId);
+    truncated = result.truncated;
+    return result.items;
+  });
+  return { cached, truncated };
+}
+
+/** Transactions, plus whether the fetch stopped at the page cap (D4). */
+export async function loadWalletTransactionsWithStatus(
+  characterId: number
+): Promise<TruncatableCachedResult<WalletTransaction[]>> {
+  let truncated = false;
+  const cached = await loadWithCache(characterId, KEYS.transactions, async () => {
+    const result = await getCharacterWalletTransactions(characterId);
+    truncated = result.truncated;
+    return result.items;
+  });
+  return { cached, truncated };
 }

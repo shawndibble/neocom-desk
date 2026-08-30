@@ -14,8 +14,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import {
   loadWalletBalanceWithStatus,
-  loadWalletJournal,
-  loadWalletTransactions,
+  loadWalletJournalWithStatus,
+  loadWalletTransactionsWithStatus,
 } from '@/features/character/wallet';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -29,7 +29,11 @@ interface Snapshot {
   /** BUG #3: 401/403 (or a failed token refresh) means "log in again", not "offline". */
   balanceNeedsReauth: boolean;
   journalResult: CachedResult<WalletJournalEntry[]> | null;
+  /** D4: fewer pages came back than ESI advertised — the list below is partial. */
+  journalTruncated: boolean;
   transactionsResult: CachedResult<WalletTransaction[]> | null;
+  /** D4: the fetch stopped at the transactions page cap; older history is missing. */
+  transactionsTruncated: boolean;
   typeNames: Map<number, string>;
 }
 
@@ -48,13 +52,15 @@ export function Wallet() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [balanceStatus, journalResult, transactionsResult] = await Promise.all([
+      const [balanceStatus, journalStatus, transactionsStatus] = await Promise.all([
         loadWalletBalanceWithStatus(activeCharacterId),
-        loadWalletJournal(activeCharacterId),
-        loadWalletTransactions(activeCharacterId),
+        loadWalletJournalWithStatus(activeCharacterId),
+        loadWalletTransactionsWithStatus(activeCharacterId),
       ]);
       if (cancelled) return;
       const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
+      const { cached: journalResult, truncated: journalTruncated } = journalStatus;
+      const { cached: transactionsResult, truncated: transactionsTruncated } = transactionsStatus;
       const typeIds = [...new Set((transactionsResult?.data ?? []).map((t) => t.type_id))];
       const typeNames = await loadTypeNames(typeIds);
       if (cancelled) return;
@@ -63,7 +69,9 @@ export function Wallet() {
         balanceResult,
         balanceNeedsReauth,
         journalResult,
+        journalTruncated,
         transactionsResult,
+        transactionsTruncated,
         typeNames,
       });
     })();
@@ -83,7 +91,9 @@ export function Wallet() {
   const balanceResult = current?.balanceResult ?? null;
   const balanceNeedsReauth = current?.balanceNeedsReauth ?? false;
   const journalResult = current?.journalResult ?? null;
+  const journalTruncated = current?.journalTruncated ?? false;
   const transactionsResult = current?.transactionsResult ?? null;
+  const transactionsTruncated = current?.transactionsTruncated ?? false;
   const typeNames = current?.typeNames ?? new Map<number, string>();
 
   const journal = useMemo(
@@ -170,6 +180,11 @@ export function Wallet() {
               {journalResult.fromCache && (
                 <p className="px-3 pt-2 text-[11px] text-warning uppercase">{t(offlineTitleKey)}</p>
               )}
+              {journalTruncated && (
+                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
+                  {t('common.incompleteTitle')}
+                </p>
+              )}
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-line text-left text-text-dim">
@@ -233,6 +248,11 @@ export function Wallet() {
             <>
               {transactionsResult.fromCache && (
                 <p className="px-3 pt-2 text-[11px] text-warning uppercase">{t(offlineTitleKey)}</p>
+              )}
+              {transactionsTruncated && (
+                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
+                  {t('wallet.transactionsCapped')}
+                </p>
               )}
               <table className="w-full text-xs">
                 <thead>

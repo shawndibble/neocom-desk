@@ -363,7 +363,8 @@ describe('wallet journal + transactions', () => {
 
     const entries = await getCharacterWalletJournal(CHARACTER_ID);
 
-    expect(entries).toEqual([...page1, ...page2]);
+    expect(entries.items).toEqual([...page1, ...page2]);
+    expect(entries.truncated).toBe(false);
   });
 
   it('getCharacterWalletTransactions cursors through from_id until a page is empty', async () => {
@@ -413,7 +414,9 @@ describe('wallet journal + transactions', () => {
     const transactions = await getCharacterWalletTransactions(CHARACTER_ID);
 
     expect(fromIds).toEqual([null, '20', '10']);
-    expect(transactions.map((t) => t.transaction_id)).toEqual([20, 10]);
+    expect(transactions.items.map((t) => t.transaction_id)).toEqual([20, 10]);
+    // Stopped because a page came back empty, not because the cap bit (D4).
+    expect(transactions.truncated).toBe(false);
   });
 });
 
@@ -452,7 +455,8 @@ describe('assets', () => {
 
     const assets = await getCharacterAssets(CHARACTER_ID);
 
-    expect(assets).toEqual([...page1, ...page2]);
+    expect(assets.items).toEqual([...page1, ...page2]);
+    expect(assets.truncated).toBe(false);
   });
 });
 

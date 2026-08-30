@@ -3,17 +3,18 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { DataAgeBadge, EmptyState, Panel, Spinner, StatChip } from '@/components/ui';
+import { DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner, StatChip } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { characterPortraitUrl } from '@/app/images';
+import { beginEveLogin } from '@/app/loginFlow';
 import {
   loadCharacterSkills,
   loadCharacterSkillQueue,
   type CachedResult,
 } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
-import { loadWalletBalance } from '@/features/character/wallet';
+import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { formatIsk } from '@/lib/isk';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { selectActiveQueueEntry } from './overviewQueue';
@@ -21,6 +22,7 @@ import { selectActiveQueueEntry } from './overviewQueue';
 interface Snapshot {
   requestKey: string;
   walletResult: CachedResult<number> | null;
+  walletNeedsReauth: boolean;
   skillsResult: CachedResult<CharacterSkills> | null;
   queueResult: CachedResult<SkillQueueEntry[]> | null;
   catalog: SkillCatalog;
@@ -48,14 +50,21 @@ export function Overview() {
     let cancelled = false;
     void loadPublicInfo(activeCharacterId);
     void (async () => {
-      const [walletResult, skillsResult, queueResult, catalog] = await Promise.all([
-        loadWalletBalance(activeCharacterId),
+      const [wallet, skillsResult, queueResult, catalog] = await Promise.all([
+        loadWalletBalanceWithStatus(activeCharacterId),
         loadCharacterSkills(activeCharacterId),
         loadCharacterSkillQueue(activeCharacterId),
         loadSkillCatalog(),
       ]);
       if (cancelled) return;
-      setSnapshot({ requestKey, walletResult, skillsResult, queueResult, catalog });
+      setSnapshot({
+        requestKey,
+        walletResult: wallet.cached,
+        walletNeedsReauth: wallet.needsReauth,
+        skillsResult,
+        queueResult,
+        catalog,
+      });
     })();
     return () => {
       cancelled = true;
@@ -76,6 +85,7 @@ export function Overview() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   const walletResult = current?.walletResult ?? null;
+  const walletNeedsReauth = current?.walletNeedsReauth ?? false;
   const skillsResult = current?.skillsResult ?? null;
   const queueResult = current?.queueResult ?? null;
   const catalog = current?.catalog ?? null;
@@ -141,6 +151,13 @@ export function Overview() {
               <p className="text-lg font-medium tabular-nums text-isk-pos">
                 {formatIsk(walletResult.data, 2)} {t('overview.isk')}
               </p>
+            ) : walletNeedsReauth ? (
+              <ReauthBanner
+                title={t('overview.reauthTitle')}
+                hint={t('overview.reauthHint')}
+                actionLabel={t('overview.reauthAction')}
+                onLogin={() => void beginEveLogin()}
+              />
             ) : (
               <EmptyState title={t('overview.walletEmpty')} className="py-4" />
             )}
