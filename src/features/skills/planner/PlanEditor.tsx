@@ -7,6 +7,7 @@ import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
   optimizeAtMarkers,
+  MAX_SUPPORTED_REMAPS,
   placeRemaps,
   suggestReorder,
   ATTRIBUTE_NAMES,
@@ -28,6 +29,7 @@ import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { ComputedQueue } from './ComputedQueue';
+import { boostedStepIndices } from '@/engine/boosterImpact';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { formatDuration } from '@/lib/duration';
@@ -70,6 +72,8 @@ interface PlanEditorProps {
 
 interface ComputeResult {
   scheduled: ScheduledStep[];
+  /** The instant the schedule was anchored to; null when no Booster forced one. */
+  startDate: Date | null;
   error: string | null;
   /** At least one entry refers to a skill the current catalog knows about (UX-REVIEW #9's empty-state discriminator). */
   hasValidEntries: boolean;
@@ -91,15 +95,17 @@ function computeQueue(
     // startDate is "now" at compute time — only relevant when a booster is
     // active (computeSchedule requires it in that case, for the
     // booster-expiry breakpoint).
+    const startDate = boosters.length > 0 ? new Date() : null;
     const scheduled = computeSchedule(
       steps,
-      { attributes, implants, boosters, startDate: boosters.length > 0 ? new Date() : undefined },
+      { attributes, implants, boosters, startDate: startDate ?? undefined },
       catalog.engineSkills
     );
-    return { scheduled, error: null, hasValidEntries };
+    return { scheduled, startDate, error: null, hasValidEntries };
   } catch (err) {
     return {
       scheduled: [],
+      startDate: null,
       error: err instanceof Error ? err.message : String(err),
       hasValidEntries,
     };
@@ -168,7 +174,12 @@ export function PlanEditor({
     [catalog]
   );
 
-  const { scheduled, error, hasValidEntries } = useMemo(
+  const {
+    scheduled,
+    startDate: queueStartDate,
+    error,
+    hasValidEntries,
+  } = useMemo(
     () =>
       computeQueue(
         plan.entries,
@@ -204,6 +215,22 @@ export function PlanEditor({
   const userSkillTypeIDs = useMemo(
     () => new Set(plan.entries.map((e) => e.skillTypeID)),
     [plan.entries]
+  );
+
+  // The plan keeps whatever count the user set (ESI prefills bonus remaps).
+  // Only the optimizer is capped, and the UI says so rather than quietly
+  // answering a different question than the one on screen.
+  const remapCount = Math.min(plan.remapCount, MAX_SUPPORTED_REMAPS);
+  const remapCapped = plan.remapCount > MAX_SUPPORTED_REMAPS;
+
+  // Which queue rows the Booster actually speeds up: trained inside its window
+  // AND on an attribute it raises. Both, or the mark is a lie.
+  const boostedSteps = useMemo(
+    () =>
+      queueStartDate && activeBoosters.length > 0
+        ? boostedStepIndices(scheduled, catalog.engineSkills, activeBoosters, queueStartDate)
+        : new Set<number>(),
+    [scheduled, catalog, activeBoosters, queueStartDate]
   );
   const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0;
 
@@ -245,9 +272,15 @@ export function PlanEditor({
     if (scheduled.length === 0) return;
     setOptimizeResult(
       placeRemaps(scheduled, catalog.engineSkills, {
-        remapCount: plan.remapCount,
+        remapCount,
         currentAttributes: attributes,
         implants: effectiveImplants,
+        // The same Boosters the computed queue schedules with, so the savings
+        // figure and the queue total cannot disagree.
+        booster:
+          activeBoosters.length > 0
+            ? { boosters: activeBoosters, startDate: new Date() }
+            : undefined,
       })
     );
   }
@@ -511,6 +544,14 @@ export function PlanEditor({
 
       {optimizeResult && (
         <Panel title={t('plans.optimizeRemaps')}>
+          {remapCapped && (
+            // The plan asks for more remaps than the optimizer evaluates. Say
+            // so: an answer for one remap presented as the answer for three is
+            // the silent-degradation failure this planner keeps hitting.
+            <p className="mb-2 text-[0.6875rem] text-warning uppercase">
+              {t('plans.remapCapNote', { count: MAX_SUPPORTED_REMAPS })}
+            </p>
+          )}
           {optimizeResult.savingsSeconds < MIN_MEANINGFUL_SAVINGS_SECONDS ? (
             <p className="text-xs text-text-dim">{t('plans.remapNoGain')}</p>
           ) : (
@@ -579,6 +620,7 @@ export function PlanEditor({
             steps={scheduled}
             nameFor={nameFor}
             userSkillTypeIDs={userSkillTypeIDs}
+            boostedSteps={boostedSteps}
             hasValidEntries={hasValidEntries}
           />
         )}

@@ -21,14 +21,15 @@
  * start can only mean less Booster — so a minimal prefix is still the best
  * prefix to extend.
  *
- * MEASURED COST, and it is not uniform. At 200 steps with a 24-day Booster:
- * `remapCount = 1` goes 62 ms -> 81 ms, but `remapCount = 5` goes 2.2 s ->
- * 21.7 s. The DP evaluates a segment per (k, i, j) and only the signature memo
- * made that affordable; a start-dependent cost defeats it. Do not wire a
- * Booster context into a UI that allows `remapCount >= 2` until this is fixed.
- * The fix shape: for a fixed (k, i) every j shares one boosted prefix, so one
- * pass over allocations can cost all j at once instead of R separate calls.
- * Interacts with D5, which already had this path at 2.2 s Booster-free.
+ * MEASURED COST at 200 steps with a 24-day Booster: `remapCount = 1` goes
+ * 64 ms -> 89 ms, `remapCount = 2` 2.16 s -> 2.64 s, `remapCount = 5` 2.15 s
+ * -> 3.35 s. Costing each (i, j) separately made that last figure 21.7 s;
+ * batching every j that shares a start into one pass is what removed it.
+ *
+ * Note what the blind column says: ~2.1 s at every `remapCount >= 2`,
+ * Booster or not. That is the O(R^2) segment-cost precompute below (D5), and
+ * capping `remapCount` does not avoid it — only `remapCount = 1`, which skips
+ * the DP entirely, does. Hence `MAX_SUPPORTED_REMAPS`.
  *
  * DP over pair-runs (maximal step runs sharing one attribute pair): segment
  * boundaries inside a run are dominated by boundaries at its edges, so only
@@ -45,6 +46,7 @@
  */
 import {
   bestAttributes,
+  bestAttributesAtBoundaries,
   bestAttributesForPairs,
   pairKey,
   type BestAttributesResult,
@@ -84,6 +86,14 @@ export interface PlaceRemapsOptions {
    */
   booster?: BoosterContext;
 }
+
+/**
+ * Remaps the planner offers today. 1, because that is the path taking the O(R)
+ * suffix scan; 2 already enters the O(R^2) DP and ~2.1 s on a 200-step plan
+ * before a Booster is involved. Raising it is a product call gated on D5, not
+ * a constant to bump — `placeRemaps` itself accepts any count.
+ */
+export const MAX_SUPPORTED_REMAPS = 1;
 
 const TIE_EPSILON = 1e-6;
 
@@ -352,10 +362,38 @@ export function placeRemaps(
   }
   for (let j = 0; j <= runCount; j++) dp[0][j] = currentPrefix[j];
   for (let k = 1; k <= maxSegments; k++) {
+    // Every segment starting at run i shares one start offset (dp[k-1][i]) and
+    // therefore one boosted prefix, so all its end points are costed in a
+    // single pass. Doing it per (i, j) instead is what made this path 21.7 s.
+    const batched = new Map<number, BestAttributesResult[]>();
+    if (boosted) {
+      for (let i = k - 1; i < runCount; i++) {
+        const start = dp[k - 1][i];
+        if (start === Infinity || start >= expirySeconds) continue;
+        const boundaries: number[] = [];
+        for (let j = i + 1; j <= runCount; j++) boundaries.push(runs[j - 1].endStep + 1);
+        batched.set(
+          i,
+          bestAttributesAtBoundaries(
+            steps,
+            skills,
+            implants,
+            {
+              boosters: liveBoosters,
+              startDate: new Date(booster!.startDate.getTime() + start * 1000),
+            },
+            runs[i].startStep,
+            boundaries
+          )
+        );
+      }
+    }
+
     for (let j = k; j <= runCount; j++) {
       for (let i = k - 1; i < j; i++) {
         if (dp[k - 1][i] === Infinity) continue;
-        const seg = segmentCostAt(i, j, dp[k - 1][i], segment[i][j]);
+        const batch = batched.get(i);
+        const seg = batch ? batch[j - i - 1] : segment[i][j];
         const total = dp[k - 1][i] + seg.seconds;
         // Strict `<` on an ascending scan: on a tie the EARLIEST split wins.
         if (total < dp[k][j]) {

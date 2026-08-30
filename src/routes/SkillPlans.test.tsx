@@ -597,6 +597,39 @@ describe('SkillPlans editor: remap markers', () => {
   });
 });
 
+describe('SkillPlans editor: the remap cap is disclosed', () => {
+  const optimize = async (remapCount: number) => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount,
+      })
+    );
+    render(<App />);
+    await screen.findByText('Computed queue');
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await screen.findByRole('heading', { name: 'Optimize remaps' });
+  };
+
+  it('says the optimizer evaluated fewer remaps than the plan allows', async () => {
+    // An answer for one remap, shown for a plan that asks for three, is the
+    // silent-degradation failure this planner keeps running into.
+    await optimize(3);
+    expect(screen.getByText(/multi-remap placement is not available yet/i)).toBeInTheDocument();
+  });
+
+  it('says nothing when the plan asks for one remap', async () => {
+    await optimize(1);
+    expect(
+      screen.queryByText(/multi-remap placement is not available yet/i)
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('SkillPlans editor: remaps available from ESI', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });

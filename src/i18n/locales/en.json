@@ -153,7 +153,10 @@
     "queueCompletedNote_one": "{{count}} skill finished training. Log in to EVE to apply it.",
     "queueCompletedNote_other": "{{count}} skills finished training. Log in to EVE to apply them.",
     "queuePausedNote": "Training is paused, so EVE reports no completion times.",
-    "queueFinishes": "Finishes {{date}}"
+    "queueFinishes": "Finishes {{date}}",
+    "boosterAffects": "Booster speeds this skill up",
+    "remapCapNote_one": "Evaluated with {{count}} remap. This plan allows more; multi-remap placement is not available yet.",
+    "remapCapNote_other": "Evaluated with {{count}} remaps. This plan allows more; multi-remap placement is not available yet."
   },
   "industry": {
     "title": "Build Plans",

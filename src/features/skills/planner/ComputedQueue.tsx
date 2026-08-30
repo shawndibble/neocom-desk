@@ -12,6 +12,8 @@ interface ComputedQueueProps {
   userSkillTypeIDs: ReadonlySet<number>;
   /** True when the plan has at least one entry the current catalog recognizes — distinguishes "nothing added yet" from "added, but already trained" (UX-REVIEW #9). */
   hasValidEntries: boolean;
+  /** Step indices a live Booster actually speeds up; marked with an icon. */
+  boostedSteps?: ReadonlySet<number>;
 }
 
 /** Read-only normalized + scheduled training queue. Prereq-inserted rows render dimmed. */
@@ -20,6 +22,7 @@ export function ComputedQueue({
   nameFor,
   userSkillTypeIDs,
   hasValidEntries,
+  boostedSteps,
 }: ComputedQueueProps) {
   const { t } = useTranslation();
 
@@ -40,8 +43,9 @@ export function ComputedQueue({
         <span className="w-16 text-right">{t('plans.columnCumulative')}</span>
       </div>
       <ul>
-        {steps.map((step) => {
+        {steps.map((step, index) => {
           const isPrereq = !userSkillTypeIDs.has(step.skillTypeID);
+          const boosted = boostedSteps?.has(index) ?? false;
           return (
             <li
               key={`${step.skillTypeID}-${step.level}`}
@@ -53,6 +57,16 @@ export function ComputedQueue({
                 {nameFor(step.skillTypeID)} {ROMAN[step.level - 1]}
                 {isPrereq && (
                   <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
+                )}
+                {boosted && (
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-label={t('plans.boosterAffects')}
+                    role="img"
+                    className="ml-1 inline-block size-3 align-[-0.125em] text-accent"
+                  >
+                    <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" fill="currentColor" />
+                  </svg>
                 )}
               </span>
               <span className="w-16 text-right tabular-nums text-text-dim">

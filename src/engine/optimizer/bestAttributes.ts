@@ -313,3 +313,102 @@ export function bestAttributes(
 
   return bestAttributesWalking(steps, skills, implants, bonus, expirySeconds);
 }
+
+/**
+ * Costs every segment `[startStep, boundary)` that shares a start, in one pass.
+ *
+ * The DP asks for R segments that all begin at the same run and the same
+ * wall-clock offset, differing only in where they end. Answering those
+ * separately re-walks the same boosted prefix R times, which is what takes
+ * `remapCount = 5` from 2.2 s to 21.7 s. Walking once per allocation and
+ * recording the running total at each boundary collapses that to a single
+ * pass, since a segment's cost is just the walk's elapsed time at its end.
+ *
+ * `boundaries` are exclusive end indices into `steps`, ascending. Returns one
+ * result per boundary, in the same order.
+ */
+export function bestAttributesAtBoundaries(
+  steps: readonly PlanStep[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  implants: Implants,
+  booster: BoosterContext,
+  startStep: number,
+  boundaries: readonly number[]
+): BestAttributesResult[] {
+  const bonus: Partial<Attributes> = {};
+  const startMs = booster.startDate.getTime();
+  const live = booster.boosters.filter((b) => b.expiresAt.getTime() > startMs);
+  for (const b of live) {
+    for (const name of ATTRIBUTE_NAMES) {
+      const add = b.bonus[name] ?? 0;
+      if (add) bonus[name] = (bonus[name] ?? 0) + add;
+    }
+  }
+  const expirySeconds =
+    live.length > 0
+      ? Math.min(...live.map((b) => (b.expiresAt.getTime() - startMs) / 1000))
+      : -Infinity;
+
+  const end = boundaries[boundaries.length - 1];
+  const sp: number[] = [];
+  const primary: AttributeName[] = [];
+  const secondary: AttributeName[] = [];
+  for (let i = startStep; i < end; i++) {
+    const skill = skills.get(steps[i].skillTypeID);
+    if (!skill) throw new Error(`Unknown skill typeID ${steps[i].skillTypeID}`);
+    sp.push(spBetween(skill.rank, steps[i].level - 1, steps[i].level));
+    primary.push(skill.primary);
+    secondary.push(skill.secondary);
+  }
+
+  const bestSeconds = boundaries.map(() => Infinity);
+  const bestExtras: (readonly number[])[] = boundaries.map(() => []);
+
+  for (const extras of allAllocations()) {
+    const value = (n: AttributeName, boosted: boolean) =>
+      BASE_MIN +
+      extras[ATTRIBUTE_NAMES.indexOf(n)] +
+      (implants[n] ?? 0) +
+      (boosted ? (bonus[n] ?? 0) : 0);
+
+    let elapsed = 0;
+    let b = 0;
+    for (let i = 0; i < sp.length; i++) {
+      // A boundary can sit before this step (an empty segment) or between any
+      // two, so drain every boundary the cursor has reached before advancing.
+      while (b < boundaries.length && boundaries[b] === startStep + i) {
+        if (elapsed < bestSeconds[b]) {
+          bestSeconds[b] = elapsed;
+          bestExtras[b] = extras;
+        }
+        b++;
+      }
+      let spLeft = sp[i];
+      while (spLeft > 0) {
+        const boosted = elapsed < expirySeconds;
+        const rate = trainingRate(value(primary[i], boosted), value(secondary[i], boosted));
+        const needed = timeToTrain(spLeft, rate);
+        const room = boosted ? expirySeconds - elapsed : Infinity;
+        if (needed <= room) {
+          elapsed += needed;
+          spLeft = 0;
+        } else {
+          elapsed += room;
+          spLeft -= (rate / 60) * room;
+        }
+      }
+    }
+    while (b < boundaries.length) {
+      if (elapsed < bestSeconds[b]) {
+        bestSeconds[b] = elapsed;
+        bestExtras[b] = extras;
+      }
+      b++;
+    }
+  }
+
+  return boundaries.map((_, b) => ({
+    attributes: toAttributes(bestExtras[b]),
+    seconds: bestSeconds[b],
+  }));
+}
