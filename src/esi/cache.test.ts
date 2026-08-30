@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import { EsiError } from './client';
 import {
+  loadPaginatedWithCache,
   loadWithCache,
   loadWithCacheStatus,
   readCached,
@@ -27,7 +28,12 @@ describe('loadWithCache', () => {
   it('fetches live, writes the cache, and reports fromCache: false', async () => {
     const result = await loadWithCache(CHAR_ID, KEY, async () => 'live-value');
 
-    expect(result).toEqual({ data: 'live-value', fetchedAt: expect.any(Date), fromCache: false });
+    expect(result).toEqual({
+      data: 'live-value',
+      fetchedAt: expect.any(Date),
+      fromCache: false,
+      truncated: false,
+    });
     const cached = await db.esiCache.get([CHAR_ID, KEY]);
     expect(cached?.value).toBe('live-value');
   });
@@ -39,7 +45,12 @@ describe('loadWithCache', () => {
       throw new Error('offline');
     });
 
-    expect(result).toEqual({ data: 'stale', fetchedAt: new Date(1234), fromCache: true });
+    expect(result).toEqual({
+      data: 'stale',
+      fetchedAt: new Date(1234),
+      fromCache: true,
+      truncated: false,
+    });
   });
 
   it('returns null when the live call fails and nothing is cached', async () => {
@@ -65,7 +76,12 @@ describe('loadWithCacheStatus — default auth-failure detection', () => {
     });
 
     expect(result.needsReauth).toBe(true);
-    expect(result.cached).toEqual({ data: 'stale', fetchedAt: new Date(1234), fromCache: true });
+    expect(result.cached).toEqual({
+      data: 'stale',
+      fetchedAt: new Date(1234),
+      fromCache: true,
+      truncated: false,
+    });
   });
 
   it('reports needsReauth: true on a 403 EsiError with null cached when nothing was ever cached', async () => {
@@ -241,31 +257,71 @@ describe('read path while a cache purge is pending', () => {
   });
 });
 
-describe('persistResult (D4)', () => {
-  it('keeps the cached row when a fetch reports itself incomplete', async () => {
+describe('loadPaginatedWithCache', () => {
+  it('refuses to let a short fetch overwrite a complete cached list', async () => {
     await db.esiCache.put({ characterId: 7, key: 'k', value: ['a', 'b', 'c'], fetchedAt: 1 });
 
-    const result = await loadWithCache(7, 'k', async () => ['a'], {
-      persistResult: () => false,
-    });
+    const result = await loadPaginatedWithCache(7, 'k', async () => ({
+      items: ['a'],
+      truncated: true,
+    }));
 
-    // Live partial data is still returned to the caller...
-    expect(result?.data).toEqual(['a']);
-    expect(result?.fromCache).toBe(false);
-    // ...but the complete cached list survives, so the next read is whole.
+    expect(result?.data).toEqual(['a', 'b', 'c']);
+    expect(result?.truncated).toBe(false);
     expect((await db.esiCache.get([7, 'k']))?.value).toEqual(['a', 'b', 'c']);
   });
 
-  it('writes when the fetch was complete', async () => {
-    await db.esiCache.put({ characterId: 7, key: 'k', value: ['old'], fetchedAt: 1 });
+  it('stores a short fetch when nothing is cached, so the cache cannot stay cold', async () => {
+    const result = await loadPaginatedWithCache(7, 'cold', async () => ({
+      items: ['a'],
+      truncated: true,
+    }));
 
-    await loadWithCache(7, 'k', async () => ['a', 'b'], { persistResult: () => true });
-
-    expect((await db.esiCache.get([7, 'k']))?.value).toEqual(['a', 'b']);
+    expect(result?.data).toEqual(['a']);
+    expect(result?.truncated).toBe(true);
+    expect((await db.esiCache.get([7, 'cold']))?.truncated).toBe(true);
   });
 
-  it('writes when no persistResult is given', async () => {
-    await loadWithCache(7, 'k2', async () => ['x']);
-    expect((await db.esiCache.get([7, 'k2']))?.value).toEqual(['x']);
+  it('reports truncation on a cache hit: a short list must not look whole after a reload', async () => {
+    await db.esiCache.put({
+      characterId: 7,
+      key: 'k2',
+      value: ['a'],
+      fetchedAt: 1,
+      truncated: true,
+    });
+
+    const result = await loadPaginatedWithCache(7, 'k2', async () => {
+      throw new Error('offline');
+    });
+
+    expect(result?.truncated).toBe(true);
+    expect(result?.fromCache).toBe(true);
+  });
+
+  it('treats a legacy row with no truncated field as complete', async () => {
+    await db.esiCache.put({ characterId: 7, key: 'legacy', value: ['a'], fetchedAt: 1 });
+
+    const result = await loadPaginatedWithCache(7, 'legacy', async () => {
+      throw new Error('offline');
+    });
+
+    expect(result?.truncated).toBe(false);
+  });
+
+  it('lets a complete fetch replace a partial cached list', async () => {
+    await db.esiCache.put({
+      characterId: 7,
+      key: 'k3',
+      value: ['a'],
+      fetchedAt: 1,
+      truncated: true,
+    });
+
+    await loadPaginatedWithCache(7, 'k3', async () => ({ items: ['a', 'b'], truncated: false }));
+
+    const row = await db.esiCache.get([7, 'k3']);
+    expect(row?.value).toEqual(['a', 'b']);
+    expect(row?.truncated).toBe(false);
   });
 });

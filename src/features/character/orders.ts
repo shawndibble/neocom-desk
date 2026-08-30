@@ -5,7 +5,7 @@ import {
   type MarketOrder,
   type MarketOrderHistory,
 } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from '@/esi/cache';
+import { loadWithCache, loadPaginatedWithCache, type CachedResult } from '@/esi/cache';
 
 const KEYS = {
   open: 'orders',
@@ -25,5 +25,7 @@ export function loadOrders(characterId: number): Promise<CachedResult<MarketOrde
 export function loadOrderHistory(
   characterId: number
 ): Promise<CachedResult<MarketOrderHistory[]> | null> {
-  return loadWithCache(characterId, KEYS.history, () => getCharacterOrderHistory(characterId));
+  return loadPaginatedWithCache(characterId, KEYS.history, () =>
+    getCharacterOrderHistory(characterId)
+  );
 }

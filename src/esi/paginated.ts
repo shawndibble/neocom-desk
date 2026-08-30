@@ -76,15 +76,3 @@ export async function fetchAllPagesStatus<T>(
     pagesReported: first.pages,
   };
 }
-
-/**
- * Items only, for callers that don't surface completeness. Compatible entry
- * point kept for the same reason `loadWithCache` sits next to
- * `loadWithCacheStatus`.
- */
-export async function fetchAllPages<T>(
-  path: string,
-  options: FetchAllPagesOptions = {}
-): Promise<T[]> {
-  return (await fetchAllPagesStatus<T>(path, options)).items;
-}

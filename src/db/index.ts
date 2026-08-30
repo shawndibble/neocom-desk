@@ -56,6 +56,12 @@ export interface EsiCacheRecord {
   value: unknown;
   /** Epoch ms when this value was fetched from ESI. */
   fetchedAt: number;
+  /**
+   * Paginated list that came back short. Optional because rows written before
+   * this existed carry no flag — absent reads as complete, which is what they
+   * always claimed to be. Not indexed, so no Dexie version bump.
+   */
+  truncated?: boolean;
 }
 
 /** User-editable Build Plan: manufacturing inputs for one blueprint (CONTEXT.md). */

@@ -193,7 +193,7 @@ describe('clone and wallet endpoints', () => {
       })
     );
 
-    const blueprints = await getCharacterBlueprints(CHARACTER_ID);
+    const { items: blueprints } = await getCharacterBlueprints(CHARACTER_ID);
 
     expect(blueprints).toEqual([...page1, ...page2]);
   });
@@ -633,7 +633,7 @@ describe('contracts', () => {
       })
     );
 
-    const contracts = await getCharacterContracts(CHARACTER_ID);
+    const { items: contracts } = await getCharacterContracts(CHARACTER_ID);
 
     expect(contracts.map((c) => c.contract_id)).toEqual([1, 2]);
   });
@@ -690,7 +690,7 @@ describe('orders', () => {
       })
     );
 
-    const history = await getCharacterOrderHistory(CHARACTER_ID);
+    const { items: history } = await getCharacterOrderHistory(CHARACTER_ID);
 
     expect(history.map((o) => o.order_id)).toEqual([1, 2]);
   });

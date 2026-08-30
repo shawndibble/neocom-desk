@@ -48,7 +48,12 @@ describe('loadMailHeaders', () => {
     });
     server.use(http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail`, () => HttpResponse.error()));
     const result = await loadMailHeaders(CHAR_ID);
-    expect(result).toEqual({ data: headers, fetchedAt: new Date(2), fromCache: true });
+    expect(result).toEqual({
+      data: headers,
+      fetchedAt: new Date(2),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });
 

@@ -14,8 +14,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import {
   loadWalletBalanceWithStatus,
-  loadWalletJournalWithStatus,
-  loadWalletTransactionsWithStatus,
+  loadWalletJournal,
+  loadWalletTransactions,
 } from '@/features/character/wallet';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -52,15 +52,15 @@ export function Wallet() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [balanceStatus, journalStatus, transactionsStatus] = await Promise.all([
+      const [balanceStatus, journalResult, transactionsResult] = await Promise.all([
         loadWalletBalanceWithStatus(activeCharacterId),
-        loadWalletJournalWithStatus(activeCharacterId),
-        loadWalletTransactionsWithStatus(activeCharacterId),
+        loadWalletJournal(activeCharacterId),
+        loadWalletTransactions(activeCharacterId),
       ]);
       if (cancelled) return;
       const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
-      const { cached: journalResult, truncated: journalTruncated } = journalStatus;
-      const { cached: transactionsResult, truncated: transactionsTruncated } = transactionsStatus;
+      const journalTruncated = journalResult?.truncated ?? false;
+      const transactionsTruncated = transactionsResult?.truncated ?? false;
       const typeIds = [...new Set((transactionsResult?.data ?? []).map((t) => t.type_id))];
       const typeNames = await loadTypeNames(typeIds);
       if (cancelled) return;

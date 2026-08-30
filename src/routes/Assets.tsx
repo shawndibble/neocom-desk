@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { loadCharacterAssetsWithTruncation } from '@/features/character/assets';
+import { loadCharacterAssets } from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -58,8 +58,8 @@ export function Assets() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const { cached: assetsResult, truncated: assetsTruncated } =
-        await loadCharacterAssetsWithTruncation(activeCharacterId);
+      const assetsResult = await loadCharacterAssets(activeCharacterId);
+      const assetsTruncated = assetsResult?.truncated ?? false;
       if (cancelled) return;
       const assets = assetsResult?.data ?? [];
       const typeNames = await loadTypeNames([...new Set(assets.map((a) => a.type_id))]);

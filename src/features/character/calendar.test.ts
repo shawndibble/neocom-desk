@@ -44,7 +44,12 @@ describe('loadCalendarEvents', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () => HttpResponse.error())
     );
     const result = await loadCalendarEvents(CHAR_ID);
-    expect(result).toEqual({ data: events, fetchedAt: new Date(3), fromCache: true });
+    expect(result).toEqual({
+      data: events,
+      fetchedAt: new Date(3),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });
 

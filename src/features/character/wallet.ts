@@ -9,6 +9,7 @@ import {
 import {
   loadWithCache,
   loadWithCacheStatus,
+  loadPaginatedWithCache,
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
@@ -41,50 +42,20 @@ export function loadWalletBalanceWithStatus(characterId: number): Promise<Status
   );
 }
 
-/**
- * D4: a cached list plus whether the live fetch behind it came up short.
- * Same shape idea as `StatusResult` (data + the one bit the caller can't
- * recover on its own). `truncated` describes the fetch this call made, so it
- * is only ever true for a fresh response — a cache hit has no page count to
- * compare against.
- */
-export interface TruncatableCachedResult<T> {
-  cached: CachedResult<T> | null;
-  truncated: boolean;
+/** Journal. `truncated` on the result means pages were missing. */
+export function loadWalletJournal(
+  characterId: number
+): Promise<CachedResult<WalletJournalEntry[]> | null> {
+  return loadPaginatedWithCache(characterId, KEYS.journal, () =>
+    getCharacterWalletJournal(characterId)
+  );
 }
 
-/** Journal, plus whether pages were missing from the fetch (D4). */
-export async function loadWalletJournalWithStatus(
+/** Transactions. `truncated` means the fetch stopped at the page cap. */
+export function loadWalletTransactions(
   characterId: number
-): Promise<TruncatableCachedResult<WalletJournalEntry[]>> {
-  let truncated = false;
-  const cached = await loadWithCache(
-    characterId,
-    KEYS.journal,
-    async () => {
-      const result = await getCharacterWalletJournal(characterId);
-      truncated = result.truncated;
-      return result.items;
-    },
-    { persistResult: () => !truncated }
+): Promise<CachedResult<WalletTransaction[]> | null> {
+  return loadPaginatedWithCache(characterId, KEYS.transactions, () =>
+    getCharacterWalletTransactions(characterId)
   );
-  return { cached, truncated };
-}
-
-/** Transactions, plus whether the fetch stopped at the page cap (D4). */
-export async function loadWalletTransactionsWithStatus(
-  characterId: number
-): Promise<TruncatableCachedResult<WalletTransaction[]>> {
-  let truncated = false;
-  const cached = await loadWithCache(
-    characterId,
-    KEYS.transactions,
-    async () => {
-      const result = await getCharacterWalletTransactions(characterId);
-      truncated = result.truncated;
-      return result.items;
-    },
-    { persistResult: () => !truncated }
-  );
-  return { cached, truncated };
 }

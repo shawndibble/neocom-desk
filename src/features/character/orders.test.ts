@@ -50,7 +50,12 @@ describe('loadOrders', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/orders`, () => HttpResponse.error())
     );
     const result = await loadOrders(CHAR_ID);
-    expect(result).toEqual({ data: [ORDER], fetchedAt: new Date(4), fromCache: true });
+    expect(result).toEqual({
+      data: [ORDER],
+      fetchedAt: new Date(4),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });
 

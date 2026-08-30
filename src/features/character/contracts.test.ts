@@ -60,6 +60,11 @@ describe('loadContracts', () => {
 
     const result = await loadContracts(CHAR_ID);
 
-    expect(result).toEqual({ data: [CONTRACT(1)], fetchedAt: new Date(9), fromCache: true });
+    expect(result).toEqual({
+      data: [CONTRACT(1)],
+      fetchedAt: new Date(9),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });

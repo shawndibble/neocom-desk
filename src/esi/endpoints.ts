@@ -5,7 +5,7 @@
  */
 import { esiFetch } from './client';
 import type { EsiResult } from './client';
-import { fetchAllPages, fetchAllPagesStatus } from './paginated';
+import { fetchAllPagesStatus } from './paginated';
 import type { PaginatedResult, TruncatableResult } from './paginated';
 
 /** Options a caller may tune per request (conditional GET, cancellation). */
@@ -113,12 +113,12 @@ export interface CharacterBlueprint {
   quantity: number;
 }
 
-/** Paginated; every page is fetched sequentially (see fetchAllPages). */
+/** Paginated; every page is fetched sequentially (see fetchAllPagesStatus). */
 export function getCharacterBlueprints(
   characterId: number,
   options: EndpointOptions = {}
-): Promise<CharacterBlueprint[]> {
-  return fetchAllPages<CharacterBlueprint>(`/characters/${characterId}/blueprints`, {
+): Promise<TruncatableResult<CharacterBlueprint>> {
+  return fetchAllPagesStatus<CharacterBlueprint>(`/characters/${characterId}/blueprints`, {
     ...options,
     characterId,
   });
@@ -253,7 +253,7 @@ export interface WalletJournalEntry {
 }
 
 /**
- * Paginated (X-Pages); every page is fetched sequentially (see fetchAllPages).
+ * Paginated (X-Pages); every page is fetched sequentially (see fetchAllPagesStatus).
  * D4: returns the completeness flag with the entries — a short journal must
  * not reach the view looking like a whole one.
  */
@@ -337,7 +337,7 @@ export interface CharacterAsset {
 }
 
 /**
- * Paginated (X-Pages); every page is fetched sequentially (see fetchAllPages).
+ * Paginated (X-Pages); every page is fetched sequentially (see fetchAllPagesStatus).
  * D4: returns the completeness flag with the assets — a short list must not
  * reach the view looking like a whole one.
  */
@@ -544,12 +544,12 @@ export interface Contract {
   end_location_id?: number;
 }
 
-/** Paginated (X-Pages); every page is fetched sequentially (see fetchAllPages). */
+/** Paginated (X-Pages); every page is fetched sequentially (see fetchAllPagesStatus). */
 export function getCharacterContracts(
   characterId: number,
   options: EndpointOptions = {}
-): Promise<Contract[]> {
-  return fetchAllPages<Contract>(`/characters/${characterId}/contracts`, {
+): Promise<TruncatableResult<Contract>> {
+  return fetchAllPagesStatus<Contract>(`/characters/${characterId}/contracts`, {
     ...options,
     characterId,
   });
@@ -591,12 +591,12 @@ export interface MarketOrderHistory extends MarketOrder {
   state: 'cancelled' | 'expired';
 }
 
-/** Paginated (X-Pages); every page is fetched sequentially (see fetchAllPages). */
+/** Paginated (X-Pages); every page is fetched sequentially (see fetchAllPagesStatus). */
 export function getCharacterOrderHistory(
   characterId: number,
   options: EndpointOptions = {}
-): Promise<MarketOrderHistory[]> {
-  return fetchAllPages<MarketOrderHistory>(`/characters/${characterId}/orders/history`, {
+): Promise<TruncatableResult<MarketOrderHistory>> {
+  return fetchAllPagesStatus<MarketOrderHistory>(`/characters/${characterId}/orders/history`, {
     ...options,
     characterId,
   });

@@ -6,8 +6,8 @@ import { db } from '@/db';
 import {
   loadWalletBalance,
   loadWalletBalanceWithStatus,
-  loadWalletJournalWithStatus,
-  loadWalletTransactionsWithStatus,
+  loadWalletJournal,
+  loadWalletTransactions,
 } from './wallet';
 
 const CHAR_ID = 91;
@@ -30,7 +30,12 @@ describe('loadWalletBalance', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet`, () => HttpResponse.json(1234.5))
     );
     const result = await loadWalletBalance(CHAR_ID);
-    expect(result).toEqual({ data: 1234.5, fetchedAt: expect.any(Date), fromCache: false });
+    expect(result).toEqual({
+      data: 1234.5,
+      fetchedAt: expect.any(Date),
+      fromCache: false,
+      truncated: false,
+    });
     expect((await db.esiCache.get([CHAR_ID, 'wallet:balance']))?.value).toBe(1234.5);
   });
 
@@ -45,7 +50,12 @@ describe('loadWalletBalance', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
     );
     const result = await loadWalletBalance(CHAR_ID);
-    expect(result).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+    expect(result).toEqual({
+      data: 500,
+      fetchedAt: new Date(1),
+      fromCache: true,
+      truncated: false,
+    });
   });
 
   it('still falls back to cache on a 401 (regression pin: plain loadWithCache callers must not lose their cache just because loadWithCacheStatus exists)', async () => {
@@ -63,7 +73,12 @@ describe('loadWalletBalance', () => {
 
     const result = await loadWalletBalance(CHAR_ID);
 
-    expect(result).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+    expect(result).toEqual({
+      data: 500,
+      fetchedAt: new Date(1),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });
 
@@ -84,7 +99,12 @@ describe('loadWalletBalanceWithStatus (BUG #3)', () => {
     const result = await loadWalletBalanceWithStatus(CHAR_ID);
 
     expect(result.needsReauth).toBe(true);
-    expect(result.cached).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+    expect(result.cached).toEqual({
+      data: 500,
+      fetchedAt: new Date(1),
+      fromCache: true,
+      truncated: false,
+    });
   });
 
   it('reports needsReauth: true and null cached when nothing was ever cached', async () => {
@@ -114,11 +134,16 @@ describe('loadWalletBalanceWithStatus (BUG #3)', () => {
     const result = await loadWalletBalanceWithStatus(CHAR_ID);
 
     expect(result.needsReauth).toBe(false);
-    expect(result.cached).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+    expect(result.cached).toEqual({
+      data: 500,
+      fetchedAt: new Date(1),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });
 
-describe('loadWalletJournalWithStatus', () => {
+describe('loadWalletJournal', () => {
   it('concatenates every page and caches the combined result', async () => {
     const page1 = [{ id: 1, date: '2026-08-01T00:00:00Z', ref_type: 'bounty', description: 'a' }];
     const page2 = [{ id: 2, date: '2026-08-02T00:00:00Z', ref_type: 'bounty', description: 'b' }];
@@ -128,7 +153,7 @@ describe('loadWalletJournalWithStatus', () => {
         return HttpResponse.json(page === '2' ? page2 : page1, { headers: { 'X-Pages': '2' } });
       })
     );
-    const result = (await loadWalletJournalWithStatus(CHAR_ID)).cached;
+    const result = await loadWalletJournal(CHAR_ID);
     expect(result?.data).toEqual([...page1, ...page2]);
     expect(result?.fromCache).toBe(false);
     expect((await db.esiCache.get([CHAR_ID, 'wallet:journal']))?.value).toEqual([
@@ -141,11 +166,11 @@ describe('loadWalletJournalWithStatus', () => {
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet/journal`, () => HttpResponse.error())
     );
-    expect((await loadWalletJournalWithStatus(CHAR_ID)).cached).toBeNull();
+    expect(await loadWalletJournal(CHAR_ID)).toBeNull();
   });
 });
 
-describe('loadWalletTransactionsWithStatus', () => {
+describe('loadWalletTransactions', () => {
   it('fetches and caches transactions', async () => {
     const txns = [
       {
@@ -167,7 +192,7 @@ describe('loadWalletTransactionsWithStatus', () => {
         return HttpResponse.json(fromId === null ? txns : []);
       })
     );
-    const result = (await loadWalletTransactionsWithStatus(CHAR_ID)).cached;
+    const result = await loadWalletTransactions(CHAR_ID);
     expect(result?.data).toEqual(txns);
   });
 });

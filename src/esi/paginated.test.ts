@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { setupServer } from 'msw/node';
-import { fetchAllPages, fetchAllPagesStatus } from './paginated';
+import { fetchAllPagesStatus } from './paginated';
 import { configureEsi, ESI_BASE_URL } from './client';
 import { rejectBadEsiHeaders } from './test-helpers';
 
@@ -14,7 +14,7 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-describe('fetchAllPages', () => {
+describe('fetchAllPagesStatus', () => {
   it('returns a single page when X-Pages is absent', async () => {
     let requests = 0;
     server.use(
@@ -26,7 +26,7 @@ describe('fetchAllPages', () => {
       })
     );
 
-    const items = await fetchAllPages<{ order_id: number }>('/markets/10000002/orders');
+    const { items } = await fetchAllPagesStatus<{ order_id: number }>('/markets/10000002/orders');
 
     expect(items).toEqual([{ order_id: 1 }]);
     expect(requests).toBe(1);
@@ -50,7 +50,7 @@ describe('fetchAllPages', () => {
       })
     );
 
-    const items = await fetchAllPages<string>('/markets/10000002/orders');
+    const { items } = await fetchAllPagesStatus<string>('/markets/10000002/orders');
 
     expect(pagesRequested).toEqual([1, 2, 3]);
     expect(maxInFlight).toBe(1);
@@ -69,7 +69,7 @@ describe('fetchAllPages', () => {
       })
     );
 
-    const items = await fetchAllPages<{ item_id: number }>('/characters/123/assets', {
+    const { items } = await fetchAllPagesStatus<{ item_id: number }>('/characters/123/assets', {
       characterId: 123,
     });
 
@@ -86,7 +86,7 @@ describe('fetchAllPages', () => {
       })
     );
 
-    const items = await fetchAllPages<string>('/markets/10000002/orders');
+    const { items } = await fetchAllPagesStatus<string>('/markets/10000002/orders');
 
     expect(items).toEqual(['item-1a']);
   });
@@ -99,7 +99,7 @@ describe('fetchAllPages', () => {
       )
     );
 
-    await expect(fetchAllPages<string>('/markets/10000002/orders')).rejects.toThrow();
+    await expect(fetchAllPagesStatus<string>('/markets/10000002/orders')).rejects.toThrow();
   });
 });
 
