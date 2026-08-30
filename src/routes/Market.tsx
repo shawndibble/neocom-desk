@@ -10,7 +10,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { addPin, removePin, MAX_PINS, type PinnedType } from '@/features/market/pins';
 import { formatVolume, formatSignedPercent, computeSpreadPct } from '@/features/market/format';
 import { formatIsk } from '@/lib/isk';
-import { typeIconUrl } from '@/features/market/icon';
+import { typeIconUrl } from '@/lib/eveImages';
 
 /** Debounce for the SDE type-name search, so a fast typist doesn't re-scan the ~9k-entry map on every keystroke. */
 const SEARCH_DEBOUNCE_MS = 250;
@@ -30,7 +30,7 @@ function TypeIcon({ typeId }: { typeId: number }) {
   }
   return (
     <img
-      src={typeIconUrl(typeId)}
+      src={typeIconUrl(typeId, 32)}
       alt=""
       width={32}
       height={32}

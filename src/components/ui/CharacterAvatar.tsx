@@ -1,4 +1,4 @@
-import { characterPortraitUrl } from '@/app/images';
+import { characterPortraitUrl } from '@/lib/eveImages';
 
 export type CharacterAvatarSize = 'sm' | 'md' | 'lg';
 
