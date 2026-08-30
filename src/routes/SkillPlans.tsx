@@ -167,14 +167,7 @@ export function SkillPlans() {
       <SkillsSubNav />
       {isSyncConfigured() && <SyncErrorNote {...syncStatus} />}
 
-      {catalog && (
-        <CurrentQueuePanel
-          characterId={activeCharacterId}
-          catalog={catalog}
-          attributes={attributes}
-          implants={implants}
-        />
-      )}
+      {catalog && <CurrentQueuePanel characterId={activeCharacterId} catalog={catalog} />}
 
       {!plans ? (
         <div className="flex justify-center py-16">

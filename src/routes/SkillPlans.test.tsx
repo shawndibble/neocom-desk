@@ -340,6 +340,66 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
   });
 });
 
+describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
+  const queuePanel = async () =>
+    (await screen.findByText('Current skill queue')).closest('section')!;
+
+  it('keeps a finished entry visible and tells the user to log in to apply it', async () => {
+    // ESI holds completed entries until the character next logs in, and says
+    // /skills is out of date until then. Hiding them would discard exactly
+    // the information the queue exists to carry.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 1,
+            queue_position: 0,
+            finished_level: 3,
+            finish_date: '2020-01-01T00:00:00Z',
+          },
+        ])
+      )
+    );
+    render(<App />);
+
+    const panel = await queuePanel();
+    expect(await within(panel).findByText('Done')).toBeInTheDocument();
+    expect(
+      within(panel).getByText(/1 skill finished training\. Log in to EVE to apply it\./i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows the training skill's remaining time from ESI's finish_date", async () => {
+    const finish = new Date(Date.now() + 2 * 3600_000).toISOString();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          { skill_id: 1, queue_position: 0, finished_level: 3, finish_date: finish },
+        ])
+      )
+    );
+    render(<App />);
+
+    const panel = await queuePanel();
+    expect(await within(panel).findByText('Training')).toBeInTheDocument();
+    expect(within(panel).getByText(/2h.*left/i)).toBeInTheDocument();
+  });
+
+  it('calls a queue with no dates paused, rather than pretending it starts now', async () => {
+    // The default fixture carries no date fields — a paused queue. Inventing
+    // a start time here is the EVEMon bug (peterhaneve/evemon#40).
+    render(<App />);
+
+    const panel = await queuePanel();
+    // Both fixture rows are paused — the badge is per row.
+    expect(await within(panel).findAllByText('Paused')).toHaveLength(2);
+    expect(
+      within(panel).getByText(/Training is paused, so EVE reports no completion times\./i)
+    ).toBeInTheDocument();
+    expect(within(panel).queryByText(/left/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('SkillPlans editor: import / export', () => {
   it('imports the in-game skill queue (deduped) and exports the computed queue to the clipboard', async () => {
     const user = userEvent.setup();

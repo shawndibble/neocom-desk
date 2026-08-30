@@ -145,7 +145,15 @@
     "csvCumulativeSeconds": "Cumulative seconds",
     "csvPrereq": "Prerequisite",
     "csvYes": "yes",
-    "csvNo": "no"
+    "csvNo": "no",
+    "queueTrainingBadge": "Training",
+    "queueDoneBadge": "Done",
+    "queuePausedBadge": "Paused",
+    "queueRemaining": "{{duration}} left",
+    "queueCompletedNote_one": "{{count}} skill finished training. Log in to EVE to apply it.",
+    "queueCompletedNote_other": "{{count}} skills finished training. Log in to EVE to apply them.",
+    "queuePausedNote": "Training is paused, so EVE reports no completion times.",
+    "queueFinishes": "Finishes {{date}}"
   },
   "industry": {
     "title": "Build Plans",

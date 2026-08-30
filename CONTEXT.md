@@ -67,3 +67,42 @@
   panels that still work. Partly done: Overview's wallet panel degrades; its
   skills and queue panels, and the Skills and Industry panels, still fall back
   to an empty state and rely on the runtime auth-failure notice.
+
+## Glossary (round 5 additions)
+
+- **Market Group**: A node in EVE's own market browse tree (`invMarketGroups`:
+  `Ships → Frigates → Standard Frigates`). Distinct from an item's **Group**
+  (`invGroups`, a taxonomy that is not the market's). Only Market Groups with
+  `hasTypes` hold items; the rest are branches.
+- **Order Book**: The live buy and sell orders for one item in one Region, read
+  from ESI. Rows, not a summary — each row is one order with its price,
+  quantity, location, range and expiry. Replaces the single best bid/ask that a
+  **Price Aggregate** gives.
+- **Price Aggregate**: One best-bid/best-ask summary per station (Fuzzwork).
+  Still the source for Build Plan pricing; no longer what the Market Browser shows.
+- **Location Mode**: The Market Browser's one location control, in one of two
+  mutually exclusive modes — **Region** (every station in that region) or
+  **Trade Hub** (that hub's region, filtered to the hub's station).
+- **Quickbar**: The user's saved item shortcuts in the Market Browser's left
+  column. Replaces the pin-to-compare grid; the comparison itself becomes a tab.
+
+## Scope decisions (round 5) — Market Browser rebuild
+
+- **Two-column Market Browser**: left column is find-an-item (search box +
+  Market Group tree + Quickbar); right column is the selected item.
+- **Order source swaps to ESI region order books.** `/markets/{region_id}/orders`
+  is public — `/market` still requires zero ESI scopes, so the round-4 decision
+  holds in spirit while its "SDE snapshot and Fuzzwork only" wording is
+  superseded. Build Plan keeps Fuzzwork (amends ADR 0002).
+- **Buy and sell are separate tables**, never one blended list.
+- **No "All Regions" option.** ESI has no cross-region endpoint; it would cost
+  100+ requests per item.
+- **New lazy-loaded SDE payloads** for `/market` only: Market Group tree and
+  the published market types. `types.json` stays as it is, so Skills and
+  Industry do not pay for the market catalogue.
+- **Player-structure orders are shown, never hidden.** Their names need a scope
+  the app does not take, so they render as an unknown structure — but with the
+  solar system and security status, which the order payload always carries.
+  Hiding the rows would misreport the best price.
+- The selected item also offers **related items** for price comparison and an
+  **item detail modal** (fitting attributes: CPU, powergrid, volume, bonuses).
