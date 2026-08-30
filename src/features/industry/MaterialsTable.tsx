@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { EffectiveMaterial, HubPrices } from '@/engine/industry/types';
-import { formatIsk } from './format';
+import { formatIsk } from '@/lib/isk';
 
 interface MaterialsTableProps {
   materials: readonly EffectiveMaterial[];

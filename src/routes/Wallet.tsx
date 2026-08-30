@@ -19,7 +19,8 @@ import {
 } from '@/features/character/wallet';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { formatIsk, humanizeRefType, iskToneClass } from '@/features/character/format';
+import { humanizeRefType, iskToneClass } from '@/features/character/format';
+import { formatIsk } from '@/lib/isk';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
 interface Snapshot {
@@ -142,7 +143,7 @@ export function Wallet() {
           ) : balanceResult ? (
             <>
               <p className={`text-lg font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}>
-                {formatIsk(balanceResult.data)} {t('wallet.isk')}
+                {formatIsk(balanceResult.data, 2)} {t('wallet.isk')}
               </p>
               {balanceResult.fromCache && (
                 <p className="mt-1 text-[11px] text-warning uppercase">{t(offlineTitleKey)}</p>
@@ -198,11 +199,13 @@ export function Wallet() {
                           entry.amount !== undefined ? iskToneClass(entry.amount) : ''
                         }`}
                       >
-                        {entry.amount !== undefined ? formatIsk(entry.amount) : t('common.unknown')}
+                        {entry.amount !== undefined
+                          ? formatIsk(entry.amount, 2)
+                          : t('common.unknown')}
                       </td>
                       <td className="px-3 py-1.5 text-right tabular-nums text-text-dim">
                         {entry.balance !== undefined
-                          ? formatIsk(entry.balance)
+                          ? formatIsk(entry.balance, 2)
                           : t('common.unknown')}
                       </td>
                     </tr>
@@ -266,12 +269,12 @@ export function Wallet() {
                           {txn.quantity.toLocaleString()}
                         </td>
                         <td className="px-3 py-1.5 text-right tabular-nums">
-                          {formatIsk(txn.unit_price)}
+                          {formatIsk(txn.unit_price, 2)}
                         </td>
                         <td
                           className={`px-3 py-1.5 text-right tabular-nums ${iskToneClass(total)}`}
                         >
-                          {formatIsk(total)}
+                          {formatIsk(total, 2)}
                         </td>
                       </tr>
                     );

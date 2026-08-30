@@ -8,6 +8,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
+import { Modal } from '@/components/ui';
 
 /**
  * Sync status dot, gated on Firebase being configured at all (see
@@ -32,6 +33,7 @@ function navClass({ isActive }: { isActive: boolean }): string {
 const MORE_SHEET_ID = 'mobile-more-sheet';
 
 interface MobileMoreSheetProps {
+  open: boolean;
   onClose: () => void;
   activeCharacter: { characterId: number; name: string } | undefined;
 }
@@ -42,32 +44,26 @@ interface MobileMoreSheetProps {
  * character" link that used to occupy the tab bar's fifth slot, plus Market
  * (character-agnostic, so it doesn't belong grouped with the Character
  * section, but the bottom tab bar is already full at 4 primary destinations
- * + More). Closes on Escape (focus returns to the More trigger, via the
- * effect in Layout) and on any link click, so it never hangs over the next
- * route.
+ * + More). It is a real modal, not just a drawer: it covers the viewport and
+ * the tab bar underneath it must not stay reachable, so it goes through the
+ * shared Modal primitive and inherits its dismissal contract — Escape closes,
+ * backdrop click closes, focus returns to the More trigger. Links also close it
+ * on click so it never hangs over the next route.
  */
-function MobileMoreSheet({ onClose, activeCharacter }: MobileMoreSheetProps) {
+function MobileMoreSheet({ open, onClose, activeCharacter }: MobileMoreSheetProps) {
   const { t } = useTranslation();
-  const firstLinkRef = useRef<HTMLAnchorElement>(null);
-
-  useEffect(() => {
-    firstLinkRef.current?.focus();
-  }, []);
 
   return (
-    <div
+    <Modal
+      open={open}
       id={MORE_SHEET_ID}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('nav.more')}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:hidden"
-      onClick={onClose}
+      onClose={onClose}
+      title={t('nav.more')}
+      placement="sheet"
+      className="md:hidden"
     >
-      <div
-        className="w-full max-w-md space-y-1 rounded-t-xs border-t border-line bg-panel p-2 pb-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <NavLink ref={firstLinkRef} to="/market" onClick={onClose} className={navClass}>
+      <div className="space-y-1 pb-3">
+        <NavLink to="/market" onClick={onClose} className={navClass}>
           {t('nav.market')}
         </NavLink>
         {activeCharacter && (
@@ -105,7 +101,7 @@ function MobileMoreSheet({ onClose, activeCharacter }: MobileMoreSheetProps) {
           {t('nav.orders')}
         </NavLink>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -121,15 +117,18 @@ export function Layout() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
+  // The sheet is mobile-only (`md:hidden`), but showModal() makes the page
+  // inert regardless of the dialog's own display — a viewport growing past the
+  // md breakpoint while it is open would leave an invisible modal holding the
+  // app hostage. Close it at the breakpoint instead.
   useEffect(() => {
     if (!moreOpen) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== 'Escape') return;
-      setMoreOpen(false);
-      moreButtonRef.current?.focus();
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    const desktop = window.matchMedia('(min-width: 48rem)');
+    const onChange = (e: MediaQueryListEvent) => {
+      if (e.matches) setMoreOpen(false);
+    };
+    desktop.addEventListener('change', onChange);
+    return () => desktop.removeEventListener('change', onChange);
   }, [moreOpen]);
 
   return (
@@ -238,9 +237,11 @@ export function Layout() {
         </button>
       </nav>
 
-      {moreOpen && (
-        <MobileMoreSheet onClose={() => setMoreOpen(false)} activeCharacter={activeCharacter} />
-      )}
+      <MobileMoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        activeCharacter={activeCharacter}
+      />
     </div>
   );
 }

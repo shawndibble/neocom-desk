@@ -15,7 +15,15 @@
  * DP over pair-runs (maximal step runs sharing one attribute pair): segment
  * boundaries inside a run are dominated by boundaries at its edges, so only
  * run edges are split candidates. Segment cost is memoized on the aggregated
- * sp-per-pair signature (at most 20 pairs), keeping ~200-step plans fast.
+ * sp-per-pair signature (at most 20 pairs).
+ *
+ * Cost: the general DP fills an R x R segment grid, each cell a 2,885-way
+ * allocation brute force, so it is quadratic in pair runs R and NOT fast on
+ * long plans (measured ~3.8 s at R = 145, ~10 s at R = 236). N = 1 — the case
+ * CONTEXT.md calls out and the UI default — takes an O(R) suffix scan instead:
+ * with one allocation only the last DP column is reachable, so scanning run
+ * edges right-to-left gives the exact same answer in R segment costs
+ * (~50-90 ms at R = 200). See `remapCount === 1` below.
  */
 import {
   bestAttributesForPairs,
@@ -117,6 +125,77 @@ export function placeRemaps(
   const runCount = runs.length;
   const maxSegments = Math.min(remapCount, runCount);
 
+  // Prefix cost: runs [0, j) trained on the current attributes (no remap).
+  const currentPrefix = new Array<number>(runCount + 1).fill(0);
+  for (let j = 1; j <= runCount; j++) {
+    currentPrefix[j] = currentPrefix[j - 1] + runs[j - 1].currentSeconds;
+  }
+
+  // ---- Fast path: exactly one allocation ("where do I remap?") ------------
+  // With one remap the DP collapses to its last column: the total is
+  // currentPrefix[i] + cost(runs [i, runCount)) for some run edge i, so only
+  // the R suffix segments are ever needed, never the R x R grid. Suffixes are
+  // built right-to-left, but each sp-per-pair map is emitted in
+  // first-appearance-scanning-forward order so the resulting cost is
+  // bit-identical to the grid's.
+  //
+  // Tie-break (must match the DP below): the EARLIEST run edge wins. Scanning
+  // i downwards with `<=` keeps the lowest tied i, exactly as the DP's
+  // ascending scan with a strict `<` does.
+  if (remapCount === 1) {
+    const suffixSp = new Map<string, number>();
+    let pairOrder: string[] = [];
+    let bestSeconds = Infinity;
+    let bestIndex = -1;
+    let bestSegment: BestAttributesResult | null = null;
+    for (let i = runCount - 1; i >= 0; i--) {
+      const run = runs[i];
+      suffixSp.set(run.pair, (suffixSp.get(run.pair) ?? 0) + run.sp);
+      pairOrder = [run.pair, ...pairOrder.filter((pair) => pair !== run.pair)];
+      const spByPair = new Map<string, number>();
+      for (const pair of pairOrder) spByPair.set(pair, suffixSp.get(pair)!);
+      const best = bestAttributesForPairs(spByPair, implants);
+      const total = currentPrefix[i] + best.seconds;
+      if (total <= bestSeconds) {
+        bestSeconds = total;
+        bestIndex = i;
+        bestSegment = best;
+      }
+    }
+    // Not remapping at all is always a candidate (see the DP path below).
+    const tieBound = bestSeconds + Math.max(TIE_EPSILON, bestSeconds * 1e-9);
+    if (currentSeconds <= tieBound) return noRemapResult();
+
+    const best = bestSegment as BestAttributesResult;
+    const segments: RemapSegment[] = [
+      {
+        startIndex: runs[bestIndex].startStep,
+        endIndex: runs[runCount - 1].endStep,
+        attributes: best.attributes,
+        seconds: best.seconds,
+        remap: true,
+      },
+    ];
+    let totalSeconds = best.seconds;
+    // Leading current-attributes prefix (row 0 of the DP), if any runs remain.
+    if (bestIndex > 0) {
+      segments.unshift({
+        startIndex: 0,
+        endIndex: runs[bestIndex - 1].endStep,
+        attributes: { ...currentAttributes },
+        seconds: currentPrefix[bestIndex],
+        remap: false,
+      });
+      totalSeconds += currentPrefix[bestIndex];
+    }
+    return {
+      segments,
+      totalSeconds,
+      currentSeconds,
+      savingsSeconds: currentSeconds - totalSeconds,
+    };
+  }
+
   // Segment cost over runs [i, j), memoized on the sp-per-pair signature.
   const bySignature = new Map<string, BestAttributesResult>();
   const segment: BestAttributesResult[][] = [];
@@ -139,12 +218,6 @@ export function placeRemaps(
     }
   }
 
-  // Prefix cost: runs [0, j) trained on the current attributes (no remap).
-  const currentPrefix = new Array<number>(runCount + 1).fill(0);
-  for (let j = 1; j <= runCount; j++) {
-    currentPrefix[j] = currentPrefix[j - 1] + runs[j - 1].currentSeconds;
-  }
-
   // dp[k][j]: min seconds for runs [0, j) using exactly k allocations after
   // an optional (possibly empty) leading current-attributes prefix. Row 0 IS
   // that prefix: dp[0][j] spends no remap and trains [0, j) on the current
@@ -161,6 +234,7 @@ export function placeRemaps(
       for (let i = k - 1; i < j; i++) {
         if (dp[k - 1][i] === Infinity) continue;
         const total = dp[k - 1][i] + segment[i][j].seconds;
+        // Strict `<` on an ascending scan: on a tie the EARLIEST split wins.
         if (total < dp[k][j]) {
           dp[k][j] = total;
           parent[k][j] = i;

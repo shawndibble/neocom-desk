@@ -7,13 +7,13 @@ import {
   EmptyState,
   Panel,
   ReauthBanner,
+  SkillBar,
   Spinner,
   StatChip,
 } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
-import { SkillBar } from '@/features/skills/SkillBar';
 import { ImplantChip } from '@/features/skills/ImplantChip';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
 import {

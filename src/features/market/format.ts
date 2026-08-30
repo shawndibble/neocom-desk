@@ -1,21 +1,14 @@
 /**
- * Display helpers for the Market Browser compare table. Kept local to this
- * feature (rather than reusing `features/character/format.ts` or
- * `features/industry/format.ts`, which already duplicate each other) so
- * Market Browser has no cross-feature coupling.
+ * Display helpers for the Market Browser compare table. `formatIsk` now
+ * lives in `@/lib/isk` (was a third duplicate of the character/industry
+ * copies) — import it from there instead.
  */
 
-const ISK_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
 const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
 const PERCENT_FORMAT = new Intl.NumberFormat('en', {
   maximumFractionDigits: 1,
   minimumFractionDigits: 1,
 });
-
-/** Whole-ISK amount, thousands-separated (e.g. "1,234,567"). */
-export function formatIsk(value: number): string {
-  return ISK_FORMAT.format(value);
-}
 
 /** Order-book volume, thousands-separated. */
 export function formatVolume(value: number): string {

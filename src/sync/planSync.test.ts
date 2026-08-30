@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore';
+import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
 import { db, type BuildPlanRecord, type SkillPlanRecord } from '@/db';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
@@ -53,7 +53,7 @@ const fake = vi.hoisted(() => {
 });
 const remoteStore = fake.remoteStore;
 
-vi.mock('firebase/firestore', () => ({
+vi.mock('firebase/firestore/lite', () => ({
   collection: vi.fn((_firestore: unknown, ...segments: string[]): FakeCol => ({
     path: segments.join('/'),
   })),

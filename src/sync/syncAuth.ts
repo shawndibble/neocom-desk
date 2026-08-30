@@ -15,10 +15,9 @@ import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
 import { getSyncAuth, getSyncFunctions } from './firebaseApp';
+import { uidForCharacter } from './uid';
 
-export function uidForCharacter(characterId: number): string {
-  return `char:${characterId}`;
-}
+export { uidForCharacter };
 
 interface MintResponse {
   token: string;

@@ -1,24 +1,15 @@
 /** Display helpers shared by the Character views (wallet, assets, contracts, orders). */
 
-const ISK_FORMAT = new Intl.NumberFormat('en', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
 /**
  * Below this magnitude, treat the value as zero (BUG #9): floating-point
  * rounding noise (e.g. -0.004 from a chain of divisions) would otherwise
- * display as "-0.00" and tone red, reading as a loss that isn't real.
+ * read as a real negative and tone red, reading as a loss that isn't real.
+ * Same epsilon `formatIsk` (now `@/lib/isk`) uses at 2-decimal precision.
  */
 const ZERO_EPSILON = 0.005;
 
 function clampZero(value: number): number {
   return Math.abs(value) < ZERO_EPSILON ? 0 : value;
-}
-
-/** ISK amount with 2 decimals, thousands-separated (e.g. "1,234,567.89"). */
-export function formatIsk(value: number): string {
-  return ISK_FORMAT.format(clampZero(value));
 }
 
 /** Tailwind text color token for a signed ISK amount (journal entries, profit/loss). */

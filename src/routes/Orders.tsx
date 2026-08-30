@@ -6,7 +6,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { formatIsk } from '@/features/character/format';
+import { formatIsk } from '@/lib/isk';
 import type { MarketOrder, MarketOrderHistory } from '@/esi/endpoints';
 
 interface Snapshot {
@@ -99,7 +99,7 @@ export function Orders() {
               <td className="px-3 py-1.5">
                 {order.is_buy_order ? t('orders.buy') : t('orders.sell')}
               </td>
-              <td className="px-3 py-1.5 text-right tabular-nums">{formatIsk(order.price)}</td>
+              <td className="px-3 py-1.5 text-right tabular-nums">{formatIsk(order.price, 2)}</td>
               <td className="px-3 py-1.5 text-right tabular-nums">
                 {order.volume_remain.toLocaleString()} / {order.volume_total.toLocaleString()}
               </td>

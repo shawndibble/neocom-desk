@@ -247,6 +247,7 @@
     "finishes": "finishes {{date}}"
   },
   "common": {
+    "close": "Close",
     "loading": "Loading",
     "loadingEllipsis": "Loading…",
     "unknown": "—",

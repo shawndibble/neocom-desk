@@ -74,8 +74,11 @@ Rules:
 
 ## 3. Spacing & radius
 
-- Spacing: Tailwind 4px grid. Dense defaults — panel padding `p-3`, table cell
-  `px-3 py-1.5`, control heights 28px (`h-7`, compact) / 36px (`h-9`, default).
+- Spacing: Tailwind v4's default `rem`-based scale (`--spacing: 0.25rem`;
+  not overridden by this project's `@theme` block, which only sets
+  colors/fonts) — sizes below are the values at the browser-default 16px
+  root and scale with it. Dense defaults — panel padding `p-3`, table cell
+  `px-3 py-1.5`, control heights `h-7` (28px, compact) / `h-9` (36px, default).
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
 - Borders: always 1px (`border`), never 2px.
@@ -84,19 +87,20 @@ Rules:
 
 Built in `src/components/ui/` (✓) or planned (○):
 
-| Component         | Status | Purpose / usage                                                                                                                                                                                                                                            |
-| ----------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Panel`           | ✓      | Base surface. Optional uppercase title header + actions slot. Everything lives in a Panel; don't nest Panels — use `panel-2` fills inside.                                                                                                                 |
-| `Button`          | ✓      | `primary` (accent fill — max one per view), `ghost` (default; hairline border), `danger` (destructive; outline red, never filled). Sizes `sm`/`md`.                                                                                                        |
-| `StatChip`        | ✓      | Tiny label+value pair (ISK balance, SP, data counts). Tones: default/accent/success/warning/danger. Rows of chips form a stat strip under a page title.                                                                                                    |
-| `DataAgeBadge`    | ✓      | Relative age of API-derived data ("12m ago"). Required on every ESI-backed view. Auto-tones: <1h dim, 1–24h warning, >24h danger.                                                                                                                          |
-| `EmptyState`      | ✓      | Centered title+hint+optional action for empty lists / not-yet-fetched views. Never show a bare empty table.                                                                                                                                                |
-| `Tabs`            | ✓      | Controlled horizontal tab bar, accent underline on active. For peer views within a page (e.g. Orders: Open / History). Not for navigation — that's the router.                                                                                             |
-| `Spinner`         | ✓      | Accent arc, sizes sm/md/lg. Inline or centered while loading; prefer skeleton-free simple spinner + DataAgeBadge of last cached data.                                                                                                                      |
-| `Tooltip`         | ✓      | Accessible hover/focus tooltip (`role="tooltip"` + `aria-describedby`) around a single focusable trigger. `InfoTooltip` variant renders a small "?" button for labeling jargon (ME/TE, EIV, SCC, cost index, Remaps available, StatChip's `tooltip` prop). |
-| `DataTable`       | ○      | Dense sortable table: `panel-2` uppercase header row, hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`.                                                                                                                   |
-| `CharacterAvatar` | ○      | ESI portrait, `rounded-full`, 1px `line` ring; size variants; online/selected accent ring.                                                                                                                                                                 |
-| `SkillBar`        | ○      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                               |
+| Component         | Status | Purpose / usage                                                                                                                                                                                                                                                      |
+| ----------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Panel`           | ✓      | Base surface. Optional uppercase title header + actions slot. Everything lives in a Panel; don't nest Panels — use `panel-2` fills inside.                                                                                                                           |
+| `Button`          | ✓      | `primary` (accent fill — max one per view), `ghost` (default; hairline border), `danger` (destructive; outline red, never filled). Sizes `sm`/`md`.                                                                                                                  |
+| `StatChip`        | ✓      | Tiny label+value pair (ISK balance, SP, data counts). Tones: default/accent/success/warning/danger. Rows of chips form a stat strip under a page title.                                                                                                              |
+| `DataAgeBadge`    | ✓      | Relative age of API-derived data ("12m ago"). Required on every ESI-backed view. Auto-tones: <1h dim, 1–24h warning, >24h danger.                                                                                                                                    |
+| `EmptyState`      | ✓      | Centered title+hint+optional action for empty lists / not-yet-fetched views. Never show a bare empty table.                                                                                                                                                          |
+| `Tabs`            | ✓      | Controlled horizontal tab bar, accent underline on active. For peer views within a page (e.g. Orders: Open / History). Not for navigation — that's the router.                                                                                                       |
+| `Spinner`         | ✓      | Accent arc, sizes sm/md/lg. Inline or centered while loading; prefer skeleton-free simple spinner + DataAgeBadge of last cached data.                                                                                                                                |
+| `Tooltip`         | ✓      | Accessible hover/focus tooltip (`role="tooltip"` + `aria-describedby`) around a single focusable trigger. `InfoTooltip` variant renders a small "?" button for labeling jargon (ME/TE, EIV, SCC, cost index, Remaps available, StatChip's `tooltip` prop).           |
+| `Modal`           | ✓      | Native `<dialog>` + `showModal()`. Platform-supplied focus trap, inert background, Escape-to-close and `::backdrop` — never hand-roll a focus trap. `placement="center"` (default) or `"sheet"` (bottom-anchored, mobile nav). Escape and backdrop click both close. |
+| `DataTable`       | ○      | Dense sortable table: `panel-2` uppercase header row, hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`.                                                                                                                             |
+| `CharacterAvatar` | ○      | ESI portrait, `rounded-full`, 1px `line` ring; size variants; online/selected accent ring.                                                                                                                                                                           |
+| `SkillBar`        | ✓      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                                         |
 
 ## 5. Usage rules
 

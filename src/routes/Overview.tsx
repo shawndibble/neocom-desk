@@ -14,7 +14,7 @@ import {
 } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
 import { loadWalletBalance } from '@/features/character/wallet';
-import { formatIsk } from '@/features/character/format';
+import { formatIsk } from '@/lib/isk';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { selectActiveQueueEntry } from './overviewQueue';
 
@@ -139,7 +139,7 @@ export function Overview() {
           >
             {walletResult ? (
               <p className="text-lg font-medium tabular-nums text-isk-pos">
-                {formatIsk(walletResult.data)} {t('overview.isk')}
+                {formatIsk(walletResult.data, 2)} {t('overview.isk')}
               </p>
             ) : (
               <EmptyState title={t('overview.walletEmpty')} className="py-4" />

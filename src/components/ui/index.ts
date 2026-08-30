@@ -11,3 +11,6 @@ export { Spinner } from './Spinner';
 export type { SpinnerSize } from './Spinner';
 export { Tooltip, InfoTooltip } from './Tooltip';
 export { ReauthBanner } from './ReauthBanner';
+export { SkillBar } from './SkillBar';
+export { Modal } from './Modal';
+export type { ModalPlacement } from './Modal';

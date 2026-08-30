@@ -8,12 +8,8 @@ import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/mar
 import { getHubPrices, clearMarketPriceCache, type HubAggregate } from '@/market/prices';
 import { useMarketHub } from '@/features/market/hub';
 import { addPin, removePin, MAX_PINS, type PinnedType } from '@/features/market/pins';
-import {
-  formatIsk,
-  formatVolume,
-  formatSignedPercent,
-  computeSpreadPct,
-} from '@/features/market/format';
+import { formatVolume, formatSignedPercent, computeSpreadPct } from '@/features/market/format';
+import { formatIsk } from '@/lib/isk';
 import { typeIconUrl } from '@/features/market/icon';
 
 /** Debounce for the SDE type-name search, so a fast typist doesn't re-scan the ~9k-entry map on every keystroke. */

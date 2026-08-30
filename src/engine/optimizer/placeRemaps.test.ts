@@ -383,3 +383,407 @@ describe('placeRemaps leading current-attributes segment', () => {
     expect(result.totalSeconds).toBeCloseTo(best, 6);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Single-remap (remapCount === 1) fast path.
+//
+// remapCount === 1 is the case CONTEXT.md calls out ("train a leading segment
+// on current attributes, then remap at the optimizer-chosen point") and the
+// prefilled default in the UI. Only the last DP column is reachable with one
+// allocation, so the answer is an O(R) suffix scan over pair-run edges rather
+// than the O(R^2) segment grid. These tests pin that the fast path is an exact
+// substitute for the general DP, not an approximation.
+// ---------------------------------------------------------------------------
+import {
+  aggregateSpByPair,
+  bestAttributesForPairs,
+  pairKey,
+} from '@/engine/optimizer/bestAttributes';
+import type { Implants } from '@/engine/types';
+import type { PlaceRemapsResult } from '@/engine/optimizer/placeRemaps';
+
+/**
+ * Independent specification of "one remap, placed anywhere": enumerate every
+ * pair-run edge, train the prefix on the current attributes, remap once for
+ * the whole suffix, keep the cheapest. Tie-break: the EARLIEST edge wins.
+ */
+function referenceSingleRemap(
+  steps: readonly PlanStep[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  currentAttributes: Attributes,
+  implants: Implants = {}
+): PlaceRemapsResult & { chosenRunIndex: number; edgeTotals: number[] } {
+  if (steps.length === 0) {
+    return {
+      segments: [],
+      totalSeconds: 0,
+      currentSeconds: 0,
+      savingsSeconds: 0,
+      chosenRunIndex: -1,
+      edgeTotals: [],
+    };
+  }
+
+  // Pair runs + per-run baseline on the current attributes.
+  const runs: { startStep: number; endStep: number; pair: string; seconds: number }[] = [];
+  let currentSeconds = 0;
+  steps.forEach((step, index) => {
+    const s = skills.get(step.skillTypeID)!;
+    const sp = spBetween(s.rank, step.level - 1, step.level);
+    const rate =
+      currentAttributes[s.primary] +
+      (implants[s.primary] ?? 0) +
+      (currentAttributes[s.secondary] + (implants[s.secondary] ?? 0)) / 2;
+    const seconds = (sp / rate) * 60;
+    currentSeconds += seconds;
+    const pair = pairKey(s.primary, s.secondary);
+    const last = runs[runs.length - 1];
+    if (last && last.pair === pair) {
+      last.endStep = index;
+      last.seconds += seconds;
+    } else {
+      runs.push({ startStep: index, endStep: index, pair, seconds });
+    }
+  });
+
+  const currentPrefix = [0];
+  runs.forEach((run, i) => currentPrefix.push(currentPrefix[i] + run.seconds));
+
+  const edgeTotals: number[] = [];
+  let bestSeconds = Infinity;
+  let bestI = -1;
+  for (let i = 0; i < runs.length; i++) {
+    const best = bestAttributesForPairs(
+      aggregateSpByPair(steps.slice(runs[i].startStep), skills),
+      implants
+    );
+    const total = currentPrefix[i] + best.seconds;
+    edgeTotals.push(total);
+    if (total < bestSeconds) {
+      bestSeconds = total;
+      bestI = i;
+    }
+  }
+
+  const tieBound = bestSeconds + Math.max(1e-6, bestSeconds * 1e-9);
+  if (currentSeconds <= tieBound) {
+    return {
+      segments: [
+        {
+          startIndex: 0,
+          endIndex: steps.length - 1,
+          attributes: { ...currentAttributes },
+          seconds: currentSeconds,
+          remap: false,
+        },
+      ],
+      totalSeconds: currentSeconds,
+      currentSeconds,
+      savingsSeconds: 0,
+      chosenRunIndex: -1,
+      edgeTotals,
+    };
+  }
+
+  const best = bestAttributesForPairs(
+    aggregateSpByPair(steps.slice(runs[bestI].startStep), skills),
+    implants
+  );
+  const segments = [
+    {
+      startIndex: runs[bestI].startStep,
+      endIndex: runs[runs.length - 1].endStep,
+      attributes: best.attributes,
+      seconds: best.seconds,
+      remap: true,
+    },
+  ];
+  let totalSeconds = best.seconds;
+  if (bestI > 0) {
+    segments.unshift({
+      startIndex: 0,
+      endIndex: runs[bestI - 1].endStep,
+      attributes: { ...currentAttributes },
+      seconds: currentPrefix[bestI],
+      remap: false,
+    });
+    totalSeconds += currentPrefix[bestI];
+  }
+  return {
+    segments,
+    totalSeconds,
+    currentSeconds,
+    savingsSeconds: currentSeconds - totalSeconds,
+    chosenRunIndex: bestI,
+    edgeTotals,
+  };
+}
+
+/** Deterministic PRNG so generated plan shapes are reproducible. */
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const ALL_PAIRS: [AttributeName, AttributeName][] = [
+  ['perception', 'willpower'],
+  ['intelligence', 'memory'],
+  ['memory', 'intelligence'],
+  ['willpower', 'perception'],
+  ['charisma', 'willpower'],
+  ['intelligence', 'perception'],
+  ['memory', 'charisma'],
+];
+
+/**
+ * Plan with `runs` pair runs. `stepsPerRun > 1` exercises multi-step runs
+ * (segment boundaries must still land on run edges); distinct ranks keep the
+ * segment-signature memo from collapsing the work.
+ */
+function generatePlan(
+  runCount: number,
+  seed: number,
+  stepsPerRun = 1
+): { steps: PlanStep[]; skills: Map<number, EngineSkill> } {
+  const rand = mulberry32(seed);
+  const skills = new Map<number, EngineSkill>();
+  const steps: PlanStep[] = [];
+  let previousPair = -1;
+  for (let r = 0; r < runCount; r++) {
+    let pairIndex = Math.floor(rand() * ALL_PAIRS.length);
+    if (pairIndex === previousPair) pairIndex = (pairIndex + 1) % ALL_PAIRS.length;
+    previousPair = pairIndex;
+    const [primary, secondary] = ALL_PAIRS[pairIndex];
+    const typeID = r + 1;
+    skills.set(typeID, {
+      typeID,
+      name: `S${typeID}`,
+      rank: 1 + Math.floor(rand() * 8),
+      primary,
+      secondary,
+      prereqs: [],
+    });
+    for (let k = 0; k < stepsPerRun; k++) {
+      steps.push({ skillTypeID: typeID, level: 1 + Math.floor(rand() * 5) });
+    }
+  }
+  return { steps, skills };
+}
+
+describe('placeRemaps single-remap fast path', () => {
+  const CURRENT_VARIANTS: { name: string; attributes: Attributes; implants?: Implants }[] = [
+    { name: 'fresh-character spread', attributes: CURRENT },
+    {
+      name: 'int-heavy legal spread',
+      attributes: {
+        intelligence: 27,
+        memory: 21,
+        perception: 17,
+        willpower: 17,
+        charisma: 17,
+      },
+    },
+    {
+      name: 'per/wil spread with +4 implants',
+      attributes: {
+        intelligence: 17,
+        memory: 17,
+        perception: 27,
+        willpower: 21,
+        charisma: 17,
+      },
+      implants: {
+        intelligence: 4,
+        memory: 4,
+        perception: 4,
+        willpower: 4,
+        charisma: 4,
+      },
+    },
+    {
+      name: 'ESI-inflated attributes outside 17..27',
+      attributes: {
+        intelligence: 29,
+        memory: 27,
+        perception: 31,
+        willpower: 25,
+        charisma: 27,
+      },
+      implants: {
+        intelligence: 4,
+        memory: 4,
+        perception: 4,
+        willpower: 4,
+        charisma: 4,
+      },
+    },
+  ];
+
+  const SHAPES: { runCount: number; stepsPerRun: number }[] = [
+    { runCount: 1, stepsPerRun: 1 },
+    { runCount: 1, stepsPerRun: 5 },
+    { runCount: 2, stepsPerRun: 1 },
+    { runCount: 2, stepsPerRun: 6 },
+    { runCount: 3, stepsPerRun: 4 },
+    { runCount: 7, stepsPerRun: 1 },
+    { runCount: 11, stepsPerRun: 3 },
+    { runCount: 23, stepsPerRun: 1 },
+    { runCount: 40, stepsPerRun: 2 },
+  ];
+
+  for (const variant of CURRENT_VARIANTS) {
+    for (const shape of SHAPES) {
+      it(`matches the run-edge specification exactly: ${variant.name}, R=${shape.runCount} x ${shape.stepsPerRun}`, () => {
+        const { steps, skills } = generatePlan(
+          shape.runCount,
+          shape.runCount * 31 + variant.name.length,
+          shape.stepsPerRun
+        );
+        const expected = referenceSingleRemap(
+          steps,
+          skills,
+          variant.attributes,
+          variant.implants ?? {}
+        );
+        const actual = placeRemaps(steps, skills, {
+          remapCount: 1,
+          currentAttributes: variant.attributes,
+          implants: variant.implants,
+        });
+
+        // Field-for-field, bit-for-bit: placement, attributes and durations.
+        expect(actual.segments).toEqual(expected.segments);
+        expect(actual.totalSeconds).toBe(expected.totalSeconds);
+        expect(actual.currentSeconds).toBe(expected.currentSeconds);
+        expect(actual.savingsSeconds).toBe(expected.savingsSeconds);
+      });
+    }
+  }
+
+  it('picks the earliest run edge among equal-cost placements', () => {
+    // Ties between distinct placements are float-exact coincidences, so this
+    // asserts the rule over generated data: whichever edges tie, the chosen
+    // one is the first minimiser.
+    for (let seed = 1; seed <= 12; seed++) {
+      const { steps, skills } = generatePlan(9, seed, seed % 3 === 0 ? 2 : 1);
+      const expected = referenceSingleRemap(steps, skills, CURRENT);
+      if (expected.chosenRunIndex < 0) continue; // no-remap case
+      const min = Math.min(...expected.edgeTotals);
+      const earliestMinimiser = expected.edgeTotals.findIndex((t) => t === min);
+      expect(expected.chosenRunIndex).toBe(earliestMinimiser);
+
+      const actual = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
+      const remapped = actual.segments.find((s) => s.remap);
+      expect(remapped).toBeDefined();
+      expect(remapped!.startIndex).toBe(expected.segments.find((s) => s.remap)!.startIndex);
+    }
+  });
+
+  it('is deterministic across repeated calls', () => {
+    const { steps, skills } = generatePlan(17, 99, 2);
+    const a = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
+    const b = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
+    expect(a).toEqual(b);
+  });
+
+  it('handles R = 0 (empty plan)', () => {
+    const result = placeRemaps([], skillMap(), { remapCount: 1, currentAttributes: CURRENT });
+    expect(result).toEqual({
+      segments: [],
+      totalSeconds: 0,
+      currentSeconds: 0,
+      savingsSeconds: 0,
+    });
+  });
+
+  it('handles R = 1 (a single pair run) with one remapped segment', () => {
+    const skills = skillMap(skill(1, 'perception', 'willpower', 3));
+    const steps = levels(1, 4);
+    const result = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
+    expect(result.segments).toHaveLength(1);
+    expect(result.segments[0]).toMatchObject({
+      startIndex: 0,
+      endIndex: steps.length - 1,
+      remap: true,
+    });
+    expect(result.segments[0].attributes.perception).toBe(27);
+    const expected = referenceSingleRemap(steps, skills, CURRENT);
+    expect(result.segments).toEqual(expected.segments);
+    expect(result.totalSeconds).toBe(expected.totalSeconds);
+    expect(result.savingsSeconds).toBe(expected.savingsSeconds);
+  });
+
+  it('keeps the no-remap result when no placement helps', () => {
+    const skills = skillMap(
+      skill(1, 'perception', 'willpower'),
+      skill(2, 'intelligence', 'memory', 3),
+      skill(3, 'willpower', 'perception', 2)
+    );
+    const steps = [...levels(1, 4), ...levels(2, 3), ...levels(3, 2)];
+    const implants: Implants = {
+      intelligence: 4,
+      memory: 4,
+      perception: 4,
+      willpower: 4,
+      charisma: 4,
+    };
+    const inflated: Attributes = {
+      intelligence: 29,
+      memory: 27,
+      perception: 31,
+      willpower: 25,
+      charisma: 27,
+    };
+    const result = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: inflated,
+      implants,
+    });
+    expect(result.segments).toHaveLength(1);
+    expect(result.segments[0].remap).toBe(false);
+    expect(result.segments[0].attributes).toEqual(inflated);
+    expect(result.savingsSeconds).toBe(0);
+    expect(result.totalSeconds).toBe(result.currentSeconds);
+  });
+
+  it('leaves the remapCount >= 2 path on the general DP', () => {
+    // Three distinct attribute phases: two remaps must beat one, and the DP
+    // must still be able to return more segments than the fast path can.
+    const skills = skillMap(
+      skill(1, 'intelligence', 'memory'),
+      skill(2, 'perception', 'willpower'),
+      skill(3, 'charisma', 'willpower', 2)
+    );
+    const current: Attributes = {
+      intelligence: 27,
+      memory: 21,
+      perception: 17,
+      willpower: 17,
+      charisma: 17,
+    };
+    const steps = [...levels(1, 4), ...levels(2, 4), ...levels(3, 4)];
+    const one = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: current });
+    const two = placeRemaps(steps, skills, { remapCount: 2, currentAttributes: current });
+    expect(one.segments.filter((s) => s.remap)).toHaveLength(1);
+    expect(two.segments.filter((s) => s.remap).length).toBeGreaterThan(1);
+    expect(two.totalSeconds).toBeLessThan(one.totalSeconds);
+    expect(one.currentSeconds).toBe(two.currentSeconds);
+  });
+
+  it('stays linear in pair runs: 200 runs with one remap', () => {
+    // Generous ceiling: the O(R^2) grid took ~3.8 s at R = 145 and ~10 s at
+    // R = 236 on the dev machine, the suffix scan ~50-90 ms. This catches a
+    // regression back to the grid without asserting a tight timing.
+    const { steps, skills } = generatePlan(200, 4242);
+    const start = performance.now();
+    const result = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
+    const elapsed = performance.now() - start;
+    expect(result.segments.length).toBeGreaterThanOrEqual(1);
+    expect(elapsed).toBeLessThan(2500);
+  }, 120000);
+});

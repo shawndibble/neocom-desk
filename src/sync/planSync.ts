@@ -39,9 +39,10 @@ import {
   where,
   type CollectionReference,
   type Firestore,
-} from 'firebase/firestore';
+} from 'firebase/firestore/lite';
 import { db, type BuildPlanRecord, type CharacterRecord, type SkillPlanRecord } from '@/db';
 import { getSyncFirestore } from './firebaseApp';
+import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
 import {
   mergeRecords,
@@ -93,47 +94,12 @@ async function writeSettingsMeta(meta: Record<string, number>): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Sync status — tracked per character so character B's later result cannot
-// stomp character A's error. subscribeSyncStatus streams every change (the UI
-// dot shows the most recent one); getSyncStatus(characterId) reads a specific
-// character's last known status.
+// Sync status — the store itself lives in status.ts (Firebase-free, so the UI
+// can subscribe without loading this module); re-exported here so the sync
+// driver stays the single import site for consumers of the driver.
 // ---------------------------------------------------------------------------
 
-export type SyncState = 'idle' | 'syncing' | 'error';
-
-export interface SyncStatus {
-  state: SyncState;
-  /** Epoch ms of the last successful sync this session, or null. */
-  lastSyncedAt: number | null;
-  error: string | null;
-  /** Character this status refers to; absent only before the first sync. */
-  characterId?: number;
-}
-
-const IDLE_STATUS: SyncStatus = { state: 'idle', lastSyncedAt: null, error: null };
-let latestStatus: SyncStatus = IDLE_STATUS;
-const statusByCharacter = new Map<number, SyncStatus>();
-const listeners = new Set<(status: SyncStatus) => void>();
-
-function setStatus(characterId: number, patch: Partial<SyncStatus>): void {
-  const base = statusByCharacter.get(characterId) ?? { ...IDLE_STATUS, characterId };
-  const next = { ...base, ...patch, characterId };
-  statusByCharacter.set(characterId, next);
-  latestStatus = next;
-  for (const listener of listeners) listener(next);
-}
-
-/** Subscribe to sync status; the listener is called immediately with the current value. */
-export function subscribeSyncStatus(listener: (status: SyncStatus) => void): () => void {
-  listeners.add(listener);
-  listener(latestStatus);
-  return () => listeners.delete(listener);
-}
-
-/** Last known status for one character (idle if it has never synced). */
-export function getSyncStatus(characterId: number): SyncStatus {
-  return statusByCharacter.get(characterId) ?? { ...IDLE_STATUS, characterId };
-}
+export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
 
 // ---------------------------------------------------------------------------
 // Mutation helpers the UI layer should use

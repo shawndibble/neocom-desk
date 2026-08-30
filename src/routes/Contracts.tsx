@@ -6,7 +6,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadContracts } from '@/features/character/contracts';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
-import { formatIsk } from '@/features/character/format';
+import { formatIsk } from '@/lib/isk';
 import type { Contract } from '@/esi/endpoints';
 
 interface Snapshot {
@@ -131,9 +131,9 @@ export function Contracts() {
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums">
                     {contract.price !== undefined
-                      ? formatIsk(contract.price)
+                      ? formatIsk(contract.price, 2)
                       : contract.reward !== undefined
-                        ? formatIsk(contract.reward)
+                        ? formatIsk(contract.reward, 2)
                         : t('common.unknown')}
                   </td>
                   <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
