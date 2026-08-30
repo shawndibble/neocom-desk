@@ -1,25 +1,16 @@
 /**
  * Privacy purge for the per-character ESI cache.
  *
- * `esiCache` holds API-derived data (wallet, mail, assets, contracts, ...)
- * that a character granted us a scope to read. Two events revoke that consent
- * and must take the cached copies with them:
+ * Two events revoke consent for a character's scoped `esiCache` rows and must
+ * take the cached copies with them: a scope removed from the granted set, and
+ * a changed `ownerHash` — character sold or transferred, so the rows are a
+ * different person's. Callers are `auth/session.ts` and `sync/planSync.ts`; a
+ * future "remove character"/logout is the third, and there must stay exactly
+ * one purge primitive.
  *
- *  - a scope is removed from the granted set (re-authorized with fewer scopes,
- *    or revoked in EVE's third-party-app portal) — see `auth/session.ts`;
- *  - the character's `ownerHash` changes, i.e. it was sold or transferred, so
- *    the cached rows belong to a *different person* — see `auth/session.ts`
- *    and `sync/planSync.ts`.
- *
- * Lives beside `cache.ts` because that module owns the `esiCache` table
- * (docs/ARCHITECTURE.md §2); split into its own file only so the auth and sync
- * layers can reach the purge without importing the read-through machinery.
- * There must be exactly one purge primitive — a future "remove character" /
- * logout is its third caller.
- *
- * Two entry points: `purgeCharacterCache` (the raw delete, may throw) and
- * `purgeCharacterCacheOrSuppress` (the escalating, never-throwing wrapper the
- * auth and sync layers actually call). See the tier commentary further down.
+ * Split from `cache.ts`, which owns the `esiCache` table
+ * (docs/ARCHITECTURE.md §2), only so auth and sync can purge without
+ * importing the read-through machinery.
  */
 import Dexie from 'dexie';
 import { db } from '@/db';
@@ -28,22 +19,20 @@ import { GLOBAL_CACHE_CHARACTER_ID } from './cache';
 /**
  * Delete every cached ESI row for one character. Returns the number deleted.
  *
- * Deliberately blunt: it drops the character's whole cache rather than only
- * the rows behind a specific revoked scope. `esiCache` is 100% re-derivable
- * from ESI, so over-purging costs one refetch while under-purging is a privacy
- * bug. (Purging precisely would need a cache-key → scope map; `registry.ts`
- * keys on endpoint *name*, and cache keys are string literals in `features/*`
- * with no link back to it — that mapping is item 15a-ii.)
+ * Deliberately blunt — the whole cache, not just the revoked scope's rows.
+ * `esiCache` is 100% re-derivable from ESI, so over-purging costs one refetch
+ * while under-purging is a privacy bug. (Precision would need a cache-key →
+ * scope map; `registry.ts` keys on endpoint *name* and cache keys are string
+ * literals in `features/*` with no link back to it.)
  *
- * `GLOBAL_CACHE_CHARACTER_ID` rows are never touched: public universe types,
- * entity names and stations, behind no scope and owned by no character.
- * Dropping them is cache churn with no privacy benefit.
+ * `GLOBAL_CACHE_CHARACTER_ID` rows are public reference data owned by no
+ * character, so no revoked consent can apply to them — skipped.
  */
 export async function purgeCharacterCache(characterId: number): Promise<number> {
   if (characterId === GLOBAL_CACHE_CHARACTER_ID) return 0;
-  // `esiCache` has one index, the compound primary key [characterId+key], and
-  // no standalone characterId index — so this is a range delete over the
-  // compound key rather than a plain equality match.
+  // The compound primary key [characterId+key] is the only index — no
+  // standalone characterId one — so this is a range delete, not an equality
+  // match.
   return db.esiCache
     .where('[characterId+key]')
     .between([characterId, Dexie.minKey], [characterId, Dexie.maxKey], true, true)
@@ -51,51 +40,40 @@ export async function purgeCharacterCache(characterId: number): Promise<number> 
 }
 
 // ---------------------------------------------------------------------------
-// Graceful degradation
-//
-// The purge above can fail: storage quota exhaustion, a corrupted object
-// store, private-browsing restrictions. It used to be allowed to throw, which
-// meant a Dexie hiccup failed the login or the token refresh it runs inside —
-// locking the user out of the whole app over a cache problem. It now degrades
-// instead, through three tiers, and never throws.
+// The purge above can fail (quota, corrupted store, private browsing) and runs
+// inside login/token refresh, so it never throws — a Dexie hiccup must not lock
+// the user out of the app. It escalates instead:
 //
 //   1. targeted   — the range delete above.
-//   2. full       — `esiCache.clear()`. Expensive (every character refetches,
-//                   global rows included) but far more likely to succeed than
-//                   a range delete over a damaged compound index, and safe.
+//   2. full       — `esiCache.clear()`. Every character refetches, global rows
+//                   included, but far more likely to succeed than a range
+//                   delete over a damaged compound index.
 //   3. suppressed — the rows could not be deleted, so they are never READ.
 //
-// Tier 3 exists because "don't block login" must not become "serve the
-// previous owner's wallet, mail and assets anyway". The failure mode that
-// makes it reachable is asymmetric: an origin over quota, or a store whose
-// index is damaged, fails readWRITE transactions while readonly ones keep
-// working — precisely the state where stale rows stay both undeletable and
+// Tier 3 is reachable because the failure is asymmetric: an over-quota origin,
+// or a damaged index, fails readWRITE transactions while readonly ones keep
+// working — precisely the state where stale rows are both undeletable and
 // readable.
 //
-// THE TRADE, stated plainly: while a character is suppressed, its cache reads
-// return nothing, so going offline shows an EMPTY view instead of a stale one.
-// That is the correct trade — an empty Wallet is a nuisance, another person's
-// Wallet is the privacy bug this whole module exists to close.
+// THE TRADE: a suppressed character's cache reads return nothing, so going
+// offline shows an EMPTY view instead of a stale one. That is correct — an
+// empty Wallet is a nuisance, another person's Wallet is the privacy bug this
+// module exists to close.
 //
 // Suppression is held in two places on purpose:
 //
 //   - an in-memory Set, which cannot fail and so is authoritative for this
-//     session. Origin-wide quota exhaustion fails the durable marker write
-//     too, exactly when tier 3 is reached, so a purely durable marker would
-//     have a hole. (In that same world `db.characters.put`/`db.tokens.put` in
-//     persistTokens also fail and the session errors out on its own; the
-//     narrower per-store failure — esiCache broken, settings writable — is
-//     where the durable marker actually lands.)
-//   - a `db.settings` row, so the suppression survives a reload while the
-//     retry keeps failing. Deliberately NOT 'sync.'-prefixed: this is device
-//     state, and `setSyncedSetting` rejecting non-'sync.' keys is the marker
-//     of that intent. One device's broken storage must not blind the others.
+//     session. Origin-wide quota exhaustion fails the durable write too,
+//     exactly when tier 3 is reached, so a purely durable marker would have a
+//     hole. (The narrower per-store failure — esiCache broken, settings
+//     writable — is where the durable marker actually lands.)
+//   - a `db.settings` row, so suppression survives a reload while the retry
+//     keeps failing. Deliberately NOT 'sync.'-prefixed: device state, and
+//     `setSyncedSetting` rejecting non-'sync.' keys is the marker of that
+//     intent. One device's broken storage must not blind the others.
 // ---------------------------------------------------------------------------
 
-/**
- * Prefix of the device-local "this character's cache could not be purged"
- * marker in `db.settings`. Not 'sync.'-prefixed, so `planSync` never pushes it.
- */
+/** Marker prefix in `db.settings`. Device-local; see above. */
 export const CACHE_PURGE_PENDING_PREFIX = 'esiCache.purgePending.';
 
 const pendingKey = (characterId: number) => `${CACHE_PURGE_PENDING_PREFIX}${characterId}`;
@@ -104,13 +82,12 @@ const pendingKey = (characterId: number) => `${CACHE_PURGE_PENDING_PREFIX}${char
 const pending = new Set<number>();
 
 /**
- * One durable read per session, memoized. Safe to memoize because the only
- * writers are `markCachePurgePending`/`clearCachePurgePending` below, which update
- * `pending` synchronously — so the memo can never answer "not suppressed" for
- * a character this tab suppressed. Another tab's marker, set after we
- * hydrated, is not seen until reload; that tab's own purge attempt already
- * deleted the rows in every case except tier 3, and tier 3 means the shared
- * IndexedDB is failing for this tab too.
+ * One durable read per session, memoized. Safe because the only writers
+ * (`markCachePurgePending`/`clearCachePurgePending`) update `pending`
+ * synchronously, so the memo can never answer "not suppressed" for a character
+ * this tab suppressed. Another tab's later marker is not seen until reload —
+ * that tab's own purge already deleted the rows in every case but tier 3, and
+ * tier 3 means the shared IndexedDB is failing for this tab too.
  */
 let hydration: Promise<void> | null = null;
 
@@ -128,35 +105,29 @@ function hydratePending(): Promise<void> {
       }
     })
     .catch(() => {
-      // Reads are failing too; retry on the next lookup rather than caching a
-      // hole. The in-memory set still answers for this session's own purges.
+      // Reads failing too: retry on the next lookup rather than caching a
+      // hole. The in-memory set still answers this session's own purges.
       hydration = null;
     });
   return hydration;
 }
 
 /**
- * True while a character's cache purge is outstanding — the read path in
- * `cache.ts` must then behave as if nothing were cached for that character.
- *
- * Costs one Set lookup after the first call. The first call pays a single
- * indexed prefix scan of `db.settings` (a table of tens of rows), not a read
- * per cache row.
+ * True while a character's purge is outstanding — `cache.ts`'s read path must
+ * then behave as if nothing were cached for it. One Set lookup after the first
+ * call, which pays a single indexed prefix scan of `db.settings`.
  */
 export async function isCachePurgePending(characterId: number): Promise<boolean> {
-  // Global rows are public reference data owned by no character, so no
-  // character's revoked consent can apply to them.
   if (characterId === GLOBAL_CACHE_CHARACTER_ID) return false;
   if (pending.has(characterId)) return true;
   try {
     await hydratePending();
   } catch {
     // A closed or schema-broken Dexie throws SYNCHRONOUSLY out of `where(...)`,
-    // before `hydratePending` has a promise to attach its own catch to. Both
-    // callers await this unguarded — `cache.ts`'s read path, which promises it
+    // before `hydratePending` has a promise to attach its catch to. Both
+    // callers await this unguarded: `cache.ts`'s read path, which promises it
     // never throws, and `persistTokens`, where throwing would cost the user
-    // their login. Same fail direction as a rejected hydration: this session's
-    // own purges still answer from the in-memory set, and the lookup retries.
+    // their login. Fails the same direction as a rejected hydration.
   }
   return pending.has(characterId);
 }
@@ -164,17 +135,14 @@ export async function isCachePurgePending(characterId: number): Promise<boolean>
 /**
  * Drop the pending marker. Exported because a successful purge is not its only
  * caller — a future "remove character"/logout clears it too.
- *
- * Failing to delete the durable row is not an error: the purge that preceded
- * it already succeeded, so nothing stale remains, and the worst case is one
- * redundant retry after the next reload.
  */
 export async function clearCachePurgePending(characterId: number): Promise<void> {
   pending.delete(characterId);
   try {
     await db.settings.delete(pendingKey(characterId));
   } catch {
-    // See above: safe to ignore.
+    // The purge already succeeded, so nothing stale remains; worst case is
+    // one redundant retry after the next reload.
   }
 }
 
@@ -183,24 +151,20 @@ async function markCachePurgePending(characterId: number): Promise<void> {
   try {
     await db.settings.put({ key: pendingKey(characterId), value: true });
   } catch {
-    // Durability lost, suppression kept. Survives until this tab reloads.
+    // Durability lost, suppression kept until this tab reloads.
   }
 }
 
-/** Which tier of the escalating fallback ended up doing the job. */
+/** Which tier of the escalating fallback did the job. */
 export type CachePurgeOutcome = 'targeted' | 'full' | 'suppressed';
 
 /**
- * Purge a character's cached ESI data, degrading rather than failing.
- *
- * NEVER throws: it runs inside `auth/session.persistTokens`, so throwing would
- * fail the login or the token refresh. See the tier commentary above for what
- * each outcome means and why tier 3 suppresses reads instead of ignoring the
- * failure.
+ * Purge a character's cached ESI data, degrading rather than failing. NEVER
+ * throws: it runs inside `auth/session.persistTokens`, where that would cost
+ * the user their login. Tiers above.
  *
  * Idempotent and safe to call speculatively — `persistTokens` calls it on
- * every grant where a purge is outstanding, which is how tiers 2 and 3 get
- * retried.
+ * every grant with an outstanding purge, which is how tiers 2 and 3 retry.
  */
 export async function purgeCharacterCacheOrSuppress(
   characterId: number
@@ -212,8 +176,7 @@ export async function purgeCharacterCacheOrSuppress(
     await purgeCharacterCache(characterId);
   } catch {
     try {
-      // Tier 2: everything, global rows included. Correctness over churn —
-      // `esiCache` is 100% re-derivable from ESI.
+      // Tier 2: everything, global rows included. Correctness over churn.
       await db.esiCache.clear();
       outcome = 'full';
     } catch {

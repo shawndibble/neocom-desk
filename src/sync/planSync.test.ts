@@ -34,9 +34,9 @@ interface FakeRef {
   id: string;
 }
 
-// In-memory Firestore double: collection path -> doc id -> data. getDocs
-// applies '==' where-filters like the real backend (and like the deployed
-// rules, which only allow filtered list queries).
+// In-memory Firestore double: collection path -> doc id -> data. getDocs applies
+// '==' where-filters like the real backend, and like the deployed rules, which
+// only allow filtered list queries.
 const fake = vi.hoisted(() => {
   const remoteStore = new Map<string, Map<string, Record<string, unknown>>>();
   const getDocsImpl = async (target: {
@@ -246,9 +246,8 @@ describe('triggerSync: plans', () => {
 
   it('wipes the character ESI cache when ownerHash changed, sparing global rows', async () => {
     // The previous owner's cached wallet/mail/assets must not survive into the
-    // new owner's session (src/esi/cachePurge.ts). GLOBAL_CACHE_CHARACTER_ID
-    // rows are public universe data owned by nobody — purging them would be
-    // cache churn with no privacy benefit.
+    // new owner's session. GLOBAL_CACHE_CHARACTER_ID rows are public universe
+    // data owned by nobody — purging them would be churn with no benefit.
     await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
     await db.esiCache.bulkPut([
       { characterId: 1, key: 'wallet:journal', value: 'secret', fetchedAt: 1 },
@@ -294,8 +293,8 @@ describe('triggerSync: plans', () => {
 
   it('leaves the ownerHash bookmark unadvanced when the purge only reached suppression', async () => {
     // Suppression can be memory-only, so advancing the bookmark would burn the
-    // last retry: after a reload the marker is gone, the hash matches, and the
-    // previous owner's cached rows read normally again.
+    // last retry: after a reload the marker is gone, the hash matches and the
+    // previous owner's rows read normally again.
     const purge = vi.mocked(await import('@/esi/cachePurge')).purgeCharacterCacheOrSuppress;
     purge.mockResolvedValueOnce('suppressed');
     await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
@@ -415,9 +414,9 @@ describe('triggerSync: settings', () => {
   });
 
   it('never pushes the device-local cache-purge-pending marker', async () => {
-    // A stuck purge is one device's storage problem. Syncing the marker would
-    // suppress the ESI cache on every other device — and it is not a 'sync.'
-    // key, which is exactly what keeps it local (src/esi/cachePurge.ts).
+    // A stuck purge is one device's storage problem; syncing the marker would
+    // suppress the ESI cache on every other device. Not being a 'sync.' key is
+    // what keeps it local.
     await db.settings.put({ key: `${CACHE_PURGE_PENDING_PREFIX}1`, value: true });
     await setSyncedSetting('sync.tradeHub', 'jita');
 

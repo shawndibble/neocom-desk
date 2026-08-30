@@ -1,8 +1,4 @@
-/**
- * Display helpers for the Market Browser compare table. `formatIsk` now
- * lives in `@/lib/isk` (was a third duplicate of the character/industry
- * copies) — import it from there instead.
- */
+/** Display helpers for the Market Browser compare table. */
 
 const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
 const PERCENT_FORMAT = new Intl.NumberFormat('en', {
@@ -22,10 +18,9 @@ export function formatSignedPercent(value: number): string {
 }
 
 /**
- * Sell-side margin: how much of the lowest sell price is profit over the
- * highest buy price, as a percent. Null ("unpriceable") unless both sides
- * have a price and the sell price is positive (avoids a divide-by-zero).
- * Can legitimately be negative (buy > sell, a temporarily inverted book).
+ * Sell-side margin: how much of the lowest sell price is profit over the highest
+ * buy price, as a percent. Null unless both sides have a price and the sell
+ * price is positive (divide-by-zero). Legitimately negative on an inverted book.
  */
 export function computeSpreadPct(sellMin: number | null, buyMax: number | null): number | null {
   if (sellMin === null || buyMax === null || sellMin <= 0) return null;

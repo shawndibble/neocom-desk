@@ -2,10 +2,9 @@ import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 
 /**
- * Full-page "still working out where you are" state. Shared by the index gate
- * (`Root`) and the auth gate (`RequireCharacter`) so an in-progress Dexie read
- * looks the same wherever the user landed — and, more importantly, so neither
- * gate is tempted to treat "not loaded yet" as "logged out".
+ * Full-page "still working out where you are". Shared by `Root` and
+ * `RequireCharacter` so neither gate is tempted to treat "not loaded yet" as
+ * "logged out".
  */
 export function BootScreen() {
   const { t } = useTranslation();

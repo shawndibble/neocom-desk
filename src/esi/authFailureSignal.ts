@@ -1,12 +1,9 @@
 /**
  * One-way notification that a live ESI call failed authentication.
  *
- * Exists so `cache.ts` does not import `src/stores`: the shell owns UI state,
- * and `src/esi` sits below it (docs/ARCHITECTURE.md §2). `esi` publishes, the
- * shell subscribes, and nothing in `esi` learns what happens next.
- *
- * Carries only a characterId — never an error object, whose message can hold
- * response text or ids.
+ * Exists so `cache.ts` need not import `src/stores`: the shell owns UI state
+ * and `src/esi` sits below it (docs/ARCHITECTURE.md §2). Carries only a
+ * characterId — never an error object, whose message can hold response text.
  */
 type AuthFailureListener = (characterId: number) => void;
 

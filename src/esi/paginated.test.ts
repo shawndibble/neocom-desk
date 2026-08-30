@@ -104,8 +104,8 @@ describe('fetchAllPagesStatus', () => {
 });
 
 /**
- * D4: a short list used to be indistinguishable from a complete one, so a
- * truncated view rendered under a fresh DataAgeBadge as if it were whole.
+ * A short list must stay distinguishable from a complete one, or a truncated
+ * view renders under a fresh DataAgeBadge as if it were whole.
  */
 describe('fetchAllPagesStatus', () => {
   function pagedHandler(totalPages: number, failFrom?: number) {

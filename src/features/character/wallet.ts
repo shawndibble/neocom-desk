@@ -30,9 +30,8 @@ export function loadWalletBalance(characterId: number): Promise<CachedResult<num
 }
 
 /**
- * Same data as loadWalletBalance, but with the auth-failure state exposed
- * (BUG #3) for views that show a re-login affordance instead of a silent
- * "offline" state.
+ * Same data as loadWalletBalance, with the auth-failure state exposed for views
+ * that show a re-login affordance instead of a silent "offline" state.
  */
 export function loadWalletBalanceWithStatus(characterId: number): Promise<StatusResult<number>> {
   return loadWithCacheStatus(

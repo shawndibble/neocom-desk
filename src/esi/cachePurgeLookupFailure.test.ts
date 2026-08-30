@@ -1,18 +1,12 @@
 /**
- * The marker LOOKUP failing must not fail anything either.
+ * The marker LOOKUP failing must not fail anything either. A store that throws
+ * *synchronously* on `where(...)`, which is how a closed or schema-broken
+ * Dexie behaves, would escape straight past the two unguarded callers:
+ * `esi/cache.ts`'s read path and `auth/session.persistTokens`.
  *
- * `isCachePurgePending` is awaited unguarded in two places — `esi/cache.ts`'s
- * read path (whose header promises it never throws) and
- * `auth/session.persistTokens` (whose whole point is that a cache problem
- * cannot cost the user their login). A store that throws *synchronously* on
- * `where(...)`, which is how a closed or schema-broken Dexie behaves, would
- * otherwise escape straight past both.
- *
- * Own file for the same reason as `cachePurgeHydration.test.ts`: the durable
- * lookup happens once per module registry, and vitest gives each test file a
- * fresh one. Sharing a file with anything that hydrates successfully would
- * warm the memo and make these assertions pass without ever calling
- * `db.settings.where`.
+ * Own file, see `cachePurgeHydration.test.ts`: sharing with anything that
+ * hydrates successfully would warm the memo, and these assertions would pass
+ * without ever calling `db.settings.where`.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { db } from '@/db';
@@ -35,7 +29,7 @@ function breakSettingsLookup(): void {
 afterEach(async () => {
   vi.restoreAllMocks();
   // Suppression is module state: a tier-3 test would otherwise leak into the
-  // next one. (Between test FILES vitest already gives a fresh registry.)
+  // next. (Between test FILES vitest already gives a fresh registry.)
   await clearCachePurgePending(CHAR_ID);
 });
 
@@ -59,9 +53,8 @@ describe('isCachePurgePending when the marker lookup itself fails', () => {
   });
 
   it('keeps the whole purge path total when EVERY store throws', async () => {
-    // What `auth/session.persistTokens` depends on: the marker lookup and the
-    // purge together are a total function, so login and token refresh complete
-    // no matter how badly Dexie is behaving.
+    // What `auth/session.persistTokens` depends on: lookup plus purge is a
+    // total function, so login and refresh complete whatever Dexie does.
     breakSettingsLookup();
     const boom = () => {
       throw new Error('DatabaseClosedError');

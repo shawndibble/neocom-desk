@@ -1,12 +1,11 @@
 /**
- * Hydrating the purge-pending marker off disk, i.e. "a previous session gave
- * up on purging and this one has to honour that".
+ * Hydrating the purge-pending marker off disk — "a previous session gave up on
+ * purging and this one has to honour that".
  *
- * Separate file on purpose. `cachePurge.ts` memoizes the pending-character set
- * per module registry, and vitest gives each test *file* its own registry — a
- * fresh registry is the only faithful stand-in for a fresh browser session.
- * Folded into `cachePurge.test.ts`, these assertions would silently depend on
- * running before anything else that touches the memo.
+ * Own file on purpose: `cachePurge.ts` memoizes the pending set per module
+ * registry, and vitest gives each test *file* a fresh one — the only faithful
+ * stand-in for a fresh browser session. Folded into `cachePurge.test.ts`,
+ * these assertions would depend on running before anything touches the memo.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { db } from '@/db';
@@ -21,8 +20,8 @@ beforeAll(async () => {
   await db.settings.clear();
   await db.settings.put({ key: `${CACHE_PURGE_PENDING_PREFIX}${STUCK_CHAR_ID}`, value: true });
   await db.settings.put({ key: 'activeCharacterId', value: HEALTHY_CHAR_ID });
-  // A key that survived some earlier shape of this marker. Hydration parses
-  // character ids out of key suffixes, so it has to tolerate junk.
+  // Hydration parses character ids out of key suffixes, so it must tolerate
+  // junk left by any earlier shape of this marker.
   await db.settings.put({ key: `${CACHE_PURGE_PENDING_PREFIX}not-a-character`, value: true });
 });
 

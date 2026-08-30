@@ -1,8 +1,6 @@
-// The '@/sync' barrel is the Firebase code-splitting boundary: every export
-// that can reach Firebase forwards through `await import('./planSync')`. These
-// tests pin that forwarding, since a dropped argument (debounceMs) or a
-// swallowed promise would be invisible in the UI until a sync silently stopped
-// happening.
+// Pins the barrel's `await import('./planSync')` forwarding: a dropped argument
+// (debounceMs) or a swallowed promise would be invisible in the UI until a sync
+// silently stopped happening.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {

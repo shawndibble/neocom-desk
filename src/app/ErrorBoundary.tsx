@@ -10,9 +10,9 @@ interface State {
 }
 
 /**
- * Strings carry `defaultValue` because this renders when something has already
- * gone wrong — a missing catalog must not turn a recoverable error into a
- * blank page.
+ * `defaultValue` throughout: this renders when something has already gone
+ * wrong, so a missing catalog must not turn a recoverable error into a blank
+ * page.
  */
 function ErrorScreen() {
   const { t } = useTranslation();
@@ -40,13 +40,11 @@ function ErrorScreen() {
 
 /**
  * Last resort so a render throw shows something recoverable instead of a blank
- * page. `useLiveQuery` rethrows a Dexie failure during render, and every
- * feature route now sits behind one (`RequireCharacter`), so a broken
- * IndexedDB would otherwise unmount the whole app.
+ * page. `useLiveQuery` rethrows a Dexie failure during render and every feature
+ * route sits behind one, so a broken IndexedDB would otherwise unmount the app.
  *
- * Never renders the error text: an exception message can carry data the user
- * would not expect on screen, and there is no sink to send it to (ADR 0001 —
- * no backend).
+ * Never renders the error text: a message can carry data the user would not
+ * expect on screen, and there is no sink to send it to (ADR 0001 — no backend).
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { failed: false };

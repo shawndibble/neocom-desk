@@ -17,10 +17,9 @@ function ViewContent() {
 }
 
 /**
- * The gate passes children through while the Dexie read is still in flight
- * (deliberately — no spinner flash for the overwhelming majority who are fine),
- * so "no banner" is only meaningful once that read has resolved. This probe
- * makes the resolution observable, keeping the negative assertions honest.
+ * The gate passes children through while the Dexie read is in flight, so "no
+ * banner" is only meaningful once it resolves. This probe makes that
+ * observable, keeping the negative assertions honest.
  */
 function GrantProbe() {
   const granted = useGrantedScopes();
@@ -78,8 +77,8 @@ describe('ScopeGate', () => {
     expect(
       screen.getByRole('button', { name: /log in again with eve online/i })
     ).toBeInTheDocument();
-    // The point of gating before the fetch: the view never renders, so there
-    // is no spinner-then-empty-table for the user to misread.
+    // The point of gating before the fetch: no spinner-then-empty-table to
+    // misread.
     expect(screen.queryByText('Mail from Aura')).not.toBeInTheDocument();
   });
 

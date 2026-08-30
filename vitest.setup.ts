@@ -2,17 +2,14 @@ import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 
 /**
- * jsdom 30 ships the `HTMLDialogElement` interface but none of its behaviour —
- * `showModal`, `show` and `close` are all missing, so a component built on the
- * native `<dialog>` (see `src/components/ui/Modal.tsx`) cannot be tested at all
- * without this. There is no top layer, no `::backdrop` and no inertness in
- * jsdom, and none of that is emulated here; what is emulated is only the part
- * component code can observe: the `open` state, the initial focus move, and
- * Escape firing a *cancelable* `cancel` event before the dialog closes itself.
+ * jsdom 30 ships the `HTMLDialogElement` interface but none of its behaviour, so
+ * a component built on the native `<dialog>` cannot be tested at all without
+ * this. Only what component code can observe is emulated — `open` state, the
+ * initial focus move, and Escape firing a *cancelable* `cancel`; there is no top
+ * layer, `::backdrop` or inertness here, as there is none in jsdom.
  *
- * `cancel` being cancelable matters: the Modal preventDefaults it so React
- * stays the source of truth for open/closed. A polyfill that closed
- * unconditionally on Escape would let that path pass untested.
+ * Cancelable is the point: `Modal` preventDefaults it, and a polyfill that
+ * closed unconditionally on Escape would let that path pass untested.
  */
 if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.showModal) {
   const FOCUSABLE =
@@ -66,13 +63,11 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
 }
 
 /**
- * jsdom implements no CSS media queries at all, so `window.matchMedia` is
- * simply absent — anything that subscribes to a breakpoint (Layout mounts the
- * mobile "More" sheet only below `md`) throws on mount. Stub the minimum
- * surface: a query that never matches and never changes. That "never matches"
- * default is load-bearing, not incidental — Layout treats a non-matching
- * `(min-width: 48rem)` as mobile, so this stub is what makes every "Layout
- * mobile More sheet" test see a mobile viewport and get the sheet at all.
+ * jsdom implements no CSS media queries, so `window.matchMedia` is absent and
+ * anything subscribing to a breakpoint throws on mount. The never-matching
+ * default is load-bearing, not incidental: `Layout` reads a non-matching
+ * `(min-width: 48rem)` as mobile, which is what makes every "mobile More sheet"
+ * test see a mobile viewport and get the sheet at all.
  */
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   window.matchMedia = (media: string): MediaQueryList =>

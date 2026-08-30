@@ -40,8 +40,7 @@ describe('purgeCharacterCache', () => {
   });
 
   it('spares GLOBAL_CACHE_CHARACTER_ID rows — public universe data behind no scope', async () => {
-    // Character-independent public lookups; purging them is cache churn with
-    // zero privacy benefit.
+    // Public reference data: purging is churn with no privacy benefit.
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'name:1000035');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'station:60003760');
@@ -83,9 +82,8 @@ describe('purgeCharacterCache', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Escalating fallback (graceful degradation). A failing purge must never fail
-// login or a token refresh, and must never leave the previous owner's cached
-// rows readable.
+// Escalating fallback: a failing purge must never fail login or a token
+// refresh, and must never leave the previous owner's rows readable.
 // ---------------------------------------------------------------------------
 
 function throwing(message: string): () => never {
@@ -114,7 +112,6 @@ describe('purgeCharacterCacheOrSuppress', () => {
 
   it('tier 2: escalates to clearing the WHOLE table when the targeted range delete fails', async () => {
     // A damaged compound index fails the range delete but not a table clear.
-    // Over-purging (global + other characters' rows) is pure refetch cost.
     await seed(CHAR_ID, 'wallet:balance');
     await seed(NEIGHBOUR_ABOVE, 'wallet:balance');
     await seed(GLOBAL_CACHE_CHARACTER_ID, 'type:587');

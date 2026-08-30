@@ -2,16 +2,15 @@ import { esiFetch, EsiError } from './client';
 import type { EsiFetchOptions } from './client';
 
 /**
- * Outcome of a paginated fetch. Mirrors the `StatusResult` idiom in
- * `esi/cache.ts`: the data plus the one bit the caller can't otherwise
- * recover — here "is this list complete?".
+ * Outcome of a paginated fetch: the data plus the one bit a caller cannot
+ * otherwise recover — is this list complete? Mirrors the `StatusResult` idiom
+ * in `esi/cache.ts`.
  */
 export interface TruncatableResult<T> {
   items: T[];
   /**
-   * D4: the fetch came up short, so `items` is a partial list. Callers must
-   * not present it as the whole thing. Also used by the cursored (non
-   * X-Pages) wallet-transactions fetch in `endpoints.ts`.
+   * `items` is a partial list; callers must not present it as the whole thing.
+   * Also set by the cursored (non X-Pages) wallet-transactions fetch.
    */
   truncated: boolean;
 }
@@ -26,21 +25,19 @@ export interface PaginatedResult<T> extends TruncatableResult<T> {
 export interface FetchAllPagesOptions extends Omit<EsiFetchOptions, 'page' | 'etag'> {
   /**
    * Stop after this many pages even if X-Pages reports more; the result is
-   * then `truncated`. Off by default — no endpoint caps itself today, and
-   * adding a cap would *create* truncation rather than report it.
+   * then `truncated`. Off by default — a cap would *create* truncation rather
+   * than report it.
    */
   maxPages?: number;
 }
 
 /**
- * Fetch every page of a paginated ESI list endpoint (X-Pages), strictly
- * sequentially (concurrency 1) to stay friendly to ESI rate limits.
- * `page` and `etag` options are ignored — all pages are always fetched fresh.
+ * Fetch every page of an X-Pages ESI list, strictly sequentially to stay
+ * friendly to rate limits. `page`/`etag` are ignored — always fetched fresh.
  *
- * D4: `truncated` is derived from pages actually collected vs. pages
- * advertised, not from which early-exit path ran, so every way of coming up
- * short reports the same way: a mid-pagination 404, a page that returned no
- * body, or the optional `maxPages` cap.
+ * `truncated` is derived from pages collected vs. pages advertised, not from
+ * which early-exit ran, so a mid-pagination 404, an empty body and the
+ * `maxPages` cap all report identically.
  */
 export async function fetchAllPagesStatus<T>(
   path: string,
@@ -59,12 +56,9 @@ export async function fetchAllPagesStatus<T>(
         pagesFetched += 1;
       }
     } catch (err) {
-      // BUG #7: a 404 on a page after the first (data changed/shrank between
-      // the X-Pages count and this request, e.g. items were deleted) means
-      // "no more data here" — treat it as end-of-data and keep whatever was
-      // already collected, rather than discarding every page fetched so far.
-      // Any other error still throws: partial data written over a good cache
-      // entry would be worse than falling back to that entry.
+      // A 404 after page 1 means the list shrank between the X-Pages count
+      // and this request: end-of-data, keep what was collected. Anything else
+      // throws — partial data over a good cache entry is worse than the entry.
       if (err instanceof EsiError && err.status === 404) break;
       throw err;
     }

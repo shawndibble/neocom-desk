@@ -14,10 +14,8 @@ import { useLockedRoutes } from './useGrantedScopes';
 import type { AppRoutePath } from './routeScopes';
 
 /**
- * Sync status dot, gated on Firebase being configured at all (see
- * syncStatus.ts) — hidden entirely rather than shown permanently idle, since
- * an unconfigured app never syncs and a dot with nothing behind it just begs
- * the "why isn't this working" question.
+ * Hidden entirely when Firebase isn't configured, rather than shown permanently
+ * idle — a dot with nothing behind it just begs "why isn't this working".
  */
 function SyncStatusIndicator() {
   const { status, online } = useSyncStatus();
@@ -33,10 +31,7 @@ function navClass({ isActive }: { isActive: boolean }): string {
   return `${NAV_LINK} ${isActive ? NAV_ACTIVE : NAV_IDLE}`;
 }
 
-/**
- * Every feature route reachable from the nav, so `useLockedRoutes` can answer
- * for all of them in one Dexie read.
- */
+/** Nav-reachable routes, so `useLockedRoutes` answers for all of them at once. */
 const NAV_PATHS = [
   '/characters',
   '/overview',
@@ -59,16 +54,15 @@ interface NavItemProps {
 }
 
 /**
- * Nav link that marks a destination the active Character cannot currently
- * use. The marker is informational only — the link still navigates, and the
- * route's `ScopeGate` explains what is missing when the user gets there.
- * Disabling it would leave no way to reach the explanation.
+ * Nav link marking a destination the active Character cannot currently use.
+ * Informational only — the link still navigates and the route's `ScopeGate`
+ * explains why; disabling it would leave no way to reach the explanation.
  */
 function NavItem({ to, label, locked, onClick }: NavItemProps) {
   const { t } = useTranslation();
-  // The marker rides on `title`, not on extra text: appending a second string
-  // inside the link would rewrite its accessible name from "Assets" to
-  // "Assets, needs a new login", which is not what the link is called.
+  // The marker rides on `title`, not extra text: a second string inside the
+  // link would rewrite its accessible name from "Assets" to "Assets, needs a
+  // new login", which is not what the link is called.
   return (
     <NavLink
       to={to}
@@ -94,16 +88,12 @@ interface MobileMoreSheetProps {
 }
 
 /**
- * Mobile-only overflow sheet (UX-REVIEW #4/#8): the six Character-section
- * views that don't fit as primary bottom-tab-bar items, plus the "switch
- * character" link that used to occupy the tab bar's fifth slot, plus Market
- * (character-agnostic, so it doesn't belong grouped with the Character
- * section, but the bottom tab bar is already full at 4 primary destinations
- * + More). It is a real modal, not just a drawer: it covers the viewport and
- * the tab bar underneath it must not stay reachable, so it goes through the
- * shared Modal primitive and inherits its dismissal contract — Escape closes,
- * backdrop click closes, focus returns to the More trigger. Links also close it
- * on click so it never hangs over the next route.
+ * Mobile-only overflow sheet: the Character-section views that don't fit as
+ * primary bottom-tab items, plus "switch character", plus Market (which isn't
+ * Character-scoped, but the tab bar is full at 4 + More). A real modal, not a
+ * drawer: it covers the viewport, so the tab bar underneath must not stay
+ * reachable — hence the shared `Modal` and its dismissal contract. Links close
+ * it on click so it never hangs over the next route.
  */
 function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreSheetProps) {
   const { t } = useTranslation();
@@ -183,15 +173,12 @@ export function Layout() {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
-  // The mobile More sheet is mounted only below the `md` breakpoint (see
-  // `!isDesktop &&` below) rather than always-mounted-but-CSS-hidden: a
-  // CSS-hidden `showModal()` dialog is still inert everywhere per the
-  // platform, so growing past `md` while it was open used to leave an
-  // invisible modal holding the whole app hostage. Mounting it conditionally
-  // means it simply isn't there to be inert — crossing the breakpoint is an
-  // unmount, and `Modal`'s own unmount-while-open cleanup already closes the
-  // dialog and returns focus to the trigger. `moreOpen` is reset alongside so
-  // a later resize back to mobile doesn't reopen it unasked.
+  // The More sheet is mounted conditionally (`!isDesktop &&` below), not
+  // CSS-hidden: `showModal()` makes the page inert regardless of the dialog's
+  // own `display`, so growing past `md` while open left an invisible modal
+  // holding the whole app hostage. Unmounting instead lets `Modal`'s cleanup
+  // close it and restore focus; `moreOpen` resets so a resize back to mobile
+  // doesn't reopen it unasked.
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 48rem)').matches
   );
@@ -264,7 +251,7 @@ export function Layout() {
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar: 4 primary destinations + More (UX-REVIEW #4). */}
+      {/* Mobile bottom tab bar: 4 primary destinations + More. */}
       <nav
         aria-label={t('nav.mobileLabel')}
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-panel/95 backdrop-blur-sm md:hidden"

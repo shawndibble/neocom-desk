@@ -53,11 +53,9 @@ describe('scope declarations', () => {
 
 describe('parity with the endpoints.ts marker comments', () => {
   // endpoints.ts documents each wrapper with `// --- METHOD /route (scope) ---`,
-  // verified against the ESI OpenAPI spec. Pinning the registry against those
-  // comments makes the two impossible to drift apart silently.
-  // Each match runs from a marker to the wrapper immediately below it, so the
-  // route and scope are pinned to a *named* wrapper rather than to an
-  // anonymous set — swapping two endpoints' routes has to fail here.
+  // verified against the ESI OpenAPI spec. Each match runs from a marker to the
+  // wrapper immediately below it, so route and scope pin to a *named* wrapper —
+  // swapping two endpoints' routes has to fail here.
   const markers = [
     ...endpointsSource.matchAll(
       /^\/\/ --- (?:GET|POST) (\S+) \(([^)]+)\) ---$[\s\S]*?^export (?:async )?function (\w+)/gm
@@ -65,8 +63,8 @@ describe('parity with the endpoints.ts marker comments', () => {
   ].map(([, route, scope, name]) => ({ name, route, scope }));
 
   it('parses one marker comment per wrapper', () => {
-    // Also the proof that the non-greedy match above paired each marker with
-    // the right wrapper: a skipped or over-consumed block changes this count.
+    // Also proves the non-greedy match paired each marker with the right
+    // wrapper: a skipped or over-consumed block changes this count.
     expect(markers).toHaveLength(Object.keys(ESI_REGISTRY).length);
   });
 

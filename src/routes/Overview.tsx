@@ -91,8 +91,7 @@ export function Overview() {
   const catalog = current?.catalog ?? null;
 
   // Reads the wall clock to pick "the entry training right now" — unavoidably
-  // impure (no ticking-clock store to subscribe to instead); harmless since
-  // it only affects which row is shown, not any computed/cached value.
+  // impure, but it only affects which row is shown, not any cached value.
   // eslint-disable-next-line react-hooks/purity -- see comment above
   const activeEntry = queueResult ? selectActiveQueueEntry(queueResult.data, Date.now()) : null;
   const activeSkillName =

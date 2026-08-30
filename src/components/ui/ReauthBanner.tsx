@@ -6,20 +6,13 @@ interface ReauthBannerProps {
   actionLabel: string;
   onLogin: () => void;
   /**
-   * `primary` is right when the banner replaces a view's content and is the
-   * only call to action on screen. Pass `ghost` where it renders *alongside*
-   * a view that still has its own primary button — docs/DESIGN.md §5 allows
-   * one per view.
+   * `primary` when the banner replaces a view's content. `ghost` where it
+   * renders alongside a view that has its own primary button — docs/DESIGN.md
+   * §5 allows one per view.
    */
   variant?: 'primary' | 'ghost';
 }
 
-/**
- * Shared "you need to log in again" affordance (BUG #3): same markup
- * src/features/industry/ActiveJobsPanel.tsx already used inline for its
- * `needsReauth` state, factored out so every read-through view that
- * distinguishes "not logged in" from "offline" can render it identically.
- */
 export function ReauthBanner({
   title,
   hint,

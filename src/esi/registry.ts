@@ -1,44 +1,33 @@
 /**
  * Single source of truth for every ESI endpoint NeoCom Desk calls: the OAuth
- * scope it needs (or an explicit "public").
+ * scope it needs, or an explicit "public".
  *
- * Two consumers, one declaration:
- *  - `src/esi/scopes.ts` derives `SCOPES` from here, so the login request can
- *    no longer drift from the endpoints the app actually calls.
- *  - `src/app/routeScopes.ts` derives each gated route's required scopes from
- *    here, so a route's scope gate can't drift from the endpoints it calls.
+ * Two consumers derive from it rather than restate it — `esi/scopes.ts` for
+ * the login request, `app/routeScopes.ts` for each gated route — so neither
+ * can drift from the endpoints the app actually calls.
  *
- * Each entry also carries its ESI route *template*, but that field has no
- * runtime consumer today — it exists so `registry.test.ts` can pin it against
- * the `// --- METHOD /route (scope) ---` marker comments in `endpoints.ts`.
- * Two features that would consume it for real don't exist yet: a precise
- * per-scope cache purge (`cachePurge.ts` ships a blunt whole-character purge
- * instead, deliberately — see its docblock) and an activity log. Either would
- * also want back the character/global distinction this table used to carry
- * as a `subject` field, dropped for lack of a reader. See
- * `docs/plans/evelens-parity/README.md` before re-adding either.
+ * The `route` template has no runtime consumer; it exists so `registry.test.ts`
+ * can pin it against the `// --- METHOD /route (scope) ---` markers in
+ * `endpoints.ts`.
  *
- * Pure static data. This module imports nothing at runtime — `endpoints.ts` is
- * referenced type-only — so it is safe to import from anywhere, including the
- * Playwright fixtures in `e2e/support`, without dragging in Dexie or fetch.
- * It must never grow auth state (docs/ARCHITECTURE.md §2) and must never be
- * imported by `src/engine` (CLAUDE.md).
+ * Pure static data, importing nothing at runtime (`endpoints.ts` is referenced
+ * type-only), so `e2e/support` fixtures can import it without dragging in
+ * Dexie or fetch. Must never grow auth state (docs/ARCHITECTURE.md §2) and
+ * must never be imported by `src/engine` (CLAUDE.md).
  */
 import type * as endpoints from './endpoints';
 
 /**
- * Explicit marker for an endpoint that needs no scope, so "public" is a
- * declaration rather than a missing field. Public endpoints are exactly the
- * ones a character can never revoke, so the purge consumer skips them.
+ * Explicit marker, so "no scope" is a declaration rather than a missing field.
+ * Public endpoints are the ones a character can never revoke, so the purge
+ * skips them.
  */
 export const PUBLIC = 'public';
 export type PublicAccess = typeof PUBLIC;
 
 /**
- * Shape check only — it catches a malformed scope string, not a misspelled
- * one. The spelling backstop is the literal list in `scopes.test.ts`, which
- * is deliberately hand-written: a test that derived its expectation from this
- * file would assert nothing.
+ * Shape check only — catches a malformed scope string, not a misspelled one.
+ * The spelling backstop is the hand-written literal list in `scopes.test.ts`.
  */
 export type EsiScopeName = `esi-${string}.v${number}`;
 
@@ -52,9 +41,8 @@ export interface EsiEndpointSpec {
 
 /**
  * Every exported wrapper in `endpoints.ts`, computed by the compiler rather
- * than hand-listed. `Record<EndpointName, EsiEndpointSpec>` below therefore
- * makes both a missing entry and a stale one a build error: adding a wrapper
- * without declaring its scope does not compile.
+ * than hand-listed, so the `Record<EndpointName, ...>` below makes both a
+ * missing entry and a stale one a build error.
  */
 type EndpointFn = (...args: never[]) => Promise<unknown>;
 type EndpointName = {
@@ -62,16 +50,10 @@ type EndpointName = {
 }[keyof typeof endpoints];
 
 /**
- * Routes and scopes transcribed from the `// --- METHOD /route (scope) ---`
- * marker comments in `endpoints.ts`, which were verified against
- * https://esi.evetech.net/meta/openapi.json. `registry.test.ts` re-parses
- * those comments and asserts they still agree with this table.
- *
- * Every wrapper in `endpoints.ts` — nothing else calls ESI directly today
- * (`src/market/cost-index.ts` and `src/market/esiPrices.ts` used to be listed
- * here too, as a `DIRECT_CALL_REGISTRY` bucket, but both are `PUBLIC` and had
- * no reader for their route or scope, so they were dropped; re-add them if a
- * consumer needs every ESI call covered, not just the wrapped ones).
+ * Transcribed from the `// --- METHOD /route (scope) ---` markers in
+ * `endpoints.ts`, verified against https://esi.evetech.net/meta/openapi.json;
+ * `registry.test.ts` re-parses those markers and asserts they still agree.
+ * Covers every wrapper — nothing else calls ESI directly today.
  */
 export const ESI_REGISTRY = {
   getCharacterSkills: {
@@ -143,7 +125,6 @@ export const ESI_REGISTRY = {
     scope: 'esi-industry.read_character_jobs.v1',
   },
 
-  // Public: no scope required.
   getCharacterPublicInfo: {
     route: '/characters/{character_id}',
     scope: PUBLIC,

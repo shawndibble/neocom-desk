@@ -2,10 +2,8 @@
 
 /*
  * Scan only the app source. Tailwind's automatic content detection walks every
- * non-gitignored file, which includes Markdown under `docs/`.
- * Prose that merely *mentions* a class name (docs/DESIGN.md's token tables,
- * docs/plans) was emitting real utility rules into the shipped stylesheet.
- * `index.html` is listed because the app shell lives there.
+ * non-gitignored file, so Markdown under `docs/` that merely *mentions* a class
+ * name emits real utility rules into the shipped stylesheet.
  */
 @source '../../index.html';
 @source '../../src';

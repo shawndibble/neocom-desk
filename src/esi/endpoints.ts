@@ -113,7 +113,7 @@ export interface CharacterBlueprint {
   quantity: number;
 }
 
-/** Paginated; every page is fetched sequentially (see fetchAllPagesStatus). */
+/** Paginated (X-Pages); see fetchAllPagesStatus. */
 export function getCharacterBlueprints(
   characterId: number,
   options: EndpointOptions = {}
@@ -189,9 +189,8 @@ export function getCorporationPublicInfo(
 // --- GET /universe/types/{type_id} (public) ---
 
 /**
- * One dogma attribute value on a type. Verified against a live ESI response
- * (2026-08): both `attribute_id` and `value` are numbers, `value` as a float
- * even for integer-valued attributes (e.g. a skill requirement typeID).
+ * One dogma attribute value on a type. Verified live (2026-08): `value` is a
+ * float even for integer-valued attributes (e.g. a skill requirement typeID).
  */
 export interface DogmaAttribute {
   attribute_id: number;
@@ -253,9 +252,8 @@ export interface WalletJournalEntry {
 }
 
 /**
- * Paginated (X-Pages); every page is fetched sequentially (see fetchAllPagesStatus).
- * D4: returns the completeness flag with the entries — a short journal must
- * not reach the view looking like a whole one.
+ * Paginated (X-Pages); see fetchAllPagesStatus. Returns the completeness flag
+ * with the entries — a short journal must not reach the view looking whole.
  */
 export function getCharacterWalletJournal(
   characterId: number,
@@ -284,10 +282,8 @@ export interface WalletTransaction {
 
 /**
  * Not X-Pages paginated: cursored via `from_id` ("transactions before this
- * id"), each call returning ESI's own page size. Followed for up to
- * MAX_TRANSACTION_PAGES calls (recent history only) rather than to
- * exhaustion, since a character's full transaction history is unbounded and
- * this view only needs recent activity.
+ * id"). Followed for up to MAX_TRANSACTION_PAGES calls, not to exhaustion —
+ * full history is unbounded and this view needs only recent activity.
  */
 const MAX_TRANSACTION_PAGES = 5;
 
@@ -297,10 +293,10 @@ export async function getCharacterWalletTransactions(
 ): Promise<TruncatableResult<WalletTransaction>> {
   const items: WalletTransaction[] = [];
   let fromId: number | undefined;
-  // D4: the cap is a deliberate product limit, but the user still has to be
-  // told when it bit. Using every call *and* getting data on the last one is
-  // the only case where history may remain unfetched (it may also have ended
-  // exactly there — ESI gives no way to tell, so this errs toward warning).
+  // The cap is a deliberate product limit, but the user still has to be told
+  // when it bit. Using every call *and* getting data on the last one is the
+  // only case where history may remain unfetched — it may also have ended
+  // exactly there, and ESI gives no way to tell, so this errs toward warning.
   let truncated = false;
   for (let page = 0; page < MAX_TRANSACTION_PAGES; page += 1) {
     const result = await esiFetch<WalletTransaction[]>(
@@ -315,9 +311,8 @@ export async function getCharacterWalletTransactions(
     if (page_.length === 0) break;
     items.push(...page_);
     truncated = page === MAX_TRANSACTION_PAGES - 1;
-    // from_id is exclusive ("transactions before this id"): passing the
-    // lowest id seen so far already excludes it from the next page, so
-    // subtracting 1 would skip the transaction with id `minId - 1`.
+    // from_id is exclusive, so the lowest id seen is already excluded from
+    // the next page; subtracting 1 would skip the transaction `minId - 1`.
     fromId = Math.min(...page_.map((t) => t.transaction_id));
   }
   return { items, truncated };
@@ -337,9 +332,8 @@ export interface CharacterAsset {
 }
 
 /**
- * Paginated (X-Pages); every page is fetched sequentially (see fetchAllPagesStatus).
- * D4: returns the completeness flag with the assets — a short list must not
- * reach the view looking like a whole one.
+ * Paginated (X-Pages); see fetchAllPagesStatus. Returns the completeness flag
+ * with the assets — a short list must not reach the view looking whole.
  */
 export function getCharacterAssets(
   characterId: number,
@@ -421,11 +415,6 @@ export function getCharacterMail(
 }
 
 // --- POST /universe/names (public) ---
-// Not modeled through esiFetch: it's the only POST this app needs, is
-// unauthenticated, and needs no ETag/pagination handling, so a body-only
-// helper is smaller than threading method/body through the shared GET
-// client. No rate-limit retry (low-volume public lookup); mirrors client.ts's
-// header contract exactly.
 
 export interface UniverseName {
   id: number;
@@ -442,11 +431,6 @@ export interface UniverseName {
     | 'faction';
 }
 
-/**
- * BUG #12: previously called `fetch` directly, bypassing esiFetch's
- * rate-limit retry (429/420) and its shared header/error handling. Routed
- * through esiFetch (POST support) instead, same as every other endpoint.
- */
 export async function postUniverseNames(
   ids: number[],
   options: { signal?: AbortSignal } = {}
@@ -544,7 +528,7 @@ export interface Contract {
   end_location_id?: number;
 }
 
-/** Paginated (X-Pages); every page is fetched sequentially (see fetchAllPagesStatus). */
+/** Paginated (X-Pages); see fetchAllPagesStatus. */
 export function getCharacterContracts(
   characterId: number,
   options: EndpointOptions = {}
@@ -591,7 +575,7 @@ export interface MarketOrderHistory extends MarketOrder {
   state: 'cancelled' | 'expired';
 }
 
-/** Paginated (X-Pages); every page is fetched sequentially (see fetchAllPagesStatus). */
+/** Paginated (X-Pages); see fetchAllPagesStatus. */
 export function getCharacterOrderHistory(
   characterId: number,
   options: EndpointOptions = {}
@@ -605,11 +589,9 @@ export function getCharacterOrderHistory(
 // --- GET /characters/{character_id}/industry/jobs (esi-industry.read_character_jobs.v1) ---
 
 /**
- * Modeled fields only (not the full response): this app shows active jobs,
- * not installer/blueprint-location/output-location bookkeeping. Verified
- * against the live schema (2026-08) — two corrections vs. the original spec
- * sketch: `station_id` is actually a required field (every job has one), and
- * this endpoint is NOT X-Pages paginated (only the corporation variant is).
+ * Modeled fields only: this app shows active jobs, not installer/location
+ * bookkeeping. Verified against the live schema (2026-08) — `station_id` is
+ * required, and this endpoint is NOT X-Pages paginated (only the corp one is).
  */
 export interface IndustryJob {
   job_id: number;
@@ -627,9 +609,8 @@ export interface IndustryJob {
 }
 
 /**
- * Not paginated (character variant, unlike the corp one). `include_completed`
- * has no documented server-side default here, so it's always sent explicitly;
- * defaults to false (active jobs only) since that's this app's v1 use.
+ * Not paginated, unlike the corp variant. `include_completed` has no documented
+ * server-side default here, so it is always sent explicitly; false for v1.
  */
 export function getCharacterIndustryJobs(
   characterId: number,

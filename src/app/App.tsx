@@ -32,10 +32,9 @@ import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-// Wire authenticated ESI calls to stored tokens once, at module load. The
-// provider is wrapped (tokenProvider.ts) so a dead refresh grant is reported
-// centrally instead of surfacing as an empty view in whichever feature
-// happened to ask first.
+// Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
+// (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
+// surfacing as an empty view in whichever feature happened to ask first.
 configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
 
 // '/neocom-desk/' on GitHub Pages, '/' in dev/tests.
@@ -43,14 +42,10 @@ const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
 /**
  * Every feature route, keyed by path. `satisfies Record<AppRoutePath, ...>` is
- * what makes a route without a scope declaration a *compile* error: an entry
- * missing from `routeScopes.ROUTE_REQUIREMENTS` fails the excess-property
- * check, and one missing here fails the completeness check. Same trick, same
- * reason, as `esi/registry.ts`'s endpoint table.
- *
- * Do not hand-write a literal `Route` element for a feature route below — it
- * would slip past both checks. `routeScopes.test.ts` scans this file's source
- * to keep that honest.
+ * what makes a route without a scope declaration a *compile* error, in both
+ * directions. Do not hand-write a literal route element for a feature route
+ * below — it would slip past both checks; `routeScopes.test.ts` scans this
+ * file's source to keep that honest.
  */
 const ROUTE_ELEMENTS = {
   '/characters': <Characters />,
@@ -88,9 +83,9 @@ export function App() {
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).
   useEffect(() => subscribeToEsiAuthFailures(), []);
 
-  // Fire-and-forget: runs on app start (once hydration resolves an active
-  // character) and again on every character switch. Errors (offline, no
-  // Firebase config) are swallowed — surfaced instead via subscribeSyncStatus.
+  // Fire-and-forget, on app start (once hydration resolves an active character)
+  // and every character switch. Errors (offline, no Firebase config) are
+  // swallowed — surfaced instead via subscribeSyncStatus.
   useEffect(() => {
     if (activeCharacterId === null || !isSyncConfigured()) return;
     void triggerSync(activeCharacterId).catch(() => {});
@@ -104,8 +99,7 @@ export function App() {
           <Route path="/" element={<Root />} />
           <Route path="/login" element={<Login />} />
           <Route path="/callback" element={<Callback />} />
-          {/* Everything below needs a logged-in Character (auth gate), and then
-            per-route, the scopes that route's endpoints need (scope gate). */}
+          {/* Below: a logged-in Character, then the route's own scopes. */}
           <Route element={<RequireCharacter />}>
             <Route element={<Layout />}>
               {FEATURE_ROUTES.map(([path, element]) => (

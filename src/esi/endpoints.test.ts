@@ -415,7 +415,7 @@ describe('wallet journal + transactions', () => {
 
     expect(fromIds).toEqual([null, '20', '10']);
     expect(transactions.items.map((t) => t.transaction_id)).toEqual([20, 10]);
-    // Stopped because a page came back empty, not because the cap bit (D4).
+    // Stopped because a page came back empty, not because the cap bit.
     expect(transactions.truncated).toBe(false);
   });
 });

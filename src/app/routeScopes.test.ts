@@ -105,12 +105,9 @@ describe('gated routes', () => {
 });
 
 /**
- * The compile-time guarantee is `App.tsx`'s
- * `ROUTE_ELEMENTS satisfies Record<AppRoutePath, ReactElement>`: a route with
- * no entry in ROUTE_REQUIREMENTS trips the excess-property check, and a
- * declared route with no element trips the completeness check. Neither can be
- * observed at runtime, so these two tests mirror it — one proving the tables
- * agree, one proving nobody bypassed the table with a hand-written <Route>.
+ * Mirrors `App.tsx`'s `satisfies Record<AppRoutePath, ReactElement>`, which
+ * cannot be observed at runtime: one test proves the tables agree, one proves
+ * nobody bypassed the table with a hand-written route element.
  */
 describe('every route must declare its scope requirement', () => {
   const elementBlock = /const ROUTE_ELEMENTS = \{([\s\S]*?)\n\} satisfies/.exec(appSource)?.[1];
@@ -126,8 +123,7 @@ describe('every route must declare its scope requirement', () => {
 
   it('has no hand-written feature <Route path="...">, which would skip both checks', () => {
     // Everything outside the gated area, listed deliberately: adding a path
-    // here is a conscious decision that the route needs no Character and no
-    // scope. Feature routes belong in ROUTE_ELEMENTS instead.
+    // here asserts the route needs no Character and no scope.
     const literalPaths = [...appSource.matchAll(/<Route\s+path="([^"]+)"/g)].map((m) => m[1]);
     expect(literalPaths.sort()).toEqual(['*', '/', '/callback', '/login', '/styleguide']);
   });

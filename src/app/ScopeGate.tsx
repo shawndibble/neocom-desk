@@ -16,23 +16,20 @@ interface ScopeGateProps {
 }
 
 /**
- * Scope gate: renders `ReauthBanner` *in place of* a route's content when the
- * active Character's grant is missing a scope that route needs.
+ * Renders `ReauthBanner` *in place of* a route's content when the active
+ * Character's grant lacks a scope that route needs. In place, not a redirect:
+ * a missing mail scope breaks mail, not the app. ("Is anyone logged in at all"
+ * is a separate question with a separate remedy — `RequireCharacter`.)
  *
- * In place, not a redirect. A missing mail scope means mail is broken; the
- * rest of the app is fine, and navigating the user away from /mail would
- * claim otherwise. The nav and their location stay put.
+ * Compares the stored grant against the route's declared requirement
+ * (`routeScopes.ts`), so it decides before any request goes out and the user
+ * never watches a spinner resolve into an unexplained empty table. Never
+ * response codes: ESI answers 403 both for a missing scope and for a structure
+ * ACL the character isn't on, and re-authing cannot fix the latter.
  *
- * The check is the stored scope set versus the route's declared requirement
- * (`routeScopes.ts`) — known before a single request goes out, so the user
- * never watches a spinner resolve into an unexplained empty table. Nothing
- * here looks at response codes: ESI's 403 does not distinguish a missing
- * scope from a structure ACL the character isn't on.
- *
- * While the Dexie read is in flight it renders `children`. A spinner there
- * would cost every user a flash on every gated route and delay the view's
- * fetch behind a keyed IndexedDB lookup, to smooth over a case that only
- * arises when the grant is already broken.
+ * Passes `children` through while the Dexie read is in flight — a spinner would
+ * flash for every user on every gated route, and delay the view's fetch behind
+ * an IndexedDB lookup, to smooth over an already-broken grant.
  */
 export function ScopeGate({ path, children }: ScopeGateProps) {
   const { t } = useTranslation();

@@ -1,12 +1,7 @@
-// Sync status store — tracked per character so character B's later result
-// cannot stomp character A's error. subscribeSyncStatus streams every change
-// (the UI dot shows the most recent one); getSyncStatus(characterId) reads a
-// specific character's last known status.
-//
-// Deliberately free of any Firebase import: this module is re-exported
-// synchronously from index.ts, so the nav dot can subscribe without pulling
-// the Firebase-backed sync driver (planSync.ts) into the entry chunk. Only
-// planSync.ts writes to it, via setStatus.
+// Sync status store, tracked per character so character B's later result cannot
+// stomp character A's error. Deliberately free of any Firebase import: index.ts
+// re-exports it synchronously, so the nav dot can subscribe without pulling the
+// sync driver (planSync.ts) into the entry chunk. Only planSync.ts writes here.
 
 export type SyncState = 'idle' | 'syncing' | 'error';
 

@@ -164,9 +164,8 @@ describe('readCached / writeCached', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Purge-pending suppression: when both purge tiers failed, the previous
-// owner's rows are still on disk. The read path must behave as if the cache
-// were empty for that character (see cachePurge.ts).
+// Purge-pending suppression: both tiers failed, so the previous owner's rows
+// are still on disk and the read path must read as empty (see cachePurge.ts).
 // ---------------------------------------------------------------------------
 
 /** Drive cachePurge into tier 3 for real, rather than poking its internals. */

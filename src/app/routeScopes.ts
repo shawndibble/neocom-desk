@@ -1,27 +1,12 @@
 /**
- * What each in-app route needs from the character's OAuth grant, declared
- * once so the shell can gate a view *before* it fetches anything.
+ * Per-route OAuth requirements, so the shell can gate a view *before* it
+ * fetches anything. A route declares its *endpoints* and the scopes are
+ * derived from `esi/registry.ts` — no scope string is hand-copied here, and an
+ * endpoint that changes scope upstream updates this table for free.
  *
- * Defect D3: `ReauthBanner` was wired into 3 of 9 ESI-backed views, so the
- * other six rendered as merely empty when a scope was missing. Wiring the
- * banner into six more views would duplicate the same branch nine times and
- * would still only discover the problem after a failed fetch — spinner, empty
- * table, then an explanation. The grant is knowable up front: `TokenRecord`
- * persists the character's `scopes`, and `src/esi/registry.ts` maps every
- * endpoint to the scope it needs. So a route declares the *endpoints* it
- * calls and the required scopes are derived; no scope string is hand-copied
- * here, and an endpoint that changes scope upstream updates this table for
- * free.
- *
- * Deliberately **not** a general permission system: gating replaces a whole
- * page, so only routes whose content collapses to nothing without one grant
- * are gated. Everything else declares `UNGATED` with its reason —
- * `/overview`, `/skills` and `/industry` each render panels backed by
- * different scopes, and hiding the page because one of them is missing would
- * hide working content. Those need panel-level treatment, not a page gate.
- *
- * Pure data + pure functions: no React, no Dexie, no fetch. The React side is
- * `ScopeGate.tsx`.
+ * Not a general permission system: a gate replaces a whole page, so only
+ * routes whose content collapses to nothing without one grant are gated.
+ * Pure data; the React side is `ScopeGate.tsx`.
  */
 import {
   ESI_REGISTRY,
@@ -31,25 +16,17 @@ import {
   type ScopeRequirement,
 } from '@/esi/registry';
 
-/**
- * Explicit marker for a route the scope gate must leave alone, so "ungated"
- * is a declaration rather than an empty list that might be an oversight.
- * Mirrors the `PUBLIC` marker in `esi/registry.ts`.
- */
+/** Explicit marker, so "ungated" is a declaration rather than an oversight. */
 export const UNGATED = 'ungated';
 export type Ungated = typeof UNGATED;
 
 export interface GatedRoute {
-  /**
-   * Every ESI endpoint the page's content depends on. Public ones may be
-   * listed too — they contribute no scope, and listing them keeps this an
-   * honest record of what the page calls.
-   */
+  /** Every ESI endpoint the page's content depends on; public ones contribute no scope. */
   readonly endpoints: readonly EsiEndpointId[];
   /**
-   * i18next namespace holding this route's `reauthTitle`/`reauthHint`/
-   * `reauthAction` keys. Named rather than derived from the path so the gate
-   * speaks the view's own language ("see your mail", not a generic string).
+   * i18next namespace holding this route's `reauth*` keys. Named rather than
+   * derived from the path, so the gate speaks the view's own language ("see
+   * your mail", not a generic string).
    */
   readonly strings: string;
 }
@@ -57,32 +34,30 @@ export interface GatedRoute {
 export type RouteRequirement = Ungated | GatedRoute;
 
 /**
- * Every route rendered inside `Layout`. `App.tsx` builds its route table by
- * mapping over an element map declared `satisfies Record<AppRoutePath, ...>`,
- * so adding a route there without an entry here does not compile — the same
- * trick `esi/registry.ts` uses to keep endpoints and scopes in step.
+ * Every route rendered inside `Layout`. `App.tsx`'s element map is declared
+ * `satisfies Record<AppRoutePath, ...>`, so adding a route there without an
+ * entry here does not compile.
  */
 export const ROUTE_REQUIREMENTS = {
   // Character-agnostic or locally-backed: nothing to gate.
   '/characters': UNGATED,
-  // Market Browser is SDE + Fuzzwork only — it calls no character endpoint.
+  // Market Browser is SDE + Fuzzwork only — no character endpoint.
   '/market': UNGATED,
   // Skill Plans are local, editable data; the ESI reads only decorate them.
   '/skills/plans': UNGATED,
 
-  // Multi-scope pages: a page gate would hide panels that still work.
-  // Overview mixes skills, skill queue and wallet; Skills mixes skills,
-  // skillqueue and implants; Industry mixes blueprints, skills and jobs.
-  // Follow-up: panel-level gating inside those views.
+  // Multi-scope pages: a page gate would hide panels that still work (Overview
+  // mixes skills, queue and wallet; Skills adds implants; Industry adds
+  // blueprints and jobs). These need panel-level gating instead.
   '/overview': UNGATED,
   '/skills': UNGATED,
   '/industry': UNGATED,
   // Single-scope, but already renders `ReauthBanner` from its own
-  // `needsReauth` result (defence in depth) — left as-is per D3 scope.
+  // `needsReauth` result.
   '/wallet': UNGATED,
 
-  // The six D3 views, minus Overview: one scope each, so a missing grant
-  // means the page has literally nothing to show.
+  // One scope each, so a missing grant leaves the page with literally nothing
+  // to show.
   '/assets': {
     endpoints: ['getCharacterAssets', 'getUniverseStation', 'postUniverseNames', 'getUniverseType'],
     strings: 'assets',
@@ -127,15 +102,15 @@ export function routeStringsNamespace(path: GatedRoutePath): string {
 
 /**
  * Distinct scopes a route's endpoints require, in declaration order. Public
- * endpoints drop out via `isScopeRequired`, so an ungated route and a route
- * that only reads public data both yield `[]` — and `[]` never gates.
+ * endpoints drop out, so an ungated route and a public-only route both yield
+ * `[]` — and `[]` never gates.
  */
 export function requiredScopesForRoute(path: AppRoutePath): readonly Scope[] {
   const requirement = ROUTE_REQUIREMENTS[path];
   if (requirement === UNGATED) return [];
-  // Widened to ScopeRequirement so `isScopeRequired` narrows: a literal union
-  // of one route's scopes is not a supertype of `Scope`, which is what the
-  // type-guard overload of `filter` needs.
+  // Widened to ScopeRequirement so `isScopeRequired` narrows: one route's
+  // literal union is not a supertype of `Scope`, which `filter`'s type-guard
+  // overload needs.
   const declared: ScopeRequirement[] = requirement.endpoints.map(
     (endpoint) => ESI_REGISTRY[endpoint].scope
   );
@@ -143,14 +118,9 @@ export function requiredScopesForRoute(path: AppRoutePath): readonly Scope[] {
 }
 
 /**
- * Required scopes absent from `granted`. Takes plain strings because a JWT's
- * `scp` claim carries whatever CCP put there, exactly as
- * `esi/scopes.revokedScopes` does.
- *
- * This scope-set comparison is the *only* authority for gating. A runtime 403
- * is not: ESI answers 403 for a structure a character simply isn't on the ACL
- * of, even with the right scope, so a gate driven by response codes could pin
- * a re-auth prompt on forever for a case re-authing cannot fix.
+ * Required scopes absent from `granted`. Plain strings, because a JWT's `scp`
+ * claim carries whatever CCP put there. This scope-set comparison is the only
+ * authority for gating — never a response code (see `ScopeGate.tsx`).
  */
 export function missingScopesForRoute(
   path: AppRoutePath,

@@ -7,10 +7,7 @@ import { Modal } from './Modal';
 
 /**
  * A trigger plus a controlled Modal — the shape both real call sites use, and
- * the only way to assert focus actually returns to the element that opened it.
- *
- * jsdom has no `<dialog>` behaviour of its own; `vitest.setup.ts` supplies the
- * observable parts (open state, initial focus, cancelable `cancel` on Escape).
+ * the only way to assert focus returns to the element that opened it.
  */
 function Harness() {
   const [open, setOpen] = useState(false);
@@ -64,15 +61,15 @@ describe('Modal', () => {
     await user.click(screen.getByRole('button', { name: 'Inside' }));
     expect(screen.getByRole('button', { name: 'Inside' })).toBeInTheDocument();
 
-    // The ::backdrop is not an element of its own — backdrop clicks surface
-    // with the <dialog> itself as the event target.
+    // The ::backdrop is not an element of its own — such clicks surface with
+    // the <dialog> itself as the event target.
     await user.click(dialog);
     expect(screen.queryByRole('button', { name: 'Inside' })).not.toBeInTheDocument();
   });
 
   it('closes and restores focus when unmounted while open', async () => {
-    // PlanEditor gates ImportClipboardDialog on `{importOpen && …}`, so for that
-    // call site "close" arrives as an unmount rather than an `open` flip.
+    // PlanEditor gates ImportClipboardDialog on `{importOpen && …}`, so there
+    // "close" arrives as an unmount rather than an `open` flip.
     function UnmountHarness() {
       const [mounted, setMounted] = useState(false);
       return (

@@ -26,13 +26,13 @@ import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 interface Snapshot {
   requestKey: string;
   balanceResult: CachedResult<number> | null;
-  /** BUG #3: 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   balanceNeedsReauth: boolean;
   journalResult: CachedResult<WalletJournalEntry[]> | null;
-  /** D4: fewer pages came back than ESI advertised — the list below is partial. */
+  /** Fewer pages came back than ESI advertised — the list below is partial. */
   journalTruncated: boolean;
   transactionsResult: CachedResult<WalletTransaction[]> | null;
-  /** D4: the fetch stopped at the transactions page cap; older history is missing. */
+  /** The fetch stopped at the transactions page cap; older history is missing. */
   transactionsTruncated: boolean;
   typeNames: Map<number, string>;
 }
@@ -83,9 +83,8 @@ export function Wallet() {
 
   const current = snapshot?.requestKey === requestKey ? snapshot : null;
   const loading = current === null;
-  // A manual Refresh (refreshKey > 0) that still falls back to cache is a
-  // distinct, more alarming case than the initial load finding cache first
-  // (UX-REVIEW #10) — same warning-tone banner, different copy.
+  // A manual Refresh that still falls back to cache is a more alarming case
+  // than the initial load finding cache first — same banner, different copy.
   const offlineTitleKey = refreshKey > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle';
 
   const balanceResult = current?.balanceResult ?? null;

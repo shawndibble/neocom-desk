@@ -3,10 +3,8 @@ import { SCOPES, SCOPES_STRING, revokedScopes } from './scopes';
 import { ESI_REGISTRY, PUBLIC, isScopeRequired } from './registry';
 
 describe('SCOPES', () => {
-  // Deliberately hand-written, not derived: SCOPES is now computed from
-  // registry.ts, so an expectation derived from the same source would assert
-  // nothing. This literal list is the spelling backstop and the proof that
-  // deriving the list did not change what the app requests at login.
+  // Hand-written, not derived: SCOPES is computed from registry.ts, so a
+  // derived expectation would assert nothing. This is the spelling backstop.
   it('lists exactly the v1 read scopes', () => {
     expect([...SCOPES].sort()).toEqual(
       [
@@ -52,8 +50,7 @@ describe('revokedScopes', () => {
   });
 
   it('returns nothing when scopes are ADDED (a wider grant is not a revocation)', () => {
-    // The case that would silently nuke every cache on an app update: shipping
-    // a batch of new scopes widens every existing grant on the next login.
+    // The case that would silently nuke every cache on an app update.
     const previous = ['esi-skills.read_skills.v1'];
     const next = [
       'esi-skills.read_skills.v1',
@@ -89,8 +86,8 @@ describe('revokedScopes', () => {
   });
 
   it('reports a removed scope the app does not model (renamed or hand-granted)', () => {
-    // Removals are NOT filtered through the registry's Scope union: a scope we
-    // do not model must still count as revoked, or the purge misses it.
+    // Not filtered through the registry's Scope union: a scope we do not model
+    // must still count as revoked, or the purge misses it.
     expect(revokedScopes(['esi-corporations.read_divisions.v1'], [])).toEqual([
       'esi-corporations.read_divisions.v1',
     ]);

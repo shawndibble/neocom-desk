@@ -1,12 +1,9 @@
 /**
- * Shared ESI read-through cache: try live `esiFetch`, on success persist to
- * the generic `esiCache` Dexie table, on failure fall back to whatever is
- * cached. Never throws for "no network" — callers get `null` only when
- * there is neither a live response nor a cached one.
- *
- * Single implementation for a pattern every `features/*` data module used to
- * copy-paste (skills, character wallet/assets/mail/calendar/contracts/orders,
- * industry blueprints/jobs) — see docs/ARCHITECTURE.md §3.
+ * Shared ESI read-through cache: try live `esiFetch`, persist to the generic
+ * `esiCache` Dexie table on success, fall back to whatever is cached on
+ * failure. Never throws for "no network" — `null` means neither a live
+ * response nor a cached one. One implementation for every `features/*` data
+ * module (docs/ARCHITECTURE.md §3).
  */
 import { db } from '@/db';
 import { emitEsiAuthFailure } from './authFailureSignal';
@@ -19,8 +16,8 @@ export interface CachedResult<T> {
   fetchedAt: Date;
   fromCache: boolean;
   /**
-   * The list is missing pages. Stored on the row, so it stays true for a
-   * cache hit — a short list must not look whole after a reload.
+   * The list is missing pages. Stored on the row so it survives a cache hit —
+   * a short list must not look whole after a reload.
    */
   truncated: boolean;
 }
@@ -33,41 +30,36 @@ export interface StatusResult<T> {
 }
 
 /**
- * `esiCache` is keyed by [characterId, key]; public, character-independent
- * lookups (universe types/names, station names) share this sentinel row
- * instead of one row per character.
+ * `esiCache` is keyed by [characterId, key]; character-independent public
+ * lookups (universe types/names, stations) share this sentinel row rather than
+ * one row per character.
  */
 export const GLOBAL_CACHE_CHARACTER_ID = 0;
 
 export interface LoadWithCacheStatusOptions {
   /**
-   * Detect an auth failure from a thrown error. Defaults to `isAuthFailure`
-   * (401/403 EsiError, or a failed token refresh). Override for a narrower
-   * definition (e.g. industry/jobs.ts treats only a 403 as "needs reauth",
-   * since a 401 there is treated as a generic offline-style failure).
+   * Defaults to `isAuthFailure` (401/403 EsiError, or a failed refresh).
+   * Override to narrow: industry/jobs.ts counts only 403, treating a 401 as a
+   * generic offline-style failure.
    */
   detectAuthFailure?: (err: unknown) => boolean;
   /**
-   * Skip the cache fallback read on an auth failure. For endpoints gated by
+   * Skip the cache fallback read on an auth failure. For an endpoint gated by
    * a scope added after some characters already logged in (e.g. industry
-   * jobs), a character that never granted the scope has never cached a
-   * response — there's nothing useful to fall back to, so the auth-failure
-   * branch returns immediately instead of also checking the cache.
+   * jobs), a character that never granted it has nothing cached to fall back
+   * to.
    */
   skipCacheOnAuthFailure?: boolean;
 }
 
 /**
- * Like `loadWithCache`, but surfaces an auth failure (401/expired token,
- * 403/missing scope, or a failed token refresh) as `needsReauth: true`
- * instead of silently falling back to cache. Any other failure (offline,
- * 5xx, timeout) still falls through to the cache below.
+ * Like `loadWithCache`, but surfaces an auth failure (401 expired token, 403
+ * missing scope, failed refresh) as `needsReauth` instead of silently falling
+ * back. Any other failure (offline, 5xx, timeout) still falls through.
  *
- * `needsReauth` never short-circuits the cache read by default: a caller
- * still using `loadWithCache` (which only reads `.cached`) must not regress
- * from stale-but-present to null just because a status-aware sibling
- * exists. Pass `skipCacheOnAuthFailure` for the one endpoint family that
- * deliberately wants the opposite (see options doc above).
+ * `needsReauth` never short-circuits the cache read by default: a caller on
+ * `loadWithCache`, which reads only `.cached`, must not regress from
+ * stale-but-present to null because a status-aware sibling exists.
  */
 export async function loadWithCacheStatus<T>(
   characterId: number,
@@ -90,14 +82,13 @@ export async function loadWithCacheStatus<T>(
   } catch (err) {
     if (detectAuthFailure(err)) {
       needsReauth = true;
-      // The shell renders one notice for this (src/app/Layout.tsx). Covers the
-      // window the route scope gate cannot: a revoke done in EVE's
-      // third-party-application portal is invisible locally until the next
-      // token refresh, so the stored grant still looks complete.
+      // The shell renders one notice (src/app/Layout.tsx). Covers the window
+      // the route scope gate cannot: a revoke done in EVE's third-party-app
+      // portal is invisible locally until the next token refresh, so the
+      // stored grant still looks complete.
       emitEsiAuthFailure(characterId);
       if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
     }
-    // Any other failure (offline, 5xx, timeout): fall through to the cache below.
   }
   const cached = await readCachedRow(characterId, key);
   if (!cached) return { cached: null, needsReauth };
@@ -125,16 +116,15 @@ export async function loadWithCache<T>(
 /**
  * Read-through for a paginated list, where a fetch can come back short.
  *
- * The rule is enforced here rather than offered as an option: a partial list
- * may not overwrite a complete one. An older complete list under an honest
- * Data Age beats a fresh list that silently lost a page. A partial is still
- * stored when nothing is cached, or when what is cached is itself partial —
- * refusing outright would leave the cache permanently cold for an endpoint
- * that truncates every time, like the wallet transactions page cap.
+ * Enforced, not an option: a partial list may not overwrite a complete one —
+ * an older complete list under an honest Data Age beats a fresh list that
+ * silently lost a page. A partial IS stored when nothing is cached, or when
+ * the cached row is itself partial; refusing outright would leave the cache
+ * permanently cold for an endpoint that truncates every time, like the wallet
+ * transactions page cap.
  *
- * Every paginated endpoint returns `TruncatableResult`, and this is the only
- * cache entry point that accepts one, so a caller cannot silently drop the
- * flag the way an opt-in predicate allowed.
+ * The only cache entry point accepting a `TruncatableResult`, so a caller
+ * cannot silently drop the flag.
  */
 export async function loadPaginatedWithCache<T>(
   characterId: number,
@@ -150,7 +140,6 @@ export async function loadPaginatedWithCache<T>(
       await db.esiCache.put({ characterId, key, value: items, fetchedAt, truncated });
       return { data: items, fetchedAt: new Date(fetchedAt), fromCache: false, truncated };
     }
-    // Keep the complete row; report it, not the short live one.
     return {
       data: existing.value as T[],
       fetchedAt: new Date(existing.fetchedAt),
@@ -158,7 +147,7 @@ export async function loadPaginatedWithCache<T>(
       truncated: false,
     };
   } catch {
-    // Offline/5xx/auth: fall back to whatever is cached, as loadWithCache does.
+    // Offline/5xx/auth: fall back to cache, as loadWithCache does.
   }
   const cached = await readCachedRow(characterId, key);
   if (!cached) return null;
@@ -173,12 +162,11 @@ export async function loadPaginatedWithCache<T>(
 /**
  * The single point where a cached row is allowed to reach a caller.
  *
- * A character whose purge is still pending (both purge tiers failed — see
- * `cachePurge.ts`) has rows on disk that we could not delete and are not
- * allowed to serve, so the cache reads as empty for it. One cheap in-memory
- * lookup per cache read, not per row: the durable marker is read once per
- * session. Writes are deliberately left alone — new rows are the *current*
- * owner's data, and the pending purge sweeps them anyway when it succeeds.
+ * A character whose purge is still pending has rows we could not delete and
+ * are not allowed to serve, so its cache reads as empty (`cachePurge.ts`).
+ * One in-memory lookup per read, not per row. Writes are deliberately left
+ * alone — new rows are the *current* owner's data, and the pending purge
+ * sweeps them when it succeeds.
  */
 async function readCachedRow(
   characterId: number,

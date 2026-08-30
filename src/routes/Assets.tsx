@@ -12,7 +12,7 @@ import type { CharacterAsset } from '@/esi/endpoints';
 interface Snapshot {
   requestKey: string;
   assetsResult: CachedResult<CharacterAsset[]> | null;
-  /** D4: fewer pages came back than ESI advertised — the list below is partial. */
+  /** Fewer pages came back than ESI advertised — the list below is partial. */
   assetsTruncated: boolean;
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
@@ -30,9 +30,8 @@ function locationLabel(
     return locationNames.get(locationId) ?? t('assets.stationLabel', { id: locationId });
   if (locationType === 'solar_system') return t('assets.inSpaceLabel', { id: locationId });
   if (locationType === 'item') {
-    // The parent is another asset (a container or ship) in this same
-    // character's asset list; label the group with ITS resolved type name
-    // ("Drake", "Freight Container") instead of a raw item id.
+    // The parent is another asset (container or ship) in this same list; label
+    // the group with ITS resolved type name instead of a raw item id.
     const parent = assetsByItemId.get(locationId);
     if (parent) {
       const parentName = typeNames.get(parent.type_id);
