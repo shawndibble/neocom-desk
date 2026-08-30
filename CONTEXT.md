@@ -106,3 +106,33 @@
   Hiding the rows would misreport the best price.
 - The selected item also offers **related items** for price comparison and an
   **item detail modal** (fitting attributes: CPU, powergrid, volume, bonuses).
+
+## Glossary (round 6 additions)
+
+- **Item Detail**: The modal view of one item's own properties — fitting cost,
+  volume, bonuses, description. Read live from ESI per item, not from the SDE
+  snapshot, so it is the one Market Browser panel that needs the network.
+- **Related Items**: The other items in the selected item's Market Group,
+  offered beside it for price comparison.
+- **Compare**: A tab that puts the Quickbar's items side by side on best sell,
+  best buy, spread and volume, under the same **Location Mode** as the order
+  book beside it.
+
+## Scope decisions (round 6)
+
+- **Radix is adopted for the primitives the app lacks** — context menu,
+  dropdown, select — and only those. Working primitives stay: the native
+  `<dialog>` Modal beats a library dialog, and `DESIGN.md` already forbids
+  hand-rolled focus traps. Every Radix part is wrapped in `src/components/ui`
+  so call sites never import Radix directly.
+- **Item Detail reads ESI on open**, plus a small SDE dictionary of attribute
+  names and units. Baking attributes into the snapshot would ship megabytes for
+  a panel that is rarely opened.
+- **Items answer to a context menu** wherever they appear — tree, search
+  results, Quickbar, order rows: add to Quickbar, show info, compare, copy
+  name, and jump to a Build Plan.
+- **Related Items are Market Group siblings.** Meta/tech variants need a
+  relation the SDE build does not emit yet; they are a later step.
+- Compare ships with four fixed columns, but user-chosen columns are the
+  expected direction, so the column set is modelled as a list, not as fixed
+  table markup.

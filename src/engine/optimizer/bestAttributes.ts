@@ -4,14 +4,20 @@
  * EVE remap rules (EVE University wiki, "Skills and learning" / Neural Remap):
  * 99 base points across 5 attributes, min 17 / max 27 each, i.e. 14 freely
  * allocatable points. Implants add on top and are unaffected by a remap.
- * Boosters are ignored here today; `computeSchedule` applies them, so the two
- * disagree. That is a known wrong answer, not a safe simplification — long
- * accelerators run to weeks, so a blind optimum is wrong for weeks of
- * training. Ruled to be fixed (plan §5.5, option b); do not build on the
- * exclusion.
+ * Boosters are accounted for when a `BoosterContext` is supplied, matching
+ * `computeSchedule` — a long accelerator runs to weeks, so ignoring one gives
+ * the wrong optimum for weeks of training (plan §5.5). `placeRemaps` does not
+ * pass one yet, so the shipped optimizer button is still Booster-blind.
  */
 import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
-import type { AttributeName, Attributes, EngineSkill, Implants, PlanStep } from '@/engine/types';
+import type {
+  AttributeName,
+  Attributes,
+  Booster,
+  EngineSkill,
+  Implants,
+  PlanStep,
+} from '@/engine/types';
 
 export const ATTRIBUTE_NAMES: readonly AttributeName[] = [
   'intelligence',
@@ -123,14 +129,187 @@ export function bestAttributesForPairs(
   return { attributes: toAttributes(bestExtras), seconds: bestSeconds };
 }
 
+/** Where this segment sits in wall-clock time, and what Boosters are live. */
+export interface BoosterContext {
+  boosters: readonly Booster[];
+  /** When this segment begins training — a Booster's remaining life is measured from here. */
+  startDate: Date;
+}
+
+/** Merge Booster bonuses into a copy of `implants`, for the uniform case. */
+function withBonus(implants: Implants, bonus: Partial<Attributes>): Implants {
+  const merged: Implants = { ...implants };
+  for (const name of ATTRIBUTE_NAMES) {
+    const add = bonus[name] ?? 0;
+    if (add) merged[name] = (merged[name] ?? 0) + add;
+  }
+  return merged;
+}
+
+/**
+ * Longest this segment can take while fully boosted, over every allocation.
+ * Uses the slowest reachable attributes (`BASE_MIN`), so if a Booster outlives
+ * this it outlives the segment for *every* candidate allocation — which is
+ * what makes the uniform shortcut safe rather than merely usual.
+ */
+function maxBoostedSeconds(spByPair: SpByPair, boostedImplants: Implants): number {
+  let seconds = 0;
+  for (const [key, sp] of spByPair) {
+    if (sp <= 0) continue;
+    const [primary, secondary] = key.split('|') as [AttributeName, AttributeName];
+    seconds += timeToTrain(
+      sp,
+      trainingRate(
+        BASE_MIN + (boostedImplants[primary] ?? 0),
+        BASE_MIN + (boostedImplants[secondary] ?? 0)
+      )
+    );
+  }
+  return seconds;
+}
+
+/**
+ * Brute force with a Booster expiring mid-segment.
+ *
+ * The pair aggregation above is order-independent, which a mid-segment expiry
+ * breaks: the rate a step trains at depends on *when* it trains. So walk the
+ * steps in order while the Booster is live, then hand the constant-rate tail
+ * back to the aggregation. Suffix SP-per-pair sums are precomputed once, so
+ * the tail costs O(pairs) at any plan length and only the boosted prefix is
+ * walked — that prefix is bounded by the Booster window, not by plan length.
+ *
+ * Matches `computeSchedule`'s semantics exactly, including the strict `<`
+ * on expiry; a test cross-checks the two.
+ */
+function bestAttributesWalking(
+  steps: readonly PlanStep[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  implants: Implants,
+  bonus: Partial<Attributes>,
+  expirySeconds: number
+): BestAttributesResult {
+  const stepSp: number[] = [];
+  const stepPrimary: AttributeName[] = [];
+  const stepSecondary: AttributeName[] = [];
+  for (const step of steps) {
+    const skill = skills.get(step.skillTypeID);
+    if (!skill) throw new Error(`Unknown skill typeID ${step.skillTypeID}`);
+    stepSp.push(spBetween(skill.rank, step.level - 1, step.level));
+    stepPrimary.push(skill.primary);
+    stepSecondary.push(skill.secondary);
+  }
+
+  const keys = [...new Set(steps.map((_, i) => pairKey(stepPrimary[i], stepSecondary[i])))];
+  const keyAt = new Map(keys.map((k, i) => [k, i]));
+  const keyPairs = keys.map((k) => k.split('|') as [AttributeName, AttributeName]);
+  // suffix[i][k] = SP of pair k across steps i..end.
+  const suffix: number[][] = Array.from({ length: steps.length + 1 }, () =>
+    new Array<number>(keys.length).fill(0)
+  );
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const row = suffix[i];
+    const next = suffix[i + 1];
+    for (let k = 0; k < keys.length; k++) row[k] = next[k];
+    row[keyAt.get(pairKey(stepPrimary[i], stepSecondary[i]))!] += stepSp[i];
+  }
+
+  const implantOf = (n: AttributeName) => implants[n] ?? 0;
+  const bonusOf = (n: AttributeName) => bonus[n] ?? 0;
+
+  let bestSeconds = Infinity;
+  let bestExtras: readonly number[] = [];
+
+  for (const extras of allAllocations()) {
+    const value = (n: AttributeName, boosted: boolean) =>
+      BASE_MIN + extras[ATTRIBUTE_NAMES.indexOf(n)] + implantOf(n) + (boosted ? bonusOf(n) : 0);
+
+    let elapsed = 0;
+    let i = 0;
+    for (; i < steps.length && elapsed < expirySeconds; i++) {
+      let spLeft = stepSp[i];
+      while (spLeft > 0 && elapsed < expirySeconds) {
+        const rate = trainingRate(value(stepPrimary[i], true), value(stepSecondary[i], true));
+        const needed = timeToTrain(spLeft, rate);
+        const room = expirySeconds - elapsed;
+        if (needed <= room) {
+          elapsed += needed;
+          spLeft = 0;
+        } else {
+          elapsed += room;
+          spLeft -= (rate / 60) * room;
+        }
+      }
+      if (spLeft > 0) {
+        // The Booster lapsed mid-step: finish this one unboosted, then the
+        // rest of the segment is constant-rate and can be aggregated.
+        elapsed += timeToTrain(
+          spLeft,
+          trainingRate(value(stepPrimary[i], false), value(stepSecondary[i], false))
+        );
+        i++;
+        break;
+      }
+    }
+
+    const tail = suffix[Math.min(i, steps.length)];
+    // Pruning: once the running total passes the incumbent this allocation
+    // cannot win, and `elapsed` only grows — so bailing leaves it above
+    // `bestSeconds`, which the check below then rejects.
+    for (let k = 0; k < keyPairs.length && elapsed < bestSeconds; k++) {
+      const sp = tail[k];
+      if (sp <= 0) continue;
+      const [primary, secondary] = keyPairs[k];
+      elapsed += timeToTrain(sp, trainingRate(value(primary, false), value(secondary, false)));
+    }
+
+    if (elapsed < bestSeconds) {
+      bestSeconds = elapsed;
+      bestExtras = extras;
+    }
+  }
+  return { attributes: toAttributes(bestExtras), seconds: bestSeconds };
+}
+
 /**
  * Best remap allocation for a contiguous segment of plan steps: minimizes
- * total training seconds at base+implant rates.
+ * total training seconds at base + implant + live-Booster rates.
+ *
+ * Three cases, and only the third is expensive:
+ * - no Booster still live at `startDate` → plain pair aggregation;
+ * - a Booster outlasting the segment → fold it into implants, same fast path;
+ * - a Booster expiring mid-segment → the ordered walk above.
  */
 export function bestAttributes(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
-  implants: Implants = {}
+  implants: Implants = {},
+  booster?: BoosterContext
 ): BestAttributesResult {
-  return bestAttributesForPairs(aggregateSpByPair(steps, skills), implants);
+  const spByPair = aggregateSpByPair(steps, skills);
+  if (!booster || booster.boosters.length === 0) {
+    return bestAttributesForPairs(spByPair, implants);
+  }
+
+  const startMs = booster.startDate.getTime();
+  const live = booster.boosters.filter((b) => b.expiresAt.getTime() > startMs);
+  if (live.length === 0) return bestAttributesForPairs(spByPair, implants);
+
+  // Stacked bonus, and the first expiry — the only breakpoint that matters
+  // while all live Boosters share it. Multiple distinct expiries fall back to
+  // the earliest, which under-credits the longer one rather than over-crediting.
+  const bonus: Partial<Attributes> = {};
+  for (const b of live) {
+    for (const name of ATTRIBUTE_NAMES) {
+      const add = b.bonus[name] ?? 0;
+      if (add) bonus[name] = (bonus[name] ?? 0) + add;
+    }
+  }
+  const expirySeconds = Math.min(...live.map((b) => (b.expiresAt.getTime() - startMs) / 1000));
+
+  const boostedImplants = withBonus(implants, bonus);
+  if (expirySeconds >= maxBoostedSeconds(spByPair, boostedImplants)) {
+    return bestAttributesForPairs(spByPair, boostedImplants);
+  }
+
+  return bestAttributesWalking(steps, skills, implants, bonus, expirySeconds);
 }

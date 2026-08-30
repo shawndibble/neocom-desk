@@ -114,3 +114,126 @@ describe('bestAttributes', () => {
     );
   });
 });
+
+describe('bestAttributes with Boosters', () => {
+  const START = new Date('2026-08-30T00:00:00Z');
+  const after = (seconds: number) => new Date(START.getTime() + seconds * 1000);
+
+  // Two pairs so the optimizer has a real trade-off to get wrong.
+  const skills = skillMap(
+    skill(1, 'perception', 'willpower', 5),
+    skill(2, 'intelligence', 'memory', 5)
+  );
+  const steps: PlanStep[] = [
+    { skillTypeID: 1, level: 4 },
+    { skillTypeID: 2, level: 4 },
+  ];
+
+  it('is unchanged when no Booster context is supplied', () => {
+    const plain = bestAttributes(steps, skills);
+    const withEmpty = bestAttributes(steps, skills, {}, { boosters: [], startDate: START });
+    expect(withEmpty.seconds).toBeCloseTo(plain.seconds, 6);
+    expect(withEmpty.attributes).toEqual(plain.attributes);
+  });
+
+  it('ignores a Booster that already expired before the segment starts', () => {
+    const plain = bestAttributes(steps, skills);
+    const expired = bestAttributes(
+      steps,
+      skills,
+      {},
+      { boosters: [{ bonus: { intelligence: 12 }, expiresAt: after(-1) }], startDate: START }
+    );
+    expect(expired.seconds).toBeCloseTo(plain.seconds, 6);
+  });
+
+  it('treats a Booster outlasting the whole segment exactly like a permanent implant', () => {
+    // The uniform case: every step trains at the boosted rate, so the answer
+    // must match folding the bonus into implants. This is also the branch
+    // that must NOT fall into the slow walk.
+    const bonus = { intelligence: 8, memory: 8, perception: 8, willpower: 8, charisma: 8 };
+    const asImplants = bestAttributes(steps, skills, bonus);
+    const asBooster = bestAttributes(
+      steps,
+      skills,
+      {},
+      { boosters: [{ bonus, expiresAt: after(10 * 365 * 24 * 3600) }], startDate: START }
+    );
+    expect(asBooster.seconds).toBeCloseTo(asImplants.seconds, 6);
+    expect(asBooster.attributes).toEqual(asImplants.attributes);
+  });
+
+  it('lands strictly between the unboosted and fully-boosted totals when it expires mid-segment', () => {
+    const bonus = { intelligence: 10, memory: 10, perception: 10, willpower: 10, charisma: 10 };
+    const unboosted = bestAttributes(steps, skills).seconds;
+    const fully = bestAttributes(steps, skills, bonus).seconds;
+    const partial = bestAttributes(
+      steps,
+      skills,
+      {},
+      { boosters: [{ bonus, expiresAt: after(unboosted / 2) }], startDate: START }
+    ).seconds;
+    expect(partial).toBeLessThan(unboosted);
+    expect(partial).toBeGreaterThan(fully);
+  });
+
+  it('agrees with computeSchedule for the allocation it picks', async () => {
+    // The load-bearing test: the optimizer's own seconds must equal what the
+    // shipped scheduler produces for the same attributes, implants and
+    // Booster. If the two ever diverge, the planner shows one number and the
+    // optimizer optimizes another — which is the D6 defect in a new place.
+    const { computeSchedule } = await import('@/engine/schedule');
+    const bonus = { intelligence: 12, perception: 12 };
+    const boosters = [{ bonus, expiresAt: after(4000) }];
+    const result = bestAttributes(steps, skills, { memory: 3 }, { boosters, startDate: START });
+
+    const scheduled = computeSchedule(
+      steps,
+      { attributes: result.attributes, implants: { memory: 3 }, boosters, startDate: START },
+      skills
+    );
+    const total = scheduled[scheduled.length - 1].cumulativeSeconds;
+    expect(result.seconds).toBeCloseTo(total, 6);
+  });
+
+  it('can choose a different allocation than it would without the Booster', () => {
+    // A Booster large enough on one pair should pull the optimum away from
+    // the unboosted choice; if it never does, the parameter is decorative.
+    const lopsided: PlanStep[] = [
+      { skillTypeID: 1, level: 3 },
+      { skillTypeID: 2, level: 5 },
+    ];
+    const plain = bestAttributes(lopsided, skills);
+    const boosted = bestAttributes(
+      lopsided,
+      skills,
+      {},
+      {
+        boosters: [{ bonus: { intelligence: 12, memory: 12 }, expiresAt: after(1e9) }],
+        startDate: START,
+      }
+    );
+    expect(boosted.seconds).toBeLessThan(plain.seconds);
+  });
+
+  it('honours a segment that starts partway through the Booster window', () => {
+    // placeRemaps evaluates later segments that begin after earlier ones have
+    // trained, so a segment's remaining Booster life is shorter than the
+    // Booster's total life. Same Booster, later start = less benefit.
+    const bonus = { intelligence: 10, memory: 10, perception: 10, willpower: 10, charisma: 10 };
+    const expiresAt = after(6000);
+    const early = bestAttributes(
+      steps,
+      skills,
+      {},
+      { boosters: [{ bonus, expiresAt }], startDate: START }
+    );
+    const late = bestAttributes(
+      steps,
+      skills,
+      {},
+      { boosters: [{ bonus, expiresAt }], startDate: after(5000) }
+    );
+    expect(late.seconds).toBeGreaterThan(early.seconds);
+  });
+});
