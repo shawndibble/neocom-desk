@@ -419,5 +419,10 @@
     "buyVolume": "Buy Volume",
     "remove": "Remove",
     "unpin": "Unpin"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "hint": "Reloading usually fixes this. Your Skill Plans and Build Plans are stored locally and are not affected.",
+    "reload": "Reload"
   }
 }

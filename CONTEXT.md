@@ -62,6 +62,8 @@
   fetch, and a **runtime auth-failure sink** covers the window where that
   stored grant is stale (a revoke performed in EVE's third-party-application
   portal is invisible locally until the next token refresh).
-- Multi-scope routes (`/overview`, `/skills`, `/industry`) degrade per panel
-  rather than gating the whole page — one missing scope must not hide the
-  panels that still work.
+- Multi-scope routes (`/overview`, `/skills`, `/industry`) must degrade per
+  panel rather than gating the whole page — one missing scope must not hide the
+  panels that still work. Partly done: Overview's wallet panel degrades; its
+  skills and queue panels, and the Skills and Industry panels, still fall back
+  to an empty state and rely on the runtime auth-failure notice.

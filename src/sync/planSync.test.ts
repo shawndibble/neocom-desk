@@ -76,6 +76,13 @@ vi.mock('firebase/firestore/lite', () => ({
   }),
 }));
 
+// Real implementation by default — only the outcome is overridden per test,
+// so the purge/spare-global assertions elsewhere still exercise real Dexie.
+vi.mock('@/esi/cachePurge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/esi/cachePurge')>();
+  return { ...actual, purgeCharacterCacheOrSuppress: vi.fn(actual.purgeCharacterCacheOrSuppress) };
+});
+
 vi.mock('./firebaseApp', () => ({
   getSyncFirestore: () => ({}),
 }));
@@ -282,6 +289,31 @@ describe('triggerSync: plans', () => {
     expect(await db.buildPlans.count()).toBe(0);
     expect(remoteStore.get(PLANS_PATH)?.get('p1')).toBeUndefined();
     expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')).toBeUndefined();
+    expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe(HASH);
+  });
+
+  it('leaves the ownerHash bookmark unadvanced when the purge only reached suppression', async () => {
+    // Suppression can be memory-only, so advancing the bookmark would burn the
+    // last retry: after a reload the marker is gone, the hash matches, and the
+    // previous owner's cached rows read normally again.
+    const purge = vi.mocked(await import('@/esi/cachePurge')).purgeCharacterCacheOrSuppress;
+    purge.mockResolvedValueOnce('suppressed');
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+    await db.skillPlans.put(plan());
+
+    await triggerSync(1);
+
+    expect(await db.skillPlans.count()).toBe(0);
+    expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe('previous-owner-hash');
+  });
+
+  it('advances the bookmark when the purge succeeded', async () => {
+    const purge = vi.mocked(await import('@/esi/cachePurge')).purgeCharacterCacheOrSuppress;
+    purge.mockResolvedValueOnce('targeted');
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+
+    await triggerSync(1);
+
     expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe(HASH);
   });
 });

@@ -52,8 +52,11 @@ What shipped instead is two central mechanisms plus one per-panel case:
   `esi/cache.ts`) covers the window where the stored grant is stale, because a
   revoke performed in EVE's third-party-application portal is invisible
   locally until the next token refresh.
-- `/overview`, `/skills` and `/industry` span three scopes each, so they
-  degrade **per panel**. Page-gating them would hide panels that still work.
+- `/overview`, `/skills` and `/industry` span three scopes each, so they are
+  left ungated and must degrade **per panel** — page-gating would hide panels
+  that still work. Only Overview's wallet panel does so far; the rest still
+  rely on the runtime sink, which means they keep the spinner-then-empty-table
+  behaviour this approach was chosen to avoid. Outstanding, not done.
 
 The whole app also moved behind authentication (see `CONTEXT.md` round 4),
 which removes the anonymous-state branch from the gate entirely.

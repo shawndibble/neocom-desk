@@ -240,3 +240,32 @@ describe('read path while a cache purge is pending', () => {
     expect(result).toMatchObject({ data: 'fresh', fromCache: true });
   });
 });
+
+describe('persistResult (D4)', () => {
+  it('keeps the cached row when a fetch reports itself incomplete', async () => {
+    await db.esiCache.put({ characterId: 7, key: 'k', value: ['a', 'b', 'c'], fetchedAt: 1 });
+
+    const result = await loadWithCache(7, 'k', async () => ['a'], {
+      persistResult: () => false,
+    });
+
+    // Live partial data is still returned to the caller...
+    expect(result?.data).toEqual(['a']);
+    expect(result?.fromCache).toBe(false);
+    // ...but the complete cached list survives, so the next read is whole.
+    expect((await db.esiCache.get([7, 'k']))?.value).toEqual(['a', 'b', 'c']);
+  });
+
+  it('writes when the fetch was complete', async () => {
+    await db.esiCache.put({ characterId: 7, key: 'k', value: ['old'], fetchedAt: 1 });
+
+    await loadWithCache(7, 'k', async () => ['a', 'b'], { persistResult: () => true });
+
+    expect((await db.esiCache.get([7, 'k']))?.value).toEqual(['a', 'b']);
+  });
+
+  it('writes when no persistResult is given', async () => {
+    await loadWithCache(7, 'k2', async () => ['x']);
+    expect((await db.esiCache.get([7, 'k2']))?.value).toEqual(['x']);
+  });
+});

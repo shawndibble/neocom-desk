@@ -9,7 +9,7 @@
  * industry blueprints/jobs) — see docs/ARCHITECTURE.md §3.
  */
 import { db } from '@/db';
-import { reportEsiAuthFailure } from '@/stores/authFailure';
+import { emitEsiAuthFailure } from './authFailureSignal';
 import { isAuthFailure } from './client';
 import { isCachePurgePending } from './cachePurge';
 
@@ -49,6 +49,17 @@ export interface LoadWithCacheStatusOptions {
    * branch returns immediately instead of also checking the cache.
    */
   skipCacheOnAuthFailure?: boolean;
+  /**
+   * Consulted after a successful fetch, before the row is written. Return
+   * false to keep whatever is already cached.
+   *
+   * D4: a paginated fetch that came up short must not overwrite a complete
+   * cached list with a partial one — an older complete list under an honest
+   * Data Age beats a fresh list that silently lost a page. Keeping partials
+   * out of the cache is also what lets a cache hit report `truncated: false`
+   * truthfully, since nothing partial is ever stored.
+   */
+  persistResult?: () => boolean;
 }
 
 /**
@@ -75,7 +86,9 @@ export async function loadWithCacheStatus<T>(
     const data = await fetchLive();
     if (data !== null) {
       const fetchedAt = Date.now();
-      await db.esiCache.put({ characterId, key, value: data, fetchedAt });
+      if (options.persistResult?.() !== false) {
+        await db.esiCache.put({ characterId, key, value: data, fetchedAt });
+      }
       return {
         cached: { data, fetchedAt: new Date(fetchedAt), fromCache: false },
         needsReauth: false,
@@ -84,13 +97,11 @@ export async function loadWithCacheStatus<T>(
   } catch (err) {
     if (detectAuthFailure(err)) {
       needsReauth = true;
-      // Publish to the shell so a runtime auth failure surfaces once, globally,
-      // instead of each view having to render its own banner. The route scope
-      // gate (src/app/ScopeGate.tsx) catches the knowable-in-advance case from
-      // the stored grant; this catches the window where that grant is stale —
-      // a revoke performed in EVE's third-party-application portal is invisible
-      // locally until the next token refresh.
-      reportEsiAuthFailure(characterId);
+      // The shell renders one notice for this (src/app/Layout.tsx). Covers the
+      // window the route scope gate cannot: a revoke done in EVE's
+      // third-party-application portal is invisible locally until the next
+      // token refresh, so the stored grant still looks complete.
+      emitEsiAuthFailure(characterId);
       if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
     }
     // Any other failure (offline, 5xx, timeout): fall through to the cache below.
@@ -107,9 +118,10 @@ export async function loadWithCacheStatus<T>(
 export async function loadWithCache<T>(
   characterId: number,
   key: string,
-  fetchLive: () => Promise<T | null>
+  fetchLive: () => Promise<T | null>,
+  options: LoadWithCacheStatusOptions = {}
 ): Promise<CachedResult<T> | null> {
-  return (await loadWithCacheStatus(characterId, key, fetchLive)).cached;
+  return (await loadWithCacheStatus(characterId, key, fetchLive, options)).cached;
 }
 
 /**

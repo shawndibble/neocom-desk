@@ -21,13 +21,16 @@ import { useAuthFailure } from '@/stores/authFailure';
  *    to /login would be wrong. It cannot happen through this path.
  *  - `AuthError` is thrown for *any* non-2xx from the SSO token endpoint
  *    (`auth/sso.ts`), so a transient 503 would otherwise log the user out.
- *    Only the codes that mean "this grant is gone" count: EVE SSO answers
- *    400 `invalid_grant` for a revoked or expired refresh token.
+ *    Match on the OAuth code, never the status: EVE SSO answers 400
+ *    `invalid_grant` for a revoked or expired refresh token, but it answers
+ *    400 for `invalid_request` too, and a proxy can return a 400 whose body
+ *    isn't JSON at all (`network_error`). Only `invalid_grant` means the grant
+ *    itself is gone and re-authorizing is the remedy.
  */
 export function isTotalAuthFailure(err: unknown): boolean {
   if (!isAuthFailure(err)) return false;
   if (!(err instanceof AuthError)) return false;
-  return err.code === 'invalid_grant' || err.status === 400 || err.status === 401;
+  return err.code === 'invalid_grant';
 }
 
 /**

@@ -233,12 +233,15 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     // transfer noticed between logins.
     //
     // Degrades rather than throws (esi/cachePurge.ts): a failing purge must not
-    // fail the sync. The ownerHash bookmark below is then advanced with the
-    // purge still outstanding — that is safe because the escalating fallback
-    // suppresses the character's cache reads instead of relying on this
-    // bookmark to retry, and `auth/session.persistTokens` retries it on the
-    // character's next login or token refresh.
-    await purgeCharacterCacheOrSuppress(character.characterId);
+    // fail the sync.
+    const outcome = await purgeCharacterCacheOrSuppress(character.characterId);
+    // 'suppressed' means both purge tiers failed and the rows are still on
+    // disk. Suppression can be memory-only — `markCachePurgePending` swallows a
+    // failed durable write — so advancing the bookmark here would lose the last
+    // retry: after a reload the marker is gone, the hash matches again, and the
+    // previous owner's cached data reads normally. Leaving it unadvanced makes
+    // the next sync re-detect the change. The plan deletes above are idempotent.
+    if (outcome === 'suppressed') return;
   }
   await db.settings.put({ key, value: character.ownerHash });
 }

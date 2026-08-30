@@ -30,6 +30,14 @@ describe('isTotalAuthFailure', () => {
     expect(isTotalAuthFailure(new AuthError('network_error', 'offline', 0))).toBe(false);
   });
 
+  it('rejects a non-invalid_grant 400: SSO uses 400 for invalid_request too', () => {
+    expect(isTotalAuthFailure(new AuthError('invalid_request', 'bad param', 400))).toBe(false);
+  });
+
+  it('rejects a 400 whose body was not JSON, e.g. an HTML error page from a proxy', () => {
+    expect(isTotalAuthFailure(new AuthError('network_error', 'proxy html', 400))).toBe(false);
+  });
+
   it('rejects an ESI 403, which can mean a structure ACL rather than a bad grant', () => {
     // Unreachable through the token provider by construction; asserted so the
     // narrowing survives anyone widening it later.

@@ -71,6 +71,9 @@ export function AuthFailureNotice() {
         hint={t('reauth.staleGrantHint')}
         actionLabel={t('reauth.staleGrantAction')}
         onLogin={() => void beginEveLogin()}
+        // Shell-level: renders above a route that may have its own primary
+        // button (docs/DESIGN.md §5, one per view).
+        variant="ghost"
       />
       <div className="pb-2">
         <Button size="sm" onClick={dismiss}>

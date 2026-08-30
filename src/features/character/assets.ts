@@ -14,10 +14,15 @@ export async function loadCharacterAssetsWithTruncation(characterId: number): Pr
   truncated: boolean;
 }> {
   let truncated = false;
-  const cached = await loadWithCache(characterId, KEY, async () => {
-    const result = await getCharacterAssets(characterId);
-    truncated = result.truncated;
-    return result.items;
-  });
+  const cached = await loadWithCache(
+    characterId,
+    KEY,
+    async () => {
+      const result = await getCharacterAssets(characterId);
+      truncated = result.truncated;
+      return result.items;
+    },
+    { persistResult: () => !truncated }
+  );
   return { cached, truncated };
 }

@@ -58,11 +58,16 @@ export async function loadWalletJournalWithStatus(
   characterId: number
 ): Promise<TruncatableCachedResult<WalletJournalEntry[]>> {
   let truncated = false;
-  const cached = await loadWithCache(characterId, KEYS.journal, async () => {
-    const result = await getCharacterWalletJournal(characterId);
-    truncated = result.truncated;
-    return result.items;
-  });
+  const cached = await loadWithCache(
+    characterId,
+    KEYS.journal,
+    async () => {
+      const result = await getCharacterWalletJournal(characterId);
+      truncated = result.truncated;
+      return result.items;
+    },
+    { persistResult: () => !truncated }
+  );
   return { cached, truncated };
 }
 
@@ -71,10 +76,15 @@ export async function loadWalletTransactionsWithStatus(
   characterId: number
 ): Promise<TruncatableCachedResult<WalletTransaction[]>> {
   let truncated = false;
-  const cached = await loadWithCache(characterId, KEYS.transactions, async () => {
-    const result = await getCharacterWalletTransactions(characterId);
-    truncated = result.truncated;
-    return result.items;
-  });
+  const cached = await loadWithCache(
+    characterId,
+    KEYS.transactions,
+    async () => {
+      const result = await getCharacterWalletTransactions(characterId);
+      truncated = result.truncated;
+      return result.items;
+    },
+    { persistResult: () => !truncated }
+  );
   return { cached, truncated };
 }

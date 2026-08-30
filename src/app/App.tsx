@@ -1,5 +1,7 @@
 import { useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { ErrorBoundary } from './ErrorBoundary';
+import { subscribeToEsiAuthFailures } from '@/stores/authFailure';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { configureEsi } from '@/esi/client';
 import { triggerSync } from '@/sync';
@@ -82,6 +84,10 @@ export function App() {
     void hydrate();
   }, [hydrate]);
 
+  // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
+  // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).
+  useEffect(() => subscribeToEsiAuthFailures(), []);
+
   // Fire-and-forget: runs on app start (once hydration resolves an active
   // character) and again on every character switch. Errors (offline, no
   // Firebase config) are swallowed — surfaced instead via subscribeSyncStatus.
@@ -91,29 +97,31 @@ export function App() {
   }, [activeCharacterId]);
 
   return (
-    <BrowserRouter basename={BASENAME}>
-      <AuthFailureRedirect />
-      <Routes>
-        <Route path="/" element={<Root />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/callback" element={<Callback />} />
-        {/* Everything below needs a logged-in Character (auth gate), and then
+    <ErrorBoundary>
+      <BrowserRouter basename={BASENAME}>
+        <AuthFailureRedirect />
+        <Routes>
+          <Route path="/" element={<Root />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/callback" element={<Callback />} />
+          {/* Everything below needs a logged-in Character (auth gate), and then
             per-route, the scopes that route's endpoints need (scope gate). */}
-        <Route element={<RequireCharacter />}>
-          <Route element={<Layout />}>
-            {FEATURE_ROUTES.map(([path, element]) => (
-              <Route
-                key={path}
-                path={path}
-                element={<ScopeGate path={path}>{element}</ScopeGate>}
-              />
-            ))}
+          <Route element={<RequireCharacter />}>
+            <Route element={<Layout />}>
+              {FEATURE_ROUTES.map(([path, element]) => (
+                <Route
+                  key={path}
+                  path={path}
+                  element={<ScopeGate path={path}>{element}</ScopeGate>}
+                />
+              ))}
+            </Route>
           </Route>
-        </Route>
-        <Route path="/styleguide" element={<Styleguide />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <ReloadPrompt />
-    </BrowserRouter>
+          <Route path="/styleguide" element={<Styleguide />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <ReloadPrompt />
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

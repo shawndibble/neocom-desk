@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { reportEsiAuthFailure, useAuthFailure } from './authFailure';
+import { reportEsiAuthFailure, subscribeToEsiAuthFailures, useAuthFailure } from './authFailure';
+import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
 
 const CHARACTER_ID = 5;
 
@@ -53,6 +54,22 @@ describe('useAuthFailure', () => {
     expect(useAuthFailure.getState().failure?.kind).toBe('request');
 
     useAuthFailure.getState().clearFor(CHARACTER_ID, 'request');
+    expect(useAuthFailure.getState().failure).toBeNull();
+  });
+});
+
+describe('subscribeToEsiAuthFailures', () => {
+  it('receives what esi publishes, so esi needs no import of this store', () => {
+    const unsubscribe = subscribeToEsiAuthFailures();
+    emitEsiAuthFailure(42);
+    expect(useAuthFailure.getState().failure).toMatchObject({ kind: 'request', characterId: 42 });
+    unsubscribe();
+  });
+
+  it('stops receiving after unsubscribe', () => {
+    subscribeToEsiAuthFailures()();
+    useAuthFailure.setState({ failure: null });
+    emitEsiAuthFailure(42);
     expect(useAuthFailure.getState().failure).toBeNull();
   });
 });

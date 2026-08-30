@@ -14,6 +14,7 @@
 // — notably ESI's 403 for a structure a character isn't on the ACL of, which
 // `esi/client.isAuthFailure` currently cannot tell apart from a missing scope.
 import { create } from 'zustand';
+import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 
 /**
  * - `token`: the refresh grant itself failed, before any ESI request. Nothing
@@ -71,10 +72,19 @@ export const useAuthFailure = create<AuthFailureState>((set, get) => ({
 }));
 
 /**
- * Publishing entry point for non-React callers (the read-through cache).
- * A free function, not a hook, so `esi/cache.ts` needs exactly one line and
- * no React import.
+ * Subscribe the store to `esi`'s auth-failure signal. Called once from the
+ * shell: `esi` publishes and must not know this store exists, so the wiring
+ * lives here rather than as an import inside `esi/cache.ts`.
+ *
+ * Returns an unsubscribe.
  */
+export function subscribeToEsiAuthFailures(): () => void {
+  return onEsiAuthFailure((characterId) => {
+    useAuthFailure.getState().reportRequestFailure(characterId);
+  });
+}
+
+/** Direct publish, for tests and non-React callers that already hold a store. */
 export function reportEsiAuthFailure(characterId: number): void {
   useAuthFailure.getState().reportRequestFailure(characterId);
 }
