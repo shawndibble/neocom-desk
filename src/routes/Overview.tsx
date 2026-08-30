@@ -3,10 +3,17 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner, StatChip } from '@/components/ui';
+import {
+  CharacterAvatar,
+  DataAgeBadge,
+  EmptyState,
+  Panel,
+  ReauthBanner,
+  Spinner,
+  StatChip,
+} from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { characterPortraitUrl } from '@/app/images';
 import { beginEveLogin } from '@/app/loginFlow';
 import {
   loadCharacterSkills,
@@ -102,12 +109,10 @@ export function Overview() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <header className="flex flex-wrap items-center gap-3">
-        <img
-          src={characterPortraitUrl(activeCharacterId, 128)}
+        <CharacterAvatar
+          characterId={activeCharacterId}
+          size="lg"
           alt={t('characters.portraitAlt', { name: character?.name ?? '' })}
-          width={64}
-          height={64}
-          className="size-16 shrink-0 rounded-xs border border-line"
         />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-semibold tracking-widest uppercase">

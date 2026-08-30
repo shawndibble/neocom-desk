@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner, Tabs } from '@/components/ui';
+import { Button, DataAgeBadge, DataTable, EmptyState, Panel, Spinner, Tabs } from '@/components/ui';
+import type { DataTableColumn } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import type { CachedResult } from '@/esi/cache';
@@ -53,7 +54,7 @@ export function Orders() {
   const loading = current === null;
   const ordersResult = current?.ordersResult ?? null;
   const historyResult = current?.historyResult ?? null;
-  const typeNames = current?.typeNames ?? new Map<number, string>();
+  const typeNames = useMemo(() => current?.typeNames ?? new Map<number, string>(), [current]);
 
   const orders = useMemo(
     () => [...(ordersResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
@@ -64,6 +65,55 @@ export function Orders() {
     [historyResult]
   );
 
+  const baseColumns = useMemo<DataTableColumn<MarketOrder>[]>(
+    () => [
+      {
+        id: 'item',
+        header: t('orders.item'),
+        render: (order) => typeNames.get(order.type_id) ?? `Type #${order.type_id}`,
+      },
+      {
+        id: 'side',
+        header: t('orders.side'),
+        render: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
+      },
+      {
+        id: 'price',
+        header: t('orders.price'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (order) => formatIsk(order.price, 2),
+      },
+      {
+        id: 'remaining',
+        header: t('orders.remaining'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (order) =>
+          `${order.volume_remain.toLocaleString()} / ${order.volume_total.toLocaleString()}`,
+      },
+      {
+        id: 'issued',
+        header: t('orders.issued'),
+        className: 'whitespace-nowrap text-text-dim',
+        render: (order) => new Date(order.issued).toLocaleDateString(),
+      },
+    ],
+    [t, typeNames]
+  );
+  const historyColumns = useMemo<DataTableColumn<MarketOrder>[]>(
+    () => [
+      ...baseColumns,
+      {
+        id: 'state',
+        header: t('orders.state'),
+        className: 'text-text-dim',
+        render: (order) => ('state' in order ? (order as MarketOrderHistory).state : ''),
+      },
+    ],
+    [baseColumns, t]
+  );
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -72,51 +122,6 @@ export function Orders() {
     );
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
-
-  function renderRows(rows: MarketOrder[], withState: boolean) {
-    return (
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-line text-left text-text-dim">
-            <th className="px-3 py-2 font-semibold uppercase">{t('orders.item')}</th>
-            <th className="px-3 py-2 font-semibold uppercase">{t('orders.side')}</th>
-            <th className="px-3 py-2 text-right font-semibold uppercase">{t('orders.price')}</th>
-            <th className="px-3 py-2 text-right font-semibold uppercase">
-              {t('orders.remaining')}
-            </th>
-            <th className="px-3 py-2 font-semibold uppercase">{t('orders.issued')}</th>
-            {withState && (
-              <th className="px-3 py-2 font-semibold uppercase">{t('orders.state')}</th>
-            )}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {rows.map((order) => (
-            <tr key={order.order_id}>
-              <td className="px-3 py-1.5">
-                {typeNames.get(order.type_id) ?? `Type #${order.type_id}`}
-              </td>
-              <td className="px-3 py-1.5">
-                {order.is_buy_order ? t('orders.buy') : t('orders.sell')}
-              </td>
-              <td className="px-3 py-1.5 text-right tabular-nums">{formatIsk(order.price, 2)}</td>
-              <td className="px-3 py-1.5 text-right tabular-nums">
-                {order.volume_remain.toLocaleString()} / {order.volume_total.toLocaleString()}
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
-                {new Date(order.issued).toLocaleDateString()}
-              </td>
-              {withState && (
-                <td className="px-3 py-1.5 text-text-dim">
-                  {'state' in order ? (order as MarketOrderHistory).state : ''}
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -159,7 +164,12 @@ export function Orders() {
                   {t('common.offlineTitle')}
                 </p>
               )}
-              {renderRows(orders, false)}
+              <DataTable
+                columns={baseColumns}
+                rows={orders}
+                rowKey={(order) => order.order_id}
+                label={t('orders.openTab')}
+              />
             </>
           )}
         </Panel>
@@ -181,7 +191,12 @@ export function Orders() {
                   {t('common.offlineTitle')}
                 </p>
               )}
-              {renderRows(history, true)}
+              <DataTable
+                columns={historyColumns}
+                rows={history}
+                rowKey={(order) => order.order_id}
+                label={t('orders.historyTab')}
+              />
             </>
           )}
         </Panel>

@@ -4,11 +4,13 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataAgeBadge,
+  DataTable,
   EmptyState,
   Panel,
   ReauthBanner,
   Spinner,
   Tabs,
+  type DataTableColumn,
 } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import {
@@ -23,6 +25,9 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/features/character
 import { formatIsk } from '@/lib/isk';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
+/** Stable identity, so the fallback doesn't invalidate the column memos every render. */
+const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
+
 interface Snapshot {
   balanceResult: CachedResult<number> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
@@ -34,6 +39,11 @@ interface Snapshot {
   /** The fetch stopped at the transactions page cap; older history is missing. */
   transactionsTruncated: boolean;
   typeNames: Map<number, string>;
+}
+
+/** Buys are money out, so the signed total is what carries the ISK tone. */
+function transactionTotal(txn: WalletTransaction): number {
+  return txn.unit_price * txn.quantity * (txn.is_buy ? -1 : 1);
 }
 
 async function loadWalletSnapshot(
@@ -82,7 +92,91 @@ export function Wallet() {
   const journalTruncated = data?.journalTruncated ?? false;
   const transactionsResult = data?.transactionsResult ?? null;
   const transactionsTruncated = data?.transactionsTruncated ?? false;
-  const typeNames = data?.typeNames ?? new Map<number, string>();
+  const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
+
+  const journalColumns = useMemo<DataTableColumn<WalletJournalEntry>[]>(
+    () => [
+      {
+        id: 'date',
+        header: t('wallet.date'),
+        className: 'whitespace-nowrap text-text-dim',
+        render: (entry) => new Date(entry.date).toLocaleString(),
+      },
+      {
+        id: 'refType',
+        header: t('wallet.refType'),
+        className: 'whitespace-nowrap',
+        render: (entry) => humanizeRefType(entry.ref_type),
+      },
+      {
+        id: 'description',
+        header: t('wallet.description'),
+        render: (entry) => entry.description,
+      },
+      {
+        id: 'amount',
+        header: t('wallet.amount'),
+        align: 'right',
+        className: 'tabular-nums',
+        cellClassName: (entry) => (entry.amount !== undefined ? iskToneClass(entry.amount) : ''),
+        render: (entry) =>
+          entry.amount !== undefined ? formatIsk(entry.amount, 2) : t('common.unknown'),
+      },
+      {
+        id: 'balance',
+        header: t('wallet.balanceCol'),
+        align: 'right',
+        className: 'tabular-nums text-text-dim',
+        render: (entry) =>
+          entry.balance !== undefined ? formatIsk(entry.balance, 2) : t('common.unknown'),
+      },
+    ],
+    [t]
+  );
+
+  const transactionColumns = useMemo<DataTableColumn<WalletTransaction>[]>(
+    () => [
+      {
+        id: 'date',
+        header: t('wallet.date'),
+        className: 'whitespace-nowrap text-text-dim',
+        render: (txn) => new Date(txn.date).toLocaleString(),
+      },
+      {
+        id: 'item',
+        header: t('wallet.item'),
+        render: (txn) => typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`,
+      },
+      {
+        id: 'side',
+        header: t('wallet.side'),
+        render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
+      },
+      {
+        id: 'quantity',
+        header: t('wallet.quantity'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (txn) => txn.quantity.toLocaleString(),
+      },
+      {
+        id: 'unitPrice',
+        header: t('wallet.unitPrice'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (txn) => formatIsk(txn.unit_price, 2),
+      },
+      {
+        id: 'total',
+        header: t('wallet.total'),
+        align: 'right',
+        className: 'tabular-nums',
+        cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
+        render: (txn) => formatIsk(transactionTotal(txn), 2),
+      },
+    ],
+    [t, typeNames]
+  );
 
   const journal = useMemo(
     () => [...(journalResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
@@ -175,48 +269,12 @@ export function Wallet() {
                   {t('common.incompleteTitle')}
                 </p>
               )}
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-line text-left text-text-dim">
-                    <th className="px-3 py-2 font-semibold uppercase">{t('wallet.date')}</th>
-                    <th className="px-3 py-2 font-semibold uppercase">{t('wallet.refType')}</th>
-                    <th className="px-3 py-2 font-semibold uppercase">{t('wallet.description')}</th>
-                    <th className="px-3 py-2 text-right font-semibold uppercase">
-                      {t('wallet.amount')}
-                    </th>
-                    <th className="px-3 py-2 text-right font-semibold uppercase">
-                      {t('wallet.balanceCol')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {journal.map((entry) => (
-                    <tr key={entry.id}>
-                      <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
-                        {new Date(entry.date).toLocaleString()}
-                      </td>
-                      <td className="px-3 py-1.5 whitespace-nowrap">
-                        {humanizeRefType(entry.ref_type)}
-                      </td>
-                      <td className="px-3 py-1.5">{entry.description}</td>
-                      <td
-                        className={`px-3 py-1.5 text-right tabular-nums ${
-                          entry.amount !== undefined ? iskToneClass(entry.amount) : ''
-                        }`}
-                      >
-                        {entry.amount !== undefined
-                          ? formatIsk(entry.amount, 2)
-                          : t('common.unknown')}
-                      </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums text-text-dim">
-                        {entry.balance !== undefined
-                          ? formatIsk(entry.balance, 2)
-                          : t('common.unknown')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                label={t('wallet.journalTab')}
+                columns={journalColumns}
+                rows={journal}
+                rowKey={(entry) => entry.id}
+              />
             </>
           )}
         </Panel>
@@ -246,53 +304,12 @@ export function Wallet() {
                   {t('wallet.transactionsCapped')}
                 </p>
               )}
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-line text-left text-text-dim">
-                    <th className="px-3 py-2 font-semibold uppercase">{t('wallet.date')}</th>
-                    <th className="px-3 py-2 font-semibold uppercase">{t('wallet.item')}</th>
-                    <th className="px-3 py-2 font-semibold uppercase">{t('wallet.side')}</th>
-                    <th className="px-3 py-2 text-right font-semibold uppercase">
-                      {t('wallet.quantity')}
-                    </th>
-                    <th className="px-3 py-2 text-right font-semibold uppercase">
-                      {t('wallet.unitPrice')}
-                    </th>
-                    <th className="px-3 py-2 text-right font-semibold uppercase">
-                      {t('wallet.total')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {transactions.map((txn) => {
-                    const total = txn.unit_price * txn.quantity * (txn.is_buy ? -1 : 1);
-                    return (
-                      <tr key={txn.transaction_id}>
-                        <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
-                          {new Date(txn.date).toLocaleString()}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          {txn.is_buy ? t('wallet.buy') : t('wallet.sell')}
-                        </td>
-                        <td className="px-3 py-1.5 text-right tabular-nums">
-                          {txn.quantity.toLocaleString()}
-                        </td>
-                        <td className="px-3 py-1.5 text-right tabular-nums">
-                          {formatIsk(txn.unit_price, 2)}
-                        </td>
-                        <td
-                          className={`px-3 py-1.5 text-right tabular-nums ${iskToneClass(total)}`}
-                        >
-                          {formatIsk(total, 2)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <DataTable
+                label={t('wallet.transactionsTab')}
+                columns={transactionColumns}
+                rows={transactions}
+                rowKey={(txn) => txn.transaction_id}
+              />
             </>
           )}
         </Panel>

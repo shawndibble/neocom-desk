@@ -1,7 +1,15 @@
 import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  DataTable,
+  EmptyState,
+  Panel,
+  Spinner,
+  type DataTableColumn,
+} from '@/components/ui';
 import { loadContracts } from '@/features/character/contracts';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
@@ -27,6 +35,9 @@ const STATUS_TONE: Record<Contract['status'], string> = {
   reversed: 'text-danger',
 };
 
+/** Stable identity, so the fallback doesn't invalidate the column memo every render. */
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
+
 function isExpired(contract: Contract): boolean {
   return new Date(contract.date_expired).getTime() < Date.now();
 }
@@ -49,7 +60,48 @@ export function Contracts() {
     useRouteSnapshot(loadContractsSnapshot);
 
   const contractsResult = data?.contractsResult ?? null;
-  const issuerNames = data?.issuerNames ?? new Map<number, string>();
+  const issuerNames = data?.issuerNames ?? NO_NAMES;
+
+  const columns = useMemo<DataTableColumn<Contract>[]>(
+    () => [
+      {
+        id: 'type',
+        header: t('contracts.type'),
+        render: (contract) => contract.title || contract.type,
+      },
+      {
+        id: 'status',
+        header: t('contracts.status'),
+        className: 'font-semibold',
+        cellClassName: (contract) => STATUS_TONE[contract.status],
+        render: (contract) => contract.status,
+      },
+      {
+        id: 'issuer',
+        header: t('contracts.issuer'),
+        render: (contract) => issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`,
+      },
+      {
+        id: 'price',
+        header: t('contracts.price'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (contract) =>
+          contract.price !== undefined
+            ? formatIsk(contract.price, 2)
+            : contract.reward !== undefined
+              ? formatIsk(contract.reward, 2)
+              : t('common.unknown'),
+      },
+      {
+        id: 'expires',
+        header: t('contracts.expires'),
+        className: 'whitespace-nowrap text-text-dim',
+        render: (contract) => new Date(contract.date_expired).toLocaleString(),
+      },
+    ],
+    [t, issuerNames]
+  );
 
   const contracts = useMemo(
     () =>
@@ -91,45 +143,13 @@ export function Contracts() {
               {t('common.offlineTitle')}
             </p>
           )}
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-line text-left text-text-dim">
-                <th className="px-3 py-2 font-semibold uppercase">{t('contracts.type')}</th>
-                <th className="px-3 py-2 font-semibold uppercase">{t('contracts.status')}</th>
-                <th className="px-3 py-2 font-semibold uppercase">{t('contracts.issuer')}</th>
-                <th className="px-3 py-2 text-right font-semibold uppercase">
-                  {t('contracts.price')}
-                </th>
-                <th className="px-3 py-2 font-semibold uppercase">{t('contracts.expires')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {contracts.map((contract) => (
-                <tr
-                  key={contract.contract_id}
-                  className={isExpired(contract) ? 'opacity-50' : undefined}
-                >
-                  <td className="px-3 py-1.5">{contract.title || contract.type}</td>
-                  <td className={`px-3 py-1.5 font-semibold ${STATUS_TONE[contract.status]}`}>
-                    {contract.status}
-                  </td>
-                  <td className="px-3 py-1.5">
-                    {issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`}
-                  </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">
-                    {contract.price !== undefined
-                      ? formatIsk(contract.price, 2)
-                      : contract.reward !== undefined
-                        ? formatIsk(contract.reward, 2)
-                        : t('common.unknown')}
-                  </td>
-                  <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
-                    {new Date(contract.date_expired).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            label={t('contracts.title')}
+            columns={columns}
+            rows={contracts}
+            rowKey={(contract) => contract.contract_id}
+            rowClassName={(contract) => (isExpired(contract) ? 'opacity-50' : undefined)}
+          />
         </Panel>
       )}
     </div>

@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner, StatChip, Tabs } from '@/components/ui';
+import {
+  Button,
+  CharacterAvatar,
+  DataAgeBadge,
+  DataTable,
+  EmptyState,
+  FilterChip,
+  Panel,
+  Spinner,
+  StatChip,
+  Tabs,
+} from '@/components/ui';
 
 const COLOR_TOKENS: { name: string; className: string; note?: string }[] = [
   { name: 'bg', className: 'bg-bg' },
@@ -29,6 +40,28 @@ const AGE_MINUTES = new Date(NOW - 12 * MIN);
 const AGE_HOURS = new Date(NOW - 5 * HOUR);
 const AGE_DAYS = new Date(NOW - 3 * DAY);
 
+/** Stand-in rows for the DataTable sample: shape is irrelevant, the column mix is the point. */
+const SAMPLE_ROWS = [
+  { id: 1, item: 'Tritanium', qty: 1_250_000, tone: 'text-isk-pos' },
+  { id: 2, item: 'Pyerite', qty: -4_200, tone: 'text-isk-neg' },
+  { id: 3, item: 'Mexallon', qty: 96_310, tone: '' },
+];
+
+const SAMPLE_COLUMNS = [
+  { id: 'item', header: 'Item', render: (row: (typeof SAMPLE_ROWS)[number]) => row.item },
+  {
+    id: 'qty',
+    header: 'Quantity',
+    align: 'right' as const,
+    className: 'tabular-nums',
+    cellClassName: (row: (typeof SAMPLE_ROWS)[number]) => row.tone,
+    render: (row: (typeof SAMPLE_ROWS)[number]) => row.qty.toLocaleString(),
+  },
+];
+
+/** A real character id, so the portrait resolves against the EVE image server. */
+const SAMPLE_CHARACTER_ID = 90_000_001;
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
@@ -40,6 +73,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export function Styleguide() {
   const [tab, setTab] = useState('open');
+  const [chip, setChip] = useState<string | null>('skills');
 
   return (
     <div className="min-h-screen space-y-10 bg-bg p-6 text-text">
@@ -182,6 +216,53 @@ export function Styleguide() {
             <Spinner size="sm" />
             <Spinner />
             <Spinner size="lg" />
+          </div>
+        </Panel>
+      </Section>
+
+      <Section title="DataTable">
+        <Panel padded={false}>
+          <DataTable
+            label="DataTable sample"
+            columns={SAMPLE_COLUMNS}
+            rows={SAMPLE_ROWS}
+            rowKey={(row) => row.id}
+            rowClassName={(row) => (row.qty < 0 ? 'opacity-50' : undefined)}
+          />
+        </Panel>
+      </Section>
+
+      <Section title="CharacterAvatar">
+        <Panel>
+          <div className="flex items-center gap-6">
+            <CharacterAvatar characterId={SAMPLE_CHARACTER_ID} size="sm" />
+            <CharacterAvatar characterId={SAMPLE_CHARACTER_ID} />
+            <CharacterAvatar characterId={SAMPLE_CHARACTER_ID} size="lg" />
+            <CharacterAvatar characterId={SAMPLE_CHARACTER_ID} size="lg" selected />
+          </div>
+        </Panel>
+      </Section>
+
+      <Section title="FilterChip">
+        <Panel>
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChip
+              label="Published"
+              selected={chip === 'published'}
+              onToggle={() => setChip(chip === 'published' ? null : 'published')}
+            />
+            <FilterChip
+              label="Skills"
+              count={511}
+              selected={chip === 'skills'}
+              onToggle={() => setChip(chip === 'skills' ? null : 'skills')}
+            />
+            <FilterChip
+              label="Blueprints"
+              count={0}
+              selected={chip === 'blueprints'}
+              onToggle={() => setChip(chip === 'blueprints' ? null : 'blueprints')}
+            />
           </div>
         </Panel>
       </Section>

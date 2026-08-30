@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, EmptyState, Spinner } from '@/components/ui';
+import { Button, CharacterAvatar, EmptyState, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
-import { characterPortraitUrl } from '@/app/images';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -58,13 +57,10 @@ export function Characters() {
                   onClick={() => void select(character.characterId)}
                   className="flex w-full items-center gap-3 rounded-xs border border-line bg-panel/85 p-3 text-left backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  <img
-                    src={characterPortraitUrl(character.characterId)}
+                  <CharacterAvatar
+                    characterId={character.characterId}
+                    size="lg"
                     alt={t('characters.portraitAlt', { name: character.name })}
-                    width={64}
-                    height={64}
-                    loading="lazy"
-                    className="size-16 shrink-0 rounded-xs border border-line"
                   />
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">{character.name}</span>

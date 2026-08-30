@@ -64,13 +64,16 @@ No bundled fonts, no new deps — system stack approximating EVE's condensed san
 Rules:
 
 - Micro-headings (panel titles, table headers, tab labels, buttons): uppercase,
-  `text-xs` or `text-[11px]`, `font-semibold`, `tracking-widest` (approximates the
+  `text-xs` or `text-[0.6875rem]`, `font-semibold`, `tracking-widest` (approximates the
   condensed EVE feel via letterspaced small caps rather than a condensed face).
 - Body/data: normal case, `text-sm` default.
 - Numbers (ISK, quantities, SP): `tabular-nums`, right-aligned in tables.
-- Type scale (Tailwind defaults): 11px chips/badges · 12px `text-xs` labels/headers ·
+- Type scale, at the browser-default 16px root: `text-[0.6875rem]` chips/badges ·
+  12px `text-xs` labels/headers ·
   14px `text-sm` body/data (default) · 16px `text-base` emphasized values ·
-  20px `text-xl` page titles · 30px `text-3xl` hero numbers only.
+  20px `text-xl` page titles · 30px `text-3xl` hero numbers only. Written in
+  `rem`, never `px` — a literal `text-[11px]` would not scale with the root
+  and inverts the hierarchy against its `rem` neighbours.
 
 ## 3. Spacing & radius
 

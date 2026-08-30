@@ -195,42 +195,39 @@ describe('loadRosterSnapshot({ live: true })', () => {
     expect(entry.queue?.data).toEqual([]);
   });
 
-  it('never exceeds the concurrency cap of 10 characters in flight', async () => {
+  it('never exceeds the concurrency cap, counted in requests not characters', async () => {
+    // 25 characters x 3 loaders = 75 requests. Every loader is deferred, so
+    // this measures the real in-flight request count — deferring only one
+    // would pass even if the cap were applied per character.
     const ids = Array.from({ length: 25 }, (_, i) => 1000 + i);
     await Promise.all(ids.map((id) => seedCharacter(id, `Pilot ${id}`)));
 
     let inFlight = 0;
     let maxInFlight = 0;
     const pending: Array<() => void> = [];
-    const deferred = () =>
-      new Promise<{ data: number; fetchedAt: Date; fromCache: boolean; truncated: boolean }>(
-        (resolve) => {
+    const deferred =
+      <T>(value: T) =>
+      () =>
+        new Promise<T>((resolve) => {
           inFlight += 1;
           maxInFlight = Math.max(maxInFlight, inFlight);
           pending.push(() => {
             inFlight -= 1;
-            resolve({ data: 0, fetchedAt: new Date(1), fromCache: false, truncated: false });
+            resolve(value);
           });
-        }
-      );
-    vi.mocked(loadWalletBalance).mockImplementation(deferred);
-    vi.mocked(loadCharacterSkills).mockResolvedValue({
-      data: { skills: [], total_sp: 0 },
-      fetchedAt: new Date(1),
-      fromCache: false,
-      truncated: false,
-    });
-    vi.mocked(loadCharacterSkillQueue).mockResolvedValue({
-      data: [],
-      fetchedAt: new Date(1),
-      fromCache: false,
-      truncated: false,
-    });
+        });
+    const stamp = { fetchedAt: new Date(1), fromCache: false, truncated: false };
+    vi.mocked(loadWalletBalance).mockImplementation(deferred({ data: 0, ...stamp }));
+    vi.mocked(loadCharacterSkills).mockImplementation(
+      deferred({ data: { skills: [], total_sp: 0 }, ...stamp })
+    );
+    vi.mocked(loadCharacterSkillQueue).mockImplementation(deferred({ data: [], ...stamp }));
 
     const rosterPromise = loadRosterSnapshot({ live: true });
 
     let released = 0;
-    for (let guard = 0; guard < 200 && released < ids.length; guard += 1) {
+    const total = ids.length * 3;
+    for (let guard = 0; guard < 400 && released < total; guard += 1) {
       await new Promise((resolve) => setTimeout(resolve, 0));
       const wave = pending.splice(0, pending.length);
       released += wave.length;
@@ -239,7 +236,7 @@ describe('loadRosterSnapshot({ live: true })', () => {
 
     await rosterPromise;
 
-    expect(released).toBe(ids.length);
+    expect(released).toBe(total);
     expect(maxInFlight).toBeLessThanOrEqual(10);
     expect(maxInFlight).toBeGreaterThan(1);
   });

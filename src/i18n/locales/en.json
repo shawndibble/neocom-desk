@@ -428,6 +428,6 @@
   "settings": {
     "title": "Settings",
     "emptyTitle": "No preferences yet",
-    "emptyHint": "Display and account preferences will appear here as they are added."
+    "emptyHint": "Display preferences will appear here as they are added."
   }
 }

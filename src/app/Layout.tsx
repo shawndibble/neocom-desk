@@ -3,12 +3,11 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { characterPortraitUrl } from './images';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
-import { Modal } from '@/components/ui';
+import { CharacterAvatar, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { useLockedRoutes } from './useGrantedScopes';
 import type { AppRoutePath } from './routeScopes';
@@ -113,13 +112,7 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
             onClick={onClose}
             className="flex items-center gap-2 rounded-xs border border-transparent px-3 py-2 transition-colors hover:bg-panel-2"
           >
-            <img
-              src={characterPortraitUrl(activeCharacter.characterId, 64)}
-              alt=""
-              width={28}
-              height={28}
-              className="size-7 rounded-xs border border-line"
-            />
+            <CharacterAvatar characterId={activeCharacter.characterId} size="sm" />
             <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
           </Link>
         )}
@@ -234,13 +227,7 @@ export function Layout() {
             aria-label={t('nav.switchCharacter')}
             className="flex items-center gap-2 border-t border-line p-2 transition-colors hover:bg-panel-2"
           >
-            <img
-              src={characterPortraitUrl(activeCharacter.characterId, 64)}
-              alt=""
-              width={32}
-              height={32}
-              className="size-8 rounded-xs border border-line"
-            />
+            <CharacterAvatar characterId={activeCharacter.characterId} />
             <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
           </Link>
         )}

@@ -23,13 +23,13 @@ const SIZE: Record<CharacterAvatarSize, { className: string; px: number; source:
 /**
  * ESI portrait for a Character.
  *
- * Uses `rounded-xs`, not the `rounded-full` docs/DESIGN.md §4 asks for: every
- * shipped portrait is `rounded-xs`, which is the house radius (§3), and
- * matching them keeps the migration visually neutral. §4 needs correcting.
+ * `rounded-xs` is the house radius (docs/DESIGN.md §3), and every portrait in
+ * the app is square-cornered — a round one would be the odd element out.
  *
- * Decorative by default — the four call sites all sit beside a text label that
- * already names the Character. Pass `alt` (already translated) for standalone
- * use.
+ * Decorative by default: the nav sites sit beside a text label that already
+ * names the Character, so a portrait `alt` would repeat it. Overview and
+ * Characters pass an explicit `alt` because their portrait is the primary
+ * identifier for the row.
  */
 export function CharacterAvatar({
   characterId,

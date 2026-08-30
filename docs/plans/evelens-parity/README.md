@@ -31,6 +31,9 @@ against them mis-baselines.
 | DESIGN §4: `DataTable` planned (○)                                            | Genuinely missing. Wanted by items 04, 07, 13, 16, 20                                                                                                                           |
 | DESIGN §4: `CharacterAvatar` planned (○)                                      | Genuinely missing. Wanted by items 02, 07, 09                                                                                                                                   |
 | DESIGN §3: control heights are "fixed pixels (`h-7` = 28px)"                  | Misleading. Tailwind v4's scale is rem-based (`tailwindcss/theme.css:325,347`); 28px is the _computed_ value at a 16px root                                                     |
+| DESIGN §4: `DataTable` "dense **sortable** table", `panel-2` header fill      | Neither holds. No shipped table fills its header, and none needs sort state — every one pre-sorts in its own `useMemo`. Built presentational; §4 corrected in Phase 1           |
+| DESIGN §4: `CharacterAvatar` `rounded-full`, "online/selected" ring           | All four shipped portraits are `rounded-xs`, the house radius (§3), and no online signal exists anywhere in the app. §4 corrected in Phase 1                                    |
+| DESIGN §2: type-scale rules still prescribe `text-[11px]`                     | Contradicts Phase 0's px→rem sweep, which left zero `text-[11px]` in `src`. §2 corrected in Phase 1                                                                             |
 
 Correcting both documents is part of Phase 0.
 

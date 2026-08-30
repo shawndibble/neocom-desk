@@ -176,6 +176,37 @@ async function readCachedRow(
   return db.esiCache.get([characterId, key]);
 }
 
+/**
+ * Same gate as `readCachedRow`, for one key across many characters. Lives
+ * here so the D1 purge check has exactly one implementation — a caller doing
+ * its own `bulkGet` would bypass it and serve a previous owner's rows.
+ *
+ * Returns a map so an absent character is distinguishable from one whose
+ * cached value is itself empty. The purge check runs *after* the read: a
+ * purge that becomes pending mid-batch still suppresses the row.
+ */
+export async function readCachedRows<T>(
+  characterIds: readonly number[],
+  key: string
+): Promise<Map<number, CachedResult<T>>> {
+  const found = new Map<number, CachedResult<T>>();
+  if (characterIds.length === 0) return found;
+
+  const rows = await db.esiCache.bulkGet(characterIds.map((id): [number, string] => [id, key]));
+  const suppressed = await Promise.all(characterIds.map((id) => isCachePurgePending(id)));
+
+  rows.forEach((row, i) => {
+    if (!row || suppressed[i]) return;
+    found.set(characterIds[i], {
+      data: row.value as T,
+      fetchedAt: new Date(row.fetchedAt),
+      fromCache: true,
+      truncated: row.truncated === true,
+    });
+  });
+  return found;
+}
+
 /** Raw cache read, for callers doing their own batch/partial-resolution (names.ts, typeNames.ts). */
 export async function readCached<T>(characterId: number, key: string): Promise<T | undefined> {
   const row = await readCachedRow(characterId, key);

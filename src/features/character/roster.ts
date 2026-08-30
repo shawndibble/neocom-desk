@@ -12,8 +12,7 @@
  * reimplement read-through).
  */
 import { db } from '@/db';
-import { isCachePurgePending } from '@/esi/cachePurge';
-import type { CachedResult } from '@/esi/cache';
+import { readCachedRows, type CachedResult } from '@/esi/cache';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadWalletBalance, KEYS as WALLET_KEYS } from './wallet';
@@ -42,49 +41,6 @@ const CACHE_KEYS = {
   queue: SKILLS_KEYS.skillqueue,
 } as const;
 
-/**
- * Batch-reads one cache key for every given character.
- *
- * Uses `db.esiCache.bulkGet` against the compound primary key `[characterId,
- * key]` — `esiCache` has no secondary index on `key` alone (`src/db/index.ts`:
- * `esiCache: '[characterId+key]'`), so `db.esiCache.where('key').equals(...)`
- * does not work. `bulkGet` against the compound PK does, with no Dexie schema
- * bump.
- *
- * PRIVACY GATE: `src/esi/cache.ts`'s `readCachedRow` is documented as "the
- * single point where a cached row is allowed to reach a caller," gated on
- * `isCachePurgePending` — a character whose cache purge could not be
- * completed (repo defect D1: a previous owner's cached wallet surviving a
- * character sale) must read as having nothing cached. A raw `bulkGet` bypasses
- * that gate entirely, which would reopen D1 for this loader. This function
- * therefore re-checks `isCachePurgePending` per character after the bulk read
- * and drops any row for a pending character, rather than calling
- * `readCachedRow`/`readCached` in a loop (which would defeat the point of
- * batching).
- */
-async function bulkReadCached<T>(
-  characterIds: readonly number[],
-  key: string
-): Promise<Map<number, CachedResult<T>>> {
-  const result = new Map<number, CachedResult<T>>();
-  if (characterIds.length === 0) return result;
-
-  const rows = await db.esiCache.bulkGet(characterIds.map((id): [number, string] => [id, key]));
-  const pending = await Promise.all(characterIds.map((id) => isCachePurgePending(id)));
-
-  rows.forEach((row, i) => {
-    if (!row || pending[i]) return; // no row, or purge pending: must not serve (see doc above)
-    result.set(characterIds[i], {
-      data: row.value as T,
-      fetchedAt: new Date(row.fetchedAt),
-      fromCache: true,
-      truncated: row.truncated === true,
-    });
-  });
-
-  return result;
-}
-
 /** Cache-only: no ESI calls, batch-reads whatever is already in Dexie. */
 async function loadCacheOnly(): Promise<RosterEntry[]> {
   const characters = await db.characters.toArray();
@@ -92,9 +48,9 @@ async function loadCacheOnly(): Promise<RosterEntry[]> {
 
   const ids = characters.map((c) => c.characterId);
   const [wallets, skills, queues] = await Promise.all([
-    bulkReadCached<number>(ids, CACHE_KEYS.wallet),
-    bulkReadCached<CharacterSkills>(ids, CACHE_KEYS.skills),
-    bulkReadCached<SkillQueueEntry[]>(ids, CACHE_KEYS.queue),
+    readCachedRows<number>(ids, CACHE_KEYS.wallet),
+    readCachedRows<CharacterSkills>(ids, CACHE_KEYS.skills),
+    readCachedRows<SkillQueueEntry[]>(ids, CACHE_KEYS.queue),
   ]);
 
   return characters.map((c) => ({
@@ -110,17 +66,17 @@ async function loadCacheOnly(): Promise<RosterEntry[]> {
 }
 
 /**
- * `live: true`: refreshes every character via the existing per-character
- * ESI-or-cache loaders, capped at `ESI_FANOUT_CONCURRENCY` characters in
- * flight at once (each character's 3 loaders run concurrently with each
- * other, so up to `ESI_FANOUT_CONCURRENCY * 3` requests in flight — the cap
- * is on characters, not on each individual call site).
+ * `live: true`: refreshes every character through the existing per-character
+ * ESI-or-cache loaders.
  *
- * One character's loader throwing must not sink the whole snapshot: each
- * loader call is awaited via `Promise.allSettled`, so a rejection just leaves
- * that field `null` for that character instead of rejecting the worker (which
- * would otherwise propagate up through `mapWithConcurrencyLimit`'s
- * `Promise.all` and fail every other character too).
+ * The work list is flattened to one entry per *request*, not per character,
+ * so `ESI_FANOUT_CONCURRENCY` means the same thing here as it does in
+ * `typeNames.ts`. Capping characters instead would put three times the
+ * constant in flight, quietly relaxing the budget CLAUDE.md requires
+ * respecting.
+ *
+ * Each request settles on its own, so one failing loader leaves that one
+ * field null rather than sinking the character or the rest of the roster.
  */
 async function loadLive(): Promise<RosterEntry[]> {
   const characters = await db.characters.toArray();
@@ -134,15 +90,24 @@ async function loadLive(): Promise<RosterEntry[]> {
     queue: null,
   }));
 
-  await mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
-    const [wallet, skills, queue] = await Promise.allSettled([
-      loadWalletBalance(entry.characterId),
-      loadCharacterSkills(entry.characterId),
-      loadCharacterSkillQueue(entry.characterId),
-    ]);
-    if (wallet.status === 'fulfilled') entry.wallet = wallet.value;
-    if (skills.status === 'fulfilled') entry.skills = skills.value;
-    if (queue.status === 'fulfilled') entry.queue = queue.value;
+  const requests = entries.flatMap((entry) => [
+    async () => {
+      entry.wallet = await loadWalletBalance(entry.characterId);
+    },
+    async () => {
+      entry.skills = await loadCharacterSkills(entry.characterId);
+    },
+    async () => {
+      entry.queue = await loadCharacterSkillQueue(entry.characterId);
+    },
+  ]);
+
+  await mapWithConcurrencyLimit(requests, ESI_FANOUT_CONCURRENCY, async (run) => {
+    try {
+      await run();
+    } catch {
+      // Leaves this one field null; the other requests are unaffected.
+    }
   });
 
   return entries;
