@@ -56,7 +56,7 @@ async function loadContractsSnapshot(
 /** Contracts: table with status chips, expired dimmed. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
-  const { data, loading, hydrated, activeCharacterId, refresh } =
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadContractsSnapshot);
 
   const contractsResult = data?.contractsResult ?? null;
@@ -134,6 +134,8 @@ export function Contracts() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !contractsResult || contracts.length === 0 ? (
         <EmptyState title={t('contracts.emptyTitle')} hint={t('contracts.emptyHint')} />
       ) : (

@@ -25,6 +25,8 @@ const TYPES: TypeMap = {
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
 };
 
+import { loadTypes } from '@/sde/loadSde';
+
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
@@ -265,5 +267,17 @@ describe('Wallet', () => {
     const { beginEveLogin } = await import('@/app/loginFlow');
     screen.getByRole('button', { name: /log in again/i }).click();
     expect(beginEveLogin).toHaveBeenCalled();
+  });
+
+  it('says the load failed when a decoration throws, not that the wallet is empty', () => {
+    // The real shape of this: balance, journal and transactions all resolve
+    // from cache, and loadTypeNames' unconditional loadTypes() throws because
+    // the SDE fetch failed. Before the hook stamped failures, the whole page
+    // spun forever with Refresh disabled.
+    vi.mocked(loadTypes).mockRejectedValueOnce(new Error('sde offline'));
+
+    render(<App />);
+
+    return screen.findByText(/Could not load/i).then((el) => expect(el).toBeInTheDocument());
   });
 });

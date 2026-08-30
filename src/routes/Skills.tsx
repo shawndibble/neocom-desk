@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,7 +11,6 @@ import {
   Spinner,
   StatChip,
 } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { ImplantChip } from '@/features/skills/ImplantChip';
@@ -25,6 +24,7 @@ import {
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
@@ -42,91 +42,65 @@ interface ImplantDetail {
 }
 
 interface Snapshot {
-  requestKey: string;
   catalog: SkillCatalog;
   skillsResult: CachedResult<CharacterSkills> | null;
   /** BUG #3: 401/403 (or a failed token refresh) means "log in again", not "offline". */
   skillsNeedsReauth: boolean;
   attributesResult: CachedResult<CharacterAttributes> | null;
-  implantsResult: CachedResult<number[]> | null;
   implantDetails: ImplantDetail[];
   implantBonuses: Implants;
 }
 
-/** Trained skills for the active character: grouped by SDE group, with SP + attributes/implants. */
-export function Skills() {
-  const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+async function loadSkillsSnapshot(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<Snapshot> {
+  const [skillsStatus, attributesResult, implantsResult, catalog] = await Promise.all([
+    loadCharacterSkillsWithStatus(characterId),
+    loadCharacterAttributes(characterId),
+    loadCharacterImplants(characterId),
+    loadSkillCatalog(),
+  ]);
+  const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
 
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const requestKey = `${activeCharacterId}:${refreshKey}`;
-
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-
-    void (async () => {
-      const [skillsStatus, attributesResult, implantsResult, catalog] = await Promise.all([
-        loadCharacterSkillsWithStatus(activeCharacterId),
-        loadCharacterAttributes(activeCharacterId),
-        loadCharacterImplants(activeCharacterId),
-        loadSkillCatalog(),
-      ]);
-      if (cancelled) return;
-      const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
-
-      const implantIds = implantsResult?.data ?? [];
-      const implantTypes = await Promise.all(implantIds.map((id) => loadUniverseType(id)));
-      if (cancelled) return;
-      const implantDetails: ImplantDetail[] = implantIds.map((id, i) => {
-        const info = implantTypes[i]?.data;
-        return {
-          typeId: id,
-          name: info?.name ?? `#${id}`,
-          description: info?.description ? stripEveMarkup(info.description) : null,
-        };
-      });
-      const implantBonuses = sumAttributeBonuses(
-        implantTypes.map((r) => extractAttributeBonuses(r?.data?.dogma_attributes))
-      );
-
-      setSnapshot({
-        requestKey,
-        catalog,
-        skillsResult,
-        skillsNeedsReauth,
-        attributesResult,
-        implantsResult,
-        implantDetails,
-        implantBonuses,
-      });
-    })();
-
-    return () => {
-      cancelled = true;
+  // Already superseded: skip the per-implant type lookups, their results would
+  // be discarded.
+  const implantIds = signal.cancelled ? [] : (implantsResult?.data ?? []);
+  const implantTypes = await Promise.all(implantIds.map((id) => loadUniverseType(id)));
+  const implantDetails: ImplantDetail[] = implantIds.map((id, i) => {
+    const info = implantTypes[i]?.data;
+    return {
+      typeId: id,
+      name: info?.name ?? `#${id}`,
+      description: info?.description ? stripEveMarkup(info.description) : null,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [activeCharacterId, refreshKey]);
+  });
+  const implantBonuses = sumAttributeBonuses(
+    implantTypes.map((r) => extractAttributeBonuses(r?.data?.dogma_attributes))
+  );
 
-  // Only trust the snapshot when it answers the current (character, refresh) request.
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const {
+  return {
     catalog,
     skillsResult,
     skillsNeedsReauth,
     attributesResult,
     implantDetails,
     implantBonuses,
-  } = current ?? {
-    catalog: null,
-    skillsResult: undefined,
-    skillsNeedsReauth: false,
-    attributesResult: undefined,
-    implantDetails: [],
-    implantBonuses: {},
   };
+}
+
+/** Trained skills for the active character: grouped by SDE group, with SP + attributes/implants. */
+export function Skills() {
+  const { t } = useTranslation();
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
+    useRouteSnapshot(loadSkillsSnapshot);
+
+  const catalog = data?.catalog ?? null;
+  const skillsResult = data?.skillsResult ?? null;
+  const skillsNeedsReauth = data?.skillsNeedsReauth ?? false;
+  const attributesResult = data?.attributesResult ?? null;
+  const implantDetails = data?.implantDetails ?? [];
+  const implantBonuses = data?.implantBonuses ?? {};
 
   const groups = useMemo<SkillGroup[]>(() => {
     if (!skillsResult?.data || !catalog) return [];
@@ -160,8 +134,6 @@ export function Skills() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  const loading = skillsResult === undefined || attributesResult === undefined;
-
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <SkillsSubNav />
@@ -184,7 +156,7 @@ export function Skills() {
         </div>
         <div className="flex items-center gap-2">
           {skillsResult?.fetchedAt && <DataAgeBadge date={skillsResult.fetchedAt} />}
-          <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)}>
+          <Button size="sm" onClick={refresh}>
             {t('skills.refresh')}
           </Button>
         </div>
@@ -194,6 +166,8 @@ export function Skills() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : skillsNeedsReauth ? (
         <ReauthBanner
           title={t('skills.reauthTitle')}

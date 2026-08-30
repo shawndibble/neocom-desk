@@ -40,7 +40,7 @@ async function loadOrdersSnapshot(
 /** Orders: open orders + history tabs. Read-only, cached for offline. */
 export function Orders() {
   const { t } = useTranslation();
-  const { data, loading, hydrated, activeCharacterId, refresh } =
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadOrdersSnapshot);
 
   const [tab, setTab] = useState<'open' | 'history'>('open');
@@ -139,6 +139,8 @@ export function Orders() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : tab === 'open' ? (
         <Panel
           padded={false}

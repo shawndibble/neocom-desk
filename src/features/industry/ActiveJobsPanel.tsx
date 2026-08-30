@@ -46,11 +46,19 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [result, types] = await Promise.all([
-        loadCharacterIndustryJobs(characterId),
-        loadTypes(),
-      ]);
-      if (!cancelled) setSnapshot({ requestKey, result, types });
+      try {
+        const [result, types] = await Promise.all([
+          loadCharacterIndustryJobs(characterId),
+          loadTypes(),
+        ]);
+        if (!cancelled) setSnapshot({ requestKey, result, types });
+      } catch {
+        // `loadTypes()` throws when the SDE fetch fails. Stamping an empty
+        // snapshot is what clears the spinner — leaving it unstamped strands
+        // the panel loading forever with its Refresh disabled.
+        if (!cancelled)
+          setSnapshot({ requestKey, result: { cached: null, needsReauth: false }, types: {} });
+      }
     })();
     return () => {
       cancelled = true;

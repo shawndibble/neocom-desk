@@ -270,7 +270,9 @@
       "minutes": "{{count}}m ago",
       "hours": "{{count}}h ago",
       "days": "{{count}}d ago"
-    }
+    },
+    "loadFailedTitle": "Could not load",
+    "loadFailedHint": "Something went wrong fetching this. Try Refresh."
   },
   "wallet": {
     "title": "Wallet",

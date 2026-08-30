@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -12,7 +11,6 @@ import {
   Spinner,
   StatChip,
 } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { beginEveLogin } from '@/app/loginFlow';
 import {
@@ -22,12 +20,12 @@ import {
 } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
+import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { selectActiveQueueEntry } from './overviewQueue';
 
 interface Snapshot {
-  requestKey: string;
   walletResult: CachedResult<number> | null;
   walletNeedsReauth: boolean;
   skillsResult: CachedResult<CharacterSkills> | null;
@@ -35,52 +33,37 @@ interface Snapshot {
   catalog: SkillCatalog;
 }
 
+async function loadOverviewSnapshot(characterId: number): Promise<Snapshot> {
+  // Fire-and-forget: the header reads corp/alliance from the store as they
+  // arrive, so the panels below must not wait on that chain of public fetches.
+  void usePublicInfo.getState().load(characterId);
+  const [wallet, skillsResult, queueResult, catalog] = await Promise.all([
+    loadWalletBalanceWithStatus(characterId),
+    loadCharacterSkills(characterId),
+    loadCharacterSkillQueue(characterId),
+    loadSkillCatalog(),
+  ]);
+  return {
+    walletResult: wallet.cached,
+    walletNeedsReauth: wallet.needsReauth,
+    skillsResult,
+    queueResult,
+    catalog,
+  };
+}
+
 /** Dashboard for the active character: identity, SP, wallet, training queue snippet. */
 export function Overview() {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const { data, error, loading, hydrated, activeCharacterId } =
+    useRouteSnapshot(loadOverviewSnapshot);
   const character = useLiveQuery(
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
     [activeCharacterId]
   );
-  const loadPublicInfo = usePublicInfo((state) => state.load);
   const publicInfo = usePublicInfo((state) =>
     activeCharacterId === null ? undefined : state.byCharacterId[activeCharacterId]
   );
-
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const requestKey = `${activeCharacterId}`;
-
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void loadPublicInfo(activeCharacterId);
-    void (async () => {
-      const [wallet, skillsResult, queueResult, catalog] = await Promise.all([
-        loadWalletBalanceWithStatus(activeCharacterId),
-        loadCharacterSkills(activeCharacterId),
-        loadCharacterSkillQueue(activeCharacterId),
-        loadSkillCatalog(),
-      ]);
-      if (cancelled) return;
-      setSnapshot({
-        requestKey,
-        walletResult: wallet.cached,
-        walletNeedsReauth: wallet.needsReauth,
-        skillsResult,
-        queueResult,
-        catalog,
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from activeCharacterId
-  }, [activeCharacterId, loadPublicInfo]);
-
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const loading = current === null;
 
   if (!hydrated) {
     return (
@@ -91,11 +74,11 @@ export function Overview() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  const walletResult = current?.walletResult ?? null;
-  const walletNeedsReauth = current?.walletNeedsReauth ?? false;
-  const skillsResult = current?.skillsResult ?? null;
-  const queueResult = current?.queueResult ?? null;
-  const catalog = current?.catalog ?? null;
+  const walletResult = data?.walletResult ?? null;
+  const walletNeedsReauth = data?.walletNeedsReauth ?? false;
+  const skillsResult = data?.skillsResult ?? null;
+  const queueResult = data?.queueResult ?? null;
+  const catalog = data?.catalog ?? null;
 
   // Reads the wall clock to pick "the entry training right now" — unavoidably
   // impure, but it only affects which row is shown, not any cached value.
@@ -145,6 +128,8 @@ export function Overview() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : (
         <>
           <Panel

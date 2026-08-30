@@ -33,7 +33,7 @@ async function loadMailSnapshot(
 /** Mail: recent headers list + body on click. Read-only, cached for offline. */
 export function Mail() {
   const { t } = useTranslation();
-  const { data, loading, hydrated, activeCharacterId, refresh } =
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadMailSnapshot);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -91,6 +91,8 @@ export function Mail() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !headersResult || headers.length === 0 ? (
         <EmptyState title={t('mail.emptyTitle')} hint={t('mail.emptyHint')} />
       ) : (

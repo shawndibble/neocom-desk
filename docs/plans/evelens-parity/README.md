@@ -4,7 +4,8 @@ Source: the "EveLens vs NeoCom Desk" competitive teardown, items 01–18 and 20
 (item 19, second language, is explicitly excluded — it waits for a stable
 English UI).
 
-**Nothing in this plan is implemented.** This document is the result of ten
+**Phases 0 and 1 have shipped** (see the status notes under each below);
+phases 2-4 have not started. This document is the result of ten
 parallel investigation passes over the codebase; each pass verified the
 teardown's claims against source and recorded a verdict with `file:line`
 citations. The per-item detail lives in [`briefs/`](./briefs/). This file is
@@ -194,6 +195,26 @@ Multi-character ESI access was expected to be a blocker and **is not**:
 (`esi/client.ts:20`), `getValidAccessToken` single-flights per Character, and
 `routes/Characters.tsx:21-23` already fans out concurrently. `roster.ts` is a
 convenience layer over a shipped capability, not new infrastructure.
+
+**Status: shipped.** All nine primitives exist, each with at least one
+production consumer, and the routes were migrated onto them:
+
+- `DataTable` absorbed five of the six duplicated tables (Contracts, Wallet's
+  journal and transactions, Orders' open and history). `MaterialsTable` needs a
+  density knob and `Market`'s table needs a `headerHidden` column option — both
+  are real API decisions, not mechanical moves, so they were left.
+- `useRouteSnapshot` (in `src/lib`, not `features/character` — nothing in it is
+  character-domain) is used by all eight read-only Character routes.
+  `features/industry/ActiveJobsPanel.tsx` still hand-rolls the pattern because
+  it takes `characterId` as a prop rather than reading the store.
+- `useLocalSetting` backs `useMarketHub`. `useActiveCharacter` was deliberately
+  **not** migrated: 97 call sites, and it would trade a domain name
+  (`activeCharacterId`) for a generic one (`value`).
+- `FilterChip` has no consumer until item 04, and no tone variants yet — brief
+  B asks for `StatChip`'s palette, which is item 04's call to make against a
+  real use.
+- `Settings` has no nav entry until item 18 lands the first real control.
+- `csv.ts`/`download.ts`/`roster.ts` await their Phase 2/3 consumers by design.
 
 ### Phase 2 — Features on data we already hold
 

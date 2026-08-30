@@ -27,7 +27,7 @@ async function loadCalendarSnapshot(characterId: number): Promise<Snapshot> {
 /** Calendar: upcoming event list + detail on click. Read-only (no respond), cached for offline. */
 export function Calendar() {
   const { t } = useTranslation();
-  const { data, loading, hydrated, activeCharacterId, refresh } =
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadCalendarSnapshot);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -81,6 +81,8 @@ export function Calendar() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !eventsResult || events.length === 0 ? (
         <EmptyState title={t('calendar.emptyTitle')} hint={t('calendar.emptyHint')} />
       ) : (

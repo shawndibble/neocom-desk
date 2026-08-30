@@ -72,7 +72,7 @@ async function loadAssetsSnapshot(
 /** Character assets grouped by location, with a name search filter. Read-only, cached for offline. */
 export function Assets() {
   const { t } = useTranslation();
-  const { data, loading, hydrated, activeCharacterId, refresh } =
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadAssetsSnapshot);
 
   const [search, setSearch] = useState('');
@@ -146,6 +146,8 @@ export function Assets() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !assetsResult ? (
         <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
       ) : (

@@ -77,7 +77,7 @@ async function loadWalletSnapshot(
 /** Wallet: ISK balance, journal, and recent transactions. Read-only, cached for offline. */
 export function Wallet() {
   const { t } = useTranslation();
-  const { data, loading, hydrated, activeCharacterId, refreshCount, refresh } =
+  const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadWalletSnapshot);
 
   const [tab, setTab] = useState<'balance' | 'journal' | 'transactions'>('balance');
@@ -220,6 +220,8 @@ export function Wallet() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : tab === 'balance' ? (
         <Panel
           title={t('wallet.balanceTab')}

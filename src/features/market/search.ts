@@ -22,9 +22,9 @@ export const SEARCH_RESULT_LIMIT = 50;
  * ~9k entries was the single largest cost in a search. Keyed weakly so a
  * replaced map does not pin the old one.
  */
-const indexCache = new WeakMap<TypeMap, TypeSearchResult[]>();
+const indexCache = new WeakMap<TypeMap, readonly TypeSearchResult[]>();
 
-function indexOf(types: TypeMap): TypeSearchResult[] {
+function indexOf(types: TypeMap): readonly TypeSearchResult[] {
   const cached = indexCache.get(types);
   if (cached) return cached;
   const index = Object.entries(types).map(([id, info]) => ({
@@ -42,7 +42,7 @@ function indexOf(types: TypeMap): TypeSearchResult[] {
  * then capped at SEARCH_RESULT_LIMIT — so an exact/prefix hit further down
  * the alphabet still surfaces over an early alphabetical substring hit.
  */
-export function searchTypes(types: TypeMap, query: string): TypeSearchResult[] {
+export function searchTypes(types: TypeMap, query: string): readonly TypeSearchResult[] {
   return rankedSearch(indexOf(types), query, {
     primary: (entry) => entry.name,
     limit: SEARCH_RESULT_LIMIT,
