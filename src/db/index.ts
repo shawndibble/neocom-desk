@@ -35,6 +35,12 @@ export interface SkillPlanRecord {
   entries: PlanEntry[];
   /** Remaps the user is willing to spend when optimizing this plan. */
   remapCount: number;
+  /**
+   * Remap Marker positions in the entry list: position p = "remap before
+   * entries[p]" (see features/skills/planner/markers.ts). Optional and
+   * additive — not indexed, so no Dexie schema version bump is needed.
+   */
+  markers?: number[];
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

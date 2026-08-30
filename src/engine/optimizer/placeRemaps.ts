@@ -2,13 +2,15 @@
  * Optimal remap placement: split an ordered plan into at most `remapCount`
  * contiguous segments, one attribute allocation each, minimizing total time.
  *
- * Model: N remaps = up to N allocations. N=0 trains the whole plan on the
- * current attributes; N=1 remaps once at the start; N=2 adds one mid-plan
- * boundary; etc. Remaps are optional: when no reachable allocation beats the
- * current attributes (they may sit outside the 17..27 base space, e.g. when
- * fed from ESI values that already include implant or booster bonuses), the
- * result keeps the current attributes and reports zero savings — the output
- * is never slower than not remapping at all.
+ * Model: N remaps = up to N allocations, optionally preceded by a leading
+ * segment trained on the CURRENT attributes at no remap cost. N=0 trains the
+ * whole plan on the current attributes; N=1 answers "where do I remap": train
+ * a prefix on current attributes, then remap once at the optimizer-chosen
+ * boundary (possibly step 0). Remaps are optional: when no reachable
+ * allocation beats the current attributes (they may sit outside the 17..27
+ * base space, e.g. when fed from ESI values that already include implant or
+ * booster bonuses), the result keeps the current attributes and reports zero
+ * savings — the output is never slower than not remapping at all.
  *
  * DP over pair-runs (maximal step runs sharing one attribute pair): segment
  * boundaries inside a run are dominated by boundaries at its edges, so only
@@ -30,6 +32,8 @@ export interface RemapSegment {
   endIndex: number;
   attributes: Attributes;
   seconds: number;
+  /** True when this segment starts with a remap; false for the leading current-attributes segment. */
+  remap: boolean;
 }
 
 export interface PlaceRemapsResult {
@@ -54,6 +58,8 @@ interface Run {
   endStep: number; // inclusive
   pair: string;
   sp: number;
+  /** Seconds to train this run on the current attributes. */
+  currentSeconds: number;
 }
 
 export function placeRemaps(
@@ -74,14 +80,16 @@ export function placeRemaps(
       currentAttributes[skill.primary] + (implants[skill.primary] ?? 0),
       currentAttributes[skill.secondary] + (implants[skill.secondary] ?? 0)
     );
-    currentSeconds += timeToTrain(sp, rate);
+    const seconds = timeToTrain(sp, rate);
+    currentSeconds += seconds;
     const pair = pairKey(skill.primary, skill.secondary);
     const last = runs[runs.length - 1];
     if (last && last.pair === pair) {
       last.endStep = index;
       last.sp += sp;
+      last.currentSeconds += seconds;
     } else {
-      runs.push({ startStep: index, endStep: index, pair, sp });
+      runs.push({ startStep: index, endStep: index, pair, sp, currentSeconds: seconds });
     }
   });
 
@@ -96,6 +104,7 @@ export function placeRemaps(
         endIndex: steps.length - 1,
         attributes: { ...currentAttributes },
         seconds: currentSeconds,
+        remap: false,
       },
     ],
     totalSeconds: currentSeconds,
@@ -130,14 +139,23 @@ export function placeRemaps(
     }
   }
 
-  // dp[k][j]: min seconds for runs [0, j) using exactly k allocations.
+  // Prefix cost: runs [0, j) trained on the current attributes (no remap).
+  const currentPrefix = new Array<number>(runCount + 1).fill(0);
+  for (let j = 1; j <= runCount; j++) {
+    currentPrefix[j] = currentPrefix[j - 1] + runs[j - 1].currentSeconds;
+  }
+
+  // dp[k][j]: min seconds for runs [0, j) using exactly k allocations after
+  // an optional (possibly empty) leading current-attributes prefix. Row 0 IS
+  // that prefix: dp[0][j] spends no remap and trains [0, j) on the current
+  // attributes, so dp[0][runCount] equals the no-remap baseline.
   const dp: number[][] = [];
   const parent: number[][] = [];
   for (let k = 0; k <= maxSegments; k++) {
     dp[k] = new Array<number>(runCount + 1).fill(Infinity);
     parent[k] = new Array<number>(runCount + 1).fill(-1);
   }
-  dp[0][0] = 0;
+  for (let j = 0; j <= runCount; j++) dp[0][j] = currentPrefix[j];
   for (let k = 1; k <= maxSegments; k++) {
     for (let j = k; j <= runCount; j++) {
       for (let i = k - 1; i < j; i++) {
@@ -180,9 +198,21 @@ export function placeRemaps(
       endIndex: runs[j - 1].endStep,
       attributes,
       seconds,
+      remap: true,
     });
     totalSeconds += seconds;
     j = i;
+  }
+  // Leading current-attributes prefix (row 0 of the DP), if any runs remain.
+  if (j > 0) {
+    segments.unshift({
+      startIndex: 0,
+      endIndex: runs[j - 1].endStep,
+      attributes: { ...currentAttributes },
+      seconds: currentPrefix[j],
+      remap: false,
+    });
+    totalSeconds += currentPrefix[j];
   }
 
   return {

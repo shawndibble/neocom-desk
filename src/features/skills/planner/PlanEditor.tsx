@@ -5,8 +5,13 @@ import { normalizePlan } from '@/engine/plan';
 import { computeSchedule } from '@/engine/schedule';
 import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
-import { placeRemaps, suggestReorder, ATTRIBUTE_NAMES } from '@/engine/optimizer';
-import type { PlaceRemapsResult } from '@/engine/optimizer';
+import {
+  optimizeAtMarkers,
+  placeRemaps,
+  suggestReorder,
+  ATTRIBUTE_NAMES,
+} from '@/engine/optimizer';
+import type { PlaceRemapsResult, RemapSegment } from '@/engine/optimizer';
 import type {
   Attributes,
   Booster,
@@ -24,13 +29,15 @@ import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { ComputedQueue } from './ComputedQueue';
 import { formatDuration } from './duration';
+import { dedupeEntries, removeEntry, upsertEntry, applyReorderSuggestion } from './reorder';
 import {
-  dedupeEntries,
-  handleReorder,
-  removeEntry,
-  upsertEntry,
-  applyReorderSuggestion,
-} from './reorder';
+  addMarker,
+  markerStepIndices,
+  markersAfterEntryRemoval,
+  removeMarker,
+  reorderRows,
+} from './markers';
+import type { RemapAvailability } from './remapAvailability';
 import { whatIfImplants, WHAT_IF_IMPLANT_MODES, type WhatIfImplantMode } from './whatIfImplants';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 
@@ -54,7 +61,9 @@ interface PlanEditorProps {
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   attributes: Attributes;
   implants: Implants;
-  onUpdate: (patch: Partial<Pick<SkillPlanRecord, 'entries' | 'remapCount'>>) => void;
+  /** Remaps Available from ESI (bonus + yearly), for the hint next to the count input. */
+  remapInfo: RemapAvailability | null;
+  onUpdate: (patch: Partial<Pick<SkillPlanRecord, 'entries' | 'remapCount' | 'markers'>>) => void;
 }
 
 interface ComputeResult {
@@ -102,11 +111,13 @@ export function PlanEditor({
   trainedSkills,
   attributes,
   implants,
+  remapInfo,
   onUpdate,
 }: PlanEditorProps) {
   const { t } = useTranslation();
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<PlaceRemapsResult | null>(null);
+  const [markersResult, setMarkersResult] = useState<PlaceRemapsResult | null>(null);
   const [reorderPreview, setReorderPreview] = useState<PlanStep[] | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
@@ -178,10 +189,13 @@ export function PlanEditor({
   // tick later.
   const [prevPlanId, setPrevPlanId] = useState(plan.id);
   const [prevEntries, setPrevEntries] = useState(plan.entries);
-  if (prevPlanId !== plan.id || prevEntries !== plan.entries) {
+  const [prevMarkers, setPrevMarkers] = useState(plan.markers);
+  if (prevPlanId !== plan.id || prevEntries !== plan.entries || prevMarkers !== plan.markers) {
     setPrevPlanId(plan.id);
     setPrevEntries(plan.entries);
+    setPrevMarkers(plan.markers);
     setOptimizeResult(null);
+    setMarkersResult(null);
     setReorderPreview(null);
   }
 
@@ -232,6 +246,51 @@ export function PlanEditor({
     );
   }
 
+  function handleOptimizeAtMarkers() {
+    if (scheduled.length === 0) return;
+    setMarkersResult(
+      optimizeAtMarkers(scheduled, catalog.engineSkills, {
+        markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
+        currentAttributes: attributes,
+        implants: effectiveImplants,
+      })
+    );
+  }
+
+  // Shared per-segment rendering for both optimize modes: a remapped segment
+  // gets the remap instruction; the leading current-attributes segment
+  // (remap: false) is labeled as "keep current attributes" instead.
+  function renderSegments(segments: readonly RemapSegment[]) {
+    return (
+      <ul className="space-y-1">
+        {segments.map((segment, index) => {
+          // Defensive: results are cleared whenever plan.entries/markers
+          // change (see the derive-and-clear block above), but guard the
+          // index anyway so a stale result can never crash the route.
+          const anchor = scheduled[segment.startIndex];
+          if (!anchor) return null;
+          return (
+            <li
+              key={index}
+              className="flex flex-wrap items-center gap-2 border-b border-line pb-1 last:border-b-0"
+            >
+              <span className="font-semibold">{t('plans.segment', { index: index + 1 })}</span>
+              <span className="flex-1">
+                {segment.remap
+                  ? t('plans.segmentRemap', {
+                      skill: stepLabel(anchor),
+                      attributes: remapInstruction(segment.attributes),
+                    })
+                  : t('plans.segmentCurrent', { skill: stepLabel(anchor) })}
+              </span>
+              <span className="tabular-nums text-text-dim">{formatDuration(segment.seconds)}</span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
   function handleSuggestReorder() {
     if (scheduled.length === 0) return;
     setReorderPreview(suggestReorder(scheduled, catalog.engineSkills));
@@ -253,9 +312,29 @@ export function PlanEditor({
           />
           <EntryList
             entries={plan.entries}
+            markers={plan.markers}
             nameFor={nameFor}
-            onReorder={(activeId, overId) => update(handleReorder(plan.entries, activeId, overId))}
-            onRemove={(skillTypeID) => update(removeEntry(plan.entries, skillTypeID))}
+            onReorder={(activeId, overId) =>
+              onUpdate(reorderRows(plan.entries, plan.markers, activeId, overId))
+            }
+            onRemove={(skillTypeID) => {
+              const entryIndex = plan.entries.findIndex((e) => e.skillTypeID === skillTypeID);
+              onUpdate({
+                entries: removeEntry(plan.entries, skillTypeID),
+                ...(plan.markers
+                  ? {
+                      markers: markersAfterEntryRemoval(
+                        plan.markers,
+                        entryIndex,
+                        plan.entries.length
+                      ),
+                    }
+                  : {}),
+              });
+            }}
+            onRemoveMarker={(markerIndex) =>
+              onUpdate({ markers: removeMarker(plan.markers, markerIndex, plan.entries.length) })
+            }
           />
         </div>
       </Panel>
@@ -280,6 +359,16 @@ export function PlanEditor({
               }
               className="h-6 w-12 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
             />
+            {remapInfo && (
+              <span className="text-text-faint">
+                {remapInfo.yearlyReady
+                  ? t('plans.remapFromEveReady', { bonus: remapInfo.bonus })
+                  : t('plans.remapFromEveCooldown', {
+                      bonus: remapInfo.bonus,
+                      date: remapInfo.cooldownUntil?.toISOString().slice(0, 10),
+                    })}
+              </span>
+            )}
           </span>
         }
       >
@@ -295,6 +384,19 @@ export function PlanEditor({
           </Button>
           <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
             {t('plans.optimizeRemaps')}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => onUpdate({ markers: addMarker(plan.markers, plan.entries.length) })}
+          >
+            {t('plans.addMarker')}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleOptimizeAtMarkers}
+            disabled={scheduled.length === 0 || (plan.markers?.length ?? 0) === 0}
+          >
+            {t('plans.optimizeAtMarkers')}
           </Button>
           <Button size="sm" onClick={handleSuggestReorder} disabled={scheduled.length === 0}>
             {t('plans.suggestReorder')}
@@ -409,37 +511,26 @@ export function PlanEditor({
                   duration: formatDuration(optimizeResult.savingsSeconds),
                 })}
               </p>
-              <ul className="space-y-1">
-                {optimizeResult.segments.map((segment, index) => {
-                  // Defensive: optimizeResult should already be cleared
-                  // whenever plan.entries changes (see effect above), but
-                  // guard the index anyway so a stale/mismatched result can
-                  // never crash the route.
-                  const anchor = scheduled[segment.startIndex];
-                  if (!anchor) return null;
-                  return (
-                    <li
-                      key={index}
-                      className="flex flex-wrap items-center gap-2 border-b border-line pb-1 last:border-b-0"
-                    >
-                      <span className="font-semibold">
-                        {t('plans.segment', { index: index + 1 })}
-                      </span>
-                      <span className="flex-1">
-                        {t('plans.segmentRemap', {
-                          skill: stepLabel(anchor),
-                          attributes: remapInstruction(segment.attributes),
-                        })}
-                      </span>
-                      <span className="tabular-nums text-text-dim">
-                        {formatDuration(segment.seconds)}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+              {renderSegments(optimizeResult.segments)}
             </div>
           )}
+        </Panel>
+      )}
+
+      {markersResult && (
+        <Panel title={t('plans.optimizeAtMarkers')}>
+          <div className="space-y-2 text-xs">
+            {markersResult.savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS ? (
+              <p className="font-semibold text-success">
+                {t('plans.remapSaves', {
+                  duration: formatDuration(markersResult.savingsSeconds),
+                })}
+              </p>
+            ) : (
+              <p className="text-text-dim">{t('plans.markersNoGain')}</p>
+            )}
+            {renderSegments(markersResult.segments)}
+          </div>
         </Panel>
       )}
 

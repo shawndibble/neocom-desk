@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bestAttributes } from '@/engine/optimizer/bestAttributes';
+import { spBetween } from '@/engine/sp';
 import { placeRemaps } from '@/engine/optimizer/placeRemaps';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
 
@@ -142,13 +143,33 @@ describe('placeRemaps', () => {
     ];
     const result = placeRemaps(steps, skills, { remapCount: 2, currentAttributes: CURRENT });
 
-    // Brute force: 1 or 2 contiguous segments over 4 steps.
-    let best = bestAttributes(steps, skills).seconds;
-    for (let cut = 1; cut < steps.length; cut++) {
-      const t =
-        bestAttributes(steps.slice(0, cut), skills).seconds +
-        bestAttributes(steps.slice(cut), skills).seconds;
-      if (t < best) best = t;
+    // Brute force: optional current-attributes prefix [0, p) at no remap
+    // cost, then 1 or 2 remapped segments over the rest.
+    const currentSecondsFor = (slice: PlanStep[]): number => {
+      let seconds = 0;
+      for (const step of slice) {
+        const s = skills.get(step.skillTypeID)!;
+        const sp = spBetween(s.rank, step.level - 1, step.level);
+        seconds += (sp / (CURRENT[s.primary] + CURRENT[s.secondary] / 2)) * 60;
+      }
+      return seconds;
+    };
+    let best = Infinity;
+    for (let p = 0; p <= steps.length; p++) {
+      const prefix = currentSecondsFor(steps.slice(0, p));
+      const rest = steps.slice(p);
+      if (rest.length === 0) {
+        best = Math.min(best, prefix);
+        continue;
+      }
+      best = Math.min(best, prefix + bestAttributes(rest, skills).seconds);
+      for (let cut = 1; cut < rest.length; cut++) {
+        const t =
+          prefix +
+          bestAttributes(rest.slice(0, cut), skills).seconds +
+          bestAttributes(rest.slice(cut), skills).seconds;
+        if (t < best) best = t;
+      }
     }
     expect(result.totalSeconds).toBeCloseTo(best, 6);
   });
@@ -171,7 +192,8 @@ describe('placeRemaps', () => {
     const result = placeRemaps(steps, skills, { remapCount: 3, currentAttributes: CURRENT });
     expect(performance.now() - start).toBeLessThan(3000);
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
-    expect(result.segments.length).toBeLessThanOrEqual(3);
+    // Up to 3 remapped segments plus an optional current-attributes prefix.
+    expect(result.segments.length).toBeLessThanOrEqual(4);
     expect(result.savingsSeconds).toBeGreaterThan(0);
   });
 });
@@ -205,13 +227,17 @@ describe('placeRemaps never beats itself with the current attributes', () => {
     willpower: 4,
     charisma: 4,
   };
-  // ESI-style values: implant bonuses baked in (sum 129 > 99, unreachable by remap).
+  // ESI-style values: implant bonuses baked in (sum 139 > 99, unreachable by
+  // remap). Every pair trains faster on these than on any legal allocation
+  // (max reachable rate with +4 implants is 31 + 25/2 = 43.5), so no split —
+  // not even a remap on a late segment after a current-attributes prefix —
+  // can help.
   const inflated: Attributes = {
     intelligence: 29,
     memory: 27,
     perception: 31,
     willpower: 25,
-    charisma: 17,
+    charisma: 27,
   };
 
   it.each([1, 2, 3])(
@@ -263,5 +289,97 @@ describe('placeRemaps never beats itself with the current attributes', () => {
     });
     expect(result.savingsSeconds).toBeGreaterThan(0);
     expect(result.totalSeconds).toBeLessThan(result.currentSeconds);
+  });
+});
+
+// Leading current-attributes segment: with N remaps the optimizer may train a
+// prefix on the CURRENT attributes (no remap spent) and remap mid-plan. The
+// single-remap case answers "where do I remap".
+describe('placeRemaps leading current-attributes segment', () => {
+  it('N=1: trains the early int/mem phase on current attributes and remaps mid-plan', () => {
+    const skills = skillMap(
+      skill(1, 'intelligence', 'memory'),
+      skill(2, 'perception', 'willpower')
+    );
+    // Current attributes are already optimal for the int/mem phase.
+    const current: Attributes = {
+      intelligence: 27,
+      memory: 21,
+      perception: 17,
+      willpower: 17,
+      charisma: 17,
+    };
+    const steps = [...levels(1, 3), ...levels(2, 3)]; // 8000 SP each phase
+    const result = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: current });
+
+    expect(result.segments).toHaveLength(2);
+    // Segment 0: the current-attributes prefix, no remap spent.
+    expect(result.segments[0]).toMatchObject({ startIndex: 0, endIndex: 2, remap: false });
+    expect(result.segments[0].attributes).toEqual(current);
+    // Segment 1: the single remap, placed mid-plan for the per/wil phase.
+    expect(result.segments[1]).toMatchObject({ startIndex: 3, endIndex: 5, remap: true });
+    expect(result.segments[1].attributes.perception).toBe(27);
+    expect(result.segments[1].attributes.willpower).toBe(21);
+    // Both phases at the optimal 37.5 SP/min: 8000/37.5 min each.
+    expect(result.totalSeconds).toBeCloseTo(2 * (8000 / 37.5) * 60, 6);
+    expect(result.totalSeconds).toBeLessThanOrEqual(result.currentSeconds);
+    expect(result.savingsSeconds).toBeCloseTo(result.currentSeconds - result.totalSeconds, 6);
+  });
+
+  it('flags remapped segments remap: true and the no-remap fallback remap: false', () => {
+    const skills = skillMap(skill(1, 'perception', 'willpower'));
+    const remapped = placeRemaps(levels(1, 3), skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+    });
+    expect(remapped.segments).toHaveLength(1);
+    expect(remapped.segments[0].remap).toBe(true);
+
+    const noRemap = placeRemaps(levels(1, 3), skills, {
+      remapCount: 0,
+      currentAttributes: CURRENT,
+    });
+    expect(noRemap.segments[0].remap).toBe(false);
+  });
+
+  it('matches brute force including current-prefix splits (N=1)', () => {
+    const skills = skillMap(
+      skill(1, 'intelligence', 'memory'),
+      skill(2, 'perception', 'willpower'),
+      skill(3, 'charisma', 'willpower', 2)
+    );
+    const current: Attributes = {
+      intelligence: 25,
+      memory: 21,
+      perception: 18,
+      willpower: 18,
+      charisma: 17,
+    };
+    const steps: PlanStep[] = [
+      { skillTypeID: 1, level: 1 },
+      { skillTypeID: 1, level: 2 },
+      { skillTypeID: 3, level: 1 },
+      { skillTypeID: 2, level: 1 },
+      { skillTypeID: 2, level: 2 },
+    ];
+    const currentSecondsFor = (slice: PlanStep[]): number => {
+      let seconds = 0;
+      for (const step of slice) {
+        const s = skills.get(step.skillTypeID)!;
+        const sp = spBetween(s.rank, step.level - 1, step.level);
+        seconds += (sp / (current[s.primary] + current[s.secondary] / 2)) * 60;
+      }
+      return seconds;
+    };
+    // Brute force: prefix [0, cut) on current attributes + one remap for the rest.
+    let best = bestAttributes(steps, skills).seconds; // remap at start
+    for (let cut = 1; cut <= steps.length; cut++) {
+      const t =
+        currentSecondsFor(steps.slice(0, cut)) +
+        (cut < steps.length ? bestAttributes(steps.slice(cut), skills).seconds : 0);
+      if (t < best) best = t;
+    }
+    const result = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: current });
+    expect(result.totalSeconds).toBeCloseTo(best, 6);
   });
 });

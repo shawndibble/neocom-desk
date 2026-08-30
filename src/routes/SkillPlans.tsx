@@ -23,6 +23,10 @@ import {
 } from '@/features/skills/data';
 import { PlanList } from '@/features/skills/planner/PlanList';
 import { PlanEditor } from '@/features/skills/planner/PlanEditor';
+import {
+  remapAvailability,
+  type RemapAvailability,
+} from '@/features/skills/planner/remapAvailability';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
 
@@ -34,13 +38,13 @@ const DEFAULT_ATTRIBUTES: Attributes = {
   charisma: 19,
 };
 
-function newPlan(characterId: number, name: string): SkillPlanRecord {
+function newPlan(characterId: number, name: string, remapCount = 0): SkillPlanRecord {
   return {
     id: crypto.randomUUID(),
     characterId,
     name,
     entries: [],
-    remapCount: 0,
+    remapCount,
     updatedAt: Date.now(),
   };
 }
@@ -62,6 +66,9 @@ export function SkillPlans() {
   const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
   const [attributes, setAttributes] = useState<Attributes>(DEFAULT_ATTRIBUTES);
   const [implants, setImplants] = useState<Implants>({});
+  // Remaps Available (CONTEXT.md): ESI bonus remaps + the yearly remap when
+  // off cooldown. Prefills new plans' remapCount; user-editable per plan.
+  const [remapInfo, setRemapInfo] = useState<RemapAvailability | null>(null);
 
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -77,6 +84,7 @@ export function SkillPlans() {
       setCatalog(cat);
       if (skills?.data) setTrainedSkills(toTrainedSkillsMap(skills.data.skills));
       if (attrs?.data) setAttributes(toEngineAttributes(attrs.data, implantBonuses));
+      setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
       setImplants(implantBonuses);
     })();
     return () => {
@@ -112,7 +120,7 @@ export function SkillPlans() {
 
   async function handleCreate() {
     if (activeCharacterId === null) return;
-    const plan = newPlan(activeCharacterId, t('plans.newPlanName'));
+    const plan = newPlan(activeCharacterId, t('plans.newPlanName'), remapInfo?.available ?? 0);
     await db.skillPlans.add(plan);
     setSelectedId(plan.id);
     syncAfterEdit();
@@ -125,6 +133,7 @@ export function SkillPlans() {
       ...newPlan(activeCharacterId, t('plans.copySuffix', { name: source.name })),
       entries: source.entries,
       remapCount: source.remapCount,
+      ...(source.markers ? { markers: source.markers } : {}),
     };
     await db.skillPlans.add(copy);
     setSelectedId(copy.id);
@@ -145,7 +154,9 @@ export function SkillPlans() {
     syncAfterEdit();
   }
 
-  async function handleUpdate(patch: Partial<Pick<SkillPlanRecord, 'entries' | 'remapCount'>>) {
+  async function handleUpdate(
+    patch: Partial<Pick<SkillPlanRecord, 'entries' | 'remapCount' | 'markers'>>
+  ) {
     if (!selectedPlan) return;
     await db.skillPlans.put({ ...selectedPlan, ...patch, updatedAt: Date.now() });
     syncAfterEdit();
@@ -191,6 +202,7 @@ export function SkillPlans() {
               trainedSkills={trainedSkills}
               attributes={attributes}
               implants={implants}
+              remapInfo={remapInfo}
               onUpdate={(patch) => void handleUpdate(patch)}
             />
           ) : plans.length > 0 ? (

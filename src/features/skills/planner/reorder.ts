@@ -1,13 +1,13 @@
 /**
- * Pure Skill Plan editing helpers. Kept dependency-free (besides @dnd-kit's
- * arrayMove) so they're unit-testable without simulating real drag events.
+ * Pure Skill Plan editing helpers, unit-testable without simulating real
+ * drag events. Drag-and-drop reordering itself lives in markers.ts
+ * (reorderRows), which handles entries and Remap Markers together.
  *
  * One entry per skill: PlanEntry has no id of its own, so `skillTypeID` (as a
  * string) doubles as the @dnd-kit sortable id. That only holds if entries are
  * deduped by skill; `upsertEntry` and `dedupeEntries` are the two places new
  * entries are ever introduced, so every caller must route through them.
  */
-import { arrayMove } from '@dnd-kit/sortable';
 import type { PlanEntry, PlanStep } from '@/engine/types';
 
 /** Sortable id for an entry (dnd-kit needs a stable string per row). */
@@ -50,19 +50,6 @@ export function upsertEntry(entries: readonly PlanEntry[], entry: PlanEntry): Pl
 
 export function removeEntry(entries: readonly PlanEntry[], skillTypeID: number): PlanEntry[] {
   return entries.filter((e) => e.skillTypeID !== skillTypeID);
-}
-
-/** Drag-and-drop reorder: move the entry with sortable id `activeId` to sit at `overId`. */
-export function handleReorder(
-  entries: readonly PlanEntry[],
-  activeId: string,
-  overId: string
-): PlanEntry[] {
-  if (activeId === overId) return entries as PlanEntry[];
-  const oldIndex = entries.findIndex((e) => entryId(e) === activeId);
-  const newIndex = entries.findIndex((e) => entryId(e) === overId);
-  if (oldIndex === -1 || newIndex === -1) return entries as PlanEntry[];
-  return arrayMove([...entries], oldIndex, newIndex);
 }
 
 /**

@@ -468,6 +468,136 @@ describe('SkillPlans editor: optimize remaps', () => {
   });
 });
 
+describe('SkillPlans editor: remap markers', () => {
+  it('adds a removable marker row and persists positions in Dexie (no schema bump)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+      })
+    );
+    render(<App />);
+
+    await screen.findByText('Computed queue');
+    expect(screen.queryByText('Remap marker')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add remap marker' }));
+    expect(await screen.findByText('Remap marker')).toBeInTheDocument();
+    // Appended after the last entry: position === entries.length.
+    await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([2]));
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+
+    await user.click(screen.getByRole('button', { name: 'Remove marker' }));
+    await waitFor(() => expect(screen.queryByText('Remap marker')).not.toBeInTheDocument());
+    expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([]);
+  });
+
+  it('optimize at my markers reports the current-attributes segment and a best spread per marker segment', async () => {
+    const user = userEvent.setup();
+    // Marker at entry position 1: train Gunnery I..V on current attributes,
+    // remap before Spaceship Command (int/mem).
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 5 },
+          { skillTypeID: 3, targetLevel: 3 },
+        ],
+        markers: [1],
+      })
+    );
+    render(<App />);
+
+    await screen.findByText('Computed queue');
+    const optimizeButton = screen.getByRole('button', { name: 'Optimize at my markers' });
+    expect(optimizeButton).toBeEnabled();
+    await user.click(optimizeButton);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Optimize at my markers' })
+    ).toBeInTheDocument();
+    // Verdict line, same pattern as "optimize now".
+    expect(screen.getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
+    // Segment 1: leading current-attributes prefix, no remap spent.
+    expect(screen.getByText('From Gunnery I, keep current attributes')).toBeInTheDocument();
+    // Segment 2: the marker's segment gets its own best spread (int/mem-heavy).
+    expect(
+      screen.getByText(/Before Spaceship Command I, remap to INT 27 \/ MEM 21 \//)
+    ).toBeInTheDocument();
+  });
+
+  it('disables "Optimize at my markers" when the plan has no markers', async () => {
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    render(<App />);
+
+    await screen.findByText('Computed queue');
+    expect(screen.getByRole('button', { name: 'Optimize at my markers' })).toBeDisabled();
+  });
+});
+
+describe('SkillPlans editor: remaps available from ESI', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-29T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows the cooldown hint and prefills a new plan with bonus remaps only', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          ...attributesPayload,
+          bonus_remaps: 2,
+          accrued_remap_cooldown_date: '2027-01-15T00:00:00Z',
+        })
+      )
+    );
+    const user = userEvent.setup();
+    // Seed a plan so the editor (and its hint) is visible before creating:
+    // the hint appearing proves the ESI attributes have loaded, so the "New
+    // plan" that follows is guaranteed to see the prefill value.
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    expect(
+      await screen.findByText('From EVE: 2 bonus + yearly on cooldown until 2027-01-15')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'New plan' }));
+    // Prefilled but user-editable: the yearly remap is on cooldown, so only
+    // the 2 bonus remaps count.
+    await waitFor(() => expect(screen.getByLabelText('Remaps available')).toHaveValue(2));
+    const created = (await db.skillPlans.where('characterId').equals(CHAR_ID).toArray()).find(
+      (p) => p.name === 'Untitled plan'
+    );
+    expect(created?.remapCount).toBe(2);
+  });
+
+  it('counts the yearly remap as ready when the cooldown date is past', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          ...attributesPayload,
+          bonus_remaps: 1,
+          accrued_remap_cooldown_date: '2026-08-29T11:00:00Z',
+        })
+      )
+    );
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    expect(await screen.findByText('From EVE: 1 bonus + yearly ready')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'New plan' }));
+    await waitFor(() => expect(screen.getByLabelText('Remaps available')).toHaveValue(2));
+  });
+});
+
 describe('SkillPlans editor: Remaps input label (UX-REVIEW #6)', () => {
   it('labels the remap count input "Remaps available" with a helper tooltip', async () => {
     await db.skillPlans.add(seedPlan());

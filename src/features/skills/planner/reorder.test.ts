@@ -3,7 +3,6 @@ import {
   dedupeEntries,
   upsertEntry,
   removeEntry,
-  handleReorder,
   applyReorderSuggestion,
   entryId,
 } from './reorder';
@@ -85,31 +84,6 @@ describe('removeEntry', () => {
       1
     );
     expect(result).toEqual([{ skillTypeID: 2, targetLevel: 1 }]);
-  });
-});
-
-describe('handleReorder', () => {
-  const entries = [
-    { skillTypeID: 1, targetLevel: 1 },
-    { skillTypeID: 2, targetLevel: 1 },
-    { skillTypeID: 3, targetLevel: 1 },
-  ];
-
-  it('moves the active entry to sit at the target entry', () => {
-    expect(handleReorder(entries, '1', '3')).toEqual([
-      { skillTypeID: 2, targetLevel: 1 },
-      { skillTypeID: 3, targetLevel: 1 },
-      { skillTypeID: 1, targetLevel: 1 },
-    ]);
-  });
-
-  it('is a no-op when active and over are the same', () => {
-    expect(handleReorder(entries, '2', '2')).toEqual(entries);
-  });
-
-  it('is a no-op when either id is unknown', () => {
-    expect(handleReorder(entries, '1', '99')).toEqual(entries);
-    expect(handleReorder(entries, '99', '1')).toEqual(entries);
   });
 });
 
