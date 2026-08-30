@@ -6,8 +6,8 @@
  * allocatable points. Implants add on top and are unaffected by a remap.
  * Boosters are accounted for when a `BoosterContext` is supplied, matching
  * `computeSchedule` — a long accelerator runs to weeks, so ignoring one gives
- * the wrong optimum for weeks of training (plan §5.5). `placeRemaps` does not
- * pass one yet, so the shipped optimizer button is still Booster-blind.
+ * the wrong optimum for weeks of training (plan §5.5). `placeRemaps` passes a
+ * context whenever the character has a Booster enabled.
  */
 import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
 import type {

@@ -60,16 +60,18 @@ What shipped instead is two central mechanisms plus one per-panel case:
   left ungated and must degrade **per panel** — page-gating would hide panels
   that still work. Only Overview's wallet panel does so far; the rest still
   rely on the runtime sink, which means they keep the spinner-then-empty-table
-  behaviour this approach was chosen to avoid. Outstanding, not done.
+  behaviour this approach was chosen to avoid. Outstanding, not done. Note the
+  new `/skillqueue` reads on `/skills` and `/industry` widen this: a revoked
+  queue scope now paints the shell notice over pages that still work.
 
 The whole app also moved behind authentication (see `CONTEXT.md` round 4),
 which removes the anonymous-state branch from the gate entirely.
 
 ### Current measurements
 
-- **JS bundle: 334 KB gzip**, single chunk. `firebase/firestore` alone is 109 KB of it (32%).
+- **JS bundle: 185 KB gzip entry** (`index`), plus a **59 KB async `planSync` chunk**. Was 334 KB in one chunk; the `firestore/lite` alias and the deferred `@/sync` import (Phase 0) did it.
 - **`public/data/` SDE payload: 2.29 MB** (blueprints 1.46 MB, types 0.73 MB, skills 0.11 MB) — already shipped to every user, and the budget items 03/04/16 draw against.
-- 91 colocated unit test files; 4 Playwright specs.
+- 128 colocated unit test files; 4 Playwright specs.
 
 ---
 
@@ -78,20 +80,20 @@ which removes the anonymous-state branch from the gate entirely.
 These are not teardown items. They are existing bugs the passes surfaced, and
 several block or distort the features above them.
 
-| #      | Defect                                                                                                                                                                                                                                                                                                   | Evidence                                                                         | Severity                                                                               |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| D1     | `handleOwnerHashChange` wipes Skill Plans when a Character is sold but leaves the **previous owner's cached wallet, mail and assets** in `esiCache`                                                                                                                                                      | `sync/planSync.ts:253-263`                                                       | Privacy                                                                                |
-| D2     | Granted scopes are persisted on `TokenRecord` and **never read by anything** — scope-revoke detection has nothing behind it                                                                                                                                                                              | `db/index.ts:22`, written `auth/session.ts:68`                                   | Privacy                                                                                |
-| D3     | `ReauthBanner` is wired into **3 of 9** ESI-backed views. Assets, Mail, Calendar, Contracts, Orders and Overview discard `needsReauth` and render as merely empty                                                                                                                                        | `components/ui/ReauthBanner.tsx` consumers                                       | Correctness                                                                            |
-| D4     | `paginated.ts` silently returns truncated data as complete, with a fresh `DataAgeBadge` and no signal anywhere                                                                                                                                                                                           | `esi/paginated.ts:19-26`                                                         | Correctness                                                                            |
-| ~~D5~~ | ~~`placeRemaps` is O(R²) synchronous on the main thread~~ **Fixed.** The R x R segment grid is gone: the DP now picks the allocation outside the search over boundaries, so it is linear in pair-runs. 200 steps, `remapCount = 5`: **2.04 s -> 21 ms** blind, 2.93 s -> 952 ms with a Booster. See §5.6 | `engine/optimizer/placeRemaps.ts`                                                | Performance                                                                            |
-| D6     | The optimizer ignores Boosters by design while the computed queue applies them — invisible today only because they render in separate panels. **Ruled §5.5: teach the optimizer (option b); a long Booster covers weeks of a plan**                                                                      | `engine/optimizer/bestAttributes.ts:7` vs `planner/PlanEditor.tsx:92-96`         | Correctness — a wrong optimum, not just an undisclosed one. Engine change, gated on D5 |
-| D7     | `dedupeEntries` rebuilds bare entry objects, so any new `PlanEntry` field is silently dropped on reorder                                                                                                                                                                                                 | `planner/reorder.ts:33`                                                          | Latent                                                                                 |
-| D8     | Two `role="dialog" aria-modal="true"` declarations on plain `<div>`s — no focus containment, no inert background                                                                                                                                                                                         | `planner/ImportClipboardDialog.tsx:61`, `app/Layout.tsx:60`                      | Accessibility                                                                          |
-| D9     | The scope list has three hand-maintained copies and has already drifted — `e2e/support/fixtureData.ts:21-31` is missing `esi-industry.read_character_jobs.v1`                                                                                                                                            | —                                                                                | Maintainability                                                                        |
-| D10    | `formatIsk` is implemented three times; only the `character` copy has the float-noise epsilon clamp, so the other two can render `-0`                                                                                                                                                                    | `features/character/format.ts:21`, `industry/format.ts:8`, `market/format.ts:14` | Maintainability                                                                        |
-| D11    | Assets fetches every page and renders all of it uncapped                                                                                                                                                                                                                                                 | `esi/paginated.ts` + `routes/Assets.tsx:164,167`                                 | Performance                                                                            |
-| D12    | `/assets` renders every player structure as `Structure #{{id}}`                                                                                                                                                                                                                                          | `routes/Assets.tsx:41`, `i18n/locales/en.json:300`                               | UX — fixed for free by the Phase 3 scope batch                                         |
+| #       | Defect                                                                                                                                                                                                                                                                                                   | Evidence                                                           | Severity                                                   |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------- |
+| ~~D1~~  | ~~Sold Character leaves the previous owner's cached wallet, mail and assets in `esiCache`~~ **Fixed** — `handleOwnerHashChange` calls `purgeCharacterCacheOrSuppress`                                                                                                                                    | `sync/planSync.ts:208`                                             | Privacy                                                    |
+| ~~D2~~  | ~~Granted scopes persisted but never read~~ **Fixed** — `purgeCacheIfConsentChangedOrPending` reads the stored set and diffs it with `revokedScopes`                                                                                                                                                     | `auth/session.ts:78`                                               | Privacy                                                    |
+| D3      | **Partly fixed.** Overview's wallet panel now shows `ReauthBanner`; Assets, Mail, Calendar, Contracts, Orders and Overview's own queue panel still discard `needsReauth` and render as merely empty                                                                                                      | `components/ui/ReauthBanner.tsx` consumers                         | Correctness                                                |
+| ~~D4~~  | ~~`paginated.ts` returns truncated data as complete~~ **Fixed** — `truncated` is a first-class field through `TruncatableResult` and the cache row, consumed by `/assets`                                                                                                                                | `esi/paginated.ts:15,68`, `routes/Assets.tsx:52`                   | Correctness                                                |
+| ~~D5~~  | ~~`placeRemaps` is O(R²) synchronous on the main thread~~ **Fixed.** The R x R segment grid is gone: the DP now picks the allocation outside the search over boundaries, so it is linear in pair-runs. 200 steps, `remapCount = 5`: **2.04 s -> 13 ms** blind, 2.93 s -> 902 ms with a Booster. See §5.6 | `engine/optimizer/placeRemaps.ts`                                  | Performance                                                |
+| ~~D6~~  | ~~The optimizer ignores Boosters while the computed queue applies them~~ **Fixed.** Ruled §5.5 (option b, teach the optimizer) and built: both placement paths are Booster-aware and `PlanEditor` passes the same Boosters the queue schedules with                                                      | `engine/optimizer/bestAttributes.ts`, `planner/PlanEditor.tsx:280` | Correctness — a wrong optimum, not just an undisclosed one |
+| D7      | `dedupeEntries` rebuilds bare entry objects, so any new `PlanEntry` field is silently dropped on reorder                                                                                                                                                                                                 | `planner/reorder.ts:33`                                            | Latent                                                     |
+| ~~D8~~  | ~~`role="dialog"` on plain `<div>`s, no focus containment~~ **Fixed** — both call sites use `components/ui/Modal.tsx`, built on native `<dialog>`/`showModal()`                                                                                                                                          | `components/ui/Modal.tsx:21-58`                                    | Accessibility                                              |
+| ~~D9~~  | ~~Three hand-maintained scope lists, already drifted~~ **Fixed** — `scopes.ts` derives from `registry.ts` and the e2e fixture re-exports it; one source                                                                                                                                                  | `e2e/support/fixtureData.ts:29`                                    | Maintainability                                            |
+| ~~D10~~ | ~~`formatIsk` implemented three times, only one clamping `-0`~~ **Fixed** — one copy                                                                                                                                                                                                                     | `lib/isk.ts:34`                                                    | Maintainability                                            |
+| D11     | Assets fetches every page and renders all of it uncapped                                                                                                                                                                                                                                                 | `esi/paginated.ts` + `routes/Assets.tsx:164,167`                   | Performance                                                |
+| D12     | `/assets` renders every player structure as `Structure #{{id}}`                                                                                                                                                                                                                                          | `routes/Assets.tsx:41`, `i18n/locales/en.json:300`                 | UX — fixed for free by the Phase 3 scope batch             |
 
 ---
 
@@ -114,15 +116,15 @@ dependencies: none. Total added bundle cost: 0 KB.** Full reasoning in
 | Keyboard shortcuts       | **BUILD**        | Small registry; the hard parts are app-specific                                                                                                                                                 |
 | Drag                     | **ALREADY HAVE** | `@dnd-kit`, and its `KeyboardSensor` is already wired at `planner/EntryList.tsx:142`                                                                                                            |
 
-**The survey's most valuable finding is unrelated to the features.** The repo
-imports eight Firestore symbols, all of which exist in
-`firebase/firestore/lite`; `onSnapshot` has zero matches repo-wide. Aliasing
-to `lite` and deferring the static `@/sync` import at `app/App.tsx:7` takes
-the bundle from **334 KB to ~175 KB gzip**. Measured by building the repo
-twice with a `manualChunks` overlay applied from a scratch Vite config
-(`outDir` redirected outside the repo), once against `firebase/firestore` and
-once against `firebase/firestore/lite` — reproduce it the same way rather
-than trusting the figure.
+**The survey's most valuable finding was unrelated to the features, and it
+shipped.** The repo imports eight Firestore symbols, all of which exist in
+`firebase/firestore/lite`; `onSnapshot` had zero matches repo-wide. Aliasing
+to `lite` and deferring the static `@/sync` import was projected to take the
+bundle from 334 KB to ~175 KB gzip. Both are done — `sync/firebaseApp.ts` and
+`planSync.ts` import from `firestore/lite`, and `sync/index.ts` is the
+code-split boundary, every Firebase-reaching export behind
+`await import('./planSync')`. **Delivered: a 185 KB gzip entry plus a 59 KB
+async chunk**, close to the projection.
 
 ---
 
@@ -137,19 +139,19 @@ not the teardown's originals.
 Everything here unblocks something downstream or is a free win. None of it is
 a teardown item, which is exactly why the teardown's ranking couldn't surface it.
 
-| Task                                                                                                                                    | Cost | Unblocks                                |
-| --------------------------------------------------------------------------------------------------------------------------------------- | ---- | --------------------------------------- |
-| Firestore `lite` alias + lazy `@/sync` import (334 → ~175 KB)                                                                           | S    | Everything — pure win                   |
-| Fix `docs/ARCHITECTURE.md` §6 and `docs/DESIGN.md` §4                                                                                   | S    | Any future planning                     |
-| **Endpoint registry**: one table mapping ESI endpoint → required scope → route template                                                 | S    | 15a, 17, D9                             |
-| Fix D1 — purge `esiCache` on owner-hash change. Start reading the stored scope set (D2)                                                 | S    | Privacy; supplies 15a's detection input |
-| Central auth gate + route scope gate, replacing per-view `ReauthBanner` wiring (D3)                                                     | S    | 13, 15b, 16, 20                         |
-| Signal truncation in `paginated.ts` (D4)                                                                                                | S    | 17, 20                                  |
-| ~~`placeRemaps` single-remap O(R) path (D5)~~ **Done**, and the general DP with it — see §5.6                                           | S    | **05**                                  |
-| ~~Decide Booster semantics (D6)~~ **Decided §5.5 — teach the optimizer.** The build is now engine work, sized **M**, sequenced after D5 | M    | 01, 05                                  |
-| `<dialog>` / Popover API migration (D8)                                                                                                 | S    | 10, 15b, 17                             |
-| px→rem sweep, 40 arbitrary `text-[11px]`/`text-[10px]` sites                                                                            | S    | **18**                                  |
-| Promote `SkillBar` to `components/ui`; dedupe `formatIsk` (D10)                                                                         | S    | Consistency                             |
+| Task                                                                                                                                       | Cost | Unblocks                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ---- | --------------------------------------- |
+| ~~Firestore `lite` alias + lazy `@/sync` import~~ **Done** — 334 KB single chunk → 185 KB entry + 59 KB async                              | S    | Everything — pure win                   |
+| Fix `docs/ARCHITECTURE.md` §6 and `docs/DESIGN.md` §4                                                                                      | S    | Any future planning                     |
+| **Endpoint registry**: one table mapping ESI endpoint → required scope → route template                                                    | S    | 15a, 17, D9                             |
+| ~~Fix D1 — purge `esiCache` on owner-hash change. Start reading the stored scope set (D2)~~ **Done**                                       | S    | Privacy; supplies 15a's detection input |
+| Central auth gate + route scope gate (D3) — **partly done**: `ScopeGate`/`AuthFailureNotice` ship, 4 routes still hand-wire `ReauthBanner` | S    | 13, 15b, 16, 20                         |
+| ~~Signal truncation in `paginated.ts` (D4)~~ **Done**                                                                                      | S    | 17, 20                                  |
+| ~~`placeRemaps` single-remap O(R) path (D5)~~ **Done**, and the general DP with it — see §5.6                                              | S    | **05**                                  |
+| ~~Decide + build Booster semantics (D6)~~ **Done** — both placement paths Booster-aware, wired into `PlanEditor`. See §5.5                 | M    | 01, 05                                  |
+| ~~`<dialog>` / Popover API migration (D8)~~ **Done** — `components/ui/Modal.tsx`                                                           | S    | 10, 15b, 17                             |
+| ~~px→rem sweep, 40 arbitrary `text-[11px]`/`text-[10px]` sites~~ **Done** — none remain                                                    | S    | **18**                                  |
+| ~~Promote `SkillBar` to `components/ui`; dedupe `formatIsk` (D10)~~ **Done**                                                               | S    | Consistency                             |
 
 The endpoint registry deserves emphasis: it is the single highest-leverage
 piece of work in this plan. Item 15a needs endpoint→scope, item 17 needs
@@ -298,7 +300,7 @@ These change what gets built. They are yours, not the implementer's.
 
 1. **Sync scope (blocks items 07 and 09).** Firebase uid is `char:{characterId}` — sync is **per Character, not per user**. A "synced setting" only reaches devices that have activated that same Character. CONTEXT.md's **Account** concept has no storage representation. Options: (a) accept per-Character duplication and document the caveat — keeps 09 at M; (b) build real account-level sync — pushes 09 to L. Additionally, `mergeSettings` has **no tombstones**, so deleted keys resurrect from remote: saved comparisons and groupings must be stored as one array-valued key, never one key per item.
 2. **The PI consent string.** `esi-planets.manage_planets.v1` is read-only in practice — it grants only two GETs in the current surface — but the SSO consent screen will read _"manage your planetary installations"_ to users of an app that advertises itself as read-only (CONTEXT.md, "Read-only: no ESI write scopes"). Product call.
-3. **Item 05's badge at `remapCount ≥ 2`.** The O(R) exact path covers the single-remap default. Multi-remap plans need either a slower exact pass or an honest "not evaluated" state. Pick one — a badge with two reachable states instead of three is worse than no badge.
+3. ~~**Item 05's badge at `remapCount ≥ 2`.**~~ **Resolved 2026-08-30 by §5.6**, both branches, at different thresholds: exact placement now ships up to `remapCount` = 2, and above that `plans.remapCapNote` states the cap honestly instead of guessing. Reopen only if 5 moves off the main thread.
 4. **Which niche tabs (item 20).** Recommended first batch: employment history (free), contacts, loyalty points. Recommended never: notifications (the `text` field is raw YAML needing per-type templates for 150+ types, sourced from neither ESI nor the SDE) and kill log (link zKillboard instead).
 5. **Boosters in the optimizer (D6). DECIDED 2026-08-30 — option (b), teach the optimizer.**
    `bestAttributes` must account for Boosters. The label-only option (a) was
@@ -343,32 +345,16 @@ These change what gets built. They are yours, not the implementer's.
    trains inside the booster window, not by plan length — which is why 200
    steps costs barely more than 50.
 
-   **`placeRemaps` threading is done, and it exposed a cliff.** Both placement
-   paths are Booster-aware, so the answer cannot change with `remapCount` (a
-   0..5 user input). The DP stays valid because segment cost is monotonically
-   non-decreasing in start time — a later start can only mean less Booster — so
-   the minimal prefix is still the best prefix to extend. Costs are resolved
-   lazily against `dp[k-1][i]`, because the sp-per-pair signature is no longer a
-   sufficient memo key once cost depends on when a segment starts.
+   **`placeRemaps` threading and the DP cost are resolved — see §5.6.** Both
+   placement paths are Booster-aware, the UI is wired (`PlanEditor` passes the
+   same Boosters the computed queue schedules with), and `MAX_SUPPORTED_REMAPS`
+   is 2. The batching this section once described as a known future fix shipped
+   as `bestAttributesAtBoundaries`, and the segment grid whose memo made the
+   old cost bearable is gone. **§5.6 carries the current measurements. The
+   figures once quoted here — 2.2 s blind and 21.7 s Booster-aware at
+   `remapCount` 5 — described code that no longer exists.**
 
-   Measured at 200 steps with a 24-day Booster:
-
-   | `remapCount` | Booster-blind | Booster-aware |
-   | ------------ | ------------- | ------------- |
-   | 1            | 62 ms         | **81 ms**     |
-   | 5            | 2.2 s         | **21.7 s**    |
-
-   The single-remap scan is effectively free. The DP is not: it evaluates a
-   segment per `(k, i, j)` and only the signature memo made that affordable.
-
-   **So the UI is not wired yet, and must not be while `remapCount >= 2` is
-   reachable.** The fix shape is known: for a fixed `(k, i)` every `j` shares
-   one boosted prefix, so a single pass over allocations can cost all `j` at
-   once instead of R separate calls. This interacts with **D5**, which already
-   had this path at 2.2 s Booster-free, and with §5 decision 3, which is the
-   user's to make.
-
-   Useful context for that decision: a 24-day Booster covers the first **5
+   Useful context for §5 decision 3: a 24-day Booster covers the first **5
    steps (3%)** of a 200-step plan, because such a plan runs ~1,100 days.
 
    Binding on items 01 and 05: they render one number, computed one way. The
