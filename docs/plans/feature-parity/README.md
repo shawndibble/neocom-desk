@@ -249,8 +249,8 @@ exactly once.
 esi-clones.read_clones.v1              item 13   required
 esi-planets.manage_planets.v1          item 16   required
 esi-universe.read_structures.v1        item 13   strongly recommended — also fixes D12
-esi-characters.read_contacts.v1        item 20   if contacts is in the batch
-esi-characters.read_loyalty.v1         item 20   if loyalty points is in the batch
+esi-characters.read_contacts.v1        item 20   required — contacts is in the batch
+esi-characters.read_loyalty.v1         item 20   required — loyalty points is in the batch
 ```
 
 Everything else these features need is public: planet, system, station and
@@ -264,13 +264,13 @@ scope-category grouping would be rebuilt the moment four scopes land. The
 additive case must be a no-op: adding scopes must not purge every cache, and
 that needs its own named test.
 
-| Item | Feature                       | Cost | Notes                                                                                                                                  |
-| ---- | ----------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 15a  | Cache purge on scope revoke   | S    | Ships **before** the batch. Blunt purge of character-scoped rows first; `GLOBAL_CACHE_CHARACTER_ID` rows are public and must be spared |
-| 13   | Clone and implant tab         | M    | Jump cooldown is `24h − 1h/level`, floor 19h — pure math, `src/engine/clones.ts`, TDD, `nowMs` injected                                |
-| 16   | Planetary industry            | M    | Revised **down from L**. SDE delta measured by building it: **+20 KB on 2.29 MB (+0.9%)**                                              |
-| 20   | Niche tabs — first batch only | S–M  | Employment history, contacts, loyalty points. Defer the rest; **defer notifications and kill log indefinitely**                        |
-| 15b  | Scope picker at login         | M    | Ships **after** the batch. Strictly local, never a `sync.` setting — a synced value would contradict the device's actual token grant   |
+| Item | Feature                               | Cost | Notes                                                                                                                                                      |
+| ---- | ------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 15a  | Cache purge on scope revoke           | S    | Ships **before** the batch. Blunt purge of character-scoped rows first; `GLOBAL_CACHE_CHARACTER_ID` rows are public and must be spared                     |
+| 13   | Clone and implant tab                 | M    | Jump cooldown is `24h − 1h/level`, floor 19h — pure math, `src/engine/clones.ts`, TDD, `nowMs` injected                                                    |
+| 16   | Planetary industry                    | M    | Revised **down from L**. SDE delta measured by building it: **+20 KB on 2.29 MB (+0.9%)**                                                                  |
+| 20   | Niche tabs — contacts, loyalty points | S–M  | One ticket each; both need the batch above. **Employment history is public and ships in Phase 2, not here.** Defer notifications and kill log indefinitely |
+| 15b  | Scope picker at login                 | M    | Ships **after** the batch. Strictly local, never a `sync.` setting — a synced value would contradict the device's actual token grant                       |
 
 Two traps to carry into implementation:
 
@@ -300,9 +300,9 @@ its own and blocks on `DataTable` + `CharacterAvatar`.
 These change what gets built. They are yours, not the implementer's.
 
 1. ~~**Sync scope (blocks items 07 and 09).**~~ **DECIDED 2026-08-30 — see §5.7. Items 07 and 09 are unblocked and store device-local; no account sync, no uid change.**
-2. **The PI consent string.** `esi-planets.manage_planets.v1` is read-only in practice — it grants only two GETs in the current surface — but the SSO consent screen will read _"manage your planetary installations"_ to users of an app that advertises itself as read-only (CONTEXT.md, "Read-only: no ESI write scopes"). Product call.
+2. ~~**The PI consent string.**~~ **DECIDED 2026-08-30 — ship item 16, and disclose it.** `esi-planets.manage_planets.v1` grants only two GETs in item 16's surface, but the SSO consent screen reads _"manage your planetary installations"_. CCP publishes no read-only PI scope, so that wording is theirs, not a widening of ours. Three conditions: say so plainly on the login screen beside the PI scope; record it in an ADR; and footnote CONTEXT.md's "Read-only: no ESI write scopes" rather than leave it flatly contradicted. The footnote must make the distinction the claim actually rests on — the app issues no ESI writes, which stays true at the behaviour level whatever the consent screen says. The scope is not in `esi/registry.ts` today; it arrives with item 16.
 3. ~~**Item 05's badge at `remapCount ≥ 2`.**~~ **Resolved 2026-08-30 by §5.6**, both branches, at different thresholds: exact placement now ships up to `remapCount` = 2, and above that `plans.remapCapNote` states the cap honestly instead of guessing. Reopen only if 5 moves off the main thread.
-4. **Which niche tabs (item 20).** Recommended first batch: employment history (free), contacts, loyalty points. Recommended never: notifications (the `text` field is raw YAML needing per-type templates for 150+ types, sourced from neither ESI nor the SDE) and kill log (link zKillboard instead).
+4. ~~**Which niche tabs (item 20).**~~ **DECIDED 2026-08-30 — all three: employment history, contacts, loyalty points.** One ticket each rather than one for item 20, because they do not share a dependency: **employment history is a public endpoint** (`security: []`), needing no scope, no re-auth and no batch, so it ships in Phase 2; **contacts** and **loyalty points** each add a scope and must join the single batched re-authorization in Phase 3. The scope batch is what groups them — the features are independent. Still recommended never: notifications (the `text` field is raw YAML needing per-type templates for 150+ types, sourced from neither ESI nor the SDE) and kill log (link zKillboard instead).
 5. **Boosters in the optimizer (D6). DECIDED 2026-08-30 — option (b), teach the optimizer.**
    `bestAttributes` must account for Boosters. The label-only option (a) was
    ruled first and reversed the same day; see the note below, and do not
