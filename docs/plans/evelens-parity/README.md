@@ -423,6 +423,9 @@ also feeds the CSV) and `routes/Industry.tsx` (industry math). Two notes:
   shows a raised per-skill SP inside a total that still counts the old one.
   The correction covers exactly the entries whose per-skill SP rose, so the
   total is never more precise than the rows it sums.
+- **`unallocated_sp` is deliberately unchanged.** Training does not draw from
+  that pool — it is filled by injectors and event rewards — so a finished
+  queue entry leaves it accurate.
 - **`features/character/roster.ts` was left alone.** It holds raw
   `CharacterSkills` but has no importer outside its own test, so nothing
   renders it. Fold it in when it gains a consumer.
