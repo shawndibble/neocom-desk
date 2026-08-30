@@ -12,6 +12,14 @@
  * booster bonuses), the result keeps the current attributes and reports zero
  * savings — the output is never slower than not remapping at all.
  *
+ * Booster-blind, and knowingly so: `bestAttributes` accepts a `BoosterContext`
+ * but this passes none, so segment costs use base + implant rates only. Fixing
+ * it needs each segment's wall-clock start offset, which also stops the
+ * sp-per-pair signature below from being a sufficient memo key — a segment's
+ * cost would then depend on when it starts. Both placement paths must change
+ * together: `remapCount` is a 0..5 user input, so a Booster-aware single-remap
+ * path beside a blind DP would change the answer with the count (plan §5.5).
+ *
  * DP over pair-runs (maximal step runs sharing one attribute pair): segment
  * boundaries inside a run are dominated by boundaries at its edges, so only
  * run edges are split candidates. Segment cost is memoized on the aggregated
