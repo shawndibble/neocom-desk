@@ -129,6 +129,63 @@ export function bestAttributesForPairs(
   return { attributes: toAttributes(bestExtras), seconds: bestSeconds };
 }
 
+/**
+ * The same brute-force search as `bestAttributesForPairs`, but pulled apart
+ * so a caller can price many segments against one allocation.
+ *
+ * Segment time is linear in SP — `timeToTrain` is `(sp / rate) * 60`, with no
+ * rounding — so for a fixed allocation the cost of a segment is just its
+ * SP-per-pair vector dotted with this table's row. `placeRemaps` uses that to
+ * turn a quadratic segment grid into a linear scan: it can pull the choice of
+ * allocation outside the search over segment boundaries.
+ *
+ * The reassociation is deliberate and costs precision: `sp * (60 / rate)`
+ * here against `(sp / rate) * 60` there. Callers that report a number to the
+ * user should select with this table and then re-price the chosen segment
+ * with `bestAttributesForPairs`.
+ */
+export interface AllocationCostTable {
+  /** Candidate allocations — every legal remap spread. */
+  count: number;
+  /** Seconds to train one SP of pair `p` under allocation `a`. */
+  secondsPerSp(a: number, p: number): number;
+  /** The attribute spread allocation `a` stands for. */
+  attributesAt(a: number): Attributes;
+}
+
+export function allocationCostTable(
+  pairKeys: readonly string[],
+  implants: Implants = {}
+): AllocationCostTable {
+  const allocations = allAllocations();
+  const implantByIndex = ATTRIBUTE_NAMES.map((name) => implants[name] ?? 0);
+  const pairs = pairKeys.map((key) => {
+    const [primary, secondary] = key.split('|') as [AttributeName, AttributeName];
+    return {
+      primary: ATTRIBUTE_NAMES.indexOf(primary),
+      secondary: ATTRIBUTE_NAMES.indexOf(secondary),
+    };
+  });
+
+  const width = pairs.length;
+  const secondsPerSp = new Float64Array(allocations.length * width);
+  allocations.forEach((extras, a) => {
+    pairs.forEach(({ primary, secondary }, p) => {
+      const rate = trainingRate(
+        BASE_MIN + extras[primary] + implantByIndex[primary],
+        BASE_MIN + extras[secondary] + implantByIndex[secondary]
+      );
+      secondsPerSp[a * width + p] = timeToTrain(1, rate);
+    });
+  });
+
+  return {
+    count: allocations.length,
+    secondsPerSp: (a, p) => secondsPerSp[a * width + p],
+    attributesAt: (a) => toAttributes(allocations[a]),
+  };
+}
+
 /** Where this segment sits in wall-clock time, and what Boosters are live. */
 export interface BoosterContext {
   boosters: readonly Booster[];

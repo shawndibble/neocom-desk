@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { bestAttributes } from '@/engine/optimizer/bestAttributes';
-import type { AttributeName, EngineSkill, PlanStep } from '@/engine/types';
+import {
+  allocationCostTable,
+  bestAttributes,
+  bestAttributesForPairs,
+  ATTRIBUTE_NAMES,
+} from '@/engine/optimizer/bestAttributes';
+import { timeToTrain, trainingRate } from '@/engine/sp';
+import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
 
 const skill = (
   typeID: number,
@@ -235,5 +241,70 @@ describe('bestAttributes with Boosters', () => {
       { boosters: [{ bonus, expiresAt }], startDate: after(5000) }
     );
     expect(late.seconds).toBeGreaterThan(early.seconds);
+  });
+});
+
+describe('allocationCostTable', () => {
+  const IM: Attributes = ATTRIBUTE_NAMES.reduce(
+    (acc, name) => ({ ...acc, [name]: 0 }),
+    {} as Attributes
+  );
+
+  it('covers every legal remap spread', () => {
+    // 14 free points over 5 attributes, none above 10: C(18,4) - 5*C(7,4).
+    expect(allocationCostTable(['intelligence|memory']).count).toBe(2885);
+  });
+
+  it('offers only spreads EVE allows: 99 points, each 17..27', () => {
+    const table = allocationCostTable(['intelligence|memory']);
+    for (let a = 0; a < table.count; a++) {
+      const attrs = table.attributesAt(a);
+      const values = ATTRIBUTE_NAMES.map((name) => attrs[name]);
+      expect(values.reduce((x, y) => x + y, 0)).toBe(99);
+      for (const value of values) {
+        expect(value).toBeGreaterThanOrEqual(17);
+        expect(value).toBeLessThanOrEqual(27);
+      }
+    }
+  });
+
+  it('prices one SP exactly as sp.ts does, implants included', () => {
+    const implants = { ...IM, perception: 5, willpower: 3 };
+    const table = allocationCostTable(['perception|willpower'], implants);
+    for (const a of [0, 100, 2884]) {
+      const attrs = table.attributesAt(a);
+      const rate = trainingRate(attrs.perception + 5, attrs.willpower + 3);
+      expect(table.secondsPerSp(a, 0)).toBeCloseTo(timeToTrain(1, rate), 12);
+    }
+  });
+
+  it('agrees with bestAttributesForPairs on the winning spread', () => {
+    // The table is only useful if summing sp x secondsPerSp reproduces the
+    // brute force. Same optimum, same attributes, to float tolerance.
+    const spByPair = new Map([
+      ['intelligence|memory', 500_000],
+      ['perception|willpower', 120_000],
+      ['charisma|willpower', 8_000],
+    ]);
+    const keys = [...spByPair.keys()];
+    const implants = { ...IM, intelligence: 4 };
+    const table = allocationCostTable(keys, implants);
+
+    let bestSeconds = Infinity;
+    let bestIndex = -1;
+    for (let a = 0; a < table.count; a++) {
+      let seconds = 0;
+      keys.forEach((key, p) => {
+        seconds += spByPair.get(key)! * table.secondsPerSp(a, p);
+      });
+      if (seconds < bestSeconds) {
+        bestSeconds = seconds;
+        bestIndex = a;
+      }
+    }
+
+    const brute = bestAttributesForPairs(spByPair, implants);
+    expect(bestSeconds).toBeCloseTo(brute.seconds, 3);
+    expect(table.attributesAt(bestIndex)).toEqual(brute.attributes);
   });
 });
