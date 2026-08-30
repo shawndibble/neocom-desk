@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/ui';
 import type { ScheduledStep } from '@/engine/types';
-import { formatDuration } from './duration';
+import { formatDuration } from '@/lib/duration';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 

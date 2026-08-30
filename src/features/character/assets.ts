@@ -1,6 +1,6 @@
 /** Fetch + cache layer for the Assets view. */
 import { getCharacterAssets, type CharacterAsset } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from './cache';
+import { loadWithCache, type CachedResult } from '@/esi/cache';
 
 const KEY = 'assets';
 

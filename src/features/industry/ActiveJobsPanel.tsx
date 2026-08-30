@@ -14,7 +14,7 @@ import {
   activityI18nKey,
   type JobsLoadResult,
 } from './jobs';
-import { formatDuration } from './duration';
+import { formatDuration } from '@/lib/duration';
 
 interface ActiveJobsPanelProps {
   characterId: number;

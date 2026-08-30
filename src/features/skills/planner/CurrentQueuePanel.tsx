@@ -7,7 +7,7 @@ import type { Attributes, Implants, PlanStep, ScheduledStep } from '@/engine/typ
 import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import type { SkillCatalog } from '../skillMap';
 import { ComputedQueue } from './ComputedQueue';
-import { formatDuration } from './duration';
+import { formatDuration } from '@/lib/duration';
 
 interface CurrentQueuePanelProps {
   characterId: number;

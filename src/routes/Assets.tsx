@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterAssets } from '@/features/character/assets';
-import type { CachedResult } from '@/features/character/cache';
+import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { CharacterAsset } from '@/esi/endpoints';

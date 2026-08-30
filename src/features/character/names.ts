@@ -1,12 +1,10 @@
 /**
  * Entity name lookups (mail senders, contract issuers, transaction clients)
  * via POST /universe/names, cached per-id in the generic `esiCache` table
- * under the global sentinel (see cache.ts), same convention as
- * src/features/skills/data.ts's loadUniverseType for public per-id data.
+ * under the global sentinel (see `esi/cache`).
  */
-import { db } from '@/db';
 import { postUniverseNames } from '@/esi/endpoints';
-import { GLOBAL_CACHE_CHARACTER_ID } from './cache';
+import { GLOBAL_CACHE_CHARACTER_ID, readCached, writeCached } from '@/esi/cache';
 
 function cacheKey(id: number): string {
   return `name:${id}`;
@@ -29,12 +27,7 @@ export async function resolveNames(ids: readonly number[]): Promise<Map<number, 
     const fetchedAt = Date.now();
     for (const entry of resolved) {
       map.set(entry.id, entry.name);
-      await db.esiCache.put({
-        characterId: GLOBAL_CACHE_CHARACTER_ID,
-        key: cacheKey(entry.id),
-        value: entry.name,
-        fetchedAt,
-      });
+      await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(entry.id), entry.name, fetchedAt);
     }
     missing = unique.filter((id) => !map.has(id));
   } catch {
@@ -42,8 +35,8 @@ export async function resolveNames(ids: readonly number[]): Promise<Map<number, 
   }
 
   for (const id of missing) {
-    const cached = await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, cacheKey(id)]);
-    if (cached) map.set(id, cached.value as string);
+    const cached = await readCached<string>(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id));
+    if (cached !== undefined) map.set(id, cached);
   }
   return map;
 }

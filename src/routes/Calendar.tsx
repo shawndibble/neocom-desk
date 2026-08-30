@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCalendarEvents, loadCalendarEvent } from '@/features/character/calendar';
-import type { CachedResult } from '@/features/character/cache';
+import type { CachedResult } from '@/esi/cache';
 import type { CalendarEventDetail, CalendarEventSummary } from '@/esi/endpoints';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 

@@ -1,40 +1,8 @@
-/**
- * Fetch + cache layer for owned blueprints: try ESI, on success persist to
- * the generic `esiCache` Dexie table, on failure fall back to whatever is
- * cached. Mirrors src/features/skills/data.ts's read-through pattern
- * (duplicated rather than imported/exported — that module is read-only
- * territory for this feature).
- */
-import { db } from '@/db';
+/** Fetch + cache layer for owned blueprints: read-through against ESI via the shared `esi/cache` helpers. */
 import { getCharacterBlueprints, type CharacterBlueprint } from '@/esi/endpoints';
-
-export interface CachedResult<T> {
-  data: T;
-  fetchedAt: Date;
-  fromCache: boolean;
-}
+import { loadWithCache, type CachedResult } from '@/esi/cache';
 
 const KEY = 'blueprints';
-
-async function loadWithCache<T>(
-  characterId: number,
-  key: string,
-  fetchLive: () => Promise<T | null>
-): Promise<CachedResult<T> | null> {
-  try {
-    const data = await fetchLive();
-    if (data !== null) {
-      const fetchedAt = Date.now();
-      await db.esiCache.put({ characterId, key, value: data, fetchedAt });
-      return { data, fetchedAt: new Date(fetchedAt), fromCache: false };
-    }
-  } catch {
-    // Offline or ESI failure: fall back to whatever is cached below.
-  }
-  const cached = await db.esiCache.get([characterId, key]);
-  if (!cached) return null;
-  return { data: cached.value as T, fetchedAt: new Date(cached.fetchedAt), fromCache: true };
-}
 
 /** Owned blueprints (originals + copies) for a character. ESI or cache. */
 export function loadCharacterBlueprints(

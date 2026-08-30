@@ -5,7 +5,7 @@ import {
   type MailHeader,
   type MailBody,
 } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from './cache';
+import { loadWithCache, type CachedResult } from '@/esi/cache';
 
 const KEYS = {
   headers: 'mail:headers',

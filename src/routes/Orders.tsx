@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner, Tabs } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
-import type { CachedResult } from '@/features/character/cache';
+import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { formatIsk } from '@/features/character/format';
 import type { MarketOrder, MarketOrderHistory } from '@/esi/endpoints';

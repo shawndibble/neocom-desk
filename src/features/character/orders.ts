@@ -5,7 +5,7 @@ import {
   type MarketOrder,
   type MarketOrderHistory,
 } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from './cache';
+import { loadWithCache, type CachedResult } from '@/esi/cache';
 
 const KEYS = {
   open: 'orders',

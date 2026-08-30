@@ -5,8 +5,8 @@
  * a single batched POST /universe/names call for anything missing (the
  * market/asset-only types the slim snapshot doesn't carry). Resolved names
  * are cached in the generic `esiCache` table under the global sentinel (see
- * cache.ts) so they're available offline. Falls back to "Type #id" only when
- * neither the snapshot, a live ESI lookup, nor the cache has a name.
+ * `esi/cache`) so they're available offline. Falls back to "Type #id" only
+ * when neither the snapshot, a live ESI lookup, nor the cache has a name.
  *
  * ESI's POST /universe/names rejects the WHOLE batch with 404 if even one id
  * in it is unresolvable (not spelled out in the OpenAPI spec's generic
@@ -15,11 +15,10 @@
  * fall back to resolving that chunk's ids one at a time via
  * GET /universe/types/{id}, skipping whichever of those also fail.
  */
-import { db } from '@/db';
 import { EsiError } from '@/esi/client';
 import { getUniverseType, postUniverseNames } from '@/esi/endpoints';
 import { loadTypes } from '@/sde/loadSde';
-import { GLOBAL_CACHE_CHARACTER_ID } from './cache';
+import { GLOBAL_CACHE_CHARACTER_ID, readCached, writeCached } from '@/esi/cache';
 
 /** ESI's documented cap on ids per /universe/names request (maxItems in the spec). */
 const NAMES_BATCH_LIMIT = 1000;
@@ -70,12 +69,7 @@ async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
       for (const entry of resolved) {
         if (entry.category !== 'inventory_type') continue;
         map.set(entry.id, entry.name);
-        await db.esiCache.put({
-          characterId: GLOBAL_CACHE_CHARACTER_ID,
-          key: cacheKey(entry.id),
-          value: entry.name,
-          fetchedAt,
-        });
+        await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(entry.id), entry.name, fetchedAt);
       }
       unresolved = ids.filter((id) => !map.has(id));
     } catch (err) {
@@ -88,12 +82,7 @@ async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
             const { data } = await getUniverseType(id);
             if (!data) return; // 304 Not Modified: unreachable, no etag is ever sent here.
             map.set(id, data.name);
-            await db.esiCache.put({
-              characterId: GLOBAL_CACHE_CHARACTER_ID,
-              key: cacheKey(id),
-              value: data.name,
-              fetchedAt,
-            });
+            await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id), data.name, fetchedAt);
           } catch {
             // Genuinely unresolvable, or offline mid-fallback: leave it to
             // the cache read below (or the caller's "Type #id" fallback).
@@ -105,8 +94,8 @@ async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
       // cached below for every id in this chunk.
     }
     for (const id of unresolved) {
-      const cached = await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, cacheKey(id)]);
-      if (cached) map.set(id, cached.value as string);
+      const cached = await readCached<string>(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id));
+      if (cached !== undefined) map.set(id, cached);
     }
   }
   return map;

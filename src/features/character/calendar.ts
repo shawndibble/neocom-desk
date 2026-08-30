@@ -5,7 +5,7 @@ import {
   type CalendarEventSummary,
   type CalendarEventDetail,
 } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from './cache';
+import { loadWithCache, type CachedResult } from '@/esi/cache';
 
 const KEYS = {
   events: 'calendar',

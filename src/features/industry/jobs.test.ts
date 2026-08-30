@@ -104,6 +104,24 @@ describe('loadCharacterIndustryJobs', () => {
     expect(result.cached).toBeNull();
   });
 
+  it('ignores an existing cache row on 403: nothing to fall back to for a scope the character never granted', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'industryJobs',
+      value: payload,
+      fetchedAt: 1234,
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json({ error: 'token is not valid for scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadCharacterIndustryJobs(CHAR_ID);
+
+    expect(result).toEqual({ cached: null, needsReauth: true });
+  });
+
   it('does not treat a non-403 error status as needing reauth', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/industry/jobs`, () =>

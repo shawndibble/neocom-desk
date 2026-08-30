@@ -1,10 +1,8 @@
 /**
- * Fetch + cache layer for character skill data: try ESI, on success persist
- * to the generic `esiCache` Dexie table, on failure (offline, ESI down) fall
- * back to whatever is cached. Never throws for "no network" — callers get
- * `null` only when there is neither a live response nor a cached one.
+ * Fetch + cache layer for character skill data: read-through against ESI via
+ * the shared `esi/cache` helpers (esiFetch → esiCache Dexie table → stale
+ * fallback).
  */
-import { db } from '@/db';
 import {
   getCharacterAttributes,
   getCharacterImplants,
@@ -16,22 +14,17 @@ import {
   type SkillQueueEntry,
   type UniverseType,
 } from '@/esi/endpoints';
-import { isAuthFailure } from '@/esi/client';
+import {
+  loadWithCache,
+  loadWithCacheStatus,
+  GLOBAL_CACHE_CHARACTER_ID,
+  type CachedResult,
+  type StatusResult,
+} from '@/esi/cache';
 import type { Implants } from '@/engine/types';
 import { extractAttributeBonuses, sumAttributeBonuses } from './dogma';
 
-export interface CachedResult<T> {
-  data: T;
-  fetchedAt: Date;
-  fromCache: boolean;
-}
-
-/** BUG #3: distinguishes "needs re-login" from "offline" (see StatusResult callers). */
-export interface StatusResult<T> {
-  cached: CachedResult<T> | null;
-  /** True when the live call failed with 401/403 (or refresh itself failed): re-login is the fix, not a refresh. */
-  needsReauth: boolean;
-}
+export type { CachedResult };
 
 const KEYS = {
   skills: 'skills',
@@ -39,64 +32,6 @@ const KEYS = {
   implants: 'implants',
   skillqueue: 'skillqueue',
 } as const;
-
-/**
- * `esiCache` is keyed by [characterId, key]; public, character-independent
- * lookups (universe type info) share this sentinel row instead of one row
- * per character.
- */
-const GLOBAL_CACHE_CHARACTER_ID = 0;
-
-/**
- * BUG #3: like loadWithCache below, but surfaces an auth failure
- * (401/expired token, 403/missing scope, or a failed token refresh) as
- * `needsReauth: true` instead of silently falling back to cache — mirrors
- * src/features/industry/jobs.ts's existing needsReauth handling. Any other
- * failure (offline, 5xx, timeout) still falls through to the cache below.
- *
- * Unlike jobs.ts's needsReauth (which has nothing to fall back to — a
- * character that never granted that scope has never cached a response),
- * this function is shared with plain loadWithCache callers that DO have
- * prior cached data. So needsReauth never short-circuits the cache read:
- * a caller still using loadWithCache (which only reads `.cached`) must not
- * regress from stale-but-present to null just because a status-aware
- * sibling exists.
- */
-async function loadWithCacheStatus<T>(
-  characterId: number,
-  key: string,
-  fetchLive: () => Promise<T | null>
-): Promise<StatusResult<T>> {
-  let needsReauth = false;
-  try {
-    const data = await fetchLive();
-    if (data !== null) {
-      const fetchedAt = Date.now();
-      await db.esiCache.put({ characterId, key, value: data, fetchedAt });
-      return {
-        cached: { data, fetchedAt: new Date(fetchedAt), fromCache: false },
-        needsReauth: false,
-      };
-    }
-  } catch (err) {
-    if (isAuthFailure(err)) needsReauth = true;
-    // Any other failure (offline, 5xx, timeout): fall through to the cache below.
-  }
-  const cached = await db.esiCache.get([characterId, key]);
-  if (!cached) return { cached: null, needsReauth };
-  return {
-    cached: { data: cached.value as T, fetchedAt: new Date(cached.fetchedAt), fromCache: true },
-    needsReauth,
-  };
-}
-
-async function loadWithCache<T>(
-  characterId: number,
-  key: string,
-  fetchLive: () => Promise<T | null>
-): Promise<CachedResult<T> | null> {
-  return (await loadWithCacheStatus(characterId, key, fetchLive)).cached;
-}
 
 /** Trained skills + total/unallocated SP for a character. ESI or cache. */
 export function loadCharacterSkills(

@@ -2,65 +2,35 @@
  * Fetch + cache layer for a character's active industry jobs, plus pure view
  * helpers (sort, progress, "done"/"completing soon", activity naming).
  *
- * Read-through pattern mirrors src/features/skills/data.ts (duplicated
- * rather than imported — that module is read-only territory for this
- * feature, per src/features/industry/data.ts's existing convention).
- *
- * Diverges from that pattern in one deliberate way:
  * `esi-industry.read_character_jobs.v1` is a scope added after some
  * characters already logged in, so a 403 here can mean "this login predates
  * the scope" rather than "offline." loadCharacterIndustryJobs surfaces that
- * as `needsReauth: true` instead of silently falling back to cache — there
- * is nothing useful to fall back to anyway, since a character that has never
- * granted the scope has never successfully cached a jobs response.
+ * as `needsReauth: true` and skips the cache fallback (via
+ * `skipCacheOnAuthFailure`) instead of silently falling back — there is
+ * nothing useful to fall back to anyway, since a character that has never
+ * granted the scope has never successfully cached a jobs response. Only a
+ * 403 counts here (narrower than the shared default's 401-or-403): this
+ * endpoint's scope check is what returns 403.
  */
-import { db } from '@/db';
 import { getCharacterIndustryJobs, type IndustryJob } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
-
-export interface CachedResult<T> {
-  data: T;
-  fetchedAt: Date;
-  fromCache: boolean;
-}
+import { loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
 const KEY = 'industryJobs';
 
-export interface JobsLoadResult {
-  /** ESI or cache; null when there's no live data and nothing cached. */
-  cached: CachedResult<IndustryJob[]> | null;
-  /** True when the live call failed with 403: re-login is the fix, not a refresh. */
-  needsReauth: boolean;
-}
+export type JobsLoadResult = StatusResult<IndustryJob[]>;
 
 /** Active (non-completed) industry jobs for a character. ESI or cache, with a distinct reauth state. */
-export async function loadCharacterIndustryJobs(characterId: number): Promise<JobsLoadResult> {
-  try {
-    const data = (await getCharacterIndustryJobs(characterId, { includeCompleted: false })).data;
-    if (data !== null) {
-      const fetchedAt = Date.now();
-      await db.esiCache.put({ characterId, key: KEY, value: data, fetchedAt });
-      return {
-        cached: { data, fetchedAt: new Date(fetchedAt), fromCache: false },
-        needsReauth: false,
-      };
+export function loadCharacterIndustryJobs(characterId: number): Promise<JobsLoadResult> {
+  return loadWithCacheStatus(
+    characterId,
+    KEY,
+    async () => (await getCharacterIndustryJobs(characterId, { includeCompleted: false })).data,
+    {
+      detectAuthFailure: (err) => err instanceof EsiError && err.status === 403,
+      skipCacheOnAuthFailure: true,
     }
-  } catch (err) {
-    if (err instanceof EsiError && err.status === 403) {
-      return { cached: null, needsReauth: true };
-    }
-    // Any other failure (offline, 5xx, timeout): fall back to cache below.
-  }
-  const cachedRow = await db.esiCache.get([characterId, KEY]);
-  if (!cachedRow) return { cached: null, needsReauth: false };
-  return {
-    cached: {
-      data: cachedRow.value as IndustryJob[],
-      fetchedAt: new Date(cachedRow.fetchedAt),
-      fromCache: true,
-    },
-    needsReauth: false,
-  };
+  );
 }
 
 // --- Pure view helpers (no fetch/DOM/Dexie — safe to unit-test with plain numbers) ---

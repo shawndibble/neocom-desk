@@ -17,7 +17,7 @@ import {
   loadWalletJournal,
   loadWalletTransactions,
 } from '@/features/character/wallet';
-import type { CachedResult } from '@/features/character/cache';
+import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { formatIsk, humanizeRefType, iskToneClass } from '@/features/character/format';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';

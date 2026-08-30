@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadMailHeaders, loadMailBody } from '@/features/character/mail';
-import type { CachedResult } from '@/features/character/cache';
+import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import type { MailBody, MailHeader } from '@/esi/endpoints';

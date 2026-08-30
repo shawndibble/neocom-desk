@@ -1,6 +1,6 @@
 /** Fetch + cache layer for the Contracts view. */
 import { getCharacterContracts, type Contract } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from './cache';
+import { loadWithCache, type CachedResult } from '@/esi/cache';
 
 const KEY = 'contracts';
 

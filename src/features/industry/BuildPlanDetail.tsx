@@ -10,7 +10,7 @@ import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './bluep
 import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
-import { formatDuration } from './duration';
+import { formatDuration } from '@/lib/duration';
 import { MaterialsTable } from './MaterialsTable';
 import { ResultsSummary } from './ResultsSummary';
 

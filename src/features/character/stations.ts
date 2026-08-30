@@ -5,7 +5,7 @@
  * callers show "Structure #id" for those instead of calling this loader.
  */
 import { getUniverseStation } from '@/esi/endpoints';
-import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from './cache';
+import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 
 function cacheKey(stationId: number): string {
   return `station:${stationId}`;

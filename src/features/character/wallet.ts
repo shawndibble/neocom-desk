@@ -6,7 +6,12 @@ import {
   type WalletJournalEntry,
   type WalletTransaction,
 } from '@/esi/endpoints';
-import { loadWithCache, loadWithCacheStatus, type CachedResult, type StatusResult } from './cache';
+import {
+  loadWithCache,
+  loadWithCacheStatus,
+  type CachedResult,
+  type StatusResult,
+} from '@/esi/cache';
 
 const KEYS = {
   balance: 'wallet:balance',

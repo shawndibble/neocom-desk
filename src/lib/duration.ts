@@ -1,7 +1,7 @@
 /**
- * Format a job duration (seconds) as "Xd Yh Zm", dropping leading zero units.
- * Duplicated from src/features/skills/planner/duration.ts (that module is
- * read-only territory for this feature) rather than imported.
+ * Format a duration (seconds) as "Xd Yh Zm", dropping leading zero units.
+ * Shared by the Industry (job timers) and Skills Planner (training queue)
+ * features — was two byte-identical copies.
  */
 export function formatDuration(totalSeconds: number): string {
   const seconds = Math.max(0, Math.round(totalSeconds));
