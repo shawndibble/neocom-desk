@@ -15,6 +15,7 @@ import { Overview } from '@/routes/Overview';
 import { Skills } from '@/routes/Skills';
 import { SkillPlans } from '@/routes/SkillPlans';
 import { Industry } from '@/routes/Industry';
+import { Market } from '@/routes/Market';
 import { Wallet } from '@/routes/Wallet';
 import { Assets } from '@/routes/Assets';
 import { Mail } from '@/routes/Mail';
@@ -75,6 +76,7 @@ export function App() {
           <Route path="/skills" element={<Skills />} />
           <Route path="/skills/plans" element={<SkillPlans />} />
           <Route path="/industry" element={<Industry />} />
+          <Route path="/market" element={<Market />} />
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/assets" element={<Assets />} />
           <Route path="/mail" element={<Mail />} />

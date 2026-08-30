@@ -39,9 +39,12 @@ interface MobileMoreSheetProps {
 /**
  * Mobile-only overflow sheet (UX-REVIEW #4/#8): the six Character-section
  * views that don't fit as primary bottom-tab-bar items, plus the "switch
- * character" link that used to occupy the tab bar's fifth slot. Closes on
- * Escape (focus returns to the More trigger, via the effect in Layout) and
- * on any link click, so it never hangs over the next route.
+ * character" link that used to occupy the tab bar's fifth slot, plus Market
+ * (character-agnostic, so it doesn't belong grouped with the Character
+ * section, but the bottom tab bar is already full at 4 primary destinations
+ * + More). Closes on Escape (focus returns to the More trigger, via the
+ * effect in Layout) and on any link click, so it never hangs over the next
+ * route.
  */
 function MobileMoreSheet({ onClose, activeCharacter }: MobileMoreSheetProps) {
   const { t } = useTranslation();
@@ -64,6 +67,9 @@ function MobileMoreSheet({ onClose, activeCharacter }: MobileMoreSheetProps) {
         className="w-full max-w-md space-y-1 rounded-t-xs border-t border-line bg-panel p-2 pb-6"
         onClick={(e) => e.stopPropagation()}
       >
+        <NavLink ref={firstLinkRef} to="/market" onClick={onClose} className={navClass}>
+          {t('nav.market')}
+        </NavLink>
         {activeCharacter && (
           <Link
             to="/characters"
@@ -80,7 +86,7 @@ function MobileMoreSheet({ onClose, activeCharacter }: MobileMoreSheetProps) {
             <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
           </Link>
         )}
-        <NavLink ref={firstLinkRef} to="/wallet" onClick={onClose} className={navClass}>
+        <NavLink to="/wallet" onClick={onClose} className={navClass}>
           {t('nav.wallet')}
         </NavLink>
         <NavLink to="/assets" onClick={onClose} className={navClass}>
@@ -154,6 +160,9 @@ export function Layout() {
           </NavLink>
           <NavLink to="/industry" className={navClass}>
             {t('nav.industry')}
+          </NavLink>
+          <NavLink to="/market" className={navClass}>
+            {t('nav.market')}
           </NavLink>
           <p className="mt-3 px-3 text-[10px] font-semibold tracking-widest text-text-faint uppercase">
             {t('nav.characterSection')}

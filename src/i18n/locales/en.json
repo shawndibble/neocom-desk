@@ -8,6 +8,7 @@
     "overview": "Overview",
     "skills": "Skills",
     "industry": "Industry",
+    "market": "Market",
     "characterSection": "Character",
     "wallet": "Wallet",
     "assets": "Assets",
@@ -115,7 +116,16 @@
     "importAddedCount": "Added {{count}} skill(s)",
     "importAddedNone": "0 added — all trained",
     "reorderEntry": "Reorder {{name}}",
-    "importError": "Couldn't import the skill queue: {{message}}"
+    "importError": "Couldn't import the skill queue: {{message}}",
+    "addMarker": "Add remap marker",
+    "optimizeAtMarkers": "Optimize at my markers",
+    "markerRow": "Remap marker",
+    "removeMarker": "Remove marker",
+    "reorderMarker": "Reorder remap marker",
+    "markersNoGain": "Remapping at these markers doesn't save time — try moving them.",
+    "segmentCurrent": "From {{skill}}, keep current attributes",
+    "remapFromEveReady": "From EVE: {{bonus}} bonus + yearly ready",
+    "remapFromEveCooldown": "From EVE: {{bonus}} bonus + yearly on cooldown until {{date}}"
   },
   "industry": {
     "title": "Build Plans",
@@ -355,5 +365,31 @@
     "updateReady": "A new version is available.",
     "reload": "Reload",
     "dismiss": "Dismiss"
+  },
+  "market": {
+    "title": "Market",
+    "tradeHub": "Trade Hub",
+    "refresh": "Refresh",
+    "searchTitle": "Item Search",
+    "searchLabel": "Search items",
+    "searchPlaceholder": "Search item name…",
+    "searchHint": "Type an item name to search.",
+    "noResults": "No items match your search.",
+    "pin": "Pin",
+    "pinned": "Pinned",
+    "capHint": "Pin limit reached ({{max}}) — remove one to add another.",
+    "compareTitle": "Compare ({{count}}/{{max}})",
+    "emptyTitle": "No items pinned",
+    "emptyHint": "Search for an item above and pin it to compare prices.",
+    "noPriceTitle": "No price data cached",
+    "noPriceHint": "Nothing listed for these items at this hub, or prices could not be fetched. Try Refresh.",
+    "item": "Item",
+    "sell": "Sell",
+    "buy": "Buy",
+    "spread": "Spread",
+    "sellVolume": "Sell Volume",
+    "buyVolume": "Buy Volume",
+    "remove": "Remove",
+    "unpin": "Unpin"
   }
 }
