@@ -327,15 +327,93 @@ These change what gets built. They are yours, not the implementer's.
    the first segment or two; every later segment keeps the fast path, and every
    existing `bestAttributes` test keeps passing.
 
-   **Sequencing.** This interacts with **D5** — `placeRemaps` is O(R²) and the
-   per-allocation objective grows from O(pairs ≤ 25) to O(steps). Measure
-   before committing to the design. `bestAttributes` also needs each segment's
+   **Measured 2026-08-30, and the hybrid holds.** 2,885 allocations, synthetic
+   plan, 21-day booster. Per `bestAttributes` call:
+
+   | Plan      | Pair aggregation (today) | Naive ordered walk | Walk-then-aggregate hybrid |
+   | --------- | ------------------------ | ------------------ | -------------------------- |
+   | 50 steps  | 0.39 ms                  | 13 ms (34×)        | **2.4 ms (6×)**            |
+   | 200 steps | 0.31 ms                  | 48 ms (154×)       | **3.9 ms (12.5×)**         |
+
+   The hybrid returns the same optimum as the naive walk (asserted in the
+   benchmark, not assumed). The trick: walk only while the booster is live,
+   then use the existing order-independent pair aggregation for the
+   constant-rate tail, with suffix SP-per-pair sums precomputed once so the
+   tail is O(pairs) at any plan length. The walked prefix is bounded by what
+   trains inside the booster window, not by plan length — which is why 200
+   steps costs barely more than 50.
+
+   At `remapCount = 1` (the UI default, an O(R) suffix scan) that is ~780 ms
+   worst case at R = 200 if every segment overlapped the booster, and far less
+   in practice since segments starting after expiry stay on the fast path.
+   Acceptable. The general `remapCount ≥ 2` DP is still gated on D5 — and note
+   `placeRemaps` memoizes segment cost on the sp-per-pair signature, which is
+   no longer a sufficient key once a segment's start offset changes its cost. `bestAttributes` also needs each segment's
    wall-clock start offset, since a Booster's remaining life differs per
    segment; threading that through `placeRemaps` is the real API change, not
    the added parameter.
 
    Binding on items 01 and 05: they render one number, computed one way. The
    "excludes booster" note option (a) called for must not ship.
+
+---
+
+## 5b. Added after the teardown (user-requested 2026-08-30)
+
+Not teardown items. Verified against the live ESI OpenAPI
+(`https://esi.evetech.net/meta/openapi.json`) before scoping.
+
+### The skill queue tells you things `/skills` does not
+
+Both route descriptions say so outright. `/skillqueue`:
+
+> "Entries that have their finish time in the past are completed, but aren't
+> updated in the "/skills" route yet. This will happen the next time the
+> character logs in."
+
+`/skills`:
+
+> "Skills returned by this route can be out-of-date if the character hasn't
+> logged in since one or more skills completed training. Use the /skillqueue
+> route to check for skills that completed training. Entries that are in the
+> past need to be applied on top of this list to get an accurate view."
+
+Three consequences, in ascending order of how much they matter:
+
+| #   | Item                                                                                                                                                                                                                                                                  | Cost |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| P1  | **Time remaining on the training skill.** ESI's `finish_date` is authoritative — it reflects real current SP. `CurrentQueuePanel` today _recomputes_ the schedule from attributes and ignores it, so its head-of-queue number is an estimate presented as fact        | S    |
+| P2  | **Keep completed entries visible** until the character next logs in, badged as done. This is not a hack — an entry with a past `finish_date` is exactly what ESI says to surface                                                                                      | S    |
+| P3  | **`/skills` is stale until login, everywhere.** `trainedSkills` feeds plan normalization and the optimizer, so a plan can be computed against skill levels the character already trained past. Applying past-`finish_date` queue entries on top is the documented fix | M    |
+
+P3 was not requested and is the largest. Recorded, not scheduled.
+
+### Field-level facts that constrain the build
+
+- **Only `queue_position`, `skill_id`, `finished_level` are required.** Every
+  date and SP field — `start_date`, `finish_date`, `level_start_sp`,
+  `level_end_sp`, `training_start_sp` — is optional and absent on a paused
+  queue. Nothing may dereference them unchecked.
+- **There is no `training_start_date`.** The field is `start_date`.
+  `engine/queueImport.ts` had invented the wrong name; corrected.
+- **An absent date means "paused, ETA unknown" — never "starts now".**
+  EVEMon shipped this bug (`peterhaneve/evemon#40`): it synthesized a start
+  time for paused entries and then marked skills falsely complete on
+  re-import. A paused entry belongs in neither the trained nor the pending
+  bucket.
+- **Staleness has two unrelated mechanisms.** The route's ~60 s cache
+  (`x-cache-age: 60`) bounds ordinary staleness; the unpruned-completed-entry
+  state persists _indefinitely_ until login. Do not conflate them.
+- **"Dismiss the notification" is not observable.** No field in the schema
+  exposes notification state, and no source supports a dismissal step. Login
+  is the only trigger. Scope P2 to login, not dismissal.
+
+### Booster durations (the evidence that reversed D6)
+
+Genius 'Boost' Cerebral Accelerator: +12 to all learning attributes, **12 days
+base, 24 days at Biology V**. Expert 'Boost': 10 days base, +10. Biology is the
+only skill affecting duration (+20%/level). Confirms a Booster spans weeks of a
+plan, which is what makes §5.5 option (b) the correct ruling.
 
 ---
 

@@ -41,7 +41,7 @@ describe('parseSkillQueue', () => {
         queue_position: 0,
         level_start_sp: 250,
         level_end_sp: 1415,
-        training_start_date: '2026-08-29T00:00:00Z',
+        start_date: '2026-08-29T00:00:00Z',
         finish_date: '2026-08-30T00:00:00Z',
       },
     ]);

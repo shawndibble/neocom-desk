@@ -1,13 +1,19 @@
 import type { PlanEntry } from '@/engine/types';
 
-/** One row of the ESI skill queue (GET /characters/{id}/skillqueue). */
+/**
+ * One row of the ESI skill queue (GET /characters/{id}/skillqueue). Only
+ * `skill_id`, `finished_level` and `queue_position` are guaranteed present —
+ * every date and SP field is absent on a paused queue, so none may be
+ * dereferenced without a check.
+ */
 export interface EsiSkillQueueEntry {
   skill_id: number;
   finished_level: number;
   queue_position: number;
   level_start_sp?: number;
   level_end_sp?: number;
-  training_start_date?: string;
+  training_start_sp?: number;
+  start_date?: string;
   finish_date?: string;
 }
 
