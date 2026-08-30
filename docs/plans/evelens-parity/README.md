@@ -517,9 +517,14 @@ Three things worth carrying forward:
   be priced by aggregation at all. Only segments starting before the last
   Booster lapses pay it.
 
-`MAX_SUPPORTED_REMAPS` is still 1, now for product reasons rather than speed:
-the UI has to say what a multi-remap answer means, and §5 decision 3 is
-unanswered. The engine accepts any count.
+`MAX_SUPPORTED_REMAPS` is still 1. Speed is no longer the blocker
+Booster-blind, but read the right column: `PlanEditor` passes a `booster`
+whenever the user has one enabled, so raising the cap buys **~420 ms at
+`remapCount = 2` and ~900 ms at 5** of synchronous main-thread work per button
+press. That cost cannot be restructured away — a mid-segment expiry defeats
+aggregation outright. Raising it is therefore still part speed and part
+product: the UI has to say what a multi-remap answer means, and §5 decision 3
+is unanswered. The engine accepts any count.
 
 ### Found while reviewing D5, not fixed: stacked Boosters share one expiry
 
@@ -541,6 +546,33 @@ time, which is the multi-Booster model, not D5.
 Booster form, so the list never holds two. `BoosterContext.boosters` is
 `readonly Booster[]`, so it is reachable the moment a second Booster becomes
 enterable — schedule this before that UI, not after.
+
+### Also found while reviewing, also not fixed
+
+- **The correction lives in four route components, not under them.**
+  `SkillPlans`, `Skills`, `Industry` and `Overview` each remember to apply
+  finished queue entries, and a fifth surface must remember too. The mechanism
+  that should absorb it is a composing loader in `features/skills/data.ts` —
+  `loadImplantBonuses` is the precedent, already composing two reads. It has
+  to return the merged `CharacterSkills` **and** the provenance map, because
+  `/skills` needs per-skill "did the queue win" plus the leftovers for skills
+  `/skills` omits; and `nowMs` has to be a parameter, keeping `data.ts`
+  clock-free. `esi/cache.ts` cannot express it: `loadWithCache` is one
+  `[characterId, key]` row with one fetcher, and the merge is time-dependent,
+  so writing it back would clobber the true payload with a snapshot. Note
+  `fetchedAt` then has to become the **older** of the two rows, or Data Age
+  overstates freshness — a question the four routes currently dodge by never
+  asking it. Callers: four routes plus **both** roster read paths, including
+  `roster.ts` `loadCacheOnly`, which bulk-reads the cache and never goes
+  through `loadCharacterSkills` at all.
+- **`esi/cache.ts` has no TTL and no in-flight dedupe.** Navigating
+  Overview -> Skills -> Plans -> Industry now makes four identical
+  `/skillqueue` round trips and four Dexie writes where one would do. The
+  layer is pre-existing; P3 is what made it bite, by putting the same endpoint
+  on four routes.
+- **`AllocationCostTable.attributesAt` has no production caller.** Chosen
+  attributes come from `exactSegment` or the boosted batch, never the table.
+  Kept as the seam the table's tests check the allocation set through.
 
 ---
 
