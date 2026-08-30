@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadContracts } from '@/features/character/contracts';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/features/character/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import type { Contract } from '@/esi/endpoints';
 
 interface Snapshot {
-  requestKey: string;
   contractsResult: CachedResult<Contract[]> | null;
   issuerNames: Map<number, string>;
 }
@@ -32,37 +31,25 @@ function isExpired(contract: Contract): boolean {
   return new Date(contract.date_expired).getTime() < Date.now();
 }
 
+async function loadContractsSnapshot(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<Snapshot> {
+  const contractsResult = await loadContracts(characterId);
+  // Already superseded: skip the name lookup, its result would be discarded.
+  const issuerIds = signal.cancelled ? [] : (contractsResult?.data ?? []).map((c) => c.issuer_id);
+  const issuerNames = await resolveNames(issuerIds);
+  return { contractsResult, issuerNames };
+}
+
 /** Contracts: table with status chips, expired dimmed. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const { data, loading, hydrated, activeCharacterId, refresh } =
+    useRouteSnapshot(loadContractsSnapshot);
 
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const requestKey = `${activeCharacterId}:${refreshKey}`;
-
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      const contractsResult = await loadContracts(activeCharacterId);
-      if (cancelled) return;
-      const issuerIds = (contractsResult?.data ?? []).map((c) => c.issuer_id);
-      const issuerNames = await resolveNames(issuerIds);
-      if (cancelled) return;
-      setSnapshot({ requestKey, contractsResult, issuerNames });
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [activeCharacterId, refreshKey]);
-
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const loading = current === null;
-  const contractsResult = current?.contractsResult ?? null;
-  const issuerNames = current?.issuerNames ?? new Map<number, string>();
+  const contractsResult = data?.contractsResult ?? null;
+  const issuerNames = data?.issuerNames ?? new Map<number, string>();
 
   const contracts = useMemo(
     () =>
@@ -85,7 +72,7 @@ export function Contracts() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('contracts.title')}</h1>
         <div className="flex items-center gap-2">
           {contractsResult && <DataAgeBadge date={contractsResult.fetchedAt} />}
-          <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+          <Button size="sm" onClick={refresh} disabled={loading}>
             {t('contracts.refresh')}
           </Button>
         </div>

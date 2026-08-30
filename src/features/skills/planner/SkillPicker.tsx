@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { SkillType } from '@/sde/types';
 import type { PlanEntry } from '@/engine/types';
+import { rankedSearch } from '@/lib/rankedSearch';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const MAX_RESULTS = 20;
@@ -13,19 +14,21 @@ interface SkillPickerProps {
   className?: string;
 }
 
-/** Searchable skill picker: filter by name/group, then pick a target level I-V. */
+/** Searchable skill picker: ranked search by name/group, then pick a target level I-V. */
 export function SkillPicker({ skills, onAdd, className = '' }: SkillPickerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return skills
-      .filter((s) => s.name.toLowerCase().includes(q) || s.groupName.toLowerCase().includes(q))
-      .slice(0, MAX_RESULTS);
-  }, [skills, query]);
+  const results = useMemo(
+    () =>
+      rankedSearch(skills, query, {
+        primary: (s) => s.name,
+        secondary: [(s) => s.groupName],
+        limit: MAX_RESULTS,
+      }),
+    [skills, query]
+  );
 
   function pick(skillTypeID: number, targetLevel: number) {
     onAdd({ skillTypeID, targetLevel });
