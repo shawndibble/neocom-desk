@@ -1,8 +1,6 @@
-import type { CsvColumn } from '@/lib/csv';
+import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { IndustryJob } from '@/esi/endpoints';
 import { activityI18nKey } from './jobs';
-
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 /**
  * CSV columns for the active-jobs list: activity, blueprint, blueprint type
@@ -14,7 +12,7 @@ type Translate = (key: string, opts?: Record<string, unknown>) => string;
  * `||`).
  */
 export function jobsCsvColumns(
-  t: Translate,
+  t: CsvTranslate,
   nameFor: (blueprintTypeId: number) => string
 ): CsvColumn<IndustryJob>[] {
   return [

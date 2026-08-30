@@ -4,6 +4,13 @@
  * part is ours regardless.
  */
 
+/**
+ * What a column builder needs from i18next: a key in, a string out. Declared
+ * structurally rather than as i18next's `TFunction` so a test can pass
+ * `(k) => k` and pin key names without constructing a real translator.
+ */
+export type CsvTranslate = (key: string, options?: Record<string, unknown>) => string;
+
 export interface CsvColumn<T> {
   header: string;
   value: (row: T) => string | number | null | undefined;

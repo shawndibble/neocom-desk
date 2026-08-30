@@ -177,4 +177,26 @@ describe('Skills', () => {
     screen.getByRole('button', { name: /log in again/i }).click();
     expect(beginEveLogin).toHaveBeenCalled();
   });
+  it('disables CSV export in the re-login state, so a stale cache cannot be exported behind the banner', async () => {
+    // The invariant: whatever the route refuses to render, export refuses to
+    // hand over. loadWithCacheStatus deliberately still reads the cache on an
+    // auth failure ("needsReauth never short-circuits the cache read"), so
+    // nothing upstream guarantees `groups` is empty here.
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'skills',
+      value: skillsPayload,
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: /log in again/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /export csv/i })).toBeDisabled();
+  });
 });

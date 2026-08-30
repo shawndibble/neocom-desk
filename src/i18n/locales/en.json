@@ -239,8 +239,8 @@
       "reaction": "Reaction",
       "unknown": "Activity #{{id}}"
     },
-    "exportCsvMaterials": "Export CSV",
-    "exportCsvJobs": "Export CSV",
+    "exportCsvMaterials": "Export materials",
+    "exportCsvJobs": "Export jobs",
     "csvMaterial": "Material",
     "csvQuantity": "Quantity",
     "csvUnitPriceIsk": "Unit price (ISK)",

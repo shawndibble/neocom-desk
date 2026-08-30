@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { skillCsvRows, skillCsvColumns, type SkillGroupLike } from './skillsCsv';
+import { skillCsvRows, skillCsvColumns, type SkillGroup } from './skillsCsv';
 import { toCsv } from '@/lib/csv';
 
 const identityT = (k: string) => k;
 
-const groups: SkillGroupLike[] = [
+const groups: SkillGroup[] = [
   {
     groupName: 'Gunnery',
     skills: [

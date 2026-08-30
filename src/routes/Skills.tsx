@@ -24,19 +24,13 @@ import {
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
-import { skillCsvColumns, skillCsvRows } from '@/features/skills/skillsCsv';
+import { skillCsvColumns, skillCsvRows, type SkillGroup } from '@/features/skills/skillsCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { csvFilename, toCsv } from '@/lib/csv';
-import { downloadTextFile } from '@/lib/download';
+import { downloadCsv } from '@/lib/downloadCsv';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
 const ATTRIBUTE_ORDER = ['intelligence', 'memory', 'perception', 'willpower', 'charisma'] as const;
-
-interface SkillGroup {
-  groupName: string;
-  skills: { skillTypeID: number; name: string; level: number; sp: number }[];
-}
 
 interface ImplantDetail {
   typeId: number;
@@ -161,13 +155,8 @@ export function Skills() {
           {skillsResult?.fetchedAt && <DataAgeBadge date={skillsResult.fetchedAt} />}
           <Button
             size="sm"
-            disabled={groups.length === 0}
-            onClick={() =>
-              downloadTextFile(
-                csvFilename('skills', new Date()),
-                toCsv(skillCsvRows(groups), skillCsvColumns(t))
-              )
-            }
+            disabled={groups.length === 0 || skillsNeedsReauth}
+            onClick={() => downloadCsv('skills', skillCsvRows(groups), skillCsvColumns(t))}
           >
             {t('skills.exportCsv')}
           </Button>

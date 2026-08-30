@@ -1,7 +1,5 @@
-import type { CsvColumn } from '@/lib/csv';
+import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { ScheduledStep } from '@/engine/types';
-
-type Translate = (key: string) => string;
 
 /**
  * CSV columns for the computed training queue. Level/seconds/cumulative
@@ -10,7 +8,7 @@ type Translate = (key: string) => string;
  * spreadsheet math.
  */
 export function queueCsvColumns(
-  t: Translate,
+  t: CsvTranslate,
   nameFor: (skillTypeID: number) => string,
   userSkillTypeIDs: ReadonlySet<number>
 ): CsvColumn<ScheduledStep>[] {

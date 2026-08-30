@@ -1,6 +1,7 @@
-import type { CsvColumn } from '@/lib/csv';
+import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 
-export interface SkillGroupLike {
+/** Trained skills of one SDE group, as /skills builds them for display and export. */
+export interface SkillGroup {
   groupName: string;
   skills: { skillTypeID: number; name: string; level: number; sp: number }[];
 }
@@ -12,10 +13,8 @@ export interface SkillCsvRow {
   sp: number;
 }
 
-type Translate = (key: string) => string;
-
 /** One row per skill, preserving the incoming group order and within-group order. */
-export function skillCsvRows(groups: readonly SkillGroupLike[]): SkillCsvRow[] {
+export function skillCsvRows(groups: readonly SkillGroup[]): SkillCsvRow[] {
   return groups.flatMap((group) =>
     group.skills.map((skill) => ({
       groupName: group.groupName,
@@ -26,7 +25,7 @@ export function skillCsvRows(groups: readonly SkillGroupLike[]): SkillCsvRow[] {
   );
 }
 
-export function skillCsvColumns(t: Translate): CsvColumn<SkillCsvRow>[] {
+export function skillCsvColumns(t: CsvTranslate): CsvColumn<SkillCsvRow>[] {
   return [
     { header: t('skills.csvGroup'), value: (row) => row.groupName },
     { header: t('skills.csvSkill'), value: (row) => row.name },

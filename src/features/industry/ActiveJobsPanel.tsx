@@ -15,8 +15,7 @@ import {
   type JobsLoadResult,
 } from './jobs';
 import { formatDuration } from '@/lib/duration';
-import { toCsv, csvFilename } from '@/lib/csv';
-import { downloadTextFile } from '@/lib/download';
+import { downloadCsv } from '@/lib/downloadCsv';
 import { jobsCsvColumns } from './jobsCsv';
 
 interface ActiveJobsPanelProps {
@@ -81,6 +80,8 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
 
   const jobs = useMemo(() => sortJobsBySoonest(result?.cached?.data ?? []), [result]);
 
+  const nameForBlueprint = (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`;
+
   return (
     <Panel
       title={t('industry.jobsTitle')}
@@ -90,15 +91,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           <Button
             size="sm"
             disabled={jobs.length === 0}
-            onClick={() =>
-              downloadTextFile(
-                csvFilename('industry-jobs', new Date()),
-                toCsv(
-                  jobs,
-                  jobsCsvColumns(t, (id) => types[String(id)]?.name ?? `#${id}`)
-                )
-              )
-            }
+            onClick={() => downloadCsv('industry-jobs', jobs, jobsCsvColumns(t, nameForBlueprint))}
           >
             {t('industry.exportCsvJobs')}
           </Button>
@@ -144,8 +137,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           )}
           <ul className="space-y-2">
             {jobs.map((job) => {
-              const name =
-                types[String(job.blueprint_type_id)]?.name ?? `#${job.blueprint_type_id}`;
+              const name = nameForBlueprint(job.blueprint_type_id);
               const done = isJobDone(job, now);
               const soon = !done && isCompletingSoon(job, now);
               const progress = Math.round(jobProgress(job, now) * 100);

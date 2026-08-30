@@ -11,8 +11,7 @@ import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { formatDuration } from '@/lib/duration';
-import { toCsv, csvFilename } from '@/lib/csv';
-import { downloadTextFile } from '@/lib/download';
+import { downloadCsv } from '@/lib/downloadCsv';
 import { MaterialsTable } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
 import { ResultsSummary } from './ResultsSummary';
@@ -110,16 +109,14 @@ export function BuildPlanDetail({
 
   function exportMaterialsCsv() {
     if (!result) return;
-    downloadTextFile(
-      csvFilename('materials', new Date()),
-      toCsv(
-        result.materials,
-        materialsCsvColumns(
-          t,
-          (typeID) => nameForType(catalog, typeID),
-          snapshot?.hubPrices ?? {},
-          pricesReady
-        )
+    downloadCsv(
+      'build-materials',
+      result.materials,
+      materialsCsvColumns(
+        t,
+        (typeID) => nameForType(catalog, typeID),
+        snapshot?.hubPrices ?? {},
+        pricesReady
       )
     );
   }

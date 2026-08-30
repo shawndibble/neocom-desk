@@ -29,8 +29,7 @@ import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { ComputedQueue } from './ComputedQueue';
 import { queueCsvColumns } from './queueCsv';
-import { csvFilename, toCsv } from '@/lib/csv';
-import { downloadTextFile } from '@/lib/download';
+import { downloadCsv } from '@/lib/downloadCsv';
 import { formatDuration } from '@/lib/duration';
 import { dedupeEntries, removeEntry, upsertEntry, applyReorderSuggestion } from './reorder';
 import {
@@ -239,10 +238,7 @@ export function PlanEditor({
   }
 
   function handleExportCsv() {
-    downloadTextFile(
-      csvFilename('skill-queue', new Date()),
-      toCsv(scheduled, queueCsvColumns(t, nameFor, userSkillTypeIDs))
-    );
+    downloadCsv('skill-queue', scheduled, queueCsvColumns(t, nameFor, userSkillTypeIDs));
   }
 
   function handleOptimizeRemaps() {

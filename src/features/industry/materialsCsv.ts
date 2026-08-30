@@ -1,7 +1,5 @@
-import type { CsvColumn } from '@/lib/csv';
+import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { EffectiveMaterial, HubPrices } from '@/engine/industry/types';
-
-type Translate = (key: string) => string;
 
 /**
  * CSV columns for the materials list: name, effective (post-ME) quantity,
@@ -13,7 +11,7 @@ type Translate = (key: string) => string;
  * column into text.
  */
 export function materialsCsvColumns(
-  t: Translate,
+  t: CsvTranslate,
   nameFor: (typeID: number) => string,
   hubPrices: HubPrices,
   pricesReady: boolean
