@@ -15,7 +15,7 @@ const base = {
   name: 'CCP Alpha',
   owner: '8PmzCeTKb4VFUDrHLc/AeZXDSWM=',
   exp: 1_900_000_000,
-  scp: ['esi-skills.read_skills.v1', 'esi-wallet.read_character_wallet.v1']
+  scp: ['esi-skills.read_skills.v1', 'esi-wallet.read_character_wallet.v1'],
 };
 
 describe('decodeAccessToken', () => {
@@ -26,14 +26,14 @@ describe('decodeAccessToken', () => {
       name: 'CCP Alpha',
       ownerHash: '8PmzCeTKb4VFUDrHLc/AeZXDSWM=',
       expiresAt: 1_900_000_000 * 1000,
-      scopes: ['esi-skills.read_skills.v1', 'esi-wallet.read_character_wallet.v1']
+      scopes: ['esi-skills.read_skills.v1', 'esi-wallet.read_character_wallet.v1'],
     });
   });
 
   it('accepts scp as a single string', () => {
-    expect(decodeAccessToken(makeJwt({ ...base, scp: 'esi-skills.read_skills.v1' })).scopes).toEqual([
-      'esi-skills.read_skills.v1'
-    ]);
+    expect(
+      decodeAccessToken(makeJwt({ ...base, scp: 'esi-skills.read_skills.v1' })).scopes
+    ).toEqual(['esi-skills.read_skills.v1']);
   });
 
   it('accepts missing scp (no scopes requested)', () => {

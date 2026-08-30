@@ -39,7 +39,7 @@ export function buildAuthorizeUrl(opts: {
     scope: opts.scopes.join(' '),
     state: opts.state,
     code_challenge: opts.challenge,
-    code_challenge_method: 'S256'
+    code_challenge_method: 'S256',
   }).toString();
   return url.toString();
 }
@@ -48,7 +48,7 @@ async function postToken(body: Record<string, string>): Promise<TokenResponse> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(body).toString()
+    body: new URLSearchParams(body).toString(),
   });
   const json: unknown = await res.json().catch(() => null);
   if (!res.ok || json === null) {
@@ -71,7 +71,7 @@ export function exchangeCode(opts: {
     grant_type: 'authorization_code',
     code: opts.code,
     client_id: opts.clientId,
-    code_verifier: opts.verifier
+    code_verifier: opts.verifier,
   });
 }
 
@@ -83,6 +83,6 @@ export function refreshToken(opts: {
   return postToken({
     grant_type: 'refresh_token',
     refresh_token: opts.refreshToken,
-    client_id: opts.clientId
+    client_id: opts.clientId,
   });
 }

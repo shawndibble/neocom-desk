@@ -8,7 +8,7 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
  */
 export function exportPlanToClipboard(
   steps: readonly PlanStep[],
-  skills: ReadonlyMap<number, EngineSkill>,
+  skills: ReadonlyMap<number, EngineSkill>
 ): string {
   return steps
     .map((step) => {

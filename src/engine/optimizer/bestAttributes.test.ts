@@ -6,7 +6,7 @@ const skill = (
   typeID: number,
   primary: AttributeName,
   secondary: AttributeName,
-  rank = 1,
+  rank = 1
 ): EngineSkill => ({ typeID, name: `Skill ${typeID}`, rank, primary, secondary, prereqs: [] });
 
 const skillMap = (...list: EngineSkill[]): Map<number, EngineSkill> =>
@@ -50,7 +50,7 @@ describe('bestAttributes', () => {
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
       skill(2, 'intelligence', 'memory'),
-      skill(3, 'charisma', 'willpower', 3),
+      skill(3, 'charisma', 'willpower', 3)
     );
     const steps: PlanStep[] = [
       { skillTypeID: 1, level: 1 },
@@ -69,7 +69,7 @@ describe('bestAttributes', () => {
   it('matches a brute-force search over all valid allocations', () => {
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
-      skill(2, 'intelligence', 'memory', 2),
+      skill(2, 'intelligence', 'memory', 2)
     );
     const steps: PlanStep[] = [
       { skillTypeID: 1, level: 1 },
@@ -88,8 +88,7 @@ describe('bestAttributes', () => {
             const c = 14 - i - m - p - w;
             if (c < 0 || c > 10) continue;
             const t =
-              (1415 / (17 + p + (17 + w) / 2)) * 60 +
-              (500 / (17 + i + (17 + m + 3) / 2)) * 60;
+              (1415 / (17 + p + (17 + w) / 2)) * 60 + (500 / (17 + i + (17 + m + 3) / 2)) * 60;
             if (t < best) best = t;
           }
     expect(seconds).toBeCloseTo(best, 6);
@@ -100,18 +99,18 @@ describe('bestAttributes', () => {
     // value of allocating there, pushing points toward perception/willpower.
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
-      skill(2, 'intelligence', 'memory'),
+      skill(2, 'intelligence', 'memory')
     );
     const steps: PlanStep[] = [
       { skillTypeID: 1, level: 3 },
       { skillTypeID: 2, level: 3 },
     ].flatMap((s) =>
-      Array.from({ length: s.level }, (_, i) => ({ skillTypeID: s.skillTypeID, level: i + 1 })),
+      Array.from({ length: s.level }, (_, i) => ({ skillTypeID: s.skillTypeID, level: i + 1 }))
     );
     const plain = bestAttributes(steps, skills);
     const boosted = bestAttributes(steps, skills, { intelligence: 5, memory: 5 });
-    expect(
-      boosted.attributes.perception + boosted.attributes.willpower,
-    ).toBeGreaterThan(plain.attributes.perception + plain.attributes.willpower);
+    expect(boosted.attributes.perception + boosted.attributes.willpower).toBeGreaterThan(
+      plain.attributes.perception + plain.attributes.willpower
+    );
   });
 });

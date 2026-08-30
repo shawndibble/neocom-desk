@@ -19,7 +19,7 @@ describe('exportPlanToClipboard', () => {
       { skillTypeID: 3300, level: 4 },
     ];
     expect(exportPlanToClipboard(steps, skills)).toBe(
-      'Spaceship Command I\nSpaceship Command II\nGunnery IV',
+      'Spaceship Command I\nSpaceship Command II\nGunnery IV'
     );
   });
 
@@ -43,7 +43,11 @@ describe('exportPlanToClipboard', () => {
   });
 
   it('throws on level outside 1..5', () => {
-    expect(() => exportPlanToClipboard([{ skillTypeID: 3300, level: 0 }], skills)).toThrow(RangeError);
-    expect(() => exportPlanToClipboard([{ skillTypeID: 3300, level: 6 }], skills)).toThrow(RangeError);
+    expect(() => exportPlanToClipboard([{ skillTypeID: 3300, level: 0 }], skills)).toThrow(
+      RangeError
+    );
+    expect(() => exportPlanToClipboard([{ skillTypeID: 3300, level: 6 }], skills)).toThrow(
+      RangeError
+    );
   });
 });

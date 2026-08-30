@@ -12,7 +12,7 @@ Core loops work end-to-end: SSO re-auth, skill plan → computed queue → expor
 
 - **[confusing / med]** Cold start is a bare full-screen spinner on `bg` with no logo or text (`01-landing.png`); with a locked/failed IndexedDB it spins forever with no error. Fix: add wordmark + "Loading character data…" line under the `Spinner` in the app-boot gate, and a danger `EmptyState` after a timeout.
 - **[good]** Landing on Characters with portrait card, corp/alliance; nav labels (Characters/Overview/Skills/Industry + Character section) map cleanly to EVE concepts (`01b-landing-loaded.png`).
-- **[lacking / low]** Nothing in-app says what the tool *is* (the manifest tagline "character, skill planning, and industry companion" never appears). Fix: reuse `app.tagline` as a `text-dim` line under the Characters page title, and in the logged-out `EmptyState`.
+- **[lacking / low]** Nothing in-app says what the tool _is_ (the manifest tagline "character, skill planning, and industry companion" never appears). Fix: reuse `app.tagline` as a `text-dim` line under the Characters page title, and in the logged-out `EmptyState`.
 - **[confusing / med]** Red dot beside the wordmark is hover-only (`SyncStatusDot` title). A new player reads "red = broken" with no visible words and no action. Fix: on `error`/`offline` states render the label text next to the dot (11px chip), not tooltip-only.
 
 ## 2. Re-login flow (new industry-jobs scope)

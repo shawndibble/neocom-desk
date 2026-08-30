@@ -12,7 +12,10 @@ export interface DecodedAccessToken {
 }
 
 function b64urlDecode(s: string): string {
-  const padded = s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=');
+  const padded = s
+    .replace(/-/g, '+')
+    .replace(/_/g, '/')
+    .padEnd(Math.ceil(s.length / 4) * 4, '=');
   return atob(padded);
 }
 
@@ -39,6 +42,6 @@ export function decodeAccessToken(jwt: string): DecodedAccessToken {
     name: String(payload.name ?? ''),
     ownerHash: String(payload.owner ?? ''),
     expiresAt: Number(payload.exp) * 1000,
-    scopes
+    scopes,
   };
 }

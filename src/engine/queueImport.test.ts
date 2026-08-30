@@ -57,12 +57,20 @@ describe('parseSkillQueue', () => {
   });
 
   it('rejects rows missing skill_id or finished_level', () => {
-    expect(() => parseSkillQueue([{ finished_level: 1, queue_position: 0 } as never])).toThrow(/skill_id/);
-    expect(() => parseSkillQueue([{ skill_id: 1, queue_position: 0 } as never])).toThrow(/finished_level/);
+    expect(() => parseSkillQueue([{ finished_level: 1, queue_position: 0 } as never])).toThrow(
+      /skill_id/
+    );
+    expect(() => parseSkillQueue([{ skill_id: 1, queue_position: 0 } as never])).toThrow(
+      /finished_level/
+    );
   });
 
   it('rejects finished_level outside 1..5', () => {
-    expect(() => parseSkillQueue([{ skill_id: 1, finished_level: 6, queue_position: 0 }])).toThrow(/finished_level/);
-    expect(() => parseSkillQueue([{ skill_id: 1, finished_level: 0, queue_position: 0 }])).toThrow(/finished_level/);
+    expect(() => parseSkillQueue([{ skill_id: 1, finished_level: 6, queue_position: 0 }])).toThrow(
+      /finished_level/
+    );
+    expect(() => parseSkillQueue([{ skill_id: 1, finished_level: 0, queue_position: 0 }])).toThrow(
+      /finished_level/
+    );
   });
 });

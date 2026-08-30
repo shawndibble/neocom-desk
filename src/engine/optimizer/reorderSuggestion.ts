@@ -45,7 +45,7 @@ function requirementMet(index: PlanIndex, typeID: number, level: number): boolea
 function isReady(
   index: PlanIndex,
   step: PlanStep,
-  skills: ReadonlyMap<number, EngineSkill>,
+  skills: ReadonlyMap<number, EngineSkill>
 ): boolean {
   const skill = skills.get(step.skillTypeID);
   if (!skill) throw new Error(`Unknown skill typeID ${step.skillTypeID}`);
@@ -65,7 +65,7 @@ function markEmitted(index: PlanIndex, step: PlanStep): void {
 /** True when `steps` satisfies same-skill level order and in-plan prereqs. */
 export function isValidOrder(
   steps: readonly PlanStep[],
-  skills: ReadonlyMap<number, EngineSkill>,
+  skills: ReadonlyMap<number, EngineSkill>
 ): boolean {
   const index = buildPlanIndex(steps);
   for (const step of steps) {
@@ -78,7 +78,7 @@ export function isValidOrder(
 /** Reorder steps grouped by attribute pair; prereq-valid and stable. */
 export function suggestReorder(
   steps: readonly PlanStep[],
-  skills: ReadonlyMap<number, EngineSkill>,
+  skills: ReadonlyMap<number, EngineSkill>
 ): PlanStep[] {
   const groups: PlanStep[][] = [];
   const groupByPair = new Map<string, PlanStep[]>();

@@ -45,7 +45,7 @@ export function pairKey(primary: AttributeName, secondary: AttributeName): strin
 /** Sum segment SP per (primary, secondary) attribute pair. */
 export function aggregateSpByPair(
   steps: readonly PlanStep[],
-  skills: ReadonlyMap<number, EngineSkill>,
+  skills: ReadonlyMap<number, EngineSkill>
 ): Map<string, number> {
   const spByPair = new Map<string, number>();
   for (const step of steps) {
@@ -85,7 +85,7 @@ function toAttributes(extras: readonly number[]): Attributes {
 /** Brute-force the best allocation for pre-aggregated segment SP. */
 export function bestAttributesForPairs(
   spByPair: SpByPair,
-  implants: Implants = {},
+  implants: Implants = {}
 ): BestAttributesResult {
   const pairs: { primary: number; secondary: number; sp: number }[] = [];
   for (const [key, sp] of spByPair) {
@@ -107,7 +107,7 @@ export function bestAttributesForPairs(
     for (const { primary, secondary, sp } of pairs) {
       const rate = trainingRate(
         BASE_MIN + extras[primary] + implantByIndex[primary],
-        BASE_MIN + extras[secondary] + implantByIndex[secondary],
+        BASE_MIN + extras[secondary] + implantByIndex[secondary]
       );
       seconds += timeToTrain(sp, rate);
     }
@@ -126,7 +126,7 @@ export function bestAttributesForPairs(
 export function bestAttributes(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
-  implants: Implants = {},
+  implants: Implants = {}
 ): BestAttributesResult {
   return bestAttributesForPairs(aggregateSpByPair(steps, skills), implants);
 }

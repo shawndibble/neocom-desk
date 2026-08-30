@@ -26,7 +26,13 @@ describe('computeSchedule', () => {
   it('computes sp and seconds at a flat rate', () => {
     // rate = 20 + 20/2 = 30 SP/min; L1 = 250 SP -> 500 s
     const [step] = computeSchedule(L1, { attributes: attrs(20, 20) }, skills);
-    expect(step).toEqual({ skillTypeID: 100, level: 1, sp: 250, seconds: 500, cumulativeSeconds: 500 });
+    expect(step).toEqual({
+      skillTypeID: 100,
+      level: 1,
+      sp: 250,
+      seconds: 500,
+      cumulativeSeconds: 500,
+    });
   });
 
   it('accumulates cumulativeSeconds across steps', () => {
@@ -47,7 +53,7 @@ describe('computeSchedule', () => {
     const [step] = computeSchedule(
       L1,
       { attributes: attrs(20, 10), implants: { intelligence: 5, memory: 2 } },
-      skills,
+      skills
     );
     expect(step.seconds).toBeCloseTo((250 / 31) * 60, 6);
   });
@@ -62,7 +68,7 @@ describe('computeSchedule', () => {
         boosters: [{ bonus: { intelligence: 10 }, expiresAt: new Date(300_000) }],
         startDate: new Date(0),
       },
-      skills,
+      skills
     );
     expect(step.sp).toBe(250);
     expect(step.seconds).toBeCloseTo(480, 6);
@@ -85,7 +91,7 @@ describe('computeSchedule', () => {
         boosters: [{ bonus: { intelligence: 10 }, expiresAt: new Date(600_000) }],
         startDate: new Date(0),
       },
-      skills,
+      skills
     );
     expect(result[0].seconds).toBeCloseTo(3000 / 7, 6);
     expect(result[1].seconds).toBeCloseTo(3156 - 3000 / 7, 6);
@@ -100,7 +106,7 @@ describe('computeSchedule', () => {
         boosters: [{ bonus: { intelligence: 10 }, expiresAt: new Date(0) }],
         startDate: new Date(60_000),
       },
-      skills,
+      skills
     );
     expect(step.seconds).toBeCloseTo(600, 6); // rate 25 -> 250 SP -> 600 s
   });
@@ -116,7 +122,7 @@ describe('computeSchedule', () => {
         ],
         startDate: new Date(0),
       },
-      skills,
+      skills
     );
     // int 25, mem 12 -> rate 31
     expect(step.seconds).toBeCloseTo((250 / 31) * 60, 6);
@@ -124,13 +130,17 @@ describe('computeSchedule', () => {
 
   it('requires startDate when boosters are provided', () => {
     expect(() =>
-      computeSchedule(L1, { attributes: attrs(20, 10), boosters: [{ bonus: {}, expiresAt: new Date(1) }] }, skills),
+      computeSchedule(
+        L1,
+        { attributes: attrs(20, 10), boosters: [{ bonus: {}, expiresAt: new Date(1) }] },
+        skills
+      )
     ).toThrow(/startDate/);
   });
 
   it('throws on unknown skill in a step', () => {
     expect(() =>
-      computeSchedule([{ skillTypeID: 999, level: 1 }], { attributes: attrs(20, 20) }, skills),
+      computeSchedule([{ skillTypeID: 999, level: 1 }], { attributes: attrs(20, 20) }, skills)
     ).toThrow(/999/);
   });
 });

@@ -10,7 +10,7 @@ import type { EngineSkill, PlanEntry, PlanStep, TrainedSkill } from '@/engine/ty
 export function normalizePlan(
   entries: readonly PlanEntry[],
   skills: ReadonlyMap<number, EngineSkill>,
-  trainedSkills: ReadonlyMap<number, TrainedSkill> = new Map(),
+  trainedSkills: ReadonlyMap<number, TrainedSkill> = new Map()
 ): PlanStep[] {
   const steps: PlanStep[] = [];
   const planned = new Map<number, number>(); // typeID -> highest level already in steps

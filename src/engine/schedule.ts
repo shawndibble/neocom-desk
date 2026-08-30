@@ -28,7 +28,7 @@ const EPSILON_SP = 1e-9;
 export function computeSchedule(
   steps: readonly PlanStep[],
   options: ScheduleOptions,
-  skills: ReadonlyMap<number, EngineSkill>,
+  skills: ReadonlyMap<number, EngineSkill>
 ): ScheduledStep[] {
   const { attributes, implants = {}, boosters = [], startDate } = options;
   if (boosters.length > 0 && !startDate) {

@@ -18,7 +18,7 @@ const server = setupServer(
         access_token: 'access-1',
         token_type: 'Bearer',
         expires_in: 1199,
-        refresh_token: 'refresh-1'
+        refresh_token: 'refresh-1',
       });
     }
     if (grant === 'refresh_token' && lastBody.get('refresh_token') === 'refresh-1') {
@@ -26,7 +26,7 @@ const server = setupServer(
         access_token: 'access-2',
         token_type: 'Bearer',
         expires_in: 1199,
-        refresh_token: 'refresh-2' // rotated
+        refresh_token: 'refresh-2', // rotated
       });
     }
     return HttpResponse.json(
@@ -52,7 +52,7 @@ describe('buildAuthorizeUrl', () => {
         redirectUri: 'https://app.example/neocom-desk/callback',
         scopes: ['esi-skills.read_skills.v1', 'esi-wallet.read_character_wallet.v1'],
         state: 'state-xyz',
-        challenge: 'challenge-123'
+        challenge: 'challenge-123',
       })
     );
     expect(url.origin + url.pathname).toBe('https://login.eveonline.com/v2/oauth/authorize');
@@ -70,12 +70,16 @@ describe('buildAuthorizeUrl', () => {
 
 describe('exchangeCode', () => {
   it('posts form-encoded grant and returns token response', async () => {
-    const res = await exchangeCode({ clientId: 'client-abc', code: 'good-code', verifier: 'ver-1' });
+    const res = await exchangeCode({
+      clientId: 'client-abc',
+      code: 'good-code',
+      verifier: 'ver-1',
+    });
     expect(res).toEqual({
       access_token: 'access-1',
       token_type: 'Bearer',
       expires_in: 1199,
-      refresh_token: 'refresh-1'
+      refresh_token: 'refresh-1',
     });
     expect(lastBody?.get('grant_type')).toBe('authorization_code');
     expect(lastBody?.get('code')).toBe('good-code');
@@ -89,7 +93,11 @@ describe('exchangeCode', () => {
   });
 
   it('throws typed AuthError on error response', async () => {
-    const err = await exchangeCode({ clientId: 'client-abc', code: 'bad-code', verifier: 'v' }).then(
+    const err = await exchangeCode({
+      clientId: 'client-abc',
+      code: 'bad-code',
+      verifier: 'v',
+    }).then(
       () => null,
       (e: unknown) => e
     );
@@ -112,8 +120,8 @@ describe('refreshToken', () => {
   });
 
   it('throws AuthError on revoked refresh token', async () => {
-    await expect(refreshToken({ clientId: 'client-abc', refreshToken: 'revoked' })).rejects.toBeInstanceOf(
-      AuthError
-    );
+    await expect(
+      refreshToken({ clientId: 'client-abc', refreshToken: 'revoked' })
+    ).rejects.toBeInstanceOf(AuthError);
   });
 });

@@ -1,11 +1,7 @@
 // Shapes of the slim SDE JSON emitted by scripts/build-sde.mjs.
 
 export type CharacterAttribute =
-  | 'charisma'
-  | 'intelligence'
-  | 'memory'
-  | 'perception'
-  | 'willpower';
+  'charisma' | 'intelligence' | 'memory' | 'perception' | 'willpower';
 
 export interface SkillPrereq {
   skillTypeID: number;

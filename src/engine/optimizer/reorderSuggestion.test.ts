@@ -7,7 +7,7 @@ const skill = (
   primary: AttributeName,
   secondary: AttributeName,
   prereqs: SkillPrereq[] = [],
-  rank = 1,
+  rank = 1
 ): EngineSkill => ({ typeID, name: `Skill ${typeID}`, rank, primary, secondary, prereqs });
 
 const skillMap = (...list: EngineSkill[]): Map<number, EngineSkill> =>
@@ -24,7 +24,7 @@ const sortedKey = (steps: readonly PlanStep[]): string =>
 describe('isValidOrder', () => {
   const skills = skillMap(
     skill(1, 'perception', 'willpower'),
-    skill(2, 'intelligence', 'memory', [{ typeID: 1, level: 2 }]),
+    skill(2, 'intelligence', 'memory', [{ typeID: 1, level: 2 }])
   );
 
   it('accepts an order that satisfies prereqs and level order', () => {
@@ -55,7 +55,7 @@ describe('suggestReorder', () => {
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
       skill(2, 'intelligence', 'memory'),
-      skill(3, 'perception', 'willpower'),
+      skill(3, 'perception', 'willpower')
     );
     const steps = [step(1, 1), step(2, 1), step(3, 1), step(2, 2)];
     const result = suggestReorder(steps, skills);
@@ -66,7 +66,7 @@ describe('suggestReorder', () => {
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
       skill(2, 'perception', 'willpower'),
-      skill(3, 'intelligence', 'memory'),
+      skill(3, 'intelligence', 'memory')
     );
     const steps = [step(2, 1), step(3, 1), step(1, 1), step(2, 2)];
     const result = suggestReorder(steps, skills);
@@ -78,7 +78,7 @@ describe('suggestReorder', () => {
     const skills = skillMap(
       skill(1, 'perception', 'willpower'),
       skill(2, 'intelligence', 'memory'),
-      skill(3, 'perception', 'willpower', [{ typeID: 2, level: 1 }]),
+      skill(3, 'perception', 'willpower', [{ typeID: 2, level: 1 }])
     );
     const steps = [step(1, 1), step(2, 1), step(3, 1)];
     const result = suggestReorder(steps, skills);
@@ -91,7 +91,7 @@ describe('suggestReorder', () => {
       skill(1, 'perception', 'willpower'),
       skill(2, 'intelligence', 'memory', [{ typeID: 1, level: 3 }]),
       skill(3, 'perception', 'willpower', [{ typeID: 2, level: 2 }]),
-      skill(4, 'charisma', 'willpower', [{ typeID: 3, level: 1 }]),
+      skill(4, 'charisma', 'willpower', [{ typeID: 3, level: 1 }])
     );
     const steps = [
       step(1, 1),
@@ -114,17 +114,20 @@ describe('suggestReorder', () => {
     };
     const boundaries = result.reduce(
       (count, s, i) => (i > 0 && pairAt(s) !== pairAt(result[i - 1]) ? count + 1 : count),
-      0,
+      0
     );
     const originalBoundaries = steps.reduce(
       (count, s, i) => (i > 0 && pairAt(s) !== pairAt(steps[i - 1]) ? count + 1 : count),
-      0,
+      0
     );
     expect(boundaries).toBeLessThanOrEqual(originalBoundaries);
   });
 
   it('keeps same-skill levels ascending under grouping pressure', () => {
-    const skills = skillMap(skill(1, 'perception', 'willpower'), skill(2, 'intelligence', 'memory'));
+    const skills = skillMap(
+      skill(1, 'perception', 'willpower'),
+      skill(2, 'intelligence', 'memory')
+    );
     const steps = [step(1, 1), step(2, 1), step(1, 2), step(2, 2), step(1, 3)];
     const result = suggestReorder(steps, skills);
     expect(result).toEqual([step(1, 1), step(1, 2), step(1, 3), step(2, 1), step(2, 2)]);
