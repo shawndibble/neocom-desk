@@ -12,13 +12,23 @@
  * booster bonuses), the result keeps the current attributes and reports zero
  * savings — the output is never slower than not remapping at all.
  *
- * Booster-blind, and knowingly so: `bestAttributes` accepts a `BoosterContext`
- * but this passes none, so segment costs use base + implant rates only. Fixing
- * it needs each segment's wall-clock start offset, which also stops the
- * sp-per-pair signature below from being a sufficient memo key — a segment's
- * cost would then depend on when it starts. Both placement paths must change
- * together: `remapCount` is a 0..5 user input, so a Booster-aware single-remap
- * path beside a blind DP would change the answer with the count (plan §5.5).
+ * Booster-aware when `options.booster` is supplied — both placement paths, so
+ * the answer cannot change with `remapCount` (a 0..5 user input). A segment's
+ * cost then depends on when it starts, which is why costs are resolved lazily
+ * against `dp[k-1][i]` rather than read from the signature-memoized table: the
+ * sp-per-pair signature stops being a sufficient key. The DP stays valid
+ * because segment cost is monotonically non-decreasing in start time — a later
+ * start can only mean less Booster — so a minimal prefix is still the best
+ * prefix to extend.
+ *
+ * MEASURED COST, and it is not uniform. At 200 steps with a 24-day Booster:
+ * `remapCount = 1` goes 62 ms -> 81 ms, but `remapCount = 5` goes 2.2 s ->
+ * 21.7 s. The DP evaluates a segment per (k, i, j) and only the signature memo
+ * made that affordable; a start-dependent cost defeats it. Do not wire a
+ * Booster context into a UI that allows `remapCount >= 2` until this is fixed.
+ * The fix shape: for a fixed (k, i) every j shares one boosted prefix, so one
+ * pass over allocations can cost all j at once instead of R separate calls.
+ * Interacts with D5, which already had this path at 2.2 s Booster-free.
  *
  * DP over pair-runs (maximal step runs sharing one attribute pair): segment
  * boundaries inside a run are dominated by boundaries at its edges, so only
@@ -34,10 +44,13 @@
  * (~50-90 ms at R = 200). See `remapCount === 1` below.
  */
 import {
+  bestAttributes,
   bestAttributesForPairs,
   pairKey,
   type BestAttributesResult,
+  type BoosterContext,
 } from '@/engine/optimizer/bestAttributes';
+import { computeSchedule } from '@/engine/schedule';
 import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
 import type { Attributes, EngineSkill, Implants, PlanStep } from '@/engine/types';
 
@@ -65,6 +78,11 @@ export interface PlaceRemapsOptions {
   remapCount: number;
   currentAttributes: Attributes;
   implants?: Implants;
+  /**
+   * Live Boosters and when the plan starts training. Omit for Booster-blind
+   * costing — every existing caller and test does, and that path is untouched.
+   */
+  booster?: BoosterContext;
 }
 
 const TIE_EPSILON = 1e-6;
@@ -93,7 +111,34 @@ export function placeRemaps(
   skills: ReadonlyMap<number, EngineSkill>,
   options: PlaceRemapsOptions
 ): PlaceRemapsResult {
-  const { remapCount, currentAttributes, implants = {} } = options;
+  const { remapCount, currentAttributes, implants = {}, booster } = options;
+
+  const liveBoosters =
+    booster?.boosters.filter((b) => b.expiresAt.getTime() > booster.startDate.getTime()) ?? [];
+  const boosted = booster !== undefined && liveBoosters.length > 0;
+  /** Seconds from plan start until the first Booster lapses; -Infinity when none. */
+  const expirySeconds = boosted
+    ? Math.min(
+        ...liveBoosters.map((b) => (b.expiresAt.getTime() - booster!.startDate.getTime()) / 1000)
+      )
+    : -Infinity;
+
+  // Baseline on current attributes. With a Booster live this defers to
+  // `computeSchedule`, so the no-remap number here is the same one the planner
+  // shows rather than a second opinion about it.
+  const boostedStepSeconds =
+    boosted && steps.length > 0
+      ? computeSchedule(
+          steps,
+          {
+            attributes: currentAttributes,
+            implants,
+            boosters: [...liveBoosters],
+            startDate: booster!.startDate,
+          },
+          skills
+        ).map((s) => s.seconds)
+      : null;
 
   // Per-step sp + pair, plus baseline time on current attributes.
   let currentSeconds = 0;
@@ -106,7 +151,7 @@ export function placeRemaps(
       currentAttributes[skill.primary] + (implants[skill.primary] ?? 0),
       currentAttributes[skill.secondary] + (implants[skill.secondary] ?? 0)
     );
-    const seconds = timeToTrain(sp, rate);
+    const seconds = boostedStepSeconds ? boostedStepSeconds[index] : timeToTrain(sp, rate);
     currentSeconds += seconds;
     const pair = pairKey(skill.primary, skill.secondary);
     const last = runs[runs.length - 1];
@@ -180,6 +225,41 @@ export function placeRemaps(
     };
   };
 
+  /**
+   * Segment cost for runs [i, j) starting `startSeconds` into the plan.
+   *
+   * Falls straight through to the Booster-blind `fallback` whenever no Booster
+   * is live or the segment begins after the last one lapsed — which is the
+   * overwhelming majority: a 24-day Booster covers the first ~3% of a
+   * multi-year plan, so only the earliest segments ever pay for the walk.
+   * Memoized on the segment plus its start, since with a Booster the start is
+   * part of the cost and the sp-per-pair signature alone is no longer a key.
+   */
+  const boostedCost = new Map<string, BestAttributesResult>();
+  const segmentCostAt = (
+    i: number,
+    j: number,
+    startSeconds: number,
+    fallback: BestAttributesResult
+  ): BestAttributesResult => {
+    if (!boosted || startSeconds >= expirySeconds) return fallback;
+    const key = `${i}|${j}|${startSeconds}`;
+    let result = boostedCost.get(key);
+    if (!result) {
+      result = bestAttributes(
+        steps.slice(runs[i].startStep, runs[j - 1].endStep + 1),
+        skills,
+        implants,
+        {
+          boosters: liveBoosters,
+          startDate: new Date(booster!.startDate.getTime() + startSeconds * 1000),
+        }
+      );
+      boostedCost.set(key, result);
+    }
+    return result;
+  };
+
   // ---- Fast path: exactly one allocation ("where do I remap?") ------------
   // With one remap the DP collapses to its last column: the total is
   // currentPrefix[i] + cost(runs [i, runCount)) for some run edge i, so only
@@ -205,7 +285,12 @@ export function placeRemaps(
       pairOrder = [run.pair, ...pairOrder.filter((pair) => pair !== run.pair)];
       const spByPair = new Map<string, number>();
       for (const pair of pairOrder) spByPair.set(pair, suffixSp.get(pair)!);
-      const best = bestAttributesForPairs(spByPair, implants);
+      const best = segmentCostAt(
+        i,
+        runCount,
+        currentPrefix[i],
+        bestAttributesForPairs(spByPair, implants)
+      );
       const total = currentPrefix[i] + best.seconds;
       if (total <= bestSeconds) {
         bestSeconds = total;
@@ -257,20 +342,26 @@ export function placeRemaps(
   // attributes, so dp[0][runCount] equals the no-remap baseline.
   const dp: number[][] = [];
   const parent: number[][] = [];
+  // The segment actually chosen for dp[k][j]. With a Booster its cost depends
+  // on where it started, so `segment[i][j]` is no longer enough to rebuild it.
+  const chosen: (BestAttributesResult | null)[][] = [];
   for (let k = 0; k <= maxSegments; k++) {
     dp[k] = new Array<number>(runCount + 1).fill(Infinity);
     parent[k] = new Array<number>(runCount + 1).fill(-1);
+    chosen[k] = new Array<BestAttributesResult | null>(runCount + 1).fill(null);
   }
   for (let j = 0; j <= runCount; j++) dp[0][j] = currentPrefix[j];
   for (let k = 1; k <= maxSegments; k++) {
     for (let j = k; j <= runCount; j++) {
       for (let i = k - 1; i < j; i++) {
         if (dp[k - 1][i] === Infinity) continue;
-        const total = dp[k - 1][i] + segment[i][j].seconds;
+        const seg = segmentCostAt(i, j, dp[k - 1][i], segment[i][j]);
+        const total = dp[k - 1][i] + seg.seconds;
         // Strict `<` on an ascending scan: on a tie the EARLIEST split wins.
         if (total < dp[k][j]) {
           dp[k][j] = total;
           parent[k][j] = i;
+          chosen[k][j] = seg;
         }
       }
     }
@@ -299,7 +390,7 @@ export function placeRemaps(
   let j = runCount;
   for (let k = bestK; k >= 1; k--) {
     const i = parent[k][j];
-    const { attributes, seconds } = segment[i][j];
+    const { attributes, seconds } = chosen[k][j] ?? segment[i][j];
     segments.unshift({
       startIndex: runs[i].startStep,
       endIndex: runs[j - 1].endStep,

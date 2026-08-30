@@ -343,15 +343,33 @@ These change what gets built. They are yours, not the implementer's.
    trains inside the booster window, not by plan length — which is why 200
    steps costs barely more than 50.
 
-   At `remapCount = 1` (the UI default, an O(R) suffix scan) that is ~780 ms
-   worst case at R = 200 if every segment overlapped the booster, and far less
-   in practice since segments starting after expiry stay on the fast path.
-   Acceptable. The general `remapCount ≥ 2` DP is still gated on D5 — and note
-   `placeRemaps` memoizes segment cost on the sp-per-pair signature, which is
-   no longer a sufficient key once a segment's start offset changes its cost. `bestAttributes` also needs each segment's
-   wall-clock start offset, since a Booster's remaining life differs per
-   segment; threading that through `placeRemaps` is the real API change, not
-   the added parameter.
+   **`placeRemaps` threading is done, and it exposed a cliff.** Both placement
+   paths are Booster-aware, so the answer cannot change with `remapCount` (a
+   0..5 user input). The DP stays valid because segment cost is monotonically
+   non-decreasing in start time — a later start can only mean less Booster — so
+   the minimal prefix is still the best prefix to extend. Costs are resolved
+   lazily against `dp[k-1][i]`, because the sp-per-pair signature is no longer a
+   sufficient memo key once cost depends on when a segment starts.
+
+   Measured at 200 steps with a 24-day Booster:
+
+   | `remapCount` | Booster-blind | Booster-aware |
+   | ------------ | ------------- | ------------- |
+   | 1            | 62 ms         | **81 ms**     |
+   | 5            | 2.2 s         | **21.7 s**    |
+
+   The single-remap scan is effectively free. The DP is not: it evaluates a
+   segment per `(k, i, j)` and only the signature memo made that affordable.
+
+   **So the UI is not wired yet, and must not be while `remapCount >= 2` is
+   reachable.** The fix shape is known: for a fixed `(k, i)` every `j` shares
+   one boosted prefix, so a single pass over allocations can cost all `j` at
+   once instead of R separate calls. This interacts with **D5**, which already
+   had this path at 2.2 s Booster-free, and with §5 decision 3, which is the
+   user's to make.
+
+   Useful context for that decision: a 24-day Booster covers the first **5
+   steps (3%)** of a 200-step plan, because such a plan runs ~1,100 days.
 
    Binding on items 01 and 05: they render one number, computed one way. The
    "excludes booster" note option (a) called for must not ship.

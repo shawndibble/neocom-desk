@@ -136,3 +136,18 @@
 - Compare ships with four fixed columns, but user-chosen columns are the
   expected direction, so the column set is modelled as a list, not as fixed
   table markup.
+
+## Scope decisions (round 7)
+
+- The Market Browser's state lives in the URL as query parameters
+  (`/market?type=…&region=…`), so a view is shareable and survives a reload.
+  Path parameters are not an option: routes are keyed by literal path.
+- Order rows are capped at 15 per side, with "show all (N total)" to expand.
+  Sell sorts cheapest first, buy sorts highest first; columns are click-sortable.
+- The Quickbar is **Editable Data** — it syncs across devices. The Location Mode
+  is not; it stays a device-local view preference like the current hub setting.
+- A context-menu jump to a Build Plan stays visible for items no blueprint
+  produces, reading "No blueprint options" rather than vanishing.
+- The rebuild ships in two passes. Pass 1: two-column layout, search, Market
+  Group tree, order book, Location Mode. Pass 2: Quickbar sync, Compare,
+  Item Detail, context menus, price history.

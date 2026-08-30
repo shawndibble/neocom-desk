@@ -787,3 +787,120 @@ describe('placeRemaps single-remap fast path', () => {
     expect(elapsed).toBeLessThan(2500);
   }, 120000);
 });
+
+describe('placeRemaps with Boosters', () => {
+  const START = new Date('2026-08-30T00:00:00Z');
+  const after = (seconds: number) => new Date(START.getTime() + seconds * 1000);
+  const skills = skillMap(
+    skill(1, 'perception', 'willpower', 5),
+    skill(2, 'intelligence', 'memory', 5),
+    skill(3, 'charisma', 'willpower', 5)
+  );
+  const steps: PlanStep[] = [...levels(1, 4), ...levels(2, 4), ...levels(3, 3)];
+  const bonus = {
+    intelligence: 12,
+    memory: 12,
+    perception: 12,
+    willpower: 12,
+    charisma: 12,
+  };
+
+  it('leaves the Booster-blind result untouched when no context is passed', () => {
+    const blind = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
+    const empty = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      booster: { boosters: [], startDate: START },
+    });
+    expect(empty.totalSeconds).toBeCloseTo(blind.totalSeconds, 9);
+    expect(empty.currentSeconds).toBeCloseTo(blind.currentSeconds, 9);
+  });
+
+  it('makes the no-remap baseline faster, because the Booster speeds training up', () => {
+    // currentSeconds is what the savings figure is measured against. If it
+    // ignored the Booster the app would advertise savings it cannot deliver.
+    const blind = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
+    const withBooster = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      booster: { boosters: [{ bonus, expiresAt: after(1e9) }], startDate: START },
+    });
+    expect(withBooster.currentSeconds).toBeLessThan(blind.currentSeconds);
+  });
+
+  it('reports, for every segment, the time computeSchedule says that segment takes', async () => {
+    // The load-bearing check. Each segment starts where the previous one
+    // ended, so its remaining Booster life differs — training its own steps on
+    // its own attributes, with the Booster shifted by that offset, must take
+    // exactly the seconds it reported. Blind segment costs fail this.
+    const { computeSchedule } = await import('@/engine/schedule');
+    const planSeconds = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+    }).currentSeconds;
+
+    // Expiry fractions chosen so that later segments — not just the first —
+    // begin while the Booster is still live. At 0.1 only segment one straddles
+    // it, which would let a bug that ignores each segment's own start offset
+    // pass unnoticed.
+    for (const fraction of [0.1, 0.5, 0.9]) {
+      const boosters = [{ bonus, expiresAt: after(planSeconds * fraction) }];
+      for (const remapCount of [1, 2, 3]) {
+        const result = placeRemaps(steps, skills, {
+          remapCount,
+          currentAttributes: CURRENT,
+          booster: { boosters, startDate: START },
+        });
+
+        let offset = 0;
+        for (const segment of result.segments) {
+          const slice = steps.slice(segment.startIndex, segment.endIndex + 1);
+          const scheduled = computeSchedule(
+            slice,
+            { attributes: segment.attributes, boosters, startDate: after(offset) },
+            skills
+          );
+          const actual = scheduled[scheduled.length - 1].cumulativeSeconds;
+          expect(segment.seconds).toBeCloseTo(actual, 4);
+          offset += segment.seconds;
+        }
+        expect(result.totalSeconds).toBeCloseTo(offset, 4);
+      }
+    }
+  });
+
+  it('never reports savings against a baseline it did not use', () => {
+    const boosters = [{ bonus, expiresAt: after(20000) }];
+    for (const remapCount of [1, 2, 3]) {
+      const r = placeRemaps(steps, skills, {
+        remapCount,
+        currentAttributes: CURRENT,
+        booster: { boosters, startDate: START },
+      });
+      expect(r.savingsSeconds).toBeCloseTo(r.currentSeconds - r.totalSeconds, 6);
+      expect(r.totalSeconds).toBeLessThanOrEqual(r.currentSeconds + 1e-6);
+    }
+  });
+
+  it('gives the same answer at remapCount 1 whether or not the DP path runs', () => {
+    // The reason both paths had to change together: remapCount is a 0..5 user
+    // input, so a Booster-aware fast path beside a blind DP would change the
+    // answer with the count.
+    const boosters = [{ bonus, expiresAt: after(20000) }];
+    const opts = { currentAttributes: CURRENT, booster: { boosters, startDate: START } };
+    const one = placeRemaps(steps, skills, { ...opts, remapCount: 1 });
+    const many = placeRemaps(steps, skills, { ...opts, remapCount: 3 });
+    // More remaps can only help; it must never be worse than the single-remap answer.
+    expect(many.totalSeconds).toBeLessThanOrEqual(one.totalSeconds + 1e-6);
+  });
+
+  it('ignores a Booster that expired before the plan starts', () => {
+    const blind = placeRemaps(steps, skills, { remapCount: 2, currentAttributes: CURRENT });
+    const expired = placeRemaps(steps, skills, {
+      remapCount: 2,
+      currentAttributes: CURRENT,
+      booster: { boosters: [{ bonus, expiresAt: after(-1) }], startDate: START },
+    });
+    expect(expired.totalSeconds).toBeCloseTo(blind.totalSeconds, 9);
+  });
+});
