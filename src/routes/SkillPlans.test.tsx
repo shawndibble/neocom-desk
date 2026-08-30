@@ -658,14 +658,14 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
     // An answer for one remap, shown for a plan that asks for three, is the
     // silent-degradation failure this planner keeps running into.
     await optimize(3);
-    expect(screen.getByText(/multi-remap placement is not available yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Evaluated with 2 remaps/i)).toBeInTheDocument();
   });
 
-  it('says nothing when the plan asks for one remap', async () => {
-    await optimize(1);
-    expect(
-      screen.queryByText(/multi-remap placement is not available yet/i)
-    ).not.toBeInTheDocument();
+  it.each([1, 2])('says nothing when the plan asks for %i remap(s)', async (remapCount) => {
+    // Two is the cap, not a capped value: the note must not fire at the
+    // boundary itself.
+    await optimize(remapCount);
+    expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
   });
 });
 

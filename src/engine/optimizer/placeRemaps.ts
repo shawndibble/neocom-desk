@@ -79,12 +79,14 @@ export interface PlaceRemapsOptions {
 }
 
 /**
- * Remaps the planner offers today. 1 for product reasons, not speed: the UI
- * has to say what a multi-remap answer means, and plan §5 decision 3 (the
- * savings badge above one remap) is unanswered. `placeRemaps` accepts any
- * count.
+ * Remaps the planner evaluates. 2, because that is what the cost curve pays
+ * for: a plan asking for 2 costs ~420 ms per press with a Booster live and
+ * ~6 ms without, while 5 costs ~900 ms of synchronous main-thread work. Most
+ * characters hold one remap anyway, and `remapCount = 1` never enters this
+ * DP — it takes the O(R) suffix scan — so the cost lands only on the plans
+ * that asked for it. `placeRemaps` accepts any count.
  */
-export const MAX_SUPPORTED_REMAPS = 1;
+export const MAX_SUPPORTED_REMAPS = 2;
 
 const TIE_EPSILON = 1e-6;
 

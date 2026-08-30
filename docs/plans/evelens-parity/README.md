@@ -517,14 +517,28 @@ Three things worth carrying forward:
   be priced by aggregation at all. Only segments starting before the last
   Booster lapses pay it.
 
-`MAX_SUPPORTED_REMAPS` is still 1. Speed is no longer the blocker
-Booster-blind, but read the right column: `PlanEditor` passes a `booster`
-whenever the user has one enabled, so raising the cap buys **~420 ms at
-`remapCount = 2` and ~900 ms at 5** of synchronous main-thread work per button
-press. That cost cannot be restructured away — a mid-segment expiry defeats
-aggregation outright. Raising it is therefore still part speed and part
-product: the UI has to say what a multi-remap answer means, and §5 decision 3
-is unanswered. The engine accepts any count.
+**`MAX_SUPPORTED_REMAPS` raised 1 -> 2** (user decision, 2026-08-30).
+
+Read the right column when judging this. `PlanEditor` passes a `booster`
+whenever the user has one enabled, so the cost per button press is **~420 ms
+at `remapCount = 2` and ~900 ms at 5**, not the 6-13 ms of the blind column.
+That cost cannot be restructured away — a mid-segment expiry defeats
+aggregation outright — so 5 stays out until the work moves off the main
+thread.
+
+Two things make 2 cheap in practice:
+
+- **`remapCount = 1` never enters this DP.** It takes the O(R) suffix scan, so
+  it is unchanged at ~59-81 ms.
+- **Most characters hold one remap.** `remapCount` is prefilled from
+  `remapAvailability` (ESI bonus remaps plus the yearly one off cooldown), and
+  the common case is 1. The 420 ms lands only on plans that actually asked for
+  two.
+
+`plans.remapCapNote` said "multi-remap placement is not available yet", which
+the raise makes false; it now reads "placement beyond that". **§5 decision 3
+(the savings badge above one remap) is now live rather than doubly
+unavailable** — the optimizer really does return two remapped segments.
 
 ### Found while reviewing D5, not fixed: stacked Boosters share one expiry
 
