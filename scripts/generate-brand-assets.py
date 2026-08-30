@@ -11,7 +11,7 @@ Run: python3 scripts/generate-brand-assets.py
 """
 
 from pathlib import Path
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "assets" / "brand"
@@ -62,6 +62,41 @@ def on_plate(mark: Image.Image, size: int, coverage: float) -> Image.Image:
     return canvas.convert("RGB")
 
 
+def on_keyline(mark: Image.Image, size: int, coverage: float, halo: int) -> Image.Image:
+    """Square icon on transparency, the mark ringed by a dark keyline.
+
+    The plate is what used to carry the silver mark against a pale surface, so
+    removing it has to be paid for. Dilating the mark's own alpha by `halo` and
+    filling that ring with the plate colour gives the same separation without a
+    box: the icon still reads on a white tab strip, but only the artwork is
+    opaque. Mirrors the keyline pass in favicon.svg so the two files agree.
+    """
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    limit = int(size * coverage)
+    scaled = ImageOps.contain(mark, (limit, limit), Image.LANCZOS)
+    x = (size - scaled.width) // 2
+    y = (size - scaled.height) // 2
+    # Dilate the *solid* mark, not its raw alpha: with_alpha() deliberately
+    # ramps the glow across a wide band, and growing that band just yields a
+    # soft grey cloud instead of an edge. Threshold to the body first so the
+    # keyline is opaque and hugs the artwork.
+    # MaxFilter needs odd, >=3; at 16px a halo of 1 is already a whole pixel.
+    body = scaled.getchannel("A").point(lambda v: 255 if v > 140 else 0)
+    grown = body.filter(ImageFilter.MaxFilter(halo * 2 + 1))
+    # Half a pixel of blur is what keeps the hard 0/255 mask from stair-casing.
+    grown = grown.filter(ImageFilter.GaussianBlur(0.5))
+    layer = Image.new("RGBA", scaled.size, (*PLATE, 255))
+    layer.putalpha(grown)
+    layer.alpha_composite(scaled)
+    # Clip to the keyline silhouette. Without this the glow keeps the partial
+    # alpha it was given upstream and paints a faint pale box on a light tab
+    # strip -- a ghost of the very plate this function exists to remove. Inside
+    # the silhouette the glow still shows, composited over the keyline colour.
+    layer.putalpha(grown)
+    canvas.alpha_composite(layer, (x, y))
+    return canvas
+
+
 def main() -> None:
     ICONS.mkdir(parents=True, exist_ok=True)
     BRAND.mkdir(parents=True, exist_ok=True)
@@ -76,10 +111,18 @@ def main() -> None:
     on_plate(mark, 512, 0.60).save(ICONS / "icon-512-maskable.png")
     on_plate(mark, 180, 0.78).save(ICONS / "apple-touch-icon-180.png")
 
-    # Fallback only -- index.html offers favicon.svg first, and every browser
-    # that understands the SVG link never asks for this file.
-    ico = on_plate(mark, 64, 0.86)
-    ico.save(ICONS / "favicon.ico", sizes=[(16, 16), (32, 32), (48, 48)])
+    # Safari and other browsers that skip the SVG link land here (Chrome and
+    # Firefox were observed requesting only favicon.svg). It cannot carry the
+    # SVG's prefers-color-scheme flip, so the keyline is the whole defence, and
+    # it is generated at each stored size rather than downscaled from one: a
+    # halo resampled from 48px to 16px washes out to nothing.
+    sizes = [(16, 16), (32, 32), (48, 48)]
+    ico = on_keyline(mark, 48, 0.86, 2)
+    ico.save(
+        ICONS / "favicon.ico",
+        sizes=sizes,
+        append_images=[on_keyline(mark, s, 0.86, 1) for s, _ in sizes[:2]],
+    )
 
     # Login art: full lockup, transparent, kept at source resolution so it has
     # headroom above its ~14rem display width on a 2x screen.
