@@ -196,7 +196,9 @@ describe('Skills', () => {
 
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: /log in again/i })).toBeInTheDocument();
+    // The route's own banner, not Layout's global auth notice — the latter
+    // fires on emitEsiAuthFailure, before the snapshot settles.
+    expect(await screen.findByText(/log in again to see skills/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /export csv/i })).toBeDisabled();
   });
 });
