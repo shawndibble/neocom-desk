@@ -12,6 +12,7 @@ export interface SkillPrereq {
 export interface SkillType {
   typeID: number;
   name: string;
+  description: string;
   groupID: number;
   groupName: string;
   /** skillTimeConstant (dogma attr 275), 1-16 */

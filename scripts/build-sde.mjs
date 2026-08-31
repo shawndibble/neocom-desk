@@ -164,6 +164,7 @@ async function main() {
       const r = rows[i];
       types.set(Number(r[h.typeID]), {
         name: r[h.typeName],
+        description: r[h.description] ?? '',
         groupID: Number(r[h.groupID]),
         volume: num(r[h.volume]) ?? 0,
         published: r[h.published] === '1',
@@ -220,6 +221,7 @@ async function main() {
     skills.push({
       typeID,
       name: t.name,
+      description: t.description,
       groupID: t.groupID,
       groupName: g.name,
       rank: Math.round(attrs.get(RANK_ATTR) ?? 1),

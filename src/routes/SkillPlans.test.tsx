@@ -58,6 +58,7 @@ const FIXTURE_SKILLS: SkillType[] = [
   {
     typeID: 1,
     name: 'Gunnery',
+    description: '',
     groupID: 10,
     groupName: 'Gunnery',
     rank: 1,
@@ -68,6 +69,7 @@ const FIXTURE_SKILLS: SkillType[] = [
   {
     typeID: 2,
     name: 'Small Hybrid Turret',
+    description: '',
     groupID: 10,
     groupName: 'Gunnery',
     rank: 1,
@@ -78,6 +80,7 @@ const FIXTURE_SKILLS: SkillType[] = [
   {
     typeID: 3,
     name: 'Spaceship Command',
+    description: '',
     groupID: 20,
     groupName: 'Spaceship Command',
     rank: 1,
@@ -88,6 +91,7 @@ const FIXTURE_SKILLS: SkillType[] = [
   {
     typeID: 4,
     name: 'Small Projectile Turret',
+    description: '',
     groupID: 10,
     groupName: 'Gunnery',
     rank: 1,

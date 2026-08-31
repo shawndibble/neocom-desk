@@ -11,6 +11,7 @@ const SKILLS: SkillType[] = [
   {
     typeID: 3336,
     name: 'Gunnery',
+    description: '',
     groupID: 10,
     groupName: 'Gunnery',
     rank: 1,
@@ -22,6 +23,7 @@ const SKILLS: SkillType[] = [
   {
     typeID: 99999,
     name: 'Rifter',
+    description: '',
     groupID: 1,
     groupName: 'x',
     rank: 1,
