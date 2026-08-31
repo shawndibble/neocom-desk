@@ -224,6 +224,20 @@ describe('Industry: owned-blueprint prefill', () => {
     expect(stored?.me).toBe(8);
     expect(stored?.te).toBe(16);
   });
+
+  it('shows a re-login prompt when the blueprints scope was revoked, without blocking the rest of the page', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+
+    expect(await screen.findByText('Log in again to see owned blueprints')).toBeInTheDocument();
+    // The Build Plan list and Active Jobs panel still render.
+    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+    expect(screen.getByText('Active jobs')).toBeInTheDocument();
+  });
 });
 
 describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {

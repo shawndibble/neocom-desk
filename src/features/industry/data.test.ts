@@ -39,8 +39,9 @@ describe('loadCharacterBlueprints', () => {
 
     const result = await loadCharacterBlueprints(CHAR_ID);
 
-    expect(result?.fromCache).toBe(false);
-    expect(result?.data).toEqual(payload);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.fromCache).toBe(false);
+    expect(result.cached?.data).toEqual(payload);
     const cached = await db.esiCache.get([CHAR_ID, 'blueprints']);
     expect(cached?.value).toEqual(payload);
   });
@@ -58,15 +59,31 @@ describe('loadCharacterBlueprints', () => {
 
     const result = await loadCharacterBlueprints(CHAR_ID);
 
-    expect(result?.fromCache).toBe(true);
-    expect(result?.data).toEqual(payload);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.fromCache).toBe(true);
+    expect(result.cached?.data).toEqual(payload);
   });
 
-  it('returns null when ESI fails and nothing is cached', async () => {
+  it('returns null cached when ESI fails and nothing is cached', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/blueprints`, () => HttpResponse.error())
     );
-    expect(await loadCharacterBlueprints(CHAR_ID)).toBeNull();
+    const result = await loadCharacterBlueprints(CHAR_ID);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toBeNull();
+  });
+
+  it('reports needsReauth when the blueprints scope was revoked (403) and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/blueprints`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadCharacterBlueprints(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
   });
 });
 

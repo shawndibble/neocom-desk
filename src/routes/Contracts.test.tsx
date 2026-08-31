@@ -138,4 +138,15 @@ describe('Contracts', () => {
     render(<App />);
     expect(await screen.findByText(/no contracts cached/i)).toBeInTheDocument();
   });
+
+  it('shows a re-login prompt (not a silent empty state) when the contracts scope was revoked', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Log in again to see contracts')).toBeInTheDocument();
+    expect(screen.queryByText(/no contracts cached/i)).not.toBeInTheDocument();
+  });
 });

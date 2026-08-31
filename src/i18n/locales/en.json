@@ -210,6 +210,10 @@
     "jobsDone": "Done",
     "jobsCompletingSoon": "Completing soon",
     "jobsProgress": "{{name}} progress",
+    "blueprintsTitle": "Owned blueprints",
+    "blueprintsReauthTitle": "Log in again to see owned blueprints",
+    "blueprintsReauthHint": "Log in again to fetch this character's blueprints for ME/TE prefill.",
+    "blueprintsReauthAction": "Log in again with EVE Online",
     "activity": {
       "manufacturing": "Manufacturing",
       "timeEfficiencyResearch": "Time efficiency research",
@@ -244,7 +248,10 @@
     "queue": "Training queue",
     "queueEmpty": "No active in-game training queue cached.",
     "training": "Training {{name}}",
-    "finishes": "finishes {{date}}"
+    "finishes": "finishes {{date}}",
+    "queueReauthTitle": "Log in again to see the training queue",
+    "queueReauthHint": "Log in again to fetch this character's in-game skill queue.",
+    "queueReauthAction": "Log in again with EVE Online"
   },
   "common": {
     "loading": "Loading",
@@ -299,7 +306,10 @@
     "stationLabel": "Station #{{id}}",
     "structureLabel": "Structure #{{id}}",
     "inSpaceLabel": "In space (system #{{id}})",
-    "containerLabel": "Container"
+    "containerLabel": "Container",
+    "reauthTitle": "Log in again to see assets",
+    "reauthHint": "Log in again to fetch this character's assets.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "mail": {
     "title": "Mail",
@@ -308,7 +318,10 @@
     "emptyHint": "Reconnect to fetch this character's mail.",
     "selectHint": "Select a message to read it.",
     "unknownSender": "Unknown sender",
-    "noSubject": "(no subject)"
+    "noSubject": "(no subject)",
+    "reauthTitle": "Log in again to see mail",
+    "reauthHint": "Log in again to fetch this character's mail.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "calendar": {
     "title": "Calendar",
@@ -320,7 +333,10 @@
     "responseAccepted": "Accepted",
     "responseDeclined": "Declined",
     "responseTentative": "Tentative",
-    "responseNotResponded": "Not responded"
+    "responseNotResponded": "Not responded",
+    "reauthTitle": "Log in again to see calendar events",
+    "reauthHint": "Log in again to fetch this character's calendar.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "contracts": {
     "title": "Contracts",
@@ -331,7 +347,10 @@
     "type": "Type",
     "price": "Price",
     "expires": "Expires",
-    "issuer": "Issuer"
+    "issuer": "Issuer",
+    "reauthTitle": "Log in again to see contracts",
+    "reauthHint": "Log in again to fetch this character's contracts.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "orders": {
     "title": "Orders",
@@ -351,7 +370,10 @@
     "total": "Total",
     "issued": "Issued",
     "expires": "Expires",
-    "state": "State"
+    "state": "State",
+    "reauthTitle": "Log in again to see market orders",
+    "reauthHint": "Log in again to fetch this character's market orders.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "sync": {
     "idle": "Synced",

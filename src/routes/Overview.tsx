@@ -3,13 +3,14 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { DataAgeBadge, EmptyState, Panel, Spinner, StatChip } from '@/components/ui';
+import { DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner, StatChip } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { beginEveLogin } from '@/app/loginFlow';
 import { characterPortraitUrl } from '@/app/images';
 import {
   loadCharacterSkills,
-  loadCharacterSkillQueue,
+  loadCharacterSkillQueueWithStatus,
   type CachedResult,
 } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
@@ -23,6 +24,8 @@ interface Snapshot {
   walletResult: CachedResult<number> | null;
   skillsResult: CachedResult<CharacterSkills> | null;
   queueResult: CachedResult<SkillQueueEntry[]> | null;
+  /** 401/403 on the queue read means "log in again", not "queue is empty". */
+  queueNeedsReauth: boolean;
   catalog: SkillCatalog;
 }
 
@@ -48,14 +51,21 @@ export function Overview() {
     let cancelled = false;
     void loadPublicInfo(activeCharacterId);
     void (async () => {
-      const [walletResult, skillsResult, queueResult, catalog] = await Promise.all([
+      const [walletResult, skillsResult, queueStatus, catalog] = await Promise.all([
         loadWalletBalance(activeCharacterId),
         loadCharacterSkills(activeCharacterId),
-        loadCharacterSkillQueue(activeCharacterId),
+        loadCharacterSkillQueueWithStatus(activeCharacterId),
         loadSkillCatalog(),
       ]);
       if (cancelled) return;
-      setSnapshot({ requestKey, walletResult, skillsResult, queueResult, catalog });
+      setSnapshot({
+        requestKey,
+        walletResult,
+        skillsResult,
+        queueResult: queueStatus.cached,
+        queueNeedsReauth: queueStatus.needsReauth,
+        catalog,
+      });
     })();
     return () => {
       cancelled = true;
@@ -78,6 +88,7 @@ export function Overview() {
   const walletResult = current?.walletResult ?? null;
   const skillsResult = current?.skillsResult ?? null;
   const queueResult = current?.queueResult ?? null;
+  const queueNeedsReauth = current?.queueNeedsReauth ?? false;
   const catalog = current?.catalog ?? null;
 
   // Reads the wall clock to pick "the entry training right now" — unavoidably
@@ -153,7 +164,14 @@ export function Overview() {
             title={t('overview.queue')}
             actions={queueResult ? <DataAgeBadge date={queueResult.fetchedAt} /> : undefined}
           >
-            {activeSkillName ? (
+            {queueNeedsReauth ? (
+              <ReauthBanner
+                title={t('overview.queueReauthTitle')}
+                hint={t('overview.queueReauthHint')}
+                actionLabel={t('overview.queueReauthAction')}
+                onLogin={() => void beginEveLogin()}
+              />
+            ) : activeSkillName ? (
               <p className="text-sm">
                 {t('overview.training', { name: activeSkillName })}
                 {activeEntry?.finish_date && (

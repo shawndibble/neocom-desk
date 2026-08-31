@@ -192,4 +192,15 @@ describe('Assets', () => {
     render(<App />);
     expect(await screen.findByText(/no assets cached/i)).toBeInTheDocument();
   });
+
+  it('shows a re-login prompt (not a silent empty state) when the assets scope was revoked', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Log in again to see assets')).toBeInTheDocument();
+    expect(screen.queryByText(/no assets cached/i)).not.toBeInTheDocument();
+  });
 });

@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
 import { markBuildPlanDeleted, scheduleSync } from '@/sync';
-import { EmptyState, Panel, Spinner } from '@/components/ui';
+import { EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { beginEveLogin } from '@/app/loginFlow';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -55,6 +56,7 @@ export function Industry() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   const [ownedBlueprints, setOwnedBlueprints] = useState<CharacterBlueprint[]>([]);
+  const [blueprintsNeedsReauth, setBlueprintsNeedsReauth] = useState(false);
   const [skills, setSkills] = useState<SkillLevels>({});
 
   useEffect(() => {
@@ -68,7 +70,8 @@ export function Industry() {
       ]);
       if (cancelled) return;
       setCatalog(cat);
-      setOwnedBlueprints(owned?.data ?? []);
+      setOwnedBlueprints(owned.cached?.data ?? []);
+      setBlueprintsNeedsReauth(owned.needsReauth);
       if (skillsResult?.data) {
         const map: SkillLevels = {};
         for (const skill of skillsResult.data.skills)
@@ -156,6 +159,17 @@ export function Industry() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <ActiveJobsPanel characterId={activeCharacterId} />
+
+      {blueprintsNeedsReauth && (
+        <Panel title={t('industry.blueprintsTitle')}>
+          <ReauthBanner
+            title={t('industry.blueprintsReauthTitle')}
+            hint={t('industry.blueprintsReauthHint')}
+            actionLabel={t('industry.blueprintsReauthAction')}
+            onLogin={() => void beginEveLogin()}
+          />
+        </Panel>
+      )}
 
       {!plans || !catalog ? (
         <div className="flex justify-center py-16">

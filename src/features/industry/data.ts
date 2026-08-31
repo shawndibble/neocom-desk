@@ -1,14 +1,18 @@
 /** Fetch + cache layer for owned blueprints: read-through against ESI via the shared `esi/cache` helpers. */
 import { getCharacterBlueprints, type CharacterBlueprint } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from '@/esi/cache';
+import { loadWithCacheStatus, type StatusResult } from '@/esi/cache';
 
 const KEY = 'blueprints';
 
-/** Owned blueprints (originals + copies) for a character. ESI or cache. */
+/**
+ * Owned blueprints (originals + copies) for a character. ESI or cache, with
+ * the auth-failure state exposed so the view can offer a re-login instead of
+ * silently prefilling nothing when the blueprints scope was revoked (issue #14).
+ */
 export function loadCharacterBlueprints(
   characterId: number
-): Promise<CachedResult<CharacterBlueprint[]> | null> {
-  return loadWithCache(characterId, KEY, () => getCharacterBlueprints(characterId));
+): Promise<StatusResult<CharacterBlueprint[]>> {
+  return loadWithCacheStatus(characterId, KEY, () => getCharacterBlueprints(characterId));
 }
 
 /**
