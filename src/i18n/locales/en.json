@@ -74,6 +74,7 @@
     "toolbar": "Toolbar",
     "addSkill": "Add skill",
     "searchPlaceholder": "Search skills…",
+    "filterByGroup": "Filter by skill group",
     "level": "Level {{level}}",
     "remapCount": "Remaps available",
     "remapCountTooltipLabel": "About remaps available",

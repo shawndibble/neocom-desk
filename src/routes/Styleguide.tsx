@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner, StatChip, Tabs } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  FilterChip,
+  Panel,
+  Spinner,
+  StatChip,
+  Tabs,
+} from '@/components/ui';
 
 const COLOR_TOKENS: { name: string; className: string; note?: string }[] = [
   { name: 'bg', className: 'bg-bg' },
@@ -40,6 +49,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export function Styleguide() {
   const [tab, setTab] = useState('open');
+  const [chipFilters, setChipFilters] = useState<Set<string>>(new Set(['Frigate']));
+
+  function toggleChip(name: string) {
+    setChipFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
 
   return (
     <div className="min-h-screen space-y-10 bg-bg p-6 text-text">
@@ -134,6 +153,22 @@ export function Styleguide() {
             <StatChip label="Training" value="Active" tone="success" />
             <StatChip label="Queue" value="2d left" tone="warning" />
             <StatChip label="Clone" value="Expired" tone="danger" />
+          </div>
+        </Panel>
+      </Section>
+
+      <Section title="FilterChip">
+        <Panel>
+          <div className="flex flex-wrap gap-2">
+            {['Frigate', 'Cruiser', 'Battleship', 'Capital'].map((name) => (
+              <FilterChip
+                key={name}
+                label={name}
+                selected={chipFilters.has(name)}
+                onToggle={() => toggleChip(name)}
+                count={name === 'Frigate' ? 12 : undefined}
+              />
+            ))}
           </div>
         </Panel>
       </Section>

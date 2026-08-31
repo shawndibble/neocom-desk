@@ -5,6 +5,7 @@ const FIXTURE: SkillType[] = [
   {
     typeID: 1,
     name: 'Spaceship Command',
+    description: '',
     groupID: 10,
     groupName: 'Spaceship Command',
     rank: 1,
@@ -15,6 +16,7 @@ const FIXTURE: SkillType[] = [
   {
     typeID: 2,
     name: 'Advanced Spaceship Command',
+    description: '',
     groupID: 10,
     groupName: 'Spaceship Command',
     rank: 5,

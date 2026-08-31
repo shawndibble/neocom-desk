@@ -3,6 +3,7 @@ export { Button } from './Button';
 export type { ButtonVariant, ButtonSize } from './Button';
 export { StatChip } from './StatChip';
 export type { StatChipTone } from './StatChip';
+export { FilterChip } from './FilterChip';
 export { DataAgeBadge } from './DataAgeBadge';
 export { EmptyState } from './EmptyState';
 export { Tabs } from './Tabs';
