@@ -3,6 +3,7 @@ import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore';
 import { db, type BuildPlanRecord, type SkillPlanRecord } from '@/db';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
+  deleteSyncedSetting,
   getSyncStatus,
   markBuildPlanDeleted,
   markPlanDeleted,
@@ -12,6 +13,7 @@ import {
   triggerSync,
   type SyncStatus,
 } from './planSync';
+import type { SyncedSettingTombstone } from './merge';
 
 type DocData = Record<string, unknown>;
 
@@ -128,6 +130,28 @@ function remoteBuildDoc(overrides: DocData = {}): DocData {
 
 function seedRemote(path: string, docs: DocData[]): void {
   remoteStore.set(path, new Map(docs.map((d) => [String(d.id ?? d.key), d])));
+}
+
+const SETTINGS_META_KEY = 'sync.__settingsMeta';
+const SETTINGS_TOMBSTONES_KEY = 'sync.__settingsTombstones';
+
+// Seed a synced setting locally as if setSyncedSetting had written it. The
+// allow-list is empty in production, so tests can't call setSyncedSetting;
+// planSync tolerates keys written outside it (a real device that synced before
+// a key was removed from the allow-list is in exactly this state).
+async function seedLocalSetting(
+  key: string,
+  value: unknown,
+  updatedAt = Date.now()
+): Promise<void> {
+  await db.settings.put({ key, value });
+  const meta = ((await db.settings.get(SETTINGS_META_KEY))?.value ?? {}) as Record<string, number>;
+  await db.settings.put({ key: SETTINGS_META_KEY, value: { ...meta, [key]: updatedAt } });
+}
+
+async function readLocalSettingsTombstones(): Promise<SyncedSettingTombstone[]> {
+  const record = await db.settings.get(SETTINGS_TOMBSTONES_KEY);
+  return Array.isArray(record?.value) ? (record.value as SyncedSettingTombstone[]) : [];
 }
 
 beforeEach(async () => {
@@ -336,7 +360,7 @@ describe('triggerSync: build plans', () => {
 
 describe('triggerSync: settings', () => {
   it('pushes synced settings with timestamp and ownerHash', async () => {
-    await setSyncedSetting('sync.tradeHub', 'jita');
+    await seedLocalSetting('sync.tradeHub', 'jita');
     await triggerSync(1);
     const doc = remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub');
     expect(doc).toMatchObject({ key: 'sync.tradeHub', value: 'jita', ownerHash: HASH });
@@ -347,7 +371,7 @@ describe('triggerSync: settings', () => {
     seedRemote(SETTINGS_PATH, [
       { key: 'sync.tradeHub', value: 'amarr', updatedAt: Date.now() + 60_000, ownerHash: HASH },
     ]);
-    await setSyncedSetting('sync.tradeHub', 'jita');
+    await seedLocalSetting('sync.tradeHub', 'jita');
     await triggerSync(1);
     expect((await db.settings.get('sync.tradeHub'))?.value).toBe('amarr');
   });
@@ -376,6 +400,84 @@ describe('triggerSync: settings', () => {
 
   it('rejects setSyncedSetting keys without the sync. prefix', async () => {
     await expect(setSyncedSetting('theme', 'dark')).rejects.toThrow(/sync\./);
+  });
+
+  it('rejects setSyncedSetting keys that are not on the allow-list', async () => {
+    await expect(setSyncedSetting('sync.tradeHub', 'jita')).rejects.toThrow(/allow-list/);
+  });
+
+  it('deleteSyncedSetting removes the Dexie row and its meta entry', async () => {
+    await seedLocalSetting('sync.tradeHub', 'jita', 1_000);
+    await deleteSyncedSetting('sync.tradeHub');
+    expect(await db.settings.get('sync.tradeHub')).toBeUndefined();
+    const meta = (await db.settings.get(SETTINGS_META_KEY))?.value as Record<string, number>;
+    expect('sync.tradeHub' in meta).toBe(false);
+    expect(await readLocalSettingsTombstones()).toEqual([
+      { key: 'sync.tradeHub', deletedAt: expect.any(Number) },
+    ]);
+  });
+
+  it('deleteSyncedSetting propagates a tombstone to remote and keeps the local one', async () => {
+    // The local tombstone survives a successful push: it is the only defense
+    // against a stale device re-pushing its pre-delete copy once the remote
+    // tombstone ages past TOMBSTONE_TTL_MS and gets purged. It clears only
+    // once a remote write is observed postdating the delete (see merge.ts).
+    await seedLocalSetting('sync.tradeHub', 'jita', Date.now() - 5_000);
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'jita', updatedAt: Date.now() - 5_000, ownerHash: HASH },
+    ]);
+    await deleteSyncedSetting('sync.tradeHub');
+
+    await triggerSync(1);
+    const doc = remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub');
+    expect(doc?.deleted).toBe(true);
+    expect(doc?.ownerHash).toBe(HASH);
+    expect('value' in (doc ?? {})).toBe(false);
+    expect(await readLocalSettingsTombstones()).toEqual([
+      { key: 'sync.tradeHub', deletedAt: expect.any(Number) },
+    ]);
+  });
+
+  it('a remote settings tombstone deletes the local setting on the next sync', async () => {
+    await seedLocalSetting('sync.tradeHub', 'jita', Date.now() - 5_000);
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', updatedAt: Date.now() - 100, ownerHash: HASH, deleted: true },
+    ]);
+    await triggerSync(1);
+    expect(await db.settings.get('sync.tradeHub')).toBeUndefined();
+    const meta = (await db.settings.get(SETTINGS_META_KEY))?.value as Record<string, number>;
+    expect('sync.tradeHub' in meta).toBe(false);
+  });
+
+  it('purges a remote settings tombstone older than 30 days', async () => {
+    seedRemote(SETTINGS_PATH, [
+      {
+        key: 'sync.tradeHub',
+        updatedAt: Date.now() - TOMBSTONE_TTL_MS - 60_000,
+        ownerHash: HASH,
+        deleted: true,
+      },
+    ]);
+    await triggerSync(1);
+    expect(remoteStore.get(SETTINGS_PATH)?.has('sync.tradeHub')).toBe(false);
+  });
+
+  it('a rewrite after the delete supersedes the local settings tombstone', async () => {
+    // seedLocalSetting stands in for setSyncedSetting re-adding an allow-listed key.
+    await db.settings.put({
+      key: SETTINGS_TOMBSTONES_KEY,
+      value: [{ key: 'sync.tradeHub', deletedAt: Date.now() - 1_000 }],
+    });
+    await seedLocalSetting('sync.tradeHub', 'amarr', Date.now());
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'jita', updatedAt: Date.now() - 5_000, ownerHash: HASH },
+    ]);
+    await triggerSync(1);
+    expect(remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub')).toMatchObject({
+      value: 'amarr',
+      deleted: false,
+    });
+    expect(await readLocalSettingsTombstones()).toEqual([]);
   });
 });
 

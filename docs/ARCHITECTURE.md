@@ -46,7 +46,7 @@ External dependencies: `esi.evetech.net`, `login.eveonline.com`,
 | `src/sde`                                          | `loadSde.ts` (fetch+memoize `public/data/{skills,blueprints,types}.json`, built by `scripts/build-sde.mjs`), `types.ts` (`SkillType`, `BlueprintMap`, `TypeMap`)                                                                                                                                                                                                                                                                                                                                                                                                    | Make ESI calls                                                                                                                       | `features/skills`, `features/industry`, `features/market`                |
 | `src/stores`                                       | Zustand stores: `activeCharacter.ts` (persisted via Dexie `settings`, `hydrate`/`setActiveCharacter`), `publicInfo.ts` (session-only corp/alliance name cache, not durable)                                                                                                                                                                                                                                                                                                                                                                                         | Persist editable data outside `src/db`/sync                                                                                          | `app`, `routes/Characters.tsx`                                           |
 | `src/styles`                                       | `index.css` — Tailwind v4 `@theme` tokens per `docs/DESIGN.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Component logic                                                                                                                      | build pipeline                                                           |
-| `src/sync`                                         | `index.ts` (public barrel — **import from `@/sync` only**), `planSync.ts` (driver: `triggerSync`/`scheduleSync`/status/`markPlanDeleted`/`markBuildPlanDeleted`/`setSyncedSetting`), `merge.ts` (pure LWW+tombstone merge, no Firebase import, unit-testable), `syncAuth.ts` (`ensureSignedIn` → `mintFirebaseToken` exchange), `firebaseApp.ts` (lazy Firebase app/auth/firestore/functions getters)                                                                                                                                                               | UI wiring (owned by `src/app`)                                                                                                       | `app/App.tsx`, `routes/Industry.tsx`, `features/skills/planner`          |
+| `src/sync`                                         | `index.ts` (public barrel — **import from `@/sync` only**), `planSync.ts` (driver: `triggerSync`/`scheduleSync`/status/`markPlanDeleted`/`markBuildPlanDeleted`/`setSyncedSetting`/`deleteSyncedSetting`), `merge.ts` (pure LWW+tombstone merge, no Firebase import, unit-testable), `syncedSettings.ts` (`SYNCED_SETTING_KEYS` allow-list + pinned test), `syncAuth.ts` (`ensureSignedIn` → `mintFirebaseToken` exchange), `firebaseApp.ts` (lazy Firebase app/auth/firestore/functions getters)                                                                   | UI wiring (owned by `src/app`)                                                                                                       | `app/App.tsx`, `routes/Industry.tsx`, `features/skills/planner`          |
 
 ## 3. Data flows
 
@@ -81,12 +81,16 @@ share the raw `readCached`/`writeCached` primitives and the
 UI mutates `db.skillPlans`/`db.buildPlans`/`setSyncedSetting` directly, then
 calls `scheduleSync(characterId)` (2s debounce) or `triggerSync` for
 immediate. Deletes MUST go through `markPlanDeleted`/`markBuildPlanDeleted`
-(records a tombstone) — a plain Dexie delete resurrects from the remote copy.
+/`deleteSyncedSetting` (each records a tombstone) — a plain Dexie delete
+resurrects from the remote copy. `setSyncedSetting` also enforces the
+`SYNCED_SETTING_KEYS` allow-list (`src/sync/syncedSettings.ts`); adding a
+synced setting is a deliberate two-file edit (list + its pinned test).
 `triggerSync` → `syncAuth.ensureSignedIn` (mints a Firebase custom token from
 the current EVE access token, uid `char:{characterId}`, claim `ownerHash`) →
 per collection: fetch remote docs filtered `where(ownerHash==current)` →
-`merge.mergeRecords` (last-write-wins by `updatedAt`, tombstones kept 30 days)
-→ push/pull/delete accordingly. Syncs are globally serialized (one Firebase
+`merge.mergeRecords`/`merge.mergeSettings` (last-write-wins by `updatedAt`;
+remote tombstones kept 30 days, local settings tombstones until the key is
+rewritten) → push/pull/delete accordingly. Syncs are globally serialized (one Firebase
 session, swapped on character switch) and coalesced per character. If a
 character's `ownerHash` changed since the last sync (sold/transferred), local
 plans for it are wiped first (`handleOwnerHashChange`).

@@ -6,6 +6,7 @@ import {
   TOMBSTONE_TTL_MS,
   type LocalTombstone,
   type RemotePlanDoc,
+  type SyncedSettingTombstone,
 } from './merge';
 
 const NOW = 1_756_000_000_000;
@@ -173,10 +174,21 @@ describe('mergeRecords', () => {
 });
 
 describe('mergeSettings', () => {
+  const EMPTY_RESULT = {
+    push: [],
+    pull: [],
+    pushTombstones: [],
+    deleteLocal: [],
+    purgeRemote: [],
+    clearLocalTombstones: [],
+  };
+
   it('pushes local-only keys and pulls remote-only keys', () => {
     const result = mergeSettings(
       [{ key: 'sync.theme', value: 'dark', updatedAt: NOW }],
-      [{ key: 'sync.hub', value: 'jita', updatedAt: NOW }]
+      [],
+      [{ key: 'sync.hub', value: 'jita', updatedAt: NOW }],
+      NOW
     );
     expect(result.push.map((s) => s.key)).toEqual(['sync.theme']);
     expect(result.pull.map((s) => s.key)).toEqual(['sync.hub']);
@@ -188,10 +200,12 @@ describe('mergeSettings', () => {
         { key: 'sync.a', value: 1, updatedAt: NOW },
         { key: 'sync.b', value: 1, updatedAt: NOW - 100 },
       ],
+      [],
       [
         { key: 'sync.a', value: 2, updatedAt: NOW - 100 },
         { key: 'sync.b', value: 2, updatedAt: NOW },
-      ]
+      ],
+      NOW
     );
     expect(result.push.map((s) => s.key)).toEqual(['sync.a']);
     expect(result.pull.map((s) => s.key)).toEqual(['sync.b']);
@@ -200,8 +214,144 @@ describe('mergeSettings', () => {
   it('equal timestamps are left alone', () => {
     const result = mergeSettings(
       [{ key: 'sync.a', value: 1, updatedAt: NOW }],
-      [{ key: 'sync.a', value: 1, updatedAt: NOW }]
+      [],
+      [{ key: 'sync.a', value: 1, updatedAt: NOW }],
+      NOW
     );
-    expect(result).toEqual({ push: [], pull: [] });
+    expect(result).toEqual(EMPTY_RESULT);
+  });
+
+  it('pushes a settings tombstone when the remote copy is older than the delete', () => {
+    const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 100 };
+    const result = mergeSettings(
+      [],
+      [tombstone],
+      [{ key: 'sync.a', value: 1, updatedAt: NOW - 500 }],
+      NOW
+    );
+    expect(result.pushTombstones).toEqual([tombstone]);
+    expect(result.pull).toEqual([]);
+  });
+
+  it('a remote write newer than the local delete resurrects the setting', () => {
+    const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 500 };
+    const result = mergeSettings(
+      [],
+      [tombstone],
+      [{ key: 'sync.a', value: 2, updatedAt: NOW - 100 }],
+      NOW
+    );
+    expect(result.pull).toEqual([{ key: 'sync.a', value: 2, updatedAt: NOW - 100 }]);
+    expect(result.pushTombstones).toEqual([]);
+    expect(result.clearLocalTombstones).toEqual(['sync.a']);
+  });
+
+  it('reasserts a local settings tombstone with no remote counterpart (not cleared)', () => {
+    const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 100 };
+    const result = mergeSettings([], [tombstone], [], NOW);
+    expect(result.pushTombstones).toEqual([tombstone]);
+    expect(result.clearLocalTombstones).toEqual([]);
+  });
+
+  it('a remote settings tombstone deletes the local setting', () => {
+    const result = mergeSettings(
+      [{ key: 'sync.a', value: 1, updatedAt: NOW - 500 }],
+      [],
+      [{ key: 'sync.a', updatedAt: NOW - 100, deleted: true }],
+      NOW
+    );
+    expect(result.deleteLocal).toEqual(['sync.a']);
+    expect(result.push).toEqual([]);
+  });
+
+  it('a local rewrite newer than a remote settings tombstone wins', () => {
+    const result = mergeSettings(
+      [{ key: 'sync.a', value: 9, updatedAt: NOW - 100 }],
+      [],
+      [{ key: 'sync.a', updatedAt: NOW - 500, deleted: true }],
+      NOW
+    );
+    expect(result.push.map((s) => s.value)).toEqual([9]);
+    expect(result.deleteLocal).toEqual([]);
+  });
+
+  it('purges remote settings tombstones older than 30 days', () => {
+    const result = mergeSettings(
+      [],
+      [],
+      [{ key: 'sync.a', updatedAt: NOW - TOMBSTONE_TTL_MS - 1, deleted: true }],
+      NOW
+    );
+    expect(result.purgeRemote).toEqual(['sync.a']);
+  });
+
+  it('keeps remote settings tombstones younger than 30 days', () => {
+    const result = mergeSettings(
+      [],
+      [],
+      [{ key: 'sync.a', updatedAt: NOW - TOMBSTONE_TTL_MS + 1000, deleted: true }],
+      NOW
+    );
+    expect(result.purgeRemote).toEqual([]);
+    expect(result.deleteLocal).toEqual([]);
+  });
+
+  it('a live local write supersedes its own settings tombstone', () => {
+    const result = mergeSettings(
+      [{ key: 'sync.a', value: 1, updatedAt: NOW }],
+      [{ key: 'sync.a', deletedAt: NOW - 5000 }],
+      [],
+      NOW
+    );
+    expect(result.clearLocalTombstones).toEqual(['sync.a']);
+    expect(result.push.map((s) => s.key)).toEqual(['sync.a']);
+  });
+
+  it('a local settings tombstone is not time-limited (no TTL expiry)', () => {
+    const tombstone: SyncedSettingTombstone = {
+      key: 'sync.a',
+      deletedAt: NOW - TOMBSTONE_TTL_MS * 4,
+    };
+    const result = mergeSettings(
+      [],
+      [tombstone],
+      [{ key: 'sync.a', value: 1, updatedAt: NOW - TOMBSTONE_TTL_MS * 5 }],
+      NOW
+    );
+    expect(result.pushTombstones).toEqual([tombstone]);
+    expect(result.clearLocalTombstones).toEqual([]);
+    expect(result.pull).toEqual([]);
+  });
+
+  it('does not clear a local tombstone just because remote already carries its own', () => {
+    // The remote tombstone is only good for TOMBSTONE_TTL_MS. If the local
+    // tombstone were cleared here, nothing would defend this device once the
+    // remote copy is purged and a stale device re-pushes its pre-delete value.
+    const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 1000 };
+    const result = mergeSettings(
+      [],
+      [tombstone],
+      [{ key: 'sync.a', updatedAt: NOW - 500, deleted: true }],
+      NOW
+    );
+    expect(result.deleteLocal).toEqual([]);
+    expect(result.clearLocalTombstones).toEqual([]);
+  });
+
+  it('reasserts the delete against a stale re-push after the remote tombstone was purged', () => {
+    // Device A deleted sync.a and its remote tombstone has since aged out
+    // (purged by some sync). Device B was offline the whole time and re-pushes
+    // its pre-deletion copy as a live doc, older than the delete. Device A's
+    // local tombstone (never cleared, per the two tests above) must win.
+    const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 1000 };
+    const result = mergeSettings(
+      [],
+      [tombstone],
+      [{ key: 'sync.a', value: 'stale', updatedAt: NOW - 2000 }],
+      NOW
+    );
+    expect(result.pushTombstones).toEqual([tombstone]);
+    expect(result.pull).toEqual([]);
+    expect(result.clearLocalTombstones).toEqual([]);
   });
 });

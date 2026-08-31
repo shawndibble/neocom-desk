@@ -9,6 +9,7 @@ export {
   markPlanDeleted,
   markBuildPlanDeleted,
   setSyncedSetting,
+  deleteSyncedSetting,
   type SyncState,
   type SyncStatus,
 } from './planSync';
