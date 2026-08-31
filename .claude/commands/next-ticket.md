@@ -51,6 +51,49 @@ back to the main checkout, `git worktree remove "$WORKTREE_PATH" --force`,
 `git worktree prune`, then stop per that step's instructions (report and
 STOP, or continue to pick a different ticket, as stated).
 
+## Resilience: merge conflicts and failing tests
+
+Both failure classes below are expected, not exceptional — concurrent
+`/next-ticket` runs (or a human) can land on `main` while this one is still
+working, and a gate can fail mid-implementation. Neither should kill the run;
+both procedures are bounded, so if a bound is exceeded the run abandons
+cleanly per the procedure above instead of looping unboundedly.
+
+### Sync-with-main / conflict resolution procedure
+
+Referenced by steps 6 and 8 whenever the branch is behind `main` or a PR
+reports `mergeStateStatus: CONFLICTING`/`DIRTY`. Up to **3 attempts**:
+
+1. `git fetch origin main`
+2. `git merge origin/main --no-edit`
+3. If it reports conflicts, invoke the `resolving-merge-conflicts` skill to
+   resolve them in place — it resolves and commits; never `git merge --abort`.
+4. Re-run the local gate (step 6's Bash chain) against the merged tree. If it
+   fails, follow the local gate failure procedure below.
+5. If the merge left anything uncommitted, commit it.
+
+If a 3rd attempt still leaves conflicts (main moving faster than this run can
+converge — very unlikely), abandon and report that `main` would not settle.
+
+### Local gate failure procedure
+
+Referenced by step 6, and by step 8 whenever a post-merge re-check is needed.
+Up to **5 rounds**:
+
+1. Read the failing command's output directly — it's local, not a CI log, so
+   no sub-agent is needed here.
+2. Fix the actual cause: code or test, whichever is wrong. Never delete,
+   skip, or loosen a test just to make it pass.
+3. If a failure looks pre-existing and unrelated to this ticket's diff (e.g.
+   a flaky or environment-dependent test), confirm before ignoring it: `git
+stash`, run just that one check, `git stash pop`. If it fails identically
+   without this ticket's changes, note it in the PR's Review notes instead of
+   trying to fix it.
+4. Re-run the full gate chain.
+
+If still failing after 5 rounds: comment on the issue with a precise summary
+of the remaining failure, then abandon per the procedure above.
+
 ## 1. Prepare
 
 - `gh auth status` must succeed. If not, stop and report.
@@ -158,17 +201,22 @@ batch the exploration reads, and make one edit per file rather than a stream of
 small ones. `/code-review` runs its two axes as parallel sub-agents — do not
 run them inline.
 
-## 6. Local gate (mirror CI)
+## 6. Sync with main, then the local gate (mirror CI)
 
-Run the gate as **one Bash call** — these always run together, and five
+`main` may have moved since step 3 (another `/next-ticket` run or a human
+merge) — catch that now rather than at PR-merge time. Run the sync-with-main
+procedure above once, unconditionally, before the gate.
+
+Then run the gate as **one Bash call** — these always run together, and five
 separate calls cost five full context re-reads:
 
 ```
 npm run format:check && npm run lint && npm run typecheck && npm run test:run && npm run build
 ```
 
-`&&` stops at the first failure, which is the one you need to see. Fix it, then
-re-run the whole chain. `npm run format` auto-fixes formatting.
+`&&` stops at the first failure, which is the one you need to see. If it
+fails, follow the local gate failure procedure above (bounded to 5 rounds)
+rather than looping freely. `npm run format` auto-fixes formatting.
 
 Do **not** run `npm run test:e2e` locally — one spec
 (`e2e/plans.spec.ts` clipboard export) fails only on Windows due to a clipboard
@@ -185,11 +233,18 @@ export/clipboard behaviour, reason about e2e impact from the spec instead.
     and a "Review notes" section for unaddressed judgement-call findings from
     `/code-review`.
 
-## 8. Drive CI green
+## 8. Drive to a mergeable, green PR
 
+Loop up to **5 rounds** (this budget is shared across both triggers below —
+it is not 5 conflict rounds plus 5 CI rounds):
+
+- **Mergeability first**: `gh pr view <pr> --json mergeStateStatus --jq
+.mergeStateStatus`. If it's `CONFLICTING` or `DIRTY`, run the
+  sync-with-main / conflict resolution procedure above, push, and restart
+  this round (re-check CI below against the new commit).
 - `gh pr checks <pr> --watch --interval 30` (blocks until `validate` + `e2e`
   finish).
-- **If any check fails**, up to **5 rounds**:
+- **If any check fails**, within the same round budget:
   1. Diagnose in a **sub-agent** — CI logs run to tens of thousands of tokens
      and you only need the conclusion. Give it the run id and have it fetch
      `gh run view <run-id> --log-failed` (and, for an `e2e` failure,
@@ -203,14 +258,20 @@ export/clipboard behaviour, reason about e2e impact from the spec instead.
      actually wrong — do not delete a failing test to make it pass).
   3. Re-run the local gate (step 6), commit, `git push`.
   4. `gh pr checks <pr> --watch --interval 30` again.
-- If still red after 5 rounds: comment on the PR **and** the issue with a
-  precise summary of the remaining failure, leave the PR open, abandon per the
-  procedure above (this removes the claim so a human — or a future run, once
-  someone fixes the blocker — can pick it back up), and **STOP**.
+- Once a round trips neither trigger — mergeable and green — proceed to
+  step 9.
+- If still not both mergeable and green after 5 rounds: comment on the PR
+  **and** the issue with a precise summary of the remaining failure, leave the
+  PR open, abandon per the procedure above (this removes the claim so a
+  human — or a future run, once someone fixes the blocker — can pick it back
+  up), and **STOP**.
 
 ## 9. Merge, close, and clean up
 
-- All checks green → `gh pr merge <pr> --squash --delete-branch`.
+- All checks green and mergeable → `gh pr merge <pr> --squash --delete-branch`.
+  If this fails anyway (a last-second race — something merged to `main`
+  between step 8's check and now), re-run step 8's mergeability check once
+  more; if it still won't merge, abandon per the procedure above.
 - The squash commit carries `Closes #<n>`, so the issue auto-closes on merge to
   `main`. Verify with `gh issue view <n> --json state`; if still `OPEN`, run
   `gh issue close <n> --comment "Merged in <pr-url>"`.
