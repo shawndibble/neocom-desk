@@ -20,6 +20,18 @@ Tickets from `/to-tickets` record blockers as free text in a `## Blocked by` sec
 2. "None" / "None — can start immediately" → unblocked.
 3. Otherwise extract every `#<n>` reference and check each with `gh issue view <n> --json state`. The ticket is unblocked only when every referenced issue is `CLOSED`.
 
+## Concurrency claim
+
+`/next-ticket` can run as several parallel processes on one machine, each in
+its own `git worktree`. A ticket is **claimed** by an assignee (`@me`) _and_
+the `in-progress` label — the label is the real guard, since parallel runs all
+authenticate as the same `gh` user, so "assigned to me" alone can't tell two
+concurrent runs apart. Ticket selection is additionally serialized by a local
+lock file under the shared `.git` dir, so two runs can never select the same
+ticket in the first place. Release both the assignee and the label
+(`gh issue edit <n> --remove-assignee @me --remove-label in-progress`) on any
+early exit so the ticket becomes pickable again.
+
 ## PRs as a request surface
 
 **No.** External PRs are not triaged as feature requests. (Set to `yes` here if that changes.)
