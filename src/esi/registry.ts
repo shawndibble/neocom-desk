@@ -2,13 +2,10 @@
  * Single source of truth for every ESI endpoint NeoCom Desk calls: the OAuth
  * scope it needs, or an explicit "public".
  *
- * Two consumers derive from it rather than restate it — `esi/scopes.ts` for
- * the login request, `app/routeScopes.ts` for each gated route — so neither
- * can drift from the endpoints the app actually calls.
- *
- * The `route` template has no runtime consumer; it exists so `registry.test.ts`
- * can pin it against the `// --- METHOD /route (scope) ---` markers in
- * `endpoints.ts`.
+ * Three consumers derive from it rather than restate it — `esi/scopes.ts` for
+ * the login request, `app/routeScopes.ts` for each gated route,
+ * `esi/endpointRoutes.ts` for the runtime route-template lookup — so none can
+ * drift from the endpoints the app actually calls.
  *
  * Pure static data, importing nothing at runtime (`endpoints.ts` is referenced
  * type-only), so `e2e/support` fixtures can import it without dragging in
@@ -147,6 +144,14 @@ export const ESI_REGISTRY = {
   },
   postUniverseNames: {
     route: '/universe/names',
+    scope: PUBLIC,
+  },
+  getMarketsPrices: {
+    route: '/markets/prices',
+    scope: PUBLIC,
+  },
+  getIndustrySystemCostIndices: {
+    route: '/industry/systems',
     scope: PUBLIC,
   },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;

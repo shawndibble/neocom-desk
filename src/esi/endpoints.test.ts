@@ -28,6 +28,8 @@ import {
   getCharacterOrders,
   getCharacterOrderHistory,
   getCharacterIndustryJobs,
+  getMarketsPrices,
+  getIndustrySystemCostIndices,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
 
@@ -739,5 +741,40 @@ describe('industry jobs', () => {
     await getCharacterIndustryJobs(CHARACTER_ID, { includeCompleted: true });
 
     expect(query?.get('include_completed')).toBe('true');
+  });
+});
+
+describe('market and industry public endpoints', () => {
+  it('getMarketsPrices is unauthenticated and returns the raw price list', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/prices`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json([{ type_id: 34, adjusted_price: 5.5, average_price: 5.2 }]);
+      })
+    );
+
+    const result = await getMarketsPrices();
+
+    expect(result.data).toEqual([{ type_id: 34, adjusted_price: 5.5, average_price: 5.2 }]);
+  });
+
+  it('getIndustrySystemCostIndices is unauthenticated and returns the raw index list', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/industry/systems`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json([
+          {
+            solar_system_id: 30000142,
+            cost_indices: [{ activity: 'manufacturing', cost_index: 0.0464 }],
+          },
+        ]);
+      })
+    );
+
+    const result = await getIndustrySystemCostIndices();
+
+    expect(result.data?.[0].solar_system_id).toBe(30000142);
   });
 });
