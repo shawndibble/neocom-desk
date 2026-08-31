@@ -420,15 +420,19 @@ describe('SkillPlans editor: optimize remaps', () => {
     await screen.findByText('Computed queue');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
-    expect(await screen.findByRole('heading', { name: 'Optimize remaps' })).toBeInTheDocument();
+    const panel = (await screen.findByRole('heading', { name: 'Optimize remaps' })).closest(
+      'section'
+    )!;
     // Single verdict line (UX-REVIEW #2), not the Total/Current/Savings triple.
-    expect(screen.getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
-    expect(screen.queryByText(/Total time/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Current attributes/)).not.toBeInTheDocument();
+    expect(within(panel).getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
+    expect(within(panel).queryByText(/Total time/)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Current attributes/)).not.toBeInTheDocument();
     // Actionable per-segment instruction (UX-REVIEW #6): the plan is
     // perception/willpower-heavy, so the remap maxes PER.
-    expect(screen.getByText(/Segment 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Before Gunnery I, remap to PER 27 \/ WIL 21 \/ /)).toBeInTheDocument();
+    expect(within(panel).getByText(/Segment 1/)).toBeInTheDocument();
+    expect(
+      within(panel).getByText(/Before Gunnery I, remap to PER 27 \/ WIL 21 \/ /)
+    ).toBeInTheDocument();
   });
 
   it('says no remap helps (and hides segments) when current attributes are already optimal', async () => {

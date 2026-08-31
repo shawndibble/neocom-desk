@@ -134,7 +134,15 @@
     "markersNoGain": "Remapping at these markers doesn't save time — try moving them.",
     "segmentCurrent": "From {{skill}}, keep current attributes",
     "remapFromEveReady": "From EVE: {{bonus}} bonus + yearly ready",
-    "remapFromEveCooldown": "From EVE: {{bonus}} bonus + yearly on cooldown until {{date}}"
+    "remapFromEveCooldown": "From EVE: {{bonus}} bonus + yearly on cooldown until {{date}}",
+    "headerTitle": "Plan summary",
+    "headerTrainingTime": "Training time",
+    "headerSkillCount": "Skills",
+    "headerProjectedFinish": "Projected finish",
+    "headerNoFinish": "—",
+    "headerSavings": "Remapping saves {{duration}}",
+    "headerNoSavings": "No remap improves this plan",
+    "headerSavingsCapped": "(evaluated at {{evaluated}} remaps)"
   },
   "industry": {
     "title": "Build Plans",

@@ -28,7 +28,13 @@ import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { ComputedQueue } from './ComputedQueue';
+import { PlanHeader } from './PlanHeader';
 import { formatDuration } from '@/lib/duration';
+import {
+  evaluateOptimisationBadge,
+  projectedFinish,
+  MIN_MEANINGFUL_SAVINGS_SECONDS,
+} from './planHeaderStats';
 import { dedupeEntries, removeEntry, upsertEntry, applyReorderSuggestion } from './reorder';
 import {
   addMarker,
@@ -42,9 +48,6 @@ import { whatIfImplants, WHAT_IF_IMPLANT_MODES, type WhatIfImplantMode } from '.
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-
-// Below a minute the remap verdict reads "saves 0m" — treat it as no gain.
-const MIN_MEANINGFUL_SAVINGS_SECONDS = 60;
 
 /** "PER 27 / WIL 21 / INT 17 / …": full remap spread, highest first. */
 function remapInstruction(attributes: Attributes): string {
@@ -205,6 +208,22 @@ export function PlanEditor({
   );
   const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0;
 
+  // Header stats: live, so they need no click and no spinner — placeRemaps
+  // stays fast enough at the plan sizes this app supports.
+  const headerBadge = useMemo(
+    () =>
+      evaluateOptimisationBadge(scheduled, catalog.engineSkills, {
+        remapCount: plan.remapCount,
+        currentAttributes: attributes,
+        implants: effectiveImplants,
+      }),
+    [scheduled, catalog, plan.remapCount, attributes, effectiveImplants]
+  );
+  const headerProjectedFinish = useMemo(
+    () => projectedFinish(totalSeconds, new Date()),
+    [totalSeconds]
+  );
+
   function update(entries: PlanEntry[]) {
     onUpdate({ entries });
   }
@@ -304,6 +323,13 @@ export function PlanEditor({
 
   return (
     <div className="space-y-4">
+      <PlanHeader
+        totalSeconds={totalSeconds}
+        skillCount={plan.entries.length}
+        projectedFinish={headerProjectedFinish}
+        badge={headerBadge}
+      />
+
       <Panel title={t('plans.yourEntries')}>
         <div className="space-y-3">
           <SkillPicker
