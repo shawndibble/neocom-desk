@@ -96,6 +96,19 @@ export function Orders() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  // Both tabs read the same scope (esi-markets.read_character_orders.v1), so
+  // the same banner covers either panel losing it.
+  const reauthBanner = (
+    <div className="px-3 py-2">
+      <ReauthBanner
+        title={t('orders.reauthTitle')}
+        hint={t('orders.reauthHint')}
+        actionLabel={t('orders.reauthAction')}
+        onLogin={() => void beginEveLogin()}
+      />
+    </div>
+  );
+
   function renderRows(rows: MarketOrder[], withState: boolean) {
     return (
       <table className="w-full text-xs">
@@ -170,14 +183,7 @@ export function Orders() {
           actions={ordersResult ? <DataAgeBadge date={ordersResult.fetchedAt} /> : undefined}
         >
           {ordersNeedsReauth ? (
-            <div className="px-3 py-2">
-              <ReauthBanner
-                title={t('orders.reauthTitle')}
-                hint={t('orders.reauthHint')}
-                actionLabel={t('orders.reauthAction')}
-                onLogin={() => void beginEveLogin()}
-              />
-            </div>
+            reauthBanner
           ) : !ordersResult || orders.length === 0 ? (
             <EmptyState
               title={t('orders.emptyTitle')}
@@ -201,14 +207,7 @@ export function Orders() {
           actions={historyResult ? <DataAgeBadge date={historyResult.fetchedAt} /> : undefined}
         >
           {historyNeedsReauth ? (
-            <div className="px-3 py-2">
-              <ReauthBanner
-                title={t('orders.reauthTitle')}
-                hint={t('orders.reauthHint')}
-                actionLabel={t('orders.reauthAction')}
-                onLogin={() => void beginEveLogin()}
-              />
-            </div>
+            reauthBanner
           ) : !historyResult || history.length === 0 ? (
             <EmptyState
               title={t('orders.historyEmptyTitle')}
