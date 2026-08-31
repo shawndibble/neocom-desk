@@ -50,9 +50,12 @@ import {
   type RemoteBuildPlanDoc,
   type RemoteDoc,
   type RemotePlanDoc,
+  type RemoteSyncedSetting,
+  type SyncedSettingTombstone,
   type SyncedSettingValue,
   type SyncRecord,
 } from './merge';
+import { isAllowedSyncedSettingKey } from './syncedSettings';
 
 // ---------------------------------------------------------------------------
 // Local bookkeeping (Dexie settings table). Keys under 'sync.__' are internal
@@ -67,6 +70,10 @@ const buildPlanTombstonesKey = (characterId: number) =>
   `${INTERNAL_PREFIX}buildTombstones.${characterId}`;
 const ownerHashKey = (characterId: number) => `${INTERNAL_PREFIX}ownerHash.${characterId}`;
 const SETTINGS_META_KEY = `${INTERNAL_PREFIX}settingsMeta`;
+// Synced settings are a single global set (not per-character, like plans), so
+// their tombstones live under one global key too — a delete recorded during
+// one character's sync must be visible on every other character's pass.
+const SETTINGS_TOMBSTONES_KEY = `${INTERNAL_PREFIX}settingsTombstones`;
 
 function isSyncedSettingKey(key: string): boolean {
   return key.startsWith(SYNCED_PREFIX) && !key.startsWith(INTERNAL_PREFIX);
@@ -90,6 +97,15 @@ async function readSettingsMeta(): Promise<Record<string, number>> {
 
 async function writeSettingsMeta(meta: Record<string, number>): Promise<void> {
   await db.settings.put({ key: SETTINGS_META_KEY, value: meta });
+}
+
+async function readSettingsTombstones(): Promise<SyncedSettingTombstone[]> {
+  const record = await db.settings.get(SETTINGS_TOMBSTONES_KEY);
+  return Array.isArray(record?.value) ? (record.value as SyncedSettingTombstone[]) : [];
+}
+
+async function writeSettingsTombstones(tombstones: SyncedSettingTombstone[]): Promise<void> {
+  await db.settings.put({ key: SETTINGS_TOMBSTONES_KEY, value: tombstones });
 }
 
 // ---------------------------------------------------------------------------
@@ -176,10 +192,41 @@ export async function setSyncedSetting(key: string, value: unknown): Promise<voi
   if (!isSyncedSettingKey(key)) {
     throw new Error(`Synced settings keys must start with '${SYNCED_PREFIX}' (got '${key}')`);
   }
+  if (!isAllowedSyncedSettingKey(key)) {
+    throw new Error(
+      `'${key}' is not on the synced-settings allow-list. Add it to SYNCED_SETTING_KEYS ` +
+        `in src/sync/syncedSettings.ts (and its pinned test), and delete it via ` +
+        `deleteSyncedSetting so the tombstone path applies.`
+    );
+  }
   await db.settings.put({ key, value });
   const meta = await readSettingsMeta();
   meta[key] = Date.now();
   await writeSettingsMeta(meta);
+}
+
+/**
+ * Delete a synced setting locally and record a tombstone so the deletion
+ * propagates to other devices on the next sync. Always use this instead of a
+ * plain Dexie delete, or the setting resurrects from the remote copy.
+ *
+ * Deliberately does NOT check the allow-list — a key removed from
+ * SYNCED_SETTING_KEYS must still be deletable. Like setSyncedSetting it leaves
+ * scheduling to the caller (pair it with scheduleSync(characterId)).
+ */
+export async function deleteSyncedSetting(key: string): Promise<void> {
+  if (!isSyncedSettingKey(key)) {
+    throw new Error(`Synced settings keys must start with '${SYNCED_PREFIX}' (got '${key}')`);
+  }
+  await db.settings.delete(key);
+  const meta = await readSettingsMeta();
+  if (key in meta) {
+    delete meta[key];
+    await writeSettingsMeta(meta);
+  }
+  const tombstones = (await readSettingsTombstones()).filter((t) => t.key !== key);
+  tombstones.push({ key, deletedAt: Date.now() });
+  await writeSettingsTombstones(tombstones);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,31 +477,64 @@ async function syncCharacter(characterId: number): Promise<void> {
   // (hostile or stale doc naming a non-synced Dexie key such as
   // 'activeCharacterId', or an internal 'sync.__' key) must never reach Dexie.
   const remoteSettings = snapshot.docs
-    .map((d) => d.data() as SyncedSettingValue)
+    .map((d) => d.data() as RemoteSyncedSetting)
     .filter((s) => typeof s.key === 'string' && isSyncedSettingKey(s.key));
   const meta = await readSettingsMeta();
+  const settingsTombstones = await readSettingsTombstones();
   const localSettings: SyncedSettingValue[] = (await db.settings.toArray())
     .filter((record) => isSyncedSettingKey(record.key))
     .map((record) => ({ key: record.key, value: record.value, updatedAt: meta[record.key] ?? 0 }));
 
-  const settings = mergeSettings(localSettings, remoteSettings);
+  const settings = mergeSettings(localSettings, settingsTombstones, remoteSettings, now);
   let metaDirty = false;
 
-  await Promise.all(
-    settings.push.map((s) => {
+  await Promise.all([
+    ...settings.push.map((s) => {
       // A key written outside setSyncedSetting has no timestamp yet: stamp now.
       const updatedAt = s.updatedAt > 0 ? s.updatedAt : now;
       if (meta[s.key] !== updatedAt) {
         meta[s.key] = updatedAt;
         metaDirty = true;
       }
-      return setDoc(doc(settingsCol, s.key), { key: s.key, value: s.value, updatedAt, ownerHash });
-    })
-  );
+      return setDoc(doc(settingsCol, s.key), {
+        key: s.key,
+        value: s.value,
+        updatedAt,
+        ownerHash,
+        deleted: false,
+      });
+    }),
+    ...settings.pushTombstones.map((t) =>
+      // No `value` field — Firestore rejects undefined, and a tombstone carries none.
+      setDoc(doc(settingsCol, t.key), {
+        key: t.key,
+        updatedAt: t.deletedAt,
+        ownerHash,
+        deleted: true,
+      })
+    ),
+    ...settings.purgeRemote.map((key) => deleteDoc(doc(settingsCol, key))),
+  ]);
+
   for (const s of settings.pull) {
     await db.settings.put({ key: s.key, value: s.value });
     meta[s.key] = s.updatedAt;
     metaDirty = true;
   }
+  for (const key of settings.deleteLocal) {
+    await db.settings.delete(key);
+    if (key in meta) {
+      delete meta[key];
+      metaDirty = true;
+    }
+  }
   if (metaDirty) await writeSettingsMeta(meta);
+
+  const settledTombstones = new Set([
+    ...settings.clearLocalTombstones,
+    ...settings.pushTombstones.map((t) => t.key),
+  ]);
+  if (settledTombstones.size > 0) {
+    await writeSettingsTombstones(settingsTombstones.filter((t) => !settledTombstones.has(t.key)));
+  }
 }
