@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadContracts } from '@/features/character/contracts';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
@@ -12,6 +13,8 @@ import type { Contract } from '@/esi/endpoints';
 interface Snapshot {
   requestKey: string;
   contractsResult: CachedResult<Contract[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  contractsNeedsReauth: boolean;
   issuerNames: Map<number, string>;
 }
 
@@ -46,12 +49,13 @@ export function Contracts() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const contractsResult = await loadContracts(activeCharacterId);
+      const { cached: contractsResult, needsReauth: contractsNeedsReauth } =
+        await loadContracts(activeCharacterId);
       if (cancelled) return;
       const issuerIds = (contractsResult?.data ?? []).map((c) => c.issuer_id);
       const issuerNames = await resolveNames(issuerIds);
       if (cancelled) return;
-      setSnapshot({ requestKey, contractsResult, issuerNames });
+      setSnapshot({ requestKey, contractsResult, contractsNeedsReauth, issuerNames });
     })();
     return () => {
       cancelled = true;
@@ -62,6 +66,7 @@ export function Contracts() {
   const current = snapshot?.requestKey === requestKey ? snapshot : null;
   const loading = current === null;
   const contractsResult = current?.contractsResult ?? null;
+  const contractsNeedsReauth = current?.contractsNeedsReauth ?? false;
   const issuerNames = current?.issuerNames ?? new Map<number, string>();
 
   const contracts = useMemo(
@@ -95,6 +100,13 @@ export function Contracts() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : contractsNeedsReauth ? (
+        <ReauthBanner
+          title={t('contracts.reauthTitle')}
+          hint={t('contracts.reauthHint')}
+          actionLabel={t('contracts.reauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
       ) : !contractsResult || contracts.length === 0 ? (
         <EmptyState title={t('contracts.emptyTitle')} hint={t('contracts.emptyHint')} />
       ) : (

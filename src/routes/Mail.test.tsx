@@ -122,4 +122,15 @@ describe('Mail', () => {
     render(<App />);
     expect(await screen.findByText(/no mail cached/i)).toBeInTheDocument();
   });
+
+  it('shows a re-login prompt (not a silent empty state) when the mail scope was revoked', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Log in again to see mail')).toBeInTheDocument();
+    expect(screen.queryByText(/no mail cached/i)).not.toBeInTheDocument();
+  });
 });

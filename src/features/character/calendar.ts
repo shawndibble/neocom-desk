@@ -5,18 +5,27 @@ import {
   type CalendarEventSummary,
   type CalendarEventDetail,
 } from '@/esi/endpoints';
-import { loadWithCache, type CachedResult } from '@/esi/cache';
+import {
+  loadWithCache,
+  loadWithCacheStatus,
+  type CachedResult,
+  type StatusResult,
+} from '@/esi/cache';
 
 const KEYS = {
   events: 'calendar',
   event: (eventId: number) => `calendar:${eventId}`,
 } as const;
 
-/** Upcoming/recent calendar events. ESI or cache. */
+/**
+ * Upcoming/recent calendar events. ESI or cache, with the auth-failure state
+ * exposed so the view can offer a re-login instead of a silent empty state
+ * when the calendar scope was revoked (issue #14).
+ */
 export function loadCalendarEvents(
   characterId: number
-): Promise<CachedResult<CalendarEventSummary[]> | null> {
-  return loadWithCache(
+): Promise<StatusResult<CalendarEventSummary[]>> {
+  return loadWithCacheStatus(
     characterId,
     KEYS.events,
     async () => (await getCharacterCalendar(characterId)).data

@@ -44,7 +44,8 @@ describe('loadContracts', () => {
 
     const result = await loadContracts(CHAR_ID);
 
-    expect(result?.data.map((c) => c.contract_id)).toEqual([1, 2]);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data.map((c) => c.contract_id)).toEqual([1, 2]);
   });
 
   it('falls back to cache offline', async () => {
@@ -60,6 +61,20 @@ describe('loadContracts', () => {
 
     const result = await loadContracts(CHAR_ID);
 
-    expect(result).toEqual({ data: [CONTRACT(1)], fetchedAt: new Date(9), fromCache: true });
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toEqual({ data: [CONTRACT(1)], fetchedAt: new Date(9), fromCache: true });
+  });
+
+  it('reports needsReauth when the contracts scope was revoked (403) and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadContracts(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
   });
 });

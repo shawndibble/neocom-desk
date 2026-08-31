@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadMailHeaders, loadMailBody } from '@/features/character/mail';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
@@ -12,6 +13,8 @@ import type { MailBody, MailHeader } from '@/esi/endpoints';
 interface Snapshot {
   requestKey: string;
   headersResult: CachedResult<MailHeader[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  headersNeedsReauth: boolean;
   senderNames: Map<number, string>;
 }
 
@@ -34,14 +37,15 @@ export function Mail() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const headersResult = await loadMailHeaders(activeCharacterId);
+      const { cached: headersResult, needsReauth: headersNeedsReauth } =
+        await loadMailHeaders(activeCharacterId);
       if (cancelled) return;
       const senderIds = (headersResult?.data ?? [])
         .map((h) => h.from)
         .filter((id): id is number => id !== undefined);
       const senderNames = await resolveNames(senderIds);
       if (cancelled) return;
-      setSnapshot({ requestKey, headersResult, senderNames });
+      setSnapshot({ requestKey, headersResult, headersNeedsReauth, senderNames });
     })();
     return () => {
       cancelled = true;
@@ -52,6 +56,7 @@ export function Mail() {
   const current = snapshot?.requestKey === requestKey ? snapshot : null;
   const loading = current === null;
   const headersResult = current?.headersResult ?? null;
+  const headersNeedsReauth = current?.headersNeedsReauth ?? false;
   const senderNames = current?.senderNames ?? new Map<number, string>();
 
   const headers = useMemo(
@@ -100,6 +105,13 @@ export function Mail() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : headersNeedsReauth ? (
+        <ReauthBanner
+          title={t('mail.reauthTitle')}
+          hint={t('mail.reauthHint')}
+          actionLabel={t('mail.reauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
       ) : !headersResult || headers.length === 0 ? (
         <EmptyState title={t('mail.emptyTitle')} hint={t('mail.emptyHint')} />
       ) : (

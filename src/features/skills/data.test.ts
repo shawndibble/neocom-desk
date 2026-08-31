@@ -9,6 +9,7 @@ import {
   loadCharacterAttributes,
   loadCharacterImplants,
   loadCharacterSkillQueue,
+  loadCharacterSkillQueueWithStatus,
   loadUniverseType,
   loadImplantBonuses,
 } from './data';
@@ -184,6 +185,33 @@ describe('loadCharacterSkillQueue', () => {
 
     expect(result?.data).toEqual(queue);
     expect(result?.fromCache).toBe(true);
+  });
+});
+
+describe('loadCharacterSkillQueueWithStatus (issue #14)', () => {
+  it('reports needsReauth on a 403 with nothing cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadCharacterSkillQueueWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
+  });
+
+  it('reports needsReauth false and returns data on a live fetch', async () => {
+    const queue = [{ skill_id: 3300, queue_position: 0, finished_level: 5 }];
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/skillqueue`, () => HttpResponse.json(queue))
+    );
+
+    const result = await loadCharacterSkillQueueWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual(queue);
   });
 });
 

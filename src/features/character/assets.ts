@@ -9,8 +9,6 @@ const KEY = 'assets';
  * so the view can offer a re-login instead of a silent empty state when the
  * assets scope was revoked (issue #14).
  */
-export function loadCharacterAssets(
-  characterId: number
-): Promise<StatusResult<CharacterAsset[]>> {
+export function loadCharacterAssets(characterId: number): Promise<StatusResult<CharacterAsset[]>> {
   return loadWithCacheStatus(characterId, KEY, () => getCharacterAssets(characterId));
 }

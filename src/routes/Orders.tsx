@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner, Tabs } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  Panel,
+  ReauthBanner,
+  Spinner,
+  Tabs,
+} from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -13,6 +22,9 @@ interface Snapshot {
   requestKey: string;
   ordersResult: CachedResult<MarketOrder[]> | null;
   historyResult: CachedResult<MarketOrderHistory[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  ordersNeedsReauth: boolean;
+  historyNeedsReauth: boolean;
   typeNames: Map<number, string>;
 }
 
@@ -31,17 +43,26 @@ export function Orders() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [ordersResult, historyResult] = await Promise.all([
+      const [ordersStatus, historyStatus] = await Promise.all([
         loadOrders(activeCharacterId),
         loadOrderHistory(activeCharacterId),
       ]);
       if (cancelled) return;
+      const { cached: ordersResult, needsReauth: ordersNeedsReauth } = ordersStatus;
+      const { cached: historyResult, needsReauth: historyNeedsReauth } = historyStatus;
       const typeIds = new Set<number>();
       for (const o of ordersResult?.data ?? []) typeIds.add(o.type_id);
       for (const o of historyResult?.data ?? []) typeIds.add(o.type_id);
       const typeNames = await loadTypeNames([...typeIds]);
       if (cancelled) return;
-      setSnapshot({ requestKey, ordersResult, historyResult, typeNames });
+      setSnapshot({
+        requestKey,
+        ordersResult,
+        historyResult,
+        ordersNeedsReauth,
+        historyNeedsReauth,
+        typeNames,
+      });
     })();
     return () => {
       cancelled = true;
@@ -53,6 +74,8 @@ export function Orders() {
   const loading = current === null;
   const ordersResult = current?.ordersResult ?? null;
   const historyResult = current?.historyResult ?? null;
+  const ordersNeedsReauth = current?.ordersNeedsReauth ?? false;
+  const historyNeedsReauth = current?.historyNeedsReauth ?? false;
   const typeNames = current?.typeNames ?? new Map<number, string>();
 
   const orders = useMemo(
@@ -146,7 +169,16 @@ export function Orders() {
           padded={false}
           actions={ordersResult ? <DataAgeBadge date={ordersResult.fetchedAt} /> : undefined}
         >
-          {!ordersResult || orders.length === 0 ? (
+          {ordersNeedsReauth ? (
+            <div className="px-3 py-2">
+              <ReauthBanner
+                title={t('orders.reauthTitle')}
+                hint={t('orders.reauthHint')}
+                actionLabel={t('orders.reauthAction')}
+                onLogin={() => void beginEveLogin()}
+              />
+            </div>
+          ) : !ordersResult || orders.length === 0 ? (
             <EmptyState
               title={t('orders.emptyTitle')}
               hint={t('orders.emptyHint')}
@@ -168,7 +200,16 @@ export function Orders() {
           padded={false}
           actions={historyResult ? <DataAgeBadge date={historyResult.fetchedAt} /> : undefined}
         >
-          {!historyResult || history.length === 0 ? (
+          {historyNeedsReauth ? (
+            <div className="px-3 py-2">
+              <ReauthBanner
+                title={t('orders.reauthTitle')}
+                hint={t('orders.reauthHint')}
+                actionLabel={t('orders.reauthAction')}
+                onLogin={() => void beginEveLogin()}
+              />
+            </div>
+          ) : !historyResult || history.length === 0 ? (
             <EmptyState
               title={t('orders.historyEmptyTitle')}
               hint={t('orders.historyEmptyHint')}
