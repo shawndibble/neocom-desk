@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterAssets } from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
@@ -12,6 +13,8 @@ import type { CharacterAsset } from '@/esi/endpoints';
 interface Snapshot {
   requestKey: string;
   assetsResult: CachedResult<CharacterAsset[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  assetsNeedsReauth: boolean;
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
 }
@@ -56,7 +59,8 @@ export function Assets() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const assetsResult = await loadCharacterAssets(activeCharacterId);
+      const { cached: assetsResult, needsReauth: assetsNeedsReauth } =
+        await loadCharacterAssets(activeCharacterId);
       if (cancelled) return;
       const assets = assetsResult?.data ?? [];
       const typeNames = await loadTypeNames([...new Set(assets.map((a) => a.type_id))]);
@@ -73,7 +77,7 @@ export function Assets() {
         if (name) locationNames.set(id, name);
       });
 
-      setSnapshot({ requestKey, assetsResult, typeNames, locationNames });
+      setSnapshot({ requestKey, assetsResult, assetsNeedsReauth, typeNames, locationNames });
     })();
     return () => {
       cancelled = true;
@@ -84,6 +88,7 @@ export function Assets() {
   const current = snapshot?.requestKey === requestKey ? snapshot : null;
   const loading = current === null;
   const assetsResult = current?.assetsResult ?? null;
+  const assetsNeedsReauth = current?.assetsNeedsReauth ?? false;
   const typeNames = current?.typeNames ?? new Map<number, string>();
   const locationNames = current?.locationNames ?? new Map<number, string>();
 
@@ -137,7 +142,7 @@ export function Assets() {
         </div>
       </header>
 
-      {!loading && assetsResult && (
+      {!loading && assetsResult && !assetsNeedsReauth && (
         <input
           type="search"
           value={search}
@@ -151,6 +156,13 @@ export function Assets() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : assetsNeedsReauth ? (
+        <ReauthBanner
+          title={t('assets.reauthTitle')}
+          hint={t('assets.reauthHint')}
+          actionLabel={t('assets.reauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
       ) : !assetsResult ? (
         <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
       ) : (

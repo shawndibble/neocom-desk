@@ -299,7 +299,10 @@
     "stationLabel": "Station #{{id}}",
     "structureLabel": "Structure #{{id}}",
     "inSpaceLabel": "In space (system #{{id}})",
-    "containerLabel": "Container"
+    "containerLabel": "Container",
+    "reauthTitle": "Log in again to see assets",
+    "reauthHint": "Log in again to fetch this character's assets.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "mail": {
     "title": "Mail",
