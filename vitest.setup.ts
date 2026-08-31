@@ -63,6 +63,26 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
 }
 
 /**
+ * jsdom has no pointer-capture or scroll implementation, so Radix's menu and
+ * select primitives — which capture the pointer during open/drag-select and
+ * scroll the highlighted option into view — throw the moment a test opens one.
+ */
+if (typeof Element !== 'undefined') {
+  if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = () => false;
+  }
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = () => {};
+  }
+  if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = () => {};
+  }
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = () => {};
+  }
+}
+
+/**
  * jsdom implements no CSS media queries, so `window.matchMedia` is absent and
  * anything subscribing to a breakpoint throws on mount. The never-matching
  * default is load-bearing, not incidental: `Layout` reads a non-matching

@@ -1,0 +1,44 @@
+import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
+import type { ComponentProps } from 'react';
+import { cx } from '@/lib/cx';
+import { menuContentClassName, menuItemClassName } from './menuStyles';
+
+/**
+ * Click-triggered menu. Wraps `radix-ui`'s DropdownMenu — see docs/adr/0004
+ * for why: focus movement, typeahead, roving tabindex, submenu timing and
+ * screen-reader behaviour are exactly the parts worth not hand-rolling.
+ */
+export const DropdownMenu = DropdownMenuPrimitive.Root;
+export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+
+export function DropdownMenuContent({
+  className,
+  sideOffset = 4,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  return (
+    <DropdownMenuPrimitive.Portal>
+      <DropdownMenuPrimitive.Content
+        sideOffset={sideOffset}
+        className={cx(menuContentClassName, className)}
+        {...props}
+      />
+    </DropdownMenuPrimitive.Portal>
+  );
+}
+
+export function DropdownMenuItem({
+  className,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.Item>) {
+  return <DropdownMenuPrimitive.Item className={cx(menuItemClassName, className)} {...props} />;
+}
+
+export function DropdownMenuSeparator({
+  className,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.Separator>) {
+  return (
+    <DropdownMenuPrimitive.Separator className={cx('my-1 h-px bg-line', className)} {...props} />
+  );
+}

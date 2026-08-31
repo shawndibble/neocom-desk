@@ -22,5 +22,22 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
+  },
+  {
+    files: ['**/*.{ts,tsx}'],
+    ignores: ['src/components/ui/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'radix-ui',
+              message: 'Import Radix primitives through src/components/ui, not directly.',
+            },
+          ],
+        },
+      ],
+    },
   }
 );

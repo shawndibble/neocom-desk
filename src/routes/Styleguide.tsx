@@ -2,12 +2,31 @@ import { useState } from 'react';
 import {
   Button,
   CharacterAvatar,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
   DataAgeBadge,
   DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
   EmptyState,
   FilterChip,
   LogoMark,
   Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   StatChip,
   Tabs,
@@ -75,6 +94,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function Styleguide() {
   const [tab, setTab] = useState('open');
   const [chip, setChip] = useState<string | null>('skills');
+  const [region, setRegion] = useState('the-forge');
 
   return (
     <div className="min-h-screen space-y-10 bg-bg p-6 text-text">
@@ -277,6 +297,57 @@ export function Styleguide() {
             />
           </div>
         </Panel>
+      </Section>
+
+      <Section title="Context menu">
+        <ContextMenu>
+          <ContextMenuTrigger>
+            <Panel>
+              <p className="text-sm text-text-dim">Right-click this panel.</p>
+            </Panel>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem>Add to Quickbar</ContextMenuItem>
+            <ContextMenuItem>Show info</ContextMenuItem>
+            <ContextMenuItem disabled>No blueprint options</ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>Copy</ContextMenuSubTrigger>
+              <ContextMenuSubContent>
+                <ContextMenuItem>Copy name</ContextMenuItem>
+                <ContextMenuItem>Copy price</ContextMenuItem>
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          </ContextMenuContent>
+        </ContextMenu>
+      </Section>
+
+      <Section title="Dropdown menu">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button>Actions</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem>Refresh</DropdownMenuItem>
+            <DropdownMenuItem>Export CSV</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>Remove character</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </Section>
+
+      <Section title="Select">
+        <Select value={region} onValueChange={setRegion}>
+          <SelectTrigger aria-label="Region">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="the-forge">The Forge</SelectItem>
+            <SelectItem value="domain">Domain</SelectItem>
+            <SelectSeparator />
+            <SelectItem value="heimatar">Heimatar</SelectItem>
+          </SelectContent>
+        </Select>
       </Section>
     </div>
   );
