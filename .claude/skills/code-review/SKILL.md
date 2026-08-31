@@ -8,7 +8,7 @@ Two-axis review of the diff between `HEAD` and a fixed point:
 - **Standards**: does the code conform to this repo's documented coding standards?
 - **Spec**: does the code faithfully implement the originating issue / spec?
 
-The two axes are kept **separate** so one never masks the other. Run them as parallel sub-agents when a human is driving; run them inline as two distinct passes when unattended (e.g. inside `/next-ticket`). Either way, do not merge or rerank findings across axes.
+The two axes are kept **separate** so one never masks the other. **Always run them as two parallel sub-agents**, whether or not a human is driving. Each axis re-reads the whole diff; doing that inline pours both passes into the caller's context, and inside an unattended `/next-ticket` run that context is already large and gets re-sent on every subsequent turn. The sub-agents read the diff in their own fresh contexts and return only their findings. Do not merge or rerank findings across axes.
 
 The issue tracker config is at `docs/agents/issue-tracker.md`.
 
