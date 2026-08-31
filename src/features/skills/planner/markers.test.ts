@@ -67,6 +67,20 @@ describe('reorderRows', () => {
     expect(result.entries).toEqual(entries);
     expect(result.markers).toEqual([1]);
   });
+
+  it('preserves fields beyond skillTypeID and targetLevel on every entry', () => {
+    const withExtra = [
+      { skillTypeID: 1, targetLevel: 1, priority: 5 },
+      { skillTypeID: 2, targetLevel: 1, priority: 9 },
+      { skillTypeID: 3, targetLevel: 1, priority: 2 },
+    ];
+    const result = reorderRows(withExtra, [], '3', '1');
+    expect(result.entries).toEqual([
+      { skillTypeID: 3, targetLevel: 1, priority: 2 },
+      { skillTypeID: 1, targetLevel: 1, priority: 5 },
+      { skillTypeID: 2, targetLevel: 1, priority: 9 },
+    ]);
+  });
 });
 
 describe('addMarker / removeMarker', () => {
