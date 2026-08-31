@@ -474,6 +474,10 @@
     "reload": "Reload",
     "dismiss": "Dismiss"
   },
+  "whatsNew": {
+    "title": "What's new in v{{version}}",
+    "dismiss": "Got it"
+  },
   "market": {
     "title": "Market",
     "tradeHub": "Trade Hub",

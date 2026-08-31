@@ -26,6 +26,7 @@ import { Settings } from '@/routes/Settings';
 import { Styleguide } from '@/routes/Styleguide';
 import { Layout } from './Layout';
 import { ReloadPrompt } from './ReloadPrompt';
+import { WhatsNewPanel } from './WhatsNewPanel';
 import { BootScreen } from './BootScreen';
 import { RequireCharacter } from './RequireCharacter';
 import { ScopeGate } from './ScopeGate';
@@ -119,6 +120,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <ReloadPrompt />
+        <WhatsNewPanel />
       </BrowserRouter>
     </ErrorBoundary>
   );
