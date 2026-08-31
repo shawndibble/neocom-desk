@@ -26,7 +26,7 @@ import { extractAttributeBonuses, sumAttributeBonuses } from './dogma';
 
 export type { CachedResult };
 
-const KEYS = {
+export const KEYS = {
   skills: 'skills',
   attributes: 'attributes',
   implants: 'implants',

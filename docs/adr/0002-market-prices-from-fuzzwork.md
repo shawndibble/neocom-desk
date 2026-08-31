@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted (2026-08-29)
+Accepted (2026-08-29). Amended for `/market` by ADR 0003 —
+the Market Browser now reads ESI order books; Build Plan pricing is unchanged.
 
 ## Context
 

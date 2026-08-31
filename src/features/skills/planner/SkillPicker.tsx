@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { SkillType } from '@/sde/types';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
+import { rankedSearch } from '@/lib/rankedSearch';
 import { SkillRequirementsList } from '../SkillRequirementsList';
 import { buildSkillRequirements } from '../skillRequirements';
 import type { SkillCatalog } from '../skillMap';
@@ -18,7 +19,10 @@ interface SkillPickerProps {
   className?: string;
 }
 
-/** Searchable skill picker: filter by name/group, then pick a target level I-V. */
+/**
+ * Searchable skill picker: ranked search by name/group, then pick a target
+ * level I-V, showing that skill's prerequisites and unlocks.
+ */
 export function SkillPicker({
   skills,
   catalog,
@@ -30,18 +34,20 @@ export function SkillPicker({
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
 
+  const results = useMemo(
+    () =>
+      rankedSearch(skills, query, {
+        primary: (s) => s.name,
+        secondary: [(s) => s.groupName],
+        limit: MAX_RESULTS,
+      }),
+    [skills, query]
+  );
+
   const requirements = useMemo(
     () => (selected === null ? null : buildSkillRequirements(catalog, trainedSkills, selected)),
     [selected, catalog, trainedSkills]
   );
-
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return skills
-      .filter((s) => s.name.toLowerCase().includes(q) || s.groupName.toLowerCase().includes(q))
-      .slice(0, MAX_RESULTS);
-  }, [skills, query]);
 
   function pick(skillTypeID: number, targetLevel: number) {
     onAdd({ skillTypeID, targetLevel });

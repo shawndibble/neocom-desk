@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -7,13 +7,12 @@ import {
   EmptyState,
   Panel,
   ReauthBanner,
+  SkillBar,
   Spinner,
   StatChip,
 } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
-import { SkillBar } from '@/features/skills/SkillBar';
 import { ImplantChip } from '@/features/skills/ImplantChip';
 import { SkillInspector } from '@/features/skills/SkillInspector';
 import { buildSkillRequirements } from '@/features/skills/skillRequirements';
@@ -25,21 +24,25 @@ import {
 import {
   loadCharacterAttributes,
   loadCharacterImplants,
+  loadCharacterSkillQueue,
   loadCharacterSkillsWithStatus,
   loadUniverseType,
 } from '@/features/skills/data';
+import {
+  completedQueueLevels,
+  completedSpGain,
+  type CompletedLevel,
+} from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
+import { skillCsvColumns, skillCsvRows, type SkillGroup } from '@/features/skills/skillsCsv';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { downloadCsv } from '@/lib/downloadCsv';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
 const ATTRIBUTE_ORDER = ['intelligence', 'memory', 'perception', 'willpower', 'charisma'] as const;
-
-interface SkillGroup {
-  groupName: string;
-  skills: { skillTypeID: number; name: string; level: number; sp: number }[];
-}
 
 interface ImplantDetail {
   typeId: number;
@@ -48,27 +51,81 @@ interface ImplantDetail {
 }
 
 interface Snapshot {
-  requestKey: string;
   catalog: SkillCatalog;
   skillsResult: CachedResult<CharacterSkills> | null;
   /** BUG #3: 401/403 (or a failed token refresh) means "log in again", not "offline". */
   skillsNeedsReauth: boolean;
   attributesResult: CachedResult<CharacterAttributes> | null;
-  implantsResult: CachedResult<number[]> | null;
+  /**
+   * Levels finished in the queue that /skills has not caught up to. ESI says
+   * to apply these on top; computed here so the render stays free of a clock.
+   */
+  completedLevels: Map<number, CompletedLevel>;
+  /** SP those credited levels add to ESI's total_sp, which is stale by the same amount. */
+  completedSp: number;
   implantDetails: ImplantDetail[];
   implantBonuses: Implants;
+}
+
+async function loadSkillsSnapshot(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<Snapshot> {
+  const [skillsStatus, attributesResult, implantsResult, queueResult, catalog] = await Promise.all([
+    loadCharacterSkillsWithStatus(characterId),
+    loadCharacterAttributes(characterId),
+    loadCharacterImplants(characterId),
+    loadCharacterSkillQueue(characterId),
+    loadSkillCatalog(),
+  ]);
+  const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
+  const completedLevels = completedQueueLevels(queueResult?.data ?? [], Date.now());
+  const completedSp = completedSpGain(skillsResult?.data?.skills ?? [], completedLevels);
+
+  // Already superseded: skip the per-implant type lookups, their results would
+  // be discarded.
+  const implantIds = signal.cancelled ? [] : (implantsResult?.data ?? []);
+  const implantTypes = await Promise.all(implantIds.map((id) => loadUniverseType(id)));
+  const implantDetails: ImplantDetail[] = implantIds.map((id, i) => {
+    const info = implantTypes[i]?.data;
+    return {
+      typeId: id,
+      name: info?.name ?? `#${id}`,
+      description: info?.description ? stripEveMarkup(info.description) : null,
+    };
+  });
+  const implantBonuses = sumAttributeBonuses(
+    implantTypes.map((r) => extractAttributeBonuses(r?.data?.dogma_attributes))
+  );
+
+  return {
+    catalog,
+    skillsResult,
+    skillsNeedsReauth,
+    attributesResult,
+    completedLevels,
+    completedSp,
+    implantDetails,
+    implantBonuses,
+  };
 }
 
 /** Trained skills for the active character: grouped by SDE group, with SP + attributes/implants. */
 export function Skills() {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
+    useRouteSnapshot(loadSkillsSnapshot);
 
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const catalog = data?.catalog ?? null;
+  const skillsResult = data?.skillsResult ?? null;
+  const skillsNeedsReauth = data?.skillsNeedsReauth ?? false;
+  const attributesResult = data?.attributesResult ?? null;
+  const completedLevels = data?.completedLevels ?? null;
+  const completedSp = data?.completedSp ?? 0;
+  const implantDetails = data?.implantDetails ?? [];
+  const implantBonuses = data?.implantBonuses ?? {};
+
   const [selectedSkillTypeID, setSelectedSkillTypeID] = useState<number | null>(null);
-  const requestKey = `${activeCharacterId}:${refreshKey}`;
 
   // Drop the inspector selection when switching characters, without an effect
   // (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
@@ -78,93 +135,37 @@ export function Skills() {
     setSelectedSkillTypeID(null);
   }
 
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-
-    void (async () => {
-      const [skillsStatus, attributesResult, implantsResult, catalog] = await Promise.all([
-        loadCharacterSkillsWithStatus(activeCharacterId),
-        loadCharacterAttributes(activeCharacterId),
-        loadCharacterImplants(activeCharacterId),
-        loadSkillCatalog(),
-      ]);
-      if (cancelled) return;
-      const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
-
-      const implantIds = implantsResult?.data ?? [];
-      const implantTypes = await Promise.all(implantIds.map((id) => loadUniverseType(id)));
-      if (cancelled) return;
-      const implantDetails: ImplantDetail[] = implantIds.map((id, i) => {
-        const info = implantTypes[i]?.data;
-        return {
-          typeId: id,
-          name: info?.name ?? `#${id}`,
-          description: info?.description ? stripEveMarkup(info.description) : null,
-        };
-      });
-      const implantBonuses = sumAttributeBonuses(
-        implantTypes.map((r) => extractAttributeBonuses(r?.data?.dogma_attributes))
-      );
-
-      setSnapshot({
-        requestKey,
-        catalog,
-        skillsResult,
-        skillsNeedsReauth,
-        attributesResult,
-        implantsResult,
-        implantDetails,
-        implantBonuses,
-      });
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [activeCharacterId, refreshKey]);
-
-  // Only trust the snapshot when it answers the current (character, refresh) request.
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const {
-    catalog,
-    skillsResult,
-    skillsNeedsReauth,
-    attributesResult,
-    implantDetails,
-    implantBonuses,
-  } = current ?? {
-    catalog: null,
-    skillsResult: undefined,
-    skillsNeedsReauth: false,
-    attributesResult: undefined,
-    implantDetails: [],
-    implantBonuses: {},
-  };
-
   const groups = useMemo<SkillGroup[]>(() => {
     if (!skillsResult?.data || !catalog) return [];
     const byGroup = new Map<string, SkillGroup['skills']>();
-    for (const skill of skillsResult.data.skills) {
-      const info = catalog.bySkillTypeID.get(skill.skill_id);
+    const done = new Map(completedLevels ?? []);
+    const add = (skillTypeID: number, level: number, sp: number | null) => {
+      const info = catalog.bySkillTypeID.get(skillTypeID);
       const groupName = info?.groupName ?? t('common.unknown');
       const list = byGroup.get(groupName) ?? [];
-      list.push({
-        skillTypeID: skill.skill_id,
-        name: info?.name ?? `#${skill.skill_id}`,
-        level: skill.trained_skill_level,
-        sp: skill.skillpoints_in_skill,
-      });
+      list.push({ skillTypeID, name: info?.name ?? `#${skillTypeID}`, level, sp });
       byGroup.set(groupName, list);
+    };
+    for (const skill of skillsResult.data.skills) {
+      // Delete as we go, so the leftovers below are only the skills /skills
+      // does not list at all.
+      const finished = done.get(skill.skill_id);
+      done.delete(skill.skill_id);
+      const beatsEsi = finished !== undefined && finished.level > skill.trained_skill_level;
+      add(
+        skill.skill_id,
+        beatsEsi ? finished.level : skill.trained_skill_level,
+        beatsEsi ? (finished.sp ?? skill.skillpoints_in_skill) : skill.skillpoints_in_skill
+      );
     }
+    for (const [skillTypeID, finished] of done) add(skillTypeID, finished.level, finished.sp);
     return [...byGroup.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([groupName, skills]) => ({
         groupName,
         skills: skills.sort((a, b) => a.name.localeCompare(b.name)),
       }));
-  }, [skillsResult, catalog, t]);
+  }, [skillsResult, catalog, completedLevels, t]);
 
   const trainedSkillsMap = useMemo(
     () => toTrainedSkillsMap(skillsResult?.data?.skills ?? []),
@@ -185,8 +186,6 @@ export function Skills() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  const loading = skillsResult === undefined || attributesResult === undefined;
-
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <SkillsSubNav />
@@ -195,7 +194,9 @@ export function Skills() {
           <StatChip
             label={t('skills.totalSp')}
             value={
-              skillsResult?.data ? skillsResult.data.total_sp.toLocaleString() : t('common.unknown')
+              skillsResult?.data
+                ? (skillsResult.data.total_sp + completedSp).toLocaleString()
+                : t('common.unknown')
             }
           />
           <StatChip
@@ -209,7 +210,14 @@ export function Skills() {
         </div>
         <div className="flex items-center gap-2">
           {skillsResult?.fetchedAt && <DataAgeBadge date={skillsResult.fetchedAt} />}
-          <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)}>
+          <Button
+            size="sm"
+            disabled={groups.length === 0 || skillsNeedsReauth}
+            onClick={() => downloadCsv('skills', skillCsvRows(groups), skillCsvColumns(t))}
+          >
+            {t('skills.exportCsv')}
+          </Button>
+          <Button size="sm" onClick={refresh}>
             {t('skills.refresh')}
           </Button>
         </div>
@@ -219,6 +227,8 @@ export function Skills() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : skillsNeedsReauth ? (
         <ReauthBanner
           title={t('skills.reauthTitle')}
@@ -231,7 +241,7 @@ export function Skills() {
       ) : (
         <>
           {skillsResult.fromCache && (
-            <p className="text-[11px] text-warning uppercase">{t('skills.offlineTitle')}</p>
+            <p className="text-[0.6875rem] text-warning uppercase">{t('skills.offlineTitle')}</p>
           )}
 
           <Panel title={t('skills.attributes')}>
@@ -258,7 +268,7 @@ export function Skills() {
               )}
             </div>
             <div className="mt-3">
-              <p className="text-[11px] font-semibold tracking-widest text-text-dim uppercase">
+              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('skills.implants')}
               </p>
               {implantDetails.length > 0 ? (
@@ -310,7 +320,9 @@ export function Skills() {
                         <span className="flex-1 truncate">{skill.name}</span>
                         <SkillBar level={skill.level} />
                         <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
-                          {t('skills.sp', { value: skill.sp.toLocaleString() })}
+                          {skill.sp === null
+                            ? t('common.unknown')
+                            : t('skills.sp', { value: skill.sp.toLocaleString() })}
                         </span>
                       </button>
                     </li>

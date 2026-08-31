@@ -364,6 +364,105 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
   });
 });
 
+describe('SkillPlans: /skills is stale until the character logs in', () => {
+  it('counts a level the queue finished in the past as trained, though /skills omits it', async () => {
+    // ESI: entries "that are in the past need to be applied on top of this
+    // list". Without that, the plan is computed against levels already passed.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 1,
+            queue_position: 0,
+            finished_level: 3,
+            start_date: '2026-01-01T00:00:00Z',
+            finish_date: '2026-01-05T00:00:00Z',
+          },
+        ])
+      )
+    );
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    expect(
+      await within(panel).findByText('All selected skills are already trained.')
+    ).toBeInTheDocument();
+  });
+
+  it('does not credit a paused queue entry, which has no finish date at all', async () => {
+    // peterhaneve/evemon#40 marked skills falsely complete this way. The
+    // default handler's entries are dateless, i.e. paused.
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    expect(
+      within(panel).queryByText('All selected skills are already trained.')
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
+  const queuePanel = async () =>
+    (await screen.findByText('Current skill queue')).closest('section')!;
+
+  it('keeps a finished entry visible and tells the user to log in to apply it', async () => {
+    // ESI holds completed entries until the character next logs in, and says
+    // /skills is out of date until then. Hiding them would discard exactly
+    // the information the queue exists to carry.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 1,
+            queue_position: 0,
+            finished_level: 3,
+            finish_date: '2020-01-01T00:00:00Z',
+          },
+        ])
+      )
+    );
+    render(<App />);
+
+    const panel = await queuePanel();
+    expect(await within(panel).findByText('Done')).toBeInTheDocument();
+    expect(
+      within(panel).getByText(/1 skill finished training\. Log in to EVE to apply it\./i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows the training skill's remaining time from ESI's finish_date", async () => {
+    const finish = new Date(Date.now() + 2 * 3600_000).toISOString();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          { skill_id: 1, queue_position: 0, finished_level: 3, finish_date: finish },
+        ])
+      )
+    );
+    render(<App />);
+
+    const panel = await queuePanel();
+    expect(await within(panel).findByText('Training')).toBeInTheDocument();
+    expect(within(panel).getByText(/2h.*left/i)).toBeInTheDocument();
+  });
+
+  it('calls a queue with no dates paused, rather than pretending it starts now', async () => {
+    // The default fixture carries no date fields — a paused queue. Inventing
+    // a start time here is the EVEMon bug (peterhaneve/evemon#40).
+    render(<App />);
+
+    const panel = await queuePanel();
+    // Both fixture rows are paused — the badge is per row.
+    expect(await within(panel).findAllByText('Paused')).toHaveLength(2);
+    expect(
+      within(panel).getByText(/Training is paused, so EVE reports no completion times\./i)
+    ).toBeInTheDocument();
+    expect(within(panel).queryByText(/left/i)).not.toBeInTheDocument();
+  });
+});
+
 describe('SkillPlans editor: import / export', () => {
   it('imports the in-game skill queue (deduped) and exports the computed queue to the clipboard', async () => {
     const user = userEvent.setup();
@@ -562,6 +661,39 @@ describe('SkillPlans editor: remap markers', () => {
 
     await screen.findByText('Computed queue');
     expect(screen.getByRole('button', { name: 'Optimize at my markers' })).toBeDisabled();
+  });
+});
+
+describe('SkillPlans editor: the remap cap is disclosed', () => {
+  const optimize = async (remapCount: number) => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount,
+      })
+    );
+    render(<App />);
+    await screen.findByText('Computed queue');
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await screen.findByRole('heading', { name: 'Optimize remaps' });
+  };
+
+  it('says the optimizer evaluated fewer remaps than the plan allows', async () => {
+    // An answer for one remap, shown for a plan that asks for three, is the
+    // silent-degradation failure this planner keeps running into.
+    await optimize(3);
+    expect(screen.getByText(/Evaluated with 2 remaps/i)).toBeInTheDocument();
+  });
+
+  it.each([1, 2])('says nothing when the plan asks for %i remap(s)', async (remapCount) => {
+    // Two is the cap, not a capped value: the note must not fire at the
+    // boundary itself.
+    await optimize(remapCount);
+    expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
   });
 });
 
@@ -832,6 +964,44 @@ describe('SkillPlans editor: import from clipboard', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
     expect(await screen.findByText('0 added — all trained')).toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: schedule timeline (#20)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-29T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("projects a plan finish date that matches the last step's own finish, and starts the first step at the plan start (#20)", async () => {
+    // Gunnery I..V is a multi-day train at these attributes, so start and
+    // finish land on different calendar dates.
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    const items = await within(panel).findAllByRole('listitem');
+
+    const finishNote = within(panel).getByText(/^Finishes \d{4}-\d{2}-\d{2}$/);
+    const planFinishDate = finishNote.textContent!.replace('Finishes ', '');
+
+    // First step starts exactly at the plan's wall-clock start.
+    expect(items[0].textContent).toContain('2026-08-29 → ');
+    // Last step's own finish is the same value the panel header projects —
+    // one number, computed one way (#20 acceptance criterion).
+    expect(items[items.length - 1].textContent).toContain(`→ ${planFinishDate}`);
+  });
+
+  it('shows no projected finish date, and no invented start time, for an empty plan (#20)', async () => {
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    await within(panel).findByText('Add a skill to see the training queue.');
+    expect(within(panel).queryByText(/^Finishes/)).not.toBeInTheDocument();
   });
 });
 

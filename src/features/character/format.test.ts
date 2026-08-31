@@ -1,20 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatIsk, iskToneClass, humanizeRefType } from './format';
-
-describe('formatIsk', () => {
-  it('formats with thousands separators and 2 decimals', () => {
-    expect(formatIsk(1234567.891)).toBe('1,234,567.89');
-  });
-
-  it('formats negative values with a leading minus', () => {
-    expect(formatIsk(-11724000)).toBe('-11,724,000.00');
-  });
-
-  it('clamps a rounding-noise negative near zero to "0.00" instead of "-0.00" (BUG #9)', () => {
-    expect(formatIsk(-0.004)).toBe('0.00');
-    expect(formatIsk(-0.006)).toBe('-0.01');
-  });
-});
+import { iskToneClass, humanizeRefType } from './format';
 
 describe('iskToneClass', () => {
   it('is the negative token for negative values', () => {
@@ -28,6 +13,10 @@ describe('iskToneClass', () => {
 
   it('is the positive token for a rounding-noise negative near zero (BUG #9)', () => {
     expect(iskToneClass(-0.004)).toBe('text-isk-pos');
+  });
+
+  it('is still the negative token just past the clamp threshold (pins the 2-decimal epsilon)', () => {
+    expect(iskToneClass(-0.006)).toBe('text-isk-neg');
   });
 });
 

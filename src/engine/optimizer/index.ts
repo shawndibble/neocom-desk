@@ -8,7 +8,11 @@ export {
 } from '@/engine/optimizer/bestAttributes';
 export type { BestAttributesResult, SpByPair } from '@/engine/optimizer/bestAttributes';
 
-export { placeRemaps, placeRemaps as optimizeRemaps } from '@/engine/optimizer/placeRemaps';
+export {
+  MAX_SUPPORTED_REMAPS,
+  placeRemaps,
+  placeRemaps as optimizeRemaps,
+} from '@/engine/optimizer/placeRemaps';
 export { optimizeAtMarkers } from '@/engine/optimizer/optimizeAtMarkers';
 export type { OptimizeAtMarkersOptions } from '@/engine/optimizer/optimizeAtMarkers';
 export type {

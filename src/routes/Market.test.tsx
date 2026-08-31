@@ -54,15 +54,18 @@ afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
+  // Market needs no ESI scope and no *active* Character, but the feature area
+  // sits behind RequireCharacter, so one must exist for the route to render.
+  await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
-  useMarketHub.setState({ hubId: 'jita', hydrated: false });
+  useMarketHub.setState({ value: 'jita', hydrated: false });
   clearMarketPriceCache();
   window.history.pushState({}, '', '/market');
 });
 
 async function pinTritanium(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByRole('searchbox'), 'trit');
+  await user.type(await screen.findByRole('searchbox'), 'trit');
   await user.click(await screen.findByRole('button', { name: 'Pin' }));
 }
 
@@ -71,7 +74,7 @@ describe('Market Browser', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.type(screen.getByRole('searchbox'), 'trit');
+    await user.type(await screen.findByRole('searchbox'), 'trit');
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();

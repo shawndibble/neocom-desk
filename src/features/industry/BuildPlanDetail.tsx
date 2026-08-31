@@ -11,7 +11,9 @@ import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { formatDuration } from '@/lib/duration';
+import { downloadCsv } from '@/lib/downloadCsv';
 import { MaterialsTable } from './MaterialsTable';
+import { materialsCsvColumns } from './materialsCsv';
 import { ResultsSummary } from './ResultsSummary';
 
 type PlanPatch = Partial<
@@ -105,6 +107,20 @@ export function BuildPlanDetail({
     onUpdate(patch);
   }
 
+  function exportMaterialsCsv() {
+    if (!result) return;
+    downloadCsv(
+      'build-materials',
+      result.materials,
+      materialsCsvColumns(
+        t,
+        (typeID) => nameForType(catalog, typeID),
+        snapshot?.hubPrices ?? {},
+        pricesReady
+      )
+    );
+  }
+
   return (
     <div className="space-y-4">
       <Panel title={entry.productName}>
@@ -137,7 +153,7 @@ export function BuildPlanDetail({
               className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
             />
             {ownedMatch && (
-              <span className="text-[11px] text-text-dim">
+              <span className="text-[0.6875rem] text-text-dim">
                 {t('industry.ownedHint', {
                   me: ownedMatch.material_efficiency,
                   te: ownedMatch.time_efficiency,
@@ -256,8 +272,15 @@ export function BuildPlanDetail({
       <Panel
         title={t('industry.materials')}
         actions={
-          <span className="flex items-center gap-2 text-[11px] text-text-dim">
+          <span className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
             {fetchedAt && <DataAgeBadge date={fetchedAt} />}
+            <Button
+              size="sm"
+              onClick={exportMaterialsCsv}
+              disabled={!!error || !result || result.materials.length === 0}
+            >
+              {t('industry.exportCsvMaterials')}
+            </Button>
             <Button size="sm" onClick={() => setRefreshTick((v) => v + 1)}>
               {t('industry.refresh')}
             </Button>

@@ -31,7 +31,7 @@ export function StatChip({
   const { t } = useTranslation();
   return (
     <span
-      className={`inline-flex h-7 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2.5 text-[11px] ${className}`}
+      className={`inline-flex h-7 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2.5 text-[0.6875rem] ${className}`}
     >
       <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
       {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}

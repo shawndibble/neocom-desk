@@ -4,8 +4,10 @@
 
 import { generateVerifier, challengeFromVerifier } from './pkce';
 import { buildAuthorizeUrl, exchangeCode, refreshToken, type TokenResponse } from './sso';
-import { decodeAccessToken } from './jwt';
+import { decodeAccessToken, type DecodedAccessToken } from './jwt';
 import { db, type CharacterRecord } from '@/db';
+import { isCachePurgePending, purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
+import { revokedScopes } from '@/esi/scopes';
 
 export interface SsoConfig {
   clientId?: string;
@@ -41,13 +43,50 @@ export async function startLogin(scopes: string[], config?: SsoConfig): Promise<
   });
 }
 
+/**
+ * Drop every cached ESI response for a character whose consent no longer
+ * covers it. Called from `persistTokens` — the one funnel for both login and
+ * refresh, and a portal-side revoke surfaces only in the refresh JWT.
+ *
+ * Triggers: a scope removed from the grant (widening is not a revocation, see
+ * `esi/scopes.revokedScopes`); a changed `ownerHash` — character sold or
+ * transferred, so the cached wallet/mail/assets are a different person's
+ * (`sync/planSync.handleOwnerHashChange` purges too, but only during a
+ * successful Firebase sync, which never happens when sync is unconfigured);
+ * or an outstanding purge from an earlier grant, since the retry rides
+ * entirely on that marker. An unknown prior grant is not a revocation: no
+ * token record, a legacy record predating `scopes`, and an unseen character
+ * all purge nothing.
+ *
+ * Runs before the record writes so suppression is in force before anything
+ * downstream can read the cache. Neither call can fail the session:
+ * `purgeCharacterCacheOrSuppress` degrades instead of throwing (tiers and the
+ * trade in `esi/cachePurge.ts`), and `isCachePurgePending` is total by
+ * contract even against a Dexie that throws synchronously
+ * (`esi/cachePurgeLookupFailure.test.ts` pins it). A marker pending for
+ * character A is not retried by B's refresh: A stays suppressed — an empty
+ * offline view — until A itself logs in.
+ *
+ * Scope lists are compared, never logged; no token material here (ADR 0001).
+ */
+async function purgeCacheIfConsentChangedOrPending(
+  decoded: DecodedAccessToken,
+  existing: CharacterRecord | undefined,
+  previousScopes: string[] | undefined
+): Promise<void> {
+  const scopeRevoked =
+    Array.isArray(previousScopes) && revokedScopes(previousScopes, decoded.scopes).length > 0;
+  const ownerChanged = existing !== undefined && existing.ownerHash !== decoded.ownerHash;
+  if (!scopeRevoked && !ownerChanged && !(await isCachePurgePending(decoded.characterId))) return;
+  await purgeCharacterCacheOrSuppress(decoded.characterId);
+}
+
 async function persistTokens(tokens: TokenResponse): Promise<CharacterRecord> {
   const decoded = decodeAccessToken(tokens.access_token);
   const existing = await db.characters.get(decoded.characterId);
   const previous = await db.tokens.get(decoded.characterId);
   // SSO rotates the refresh token on most grants but MAY omit refresh_token
-  // from the response when it doesn't — keep the stored one in that case.
-  // Overwriting with undefined would strand the session.
+  // when it doesn't; overwriting with undefined would strand the session.
   const rotatedRefreshToken: string | undefined = tokens.refresh_token;
   const refreshTokenToStore = rotatedRefreshToken ?? previous?.refreshToken;
   if (refreshTokenToStore === undefined) {
@@ -59,6 +98,9 @@ async function persistTokens(tokens: TokenResponse): Promise<CharacterRecord> {
     ownerHash: decoded.ownerHash,
     addedAt: existing?.addedAt ?? Date.now(),
   };
+
+  await purgeCacheIfConsentChangedOrPending(decoded, existing, previous?.scopes);
+
   await db.characters.put(character);
   await db.tokens.put({
     characterId: decoded.characterId,
@@ -95,11 +137,9 @@ const inflightRefresh = new Map<number, Promise<string>>();
  * Return a usable access token, refreshing (and persisting rotation) if near
  * expiry.
  *
- * Ordering matters: the in-flight check happens FIRST (synchronously), and the
- * token record is read INSIDE the single-flight task. A caller that read the
- * record before checking for an in-flight refresh could act on a stale
- * snapshot after that refresh completed — and re-send the rotated (burned)
- * refresh token to the SSO.
+ * The in-flight check is FIRST and synchronous, and the token record is read
+ * INSIDE the single-flight task: reading it earlier could act on a snapshot
+ * gone stale mid-refresh and re-send the rotated (burned) refresh token.
  */
 export function getValidAccessToken(characterId: number, config?: SsoConfig): Promise<string> {
   const pending = inflightRefresh.get(characterId);

@@ -35,7 +35,7 @@ export function PlanHeader({ totalSeconds, skillCount, projectedFinish, badge }:
                 {showsSavings ? formatDuration(savingsSeconds) : t('plans.headerSavingsNone')}
                 {badge.capped && (
                   <span className="ml-1 text-text-dim">
-                    {t('plans.headerSavingsCapped', { evaluated: badge.evaluatedRemapCount })}
+                    {t('plans.remapCapNote', { count: badge.evaluatedRemapCount })}
                   </span>
                 )}
               </>

@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { placeRemaps } from '@/engine/optimizer';
-import {
-  evaluateOptimizationBadge,
-  projectedFinish,
-  REMAP_EVALUATION_CAP,
-} from './planHeaderStats';
+import { MAX_SUPPORTED_REMAPS, placeRemaps } from '@/engine/optimizer';
+import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
 
 const skill = (
@@ -25,8 +21,8 @@ const CURRENT: Attributes = {
   charisma: 19,
 };
 
-// Six distinct attribute-pair skills, one step each, so remapCount=6 places
-// a remap for every step and remapCount=5 (the cap) cannot.
+// Six distinct attribute-pair skills, one step each, so a remapCount above
+// MAX_SUPPORTED_REMAPS places a remap the evaluated (capped) run cannot.
 const PAIRS: [AttributeName, AttributeName][] = [
   ['intelligence', 'memory'],
   ['perception', 'willpower'],
@@ -45,32 +41,32 @@ describe('evaluateOptimizationBadge', () => {
     ).toBeNull();
   });
 
-  it('reports the exact result, uncapped, when the request is within the cap', () => {
+  it('reports the exact result, uncapped, when the request is within MAX_SUPPORTED_REMAPS', () => {
     const badge = evaluateOptimizationBadge(STEPS, SKILLS, {
-      remapCount: 3,
+      remapCount: 1,
       currentAttributes: CURRENT,
     });
-    const direct = placeRemaps(STEPS, SKILLS, { remapCount: 3, currentAttributes: CURRENT });
+    const direct = placeRemaps(STEPS, SKILLS, { remapCount: 1, currentAttributes: CURRENT });
     expect(badge).toMatchObject({
       savingsSeconds: direct.savingsSeconds,
-      evaluatedRemapCount: 3,
-      requestedRemapCount: 3,
+      evaluatedRemapCount: 1,
+      requestedRemapCount: 1,
       capped: false,
     });
   });
 
-  it('caps evaluation at REMAP_EVALUATION_CAP and says so when the plan requests more', () => {
+  it('caps evaluation at MAX_SUPPORTED_REMAPS and says so when the plan requests more', () => {
     const badge = evaluateOptimizationBadge(STEPS, SKILLS, {
       remapCount: 6,
       currentAttributes: CURRENT,
     });
     const capped = placeRemaps(STEPS, SKILLS, {
-      remapCount: REMAP_EVALUATION_CAP,
+      remapCount: MAX_SUPPORTED_REMAPS,
       currentAttributes: CURRENT,
     });
     expect(badge).toMatchObject({
       savingsSeconds: capped.savingsSeconds,
-      evaluatedRemapCount: REMAP_EVALUATION_CAP,
+      evaluatedRemapCount: MAX_SUPPORTED_REMAPS,
       requestedRemapCount: 6,
       capped: true,
     });
@@ -80,7 +76,7 @@ describe('evaluateOptimizationBadge', () => {
     expect(uncapped.savingsSeconds).toBeGreaterThan(capped.savingsSeconds);
   });
 
-  it('never reports a negative evaluated count for a negative or zero request', () => {
+  it('reports zero remaps evaluated for a zero request', () => {
     const badge = evaluateOptimizationBadge(STEPS, SKILLS, {
       remapCount: 0,
       currentAttributes: CURRENT,
@@ -89,14 +85,19 @@ describe('evaluateOptimizationBadge', () => {
   });
 });
 
-describe('projectedFinish', () => {
-  const NOW = new Date('2026-08-31T00:00:00Z');
-
-  it('returns null for a zero-length plan', () => {
-    expect(projectedFinish(0, NOW)).toBeNull();
-  });
-
-  it('adds the training seconds to now', () => {
-    expect(projectedFinish(3600, NOW)).toEqual(new Date('2026-08-31T01:00:00Z'));
+describe('toOptimizationBadge', () => {
+  it('flags capped only when the request exceeds what was evaluated', () => {
+    expect(toOptimizationBadge(120, 2, 2)).toEqual({
+      savingsSeconds: 120,
+      evaluatedRemapCount: 2,
+      requestedRemapCount: 2,
+      capped: false,
+    });
+    expect(toOptimizationBadge(120, 2, 5)).toEqual({
+      savingsSeconds: 120,
+      evaluatedRemapCount: 2,
+      requestedRemapCount: 5,
+      capped: true,
+    });
   });
 });

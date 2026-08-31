@@ -30,7 +30,12 @@ describe('loadWalletBalance', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet`, () => HttpResponse.json(1234.5))
     );
     const result = await loadWalletBalance(CHAR_ID);
-    expect(result).toEqual({ data: 1234.5, fetchedAt: expect.any(Date), fromCache: false });
+    expect(result).toEqual({
+      data: 1234.5,
+      fetchedAt: expect.any(Date),
+      fromCache: false,
+      truncated: false,
+    });
     expect((await db.esiCache.get([CHAR_ID, 'wallet:balance']))?.value).toBe(1234.5);
   });
 
@@ -45,7 +50,12 @@ describe('loadWalletBalance', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())
     );
     const result = await loadWalletBalance(CHAR_ID);
-    expect(result).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+    expect(result).toEqual({
+      data: 500,
+      fetchedAt: new Date(1),
+      fromCache: true,
+      truncated: false,
+    });
   });
 
   it('still falls back to cache on a 401 (regression pin: plain loadWithCache callers must not lose their cache just because loadWithCacheStatus exists)', async () => {
@@ -63,7 +73,12 @@ describe('loadWalletBalance', () => {
 
     const result = await loadWalletBalance(CHAR_ID);
 
-    expect(result).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+    expect(result).toEqual({
+      data: 500,
+      fetchedAt: new Date(1),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });
 
@@ -84,7 +99,12 @@ describe('loadWalletBalanceWithStatus (BUG #3)', () => {
     const result = await loadWalletBalanceWithStatus(CHAR_ID);
 
     expect(result.needsReauth).toBe(true);
-    expect(result.cached).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+    expect(result.cached).toEqual({
+      data: 500,
+      fetchedAt: new Date(1),
+      fromCache: true,
+      truncated: false,
+    });
   });
 
   it('reports needsReauth: true and null cached when nothing was ever cached', async () => {
@@ -114,7 +134,12 @@ describe('loadWalletBalanceWithStatus (BUG #3)', () => {
     const result = await loadWalletBalanceWithStatus(CHAR_ID);
 
     expect(result.needsReauth).toBe(false);
-    expect(result.cached).toEqual({ data: 500, fetchedAt: new Date(1), fromCache: true });
+    expect(result.cached).toEqual({
+      data: 500,
+      fetchedAt: new Date(1),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });
 

@@ -18,9 +18,11 @@ import {
 } from '@/features/skills/skillMap';
 import {
   loadCharacterAttributes,
+  loadCharacterSkillQueue,
   loadCharacterSkills,
   loadImplantBonuses,
 } from '@/features/skills/data';
+import { applyCompletedQueueEntries } from '@/features/skills/queueStatus';
 import { PlanList } from '@/features/skills/planner/PlanList';
 import { PlanEditor } from '@/features/skills/planner/PlanEditor';
 import {
@@ -74,15 +76,26 @@ export function SkillPlans() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [cat, skills, attrs, implantBonuses] = await Promise.all([
+      const [cat, skills, queue, attrs, implantBonuses] = await Promise.all([
         loadSkillCatalog(),
         loadCharacterSkills(activeCharacterId),
+        loadCharacterSkillQueue(activeCharacterId),
         loadCharacterAttributes(activeCharacterId),
         loadImplantBonuses(activeCharacterId),
       ]);
       if (cancelled) return;
       setCatalog(cat);
-      if (skills?.data) setTrainedSkills(toTrainedSkillsMap(skills.data.skills));
+      // /skills is stale until the character next logs in. ESI says to apply
+      // past-finish_date queue entries on top, or a plan gets normalized and
+      // optimized against levels the character already trained past.
+      if (skills?.data)
+        setTrainedSkills(
+          applyCompletedQueueEntries(
+            toTrainedSkillsMap(skills.data.skills),
+            queue?.data ?? [],
+            Date.now()
+          )
+        );
       if (attrs?.data) setAttributes(toEngineAttributes(attrs.data, implantBonuses));
       setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
       setImplants(implantBonuses);
@@ -167,14 +180,7 @@ export function SkillPlans() {
       <SkillsSubNav />
       {isSyncConfigured() && <SyncErrorNote {...syncStatus} />}
 
-      {catalog && (
-        <CurrentQueuePanel
-          characterId={activeCharacterId}
-          catalog={catalog}
-          attributes={attributes}
-          implants={implants}
-        />
-      )}
+      {catalog && <CurrentQueuePanel characterId={activeCharacterId} catalog={catalog} />}
 
       {!plans ? (
         <div className="flex justify-center py-16">

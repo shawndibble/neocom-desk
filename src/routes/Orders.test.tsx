@@ -139,7 +139,7 @@ describe('Orders', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText('Log in again to see market orders')).toBeInTheDocument();
+    expect(await screen.findByText('Log in again to see your orders')).toBeInTheDocument();
     expect(screen.queryByText(/no open orders cached/i)).not.toBeInTheDocument();
   });
 });

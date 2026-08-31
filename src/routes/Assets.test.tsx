@@ -175,7 +175,7 @@ describe('Assets', () => {
     await db.esiCache.put({
       characterId: CHAR_ID,
       key: 'assets',
-      value: { items: assetPage1, truncated: false },
+      value: assetPage1,
       fetchedAt: Date.now(),
     });
     server.use(
@@ -184,6 +184,25 @@ describe('Assets', () => {
     render(<App />);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
+  });
+
+  it('warns that the list is incomplete when a page fails mid-pagination (D4)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        if (page === '2') return new HttpResponse(null, { status: 404 });
+        return HttpResponse.json(assetPage1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+    render(<App />);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
+  });
+
+  it('shows no incomplete-data warning when every page came back', async () => {
+    render(<App />);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText(/incomplete data/i)).not.toBeInTheDocument();
   });
 
   it('shows the empty state when there is no data at all', async () => {
@@ -201,7 +220,7 @@ describe('Assets', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText('Log in again to see assets')).toBeInTheDocument();
+    expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
     expect(screen.queryByText(/no assets cached/i)).not.toBeInTheDocument();
   });
 

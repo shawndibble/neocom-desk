@@ -157,7 +157,12 @@ describe('loadCharacterImplants', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/implants`, () => HttpResponse.error())
     );
     const result = await loadCharacterImplants(CHAR_ID);
-    expect(result).toEqual({ data: [9899], fetchedAt: new Date(10), fromCache: true });
+    expect(result).toEqual({
+      data: [9899],
+      fetchedAt: new Date(10),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });
 
@@ -295,6 +300,11 @@ describe('loadUniverseType', () => {
 
     const result = await loadUniverseType(9899);
 
-    expect(result).toEqual({ data: type, fetchedAt: new Date(42), fromCache: true });
+    expect(result).toEqual({
+      data: type,
+      fetchedAt: new Date(42),
+      fromCache: true,
+      truncated: false,
+    });
   });
 });

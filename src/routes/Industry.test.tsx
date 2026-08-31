@@ -10,7 +10,8 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
-import { formatIsk, formatCostIndex } from '@/features/industry/format';
+import { formatCostIndex } from '@/features/industry/format';
+import { formatIsk } from '@/lib/isk';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
@@ -80,6 +81,7 @@ const server = setupServer(
     HttpResponse.json(emptySkillsPayload)
   ),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () => HttpResponse.json([])),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
     HttpResponse.json([])
   ),
@@ -270,6 +272,45 @@ const RIFTER_BLUEPRINT = {
   ],
   products: [{ typeID: 587, quantity: 1 }],
 };
+
+describe('Industry: /skills is stale until the character logs in', () => {
+  it('applies an Industry level the queue finished in the past, which /skills omits', async () => {
+    // Base blueprint time is 1200s (20m). Industry V is -4%/level, so a
+    // credited level 5 lands at 960s (16m). ESI says past-finish_date queue
+    // entries must be applied on top of /skills, which here reports nothing.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 3380, // Industry
+            queue_position: 0,
+            finished_level: 5,
+            start_date: '2026-01-01T00:00:00Z',
+            finish_date: '2026-01-05T00:00:00Z',
+          },
+        ])
+      )
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    expect(await screen.findByText('16m')).toBeInTheDocument();
+    expect(screen.queryByText('20m')).not.toBeInTheDocument();
+  });
+
+  it('does not credit a paused queue entry, which carries no finish date', async () => {
+    // peterhaneve/evemon#40: an absent date is "ETA unknown", never "done".
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([{ skill_id: 3380, queue_position: 0, finished_level: 5 }])
+      )
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    expect(await screen.findByText('20m')).toBeInTheDocument();
+  });
+});
 
 describe('Industry: results panel', () => {
   it('flags an unpriced material, wires displayed totals (including the job fee breakdown and unit vs. sell-value product price) to buildVsBuy, then refetches on hub switch', async () => {

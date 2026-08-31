@@ -8,13 +8,9 @@ import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/mar
 import { getHubPrices, clearMarketPriceCache, type HubAggregate } from '@/market/prices';
 import { useMarketHub } from '@/features/market/hub';
 import { addPin, removePin, MAX_PINS, type PinnedType } from '@/features/market/pins';
-import {
-  formatIsk,
-  formatVolume,
-  formatSignedPercent,
-  computeSpreadPct,
-} from '@/features/market/format';
-import { typeIconUrl } from '@/features/market/icon';
+import { formatVolume, formatSignedPercent, computeSpreadPct } from '@/features/market/format';
+import { formatIsk } from '@/lib/isk';
+import { typeIconUrl } from '@/lib/eveImages';
 
 /** Debounce for the SDE type-name search, so a fast typist doesn't re-scan the ~9k-entry map on every keystroke. */
 const SEARCH_DEBOUNCE_MS = 250;
@@ -26,7 +22,7 @@ function TypeIcon({ typeId }: { typeId: number }) {
     return (
       <span
         aria-hidden="true"
-        className="flex size-8 shrink-0 items-center justify-center rounded-xs border border-line bg-panel-2 text-[10px] text-text-faint"
+        className="flex size-8 shrink-0 items-center justify-center rounded-xs border border-line bg-panel-2 text-[0.625rem] text-text-faint"
       >
         ?
       </span>
@@ -34,7 +30,7 @@ function TypeIcon({ typeId }: { typeId: number }) {
   }
   return (
     <img
-      src={typeIconUrl(typeId)}
+      src={typeIconUrl(typeId, 32)}
       alt=""
       width={32}
       height={32}
@@ -54,10 +50,10 @@ function TypeIcon({ typeId }: { typeId: number }) {
  */
 export function Market() {
   const { t } = useTranslation();
-  const hubId = useMarketHub((state) => state.hubId);
+  const hubId = useMarketHub((state) => state.value);
   const hubHydrated = useMarketHub((state) => state.hydrated);
   const hydrateHub = useMarketHub((state) => state.hydrate);
-  const setHubId = useMarketHub((state) => state.setHubId);
+  const setHubId = useMarketHub((state) => state.setValue);
 
   const [types, setTypes] = useState<TypeMap | null>(null);
   const [rawQuery, setRawQuery] = useState('');
@@ -176,7 +172,7 @@ export function Market() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('market.title')}</h1>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-2 text-xs">
-            <span className="text-[11px] font-semibold tracking-widest text-text-dim uppercase">
+            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('market.tradeHub')}
             </span>
             <select
@@ -208,7 +204,7 @@ export function Market() {
         />
 
         {atCap && (
-          <p className="pt-2 text-[11px] text-warning uppercase">
+          <p className="pt-2 text-[0.6875rem] text-warning uppercase">
             {t('market.capHint', { max: MAX_PINS })}
           </p>
         )}
