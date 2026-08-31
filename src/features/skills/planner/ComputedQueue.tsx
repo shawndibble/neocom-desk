@@ -72,7 +72,7 @@ export function ComputedQueue({
                 </span>
               </div>
               {timeline && (
-                <div className="mt-0.5 text-[10px] tabular-nums text-text-faint">
+                <div className="mt-0.5 text-[10px] tabular-nums text-text-dim">
                   {t('plans.stepTimeline', {
                     start: formatDate(timeline.start),
                     finish: formatDate(timeline.finish),

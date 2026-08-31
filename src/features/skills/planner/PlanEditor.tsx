@@ -376,7 +376,7 @@ export function PlanEditor({
                   ? t('plans.remapFromEveReady', { bonus: remapInfo.bonus })
                   : t('plans.remapFromEveCooldown', {
                       bonus: remapInfo.bonus,
-                      date: remapInfo.cooldownUntil?.toISOString().slice(0, 10),
+                      date: remapInfo.cooldownUntil ? formatDate(remapInfo.cooldownUntil) : '',
                     })}
               </span>
             )}
