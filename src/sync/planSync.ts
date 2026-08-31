@@ -530,11 +530,11 @@ async function syncCharacter(characterId: number): Promise<void> {
   }
   if (metaDirty) await writeSettingsMeta(meta);
 
-  const settledTombstones = new Set([
-    ...settings.clearLocalTombstones,
-    ...settings.pushTombstones.map((t) => t.key),
-  ]);
-  if (settledTombstones.size > 0) {
-    await writeSettingsTombstones(settingsTombstones.filter((t) => !settledTombstones.has(t.key)));
+  // Do NOT also clear on settings.pushTombstones: a tombstone that was just
+  // pushed is not yet resolved — see mergeSettings for why it must survive
+  // until a remote write postdates the delete.
+  if (settings.clearLocalTombstones.length > 0) {
+    const cleared = new Set(settings.clearLocalTombstones);
+    await writeSettingsTombstones(settingsTombstones.filter((t) => !cleared.has(t.key)));
   }
 }

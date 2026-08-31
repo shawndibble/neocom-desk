@@ -417,7 +417,11 @@ describe('triggerSync: settings', () => {
     ]);
   });
 
-  it('deleteSyncedSetting propagates a tombstone and clears the local one after sync', async () => {
+  it('deleteSyncedSetting propagates a tombstone to remote and keeps the local one', async () => {
+    // The local tombstone survives a successful push: it is the only defense
+    // against a stale device re-pushing its pre-delete copy once the remote
+    // tombstone ages past TOMBSTONE_TTL_MS and gets purged. It clears only
+    // once a remote write is observed postdating the delete (see merge.ts).
     await seedLocalSetting('sync.tradeHub', 'jita', Date.now() - 5_000);
     seedRemote(SETTINGS_PATH, [
       { key: 'sync.tradeHub', value: 'jita', updatedAt: Date.now() - 5_000, ownerHash: HASH },
@@ -429,7 +433,9 @@ describe('triggerSync: settings', () => {
     expect(doc?.deleted).toBe(true);
     expect(doc?.ownerHash).toBe(HASH);
     expect('value' in (doc ?? {})).toBe(false);
-    expect(await readLocalSettingsTombstones()).toEqual([]);
+    expect(await readLocalSettingsTombstones()).toEqual([
+      { key: 'sync.tradeHub', deletedAt: expect.any(Number) },
+    ]);
   });
 
   it('a remote settings tombstone deletes the local setting on the next sync', async () => {

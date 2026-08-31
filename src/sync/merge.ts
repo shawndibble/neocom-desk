@@ -177,7 +177,11 @@ export interface SettingsMergeResult {
   deleteLocal: string[];
   /** Remote tombstone doc keys past TTL, to delete remotely. */
   purgeRemote: string[];
-  /** Local tombstone keys that are resolved and can be dropped. */
+  /**
+   * Local tombstone keys superseded by a remote write postdating the delete.
+   * NOT populated just because a tombstone was pushed, or because the remote
+   * already carries its own tombstone — see mergeSettings for why.
+   */
   clearLocalTombstones: string[];
 }
 
@@ -210,8 +214,15 @@ export function mergeSettings(
   const localByKey = new Map(local.map((s) => [s.key, s]));
   const remoteByKey = new Map(remote.map((s) => [s.key, s]));
 
-  // A live local write supersedes its own pending deletion. No TTL branch:
-  // an un-superseded local tombstone lives forever.
+  // A live local write supersedes its own pending deletion. Otherwise the
+  // tombstone survives this cycle untouched: it is cleared ONLY when a remote
+  // write postdates the delete (see the `if (t)` branch below) — never merely
+  // because it was just pushed, or because the remote already carries its own
+  // tombstone, or because remote has nothing for the key. The remote
+  // tombstone is only good for TOMBSTONE_TTL_MS; once purged, this local
+  // tombstone is the sole defense against a stale device re-pushing its
+  // pre-deletion copy. No TTL branch: an un-superseded local tombstone lives
+  // forever.
   const tombstoneByKey = new Map<string, SyncedSettingTombstone>();
   for (const t of localTombstones) {
     if (localByKey.has(t.key)) result.clearLocalTombstones.push(t.key);
@@ -233,19 +244,16 @@ export function mergeSettings(
         if (l) result.deleteLocal.push(key);
         if (now - r.updatedAt > TOMBSTONE_TTL_MS) result.purgeRemote.push(key);
       }
-      if (t) result.clearLocalTombstones.push(key); // remote already records it
       continue;
     }
 
     if (t) {
       // Local pending deletion (no live local row — guaranteed above).
-      if (!r) {
-        result.clearLocalTombstones.push(key); // nothing remote to delete
-      } else if (r.updatedAt > t.deletedAt) {
+      if (r && r.updatedAt > t.deletedAt) {
         result.pull.push({ key, value: r.value, updatedAt: r.updatedAt });
         result.clearLocalTombstones.push(key); // edited elsewhere after the delete
       } else {
-        result.pushTombstones.push(t);
+        result.pushTombstones.push(t); // reassert: remote has nothing, or is stale
       }
       continue;
     }

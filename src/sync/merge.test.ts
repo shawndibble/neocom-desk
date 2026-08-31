@@ -246,10 +246,11 @@ describe('mergeSettings', () => {
     expect(result.clearLocalTombstones).toEqual(['sync.a']);
   });
 
-  it('clears a local settings tombstone with no remote counterpart', () => {
-    const result = mergeSettings([], [{ key: 'sync.a', deletedAt: NOW - 100 }], [], NOW);
-    expect(result.clearLocalTombstones).toEqual(['sync.a']);
-    expect(result.pushTombstones).toEqual([]);
+  it('reasserts a local settings tombstone with no remote counterpart (not cleared)', () => {
+    const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 100 };
+    const result = mergeSettings([], [tombstone], [], NOW);
+    expect(result.pushTombstones).toEqual([tombstone]);
+    expect(result.clearLocalTombstones).toEqual([]);
   });
 
   it('a remote settings tombstone deletes the local setting', () => {
@@ -320,5 +321,37 @@ describe('mergeSettings', () => {
     expect(result.pushTombstones).toEqual([tombstone]);
     expect(result.clearLocalTombstones).toEqual([]);
     expect(result.pull).toEqual([]);
+  });
+
+  it('does not clear a local tombstone just because remote already carries its own', () => {
+    // The remote tombstone is only good for TOMBSTONE_TTL_MS. If the local
+    // tombstone were cleared here, nothing would defend this device once the
+    // remote copy is purged and a stale device re-pushes its pre-delete value.
+    const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 1000 };
+    const result = mergeSettings(
+      [],
+      [tombstone],
+      [{ key: 'sync.a', updatedAt: NOW - 500, deleted: true }],
+      NOW
+    );
+    expect(result.deleteLocal).toEqual([]);
+    expect(result.clearLocalTombstones).toEqual([]);
+  });
+
+  it('reasserts the delete against a stale re-push after the remote tombstone was purged', () => {
+    // Device A deleted sync.a and its remote tombstone has since aged out
+    // (purged by some sync). Device B was offline the whole time and re-pushes
+    // its pre-deletion copy as a live doc, older than the delete. Device A's
+    // local tombstone (never cleared, per the two tests above) must win.
+    const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: NOW - 1000 };
+    const result = mergeSettings(
+      [],
+      [tombstone],
+      [{ key: 'sync.a', value: 'stale', updatedAt: NOW - 2000 }],
+      NOW
+    );
+    expect(result.pushTombstones).toEqual([tombstone]);
+    expect(result.pull).toEqual([]);
+    expect(result.clearLocalTombstones).toEqual([]);
   });
 });
