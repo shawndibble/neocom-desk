@@ -10,6 +10,7 @@ import { SkillPicker } from './SkillPicker';
 
 function skill(overrides: Partial<SkillType> & Pick<SkillType, 'typeID' | 'name'>): SkillType {
   return {
+    description: '',
     groupID: 1,
     groupName: 'Spaceship Command',
     rank: 1,
@@ -50,6 +51,28 @@ const CATALOG: SkillCatalog = (() => {
 })();
 
 const NO_TRAINED: ReadonlyMap<number, TrainedSkill> = new Map();
+
+/** Descriptions are the point of these: search reaches them as a secondary field. */
+const DESCRIBED_SKILLS: SkillType[] = [
+  skill({
+    typeID: 11,
+    name: 'Gunnery',
+    description: 'Basic turret operation.',
+    groupName: 'Gunnery',
+  }),
+  skill({
+    typeID: 12,
+    name: 'Spaceship Command',
+    description: 'Improves turret tracking on all ships.',
+    groupName: 'Spaceship Command',
+  }),
+  skill({
+    typeID: 13,
+    name: 'Mining',
+    description: 'Extracts ore from asteroids.',
+    groupName: 'Resource Processing',
+  }),
+];
 
 describe('SkillPicker', () => {
   it('shows nothing until a query is typed', () => {
@@ -103,5 +126,100 @@ describe('SkillPicker', () => {
 
     expect(onAdd).toHaveBeenCalledWith({ skillTypeID: 1, targetLevel: 3 });
     expect(input).toHaveValue('');
+  });
+
+  it('matches description text, not just name', async () => {
+    const user = userEvent.setup();
+    render(
+      <SkillPicker
+        skills={DESCRIBED_SKILLS}
+        catalog={CATALOG}
+        trainedSkills={NO_TRAINED}
+        onAdd={vi.fn()}
+      />
+    );
+
+    await user.type(screen.getByRole('textbox'), 'tracking');
+
+    const items = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toContain('Spaceship Command');
+  });
+
+  it('ranks a name match above a description-only match', async () => {
+    const user = userEvent.setup();
+    render(
+      <SkillPicker
+        skills={DESCRIBED_SKILLS}
+        catalog={CATALOG}
+        trainedSkills={NO_TRAINED}
+        onAdd={vi.fn()}
+      />
+    );
+
+    await user.type(screen.getByRole('textbox'), 'turret');
+
+    const items = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(items[0]).toContain('Gunnery');
+    expect(items[1]).toContain('Spaceship Command');
+  });
+
+  it('shows filter chips for the matched groups, toggle to narrow results', async () => {
+    const user = userEvent.setup();
+    render(
+      <SkillPicker
+        skills={DESCRIBED_SKILLS}
+        catalog={CATALOG}
+        trainedSkills={NO_TRAINED}
+        onAdd={vi.fn()}
+      />
+    );
+
+    await user.type(screen.getByRole('textbox'), 'e');
+    const names = () => screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(names().join()).toContain('Gunnery');
+    expect(names().join()).toContain('Mining');
+
+    const chip = screen.getByRole('button', { name: 'Resource Processing' });
+    expect(chip).toHaveAttribute('aria-pressed', 'false');
+    await user.click(chip);
+
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(names()).toHaveLength(1);
+    expect(names()[0]).toContain('Mining');
+  });
+
+  it('narrows to a group crowded out of the unfiltered top results', async () => {
+    const user = userEvent.setup();
+    const common = Array.from({ length: 25 }, (_, i) =>
+      skill({
+        typeID: 100 + i,
+        name: `Common Skill ${String(i).padStart(2, '0')}`,
+        description: 'A widget-adjacent skill.',
+        groupName: 'CommonGroup',
+      })
+    );
+    const rare = skill({
+      typeID: 999,
+      name: 'Zzz Rare Skill',
+      description: 'A widget-adjacent skill.',
+      groupName: 'RareGroup',
+    });
+
+    render(
+      <SkillPicker
+        skills={[...common, rare]}
+        catalog={CATALOG}
+        trainedSkills={NO_TRAINED}
+        onAdd={vi.fn()}
+      />
+    );
+
+    await user.type(screen.getByRole('textbox'), 'widget');
+    await user.click(screen.getByRole('button', { name: 'RareGroup' }));
+
+    const names = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toContain('Zzz Rare Skill');
   });
 });

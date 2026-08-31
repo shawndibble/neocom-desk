@@ -92,4 +92,15 @@ describe('rankedSearch', () => {
     const result = rankedSearch(rows, 'zzz', { primary: byName, secondary: [byGroup], limit: 50 });
     expect(result).toEqual([]);
   });
+
+  it('checks multiple secondary fields, matching if any one hits', () => {
+    const rows: Row[] = [{ name: 'Widget', groupName: 'Gadgets' }];
+    const byDescription = () => 'A frigate-sized tool.';
+    const result = rankedSearch(rows, 'frigate', {
+      primary: byName,
+      secondary: [byGroup, byDescription],
+      limit: 50,
+    });
+    expect(result).toHaveLength(1);
+  });
 });

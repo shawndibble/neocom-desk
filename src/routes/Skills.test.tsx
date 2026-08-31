@@ -23,6 +23,7 @@ const FIXTURE_SKILLS: SkillType[] = [
   {
     typeID: 1,
     name: 'Small Hybrid Turret',
+    description: '',
     groupID: 10,
     groupName: 'Gunnery',
     rank: 1,
@@ -33,6 +34,7 @@ const FIXTURE_SKILLS: SkillType[] = [
   {
     typeID: 2,
     name: 'Frigate',
+    description: '',
     groupID: 20,
     groupName: 'Spaceship Command',
     rank: 1,

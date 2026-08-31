@@ -22,6 +22,7 @@ const FIXTURE_SKILLS: SkillType[] = [
   {
     typeID: 3300,
     name: 'Gunnery',
+    description: '',
     groupID: 10,
     groupName: 'Gunnery',
     rank: 1,
