@@ -136,4 +136,50 @@ describe('suggestReorder', () => {
   it('throws on unknown skill typeIDs', () => {
     expect(() => suggestReorder([step(99, 1)], skillMap())).toThrow(/99/);
   });
+
+  describe('with priorities', () => {
+    it('pulls a high-priority group ahead of a normal-priority group that occurs first', () => {
+      const skills = skillMap(
+        skill(1, 'perception', 'willpower'),
+        skill(2, 'intelligence', 'memory')
+      );
+      const steps = [step(1, 1), step(2, 1)];
+      const priorities = new Map([[2, 'high' as const]]);
+      const result = suggestReorder(steps, skills, priorities);
+      expect(result).toEqual([step(2, 1), step(1, 1)]);
+    });
+
+    it('keeps original (first-occurrence) group order among equal-priority groups', () => {
+      const skills = skillMap(
+        skill(1, 'perception', 'willpower'),
+        skill(2, 'intelligence', 'memory')
+      );
+      const steps = [step(1, 1), step(2, 1)];
+      const result = suggestReorder(steps, skills, new Map());
+      expect(result).toEqual(steps);
+    });
+
+    it('never places a step before a lower-priority prerequisite it still needs', () => {
+      // Z (high, perc/will) requires Y1 (normal, int/mem).
+      const skills = skillMap(
+        skill(1, 'intelligence', 'memory'),
+        skill(2, 'perception', 'willpower', [{ typeID: 1, level: 1 }])
+      );
+      const steps = [step(1, 1), step(2, 1)];
+      const priorities = new Map([[2, 'high' as const]]);
+      const result = suggestReorder(steps, skills, priorities);
+      expect(result).toEqual([step(1, 1), step(2, 1)]);
+      expect(isValidOrder(result, skills)).toBe(true);
+    });
+
+    it('omitting priorities behaves exactly like the pure attribute-pair grouping', () => {
+      const skills = skillMap(
+        skill(1, 'perception', 'willpower'),
+        skill(2, 'intelligence', 'memory'),
+        skill(3, 'perception', 'willpower')
+      );
+      const steps = [step(1, 1), step(2, 1), step(3, 1), step(2, 2)];
+      expect(suggestReorder(steps, skills)).toEqual(suggestReorder(steps, skills, new Map()));
+    });
+  });
 });

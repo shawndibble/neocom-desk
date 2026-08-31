@@ -8,7 +8,7 @@
  * deduped by skill; `upsertEntry` and `dedupeEntries` are the two places new
  * entries are ever introduced, so every caller must route through them.
  */
-import type { PlanEntry, PlanStep } from '@/engine/types';
+import type { PlanEntry, PlanPriority, PlanStep } from '@/engine/types';
 
 /** Sortable id for an entry (dnd-kit needs a stable string per row). */
 export function entryId(entry: PlanEntry): string {
@@ -62,6 +62,15 @@ export function upsertEntry(entries: readonly PlanEntry[], entry: PlanEntry): Pl
 
 export function removeEntry(entries: readonly PlanEntry[], skillTypeID: number): PlanEntry[] {
   return entries.filter((e) => e.skillTypeID !== skillTypeID);
+}
+
+/** Set one entry's own priority band (#27), leaving every other field untouched. */
+export function setEntryPriority(
+  entries: readonly PlanEntry[],
+  skillTypeID: number,
+  priority: PlanPriority
+): PlanEntry[] {
+  return entries.map((e) => (e.skillTypeID === skillTypeID ? { ...e, priority } : e));
 }
 
 /**
