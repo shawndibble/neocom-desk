@@ -196,7 +196,9 @@ export/clipboard behaviour, reason about e2e impact from the spec instead.
      `gh run download <run-id> -n playwright-report -D /tmp/pw-report`), then
      report back: the failing job and test, the error message, the
      `file:line`, and its best read of the cause. Never pull raw CI logs into
-     this context.
+     this context. On rounds 2+, tell it what previous rounds already tried —
+     each sub-agent starts fresh and will otherwise re-propose a fix you have
+     already ruled out.
   2. Fix it on the branch from that report (code or test, whichever is
      actually wrong — do not delete a failing test to make it pass).
   3. Re-run the local gate (step 6), commit, `git push`.
