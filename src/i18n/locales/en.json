@@ -309,7 +309,9 @@
     "containerLabel": "Container",
     "reauthTitle": "Log in again to see assets",
     "reauthHint": "Log in again to fetch this character's assets.",
-    "reauthAction": "Log in again with EVE Online"
+    "reauthAction": "Log in again with EVE Online",
+    "fetchTruncatedNotice": "Showing the first {{shown}} assets fetched — this character has more.",
+    "renderTruncatedNotice": "Showing {{shown}} of {{total}} assets."
   },
   "mail": {
     "title": "Mail",

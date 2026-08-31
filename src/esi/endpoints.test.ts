@@ -452,7 +452,7 @@ describe('assets', () => {
 
     const assets = await getCharacterAssets(CHARACTER_ID);
 
-    expect(assets).toEqual([...page1, ...page2]);
+    expect(assets).toEqual({ items: [...page1, ...page2], truncated: false });
   });
 });
 
