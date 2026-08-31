@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
+import { useFontScale, FONT_SCALE_KEY, DEFAULT_FONT_SCALE } from '@/lib/fontScale';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -21,13 +23,15 @@ vi.mock('@/sde/loadSde', () => ({
 
 const CHAR_ID = 91;
 
-// Rendered through <App /> rather than in isolation: /settings has no nav
-// entry, so routing to it at all is the thing worth asserting. Settings makes
-// no requests, hence no msw server.
+// Rendered through <App /> rather than in isolation: /settings has a nav
+// entry now, so routing to it through the shell is part of what's asserted.
+// Settings makes no requests, hence no msw server.
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  useFontScale.setState({ value: DEFAULT_FONT_SCALE, hydrated: false });
+  document.documentElement.style.fontSize = '';
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
@@ -35,10 +39,26 @@ beforeEach(async () => {
 });
 
 describe('Settings', () => {
-  it('renders the page heading and the no-preferences empty state', async () => {
+  it('renders the page heading and the font-scale control, defaulting to 100%', async () => {
     render(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: /settings/i })).toBeInTheDocument();
-    expect(screen.getByText(/no preferences yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/preferences will appear here/i)).toBeInTheDocument();
+
+    const group = screen.getByRole('group', { name: /text size/i });
+    expect(group.querySelector('[aria-pressed="true"]')).toHaveTextContent(/default/i);
+  });
+
+  it('applies and persists the chosen scale immediately', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(screen.getByRole('button', { name: /^large$/i }));
+
+    expect(screen.getByRole('button', { name: /^large$/i })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(document.documentElement.style.fontSize).toBe('112.5%');
+    expect((await db.settings.get(FONT_SCALE_KEY))?.value).toBe(1.125);
   });
 });

@@ -70,7 +70,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(mobileNav).getByRole('button', { name: 'More' })).toBeInTheDocument();
   });
 
-  it('opens a dialog listing Wallet, Assets, Mail, Calendar, Contracts, and Orders (not Styleguide)', async () => {
+  it('opens a dialog listing Wallet, Assets, Mail, Calendar, Contracts, Orders and Settings (not Styleguide)', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayout();
@@ -85,7 +85,15 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
 
     const sheet = screen.getByRole('dialog', { name: 'More' });
     expect(moreButton.getAttribute('aria-controls')).toBe(sheet.id);
-    for (const label of ['Wallet', 'Assets', 'Mail', 'Calendar', 'Contracts', 'Orders']) {
+    for (const label of [
+      'Wallet',
+      'Assets',
+      'Mail',
+      'Calendar',
+      'Contracts',
+      'Orders',
+      'Settings',
+    ]) {
       expect(within(sheet).getByRole('link', { name: label })).toBeInTheDocument();
     }
     expect(within(sheet).queryByRole('link', { name: 'Styleguide' })).not.toBeInTheDocument();
@@ -177,6 +185,7 @@ describe('Layout nav marks routes the character cannot use', () => {
     expect(within(rail).getByRole('link', { name: 'Mail' })).not.toHaveAttribute('title');
     expect(within(rail).getByRole('link', { name: 'Market' })).not.toHaveAttribute('title');
     expect(within(rail).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('title');
+    expect(within(rail).getByRole('link', { name: 'Settings' })).not.toHaveAttribute('title');
   });
 
   it('leaves the marked link navigable — the gate is where the explanation lives', async () => {

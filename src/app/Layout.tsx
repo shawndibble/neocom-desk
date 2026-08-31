@@ -44,6 +44,7 @@ const NAV_PATHS = [
   '/calendar',
   '/contracts',
   '/orders',
+  '/settings',
 ] as const satisfies readonly AppRoutePath[];
 
 interface NavItemProps {
@@ -154,6 +155,12 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           locked={locked.has('/orders')}
           onClick={onClose}
         />
+        <NavItem
+          to="/settings"
+          label={t('nav.settings')}
+          locked={locked.has('/settings')}
+          onClick={onClose}
+        />
       </div>
     </Modal>
   );
@@ -218,6 +225,7 @@ export function Layout() {
           <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
           <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
           <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
+          <NavItem to="/settings" label={t('nav.settings')} locked={locked.has('/settings')} />
           <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
             {t('nav.characterSection')}
           </p>

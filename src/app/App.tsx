@@ -34,6 +34,7 @@ import { AuthFailureRedirect } from './AuthFailureNotice';
 import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { useFontScale } from '@/lib/fontScale';
 
 // Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
@@ -83,6 +84,14 @@ export function App() {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  // Applies the stored text-scale to <html> as early as possible, regardless
+  // of which route the user lands on — it is not something visiting /settings
+  // should be required for.
+  const hydrateFontScale = useFontScale((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateFontScale();
+  }, [hydrateFontScale]);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).
