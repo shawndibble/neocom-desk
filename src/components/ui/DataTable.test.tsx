@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { DataTable, type DataTableColumn } from './DataTable';
 
@@ -25,6 +26,37 @@ const columns: DataTableColumn<Row>[] = [
     render: (row) => row.amount.toFixed(2),
   },
 ];
+
+interface SortRow {
+  id: number;
+  name: string;
+  value: number | undefined;
+}
+
+const sortRows: SortRow[] = [
+  { id: 1, name: 'Charlie', value: 30 },
+  { id: 2, name: 'Alpha', value: undefined },
+  { id: 3, name: 'Bravo', value: 10 },
+  { id: 4, name: 'Delta', value: 20 },
+];
+
+const sortColumns: DataTableColumn<SortRow>[] = [
+  { id: 'name', header: 'Name', render: (row) => row.name },
+  {
+    id: 'value',
+    header: 'Value',
+    align: 'right',
+    sortValue: (row) => row.value,
+    render: (row) => (row.value === undefined ? '—' : String(row.value)),
+  },
+];
+
+function itemNames() {
+  return screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => row.querySelector('td')?.textContent);
+}
 
 function renderTable(props: Partial<Parameters<typeof DataTable<Row>>[0]> = {}) {
   return render(
@@ -81,5 +113,65 @@ describe('DataTable', () => {
     renderTable({ rows: [] });
     expect(screen.getAllByRole('row')).toHaveLength(1);
     expect(screen.queryAllByRole('cell')).toHaveLength(0);
+  });
+
+  describe('sorting', () => {
+    function renderSortable(props: Partial<Parameters<typeof DataTable<SortRow>>[0]> = {}) {
+      return render(
+        <DataTable
+          columns={sortColumns}
+          rows={sortRows}
+          rowKey={(row) => row.id}
+          label="Sortable"
+          {...props}
+        />
+      );
+    }
+
+    it('leaves a column with no sortValue inert', () => {
+      renderSortable();
+      expect(screen.queryByRole('button', { name: 'Name' })).not.toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'Name' })).not.toHaveAttribute('aria-sort');
+    });
+
+    it('sorts ascending on first click and descending on second, and exposes it to assistive tech', async () => {
+      const user = userEvent.setup();
+      renderSortable();
+      const header = screen.getByRole('columnheader', { name: 'Value' });
+      expect(header).toHaveAttribute('aria-sort', 'none');
+
+      await user.click(screen.getByRole('button', { name: 'Value' }));
+      expect(header).toHaveAttribute('aria-sort', 'ascending');
+      expect(itemNames()).toEqual(['Bravo', 'Delta', 'Charlie', 'Alpha']);
+
+      await user.click(screen.getByRole('button', { name: 'Value' }));
+      expect(header).toHaveAttribute('aria-sort', 'descending');
+      expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
+    });
+
+    it('sinks rows with a missing sort value to the end in both directions', async () => {
+      const user = userEvent.setup();
+      renderSortable();
+      await user.click(screen.getByRole('button', { name: 'Value' }));
+      expect(itemNames().at(-1)).toBe('Alpha');
+      await user.click(screen.getByRole('button', { name: 'Value' }));
+      expect(itemNames().at(-1)).toBe('Alpha');
+    });
+
+    it('honours a declared default sort without a click', () => {
+      renderSortable({ defaultSort: { columnId: 'value', direction: 'desc' } });
+      expect(screen.getByRole('columnheader', { name: 'Value' })).toHaveAttribute(
+        'aria-sort',
+        'descending'
+      );
+      expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
+    });
+
+    it('leaves every existing (non-opted-in) table unsorted and in original row order', () => {
+      renderTable();
+      const cells = screen.getAllByRole('cell');
+      expect(cells[0]).toHaveTextContent('Tritanium');
+      expect(cells[2]).toHaveTextContent('Pyerite');
+    });
   });
 });
