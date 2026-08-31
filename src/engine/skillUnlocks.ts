@@ -1,4 +1,4 @@
-import type { EngineSkill, SkillPrereq } from './types';
+import type { EngineSkill, SkillUnlock } from './types';
 
 /**
  * Reverse index of EngineSkill.prereqs: for a prerequisite skill, every skill
@@ -7,8 +7,8 @@ import type { EngineSkill, SkillPrereq } from './types';
  */
 export function buildUnlockIndex(
   skills: ReadonlyMap<number, EngineSkill>
-): Map<number, SkillPrereq[]> {
-  const index = new Map<number, SkillPrereq[]>();
+): Map<number, SkillUnlock[]> {
+  const index = new Map<number, SkillUnlock[]>();
   for (const skill of skills.values()) {
     for (const prereq of skill.prereqs) {
       const unlocks = index.get(prereq.typeID);

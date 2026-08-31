@@ -15,7 +15,8 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { SkillBar } from '@/features/skills/SkillBar';
 import { ImplantChip } from '@/features/skills/ImplantChip';
-import { SkillInspector, type PrereqRow, type UnlockRow } from '@/features/skills/SkillInspector';
+import { SkillInspector } from '@/features/skills/SkillInspector';
+import { buildSkillRequirements } from '@/features/skills/skillRequirements';
 import {
   loadSkillCatalog,
   toTrainedSkillsMap,
@@ -172,24 +173,7 @@ export function Skills() {
 
   const inspector = useMemo(() => {
     if (selectedSkillTypeID === null || !catalog) return null;
-    const engineSkill = catalog.engineSkills.get(selectedSkillTypeID);
-    const info = catalog.bySkillTypeID.get(selectedSkillTypeID);
-    if (!engineSkill || !info) return null;
-
-    const prereqs: PrereqRow[] = engineSkill.prereqs.map((p) => ({
-      typeID: p.typeID,
-      name: catalog.bySkillTypeID.get(p.typeID)?.name ?? `#${p.typeID}`,
-      level: p.level,
-      trained: (trainedSkillsMap.get(p.typeID)?.level ?? 0) >= p.level,
-    }));
-    const unlocks: UnlockRow[] = (catalog.unlocksByTypeID.get(selectedSkillTypeID) ?? []).map(
-      (u) => ({
-        typeID: u.typeID,
-        name: catalog.bySkillTypeID.get(u.typeID)?.name ?? `#${u.typeID}`,
-        level: u.level,
-      })
-    );
-    return { name: info.name, prereqs, unlocks };
+    return buildSkillRequirements(catalog, trainedSkillsMap, selectedSkillTypeID);
   }, [selectedSkillTypeID, catalog, trainedSkillsMap]);
 
   if (!hydrated) {
