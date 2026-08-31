@@ -1,0 +1,41 @@
+// Shapes of the market catalogue JSON emitted by scripts/build-sde.mjs into
+// public/data/market/ — kept out of the install precache (vite.config.ts
+// globIgnores) and fetched lazily on first visit to /market, since most
+// installs never open it (CONTEXT.md round 10).
+
+/** One entry in public/data/market/groups.json — a node in invMarketGroups. */
+export interface MarketGroupNode {
+  id: number;
+  name: string;
+  parentId: number | null;
+  /** Only groups with hasTypes hold items directly; the rest are branches. */
+  hasTypes: boolean;
+}
+
+/** One entry in public/data/market/types.json — a published, market-grouped type. */
+export interface MarketTypeEntry {
+  typeId: number;
+  name: string;
+  marketGroupId: number;
+}
+
+/** One entry in public/data/market/systems.json. */
+export interface SolarSystemEntry {
+  id: number;
+  name: string;
+  security: number;
+  regionId: number;
+}
+
+/** One entry in public/data/market/stations.json — an NPC station. */
+export interface NpcStationEntry {
+  id: number;
+  name: string;
+  systemId: number;
+}
+
+/** One entry in public/data/market/regions.json — a region probed to actually carry orders. */
+export interface MarketRegionEntry {
+  id: number;
+  name: string;
+}
