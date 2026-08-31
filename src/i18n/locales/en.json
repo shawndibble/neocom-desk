@@ -6,6 +6,7 @@
   "nav": {
     "characters": "Characters",
     "overview": "Overview",
+    "queueHealth": "Queue Health",
     "skills": "Skills",
     "industry": "Industry",
     "market": "Market",
@@ -311,6 +312,17 @@
     "queueReauthTitle": "Log in again to see the training queue",
     "queueReauthHint": "Log in again to fetch this character's in-game skill queue.",
     "queueReauthAction": "Log in again with EVE Online"
+  },
+  "queueHealth": {
+    "title": "Queue Health",
+    "state": "Status",
+    "states": {
+      "training": "Training",
+      "idle": "Idle",
+      "paused": "Paused",
+      "endingSoon": "Ending soon",
+      "unknown": "Unknown"
+    }
   },
   "common": {
     "close": "Close",
