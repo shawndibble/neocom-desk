@@ -217,10 +217,9 @@ export function PlanEditor({
   );
 
   // The plan keeps whatever count the user set (ESI prefills bonus remaps).
-  // Only the optimizer is capped, and the UI says so rather than quietly
-  // answering a different question than the one on screen.
+  // Only the optimizer is capped, and the header badge says so rather than
+  // quietly answering a different question than the one on screen.
   const remapCount = Math.min(plan.remapCount, MAX_SUPPORTED_REMAPS);
-  const remapCapped = plan.remapCount > MAX_SUPPORTED_REMAPS;
 
   // Which queue rows the Booster actually speeds up: trained inside its window
   // AND on an attribute it raises. Both, or the mark is a lie.
@@ -441,15 +440,10 @@ export function PlanEditor({
               id="plan-remap-count"
               type="number"
               min={0}
-              max={REMAP_EVALUATION_CAP}
+              max={5}
               value={plan.remapCount}
               onChange={(e) =>
-                onUpdate({
-                  remapCount: Math.min(
-                    REMAP_EVALUATION_CAP,
-                    Math.max(0, Number(e.target.value) || 0)
-                  ),
-                })
+                onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
               }
               className="h-6 w-12 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
             />
@@ -599,14 +593,9 @@ export function PlanEditor({
 
       {optimizeResult && (
         <Panel title={t('plans.optimizeRemaps')}>
-          {remapCapped && (
-            // The plan asks for more remaps than the optimizer evaluates. Say
-            // so: an answer for one remap presented as the answer for three is
-            // the silent-degradation failure this planner keeps hitting.
-            <p className="mb-2 text-[0.6875rem] text-warning uppercase">
-              {t('plans.remapCapNote', { count: MAX_SUPPORTED_REMAPS })}
-            </p>
-          )}
+          {/* The header badge above already discloses a capped evaluation
+              live, before any click — repeating it here would just be the
+              same warning shown twice. */}
           {optimizeResult.savingsSeconds < MIN_MEANINGFUL_SAVINGS_SECONDS ? (
             <p className="text-xs text-text-dim">{t('plans.remapNoGain')}</p>
           ) : (
