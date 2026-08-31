@@ -86,7 +86,7 @@ Up to **5 rounds**:
    skip, or loosen a test just to make it pass.
 3. If a failure looks pre-existing and unrelated to this ticket's diff (e.g.
    a flaky or environment-dependent test), confirm before ignoring it: `git
-   stash`, run just that one check, `git stash pop`. If it fails identically
+stash`, run just that one check, `git stash pop`. If it fails identically
    without this ticket's changes, note it in the PR's Review notes instead of
    trying to fix it.
 4. Re-run the full gate chain.
@@ -239,7 +239,7 @@ Loop up to **5 rounds** (this budget is shared across both triggers below —
 it is not 5 conflict rounds plus 5 CI rounds):
 
 - **Mergeability first**: `gh pr view <pr> --json mergeStateStatus --jq
-  .mergeStateStatus`. If it's `CONFLICTING` or `DIRTY`, run the
+.mergeStateStatus`. If it's `CONFLICTING` or `DIRTY`, run the
   sync-with-main / conflict resolution procedure above, push, and restart
   this round (re-check CI below against the new commit).
 - `gh pr checks <pr> --watch --interval 30` (blocks until `validate` + `e2e`
