@@ -310,6 +310,30 @@ describe('SkillPlans editor: add-skill picker', () => {
     expect(stored?.entries).toEqual([{ skillTypeID: 2, targetLevel: 1 }]);
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
+
+  it("shows the expanded skill's prerequisites (untrained) and unlocks inline (#18)", async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const search = await screen.findByRole('textbox', { name: 'Add skill' });
+    await user.type(search, 'Small Hybrid Turret');
+    await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
+
+    // Small Hybrid Turret needs Gunnery III; this character has 0 SP (emptySkillsPayload).
+    const prereqsHeading = await screen.findByText('Prerequisites');
+    const prereqsSection = prereqsHeading.closest('section')!;
+    expect(within(prereqsSection).getByText('Gunnery')).toBeInTheDocument();
+    expect(within(prereqsSection).getByText('Level 3')).toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, 'Gunnery');
+    await user.click(await screen.findByRole('button', { name: /^Gunnery/ }));
+
+    const unlocksHeading = await screen.findByText('Unlocks');
+    const unlocksSection = unlocksHeading.closest('section')!;
+    expect(within(unlocksSection).getByText('Small Hybrid Turret')).toBeInTheDocument();
+  });
 });
 
 describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {

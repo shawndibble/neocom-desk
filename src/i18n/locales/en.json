@@ -45,7 +45,16 @@
     },
     "reauthTitle": "Log in again to see skills",
     "reauthHint": "Log in again to fetch this character's trained skills.",
-    "reauthAction": "Log in again with EVE Online"
+    "reauthAction": "Log in again with EVE Online",
+    "inspector": {
+      "prereqsTitle": "Prerequisites",
+      "unlocksTitle": "Unlocks",
+      "noPrereqs": "No prerequisites",
+      "noUnlocks": "Doesn't unlock anything yet",
+      "levelNeeded": "Level {{level}}",
+      "trained": "Trained · Level {{level}}",
+      "close": "Close"
+    }
   },
   "plans": {
     "title": "Skill Plans",

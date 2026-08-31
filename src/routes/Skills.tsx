@@ -15,7 +15,13 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { SkillBar } from '@/features/skills/SkillBar';
 import { ImplantChip } from '@/features/skills/ImplantChip';
-import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
+import { SkillInspector } from '@/features/skills/SkillInspector';
+import { buildSkillRequirements } from '@/features/skills/skillRequirements';
+import {
+  loadSkillCatalog,
+  toTrainedSkillsMap,
+  type SkillCatalog,
+} from '@/features/skills/skillMap';
 import {
   loadCharacterAttributes,
   loadCharacterImplants,
@@ -61,7 +67,16 @@ export function Skills() {
 
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedSkillTypeID, setSelectedSkillTypeID] = useState<number | null>(null);
   const requestKey = `${activeCharacterId}:${refreshKey}`;
+
+  // Drop the inspector selection when switching characters, without an effect
+  // (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  const [inspectorForCharacter, setInspectorForCharacter] = useState(activeCharacterId);
+  if (inspectorForCharacter !== activeCharacterId) {
+    setInspectorForCharacter(activeCharacterId);
+    setSelectedSkillTypeID(null);
+  }
 
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -150,6 +165,16 @@ export function Skills() {
         skills: skills.sort((a, b) => a.name.localeCompare(b.name)),
       }));
   }, [skillsResult, catalog, t]);
+
+  const trainedSkillsMap = useMemo(
+    () => toTrainedSkillsMap(skillsResult?.data?.skills ?? []),
+    [skillsResult]
+  );
+
+  const inspector = useMemo(() => {
+    if (selectedSkillTypeID === null || !catalog) return null;
+    return buildSkillRequirements(catalog, trainedSkillsMap, selectedSkillTypeID);
+  }, [selectedSkillTypeID, catalog, trainedSkillsMap]);
 
   if (!hydrated) {
     return (
@@ -254,21 +279,43 @@ export function Skills() {
             </div>
           </Panel>
 
+          {inspector && (
+            <SkillInspector
+              skillName={inspector.name}
+              prereqs={inspector.prereqs}
+              unlocks={inspector.unlocks}
+              onClose={() => setSelectedSkillTypeID(null)}
+            />
+          )}
+
           {groups.map((group) => (
             <Panel key={group.groupName} title={group.groupName}>
               <ul className="divide-y divide-line">
-                {group.skills.map((skill) => (
-                  <li
-                    key={skill.skillTypeID}
-                    className="flex items-center justify-between gap-2 py-1.5 text-xs"
-                  >
-                    <span className="flex-1 truncate">{skill.name}</span>
-                    <SkillBar level={skill.level} />
-                    <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
-                      {t('skills.sp', { value: skill.sp.toLocaleString() })}
-                    </span>
-                  </li>
-                ))}
+                {group.skills.map((skill) => {
+                  const selected = selectedSkillTypeID === skill.skillTypeID;
+                  return (
+                    <li key={skill.skillTypeID}>
+                      <button
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() =>
+                          setSelectedSkillTypeID((current) =>
+                            current === skill.skillTypeID ? null : skill.skillTypeID
+                          )
+                        }
+                        className={`flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 ${
+                          selected ? 'bg-panel-2' : ''
+                        }`}
+                      >
+                        <span className="flex-1 truncate">{skill.name}</span>
+                        <SkillBar level={skill.level} />
+                        <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
+                          {t('skills.sp', { value: skill.sp.toLocaleString() })}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </Panel>
           ))}

@@ -3,6 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { SkillPicker } from './SkillPicker';
 import type { SkillType } from '@/sde/types';
+import type { SkillCatalog } from '../skillMap';
+import type { TrainedSkill } from '@/engine/types';
+
+const EMPTY_CATALOG: SkillCatalog = {
+  engineSkills: new Map(),
+  bySkillTypeID: new Map(),
+  unlocksByTypeID: new Map(),
+};
+const NO_TRAINED_SKILLS: ReadonlyMap<number, TrainedSkill> = new Map();
 
 function skill(overrides: Partial<SkillType>): SkillType {
   return {
@@ -42,7 +51,14 @@ const SKILLS: SkillType[] = [
 
 describe('SkillPicker', () => {
   it('matches description text, not just name', async () => {
-    render(<SkillPicker skills={SKILLS} onAdd={vi.fn()} />);
+    render(
+      <SkillPicker
+        skills={SKILLS}
+        catalog={EMPTY_CATALOG}
+        trainedSkills={NO_TRAINED_SKILLS}
+        onAdd={vi.fn()}
+      />
+    );
     await userEvent.type(screen.getByRole('textbox'), 'tracking');
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(items).toHaveLength(1);
@@ -50,7 +66,14 @@ describe('SkillPicker', () => {
   });
 
   it('ranks a name match above a description-only match', async () => {
-    render(<SkillPicker skills={SKILLS} onAdd={vi.fn()} />);
+    render(
+      <SkillPicker
+        skills={SKILLS}
+        catalog={EMPTY_CATALOG}
+        trainedSkills={NO_TRAINED_SKILLS}
+        onAdd={vi.fn()}
+      />
+    );
     await userEvent.type(screen.getByRole('textbox'), 'turret');
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(items[0]).toContain('Gunnery');
@@ -58,7 +81,14 @@ describe('SkillPicker', () => {
   });
 
   it('shows filter chips for the matched groups, toggle to narrow results', async () => {
-    render(<SkillPicker skills={SKILLS} onAdd={vi.fn()} />);
+    render(
+      <SkillPicker
+        skills={SKILLS}
+        catalog={EMPTY_CATALOG}
+        trainedSkills={NO_TRAINED_SKILLS}
+        onAdd={vi.fn()}
+      />
+    );
     await userEvent.type(screen.getByRole('textbox'), 'e');
     const names = () => screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(names().join()).toContain('Gunnery');
@@ -88,7 +118,14 @@ describe('SkillPicker', () => {
       groupName: 'RareGroup',
     });
 
-    render(<SkillPicker skills={[...common, rare]} onAdd={vi.fn()} />);
+    render(
+      <SkillPicker
+        skills={[...common, rare]}
+        catalog={EMPTY_CATALOG}
+        trainedSkills={NO_TRAINED_SKILLS}
+        onAdd={vi.fn()}
+      />
+    );
     await userEvent.type(screen.getByRole('textbox'), 'widget');
 
     const chip = screen.getByRole('button', { name: 'RareGroup' });
