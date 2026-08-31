@@ -963,6 +963,44 @@ describe('SkillPlans editor: import from clipboard', () => {
   });
 });
 
+describe('SkillPlans editor: schedule timeline (#20)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-29T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("projects a plan finish date that matches the last step's own finish, and starts the first step at the plan start (#20)", async () => {
+    // Gunnery I..V is a multi-day train at these attributes, so start and
+    // finish land on different calendar dates.
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    const items = await within(panel).findAllByRole('listitem');
+
+    const finishNote = within(panel).getByText(/^Finishes \d{4}-\d{2}-\d{2}$/);
+    const planFinishDate = finishNote.textContent!.replace('Finishes ', '');
+
+    // First step starts exactly at the plan's wall-clock start.
+    expect(items[0].textContent).toContain('2026-08-29 → ');
+    // Last step's own finish is the same value the panel header projects —
+    // one number, computed one way (#20 acceptance criterion).
+    expect(items[items.length - 1].textContent).toContain(`→ ${planFinishDate}`);
+  });
+
+  it('shows no projected finish date, and no invented start time, for an empty plan (#20)', async () => {
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    await within(panel).findByText('Add a skill to see the training queue.');
+    expect(within(panel).queryByText(/^Finishes/)).not.toBeInTheDocument();
+  });
+});
+
 describe('SkillPlans: current skill queue panel', () => {
   it('shows the in-game skill queue with training times, separate from any plan', async () => {
     render(<App />);

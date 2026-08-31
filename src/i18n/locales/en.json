@@ -88,6 +88,8 @@
     "computedQueueAllTrained": "All selected skills are already trained.",
     "columnPerLevel": "Per-level",
     "columnCumulative": "Cumulative",
+    "projectedFinish": "Finishes {{date}}",
+    "stepTimeline": "{{start}} → {{finish}}",
     "currentQueueTitle": "Current skill queue",
     "currentQueueEmpty": "No active in-game training queue cached.",
     "computeError": "Couldn't compute this plan: {{message}}",
