@@ -149,6 +149,23 @@ describe('DataTable', () => {
       expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
     });
 
+    it('keeps the original relative order of rows that tie on sort value', async () => {
+      const user = userEvent.setup();
+      render(
+        <DataTable
+          columns={sortColumns}
+          rows={[
+            { id: 1, name: 'First', value: 10 },
+            { id: 2, name: 'Second', value: 10 },
+          ]}
+          rowKey={(row) => row.id}
+          label="Sortable"
+        />
+      );
+      await user.click(screen.getByRole('button', { name: 'Value' }));
+      expect(itemNames()).toEqual(['First', 'Second']);
+    });
+
     it('sinks rows with a missing sort value to the end in both directions', async () => {
       const user = userEvent.setup();
       renderSortable();

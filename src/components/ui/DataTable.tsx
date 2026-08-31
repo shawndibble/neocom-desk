@@ -81,13 +81,10 @@ export function DataTable<T>({
 
   // Per-column classes are invariant across rows, so they are built once
   // rather than per cell — a 1,000-row journal is 5,000 cells.
-  const headerClass = columns.map((column) =>
-    cx(
-      'px-3 py-2 font-semibold uppercase',
-      column.align === 'right' && 'text-right',
-      column.sortValue && 'p-0'
-    )
+  const headerTextClass = columns.map((column) =>
+    cx('px-3 py-2 font-semibold uppercase', column.align === 'right' && 'text-right')
   );
+  const headerClass = columns.map((column, i) => cx(column.sortValue ? 'p-0' : headerTextClass[i]));
   const cellClass = columns.map((column) =>
     cx('px-3 py-1.5', column.align === 'right' && 'text-right', column.className)
   );
@@ -131,7 +128,8 @@ export function DataTable<T>({
                   type="button"
                   onClick={() => toggleSort(column)}
                   className={cx(
-                    'inline-flex w-full items-center gap-1 px-3 py-2 font-semibold uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                    headerTextClass[i],
+                    'inline-flex w-full items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
                     column.align === 'right' && 'justify-end'
                   )}
                 >
