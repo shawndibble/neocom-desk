@@ -22,18 +22,18 @@ describe('previewPlanXmlImport', () => {
     expect(preview.planName).toBe('Sample Plan');
     expect(preview.errors).toEqual([]);
     expect(preview.entries).toEqual([
-      { skillTypeID: 3300, targetLevel: 4, priority: 3 },
-      { skillTypeID: 3327, targetLevel: 3, priority: 2 },
-      { skillTypeID: 3335, targetLevel: 5, priority: 1 },
+      { skillTypeID: 3300, targetLevel: 4, priority: 'normal' },
+      { skillTypeID: 3327, targetLevel: 3, priority: 'high' },
+      { skillTypeID: 3335, targetLevel: 5, priority: 'high' },
     ]);
   });
 
   it('round-trips the plain .xml variant identically', async () => {
     const preview = await previewPlanXmlImport(fileFrom('sample-plan.xml'), CATALOG);
     expect(preview.entries).toEqual([
-      { skillTypeID: 3300, targetLevel: 4, priority: 3 },
-      { skillTypeID: 3327, targetLevel: 3, priority: 2 },
-      { skillTypeID: 3335, targetLevel: 5, priority: 1 },
+      { skillTypeID: 3300, targetLevel: 4, priority: 'normal' },
+      { skillTypeID: 3327, targetLevel: 3, priority: 'high' },
+      { skillTypeID: 3335, targetLevel: 5, priority: 'high' },
     ]);
   });
 
@@ -42,7 +42,7 @@ describe('previewPlanXmlImport', () => {
       fileFrom('sample-plan.emp'),
       new Map([['gunnery', { typeID: 3300 }]])
     );
-    expect(preview.entries).toEqual([{ skillTypeID: 3300, targetLevel: 4, priority: 3 }]);
+    expect(preview.entries).toEqual([{ skillTypeID: 3300, targetLevel: 4, priority: 'normal' }]);
     expect(preview.errors).toEqual([
       { line: 1, text: 'entry[1] "Spaceship Command"', reason: 'unknown skill: Spaceship Command' },
       { line: 2, text: 'entry[2] "Caldari Frigate"', reason: 'unknown skill: Caldari Frigate' },

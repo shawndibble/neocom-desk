@@ -53,16 +53,15 @@ export interface CharacterSheet {
   trainedSkills: Map<number, TrainedSkill>;
 }
 
+/** Training-order urgency a user assigns to a Skill Plan entry. */
+export type PlanPriority = 'high' | 'normal' | 'low';
+
 /** User plan entry: train a skill up to targetLevel. */
 export interface PlanEntry {
   skillTypeID: number;
   targetLevel: number;
-  /**
-   * Import-sourced priority (1-highest .. lower-priority), carried over from
-   * other planners' plan files. Not yet consumed by any engine logic here —
-   * preserved for the future skill-priorities feature.
-   */
-  priority?: number;
+  /** Absent means 'normal' (#27: Skill priorities and bands). */
+  priority?: PlanPriority;
 }
 
 /** Normalized single-level training step. */

@@ -5,12 +5,13 @@
  * one `<entry skill="..." level="..." priority="...">` per skill.
  */
 
-import type { PlanEntry } from '@/engine/types';
+import type { PlanEntry, PlanPriority } from '@/engine/types';
 
 export interface PlanXmlEntryInput {
   skillName: string;
   skillID?: number;
   level: number;
+  /** Raw EVEMon priority attribute: integer 1 (most urgent) .. 99, default 3. */
   priority?: number;
 }
 
@@ -33,6 +34,19 @@ export interface SkillPlanXmlResult {
 
 /** Minimal catalog shape needed to resolve a skill name to a typeID. */
 export type SkillCatalog = ReadonlyMap<string, { typeID: number }>;
+
+/**
+ * Map EVEMon's numeric priority (1 = most urgent .. 99, default 3) onto this
+ * app's three-band `PlanPriority` (#27: Skill priorities and bands). The
+ * threshold is EVEMon's own default value — a file that never touched
+ * priority reads as 'normal', matching this app's own "absent means normal"
+ * default (bands.ts) rather than introducing a second scale.
+ */
+function mapImportPriority(raw: number): PlanPriority {
+  if (raw < 3) return 'high';
+  if (raw > 3) return 'low';
+  return 'normal';
+}
 
 /**
  * Parse a plan-XML intermediate object into plan entries. Never throws:
@@ -70,7 +84,7 @@ export function parseSkillPlanXml(
       byTypeID.set(skill.typeID, {
         skillTypeID: skill.typeID,
         targetLevel: entry.level,
-        ...(entry.priority !== undefined ? { priority: entry.priority } : {}),
+        ...(entry.priority !== undefined ? { priority: mapImportPriority(entry.priority) } : {}),
       });
     }
   });

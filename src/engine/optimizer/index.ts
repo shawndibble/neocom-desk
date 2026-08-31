@@ -22,3 +22,5 @@ export type {
 } from '@/engine/optimizer/placeRemaps';
 
 export { isValidOrder, suggestReorder } from '@/engine/optimizer/reorderSuggestion';
+
+export { effectivePriority, higherPriority, priorityRank } from '@/engine/planPriority';

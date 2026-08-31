@@ -14,12 +14,21 @@ describe('parseSkillPlanXml', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('preserves the priority attribute', () => {
-    const result = parseSkillPlanXml(
-      { entries: [{ skillName: 'Gunnery', level: 4, priority: 2 }] },
-      CATALOG
-    );
-    expect(result.entries).toEqual([{ skillTypeID: 3300, targetLevel: 4, priority: 2 }]);
+  it('maps the priority attribute onto a PlanPriority band (#27)', () => {
+    // EVEMon priority: 1 = most urgent .. 99, default 3. Threshold is that
+    // default: below it is 'high', above it is 'low', at it is 'normal'.
+    expect(
+      parseSkillPlanXml({ entries: [{ skillName: 'Gunnery', level: 4, priority: 1 }] }, CATALOG)
+        .entries
+    ).toEqual([{ skillTypeID: 3300, targetLevel: 4, priority: 'high' }]);
+    expect(
+      parseSkillPlanXml({ entries: [{ skillName: 'Gunnery', level: 4, priority: 3 }] }, CATALOG)
+        .entries
+    ).toEqual([{ skillTypeID: 3300, targetLevel: 4, priority: 'normal' }]);
+    expect(
+      parseSkillPlanXml({ entries: [{ skillName: 'Gunnery', level: 4, priority: 10 }] }, CATALOG)
+        .entries
+    ).toEqual([{ skillTypeID: 3300, targetLevel: 4, priority: 'low' }]);
   });
 
   it('never emits an explicit priority: undefined key for an entry with no priority', () => {
@@ -40,7 +49,7 @@ describe('parseSkillPlanXml', () => {
       },
       CATALOG
     );
-    expect(result.entries).toEqual([{ skillTypeID: 3300, targetLevel: 4, priority: 2 }]);
+    expect(result.entries).toEqual([{ skillTypeID: 3300, targetLevel: 4, priority: 'high' }]);
   });
 
   it('is case-insensitive on skill name lookup', () => {
