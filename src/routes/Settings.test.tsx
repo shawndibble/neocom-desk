@@ -61,4 +61,15 @@ describe('Settings', () => {
     expect(document.documentElement.style.fontSize).toBe('112.5%');
     expect((await db.settings.get(FONT_SCALE_KEY))?.value).toBe(1.125);
   });
+
+  it('lists the keyboard shortcuts, so they are discoverable (issue #25)', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(screen.getByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    expect(screen.getByText('Jump to search')).toBeInTheDocument();
+    expect(screen.getByText('Switch character')).toBeInTheDocument();
+    expect(screen.getByText('Open Settings')).toBeInTheDocument();
+    expect(screen.getByText('Close the open dialog')).toBeInTheDocument();
+  });
 });

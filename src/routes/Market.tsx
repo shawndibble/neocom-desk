@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
@@ -11,6 +12,7 @@ import { addPin, removePin, MAX_PINS, type PinnedType } from '@/features/market/
 import { formatVolume, formatSignedPercent, computeSpreadPct } from '@/features/market/format';
 import { formatIsk } from '@/lib/isk';
 import { typeIconUrl } from '@/lib/eveImages';
+import type { MarketFocusSearchState } from '@/lib/shortcuts';
 
 /** Debounce for the SDE type-name search, so a fast typist doesn't re-scan the ~9k-entry map on every keystroke. */
 const SEARCH_DEBOUNCE_MS = 250;
@@ -50,6 +52,8 @@ function TypeIcon({ typeId }: { typeId: number }) {
  */
 export function Market() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const hubId = useMarketHub((state) => state.value);
   const hubHydrated = useMarketHub((state) => state.hydrated);
   const hydrateHub = useMarketHub((state) => state.hydrate);
@@ -67,6 +71,14 @@ export function Market() {
   useEffect(() => {
     void hydrateHub();
   }, [hydrateHub]);
+
+  // The "jump to search" shortcut (`lib/shortcuts.ts`) navigates here with
+  // this state to focus the box in one step, from anywhere in the app.
+  useEffect(() => {
+    if ((location.state as Partial<MarketFocusSearchState> | null)?.focusSearch) {
+      searchInputRef.current?.focus();
+    }
+  }, [location.state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -195,6 +207,7 @@ export function Market() {
 
       <Panel title={t('market.searchTitle')}>
         <input
+          ref={searchInputRef}
           type="search"
           value={rawQuery}
           onChange={(e) => setRawQuery(e.target.value)}

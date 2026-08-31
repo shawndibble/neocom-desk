@@ -31,6 +31,30 @@ function renderLayout() {
   );
 }
 
+/** For the shortcut tests below, which need more than one destination route. */
+function renderLayoutWithRoutes() {
+  return render(
+    <MemoryRouter initialEntries={['/overview']}>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route
+            path="/overview"
+            element={
+              <div>
+                <p>overview page</p>
+                <input aria-label="dummy input" />
+              </div>
+            }
+          />
+          <Route path="/market" element={<div>market page</div>} />
+          <Route path="/characters" element={<div>characters page</div>} />
+          <Route path="/settings" element={<div>settings page</div>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
 beforeEach(async () => {
   mockSubscribe.mockReset().mockImplementation((listener) => {
     listener({ state: 'idle', lastSyncedAt: null, error: null });
@@ -246,5 +270,97 @@ describe('Layout runtime auth-failure notice', () => {
 
     expect(screen.queryByText(/eve access was refused/i)).not.toBeInTheDocument();
     expect(screen.getByText('page content')).toBeInTheDocument();
+  });
+});
+
+describe('Layout keyboard shortcuts (issue #25)', () => {
+  beforeEach(() => {
+    mockIsSyncConfigured.mockReturnValue(false);
+  });
+
+  it('"/" jumps to Market', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard('/');
+    expect(await screen.findByText('market page')).toBeInTheDocument();
+  });
+
+  it('"c" switches character', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard('c');
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+  });
+
+  it('"c" still fires with Caps Lock on, where the browser reports it as "C"', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard('{CapsLock}c{CapsLock}');
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+  });
+
+  it('"," opens Settings', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard(',');
+    expect(await screen.findByText('settings page')).toBeInTheDocument();
+  });
+
+  it('does not fire while the user is typing in an input', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await user.click(screen.getByLabelText('dummy input'));
+
+    await user.keyboard('c');
+    expect(screen.getByText('overview page')).toBeInTheDocument();
+    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+  });
+
+  it('ignores a shortcut key held with a modifier', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard('{Control>}/{/Control}');
+    expect(screen.queryByText('market page')).not.toBeInTheDocument();
+  });
+
+  it('defers to an open dialog rather than also navigating', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+    expect(screen.getByRole('dialog', { name: 'More' })).toBeInTheDocument();
+
+    await user.keyboard('c');
+    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+  });
+
+  it('defers to an open Radix menu/listbox (DropdownMenu, ContextMenu, Select) the same way', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    // Stands in for one of those primitives: none force-mount while closed
+    // (`components/ui/DropdownMenu.tsx` et al.), so an open one is exactly
+    // this — a `role="menu"`/`role="listbox"` element present in the DOM.
+    const menu = document.createElement('div');
+    menu.setAttribute('role', 'menu');
+    document.body.appendChild(menu);
+    try {
+      await user.keyboard('c');
+      expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+    } finally {
+      menu.remove();
+    }
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -11,6 +12,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { clearMarketPriceCache } from '@/market/prices';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
 import { App } from '@/app/App';
+import { Market } from './Market';
 import type { TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -165,5 +167,27 @@ describe('Market Browser', () => {
 
     expect(await screen.findByText('No price data cached')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+});
+
+describe('Market search focus (issue #25 "jump to search" shortcut)', () => {
+  it('focuses the search box when navigated here with focusSearch router state', async () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/market', state: { focusSearch: true } }]}>
+        <Market />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByRole('searchbox')).toHaveFocus());
+  });
+
+  it('leaves focus alone on an ordinary visit', async () => {
+    render(
+      <MemoryRouter initialEntries={['/market']}>
+        <Market />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole('searchbox')).not.toHaveFocus();
   });
 });

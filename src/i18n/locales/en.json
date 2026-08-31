@@ -536,5 +536,12 @@
     "fontScaleDefault": "Default",
     "fontScaleLarge": "Large",
     "fontScaleExtraLarge": "Extra large"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "jumpToSearch": "Jump to search",
+    "switchCharacter": "Switch character",
+    "openSettings": "Open Settings",
+    "close": "Close the open dialog"
   }
 }
