@@ -1,22 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterAssets } from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
-import { capItems, type Capped } from '@/lib/cap';
+import { capItems } from '@/lib/cap';
 
 /** Rendered rows past this many and grouping/painting the list starts to lag. */
 export const MAX_RENDERED_ASSETS = 1000;
 
+/** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
+
 interface Snapshot {
-  requestKey: string;
-  assetsResult: CachedResult<Capped<CharacterAsset>> | null;
+  assetsResult: CachedResult<CharacterAsset[]> | null;
+  /** Pages were capped or missing — the list below is partial. */
+  assetsTruncated: boolean;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   assetsNeedsReauth: boolean;
   typeNames: Map<number, string>;
@@ -26,18 +30,17 @@ interface Snapshot {
 function locationLabel(
   locationId: number,
   locationType: CharacterAsset['location_type'],
-  locationNames: Map<number, string>,
+  locationNames: ReadonlyMap<number, string>,
   assetsByItemId: Map<number, CharacterAsset>,
-  typeNames: Map<number, string>,
+  typeNames: ReadonlyMap<number, string>,
   t: (key: string, opts?: Record<string, unknown>) => string
 ): string {
   if (locationType === 'station')
     return locationNames.get(locationId) ?? t('assets.stationLabel', { id: locationId });
   if (locationType === 'solar_system') return t('assets.inSpaceLabel', { id: locationId });
   if (locationType === 'item') {
-    // The parent is another asset (a container or ship) in this same
-    // character's asset list; label the group with ITS resolved type name
-    // ("Drake", "Freight Container") instead of a raw item id.
+    // The parent is another asset (container or ship) in this same list; label
+    // the group with ITS resolved type name instead of a raw item id.
     const parent = assetsByItemId.get(locationId);
     if (parent) {
       const parentName = typeNames.get(parent.type_id);
@@ -48,56 +51,48 @@ function locationLabel(
   return t('assets.structureLabel', { id: locationId });
 }
 
+async function loadAssetsSnapshot(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<Snapshot> {
+  const { cached: assetsResult, needsReauth: assetsNeedsReauth } =
+    await loadCharacterAssets(characterId);
+  const assetsTruncated = assetsResult?.truncated ?? false;
+  const assets = assetsResult?.data ?? [];
+
+  // Already superseded: skip the ESI name resolves, their results would be discarded.
+  const typeIds = signal.cancelled ? [] : [...new Set(assets.map((a) => a.type_id))];
+  const typeNames = await loadTypeNames(typeIds);
+
+  const stationIds = signal.cancelled
+    ? []
+    : [...new Set(assets.filter((a) => a.location_type === 'station').map((a) => a.location_id))];
+  const resolvedStations = await Promise.all(stationIds.map((id) => loadStationName(id)));
+  const locationNames = new Map<number, string>();
+  stationIds.forEach((id, i) => {
+    const name = resolvedStations[i];
+    if (name) locationNames.set(id, name);
+  });
+
+  return { assetsResult, assetsTruncated, assetsNeedsReauth, typeNames, locationNames };
+}
+
 /** Character assets grouped by location, with a name search filter. Read-only, cached for offline. */
 export function Assets() {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
+    useRouteSnapshot(loadAssetsSnapshot);
 
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [search, setSearch] = useState('');
-  const requestKey = `${activeCharacterId}:${refreshKey}`;
 
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      const { cached: assetsResult, needsReauth: assetsNeedsReauth } =
-        await loadCharacterAssets(activeCharacterId);
-      if (cancelled) return;
-      const assets = assetsResult?.data.items ?? [];
-      const typeNames = await loadTypeNames([...new Set(assets.map((a) => a.type_id))]);
-      if (cancelled) return;
-
-      const stationIds = [
-        ...new Set(assets.filter((a) => a.location_type === 'station').map((a) => a.location_id)),
-      ];
-      const resolvedStations = await Promise.all(stationIds.map((id) => loadStationName(id)));
-      if (cancelled) return;
-      const locationNames = new Map<number, string>();
-      stationIds.forEach((id, i) => {
-        const name = resolvedStations[i];
-        if (name) locationNames.set(id, name);
-      });
-
-      setSnapshot({ requestKey, assetsResult, assetsNeedsReauth, typeNames, locationNames });
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [activeCharacterId, refreshKey]);
-
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const loading = current === null;
-  const assetsResult = current?.assetsResult ?? null;
-  const assetsNeedsReauth = current?.assetsNeedsReauth ?? false;
-  const typeNames = current?.typeNames ?? new Map<number, string>();
-  const locationNames = current?.locationNames ?? new Map<number, string>();
+  const assetsResult = data?.assetsResult ?? null;
+  const assetsTruncated = data?.assetsTruncated ?? false;
+  const assetsNeedsReauth = data?.assetsNeedsReauth ?? false;
+  const typeNames = data?.typeNames ?? NO_NAMES;
+  const locationNames = data?.locationNames ?? NO_NAMES;
 
   const { groups, shownCount, totalMatches } = useMemo(() => {
-    const items = assetsResult?.data.items ?? [];
+    const items = assetsResult?.data ?? [];
     const query = search.trim().toLowerCase();
     const assetsByItemId = new Map(items.map((asset) => [asset.item_id, asset]));
 
@@ -134,7 +129,6 @@ export function Assets() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
   }, [assetsResult, typeNames, locationNames, search]);
 
-  const fetchTruncated = assetsResult?.data.truncated ?? false;
   const renderTruncated = shownCount < totalMatches;
 
   if (!hydrated) {
@@ -152,7 +146,7 @@ export function Assets() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('assets.title')}</h1>
         <div className="flex items-center gap-2">
           {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
-          <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+          <Button size="sm" onClick={refresh} disabled={loading}>
             {t('assets.refresh')}
           </Button>
         </div>
@@ -179,16 +173,19 @@ export function Assets() {
           actionLabel={t('assets.reauthAction')}
           onLogin={() => void beginEveLogin()}
         />
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !assetsResult ? (
         <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
       ) : (
         <>
           {assetsResult.fromCache && (
-            <p className="text-[11px] text-warning uppercase">{t('common.offlineTitle')}</p>
+            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
-          {fetchTruncated && (
-            <p className="text-[11px] text-warning uppercase">
-              {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.items.length })}
+          {assetsTruncated && (
+            <p className="text-[0.6875rem] text-warning uppercase">
+              {t('common.incompleteTitle')} —{' '}
+              {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
             </p>
           )}
           {renderTruncated && (

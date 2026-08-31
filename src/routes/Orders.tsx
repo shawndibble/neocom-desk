@@ -1,25 +1,29 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataAgeBadge,
+  DataTable,
   EmptyState,
   Panel,
   ReauthBanner,
   Spinner,
   Tabs,
 } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
+import type { DataTableColumn } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { formatIsk } from '@/features/character/format';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { formatIsk } from '@/lib/isk';
 import type { MarketOrder, MarketOrderHistory } from '@/esi/endpoints';
 
+/** Stable identity, so the fallback doesn't invalidate the column memos every render. */
+const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
+
 interface Snapshot {
-  requestKey: string;
   ordersResult: CachedResult<MarketOrder[]> | null;
   historyResult: CachedResult<MarketOrderHistory[]> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
@@ -28,55 +32,39 @@ interface Snapshot {
   typeNames: Map<number, string>;
 }
 
+async function loadOrdersSnapshot(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<Snapshot> {
+  const [ordersStatus, historyStatus] = await Promise.all([
+    loadOrders(characterId),
+    loadOrderHistory(characterId),
+  ]);
+  const { cached: ordersResult, needsReauth: ordersNeedsReauth } = ordersStatus;
+  const { cached: historyResult, needsReauth: historyNeedsReauth } = historyStatus;
+  const typeIds = new Set<number>();
+  // Already superseded: skip the ESI name resolve, its result would be discarded.
+  if (!signal.cancelled) {
+    for (const o of ordersResult?.data ?? []) typeIds.add(o.type_id);
+    for (const o of historyResult?.data ?? []) typeIds.add(o.type_id);
+  }
+  const typeNames = await loadTypeNames([...typeIds]);
+  return { ordersResult, historyResult, ordersNeedsReauth, historyNeedsReauth, typeNames };
+}
+
 /** Orders: open orders + history tabs. Read-only, cached for offline. */
 export function Orders() {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
+    useRouteSnapshot(loadOrdersSnapshot);
 
   const [tab, setTab] = useState<'open' | 'history'>('open');
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const requestKey = `${activeCharacterId}:${refreshKey}`;
 
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      const [ordersStatus, historyStatus] = await Promise.all([
-        loadOrders(activeCharacterId),
-        loadOrderHistory(activeCharacterId),
-      ]);
-      if (cancelled) return;
-      const { cached: ordersResult, needsReauth: ordersNeedsReauth } = ordersStatus;
-      const { cached: historyResult, needsReauth: historyNeedsReauth } = historyStatus;
-      const typeIds = new Set<number>();
-      for (const o of ordersResult?.data ?? []) typeIds.add(o.type_id);
-      for (const o of historyResult?.data ?? []) typeIds.add(o.type_id);
-      const typeNames = await loadTypeNames([...typeIds]);
-      if (cancelled) return;
-      setSnapshot({
-        requestKey,
-        ordersResult,
-        historyResult,
-        ordersNeedsReauth,
-        historyNeedsReauth,
-        typeNames,
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [activeCharacterId, refreshKey]);
-
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const loading = current === null;
-  const ordersResult = current?.ordersResult ?? null;
-  const historyResult = current?.historyResult ?? null;
-  const ordersNeedsReauth = current?.ordersNeedsReauth ?? false;
-  const historyNeedsReauth = current?.historyNeedsReauth ?? false;
-  const typeNames = current?.typeNames ?? new Map<number, string>();
+  const ordersResult = data?.ordersResult ?? null;
+  const historyResult = data?.historyResult ?? null;
+  const ordersNeedsReauth = data?.ordersNeedsReauth ?? false;
+  const historyNeedsReauth = data?.historyNeedsReauth ?? false;
+  const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
 
   const orders = useMemo(
     () => [...(ordersResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
@@ -85,6 +73,55 @@ export function Orders() {
   const history = useMemo(
     () => [...(historyResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
     [historyResult]
+  );
+
+  const baseColumns = useMemo<DataTableColumn<MarketOrder>[]>(
+    () => [
+      {
+        id: 'item',
+        header: t('orders.item'),
+        render: (order) => typeNames.get(order.type_id),
+      },
+      {
+        id: 'side',
+        header: t('orders.side'),
+        render: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
+      },
+      {
+        id: 'price',
+        header: t('orders.price'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (order) => formatIsk(order.price, 2),
+      },
+      {
+        id: 'remaining',
+        header: t('orders.remaining'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (order) =>
+          `${order.volume_remain.toLocaleString()} / ${order.volume_total.toLocaleString()}`,
+      },
+      {
+        id: 'issued',
+        header: t('orders.issued'),
+        className: 'whitespace-nowrap text-text-dim',
+        render: (order) => new Date(order.issued).toLocaleDateString(),
+      },
+    ],
+    [t, typeNames]
+  );
+  const historyColumns = useMemo<DataTableColumn<MarketOrderHistory>[]>(
+    () => [
+      ...baseColumns,
+      {
+        id: 'state',
+        header: t('orders.state'),
+        className: 'text-text-dim',
+        render: (order) => order.state,
+      },
+    ],
+    [baseColumns, t]
   );
 
   if (!hydrated) {
@@ -109,56 +146,11 @@ export function Orders() {
     </div>
   );
 
-  function renderRows(rows: MarketOrder[], withState: boolean) {
-    return (
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-line text-left text-text-dim">
-            <th className="px-3 py-2 font-semibold uppercase">{t('orders.item')}</th>
-            <th className="px-3 py-2 font-semibold uppercase">{t('orders.side')}</th>
-            <th className="px-3 py-2 text-right font-semibold uppercase">{t('orders.price')}</th>
-            <th className="px-3 py-2 text-right font-semibold uppercase">
-              {t('orders.remaining')}
-            </th>
-            <th className="px-3 py-2 font-semibold uppercase">{t('orders.issued')}</th>
-            {withState && (
-              <th className="px-3 py-2 font-semibold uppercase">{t('orders.state')}</th>
-            )}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {rows.map((order) => (
-            <tr key={order.order_id}>
-              <td className="px-3 py-1.5">
-                {typeNames.get(order.type_id) ?? `Type #${order.type_id}`}
-              </td>
-              <td className="px-3 py-1.5">
-                {order.is_buy_order ? t('orders.buy') : t('orders.sell')}
-              </td>
-              <td className="px-3 py-1.5 text-right tabular-nums">{formatIsk(order.price)}</td>
-              <td className="px-3 py-1.5 text-right tabular-nums">
-                {order.volume_remain.toLocaleString()} / {order.volume_total.toLocaleString()}
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
-                {new Date(order.issued).toLocaleDateString()}
-              </td>
-              {withState && (
-                <td className="px-3 py-1.5 text-text-dim">
-                  {'state' in order ? (order as MarketOrderHistory).state : ''}
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('orders.title')}</h1>
-        <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+        <Button size="sm" onClick={refresh} disabled={loading}>
           {t('orders.refresh')}
         </Button>
       </header>
@@ -177,6 +169,8 @@ export function Orders() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : tab === 'open' ? (
         <Panel
           padded={false}
@@ -193,11 +187,16 @@ export function Orders() {
           ) : (
             <>
               {ordersResult.fromCache && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
+                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('common.offlineTitle')}
                 </p>
               )}
-              {renderRows(orders, false)}
+              <DataTable
+                columns={baseColumns}
+                rows={orders}
+                rowKey={(order) => order.order_id}
+                label={t('orders.openTab')}
+              />
             </>
           )}
         </Panel>
@@ -217,11 +216,16 @@ export function Orders() {
           ) : (
             <>
               {historyResult.fromCache && (
-                <p className="px-3 pt-2 text-[11px] text-warning uppercase">
+                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('common.offlineTitle')}
                 </p>
               )}
-              {renderRows(history, true)}
+              <DataTable
+                columns={historyColumns}
+                rows={history}
+                rowKey={(order) => order.order_id}
+                label={t('orders.historyTab')}
+              />
             </>
           )}
         </Panel>

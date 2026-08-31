@@ -123,6 +123,23 @@ describe('Mail', () => {
     expect(await screen.findByText(/no mail cached/i)).toBeInTheDocument();
   });
 
+  it('falls back to the unknown-sender label when a header has no sender', async () => {
+    // `cond && map.get(x) ?? fallback` yields `false` for a missing sender,
+    // and React renders `false` as nothing — the label never appeared.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          { mail_id: 3, subject: 'From nobody', timestamp: '2026-08-03T00:00:00Z', labels: [] },
+        ])
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText(/From nobody/)).toBeInTheDocument();
+    expect(screen.getByText(/Unknown sender/i)).toBeInTheDocument();
+  });
+
   it('shows a re-login prompt (not a silent empty state) when the mail scope was revoked', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
@@ -130,7 +147,7 @@ describe('Mail', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText('Log in again to see mail')).toBeInTheDocument();
+    expect(await screen.findByText('Log in again to see your mail')).toBeInTheDocument();
     expect(screen.queryByText(/no mail cached/i)).not.toBeInTheDocument();
   });
 });

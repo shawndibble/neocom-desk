@@ -17,19 +17,16 @@ export const CORPORATION_NAME = 'Test Corp';
 export const ALLIANCE_ID = 99000001;
 export const ALLIANCE_NAME = 'Test Alliance';
 
-/** Requested SSO scopes, echoed into the mocked JWT's `scp` claim. */
-export const SCOPES = [
-  'esi-skills.read_skills.v1',
-  'esi-skills.read_skillqueue.v1',
-  'esi-clones.read_implants.v1',
-  'esi-wallet.read_character_wallet.v1',
-  'esi-assets.read_assets.v1',
-  'esi-mail.read_mail.v1',
-  'esi-calendar.read_calendar_events.v1',
-  'esi-contracts.read_character_contracts.v1',
-  'esi-markets.read_character_orders.v1',
-  'esi-characters.read_blueprints.v1',
-] as const;
+/**
+ * Requested SSO scopes, echoed into the mocked JWT's `scp` claim.
+ *
+ * Re-exported from the app's single source of truth rather than re-listed:
+ * the hand-copied version had already drifted (it was missing
+ * `esi-industry.read_character_jobs.v1`). `src/esi/scopes.ts` derives the list
+ * from `src/esi/registry.ts`, which imports nothing at runtime, so pulling it
+ * in here drags in no Dexie/fetch code.
+ */
+export { SCOPES } from '../../src/esi/scopes';
 
 /**
  * Skill typeIDs from public/data/skills.json. Caldari Cruiser's prereq

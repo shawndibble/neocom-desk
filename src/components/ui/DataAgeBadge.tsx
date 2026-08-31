@@ -41,7 +41,7 @@ export function DataAgeBadge({ date, className = '' }: DataAgeBadgeProps) {
     <time
       dateTime={date.toISOString()}
       title={date.toLocaleString()}
-      className={`inline-flex items-center gap-1.5 text-[11px] tabular-nums ${toneFor(ms)} ${className}`}
+      className={`inline-flex items-center gap-1.5 text-[0.6875rem] tabular-nums ${toneFor(ms)} ${className}`}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {formatAge(ms, t)}

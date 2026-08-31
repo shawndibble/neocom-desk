@@ -1,4 +1,12 @@
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
+
+/*
+ * Scan only the app source. Tailwind's automatic content detection walks every
+ * non-gitignored file, so Markdown under `docs/` that merely *mentions* a class
+ * name emits real utility rules into the shipped stylesheet.
+ */
+@source '../../index.html';
+@source '../../src';
 
 /* Design tokens — see docs/DESIGN.md. Photon-UI-inspired dark theme. */
 @theme {

@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { SCOPES, SCOPES_STRING } from './scopes';
+import { SCOPES, SCOPES_STRING, revokedScopes } from './scopes';
+import { ESI_REGISTRY, PUBLIC, isScopeRequired } from './registry';
 
 describe('SCOPES', () => {
+  // Hand-written, not derived: SCOPES is computed from registry.ts, so a
+  // derived expectation would assert nothing. This is the spelling backstop.
   it('lists exactly the v1 read scopes', () => {
     expect([...SCOPES].sort()).toEqual(
       [
@@ -24,8 +27,69 @@ describe('SCOPES', () => {
     expect(new Set(SCOPES).size).toBe(SCOPES.length);
   });
 
+  it('contains no PUBLIC marker from the registry', () => {
+    expect(SCOPES).not.toContain(PUBLIC);
+  });
+
+  it('covers every scope some registry endpoint requires', () => {
+    const required = Object.values(ESI_REGISTRY)
+      .map((endpoint) => endpoint.scope)
+      .filter(isScopeRequired);
+    expect([...new Set(required)].sort()).toEqual([...SCOPES].sort());
+  });
+
   it('exposes a space-joined string for the SSO scope parameter', () => {
     expect(SCOPES_STRING).toBe(SCOPES.join(' '));
     expect(SCOPES_STRING.split(' ')).toHaveLength(SCOPES.length);
+  });
+});
+
+describe('revokedScopes', () => {
+  it('returns nothing when the sets are identical', () => {
+    expect(revokedScopes([...SCOPES], [...SCOPES])).toEqual([]);
+  });
+
+  it('returns nothing when scopes are ADDED (a wider grant is not a revocation)', () => {
+    // The case that would silently nuke every cache on an app update.
+    const previous = ['esi-skills.read_skills.v1'];
+    const next = [
+      'esi-skills.read_skills.v1',
+      'esi-mail.read_mail.v1',
+      'esi-assets.read_assets.v1',
+    ];
+    expect(revokedScopes(previous, next)).toEqual([]);
+  });
+
+  it('returns only the removals from a mixed add-and-remove diff', () => {
+    const previous = ['esi-skills.read_skills.v1', 'esi-mail.read_mail.v1'];
+    const next = ['esi-skills.read_skills.v1', 'esi-assets.read_assets.v1'];
+    expect(revokedScopes(previous, next)).toEqual(['esi-mail.read_mail.v1']);
+  });
+
+  it('is order-independent on both sides', () => {
+    const previous = ['b', 'a', 'c'];
+    const next = ['c', 'b', 'a'];
+    expect(revokedScopes(previous, next)).toEqual([]);
+    expect(revokedScopes(previous, ['c', 'a'])).toEqual(['b']);
+  });
+
+  it('reports a full revocation when the new grant is empty', () => {
+    expect(revokedScopes(['a', 'b'], [])).toEqual(['a', 'b']);
+  });
+
+  it('reports nothing when the previous grant was empty', () => {
+    expect(revokedScopes([], ['a'])).toEqual([]);
+  });
+
+  it('deduplicates a repeated scope in the previous set', () => {
+    expect(revokedScopes(['a', 'a'], [])).toEqual(['a']);
+  });
+
+  it('reports a removed scope the app does not model (renamed or hand-granted)', () => {
+    // Not filtered through the registry's Scope union: a scope we do not model
+    // must still count as revoked, or the purge misses it.
+    expect(revokedScopes(['esi-corporations.read_divisions.v1'], [])).toEqual([
+      'esi-corporations.read_divisions.v1',
+    ]);
   });
 });

@@ -19,7 +19,11 @@ interface SkillPickerProps {
   className?: string;
 }
 
-/** Searchable skill picker: filter by name/group/description, narrow by group, pick a target level I-V. */
+/**
+ * Searchable skill picker: ranked search by name/group/description, narrow by
+ * group, then pick a target level I-V, showing that skill's prerequisites and
+ * unlocks.
+ */
 export function SkillPicker({
   skills,
   catalog,
@@ -32,15 +36,11 @@ export function SkillPicker({
   const [selected, setSelected] = useState<number | null>(null);
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set());
 
-  const requirements = useMemo(
-    () => (selected === null ? null : buildSkillRequirements(catalog, trainedSkills, selected)),
-    [selected, catalog, trainedSkills]
-  );
-
   /**
-   * Ranked over every skill (not capped at MAX_RESULTS) so a group filter
-   * chip can surface a match that would otherwise be crowded out of the
-   * top-N by an unrelated, more common group.
+   * Ranked over every skill rather than capped at MAX_RESULTS, so a group
+   * chip both exists for, and can surface, a match that the unfiltered top-N
+   * would crowd out with a more common group. Affordable where the Market
+   * search's cap is not: the skill catalogue is ~500 entries, not ~9,000.
    */
   const matches = useMemo(
     () =>
@@ -57,9 +57,9 @@ export function SkillPicker({
     [matches]
   );
 
-  const filtered =
-    activeGroups.size === 0 ? matches : matches.filter((s) => activeGroups.has(s.groupName));
-  const results = filtered.slice(0, MAX_RESULTS);
+  const results = (
+    activeGroups.size === 0 ? matches : matches.filter((s) => activeGroups.has(s.groupName))
+  ).slice(0, MAX_RESULTS);
 
   function toggleGroup(name: string) {
     setActiveGroups((prev) => {
@@ -69,6 +69,11 @@ export function SkillPicker({
       return next;
     });
   }
+
+  const requirements = useMemo(
+    () => (selected === null ? null : buildSkillRequirements(catalog, trainedSkills, selected)),
+    [selected, catalog, trainedSkills]
+  );
 
   function pick(skillTypeID: number, targetLevel: number) {
     onAdd({ skillTypeID, targetLevel });

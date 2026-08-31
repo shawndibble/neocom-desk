@@ -1,21 +1,10 @@
-/**
- * Display helpers for the Market Browser compare table. Kept local to this
- * feature (rather than reusing `features/character/format.ts` or
- * `features/industry/format.ts`, which already duplicate each other) so
- * Market Browser has no cross-feature coupling.
- */
+/** Display helpers for the Market Browser compare table. */
 
-const ISK_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
 const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
 const PERCENT_FORMAT = new Intl.NumberFormat('en', {
   maximumFractionDigits: 1,
   minimumFractionDigits: 1,
 });
-
-/** Whole-ISK amount, thousands-separated (e.g. "1,234,567"). */
-export function formatIsk(value: number): string {
-  return ISK_FORMAT.format(value);
-}
 
 /** Order-book volume, thousands-separated. */
 export function formatVolume(value: number): string {
@@ -29,10 +18,9 @@ export function formatSignedPercent(value: number): string {
 }
 
 /**
- * Sell-side margin: how much of the lowest sell price is profit over the
- * highest buy price, as a percent. Null ("unpriceable") unless both sides
- * have a price and the sell price is positive (avoids a divide-by-zero).
- * Can legitimately be negative (buy > sell, a temporarily inverted book).
+ * Sell-side margin: how much of the lowest sell price is profit over the highest
+ * buy price, as a percent. Null unless both sides have a price and the sell
+ * price is positive (divide-by-zero). Legitimately negative on an inverted book.
  */
 export function computeSpreadPct(sellMin: number | null, buyMax: number | null): number | null {
   if (sellMin === null || buyMax === null || sellMin <= 0) return null;

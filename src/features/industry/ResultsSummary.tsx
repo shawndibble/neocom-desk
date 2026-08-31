@@ -2,7 +2,8 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState, StatChip } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
 import { formatDuration } from '@/lib/duration';
-import { formatCostIndex, formatIsk, formatPercent } from './format';
+import { formatIsk } from '@/lib/isk';
+import { formatCostIndex, formatPercent } from './format';
 
 interface ResultsSummaryProps {
   result: BuildResult;

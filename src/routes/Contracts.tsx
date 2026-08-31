@@ -1,17 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
+import {
+  Button,
+  DataAgeBadge,
+  DataTable,
+  EmptyState,
+  Panel,
+  ReauthBanner,
+  Spinner,
+  type DataTableColumn,
+} from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContracts } from '@/features/character/contracts';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
-import { formatIsk } from '@/features/character/format';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { formatIsk } from '@/lib/isk';
 import type { Contract } from '@/esi/endpoints';
 
 interface Snapshot {
-  requestKey: string;
   contractsResult: CachedResult<Contract[]> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   contractsNeedsReauth: boolean;
@@ -31,43 +39,75 @@ const STATUS_TONE: Record<Contract['status'], string> = {
   reversed: 'text-danger',
 };
 
+/** Stable identity, so the fallback doesn't invalidate the column memo every render. */
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
+
 function isExpired(contract: Contract): boolean {
   return new Date(contract.date_expired).getTime() < Date.now();
+}
+
+async function loadContractsSnapshot(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<Snapshot> {
+  const { cached: contractsResult, needsReauth: contractsNeedsReauth } =
+    await loadContracts(characterId);
+  // Already superseded: skip the name lookup, its result would be discarded.
+  const issuerIds = signal.cancelled ? [] : (contractsResult?.data ?? []).map((c) => c.issuer_id);
+  const issuerNames = await resolveNames(issuerIds);
+  return { contractsResult, contractsNeedsReauth, issuerNames };
 }
 
 /** Contracts: table with status chips, expired dimmed. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
+    useRouteSnapshot(loadContractsSnapshot);
 
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const requestKey = `${activeCharacterId}:${refreshKey}`;
+  const contractsResult = data?.contractsResult ?? null;
+  const contractsNeedsReauth = data?.contractsNeedsReauth ?? false;
+  const issuerNames = data?.issuerNames ?? NO_NAMES;
 
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      const { cached: contractsResult, needsReauth: contractsNeedsReauth } =
-        await loadContracts(activeCharacterId);
-      if (cancelled) return;
-      const issuerIds = (contractsResult?.data ?? []).map((c) => c.issuer_id);
-      const issuerNames = await resolveNames(issuerIds);
-      if (cancelled) return;
-      setSnapshot({ requestKey, contractsResult, contractsNeedsReauth, issuerNames });
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [activeCharacterId, refreshKey]);
-
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const loading = current === null;
-  const contractsResult = current?.contractsResult ?? null;
-  const contractsNeedsReauth = current?.contractsNeedsReauth ?? false;
-  const issuerNames = current?.issuerNames ?? new Map<number, string>();
+  const columns = useMemo<DataTableColumn<Contract>[]>(
+    () => [
+      {
+        id: 'type',
+        header: t('contracts.type'),
+        render: (contract) => contract.title || contract.type,
+      },
+      {
+        id: 'status',
+        header: t('contracts.status'),
+        className: 'font-semibold',
+        cellClassName: (contract) => STATUS_TONE[contract.status],
+        render: (contract) => contract.status,
+      },
+      {
+        id: 'issuer',
+        header: t('contracts.issuer'),
+        render: (contract) => issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`,
+      },
+      {
+        id: 'price',
+        header: t('contracts.price'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (contract) =>
+          contract.price !== undefined
+            ? formatIsk(contract.price, 2)
+            : contract.reward !== undefined
+              ? formatIsk(contract.reward, 2)
+              : t('common.unknown'),
+      },
+      {
+        id: 'expires',
+        header: t('contracts.expires'),
+        className: 'whitespace-nowrap text-text-dim',
+        render: (contract) => new Date(contract.date_expired).toLocaleString(),
+      },
+    ],
+    [t, issuerNames]
+  );
 
   const contracts = useMemo(
     () =>
@@ -90,7 +130,7 @@ export function Contracts() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('contracts.title')}</h1>
         <div className="flex items-center gap-2">
           {contractsResult && <DataAgeBadge date={contractsResult.fetchedAt} />}
-          <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+          <Button size="sm" onClick={refresh} disabled={loading}>
             {t('contracts.refresh')}
           </Button>
         </div>
@@ -107,54 +147,24 @@ export function Contracts() {
           actionLabel={t('contracts.reauthAction')}
           onLogin={() => void beginEveLogin()}
         />
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !contractsResult || contracts.length === 0 ? (
         <EmptyState title={t('contracts.emptyTitle')} hint={t('contracts.emptyHint')} />
       ) : (
         <Panel padded={false}>
           {contractsResult.fromCache && (
-            <p className="px-3 pt-2 text-[11px] text-warning uppercase">
+            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
               {t('common.offlineTitle')}
             </p>
           )}
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-line text-left text-text-dim">
-                <th className="px-3 py-2 font-semibold uppercase">{t('contracts.type')}</th>
-                <th className="px-3 py-2 font-semibold uppercase">{t('contracts.status')}</th>
-                <th className="px-3 py-2 font-semibold uppercase">{t('contracts.issuer')}</th>
-                <th className="px-3 py-2 text-right font-semibold uppercase">
-                  {t('contracts.price')}
-                </th>
-                <th className="px-3 py-2 font-semibold uppercase">{t('contracts.expires')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {contracts.map((contract) => (
-                <tr
-                  key={contract.contract_id}
-                  className={isExpired(contract) ? 'opacity-50' : undefined}
-                >
-                  <td className="px-3 py-1.5">{contract.title || contract.type}</td>
-                  <td className={`px-3 py-1.5 font-semibold ${STATUS_TONE[contract.status]}`}>
-                    {contract.status}
-                  </td>
-                  <td className="px-3 py-1.5">
-                    {issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`}
-                  </td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">
-                    {contract.price !== undefined
-                      ? formatIsk(contract.price)
-                      : contract.reward !== undefined
-                        ? formatIsk(contract.reward)
-                        : t('common.unknown')}
-                  </td>
-                  <td className="px-3 py-1.5 whitespace-nowrap text-text-dim">
-                    {new Date(contract.date_expired).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            label={t('contracts.title')}
+            columns={columns}
+            rows={contracts}
+            rowKey={(contract) => contract.contract_id}
+            rowClassName={(contract) => (isExpired(contract) ? 'opacity-50' : undefined)}
+          />
         </Panel>
       )}
     </div>

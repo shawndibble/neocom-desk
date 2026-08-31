@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
+import { Button, Modal } from '@/components/ui';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { loadUniverseType } from '../data';
 import { loadItemNameMap, loadSkillNameMap } from '../typeCatalog';
@@ -57,124 +57,113 @@ export function ImportClipboardDialog({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('plans.importDialogTitle')}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-    >
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto">
-        <Panel title={t('plans.importDialogTitle')}>
-          <div className="space-y-3">
-            <label className="block text-xs text-text-dim" htmlFor="clipboard-import-text">
-              {t('plans.importPaste')}
-            </label>
-            <textarea
-              id="clipboard-import-text"
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                setPreview(null);
-              }}
-              rows={8}
-              className="w-full rounded-xs border border-line bg-panel-2 p-2 text-xs text-text"
-            />
+    // `open` is literal: PlanEditor mounts this component only while the import
+    // is open, so mounting is the open signal.
+    <Modal open onClose={onClose} title={t('plans.importDialogTitle')}>
+      <div className="space-y-3">
+        <label className="block text-xs text-text-dim" htmlFor="clipboard-import-text">
+          {t('plans.importPaste')}
+        </label>
+        <textarea
+          id="clipboard-import-text"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setPreview(null);
+          }}
+          rows={8}
+          className="w-full rounded-xs border border-line bg-panel-2 p-2 text-xs text-text"
+        />
 
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => void handleParse()}
-                disabled={parsing || text.trim() === ''}
-              >
-                {t('plans.importParse')}
-              </Button>
-              <Button size="sm" onClick={onClose}>
-                {t('plans.importCancel')}
-              </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => void handleParse()}
+            disabled={parsing || text.trim() === ''}
+          >
+            {t('plans.importParse')}
+          </Button>
+          <Button size="sm" onClick={onClose}>
+            {t('plans.importCancel')}
+          </Button>
+        </div>
+
+        {preview && (
+          <div className="space-y-2 border-t border-line pt-2 text-xs">
+            <p className="font-semibold text-text-dim uppercase">
+              {preview.mode === 'eftFit'
+                ? t('plans.importModeEft')
+                : t('plans.importModeSkillPlan')}
+            </p>
+
+            <div>
+              <p className="font-semibold text-text-dim uppercase">{t('plans.importPreview')}</p>
+              {preview.entries.length === 0 ? (
+                <p className="text-text-dim">{t('plans.importEmpty')}</p>
+              ) : (
+                <ul className="mt-1 max-h-40 overflow-y-auto">
+                  {preview.entries.map((entry) => {
+                    const alreadyTrained = isAlreadyTrained(entry, trainedSkills);
+                    return (
+                      <li
+                        key={entry.skillTypeID}
+                        className={`border-b border-line py-0.5 last:border-b-0 ${
+                          alreadyTrained ? 'text-text-faint italic' : ''
+                        }`}
+                      >
+                        {nameFor(entry.skillTypeID)} {ROMAN[entry.targetLevel - 1]}
+                        {alreadyTrained && (
+                          <span className="ml-2 text-[0.625rem] uppercase">
+                            {t('plans.alreadyTrained')}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
 
-            {preview && (
-              <div className="space-y-2 border-t border-line pt-2 text-xs">
-                <p className="font-semibold text-text-dim uppercase">
-                  {preview.mode === 'eftFit'
-                    ? t('plans.importModeEft')
-                    : t('plans.importModeSkillPlan')}
-                </p>
-
-                <div>
-                  <p className="font-semibold text-text-dim uppercase">
-                    {t('plans.importPreview')}
-                  </p>
-                  {preview.entries.length === 0 ? (
-                    <p className="text-text-dim">{t('plans.importEmpty')}</p>
-                  ) : (
-                    <ul className="mt-1 max-h-40 overflow-y-auto">
-                      {preview.entries.map((entry) => {
-                        const alreadyTrained = isAlreadyTrained(entry, trainedSkills);
-                        return (
-                          <li
-                            key={entry.skillTypeID}
-                            className={`border-b border-line py-0.5 last:border-b-0 ${
-                              alreadyTrained ? 'text-text-faint italic' : ''
-                            }`}
-                          >
-                            {nameFor(entry.skillTypeID)} {ROMAN[entry.targetLevel - 1]}
-                            {alreadyTrained && (
-                              <span className="ml-2 text-[10px] uppercase">
-                                {t('plans.alreadyTrained')}
-                              </span>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-
-                {preview.warnings.length > 0 && (
-                  <div>
-                    <p className="font-semibold text-warning uppercase">
-                      {t('plans.importWarnings')}
-                    </p>
-                    <ul className="mt-1">
-                      {preview.warnings.map((warning) => (
-                        <li key={warning}>{warning}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {preview.errors.length > 0 && (
-                  <div>
-                    <p className="font-semibold text-danger uppercase">{t('plans.importErrors')}</p>
-                    <ul className="mt-1">
-                      {preview.errors.map((err) => (
-                        <li key={`${err.line}-${err.text}`}>
-                          {t('plans.importLine', {
-                            line: err.line,
-                            text: err.text,
-                            reason: err.reason,
-                          })}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => onApply(preview.entries)}
-                  disabled={preview.entries.length === 0}
-                >
-                  {t('plans.importApply')}
-                </Button>
+            {preview.warnings.length > 0 && (
+              <div>
+                <p className="font-semibold text-warning uppercase">{t('plans.importWarnings')}</p>
+                <ul className="mt-1">
+                  {preview.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
               </div>
             )}
+
+            {preview.errors.length > 0 && (
+              <div>
+                <p className="font-semibold text-danger uppercase">{t('plans.importErrors')}</p>
+                <ul className="mt-1">
+                  {preview.errors.map((err) => (
+                    <li key={`${err.line}-${err.text}`}>
+                      {t('plans.importLine', {
+                        line: err.line,
+                        text: err.text,
+                        reason: err.reason,
+                      })}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => onApply(preview.entries)}
+              disabled={preview.entries.length === 0}
+            >
+              {t('plans.importApply')}
+            </Button>
           </div>
-        </Panel>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

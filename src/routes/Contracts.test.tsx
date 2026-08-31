@@ -146,7 +146,7 @@ describe('Contracts', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText('Log in again to see contracts')).toBeInTheDocument();
+    expect(await screen.findByText('Log in again to see your contracts')).toBeInTheDocument();
     expect(screen.queryByText(/no contracts cached/i)).not.toBeInTheDocument();
   });
 });

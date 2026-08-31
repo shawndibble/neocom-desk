@@ -1,13 +1,10 @@
 /**
- * Shared ranked substring search for typeahead lists (Market type search,
- * Skill Plan skill picker). Case-insensitive. Ranks exact > prefix >
- * substring on the caller's primary field; a row matched only via a
- * `secondary` field ranks below every primary match, in one flat bucket (no
- * exact/prefix/substring sub-ranking within it — the primary field owns
- * ranking, secondary fields only widen what counts as a match). Alphabetical
- * by the primary field (original case) within a rank. Empty/whitespace-only
- * query returns `[]` — load-bearing so callers never dump their whole list.
- * Pure and synchronous — callers debounce keystrokes themselves.
+ * Ranked substring search for typeahead lists. Case-insensitive. Exact >
+ * prefix > substring on `primary`; a `secondary`-only match lands in one flat
+ * bucket below all of them — secondary fields widen what matches, they don't
+ * rank. Alphabetical by `primary` within a rank. Empty query returns `[]`,
+ * load-bearing so callers never dump their whole list. Pure and synchronous;
+ * callers debounce keystrokes themselves.
  */
 export interface RankedSearchOptions<T> {
   primary: (item: T) => string;
@@ -26,15 +23,11 @@ const NO_MATCH = -1;
  * over every candidate on every keystroke, so the secondary fields are not
  * extracted for the common case.
  */
-function rankOf<T>(
-  item: T,
-  secondary: RankedSearchOptions<T>['secondary'],
-  primaryLower: string,
-  q: string
-) {
+function rankOf<T>(item: T, options: RankedSearchOptions<T>, primaryLower: string, q: string) {
   if (primaryLower === q) return PRIMARY_EXACT;
   if (primaryLower.startsWith(q)) return PRIMARY_PREFIX;
   if (primaryLower.includes(q)) return PRIMARY_SUBSTRING;
+  const secondary = options.secondary;
   if (!secondary) return NO_MATCH;
   return secondary.some((field) => field(item).toLowerCase().includes(q))
     ? SECONDARY_ONLY
@@ -49,16 +42,25 @@ export function rankedSearch<T>(
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
-  const matches: { item: T; rank: number; primaryText: string }[] = [];
+  // Bucketed by rank rather than one sort over every match: a one-character
+  // query matches most of a 9,000-entry catalogue, and sorting all of it to
+  // return `limit` is most of the cost. Lower buckets usually fill the limit,
+  // so the big substring bucket is never sorted.
+  const buckets: { item: T; primaryText: string }[][] = [[], [], [], []];
   for (const item of items) {
     const primaryText = options.primary(item);
-    const rank = rankOf(item, options.secondary, primaryText.toLowerCase(), q);
-    if (rank !== NO_MATCH) matches.push({ item, rank, primaryText });
+    const rank = rankOf(item, options, primaryText.toLowerCase(), q);
+    if (rank !== NO_MATCH) buckets[rank].push({ item, primaryText });
   }
 
-  matches.sort((a, b) =>
-    a.rank !== b.rank ? a.rank - b.rank : a.primaryText.localeCompare(b.primaryText)
-  );
-
-  return matches.slice(0, options.limit).map((m) => m.item);
+  const results: T[] = [];
+  for (const bucket of buckets) {
+    if (results.length >= options.limit) break;
+    bucket.sort((a, b) => a.primaryText.localeCompare(b.primaryText));
+    for (const match of bucket) {
+      if (results.length >= options.limit) break;
+      results.push(match.item);
+    }
+  }
+  return results;
 }

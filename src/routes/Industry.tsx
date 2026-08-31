@@ -10,7 +10,9 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { loadCharacterSkills } from '@/features/skills/data';
+import { loadCharacterSkillQueue, loadCharacterSkills } from '@/features/skills/data';
+import { applyCompletedQueueEntries } from '@/features/skills/queueStatus';
+import { toTrainedSkillsMap } from '@/features/skills/skillMap';
 import {
   loadBlueprintCatalog,
   type BlueprintCatalog,
@@ -63,19 +65,26 @@ export function Industry() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [cat, owned, skillsResult] = await Promise.all([
+      const [cat, owned, skillsResult, queue] = await Promise.all([
         loadBlueprintCatalog(),
         loadCharacterBlueprints(activeCharacterId),
         loadCharacterSkills(activeCharacterId),
+        loadCharacterSkillQueue(activeCharacterId),
       ]);
       if (cancelled) return;
       setCatalog(cat);
       setOwnedBlueprints(owned.cached?.data ?? []);
       setBlueprintsNeedsReauth(owned.needsReauth);
       if (skillsResult?.data) {
+        // /skills lags until the character logs in; completed queue entries
+        // are the difference. Without them industry math undercounts skills.
+        const merged = applyCompletedQueueEntries(
+          toTrainedSkillsMap(skillsResult.data.skills),
+          queue?.data ?? [],
+          Date.now()
+        );
         const map: SkillLevels = {};
-        for (const skill of skillsResult.data.skills)
-          map[skill.skill_id] = skill.trained_skill_level;
+        for (const [skillId, trained] of merged) map[skillId] = trained.level;
         setSkills(map);
       }
     })();

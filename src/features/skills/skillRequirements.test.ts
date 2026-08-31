@@ -6,6 +6,7 @@ import type { EngineSkill, TrainedSkill } from '@/engine/types';
 
 function sdeSkill(overrides: Partial<SkillType> & { typeID: number; name: string }): SkillType {
   return {
+    description: '',
     groupID: 1,
     groupName: 'Group',
     rank: 1,

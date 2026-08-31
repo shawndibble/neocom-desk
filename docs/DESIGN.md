@@ -64,18 +64,39 @@ No bundled fonts, no new deps — system stack approximating EVE's condensed san
 Rules:
 
 - Micro-headings (panel titles, table headers, tab labels, buttons): uppercase,
-  `text-xs` or `text-[11px]`, `font-semibold`, `tracking-widest` (approximates the
+  `text-xs` or `text-[0.6875rem]`, `font-semibold`, `tracking-widest` (approximates the
   condensed EVE feel via letterspaced small caps rather than a condensed face).
 - Body/data: normal case, `text-sm` default.
 - Numbers (ISK, quantities, SP): `tabular-nums`, right-aligned in tables.
-- Type scale (Tailwind defaults): 11px chips/badges · 12px `text-xs` labels/headers ·
+- Type scale, at the browser-default 16px root: `text-[0.6875rem]` chips/badges ·
+  12px `text-xs` labels/headers ·
   14px `text-sm` body/data (default) · 16px `text-base` emphasized values ·
-  20px `text-xl` page titles · 30px `text-3xl` hero numbers only.
+  20px `text-xl` page titles · 30px `text-3xl` hero numbers only. Written in
+  `rem`, never `px` — a literal `text-[11px]` would not scale with the root
+  and inverts the hierarchy against its `rem` neighbours.
+
+## 2b. Brand assets
+
+Sources live in `assets/brand/` (not shipped). Everything under
+`public/icons/` and `public/brand/` is generated — edit the sources and rerun
+`python3 scripts/generate-brand-assets.py`, never hand-patch the output.
+
+- `LogoMark` (`src/components/ui/`) is the mark for UI use: inline SVG, corner
+  brackets on `currentColor` so `--color-accent` drives them. Simplified from
+  the artwork, because the bevels and glow read as dirt below ~64px.
+- `public/brand/lockup.png` is the full mark-plus-wordmark artwork, login page
+  only. It is the one place the wordmark appears as art rather than as text,
+  which is why the rule above still holds: no font is bundled.
+- App icons carry an opaque `--color-bg` plate. The maskable variant sits at
+  60% of the canvas so Android's mask cannot bite the hexagon corners.
 
 ## 3. Spacing & radius
 
-- Spacing: Tailwind 4px grid. Dense defaults — panel padding `p-3`, table cell
-  `px-3 py-1.5`, control heights 28px (`h-7`, compact) / 36px (`h-9`, default).
+- Spacing: Tailwind v4's default `rem`-based scale (`--spacing: 0.25rem`;
+  not overridden by this project's `@theme` block, which only sets
+  colors/fonts) — sizes below are the values at the browser-default 16px
+  root and scale with it. Dense defaults — panel padding `p-3`, table cell
+  `px-3 py-1.5`, control heights `h-7` (28px, compact) / `h-9` (36px, default).
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
 - Borders: always 1px (`border`), never 2px.
@@ -84,20 +105,22 @@ Rules:
 
 Built in `src/components/ui/` (✓) or planned (○):
 
-| Component         | Status | Purpose / usage                                                                                                                                                                                                                                            |
-| ----------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Panel`           | ✓      | Base surface. Optional uppercase title header + actions slot. Everything lives in a Panel; don't nest Panels — use `panel-2` fills inside.                                                                                                                 |
-| `Button`          | ✓      | `primary` (accent fill — max one per view), `ghost` (default; hairline border), `danger` (destructive; outline red, never filled). Sizes `sm`/`md`.                                                                                                        |
-| `StatChip`        | ✓      | Tiny label+value pair (ISK balance, SP, data counts). Tones: default/accent/success/warning/danger. Rows of chips form a stat strip under a page title.                                                                                                    |
-| `FilterChip`      | ✓      | Toggleable filter pill, `StatChip`'s dimensions but interactive: a real `<button>` with `aria-pressed`, accent fill when selected. Narrows a result set (e.g. skill search by group); optional trailing match count.                                       |
-| `DataAgeBadge`    | ✓      | Relative age of API-derived data ("12m ago"). Required on every ESI-backed view. Auto-tones: <1h dim, 1–24h warning, >24h danger.                                                                                                                          |
-| `EmptyState`      | ✓      | Centered title+hint+optional action for empty lists / not-yet-fetched views. Never show a bare empty table.                                                                                                                                                |
-| `Tabs`            | ✓      | Controlled horizontal tab bar, accent underline on active. For peer views within a page (e.g. Orders: Open / History). Not for navigation — that's the router.                                                                                             |
-| `Spinner`         | ✓      | Accent arc, sizes sm/md/lg. Inline or centered while loading; prefer skeleton-free simple spinner + DataAgeBadge of last cached data.                                                                                                                      |
-| `Tooltip`         | ✓      | Accessible hover/focus tooltip (`role="tooltip"` + `aria-describedby`) around a single focusable trigger. `InfoTooltip` variant renders a small "?" button for labeling jargon (ME/TE, EIV, SCC, cost index, Remaps available, StatChip's `tooltip` prop). |
-| `DataTable`       | ○      | Dense sortable table: `panel-2` uppercase header row, hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`.                                                                                                                   |
-| `CharacterAvatar` | ○      | ESI portrait, `rounded-full`, 1px `line` ring; size variants; online/selected accent ring.                                                                                                                                                                 |
-| `SkillBar`        | ○      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                               |
+| Component         | Status | Purpose / usage                                                                                                                                                                                                                                                                                          |
+| ----------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Panel`           | ✓      | Base surface. Optional uppercase title header + actions slot. Everything lives in a Panel; don't nest Panels — use `panel-2` fills inside.                                                                                                                                                               |
+| `Button`          | ✓      | `primary` (accent fill — max one per view), `ghost` (default; hairline border), `danger` (destructive; outline red, never filled). Sizes `sm`/`md`.                                                                                                                                                      |
+| `StatChip`        | ✓      | Tiny label+value pair (ISK balance, SP, data counts). Tones: default/accent/success/warning/danger. Rows of chips form a stat strip under a page title.                                                                                                                                                  |
+| `DataAgeBadge`    | ✓      | Relative age of API-derived data ("12m ago"). Required on every ESI-backed view. Auto-tones: <1h dim, 1–24h warning, >24h danger.                                                                                                                                                                        |
+| `EmptyState`      | ✓      | Centered title+hint+optional action for empty lists / not-yet-fetched views. Never show a bare empty table.                                                                                                                                                                                              |
+| `Tabs`            | ✓      | Controlled horizontal tab bar, accent underline on active. For peer views within a page (e.g. Orders: Open / History). Not for navigation — that's the router.                                                                                                                                           |
+| `Spinner`         | ✓      | Accent arc, sizes sm/md/lg. Inline or centered while loading; prefer skeleton-free simple spinner + DataAgeBadge of last cached data.                                                                                                                                                                    |
+| `Tooltip`         | ✓      | Accessible hover/focus tooltip (`role="tooltip"` + `aria-describedby`) around a single focusable trigger. `InfoTooltip` variant renders a small "?" button for labeling jargon (ME/TE, EIV, SCC, cost index, Remaps available, StatChip's `tooltip` prop).                                               |
+| `Modal`           | ✓      | Native `<dialog>` + `showModal()`. Platform-supplied focus trap, inert background, Escape-to-close and `::backdrop` — never hand-roll a focus trap. `placement="center"` (default) or `"sheet"` (bottom-anchored, mobile nav). Escape and backdrop click both close.                                     |
+| `DataTable`       | ✓      | Dense table: hairline-underlined uppercase header row (no fill — matches every shipped table), hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`. Presentational only — callers pre-sort and branch to `EmptyState` themselves; sorting lands when a call site needs it. |
+| `CharacterAvatar` | ✓      | ESI portrait, `rounded-xs` (house radius, §3), 1px `line` ring; sizes `sm`/`md`/`lg`; accent ring when selected. Decorative by default — pass `alt` only for standalone use.                                                                                                                             |
+| `FilterChip`      | ✓      | Toggleable filter pill. `StatChip`'s dimensions, but interactive: a real `<button>` with `aria-pressed`, accent when on, optional trailing count.                                                                                                                                                        |
+| `SkillBar`        | ✓      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                                                                             |
+| `LogoMark`        | ✓      | The app mark, inline SVG. Decorative (`aria-hidden`) — every placement sits beside the app name. Size it with `size-*`; corner brackets follow `currentColor`, defaulting to accent. Simplified from the artwork, see §2b.                                                                               |
 
 ## 5. Usage rules
 

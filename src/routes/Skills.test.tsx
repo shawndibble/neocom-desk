@@ -79,6 +79,7 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () =>
     HttpResponse.json([9899])
   ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () => HttpResponse.json([])),
   http.get('https://esi.evetech.net/universe/types/9899', () =>
     HttpResponse.json({
       type_id: 9899,
@@ -137,6 +138,88 @@ describe('Skills', () => {
     expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
   });
 
+  it('shows the level from a finished queue entry that /skills has not caught up to', async () => {
+    // ESI: "/skills is not updated until the character logs in ... entries
+    // that are in the past need to be applied on top of this list."
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 2,
+            queue_position: 0,
+            finished_level: 4,
+            start_date: '2026-08-20T00:00:00Z',
+            finish_date: '2026-08-25T00:00:00Z',
+            level_end_sp: 45255,
+          },
+        ])
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
+    expect(screen.getByText('45,255 SP')).toBeInTheDocument();
+    // The stale /skills reading is gone, not shown alongside.
+    expect(screen.queryByRole('img', { name: 'Level 3 of 5' })).not.toBeInTheDocument();
+    expect(screen.queryByText('8,000 SP')).not.toBeInTheDocument();
+    // The total moves with the row. Leaving ESI's total_sp alone would show
+    // 45,255 SP on a skill inside a 264,000 SP total that still counts 8,000.
+    expect(screen.getByText('301,255')).toBeInTheDocument(); // 264,000 + 37,255
+    expect(screen.queryByText('264,000')).not.toBeInTheDocument();
+  });
+
+  it('credits the level but not the SP when ESI withheld level_end_sp', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 2,
+            queue_position: 0,
+            finished_level: 4,
+            start_date: '2026-08-20T00:00:00Z',
+            finish_date: '2026-08-25T00:00:00Z',
+          },
+        ])
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
+    // The last known SP stands, and so does the total. Neither is guessed up.
+    expect(screen.getByText('8,000 SP')).toBeInTheDocument();
+    expect(screen.getByText('264,000')).toBeInTheDocument();
+  });
+
+  it('shows Unknown SP for a skill only the queue knows about', async () => {
+    // /skills omits the skill entirely and the entry carries no level_end_sp,
+    // so the level is known and the SP is not. A literal 0 would read as
+    // broken rather than as unknown.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 1337,
+            queue_position: 0,
+            finished_level: 1,
+            start_date: '2026-08-20T00:00:00Z',
+            finish_date: '2026-08-25T00:00:00Z',
+          },
+        ])
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('#1337')).toBeInTheDocument();
+    const row = screen.getByText('#1337').closest('li')!;
+    expect(within(row).getByText('—')).toBeInTheDocument(); // common.unknown
+    expect(within(row).queryByText('0 SP')).not.toBeInTheDocument();
+  });
+
   it('falls back to cached skills when ESI is unreachable', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,
@@ -178,6 +261,31 @@ describe('Skills', () => {
     const { beginEveLogin } = await import('@/app/loginFlow');
     screen.getByRole('button', { name: /log in again/i }).click();
     expect(beginEveLogin).toHaveBeenCalled();
+  });
+
+  it('disables CSV export in the re-login state, so a stale cache cannot be exported behind the banner', async () => {
+    // The invariant: whatever the route refuses to render, export refuses to
+    // hand over. loadWithCacheStatus deliberately still reads the cache on an
+    // auth failure ("needsReauth never short-circuits the cache read"), so
+    // nothing upstream guarantees `groups` is empty here.
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'skills',
+      value: skillsPayload,
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+
+    render(<App />);
+
+    // The route's own banner, not Layout's global auth notice — the latter
+    // fires on emitEsiAuthFailure, before the snapshot settles.
+    expect(await screen.findByText(/log in again to see skills/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /export csv/i })).toBeDisabled();
   });
 
   it("shows a selected skill's prerequisites, marking an already-trained one distinct", async () => {

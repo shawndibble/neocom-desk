@@ -3,17 +3,18 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { characterPortraitUrl } from './images';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
+import { CharacterAvatar, LogoMark, Modal } from '@/components/ui';
+import { AuthFailureNotice } from './AuthFailureNotice';
+import { useLockedRoutes } from './useGrantedScopes';
+import type { AppRoutePath } from './routeScopes';
 
 /**
- * Sync status dot, gated on Firebase being configured at all (see
- * syncStatus.ts) — hidden entirely rather than shown permanently idle, since
- * an unconfigured app never syncs and a dot with nothing behind it just begs
- * the "why isn't this working" question.
+ * Hidden entirely when Firebase isn't configured, rather than shown permanently
+ * idle — a dot with nothing behind it just begs "why isn't this working".
  */
 function SyncStatusIndicator() {
   const { status, online } = useSyncStatus();
@@ -29,83 +30,125 @@ function navClass({ isActive }: { isActive: boolean }): string {
   return `${NAV_LINK} ${isActive ? NAV_ACTIVE : NAV_IDLE}`;
 }
 
-const MORE_SHEET_ID = 'mobile-more-sheet';
+/** Nav-reachable routes, so `useLockedRoutes` answers for all of them at once. */
+const NAV_PATHS = [
+  '/characters',
+  '/overview',
+  '/skills',
+  '/industry',
+  '/market',
+  '/wallet',
+  '/assets',
+  '/mail',
+  '/calendar',
+  '/contracts',
+  '/orders',
+] as const satisfies readonly AppRoutePath[];
 
-interface MobileMoreSheetProps {
-  onClose: () => void;
-  activeCharacter: { characterId: number; name: string } | undefined;
+interface NavItemProps {
+  to: AppRoutePath;
+  label: string;
+  locked: boolean;
+  onClick?: () => void;
 }
 
 /**
- * Mobile-only overflow sheet (UX-REVIEW #4/#8): the six Character-section
- * views that don't fit as primary bottom-tab-bar items, plus the "switch
- * character" link that used to occupy the tab bar's fifth slot, plus Market
- * (character-agnostic, so it doesn't belong grouped with the Character
- * section, but the bottom tab bar is already full at 4 primary destinations
- * + More). Closes on Escape (focus returns to the More trigger, via the
- * effect in Layout) and on any link click, so it never hangs over the next
- * route.
+ * Nav link marking a destination the active Character cannot currently use.
+ * Informational only — the link still navigates and the route's `ScopeGate`
+ * explains why; disabling it would leave no way to reach the explanation.
  */
-function MobileMoreSheet({ onClose, activeCharacter }: MobileMoreSheetProps) {
+function NavItem({ to, label, locked, onClick }: NavItemProps) {
   const { t } = useTranslation();
-  const firstLinkRef = useRef<HTMLAnchorElement>(null);
+  // The marker rides on `title`, not extra text: a second string inside the
+  // link would rewrite its accessible name from "Assets" to "Assets, needs a
+  // new login", which is not what the link is called.
+  return (
+    <NavLink
+      to={to}
+      onClick={onClick}
+      className={navClass}
+      title={locked ? t('reauth.navLocked') : undefined}
+    >
+      <span className="min-w-0 truncate">{label}</span>
+      {locked && (
+        <span aria-hidden="true" className="ml-auto size-1.5 shrink-0 rounded-full bg-warning" />
+      )}
+    </NavLink>
+  );
+}
 
-  useEffect(() => {
-    firstLinkRef.current?.focus();
-  }, []);
+const MORE_SHEET_ID = 'mobile-more-sheet';
+
+interface MobileMoreSheetProps {
+  open: boolean;
+  onClose: () => void;
+  activeCharacter: { characterId: number; name: string } | undefined;
+  locked: ReadonlySet<AppRoutePath>;
+}
+
+/**
+ * Mobile-only overflow sheet: the Character-section views that don't fit as
+ * primary bottom-tab items, plus "switch character", plus Market (which isn't
+ * Character-scoped, but the tab bar is full at 4 + More). A real modal, not a
+ * drawer: it covers the viewport, so the tab bar underneath must not stay
+ * reachable — hence the shared `Modal` and its dismissal contract. Links close
+ * it on click so it never hangs over the next route.
+ */
+function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreSheetProps) {
+  const { t } = useTranslation();
 
   return (
-    <div
-      id={MORE_SHEET_ID}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t('nav.more')}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:hidden"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md space-y-1 rounded-t-xs border-t border-line bg-panel p-2 pb-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <NavLink ref={firstLinkRef} to="/market" onClick={onClose} className={navClass}>
-          {t('nav.market')}
-        </NavLink>
+    <Modal open={open} id={MORE_SHEET_ID} onClose={onClose} title={t('nav.more')} placement="sheet">
+      <div className="space-y-1 pb-3">
+        <NavItem
+          to="/market"
+          label={t('nav.market')}
+          locked={locked.has('/market')}
+          onClick={onClose}
+        />
         {activeCharacter && (
           <Link
             to="/characters"
             onClick={onClose}
             className="flex items-center gap-2 rounded-xs border border-transparent px-3 py-2 transition-colors hover:bg-panel-2"
           >
-            <img
-              src={characterPortraitUrl(activeCharacter.characterId, 64)}
-              alt=""
-              width={28}
-              height={28}
-              className="size-7 rounded-xs border border-line"
-            />
+            <CharacterAvatar characterId={activeCharacter.characterId} size="sm" />
             <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
           </Link>
         )}
-        <NavLink to="/wallet" onClick={onClose} className={navClass}>
-          {t('nav.wallet')}
-        </NavLink>
-        <NavLink to="/assets" onClick={onClose} className={navClass}>
-          {t('nav.assets')}
-        </NavLink>
-        <NavLink to="/mail" onClick={onClose} className={navClass}>
-          {t('nav.mail')}
-        </NavLink>
-        <NavLink to="/calendar" onClick={onClose} className={navClass}>
-          {t('nav.calendar')}
-        </NavLink>
-        <NavLink to="/contracts" onClick={onClose} className={navClass}>
-          {t('nav.contracts')}
-        </NavLink>
-        <NavLink to="/orders" onClick={onClose} className={navClass}>
-          {t('nav.orders')}
-        </NavLink>
+        <NavItem
+          to="/wallet"
+          label={t('nav.wallet')}
+          locked={locked.has('/wallet')}
+          onClick={onClose}
+        />
+        <NavItem
+          to="/assets"
+          label={t('nav.assets')}
+          locked={locked.has('/assets')}
+          onClick={onClose}
+        />
+        <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} onClick={onClose} />
+        <NavItem
+          to="/calendar"
+          label={t('nav.calendar')}
+          locked={locked.has('/calendar')}
+          onClick={onClose}
+        />
+        <NavItem
+          to="/contracts"
+          label={t('nav.contracts')}
+          locked={locked.has('/contracts')}
+          onClick={onClose}
+        />
+        <NavItem
+          to="/orders"
+          label={t('nav.orders')}
+          locked={locked.has('/orders')}
+          onClick={onClose}
+        />
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -118,73 +161,60 @@ export function Layout() {
     [activeCharacterId]
   );
 
+  const locked = useLockedRoutes(NAV_PATHS);
+
   const [moreOpen, setMoreOpen] = useState(false);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
+  // The More sheet is mounted conditionally (`!isDesktop &&` below), not
+  // CSS-hidden: `showModal()` makes the page inert regardless of the dialog's
+  // own `display`, so growing past `md` while open left an invisible modal
+  // holding the whole app hostage. Unmounting instead lets `Modal`'s cleanup
+  // close it and restore focus; `moreOpen` resets so a resize back to mobile
+  // doesn't reopen it unasked.
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 48rem)').matches
+  );
   useEffect(() => {
-    if (!moreOpen) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== 'Escape') return;
-      setMoreOpen(false);
-      moreButtonRef.current?.focus();
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [moreOpen]);
+    const desktop = window.matchMedia('(min-width: 48rem)');
+    const onChange = (e: MediaQueryListEvent) => {
+      setIsDesktop(e.matches);
+      if (e.matches) setMoreOpen(false);
+    };
+    desktop.addEventListener('change', onChange);
+    return () => desktop.removeEventListener('change', onChange);
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-bg text-text">
       {/* Desktop left rail */}
       <aside className="sticky top-0 hidden h-screen w-48 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
         <div className="flex items-center gap-2 border-b border-line px-3 py-3">
-          <span
-            aria-hidden="true"
-            className="flex size-7 items-center justify-center rounded-xs bg-accent text-sm font-bold text-accent-contrast"
-          >
-            N
-          </span>
+          <LogoMark className="size-7 shrink-0" />
           <span className="flex-1 text-xs font-semibold tracking-widest uppercase">
             {t('app.name')}
           </span>
           {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-2">
-          <NavLink to="/characters" className={navClass}>
-            {t('nav.characters')}
-          </NavLink>
-          <NavLink to="/overview" className={navClass}>
-            {t('nav.overview')}
-          </NavLink>
-          <NavLink to="/skills" className={navClass}>
-            {t('nav.skills')}
-          </NavLink>
-          <NavLink to="/industry" className={navClass}>
-            {t('nav.industry')}
-          </NavLink>
-          <NavLink to="/market" className={navClass}>
-            {t('nav.market')}
-          </NavLink>
-          <p className="mt-3 px-3 text-[10px] font-semibold tracking-widest text-text-faint uppercase">
+          <NavItem
+            to="/characters"
+            label={t('nav.characters')}
+            locked={locked.has('/characters')}
+          />
+          <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
+          <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
+          <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
+          <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
+          <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
             {t('nav.characterSection')}
           </p>
-          <NavLink to="/wallet" className={navClass}>
-            {t('nav.wallet')}
-          </NavLink>
-          <NavLink to="/assets" className={navClass}>
-            {t('nav.assets')}
-          </NavLink>
-          <NavLink to="/mail" className={navClass}>
-            {t('nav.mail')}
-          </NavLink>
-          <NavLink to="/calendar" className={navClass}>
-            {t('nav.calendar')}
-          </NavLink>
-          <NavLink to="/contracts" className={navClass}>
-            {t('nav.contracts')}
-          </NavLink>
-          <NavLink to="/orders" className={navClass}>
-            {t('nav.orders')}
-          </NavLink>
+          <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
+          <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
+          <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} />
+          <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
+          <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
+          <NavItem to="/orders" label={t('nav.orders')} locked={locked.has('/orders')} />
         </nav>
         {activeCharacter && (
           <Link
@@ -192,23 +222,18 @@ export function Layout() {
             aria-label={t('nav.switchCharacter')}
             className="flex items-center gap-2 border-t border-line p-2 transition-colors hover:bg-panel-2"
           >
-            <img
-              src={characterPortraitUrl(activeCharacter.characterId, 64)}
-              alt=""
-              width={32}
-              height={32}
-              className="size-8 rounded-xs border border-line"
-            />
+            <CharacterAvatar characterId={activeCharacter.characterId} />
             <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
           </Link>
         )}
       </aside>
 
       <main className="min-w-0 flex-1 p-4 pb-20 md:pb-4">
+        <AuthFailureNotice />
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar: 4 primary destinations + More (UX-REVIEW #4). */}
+      {/* Mobile bottom tab bar: 4 primary destinations + More. */}
       <nav
         aria-label={t('nav.mobileLabel')}
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-panel/95 backdrop-blur-sm md:hidden"
@@ -238,8 +263,13 @@ export function Layout() {
         </button>
       </nav>
 
-      {moreOpen && (
-        <MobileMoreSheet onClose={() => setMoreOpen(false)} activeCharacter={activeCharacter} />
+      {!isDesktop && (
+        <MobileMoreSheet
+          open={moreOpen}
+          onClose={() => setMoreOpen(false)}
+          activeCharacter={activeCharacter}
+          locked={locked}
+        />
       )}
     </div>
   );

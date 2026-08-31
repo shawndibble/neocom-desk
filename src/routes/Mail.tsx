@@ -2,62 +2,53 @@ import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadMailHeaders, loadMailBody } from '@/features/character/mail';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import type { MailBody, MailHeader } from '@/esi/endpoints';
 
 interface Snapshot {
-  requestKey: string;
   headersResult: CachedResult<MailHeader[]> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   headersNeedsReauth: boolean;
   senderNames: Map<number, string>;
 }
 
+/** Stable identity for the loading/failed fallback, so it doesn't churn every render. */
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
+
+async function loadMailSnapshot(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<Snapshot> {
+  const { cached: headersResult, needsReauth: headersNeedsReauth } =
+    await loadMailHeaders(characterId);
+  // Already superseded: skip the name lookup, its result would be discarded.
+  const senderIds = signal.cancelled
+    ? []
+    : (headersResult?.data ?? []).map((h) => h.from).filter((id): id is number => id !== undefined);
+  const senderNames = await resolveNames(senderIds);
+  return { headersResult, headersNeedsReauth, senderNames };
+}
+
 /** Mail: recent headers list + body on click. Read-only, cached for offline. */
 export function Mail() {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } =
+    useRouteSnapshot(loadMailSnapshot);
 
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [bodySnapshot, setBodySnapshot] = useState<{
     selectedId: number;
     result: CachedResult<MailBody> | null;
   } | null>(null);
-  const requestKey = `${activeCharacterId}:${refreshKey}`;
 
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      const { cached: headersResult, needsReauth: headersNeedsReauth } =
-        await loadMailHeaders(activeCharacterId);
-      if (cancelled) return;
-      const senderIds = (headersResult?.data ?? [])
-        .map((h) => h.from)
-        .filter((id): id is number => id !== undefined);
-      const senderNames = await resolveNames(senderIds);
-      if (cancelled) return;
-      setSnapshot({ requestKey, headersResult, headersNeedsReauth, senderNames });
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [activeCharacterId, refreshKey]);
-
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const loading = current === null;
-  const headersResult = current?.headersResult ?? null;
-  const headersNeedsReauth = current?.headersNeedsReauth ?? false;
-  const senderNames = current?.senderNames ?? new Map<number, string>();
+  const headersResult = data?.headersResult ?? null;
+  const headersNeedsReauth = data?.headersNeedsReauth ?? false;
+  const senderNames = data?.senderNames ?? NO_NAMES;
 
   const headers = useMemo(
     () =>
@@ -95,7 +86,7 @@ export function Mail() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('mail.title')}</h1>
         <div className="flex items-center gap-2">
           {headersResult && <DataAgeBadge date={headersResult.fetchedAt} />}
-          <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+          <Button size="sm" onClick={refresh} disabled={loading}>
             {t('mail.refresh')}
           </Button>
         </div>
@@ -112,12 +103,14 @@ export function Mail() {
           actionLabel={t('mail.reauthAction')}
           onLogin={() => void beginEveLogin()}
         />
+      ) : error ? (
+        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !headersResult || headers.length === 0 ? (
         <EmptyState title={t('mail.emptyTitle')} hint={t('mail.emptyHint')} />
       ) : (
         <>
           {headersResult.fromCache && (
-            <p className="text-[11px] text-warning uppercase">{t('common.offlineTitle')}</p>
+            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
           <Panel padded={false}>
             <ul className="divide-y divide-line">
@@ -137,7 +130,10 @@ export function Mail() {
                       {header.subject || t('mail.noSubject')}
                     </span>
                     <span className="truncate text-text-faint">
-                      {(header.from !== undefined && senderNames.get(header.from)) ??
+                      {/* Not `cond && get(...) ?? fallback`: `??` passes `false`
+                          straight through, so a header with no sender rendered
+                          nothing at all instead of the fallback. */}
+                      {(header.from === undefined ? undefined : senderNames.get(header.from)) ??
                         t('mail.unknownSender')}
                       {header.timestamp && ` · ${new Date(header.timestamp).toLocaleString()}`}
                     </span>

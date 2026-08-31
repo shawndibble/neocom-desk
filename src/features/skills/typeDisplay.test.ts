@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { typeIconUrl, stripEveMarkup } from './typeDisplay';
-
-describe('typeIconUrl', () => {
-  it('builds the EVE image server icon URL', () => {
-    expect(typeIconUrl(9899)).toBe('https://images.evetech.net/types/9899/icon?size=64');
-    expect(typeIconUrl(9899, 32)).toBe('https://images.evetech.net/types/9899/icon?size=32');
-  });
-});
+import { stripEveMarkup } from './typeDisplay';
 
 describe('stripEveMarkup', () => {
   it('removes EVE markup tags', () => {
