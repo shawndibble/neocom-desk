@@ -39,7 +39,7 @@ describe('PlanHeader', () => {
       />
     );
 
-    expect(screen.getByText(/saves/i)).toBeInTheDocument();
+    expect(screen.getByText('8m')).toBeInTheDocument();
     expect(screen.queryByText(/evaluated at/i)).not.toBeInTheDocument();
   });
 
@@ -58,7 +58,7 @@ describe('PlanHeader', () => {
       />
     );
 
-    expect(screen.getByText(/saves/i)).toBeInTheDocument();
+    expect(screen.getByText('8m')).toBeInTheDocument();
     expect(screen.getByText(/evaluated at 5 remaps/i)).toBeInTheDocument();
   });
 
@@ -77,6 +77,6 @@ describe('PlanHeader', () => {
       />
     );
 
-    expect(screen.getByText(/no remap improves/i)).toBeInTheDocument();
+    expect(screen.getByText('None')).toBeInTheDocument();
   });
 });

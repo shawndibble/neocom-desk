@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { placeRemaps } from '@/engine/optimizer';
 import {
-  evaluateOptimisationBadge,
+  evaluateOptimizationBadge,
   projectedFinish,
   REMAP_EVALUATION_CAP,
 } from './planHeaderStats';
@@ -38,15 +38,15 @@ const PAIRS: [AttributeName, AttributeName][] = [
 const SKILLS = skillMap(...PAIRS.map(([p, s], i) => skill(i + 1, p, s)));
 const STEPS: PlanStep[] = PAIRS.map((_, i) => ({ skillTypeID: i + 1, level: 1 }));
 
-describe('evaluateOptimisationBadge', () => {
+describe('evaluateOptimizationBadge', () => {
   it('returns null for an empty plan', () => {
     expect(
-      evaluateOptimisationBadge([], SKILLS, { remapCount: 2, currentAttributes: CURRENT })
+      evaluateOptimizationBadge([], SKILLS, { remapCount: 2, currentAttributes: CURRENT })
     ).toBeNull();
   });
 
   it('reports the exact result, uncapped, when the request is within the cap', () => {
-    const badge = evaluateOptimisationBadge(STEPS, SKILLS, {
+    const badge = evaluateOptimizationBadge(STEPS, SKILLS, {
       remapCount: 3,
       currentAttributes: CURRENT,
     });
@@ -60,7 +60,7 @@ describe('evaluateOptimisationBadge', () => {
   });
 
   it('caps evaluation at REMAP_EVALUATION_CAP and says so when the plan requests more', () => {
-    const badge = evaluateOptimisationBadge(STEPS, SKILLS, {
+    const badge = evaluateOptimizationBadge(STEPS, SKILLS, {
       remapCount: 6,
       currentAttributes: CURRENT,
     });
@@ -81,7 +81,7 @@ describe('evaluateOptimisationBadge', () => {
   });
 
   it('never reports a negative evaluated count for a negative or zero request', () => {
-    const badge = evaluateOptimisationBadge(STEPS, SKILLS, {
+    const badge = evaluateOptimizationBadge(STEPS, SKILLS, {
       remapCount: 0,
       currentAttributes: CURRENT,
     });

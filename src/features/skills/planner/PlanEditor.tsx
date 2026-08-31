@@ -31,9 +31,10 @@ import { ComputedQueue } from './ComputedQueue';
 import { PlanHeader } from './PlanHeader';
 import { formatDuration } from '@/lib/duration';
 import {
-  evaluateOptimisationBadge,
+  evaluateOptimizationBadge,
   projectedFinish,
   MIN_MEANINGFUL_SAVINGS_SECONDS,
+  REMAP_EVALUATION_CAP,
 } from './planHeaderStats';
 import { dedupeEntries, removeEntry, upsertEntry, applyReorderSuggestion } from './reorder';
 import {
@@ -207,12 +208,20 @@ export function PlanEditor({
     [plan.entries]
   );
   const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0;
+  // Distinct skills in `scheduled`, not just plan.entries.length — scheduled
+  // also carries prerequisite steps normalizePlan injected, and totalSeconds
+  // already reflects their training time, so the header's skill count must
+  // count the same set it's timing.
+  const scheduledSkillCount = useMemo(
+    () => new Set(scheduled.map((s) => s.skillTypeID)).size,
+    [scheduled]
+  );
 
   // Header stats: live, so they need no click and no spinner — placeRemaps
   // stays fast enough at the plan sizes this app supports.
   const headerBadge = useMemo(
     () =>
-      evaluateOptimisationBadge(scheduled, catalog.engineSkills, {
+      evaluateOptimizationBadge(scheduled, catalog.engineSkills, {
         remapCount: plan.remapCount,
         currentAttributes: attributes,
         implants: effectiveImplants,
@@ -256,9 +265,11 @@ export function PlanEditor({
 
   function handleOptimizeRemaps() {
     if (scheduled.length === 0) return;
+    // Same evaluation cap as the header badge (REMAP_EVALUATION_CAP), so the
+    // two panels never disagree about what a legacy remapCount > the cap buys.
     setOptimizeResult(
       placeRemaps(scheduled, catalog.engineSkills, {
-        remapCount: plan.remapCount,
+        remapCount: Math.min(Math.max(plan.remapCount, 0), REMAP_EVALUATION_CAP),
         currentAttributes: attributes,
         implants: effectiveImplants,
       })
@@ -325,7 +336,7 @@ export function PlanEditor({
     <div className="space-y-4">
       <PlanHeader
         totalSeconds={totalSeconds}
-        skillCount={plan.entries.length}
+        skillCount={scheduledSkillCount}
         projectedFinish={headerProjectedFinish}
         badge={headerBadge}
       />
@@ -380,10 +391,15 @@ export function PlanEditor({
               id="plan-remap-count"
               type="number"
               min={0}
-              max={5}
+              max={REMAP_EVALUATION_CAP}
               value={plan.remapCount}
               onChange={(e) =>
-                onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
+                onUpdate({
+                  remapCount: Math.min(
+                    REMAP_EVALUATION_CAP,
+                    Math.max(0, Number(e.target.value) || 0)
+                  ),
+                })
               }
               className="h-6 w-12 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
             />

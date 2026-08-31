@@ -18,7 +18,7 @@ export const REMAP_EVALUATION_CAP = 5;
 /** Below a minute the remap verdict reads "saves 0m" — treat it as no gain. */
 export const MIN_MEANINGFUL_SAVINGS_SECONDS = 60;
 
-export interface OptimisationBadge {
+export interface OptimizationBadge {
   savingsSeconds: number;
   /** Remap count actually evaluated (<= REMAP_EVALUATION_CAP). */
   evaluatedRemapCount: number;
@@ -28,11 +28,11 @@ export interface OptimisationBadge {
   capped: boolean;
 }
 
-export function evaluateOptimisationBadge(
+export function evaluateOptimizationBadge(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
   options: Pick<PlaceRemapsOptions, 'remapCount' | 'currentAttributes' | 'implants'>
-): OptimisationBadge | null {
+): OptimizationBadge | null {
   if (steps.length === 0) return null;
   const requestedRemapCount = options.remapCount;
   const evaluatedRemapCount = Math.min(Math.max(requestedRemapCount, 0), REMAP_EVALUATION_CAP);

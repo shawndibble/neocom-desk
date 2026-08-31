@@ -140,8 +140,8 @@
     "headerSkillCount": "Skills",
     "headerProjectedFinish": "Projected finish",
     "headerNoFinish": "—",
-    "headerSavings": "Remapping saves {{duration}}",
-    "headerNoSavings": "No remap improves this plan",
+    "headerSavingsLabel": "Remap savings",
+    "headerSavingsNone": "None",
     "headerSavingsCapped": "(evaluated at {{evaluated}} remaps)"
   },
   "industry": {
