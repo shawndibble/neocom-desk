@@ -45,6 +45,11 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json}'],
+        // The Market Browser's catalogue (~1.2 MB: market groups, market
+        // types, solar systems, NPC stations, market regions) is fetched
+        // lazily on first visit to /market instead — most installs never
+        // open it, so an install should not pay for it up front (CONTEXT.md).
+        globIgnores: ['**/data/market/**'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: '/neocom-desk/index.html',
         navigateFallbackDenylist: [/^\/api\//],
