@@ -28,7 +28,7 @@ import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { ComputedQueue } from './ComputedQueue';
-import { formatDuration } from '@/lib/duration';
+import { formatDate, formatDuration } from '@/lib/duration';
 import { dedupeEntries, removeEntry, upsertEntry, applyReorderSuggestion } from './reorder';
 import {
   addMarker,
@@ -71,6 +71,12 @@ interface ComputeResult {
   error: string | null;
   /** At least one entry refers to a skill the current catalog knows about (UX-REVIEW #9's empty-state discriminator). */
   hasValidEntries: boolean;
+  /**
+   * "Now" at compute time — the single wall-clock origin fed to
+   * computeSchedule's booster-expiry math AND used to derive the plan
+   * timeline (#20), so the two can never disagree.
+   */
+  startDate: Date;
 }
 
 function computeQueue(
@@ -84,22 +90,21 @@ function computeQueue(
   // Guard against unknown typeIDs (stale plan, imported skill not in the current SDE snapshot).
   const validEntries = entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
   const hasValidEntries = validEntries.length > 0;
+  const startDate = new Date();
   try {
     const steps = normalizePlan(validEntries, catalog.engineSkills, trainedSkills);
-    // startDate is "now" at compute time — only relevant when a booster is
-    // active (computeSchedule requires it in that case, for the
-    // booster-expiry breakpoint).
     const scheduled = computeSchedule(
       steps,
-      { attributes, implants, boosters, startDate: boosters.length > 0 ? new Date() : undefined },
+      { attributes, implants, boosters, startDate },
       catalog.engineSkills
     );
-    return { scheduled, error: null, hasValidEntries };
+    return { scheduled, error: null, hasValidEntries, startDate };
   } catch (err) {
     return {
       scheduled: [],
       error: err instanceof Error ? err.message : String(err),
       hasValidEntries,
+      startDate,
     };
   }
 }
@@ -166,7 +171,7 @@ export function PlanEditor({
     [catalog]
   );
 
-  const { scheduled, error, hasValidEntries } = useMemo(
+  const { scheduled, error, hasValidEntries, startDate } = useMemo(
     () =>
       computeQueue(
         plan.entries,
@@ -204,6 +209,10 @@ export function PlanEditor({
     [plan.entries]
   );
   const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0;
+  // No steps means no plan finish to project — never invent one for an
+  // empty (or all-trained) queue (#20).
+  const planFinish =
+    scheduled.length > 0 ? new Date(startDate.getTime() + totalSeconds * 1000) : null;
 
   function update(entries: PlanEntry[]) {
     onUpdate({ entries });
@@ -561,7 +570,14 @@ export function PlanEditor({
 
       <Panel
         title={t('plans.computedQueue')}
-        actions={<span className="text-[11px] text-text-dim">{formatDuration(totalSeconds)}</span>}
+        actions={
+          <div className="flex items-center gap-2 text-[11px] text-text-dim">
+            <span>{formatDuration(totalSeconds)}</span>
+            {planFinish && (
+              <span>{t('plans.projectedFinish', { date: formatDate(planFinish) })}</span>
+            )}
+          </div>
+        }
       >
         {error ? (
           <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
@@ -571,6 +587,7 @@ export function PlanEditor({
             nameFor={nameFor}
             userSkillTypeIDs={userSkillTypeIDs}
             hasValidEntries={hasValidEntries}
+            startDate={startDate}
           />
         )}
       </Panel>
