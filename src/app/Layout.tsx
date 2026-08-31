@@ -34,6 +34,7 @@ function navClass({ isActive }: { isActive: boolean }): string {
 const NAV_PATHS = [
   '/characters',
   '/overview',
+  '/queue-health',
   '/skills',
   '/industry',
   '/market',
@@ -104,6 +105,12 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           to="/market"
           label={t('nav.market')}
           locked={locked.has('/market')}
+          onClick={onClose}
+        />
+        <NavItem
+          to="/queue-health"
+          label={t('nav.queueHealth')}
+          locked={locked.has('/queue-health')}
           onClick={onClose}
         />
         {activeCharacter && (
@@ -203,6 +210,11 @@ export function Layout() {
             locked={locked.has('/characters')}
           />
           <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
+          <NavItem
+            to="/queue-health"
+            label={t('nav.queueHealth')}
+            locked={locked.has('/queue-health')}
+          />
           <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
           <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
           <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />

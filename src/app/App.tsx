@@ -11,6 +11,7 @@ import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import { Characters } from '@/routes/Characters';
 import { Overview } from '@/routes/Overview';
+import { QueueHealth } from '@/routes/QueueHealth';
 import { Skills } from '@/routes/Skills';
 import { SkillPlans } from '@/routes/SkillPlans';
 import { Industry } from '@/routes/Industry';
@@ -51,6 +52,7 @@ const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 const ROUTE_ELEMENTS = {
   '/characters': <Characters />,
   '/overview': <Overview />,
+  '/queue-health': <QueueHealth />,
   '/skills': <Skills />,
   '/skills/plans': <SkillPlans />,
   '/industry': <Industry />,
