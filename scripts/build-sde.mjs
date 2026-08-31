@@ -26,7 +26,25 @@ const FILES = [
   'industryActivityMaterials.csv',
   'industryActivityProducts.csv',
   'industryActivitySkills.csv',
+  'invMarketGroups.csv',
+  'mapRegions.csv',
+  'mapSolarSystems.csv',
+  'staStations.csv',
 ];
+
+const MARKET_OUT_DIR = join(OUT_DIR, 'market');
+
+// Mirrors src/esi/client.ts's headers — a build-time probe is still an ESI
+// client, and courtesy to CCP's API doesn't stop at the browser boundary.
+const ESI_COMPATIBILITY_DATE = '2026-08-01';
+const ESI_USER_AGENT = 'NeoCom Desk (github.com/shawndibble/neocom-desk)';
+const ESI_BASE = 'https://esi.evetech.net';
+const PROBE_CACHE_FILE = join(CACHE_DIR, 'market-regions-probe.json');
+// Delve: canary region with no NPC station that still carries busy
+// player-structure markets (CONTEXT.md — "31 nullsec regions have none").
+const DELVE_REGION_ID = 10000060;
+const MARKET_REGIONS_MIN = 80;
+const MARKET_REGIONS_MAX = 116;
 
 // Dogma attribute IDs (verified against fuzzwork dgmAttributeTypes.csv):
 // 275 skillTimeConstant (rank), 180 primaryAttribute, 181 secondaryAttribute
@@ -136,6 +154,93 @@ function num(s) {
   return s === '' ? null : Number(s);
 }
 
+const PROBE_MAX_RETRY_WAIT_MS = 10_000;
+
+/** Mirrors src/esi/client.ts's retryWaitMs: Retry-After (429) or error-limit reset (420), capped. */
+function probeRetryWaitMs(res) {
+  const raw =
+    res.status === 420
+      ? res.headers.get('x-esi-error-limit-reset')
+      : res.headers.get('retry-after');
+  const seconds = raw === null ? NaN : Number(raw);
+  const ms = Number.isFinite(seconds) ? seconds * 1000 : 1000;
+  return Math.min(Math.max(ms, 0), PROBE_MAX_RETRY_WAIT_MS);
+}
+
+/** True if regionId's market-types listing (a lightweight endpoint) is non-empty. */
+async function probeRegionHasMarket(regionId) {
+  const url = `${ESI_BASE}/markets/${regionId}/types/?page=1`;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
+          'X-User-Agent': ESI_USER_AGENT,
+        },
+      });
+      // Respect ESI's rate limiting (429) and error-budget throttling (420):
+      // wait exactly as long as the server asks before the one retry below.
+      if (res.status === 429 || res.status === 420) {
+        if (attempt === 3) throw new Error(`HTTP ${res.status} for ${url} (rate limited)`);
+        await new Promise((r) => setTimeout(r, probeRetryWaitMs(res)));
+        continue;
+      }
+      if (res.status === 404) return false;
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+      // Proactively back off well before the error budget runs out, rather
+      // than waiting to be told — ~150 sequential probes is enough traffic
+      // that a plain fetch loop could otherwise trip the limiter.
+      const remaining = Number(res.headers.get('x-esi-error-limit-remain'));
+      if (Number.isFinite(remaining) && remaining > 0 && remaining < 20) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      const body = await res.json();
+      return Array.isArray(body) && body.length > 0;
+    } catch (err) {
+      if (attempt === 3) throw err;
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
+  }
+  return false;
+}
+
+/**
+ * Probes every candidate region for a non-empty market-types listing rather
+ * than trusting NPC-station presence or a hand-written exclusion list — 31
+ * nullsec regions have no NPC station and still carry busy player-structure
+ * markets, while wormhole/Abyssal/dev regions never carry orders at all
+ * (CONTEXT.md). Results are cached to disk (like the CSV downloads), so
+ * repeated local builds do not re-probe ~150 regions against ESI every time.
+ */
+async function probeMarketRegions(candidates) {
+  let diskCache = {};
+  try {
+    diskCache = JSON.parse(await readFile(PROBE_CACHE_FILE, 'utf8'));
+  } catch {
+    /* no cache yet */
+  }
+
+  const result = [];
+  const excluded = [];
+  for (const region of candidates) {
+    let hasMarket = diskCache[region.id];
+    if (typeof hasMarket !== 'boolean') {
+      hasMarket = await probeRegionHasMarket(region.id);
+      diskCache[region.id] = hasMarket;
+    }
+    if (hasMarket) result.push(region);
+    else excluded.push(region.name);
+  }
+
+  await mkdir(CACHE_DIR, { recursive: true });
+  await writeFile(PROBE_CACHE_FILE, JSON.stringify(diskCache));
+
+  console.log(`  market regions: ${result.length} carry orders, ${excluded.length} excluded`);
+  console.log(`  excluded: ${excluded.join(', ')}`);
+  return result;
+}
+
 async function main() {
   console.log('Downloading SDE CSVs...');
   const raw = {};
@@ -168,6 +273,7 @@ async function main() {
         groupID: Number(r[h.groupID]),
         volume: num(r[h.volume]) ?? 0,
         published: r[h.published] === '1',
+        marketGroupID: r[h.marketGroupID] === '' ? null : Number(r[h.marketGroupID]),
       });
     }
   }
@@ -319,8 +425,81 @@ async function main() {
     typeMap[typeID] = { name: t.name, groupID: t.groupID, volume: t.volume };
   }
 
+  // --- market/groups.json: invMarketGroups -> MarketGroupNode[] ---
+  const marketGroups = [];
+  {
+    const rows = raw['invMarketGroups.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const parentRaw = r[h.parentGroupID];
+      marketGroups.push({
+        id: Number(r[h.marketGroupID]),
+        name: r[h.marketGroupName],
+        parentId: parentRaw === '' ? null : Number(parentRaw),
+        hasTypes: r[h.hasTypes] === '1',
+      });
+    }
+    marketGroups.sort((a, b) => a.id - b.id);
+  }
+
+  // --- market/types.json: published invTypes with a market group -> MarketTypeEntry[] ---
+  const marketTypes = [];
+  for (const [typeID, t] of types) {
+    if (!t.published || t.marketGroupID == null) continue;
+    marketTypes.push({ typeId: typeID, name: t.name, marketGroupId: t.marketGroupID });
+  }
+  marketTypes.sort((a, b) => a.typeId - b.typeId);
+
+  // --- market/systems.json: mapSolarSystems -> SolarSystemEntry[] ---
+  const solarSystems = [];
+  {
+    const rows = raw['mapSolarSystems.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      solarSystems.push({
+        id: Number(r[h.solarSystemID]),
+        name: r[h.solarSystemName],
+        security: num(r[h.security]) ?? 0,
+        regionId: Number(r[h.regionID]),
+      });
+    }
+    solarSystems.sort((a, b) => a.id - b.id);
+  }
+
+  // --- market/stations.json: staStations -> NpcStationEntry[] ---
+  const npcStations = [];
+  {
+    const rows = raw['staStations.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      npcStations.push({
+        id: Number(r[h.stationID]),
+        name: r[h.stationName],
+        systemId: Number(r[h.solarSystemID]),
+      });
+    }
+    npcStations.sort((a, b) => a.id - b.id);
+  }
+
+  // --- market/regions.json: mapRegions, probed live against ESI for orders ---
+  const regionCandidates = [];
+  {
+    const rows = raw['mapRegions.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      regionCandidates.push({ id: Number(r[h.regionID]), name: r[h.regionName] });
+    }
+  }
+  console.log(`Probing ${regionCandidates.length} regions against ESI for live orders...`);
+  const marketRegions = await probeMarketRegions(regionCandidates);
+
   // --- write outputs (compact) ---
   await mkdir(OUT_DIR, { recursive: true });
+  await mkdir(MARKET_OUT_DIR, { recursive: true });
   const outputs = [
     ['skills.json', skills],
     ['blueprints.json', blueprints],
@@ -332,6 +511,19 @@ async function main() {
     const path = join(OUT_DIR, name);
     await writeFile(path, json);
     console.log(`  ${name}: ${Buffer.byteLength(json).toLocaleString()} bytes`);
+  }
+  const marketOutputs = [
+    ['groups.json', marketGroups],
+    ['types.json', marketTypes],
+    ['systems.json', solarSystems],
+    ['stations.json', npcStations],
+    ['regions.json', marketRegions],
+  ];
+  for (const [name, data] of marketOutputs) {
+    const json = JSON.stringify(data);
+    const path = join(MARKET_OUT_DIR, name);
+    await writeFile(path, json);
+    console.log(`  market/${name}: ${Buffer.byteLength(json).toLocaleString()} bytes`);
   }
 
   // --- sanity checks ---
@@ -352,6 +544,34 @@ async function main() {
   console.log(`  skills with rank outside 1-16: ${badRank}`);
   console.log(`  skills missing primary/secondary attr: ${badAttrs}`);
   if (badPrereq || badRank || badAttrs) process.exitCode = 1;
+
+  console.log(`  market groups: ${marketGroups.length}`);
+  console.log(`  market types: ${marketTypes.length}`);
+  console.log(`  solar systems: ${solarSystems.length}`);
+  console.log(`  npc stations: ${npcStations.length}`);
+  console.log(`  market regions: ${marketRegions.length}`);
+  if (
+    marketGroups.length === 0 ||
+    marketTypes.length === 0 ||
+    solarSystems.length === 0 ||
+    npcStations.length === 0 ||
+    marketRegions.length === 0
+  ) {
+    console.error('  FAIL: a market payload came out empty');
+    process.exitCode = 1;
+  }
+  if (!marketRegions.some((r) => r.id === DELVE_REGION_ID)) {
+    console.error(
+      '  FAIL: Delve (player-structure-only market, no NPC station) missing from market regions'
+    );
+    process.exitCode = 1;
+  }
+  if (marketRegions.length < MARKET_REGIONS_MIN || marketRegions.length > MARKET_REGIONS_MAX) {
+    console.error(
+      `  FAIL: market region count ${marketRegions.length} outside the plausible ${MARKET_REGIONS_MIN}-${MARKET_REGIONS_MAX} range`
+    );
+    process.exitCode = 1;
+  }
 }
 
 main().catch((err) => {
