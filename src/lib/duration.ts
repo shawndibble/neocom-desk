@@ -15,3 +15,22 @@ export function formatDuration(totalSeconds: number): string {
   parts.push(`${minutes}m`);
   return parts.join(' ');
 }
+
+/**
+ * Wall-clock start/finish for a scheduled step, derived from the same
+ * `seconds`/`cumulativeSeconds` the training-time columns already show —
+ * never re-derived a second way, so the two can't disagree.
+ */
+export function stepTimeline(
+  step: { seconds: number; cumulativeSeconds: number },
+  startDate: Date
+): { start: Date; finish: Date } {
+  const finish = new Date(startDate.getTime() + step.cumulativeSeconds * 1000);
+  const start = new Date(finish.getTime() - step.seconds * 1000);
+  return { start, finish };
+}
+
+/** YYYY-MM-DD, locale-independent — matches the remap-cooldown date format. */
+export function formatDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
