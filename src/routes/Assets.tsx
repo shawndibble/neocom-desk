@@ -186,16 +186,15 @@ export function Assets() {
           {assetsResult.fromCache && (
             <p className="text-[11px] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
-          {fetchTruncated ? (
+          {fetchTruncated && (
             <p className="text-[11px] text-warning uppercase">
               {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.items.length })}
             </p>
-          ) : (
-            renderTruncated && (
-              <p className="text-[11px] text-warning uppercase">
-                {t('assets.renderTruncatedNotice', { shown: shownCount, total: totalMatches })}
-              </p>
-            )
+          )}
+          {renderTruncated && (
+            <p className="text-[11px] text-warning uppercase">
+              {t('assets.renderTruncatedNotice', { shown: shownCount, total: totalMatches })}
+            </p>
           )}
           {groups.length === 0 ? (
             <EmptyState title={t('assets.noResults')} className="py-8" />

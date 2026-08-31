@@ -215,7 +215,7 @@ describe('Assets', () => {
       })
     );
     render(<App />);
-    expect(await screen.findByText(/showing the first 25 assets fetched/i)).toBeInTheDocument();
+    expect(await screen.findByText(/only the first 25 assets were fetched/i)).toBeInTheDocument();
   });
 
   it('caps what is rendered and says so, when the fetched list is larger than the render cap', async () => {
@@ -239,5 +239,22 @@ describe('Assets', () => {
         `Showing ${MAX_RENDERED_ASSETS} of ${MAX_RENDERED_ASSETS + 1} assets.`
       )
     ).toBeInTheDocument();
+  });
+
+  it('shows both notices when a character trips the fetch cap and the render cap at once', async () => {
+    const PAGE_SIZE = 50;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page')) || 1;
+        const pageItems = Array.from({ length: PAGE_SIZE }, (_, i) => ({
+          ...assetPage1[0],
+          item_id: (page - 1) * PAGE_SIZE + i + 1,
+        }));
+        return HttpResponse.json(pageItems, { headers: { 'X-Pages': '30' } });
+      })
+    );
+    render(<App />);
+    expect(await screen.findByText(/only the first 1250 assets were fetched/i)).toBeInTheDocument();
+    expect(screen.getByText(`Showing ${MAX_RENDERED_ASSETS} of 1250 assets.`)).toBeInTheDocument();
   });
 });
