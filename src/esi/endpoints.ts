@@ -424,6 +424,38 @@ export function getCharacterMail(
   });
 }
 
+// --- GET /markets/prices (public) ---
+
+export interface MarketPrice {
+  type_id: number;
+  adjusted_price?: number;
+  average_price?: number;
+}
+
+/** Global market prices — fallback price source and EIV input (ADR 0002). */
+export function getMarketsPrices(options: EndpointOptions = {}): Promise<EsiResult<MarketPrice[]>> {
+  return esiFetch<MarketPrice[]>('/markets/prices', options);
+}
+
+// --- GET /industry/systems (public) ---
+
+export interface SystemCostIndexEntry {
+  activity: string;
+  cost_index: number;
+}
+
+export interface SystemCostIndices {
+  solar_system_id: number;
+  cost_indices: SystemCostIndexEntry[];
+}
+
+/** Per-system industry cost indices, all activities. */
+export function getIndustrySystemCostIndices(
+  options: EndpointOptions = {}
+): Promise<EsiResult<SystemCostIndices[]>> {
+  return esiFetch<SystemCostIndices[]>('/industry/systems', options);
+}
+
 // --- POST /universe/names (public) ---
 
 export interface UniverseName {
