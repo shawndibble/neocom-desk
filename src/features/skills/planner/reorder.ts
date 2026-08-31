@@ -17,32 +17,44 @@ export function entryId(entry: PlanEntry): string {
 
 /**
  * Collapse entries to one per skill, keeping the highest targetLevel and the
- * position of that skill's *first* appearance. Used for queue import (one row
- * per level trained) and defensively before persisting any entry list.
+ * position of that skill's *first* appearance. Other fields on the entry
+ * (e.g. a future priority) come from that first-appearance entry, not
+ * rebuilt from scratch. Used for queue import (one row per level trained)
+ * and defensively before persisting any entry list.
  */
 export function dedupeEntries(entries: readonly PlanEntry[]): PlanEntry[] {
   const order: number[] = [];
+  const firstSeen = new Map<number, PlanEntry>();
   const maxLevel = new Map<number, number>();
   for (const entry of entries) {
-    if (!maxLevel.has(entry.skillTypeID)) order.push(entry.skillTypeID);
+    if (!firstSeen.has(entry.skillTypeID)) {
+      order.push(entry.skillTypeID);
+      firstSeen.set(entry.skillTypeID, entry);
+    }
     maxLevel.set(
       entry.skillTypeID,
       Math.max(maxLevel.get(entry.skillTypeID) ?? 0, entry.targetLevel)
     );
   }
-  return order.map((skillTypeID) => ({ skillTypeID, targetLevel: maxLevel.get(skillTypeID)! }));
+  return order.map((skillTypeID) => ({
+    ...firstSeen.get(skillTypeID)!,
+    targetLevel: maxLevel.get(skillTypeID)!,
+  }));
 }
 
 /**
  * Add a skill at a target level, or raise an existing entry's target level if
- * the plan already trains that skill (never a duplicate row).
+ * the plan already trains that skill (never a duplicate row). Fields beyond
+ * skillTypeID/targetLevel are merged in — the incoming entry's fields win,
+ * falling back to the existing entry's — so this survives future fields.
  */
 export function upsertEntry(entries: readonly PlanEntry[], entry: PlanEntry): PlanEntry[] {
   const index = entries.findIndex((e) => e.skillTypeID === entry.skillTypeID);
   if (index === -1) return [...entries, entry];
   const next = [...entries];
   next[index] = {
-    skillTypeID: entry.skillTypeID,
+    ...next[index],
+    ...entry,
     targetLevel: Math.max(next[index].targetLevel, entry.targetLevel),
   };
   return next;
