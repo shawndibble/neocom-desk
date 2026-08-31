@@ -29,6 +29,12 @@ import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { ComputedQueue } from './ComputedQueue';
+import { PlanHeader } from './PlanHeader';
+import {
+  evaluateOptimizationBadge,
+  toOptimizationBadge,
+  MIN_MEANINGFUL_SAVINGS_SECONDS,
+} from './planHeaderStats';
 import { boostedStepIndices } from '@/engine/boosterImpact';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -46,9 +52,6 @@ import { whatIfImplants, WHAT_IF_IMPLANT_MODES, type WhatIfImplantMode } from '.
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-
-// Below a minute the remap verdict reads "saves 0m" — treat it as no gain.
-const MIN_MEANINGFUL_SAVINGS_SECONDS = 60;
 
 /** "PER 27 / WIL 21 / INT 17 / …": full remap spread, highest first. */
 function remapInstruction(attributes: Attributes): string {
@@ -214,10 +217,9 @@ export function PlanEditor({
   );
 
   // The plan keeps whatever count the user set (ESI prefills bonus remaps).
-  // Only the optimizer is capped, and the UI says so rather than quietly
-  // answering a different question than the one on screen.
+  // Only the optimizer is capped, and the header badge says so rather than
+  // quietly answering a different question than the one on screen.
   const remapCount = Math.min(plan.remapCount, MAX_SUPPORTED_REMAPS);
-  const remapCapped = plan.remapCount > MAX_SUPPORTED_REMAPS;
 
   // Which queue rows the Booster actually speeds up: trained inside its window
   // AND on an attribute it raises. Both, or the mark is a lie.
@@ -233,6 +235,44 @@ export function PlanEditor({
   // empty (or all-trained) queue (#20).
   const planFinish =
     scheduled.length > 0 ? new Date(startDate.getTime() + totalSeconds * 1000) : null;
+  // Distinct skills in `scheduled`, not just plan.entries.length — scheduled
+  // also carries prerequisite steps normalizePlan injected, and totalSeconds
+  // already reflects their training time, so the header's skill count must
+  // count the same set it's timing.
+  const scheduledSkillCount = useMemo(
+    () => new Set(scheduled.map((s) => s.skillTypeID)).size,
+    [scheduled]
+  );
+
+  // Header badge: live (no click, no spinner) via Booster-blind costing —
+  // the only path cheap enough to run on every render. A Booster expiring
+  // mid-plan can push placeRemaps' Booster-aware DP into seconds of
+  // synchronous work even at remapCount=1 (measured, not just the docstring's
+  // estimate), so while a Booster is active the header instead reuses the
+  // explicit "Optimize remaps" result (Booster-aware, computed on click) and
+  // shows nothing until the user has clicked it once — never a stale or
+  // wrong number, never a spinner.
+  const headerBadge = useMemo(() => {
+    if (activeBoosters.length > 0) {
+      return optimizeResult
+        ? toOptimizationBadge(optimizeResult.savingsSeconds, remapCount, plan.remapCount)
+        : null;
+    }
+    return evaluateOptimizationBadge(scheduled, catalog.engineSkills, {
+      remapCount: plan.remapCount,
+      currentAttributes: attributes,
+      implants: effectiveImplants,
+    });
+  }, [
+    activeBoosters,
+    optimizeResult,
+    remapCount,
+    plan.remapCount,
+    scheduled,
+    catalog,
+    attributes,
+    effectiveImplants,
+  ]);
 
   function update(entries: PlanEntry[]) {
     onUpdate({ entries });
@@ -343,6 +383,13 @@ export function PlanEditor({
 
   return (
     <div className="space-y-4">
+      <PlanHeader
+        totalSeconds={totalSeconds}
+        skillCount={scheduledSkillCount}
+        projectedFinish={planFinish}
+        badge={headerBadge}
+      />
+
       <Panel title={t('plans.yourEntries')}>
         <div className="space-y-3">
           <SkillPicker
@@ -546,14 +593,9 @@ export function PlanEditor({
 
       {optimizeResult && (
         <Panel title={t('plans.optimizeRemaps')}>
-          {remapCapped && (
-            // The plan asks for more remaps than the optimizer evaluates. Say
-            // so: an answer for one remap presented as the answer for three is
-            // the silent-degradation failure this planner keeps hitting.
-            <p className="mb-2 text-[0.6875rem] text-warning uppercase">
-              {t('plans.remapCapNote', { count: MAX_SUPPORTED_REMAPS })}
-            </p>
-          )}
+          {/* The header badge above already discloses a capped evaluation
+              live, before any click — repeating it here would just be the
+              same warning shown twice. */}
           {optimizeResult.savingsSeconds < MIN_MEANINGFUL_SAVINGS_SECONDS ? (
             <p className="text-xs text-text-dim">{t('plans.remapNoGain')}</p>
           ) : (

@@ -523,15 +523,19 @@ describe('SkillPlans editor: optimize remaps', () => {
     await screen.findByText('Computed queue');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
-    expect(await screen.findByRole('heading', { name: 'Optimize remaps' })).toBeInTheDocument();
+    const panel = (await screen.findByRole('heading', { name: 'Optimize remaps' })).closest(
+      'section'
+    )!;
     // Single verdict line (UX-REVIEW #2), not the Total/Current/Savings triple.
-    expect(screen.getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
-    expect(screen.queryByText(/Total time/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Current attributes/)).not.toBeInTheDocument();
+    expect(within(panel).getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
+    expect(within(panel).queryByText(/Total time/)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Current attributes/)).not.toBeInTheDocument();
     // Actionable per-segment instruction (UX-REVIEW #6): the plan is
     // perception/willpower-heavy, so the remap maxes PER.
-    expect(screen.getByText(/Segment 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Before Gunnery I, remap to PER 27 \/ WIL 21 \/ /)).toBeInTheDocument();
+    expect(within(panel).getByText(/Segment 1/)).toBeInTheDocument();
+    expect(
+      within(panel).getByText(/Before Gunnery I, remap to PER 27 \/ WIL 21 \/ /)
+    ).toBeInTheDocument();
   });
 
   it('says no remap helps (and hides segments) when current attributes are already optimal', async () => {
@@ -694,6 +698,59 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
     // boundary itself.
     await optimize(remapCount);
     expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: plan header (#21)', () => {
+  const seedTwoSkillPlan = (remapCount = 1) =>
+    seedPlan({
+      entries: [
+        { skillTypeID: 1, targetLevel: 3 },
+        { skillTypeID: 3, targetLevel: 1 },
+      ],
+      remapCount,
+    });
+  const header = () => screen.getByText('Plan summary').closest('section')!;
+
+  it('shows total training time, skill count, and projected finish, plus a live savings badge', async () => {
+    await db.skillPlans.add(seedTwoSkillPlan());
+    render(<App />);
+    await screen.findByText('Computed queue');
+
+    // Skill count: distinct skills in the computed queue (Gunnery,
+    // Spaceship Command), matching the same set totalSeconds times.
+    expect(within(header()).getByText('2')).toBeInTheDocument();
+    expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
+    expect(within(header()).queryByText('None')).not.toBeInTheDocument();
+  });
+
+  it('omits the savings badge while a Booster is active until "Optimize remaps" supplies a real answer', async () => {
+    // Booster-aware costing can take seconds of synchronous time (a Booster
+    // expiring mid-plan defeats placeRemaps' aggregation) — far too slow to
+    // run live in a useMemo. The header must never show a number computed
+    // without the active Booster once one is on, so it shows nothing until
+    // the explicit, Booster-aware "Optimize remaps" click supplies one.
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedTwoSkillPlan());
+    render(<App />);
+    await screen.findByText('Computed queue');
+
+    expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
+
+    await waitFor(() => {
+      expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await screen.findByRole('heading', { name: 'Optimize remaps' });
+
+    await waitFor(() => {
+      expect(within(header()).getByText('Remap savings')).toBeInTheDocument();
+    });
+    expect(within(header()).queryByText('None')).not.toBeInTheDocument();
   });
 });
 

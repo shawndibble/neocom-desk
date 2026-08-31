@@ -168,7 +168,14 @@
     "queueFinishes": "Finishes {{date}}",
     "boosterAffects": "Booster speeds this skill up",
     "remapCapNote_one": "Evaluated with {{count}} remap. This plan allows more; placement beyond that is not available yet.",
-    "remapCapNote_other": "Evaluated with {{count}} remaps. This plan allows more; placement beyond that is not available yet."
+    "remapCapNote_other": "Evaluated with {{count}} remaps. This plan allows more; placement beyond that is not available yet.",
+    "headerTitle": "Plan summary",
+    "headerTrainingTime": "Training time",
+    "headerSkillCount": "Skills",
+    "headerProjectedFinish": "Projected finish",
+    "headerNoFinish": "—",
+    "headerSavingsLabel": "Remap savings",
+    "headerSavingsNone": "None"
   },
   "industry": {
     "title": "Build Plans",
