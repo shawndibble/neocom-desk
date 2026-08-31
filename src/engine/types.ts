@@ -57,6 +57,12 @@ export interface CharacterSheet {
 export interface PlanEntry {
   skillTypeID: number;
   targetLevel: number;
+  /**
+   * Import-sourced priority (1-highest .. lower-priority), carried over from
+   * other planners' plan files. Not yet consumed by any engine logic here —
+   * preserved for the future skill-priorities feature.
+   */
+  priority?: number;
 }
 
 /** Normalized single-level training step. */

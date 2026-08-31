@@ -15,8 +15,9 @@ import { extractRequiredSkills } from '../dogma';
 import type { PlanEntry } from '@/engine/types';
 import type { UniverseType } from '@/esi/endpoints';
 import type { TypeCatalogEntry } from '../typeCatalog';
+import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
 
-export type ClipboardImportMode = 'skillPlan' | 'eftFit';
+export type ClipboardImportMode = 'skillPlan' | 'eftFit' | 'planXml';
 
 export interface ClipboardImportLineIssue {
   line: number;
@@ -28,11 +29,15 @@ export interface ClipboardImportPreview {
   mode: ClipboardImportMode;
   shipName?: string;
   fitName?: string;
+  /** The `name` attribute of an imported plan-XML file's root `<plan>` element. */
+  planName?: string;
   entries: PlanEntry[];
   /** Unresolved item/skill names, and types whose requirements couldn't be fetched. */
   warnings: string[];
-  /** Line-level parse errors (bad header, unrecognized line format). */
+  /** Line-level parse errors (bad header, unrecognized line format) or per-entry plan-XML errors. */
   errors: ClipboardImportLineIssue[];
+  /** File-level failure (too large, malformed, unsupported) before any entry could be parsed — planXml mode only. */
+  documentErrorCode?: PlanXmlDocumentErrorCode;
 }
 
 export interface ClipboardImportDeps {
