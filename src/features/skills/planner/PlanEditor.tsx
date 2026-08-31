@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Panel } from '@/components/ui';
 import { normalizePlan } from '@/engine/plan';
+import { effectivePriority } from '@/engine/planPriority';
 import { computeSchedule } from '@/engine/schedule';
 import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
@@ -39,7 +40,13 @@ import { boostedStepIndices } from '@/engine/boosterImpact';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { formatDate, formatDuration } from '@/lib/duration';
-import { dedupeEntries, removeEntry, upsertEntry, applyReorderSuggestion } from './reorder';
+import {
+  dedupeEntries,
+  removeEntry,
+  upsertEntry,
+  applyReorderSuggestion,
+  setEntryPriority,
+} from './reorder';
 import {
   addMarker,
   markerStepIndices,
@@ -216,6 +223,18 @@ export function PlanEditor({
     [plan.entries]
   );
 
+  // Effective priority per skill (#27): each entry's own band, inherited by
+  // its prerequisites so one never reads as less urgent than what needs it.
+  // Guard against unknown typeIDs the same way computeQueue does.
+  const priorityMap = useMemo(
+    () =>
+      effectivePriority(
+        plan.entries.filter((e) => catalog.engineSkills.has(e.skillTypeID)),
+        catalog.engineSkills
+      ),
+    [plan.entries, catalog]
+  );
+
   // The plan keeps whatever count the user set (ESI prefills bonus remaps).
   // Only the optimizer is capped, and the header badge says so rather than
   // quietly answering a different question than the one on screen.
@@ -372,7 +391,7 @@ export function PlanEditor({
 
   function handleSuggestReorder() {
     if (scheduled.length === 0) return;
-    setReorderPreview(suggestReorder(scheduled, catalog.engineSkills));
+    setReorderPreview(suggestReorder(scheduled, catalog.engineSkills, priorityMap));
   }
 
   function acceptReorder() {
@@ -401,6 +420,7 @@ export function PlanEditor({
           <EntryList
             entries={plan.entries}
             markers={plan.markers}
+            priorityFor={priorityMap}
             nameFor={nameFor}
             onReorder={(activeId, overId) =>
               onUpdate(reorderRows(plan.entries, plan.markers, activeId, overId))
@@ -422,6 +442,9 @@ export function PlanEditor({
             }}
             onRemoveMarker={(markerIndex) =>
               onUpdate({ markers: removeMarker(plan.markers, markerIndex, plan.entries.length) })
+            }
+            onSetPriority={(skillTypeID, priority) =>
+              update(setEntryPriority(plan.entries, skillTypeID, priority))
             }
           />
         </div>

@@ -6,14 +6,8 @@ import {
   removeEntry,
   applyReorderSuggestion,
   entryId,
+  setEntryPriority,
 } from './reorder';
-
-/**
- * Stand-in for a field PlanEntry doesn't have yet (e.g. the priority band
- * from #27). Proves entry-list helpers preserve unknown fields instead of
- * rebuilding entries from a fixed set of named properties.
- */
-type EntryWithExtra = PlanEntry & { priority: number };
 
 describe('entryId', () => {
   it('is the skillTypeID as a string', () => {
@@ -49,13 +43,13 @@ describe('dedupeEntries', () => {
   });
 
   it('preserves fields beyond skillTypeID and targetLevel, from the first appearance', () => {
-    const entries: EntryWithExtra[] = [
-      { skillTypeID: 1, targetLevel: 3, priority: 7 },
-      { skillTypeID: 1, targetLevel: 5, priority: 9 },
+    const entries: PlanEntry[] = [
+      { skillTypeID: 1, targetLevel: 3, priority: 'high' },
+      { skillTypeID: 1, targetLevel: 5, priority: 'low' },
     ];
     // targetLevel takes the max (5), but priority comes from the first
-    // appearance (7), not the entry that happened to have the higher level.
-    expect(dedupeEntries(entries)).toEqual([{ skillTypeID: 1, targetLevel: 5, priority: 7 }]);
+    // appearance ('high'), not the entry that happened to have the higher level.
+    expect(dedupeEntries(entries)).toEqual([{ skillTypeID: 1, targetLevel: 5, priority: 'high' }]);
   });
 });
 
@@ -92,9 +86,34 @@ describe('upsertEntry', () => {
   });
 
   it('preserves fields beyond skillTypeID and targetLevel when merging in place', () => {
-    const existing: EntryWithExtra[] = [{ skillTypeID: 1, targetLevel: 3, priority: 7 }];
+    const existing: PlanEntry[] = [{ skillTypeID: 1, targetLevel: 3, priority: 'high' }];
     const result = upsertEntry(existing, { skillTypeID: 1, targetLevel: 5 });
-    expect(result).toEqual([{ skillTypeID: 1, targetLevel: 5, priority: 7 }]);
+    expect(result).toEqual([{ skillTypeID: 1, targetLevel: 5, priority: 'high' }]);
+  });
+});
+
+describe('setEntryPriority', () => {
+  it('sets the priority of the matching entry, leaving others untouched', () => {
+    const entries: PlanEntry[] = [
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 2, targetLevel: 1, priority: 'low' },
+    ];
+    expect(setEntryPriority(entries, 1, 'high')).toEqual([
+      { skillTypeID: 1, targetLevel: 3, priority: 'high' },
+      { skillTypeID: 2, targetLevel: 1, priority: 'low' },
+    ]);
+  });
+
+  it('overwrites an existing priority', () => {
+    const entries: PlanEntry[] = [{ skillTypeID: 1, targetLevel: 3, priority: 'high' }];
+    expect(setEntryPriority(entries, 1, 'low')).toEqual([
+      { skillTypeID: 1, targetLevel: 3, priority: 'low' },
+    ]);
+  });
+
+  it('is a no-op when the skill is not in the plan', () => {
+    const entries: PlanEntry[] = [{ skillTypeID: 1, targetLevel: 3 }];
+    expect(setEntryPriority(entries, 99, 'high')).toEqual(entries);
   });
 });
 

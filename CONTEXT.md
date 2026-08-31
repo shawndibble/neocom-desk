@@ -258,3 +258,11 @@
 - Leaving this to the user was rejected: the picker asks where they want to
   look, and for PLEX there is exactly one truthful answer. Making them find a
   region called GPMR-01 is a puzzle, not a choice.
+
+## Glossary (round 13 addition)
+
+- **Priority (Skill Plan)**: High/Normal/Low urgency a user assigns to a Skill
+  Plan entry. A prerequisite's _effective_ priority is never less urgent than
+  the most urgent entry that depends on it — the plan's banded view and the
+  optimizer's "suggest full reorder" both key off this effective value, not
+  each entry's own raw setting.
