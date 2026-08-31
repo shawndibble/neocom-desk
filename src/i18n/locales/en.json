@@ -17,6 +17,7 @@
     "calendar": "Calendar",
     "contracts": "Contracts",
     "orders": "Orders",
+    "settings": "Settings",
     "soon": "Soon",
     "switchCharacter": "Switch character",
     "more": "More",
@@ -528,7 +529,12 @@
   },
   "settings": {
     "title": "Settings",
-    "emptyTitle": "No preferences yet",
-    "emptyHint": "Display preferences will appear here as they are added."
+    "displayTitle": "Display",
+    "fontScaleLabel": "Text size",
+    "fontScaleHint": "Scales text and controls together. Applies immediately and stays on this device.",
+    "fontScaleSmall": "Small",
+    "fontScaleDefault": "Default",
+    "fontScaleLarge": "Large",
+    "fontScaleExtraLarge": "Extra large"
   }
 }

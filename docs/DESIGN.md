@@ -68,12 +68,16 @@ Rules:
   condensed EVE feel via letterspaced small caps rather than a condensed face).
 - Body/data: normal case, `text-sm` default.
 - Numbers (ISK, quantities, SP): `tabular-nums`, right-aligned in tables.
-- Type scale, at the browser-default 16px root: `text-[0.6875rem]` chips/badges ·
+- Type scale, at the 16px browser-default root: `text-[0.6875rem]` chips/badges ·
   12px `text-xs` labels/headers ·
   14px `text-sm` body/data (default) · 16px `text-base` emphasized values ·
   20px `text-xl` page titles · 30px `text-3xl` hero numbers only. Written in
   `rem`, never `px` — a literal `text-[11px]` would not scale with the root
-  and inverts the hierarchy against its `rem` neighbours.
+  and inverts the hierarchy against its `rem` neighbours. The root itself is
+  user-adjustable: Settings' text-size control (`useFontScale`,
+  `src/lib/fontScale.ts`) sets `<html>`'s font-size as a percentage, so this
+  whole scale — and the rem-based spacing scale alongside it — grows or
+  shrinks together rather than just the text.
 
 ## 2b. Brand assets
 
