@@ -4,12 +4,20 @@ import react from '@vitejs/plugin-react-swc';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+
+const { version } = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
+) as { version: string };
 
 export default defineConfig({
   base: '/neocom-desk/',
   // Port pinned: the EVE SSO dev callback URL must match exactly, so the
   // port cannot be allowed to drift when 5173 happens to be busy.
   server: { port: 5173, strictPort: true },
+  // Read once at build/dev/test start, not hand-maintained in source — the
+  // "what's new" panel (src/app/WhatsNewPanel.tsx) is the consumer.
+  define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     react(),
     tailwindcss(),
