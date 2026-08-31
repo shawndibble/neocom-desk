@@ -12,8 +12,16 @@ Implement the work described in the spec or ticket you were given. Do not reopen
 3. Drive `/tdd` at the pre-agreed seams — one red → green slice at a time. Calculation/logic modules (`src/engine`, `src/auth`, industry math) are TDD-mandatory per `CLAUDE.md`: failing test first, then code.
 4. Typecheck often (`npm run typecheck`); run single test files as you go (`npx vitest run <path>`).
 5. Run the full validation once, at the end: `npm run format:check && npm run lint && npm run typecheck && npm run test:run && npm run build`. `npm run format` auto-fixes formatting.
-6. Run `/code-review` against the merge-base with `main`. Address hard Standards violations and missing/wrong Spec findings.
+6. Run `/code-review` against the merge-base with `main` — its two axes run as parallel sub-agents, never inline. Address hard Standards violations and missing/wrong Spec findings.
 7. Commit to the current branch. Conventional Commit subject; body ends with `Closes #<n>`.
+
+## Keeping the context small
+
+Implementation is the longest phase of a run, and every tool call re-sends the
+whole conversation — so a call made late costs far more than the same call made
+early. Batch independent reads and searches into one message; gather all the
+changes you intend to make to a file and apply them in a single edit rather
+than a stream of small ones; run the validation chain as one command.
 
 ## This repo
 

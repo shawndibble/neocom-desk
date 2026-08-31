@@ -1,7 +1,7 @@
 ---
 description: Pick the next unblocked ready-for-agent issue, work it in an isolated git worktree, open a PR, drive CI green, then squash-merge and close.
 argument-hint: '[issue number] (optional — otherwise auto-picks the next unblocked ticket)'
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Skill, Task, TodoWrite, WebFetch, WebSearch
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Skill, Agent, Task, TodoWrite, WebFetch, WebSearch
 ---
 
 You are running one iteration of the autonomous ticket loop for **NeoCom Desk**
@@ -19,6 +19,29 @@ Tracker conventions: `docs/agents/issue-tracker.md`. Domain: `CONTEXT.md`,
 If `$ARGUMENTS` contains an issue number, use that issue instead of auto-picking
 in step 2 (still run every check against it — unblocked, unassigned, no
 `in-progress` label; if it fails any, report that and stop).
+
+## Token discipline (applies to every step)
+
+A run costs roughly **turns x context size**: the whole conversation is re-sent
+on every turn, so a call made late in a long run costs far more than the same
+call made early. A recent 315-turn run spent 58M tokens to produce 75k tokens
+of actual tool output. Context, not reading, is the expense.
+
+- **Batch independent tool calls into one message.** Do not spend a turn on a
+  lone `git status` when you already know the next two calls. Issue
+  independent reads, `gh` queries, and searches together.
+- **Chain shell commands that always run together.** The step 6 gate is one
+  Bash call, not five.
+- **Edit each file once.** Collect every change you intend to make to a file,
+  then apply them in a single Edit (or one Write for a rewrite). Nine small
+  edits to one file cost nine full context re-reads.
+- **Delegate read-heavy phases to sub-agents** (steps 4, 5 and 8 say where). A
+  sub-agent reads in its own fresh context and returns only a summary; the
+  same work done inline sits in this context for every remaining turn.
+  Delegate anything over ~10 turns of reading — below that the sub-agent's own
+  startup costs more than it saves.
+- **Do not narrate.** Short status lines only; your own output accumulates
+  into the context too.
 
 ## Abandon procedure (referenced by later steps)
 
@@ -103,9 +126,16 @@ failure, and **STOP**.
 
 ## 4. Revalidate — `/triage <n>` (revalidation mode)
 
-Invoke the `triage` skill in revalidation mode (see its "Revalidation mode"
-section). It runs the redundancy check and prior-rejection check only — no
-grilling, no inventing answers.
+Run this in a **sub-agent** (`Agent`, `subagent_type: general-purpose`). It
+reads the full issue and its comments, `.out-of-scope/*.md`, and searches the
+codebase for an existing implementation — all of which would otherwise sit in
+this context for the rest of the run.
+
+Instruct the sub-agent to invoke the `triage` skill in revalidation mode (see
+its "Revalidation mode" section: redundancy check and prior-rejection check
+only — no grilling, no inventing answers), to apply any outcome itself, and to
+report back a single line: `PROCEED`, or the outcome it applied
+(`wontfix` / `needs-info` / `ready-for-human`) with a one-line reason.
 
 - If triage closes the ticket as `wontfix` (already implemented / prior
   rejection), or hands it back as `needs-info` / `ready-for-human`: it has
@@ -123,17 +153,22 @@ implementation, confirm the ticket still matches the codebase; if a detail is
 stale, adjust to the ticket's **intent** and note the deviation in the PR body.
 Use WebFetch / WebSearch for external API facts (ESI, Fuzzwork) if needed.
 
+This is the longest phase, so the token discipline above matters most here:
+batch the exploration reads, and make one edit per file rather than a stream of
+small ones. `/code-review` runs its two axes as parallel sub-agents — do not
+run them inline.
+
 ## 6. Local gate (mirror CI)
 
-Run, in order, and fix until all pass:
+Run the gate as **one Bash call** — these always run together, and five
+separate calls cost five full context re-reads:
 
 ```
-npm run format:check   # npm run format to auto-fix
-npm run lint
-npm run typecheck
-npm run test:run
-npm run build
+npm run format:check && npm run lint && npm run typecheck && npm run test:run && npm run build
 ```
+
+`&&` stops at the first failure, which is the one you need to see. Fix it, then
+re-run the whole chain. `npm run format` auto-fixes formatting.
 
 Do **not** run `npm run test:e2e` locally — one spec
 (`e2e/plans.spec.ts` clipboard export) fails only on Windows due to a clipboard
@@ -155,11 +190,16 @@ export/clipboard behaviour, reason about e2e impact from the spec instead.
 - `gh pr checks <pr> --watch --interval 30` (blocks until `validate` + `e2e`
   finish).
 - **If any check fails**, up to **5 rounds**:
-  1. `gh run view <run-id> --log-failed` for the failing job. For an `e2e`
-     failure also pull the report:
-     `gh run download <run-id> -n playwright-report -D /tmp/pw-report` and read
-     it.
-  2. Diagnose the real cause. Fix it on the branch (code or test, whichever is
+  1. Diagnose in a **sub-agent** — CI logs run to tens of thousands of tokens
+     and you only need the conclusion. Give it the run id and have it fetch
+     `gh run view <run-id> --log-failed` (and, for an `e2e` failure,
+     `gh run download <run-id> -n playwright-report -D /tmp/pw-report`), then
+     report back: the failing job and test, the error message, the
+     `file:line`, and its best read of the cause. Never pull raw CI logs into
+     this context. On rounds 2+, tell it what previous rounds already tried —
+     each sub-agent starts fresh and will otherwise re-propose a fix you have
+     already ruled out.
+  2. Fix it on the branch from that report (code or test, whichever is
      actually wrong — do not delete a failing test to make it pass).
   3. Re-run the local gate (step 6), commit, `git push`.
   4. `gh pr checks <pr> --watch --interval 30` again.
