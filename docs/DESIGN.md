@@ -120,7 +120,7 @@ Built in `src/components/ui/` (✓) or planned (○):
 | `CharacterAvatar` | ✓      | ESI portrait, `rounded-xs` (house radius, §3), 1px `line` ring; sizes `sm`/`md`/`lg`; accent ring when selected. Decorative by default — pass `alt` only for standalone use.                                                                                                                             |
 | `FilterChip`      | ✓      | Toggleable filter pill. `StatChip`'s dimensions, but interactive: a real `<button>` with `aria-pressed`, accent when on, optional trailing count.                                                                                                                                                        |
 | `SkillBar`        | ✓      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                                                                             |
-| `LogoMark`        | ✓      | The app mark, inline SVG. Decorative (`aria-hidden`) — every placement sits beside the app name. Size it with `size-*`; corner brackets follow `currentColor`, defaulting to accent. Simplified from the artwork, see §2b.                                    |
+| `LogoMark`        | ✓      | The app mark, inline SVG. Decorative (`aria-hidden`) — every placement sits beside the app name. Size it with `size-*`; corner brackets follow `currentColor`, defaulting to accent. Simplified from the artwork, see §2b.                                                                               |
 
 ## 5. Usage rules
 

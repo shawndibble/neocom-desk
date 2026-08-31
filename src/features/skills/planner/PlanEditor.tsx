@@ -347,6 +347,8 @@ export function PlanEditor({
         <div className="space-y-3">
           <SkillPicker
             skills={pickerSkills}
+            catalog={catalog}
+            trainedSkills={trainedSkills}
             onAdd={(entry) => update(upsertEntry(plan.entries, entry))}
           />
           <EntryList

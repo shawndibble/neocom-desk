@@ -123,14 +123,19 @@ export async function loadWithCache<T>(
  * permanently cold for an endpoint that truncates every time, like the wallet
  * transactions page cap.
  *
- * The only cache entry point accepting a `TruncatableResult`, so a caller
- * cannot silently drop the flag.
+ * The only cache entry points accepting a `TruncatableResult`, so a caller
+ * cannot silently drop the flag. Like `loadWithCacheStatus`, the `...Status`
+ * variant reports an auth failure as `needsReauth` rather than a silent
+ * fallback.
  */
-export async function loadPaginatedWithCache<T>(
+export async function loadPaginatedWithCacheStatus<T>(
   characterId: number,
   key: string,
-  fetchLive: () => Promise<TruncatableResult<T>>
-): Promise<CachedResult<T[]> | null> {
+  fetchLive: () => Promise<TruncatableResult<T>>,
+  options: LoadWithCacheStatusOptions = {}
+): Promise<StatusResult<T[]>> {
+  const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
+  let needsReauth = false;
   try {
     const { items, truncated } = await fetchLive();
     const fetchedAt = Date.now();
@@ -138,25 +143,50 @@ export async function loadPaginatedWithCache<T>(
     const wouldClobberCompleteList = existing !== undefined && existing.truncated !== true;
     if (!wouldClobberCompleteList) {
       await db.esiCache.put({ characterId, key, value: items, fetchedAt, truncated });
-      return { data: items, fetchedAt: new Date(fetchedAt), fromCache: false, truncated };
+      return {
+        cached: { data: items, fetchedAt: new Date(fetchedAt), fromCache: false, truncated },
+        needsReauth: false,
+      };
     }
     return {
-      data: existing.value as T[],
-      fetchedAt: new Date(existing.fetchedAt),
-      fromCache: true,
-      truncated: false,
+      cached: {
+        data: existing.value as T[],
+        fetchedAt: new Date(existing.fetchedAt),
+        fromCache: true,
+        truncated: false,
+      },
+      needsReauth: false,
     };
-  } catch {
-    // Offline/5xx/auth: fall back to cache, as loadWithCache does.
+  } catch (err) {
+    // Offline/5xx: fall back to cache, as loadWithCacheStatus does. An auth
+    // failure additionally sets needsReauth so a revoked scope offers a
+    // re-login instead of a silent empty list (issue #14).
+    if (detectAuthFailure(err)) {
+      needsReauth = true;
+      emitEsiAuthFailure(characterId);
+      if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
+    }
   }
   const cached = await readCachedRow(characterId, key);
-  if (!cached) return null;
+  if (!cached) return { cached: null, needsReauth };
   return {
-    data: cached.value as T[],
-    fetchedAt: new Date(cached.fetchedAt),
-    fromCache: true,
-    truncated: cached.truncated === true,
+    cached: {
+      data: cached.value as T[],
+      fetchedAt: new Date(cached.fetchedAt),
+      fromCache: true,
+      truncated: cached.truncated === true,
+    },
+    needsReauth,
   };
+}
+
+/** Paginated read-through, dropping the auth-failure distinction. */
+export async function loadPaginatedWithCache<T>(
+  characterId: number,
+  key: string,
+  fetchLive: () => Promise<TruncatableResult<T>>
+): Promise<CachedResult<T[]> | null> {
+  return (await loadPaginatedWithCacheStatus(characterId, key, fetchLive)).cached;
 }
 
 /**

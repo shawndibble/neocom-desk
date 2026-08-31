@@ -15,7 +15,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { beginEveLogin } from '@/app/loginFlow';
 import {
   loadCharacterSkills,
-  loadCharacterSkillQueue,
+  loadCharacterSkillQueueWithStatus,
   type CachedResult,
 } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
@@ -33,6 +33,8 @@ interface Snapshot {
   queueResult: CachedResult<SkillQueueEntry[]> | null;
   /** SP the finished queue adds to a stale total_sp. */
   completedSp: number;
+  /** 401/403 on the queue read means "log in again", not "queue is empty". */
+  queueNeedsReauth: boolean;
   catalog: SkillCatalog;
 }
 
@@ -40,17 +42,19 @@ async function loadOverviewSnapshot(characterId: number): Promise<Snapshot> {
   // Fire-and-forget: the header reads corp/alliance from the store as they
   // arrive, so the panels below must not wait on that chain of public fetches.
   void usePublicInfo.getState().load(characterId);
-  const [wallet, skillsResult, queueResult, catalog] = await Promise.all([
+  const [wallet, skillsResult, queueStatus, catalog] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
     loadCharacterSkills(characterId),
-    loadCharacterSkillQueue(characterId),
+    loadCharacterSkillQueueWithStatus(characterId),
     loadSkillCatalog(),
   ]);
+  const queueResult = queueStatus.cached;
   return {
     walletResult: wallet.cached,
     walletNeedsReauth: wallet.needsReauth,
     skillsResult,
     queueResult,
+    queueNeedsReauth: queueStatus.needsReauth,
     completedSp: completedSpGain(
       skillsResult?.data?.skills ?? [],
       completedQueueLevels(queueResult?.data ?? [], Date.now())
@@ -85,6 +89,7 @@ export function Overview() {
   const walletNeedsReauth = data?.walletNeedsReauth ?? false;
   const skillsResult = data?.skillsResult ?? null;
   const queueResult = data?.queueResult ?? null;
+  const queueNeedsReauth = data?.queueNeedsReauth ?? false;
   const completedSp = data?.completedSp ?? 0;
   const catalog = data?.catalog ?? null;
 
@@ -171,7 +176,14 @@ export function Overview() {
             title={t('overview.queue')}
             actions={queueResult ? <DataAgeBadge date={queueResult.fetchedAt} /> : undefined}
           >
-            {activeSkillName ? (
+            {queueNeedsReauth ? (
+              <ReauthBanner
+                title={t('overview.queueReauthTitle')}
+                hint={t('overview.queueReauthHint')}
+                actionLabel={t('overview.queueReauthAction')}
+                onLogin={() => void beginEveLogin()}
+              />
+            ) : activeSkillName ? (
               <p className="text-sm">
                 {t('overview.training', { name: activeSkillName })}
                 {activeEntry?.finish_date && (

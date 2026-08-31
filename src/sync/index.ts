@@ -52,6 +52,12 @@ export async function setSyncedSetting(key: string, value: unknown): Promise<voi
   return setSyncedSetting(key, value);
 }
 
+/** Delete a synced setting and propagate the deletion as a tombstone. */
+export async function deleteSyncedSetting(key: string): Promise<void> {
+  const { deleteSyncedSetting } = await import('./planSync');
+  return deleteSyncedSetting(key);
+}
+
 /** Ensure the Firebase session is signed in as this character; returns the uid. */
 export async function ensureSignedIn(characterId: number): Promise<string> {
   const { ensureSignedIn } = await import('./syncAuth');

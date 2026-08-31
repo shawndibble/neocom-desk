@@ -57,7 +57,16 @@
     "csvGroup": "Group",
     "csvSkill": "Skill",
     "csvLevel": "Level",
-    "csvSp": "Skill points"
+    "csvSp": "Skill points",
+    "inspector": {
+      "prereqsTitle": "Prerequisites",
+      "unlocksTitle": "Unlocks",
+      "noPrereqs": "No prerequisites",
+      "noUnlocks": "Doesn't unlock anything yet",
+      "levelNeeded": "Level {{level}}",
+      "trained": "Trained · Level {{level}}",
+      "close": "Close"
+    }
   },
   "plans": {
     "title": "Skill Plans",
@@ -241,6 +250,10 @@
     "jobsDone": "Done",
     "jobsCompletingSoon": "Completing soon",
     "jobsProgress": "{{name}} progress",
+    "blueprintsTitle": "Owned blueprints",
+    "blueprintsReauthTitle": "Log in again to see owned blueprints",
+    "blueprintsReauthHint": "Log in again to fetch this character's blueprints for ME/TE prefill.",
+    "blueprintsReauthAction": "Log in again with EVE Online",
     "activity": {
       "manufacturing": "Manufacturing",
       "timeEfficiencyResearch": "Time efficiency research",
@@ -292,7 +305,10 @@
     "finishes": "finishes {{date}}",
     "reauthTitle": "Log in again to see your wallet",
     "reauthHint": "Log in again to fetch this character's wallet balance.",
-    "reauthAction": "Log in again with EVE Online"
+    "reauthAction": "Log in again with EVE Online",
+    "queueReauthTitle": "Log in again to see the training queue",
+    "queueReauthHint": "Log in again to fetch this character's in-game skill queue.",
+    "queueReauthAction": "Log in again with EVE Online"
   },
   "common": {
     "close": "Close",
@@ -355,7 +371,9 @@
     "containerLabel": "Container",
     "reauthTitle": "Log in again to see your assets",
     "reauthHint": "Log in again to fetch this character's assets.",
-    "reauthAction": "Log in again with EVE Online"
+    "reauthAction": "Log in again with EVE Online",
+    "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
+    "renderTruncatedNotice": "Showing {{shown}} of {{total}} assets."
   },
   "mail": {
     "title": "Mail",

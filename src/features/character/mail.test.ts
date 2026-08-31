@@ -34,7 +34,8 @@ describe('loadMailHeaders', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail`, () => HttpResponse.json(headers))
     );
     const result = await loadMailHeaders(CHAR_ID);
-    expect(result?.data).toEqual(headers);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual(headers);
     expect((await db.esiCache.get([CHAR_ID, 'mail:headers']))?.value).toEqual(headers);
   });
 
@@ -48,12 +49,24 @@ describe('loadMailHeaders', () => {
     });
     server.use(http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail`, () => HttpResponse.error()));
     const result = await loadMailHeaders(CHAR_ID);
-    expect(result).toEqual({
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toEqual({
       data: headers,
       fetchedAt: new Date(2),
       fromCache: true,
       truncated: false,
     });
+  });
+
+  it('reports needsReauth when the mail scope was revoked (403) and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const result = await loadMailHeaders(CHAR_ID);
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
   });
 });
 

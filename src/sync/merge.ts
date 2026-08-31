@@ -1,11 +1,15 @@
 // Pure merge logic for two-way sync (no firebase imports — unit-testable).
 //
-// Policy (CONTEXT.md): last-write-wins per record id, compared by updatedAt
-// (epoch ms). Deletes propagate via tombstones: a remote doc with
-// deleted: true kept for TOMBSTONE_TTL_MS (30 days), then purged.
+// Policy (CONTEXT.md): last-write-wins by updatedAt (epoch ms). Deletes
+// propagate via tombstones: a remote doc with deleted: true is kept for
+// TOMBSTONE_TTL_MS (30 days), then purged.
 //
-// mergeRecords is generic over the record shape so the same policy covers
-// every editable collection (Skill Plans, Build Plans, ...).
+// Two entry points, because the two collection shapes diverge on delete policy:
+//   mergeRecords  — keyed by record id; generic over the record shape, covers
+//                   Skill Plans and Build Plans. Local tombstones expire on the
+//                   30-day TTL.
+//   mergeSettings — keyed by setting key; local tombstones never expire (only a
+//                   newer write to the key supersedes them). See issue #13.
 
 import type { BuildPlanRecord, SkillPlanRecord } from '@/db';
 
@@ -141,27 +145,130 @@ export interface SyncedSettingValue {
   updatedAt: number;
 }
 
-export interface SettingsMergeResult {
-  push: SyncedSettingValue[];
-  pull: SyncedSettingValue[];
+/**
+ * A synced setting deleted on this device, awaiting propagation. Unlike a
+ * Skill Plan {@link LocalTombstone}, this one is NOT time-limited: it persists
+ * until the key is written again (see mergeSettings). A newer write to the key
+ * supersedes it; nothing else does.
+ */
+export interface SyncedSettingTombstone {
+  key: string;
+  /** Epoch ms when the user deleted the setting on this device. */
+  deletedAt: number;
 }
 
-/** Last-write-wins per settings key. No tombstones: keys are a stable set. */
+/** Remote Firestore doc at /characters/{uid}/settings/{key}. */
+export interface RemoteSyncedSetting {
+  key: string;
+  /** Absent on a tombstone doc (Firestore rejects undefined field values). */
+  value?: unknown;
+  updatedAt: number;
+  deleted?: boolean;
+}
+
+export interface SettingsMergeResult {
+  /** Local values to write (create/overwrite) remotely as live docs. */
+  push: SyncedSettingValue[];
+  /** Remote values to write into the local store. */
+  pull: SyncedSettingValue[];
+  /** Local deletions to write remotely as deleted: true docs. */
+  pushTombstones: SyncedSettingTombstone[];
+  /** Local setting keys to delete (remote tombstone won). */
+  deleteLocal: string[];
+  /** Remote tombstone doc keys past TTL, to delete remotely. */
+  purgeRemote: string[];
+  /**
+   * Local tombstone keys superseded by a remote write postdating the delete.
+   * NOT populated just because a tombstone was pushed, or because the remote
+   * already carries its own tombstone — see mergeSettings for why.
+   */
+  clearLocalTombstones: string[];
+}
+
+/**
+ * Last-write-wins per settings key, with tombstones for deletes so a setting
+ * deleted on one device stays deleted everywhere (issue #13).
+ *
+ * The remote tombstone expires on the shared 30-day {@link TOMBSTONE_TTL_MS}
+ * policy. The local tombstone deliberately does NOT expire — it is superseded
+ * only by a newer write to that key. Known accepted edge (the same one Skill
+ * Plans carry): a device offline past the remote 30-day window never observes
+ * the delete, and once the remote tombstone is purged it re-pushes its stale
+ * copy on the next sync.
+ */
 export function mergeSettings(
   local: SyncedSettingValue[],
-  remote: SyncedSettingValue[]
+  localTombstones: SyncedSettingTombstone[],
+  remote: RemoteSyncedSetting[],
+  now: number
 ): SettingsMergeResult {
-  const result: SettingsMergeResult = { push: [], pull: [] };
-  const remoteByKey = new Map(remote.map((s) => [s.key, s]));
-  const localKeys = new Set(local.map((s) => s.key));
+  const result: SettingsMergeResult = {
+    push: [],
+    pull: [],
+    pushTombstones: [],
+    deleteLocal: [],
+    purgeRemote: [],
+    clearLocalTombstones: [],
+  };
 
-  for (const l of local) {
-    const r = remoteByKey.get(l.key);
-    if (!r || l.updatedAt > r.updatedAt) result.push.push(l);
-    else if (r.updatedAt > l.updatedAt) result.pull.push(r);
+  const localByKey = new Map(local.map((s) => [s.key, s]));
+  const remoteByKey = new Map(remote.map((s) => [s.key, s]));
+
+  // A live local write supersedes its own pending deletion. Otherwise the
+  // tombstone survives this cycle untouched: it is cleared ONLY when a remote
+  // write postdates the delete (see the `if (t)` branch below) — never merely
+  // because it was just pushed, or because the remote already carries its own
+  // tombstone, or because remote has nothing for the key. The remote
+  // tombstone is only good for TOMBSTONE_TTL_MS; once purged, this local
+  // tombstone is the sole defense against a stale device re-pushing its
+  // pre-deletion copy. No TTL branch: an un-superseded local tombstone lives
+  // forever.
+  const tombstoneByKey = new Map<string, SyncedSettingTombstone>();
+  for (const t of localTombstones) {
+    if (localByKey.has(t.key)) result.clearLocalTombstones.push(t.key);
+    else tombstoneByKey.set(t.key, t);
   }
-  for (const r of remote) {
-    if (!localKeys.has(r.key)) result.pull.push(r);
+
+  const keys = new Set([...localByKey.keys(), ...remoteByKey.keys(), ...tombstoneByKey.keys()]);
+
+  for (const key of keys) {
+    const l = localByKey.get(key);
+    const r = remoteByKey.get(key);
+    const t = tombstoneByKey.get(key);
+
+    if (r?.deleted) {
+      // Remote tombstone.
+      if (l && l.updatedAt > r.updatedAt) {
+        result.push.push(l); // rewritten locally after the delete: resurrect
+      } else {
+        if (l) result.deleteLocal.push(key);
+        if (now - r.updatedAt > TOMBSTONE_TTL_MS) result.purgeRemote.push(key);
+      }
+      continue;
+    }
+
+    if (t) {
+      // Local pending deletion (no live local row — guaranteed above).
+      if (r && r.updatedAt > t.deletedAt) {
+        result.pull.push({ key, value: r.value, updatedAt: r.updatedAt });
+        result.clearLocalTombstones.push(key); // edited elsewhere after the delete
+      } else {
+        result.pushTombstones.push(t); // reassert: remote has nothing, or is stale
+      }
+      continue;
+    }
+
+    if (l && !r) {
+      result.push.push(l);
+    } else if (!l && r) {
+      result.pull.push({ key, value: r.value, updatedAt: r.updatedAt });
+    } else if (l && r) {
+      if (l.updatedAt > r.updatedAt) result.push.push(l);
+      else if (r.updatedAt > l.updatedAt)
+        result.pull.push({ key, value: r.value, updatedAt: r.updatedAt });
+      // equal: in sync, nothing to do
+    }
   }
+
   return result;
 }

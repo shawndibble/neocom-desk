@@ -332,8 +332,17 @@ export interface CharacterAsset {
 }
 
 /**
- * Paginated (X-Pages); see fetchAllPagesStatus. Returns the completeness flag
- * with the assets — a short list must not reach the view looking whole.
+ * A character's asset list can run into the tens of thousands of rows
+ * (BPO libraries, PI, hangars scattered across many stations). Past this
+ * many pages, further fetching costs more in ESI round trips than the view
+ * can usefully render — stop and report the cut rather than fetch forever.
+ */
+const MAX_ASSET_PAGES = 25;
+
+/**
+ * Paginated (X-Pages), capped at MAX_ASSET_PAGES; see fetchAllPagesStatus.
+ * `truncated` covers both the cap and a short read, so a partial list never
+ * reaches the view looking whole.
  */
 export function getCharacterAssets(
   characterId: number,
@@ -342,6 +351,7 @@ export function getCharacterAssets(
   return fetchAllPagesStatus<CharacterAsset>(`/characters/${characterId}/assets`, {
     ...options,
     characterId,
+    maxPages: MAX_ASSET_PAGES,
   });
 }
 

@@ -1,21 +1,28 @@
 import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterAssets } from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
+import { capItems } from '@/lib/cap';
+
+/** Rendered rows past this many and grouping/painting the list starts to lag. */
+export const MAX_RENDERED_ASSETS = 1000;
 
 /** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
 interface Snapshot {
   assetsResult: CachedResult<CharacterAsset[]> | null;
-  /** Fewer pages came back than ESI advertised — the list below is partial. */
+  /** Pages were capped or missing — the list below is partial. */
   assetsTruncated: boolean;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  assetsNeedsReauth: boolean;
   typeNames: Map<number, string>;
   locationNames: Map<number, string>;
 }
@@ -48,7 +55,8 @@ async function loadAssetsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const assetsResult = await loadCharacterAssets(characterId);
+  const { cached: assetsResult, needsReauth: assetsNeedsReauth } =
+    await loadCharacterAssets(characterId);
   const assetsTruncated = assetsResult?.truncated ?? false;
   const assets = assetsResult?.data ?? [];
 
@@ -66,7 +74,7 @@ async function loadAssetsSnapshot(
     if (name) locationNames.set(id, name);
   });
 
-  return { assetsResult, assetsTruncated, typeNames, locationNames };
+  return { assetsResult, assetsTruncated, assetsNeedsReauth, typeNames, locationNames };
 }
 
 /** Character assets grouped by location, with a name search filter. Read-only, cached for offline. */
@@ -79,22 +87,30 @@ export function Assets() {
 
   const assetsResult = data?.assetsResult ?? null;
   const assetsTruncated = data?.assetsTruncated ?? false;
+  const assetsNeedsReauth = data?.assetsNeedsReauth ?? false;
   const typeNames = data?.typeNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
 
-  const groups = useMemo(() => {
+  const { groups, shownCount, totalMatches } = useMemo(() => {
     const items = assetsResult?.data ?? [];
     const query = search.trim().toLowerCase();
     const assetsByItemId = new Map(items.map((asset) => [asset.item_id, asset]));
-    const byLocation = new Map<number, { asset: CharacterAsset; name: string }[]>();
+
+    const matches: { asset: CharacterAsset; name: string }[] = [];
     for (const asset of items) {
       const name = typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
       if (query && !name.toLowerCase().includes(query)) continue;
-      const list = byLocation.get(asset.location_id) ?? [];
-      list.push({ asset, name });
-      byLocation.set(asset.location_id, list);
+      matches.push({ asset, name });
     }
-    return [...byLocation.entries()]
+    const capped = capItems(matches, MAX_RENDERED_ASSETS);
+
+    const byLocation = new Map<number, { asset: CharacterAsset; name: string }[]>();
+    for (const entry of capped.items) {
+      const list = byLocation.get(entry.asset.location_id) ?? [];
+      list.push(entry);
+      byLocation.set(entry.asset.location_id, list);
+    }
+    const groups = [...byLocation.entries()]
       .map(([locationId, entries]) => ({
         locationId,
         label: locationLabel(
@@ -108,8 +124,12 @@ export function Assets() {
         entries: entries.sort((a, b) => a.name.localeCompare(b.name)),
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
+
+    return { groups, shownCount: capped.items.length, totalMatches: matches.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
   }, [assetsResult, typeNames, locationNames, search]);
+
+  const renderTruncated = shownCount < totalMatches;
 
   if (!hydrated) {
     return (
@@ -132,7 +152,7 @@ export function Assets() {
         </div>
       </header>
 
-      {!loading && assetsResult && (
+      {!loading && assetsResult && !assetsNeedsReauth && (
         <input
           type="search"
           value={search}
@@ -146,6 +166,13 @@ export function Assets() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : assetsNeedsReauth ? (
+        <ReauthBanner
+          title={t('assets.reauthTitle')}
+          hint={t('assets.reauthHint')}
+          actionLabel={t('assets.reauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !assetsResult ? (
@@ -156,7 +183,15 @@ export function Assets() {
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
           {assetsTruncated && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.incompleteTitle')}</p>
+            <p className="text-[0.6875rem] text-warning uppercase">
+              {t('common.incompleteTitle')} —{' '}
+              {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
+            </p>
+          )}
+          {renderTruncated && (
+            <p className="text-[11px] text-warning uppercase">
+              {t('assets.renderTruncatedNotice', { shown: shownCount, total: totalMatches })}
+            </p>
           )}
           {groups.length === 0 ? (
             <EmptyState title={t('assets.noResults')} className="py-8" />

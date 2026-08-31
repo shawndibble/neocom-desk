@@ -202,6 +202,20 @@ describe('Overview', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Characters' })).toBeInTheDocument();
   });
+
+  it('shows a re-login prompt in the queue panel when the skillqueue scope was revoked, without breaking the wallet/SP panels', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Log in again to see the training queue')).toBeInTheDocument();
+    // Sibling panels still render from their own (healthy) data.
+    expect(await screen.findByText(/1,234,567\.89/)).toBeInTheDocument();
+    expect(screen.getByText('5,000,000')).toBeInTheDocument();
+    expect(screen.queryByText(/no active in-game training queue cached/i)).not.toBeInTheDocument();
+  });
 });
 
 describe('selectActiveQueueEntry (BUG #10)', () => {

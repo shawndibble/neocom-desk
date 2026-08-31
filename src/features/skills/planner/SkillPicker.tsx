@@ -2,20 +2,34 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { SkillType } from '@/sde/types';
-import type { PlanEntry } from '@/engine/types';
+import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { rankedSearch } from '@/lib/rankedSearch';
+import { SkillRequirementsList } from '../SkillRequirementsList';
+import { buildSkillRequirements } from '../skillRequirements';
+import type { SkillCatalog } from '../skillMap';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const MAX_RESULTS = 20;
 
 interface SkillPickerProps {
   skills: readonly SkillType[];
+  catalog: SkillCatalog;
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
   onAdd: (entry: PlanEntry) => void;
   className?: string;
 }
 
-/** Searchable skill picker: ranked search by name/group, then pick a target level I-V. */
-export function SkillPicker({ skills, onAdd, className = '' }: SkillPickerProps) {
+/**
+ * Searchable skill picker: ranked search by name/group, then pick a target
+ * level I-V, showing that skill's prerequisites and unlocks.
+ */
+export function SkillPicker({
+  skills,
+  catalog,
+  trainedSkills,
+  onAdd,
+  className = '',
+}: SkillPickerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
@@ -28,6 +42,11 @@ export function SkillPicker({ skills, onAdd, className = '' }: SkillPickerProps)
         limit: MAX_RESULTS,
       }),
     [skills, query]
+  );
+
+  const requirements = useMemo(
+    () => (selected === null ? null : buildSkillRequirements(catalog, trainedSkills, selected)),
+    [selected, catalog, trainedSkills]
   );
 
   function pick(skillTypeID: number, targetLevel: number) {
@@ -62,12 +81,20 @@ export function SkillPicker({ skills, onAdd, className = '' }: SkillPickerProps)
                 <span className="shrink-0 text-text-faint">{skill.groupName}</span>
               </button>
               {selected === skill.typeID && (
-                <div className="flex gap-1 px-2 pb-2">
-                  {ROMAN.map((roman, i) => (
-                    <Button key={roman} size="sm" onClick={() => pick(skill.typeID, i + 1)}>
-                      {t('plans.level', { level: roman })}
-                    </Button>
-                  ))}
+                <div className="space-y-2 px-2 pb-2">
+                  <div className="flex gap-1">
+                    {ROMAN.map((roman, i) => (
+                      <Button key={roman} size="sm" onClick={() => pick(skill.typeID, i + 1)}>
+                        {t('plans.level', { level: roman })}
+                      </Button>
+                    ))}
+                  </div>
+                  {requirements && (
+                    <SkillRequirementsList
+                      prereqs={requirements.prereqs}
+                      unlocks={requirements.unlocks}
+                    />
+                  )}
                 </div>
               )}
             </li>

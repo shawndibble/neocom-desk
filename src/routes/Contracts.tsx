@@ -7,9 +7,11 @@ import {
   DataTable,
   EmptyState,
   Panel,
+  ReauthBanner,
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadContracts } from '@/features/character/contracts';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
@@ -19,6 +21,8 @@ import type { Contract } from '@/esi/endpoints';
 
 interface Snapshot {
   contractsResult: CachedResult<Contract[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  contractsNeedsReauth: boolean;
   issuerNames: Map<number, string>;
 }
 
@@ -46,11 +50,12 @@ async function loadContractsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const contractsResult = await loadContracts(characterId);
+  const { cached: contractsResult, needsReauth: contractsNeedsReauth } =
+    await loadContracts(characterId);
   // Already superseded: skip the name lookup, its result would be discarded.
   const issuerIds = signal.cancelled ? [] : (contractsResult?.data ?? []).map((c) => c.issuer_id);
   const issuerNames = await resolveNames(issuerIds);
-  return { contractsResult, issuerNames };
+  return { contractsResult, contractsNeedsReauth, issuerNames };
 }
 
 /** Contracts: table with status chips, expired dimmed. Read-only, cached for offline. */
@@ -60,6 +65,7 @@ export function Contracts() {
     useRouteSnapshot(loadContractsSnapshot);
 
   const contractsResult = data?.contractsResult ?? null;
+  const contractsNeedsReauth = data?.contractsNeedsReauth ?? false;
   const issuerNames = data?.issuerNames ?? NO_NAMES;
 
   const columns = useMemo<DataTableColumn<Contract>[]>(
@@ -134,6 +140,13 @@ export function Contracts() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : contractsNeedsReauth ? (
+        <ReauthBanner
+          title={t('contracts.reauthTitle')}
+          hint={t('contracts.reauthHint')}
+          actionLabel={t('contracts.reauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !contractsResult || contracts.length === 0 ? (

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -38,7 +38,7 @@ const FIXTURE_SKILLS: SkillType[] = [
     rank: 1,
     primaryAttr: 'perception',
     secondaryAttr: 'willpower',
-    prereqs: [],
+    prereqs: [{ skillTypeID: 1, level: 3 }],
   },
 ];
 
@@ -260,6 +260,7 @@ describe('Skills', () => {
     screen.getByRole('button', { name: /log in again/i }).click();
     expect(beginEveLogin).toHaveBeenCalled();
   });
+
   it('disables CSV export in the re-login state, so a stale cache cannot be exported behind the banner', async () => {
     // The invariant: whatever the route refuses to render, export refuses to
     // hand over. loadWithCacheStatus deliberately still reads the cache on an
@@ -283,5 +284,41 @@ describe('Skills', () => {
     // fires on emitEsiAuthFailure, before the snapshot settles.
     expect(await screen.findByText(/log in again to see skills/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /export csv/i })).toBeDisabled();
+  });
+
+  it("shows a selected skill's prerequisites, marking an already-trained one distinct", async () => {
+    render(<App />);
+
+    const frigateRow = await screen.findByRole('button', { name: /Frigate/ });
+    fireEvent.click(frigateRow);
+
+    const prereqsHeading = await screen.findByText('Prerequisites');
+    const prereqsSection = prereqsHeading.closest('section')!;
+    // Frigate needs Small Hybrid Turret III; the character has it trained to V.
+    expect(within(prereqsSection).getByText('Small Hybrid Turret')).toBeInTheDocument();
+    expect(within(prereqsSection).getByText('Trained · Level 3')).toBeInTheDocument();
+  });
+
+  it('shows what a selected skill unlocks, derived from the reverse of prereqs', async () => {
+    render(<App />);
+
+    const turretRow = await screen.findByRole('button', { name: /Small Hybrid Turret/ });
+    fireEvent.click(turretRow);
+
+    const unlocksHeading = await screen.findByText('Unlocks');
+    const unlocksSection = unlocksHeading.closest('section')!;
+    expect(within(unlocksSection).getByText('Frigate')).toBeInTheDocument();
+    expect(within(unlocksSection).getByText('Level 3')).toBeInTheDocument();
+  });
+
+  it('deselects a skill (closing the inspector) on a second click', async () => {
+    render(<App />);
+
+    const frigateRow = await screen.findByRole('button', { name: /Frigate/ });
+    fireEvent.click(frigateRow);
+    expect(await screen.findByText('Prerequisites')).toBeInTheDocument();
+
+    fireEvent.click(frigateRow);
+    expect(screen.queryByText('Prerequisites')).not.toBeInTheDocument();
   });
 });

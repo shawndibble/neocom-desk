@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadCalendarEvents, loadCalendarEvent } from '@/features/character/calendar';
 import type { CachedResult } from '@/esi/cache';
 import type { CalendarEventDetail, CalendarEventSummary } from '@/esi/endpoints';
@@ -10,6 +11,8 @@ import { stripEveMarkup } from '@/features/skills/typeDisplay';
 
 interface Snapshot {
   eventsResult: CachedResult<CalendarEventSummary[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  eventsNeedsReauth: boolean;
 }
 
 const RESPONSE_KEY: Record<CalendarEventSummary['event_response'], string> = {
@@ -20,8 +23,9 @@ const RESPONSE_KEY: Record<CalendarEventSummary['event_response'], string> = {
 };
 
 async function loadCalendarSnapshot(characterId: number): Promise<Snapshot> {
-  const eventsResult = await loadCalendarEvents(characterId);
-  return { eventsResult };
+  const { cached: eventsResult, needsReauth: eventsNeedsReauth } =
+    await loadCalendarEvents(characterId);
+  return { eventsResult, eventsNeedsReauth };
 }
 
 /** Calendar: upcoming event list + detail on click. Read-only (no respond), cached for offline. */
@@ -37,6 +41,7 @@ export function Calendar() {
   } | null>(null);
 
   const eventsResult = data?.eventsResult ?? null;
+  const eventsNeedsReauth = data?.eventsNeedsReauth ?? false;
 
   const events = useMemo(
     () => [...(eventsResult?.data ?? [])].sort((a, b) => a.event_date.localeCompare(b.event_date)),
@@ -81,6 +86,13 @@ export function Calendar() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : eventsNeedsReauth ? (
+        <ReauthBanner
+          title={t('calendar.reauthTitle')}
+          hint={t('calendar.reauthHint')}
+          actionLabel={t('calendar.reauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !eventsResult || events.length === 0 ? (

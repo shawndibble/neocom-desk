@@ -9,6 +9,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
 import type { TypeMap } from '@/sde/types';
+import { MAX_RENDERED_ASSETS } from './Assets';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -210,5 +211,69 @@ describe('Assets', () => {
     );
     render(<App />);
     expect(await screen.findByText(/no assets cached/i)).toBeInTheDocument();
+  });
+
+  it('shows a re-login prompt (not a silent empty state) when the assets scope was revoked', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Log in again to see your assets')).toBeInTheDocument();
+    expect(screen.queryByText(/no assets cached/i)).not.toBeInTheDocument();
+  });
+
+  it('caps what is fetched and says so, when a character has more asset pages than the fetch cap', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page')) || 1;
+        return HttpResponse.json([{ ...assetPage1[0], item_id: page }], {
+          headers: { 'X-Pages': '30' },
+        });
+      })
+    );
+    render(<App />);
+    expect(await screen.findByText(/only the first 25 assets were fetched/i)).toBeInTheDocument();
+  });
+
+  it('caps what is rendered and says so, when the fetched list is larger than the render cap', async () => {
+    const bigAssetList = Array.from({ length: MAX_RENDERED_ASSETS + 1 }, (_, i) => ({
+      item_id: i + 1,
+      type_id: 34,
+      quantity: 1,
+      location_id: 60003760,
+      location_type: 'station' as const,
+      location_flag: 'Hangar',
+      is_singleton: false,
+    }));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(bigAssetList, { headers: { 'X-Pages': '1' } })
+      )
+    );
+    render(<App />);
+    expect(
+      await screen.findByText(
+        `Showing ${MAX_RENDERED_ASSETS} of ${MAX_RENDERED_ASSETS + 1} assets.`
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('shows both notices when a character trips the fetch cap and the render cap at once', async () => {
+    const PAGE_SIZE = 50;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page')) || 1;
+        const pageItems = Array.from({ length: PAGE_SIZE }, (_, i) => ({
+          ...assetPage1[0],
+          item_id: (page - 1) * PAGE_SIZE + i + 1,
+        }));
+        return HttpResponse.json(pageItems, { headers: { 'X-Pages': '30' } });
+      })
+    );
+    render(<App />);
+    expect(await screen.findByText(/only the first 1250 assets were fetched/i)).toBeInTheDocument();
+    expect(screen.getByText(`Showing ${MAX_RENDERED_ASSETS} of 1250 assets.`)).toBeInTheDocument();
   });
 });

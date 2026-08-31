@@ -90,6 +90,21 @@ export function loadCharacterSkillQueue(
   );
 }
 
+/**
+ * Same data as loadCharacterSkillQueue, but with the auth-failure state
+ * exposed (issue #14) for views that show a re-login affordance instead of a
+ * silent "queue is empty" state when the skillqueue scope was revoked.
+ */
+export function loadCharacterSkillQueueWithStatus(
+  characterId: number
+): Promise<StatusResult<SkillQueueEntry[]>> {
+  return loadWithCacheStatus(
+    characterId,
+    KEYS.skillqueue,
+    async () => (await getCharacterSkillQueue(characterId)).data
+  );
+}
+
 /** Universe type info (name, description, icon group) for a typeID. Public, ESI or cache. */
 export function loadUniverseType(typeId: number): Promise<CachedResult<UniverseType> | null> {
   return loadWithCache(

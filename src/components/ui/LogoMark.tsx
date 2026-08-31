@@ -31,12 +31,7 @@ export function LogoMark({ className = '' }: LogoMarkProps) {
       {/* Reads as a hole, which is the point. `bg` rather than transparent so it
           stays dark on `panel` surfaces too, where the two differ by a shade. */}
       <path d="M32 28 36 32 32 36 28 32Z" fill="var(--color-bg)" />
-      <g
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <g stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
         <path d="M22.7 17.9 15.1 22.25 15.1 29" />
         <path d="M41.3 17.9 48.9 22.25 48.9 29" />
         <path d="M22.7 46.1 15.1 41.75 15.1 35" />

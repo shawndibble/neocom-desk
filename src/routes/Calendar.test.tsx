@@ -138,4 +138,15 @@ describe('Calendar', () => {
     render(<App />);
     expect(await screen.findByText(/no events cached/i)).toBeInTheDocument();
   });
+
+  it('shows a re-login prompt (not a silent empty state) when the calendar scope was revoked', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('Log in again to see your calendar')).toBeInTheDocument();
+    expect(screen.queryByText(/no events cached/i)).not.toBeInTheDocument();
+  });
 });

@@ -40,23 +40,49 @@ describe('loadCharacterAssets', () => {
 
     const result = await loadCharacterAssets(CHAR_ID);
 
-    expect(result?.data).toEqual([ASSET(1), ASSET(2)]);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toEqual({
+      data: [ASSET(1), ASSET(2)],
+      fetchedAt: expect.any(Date),
+      fromCache: false,
+      truncated: false,
+    });
     expect((await db.esiCache.get([CHAR_ID, 'assets']))?.value).toEqual([ASSET(1), ASSET(2)]);
   });
 
   it('falls back to cache offline', async () => {
-    await db.esiCache.put({ characterId: CHAR_ID, key: 'assets', value: [ASSET(1)], fetchedAt: 5 });
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'assets',
+      value: [ASSET(1)],
+      fetchedAt: 5,
+      truncated: false,
+    });
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () => HttpResponse.error())
     );
 
     const result = await loadCharacterAssets(CHAR_ID);
 
-    expect(result).toEqual({
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toEqual({
       data: [ASSET(1)],
       fetchedAt: new Date(5),
       fromCache: true,
       truncated: false,
     });
+  });
+
+  it('reports needsReauth when the scope was revoked (403) and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadCharacterAssets(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
   });
 });

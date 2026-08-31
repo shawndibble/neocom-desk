@@ -40,7 +40,8 @@ describe('loadOrders', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/orders`, () => HttpResponse.json([ORDER]))
     );
     const result = await loadOrders(CHAR_ID);
-    expect(result?.data).toEqual([ORDER]);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual([ORDER]);
     expect((await db.esiCache.get([CHAR_ID, 'orders']))?.value).toEqual([ORDER]);
   });
 
@@ -50,12 +51,24 @@ describe('loadOrders', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/orders`, () => HttpResponse.error())
     );
     const result = await loadOrders(CHAR_ID);
-    expect(result).toEqual({
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached).toEqual({
       data: [ORDER],
       fetchedAt: new Date(4),
       fromCache: true,
       truncated: false,
     });
+  });
+
+  it('reports needsReauth when the orders scope was revoked (403) and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/orders`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const result = await loadOrders(CHAR_ID);
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
   });
 });
 
@@ -73,6 +86,20 @@ describe('loadOrderHistory', () => {
 
     const result = await loadOrderHistory(CHAR_ID);
 
-    expect(result?.data.map((o) => o.order_id)).toEqual([1, 2]);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data.map((o) => o.order_id)).toEqual([1, 2]);
+  });
+
+  it('reports needsReauth when the orders scope was revoked (403) and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/orders/history`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadOrderHistory(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
   });
 });

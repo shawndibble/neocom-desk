@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, Spinner } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadMailHeaders, loadMailBody } from '@/features/character/mail';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
@@ -11,6 +12,8 @@ import type { MailBody, MailHeader } from '@/esi/endpoints';
 
 interface Snapshot {
   headersResult: CachedResult<MailHeader[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  headersNeedsReauth: boolean;
   senderNames: Map<number, string>;
 }
 
@@ -21,13 +24,14 @@ async function loadMailSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const headersResult = await loadMailHeaders(characterId);
+  const { cached: headersResult, needsReauth: headersNeedsReauth } =
+    await loadMailHeaders(characterId);
   // Already superseded: skip the name lookup, its result would be discarded.
   const senderIds = signal.cancelled
     ? []
     : (headersResult?.data ?? []).map((h) => h.from).filter((id): id is number => id !== undefined);
   const senderNames = await resolveNames(senderIds);
-  return { headersResult, senderNames };
+  return { headersResult, headersNeedsReauth, senderNames };
 }
 
 /** Mail: recent headers list + body on click. Read-only, cached for offline. */
@@ -43,6 +47,7 @@ export function Mail() {
   } | null>(null);
 
   const headersResult = data?.headersResult ?? null;
+  const headersNeedsReauth = data?.headersNeedsReauth ?? false;
   const senderNames = data?.senderNames ?? NO_NAMES;
 
   const headers = useMemo(
@@ -91,6 +96,13 @@ export function Mail() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : headersNeedsReauth ? (
+        <ReauthBanner
+          title={t('mail.reauthTitle')}
+          hint={t('mail.reauthHint')}
+          actionLabel={t('mail.reauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !headersResult || headers.length === 0 ? (

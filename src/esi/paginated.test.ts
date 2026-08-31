@@ -179,4 +179,13 @@ describe('fetchAllPagesStatus', () => {
     expect(result.truncated).toBe(false);
     expect(result.items).toEqual(['item-1', 'item-2']);
   });
+
+  it('reports complete when the page count exactly equals the cap', async () => {
+    server.use(pagedHandler(3));
+
+    const result = await fetchAllPagesStatus<string>('/markets/10000002/orders', { maxPages: 3 });
+
+    expect(result.truncated).toBe(false);
+    expect(result.items).toEqual(['item-1', 'item-2', 'item-3']);
+  });
 });

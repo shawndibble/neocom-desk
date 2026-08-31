@@ -1,8 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, DataTable, EmptyState, Panel, Spinner, Tabs } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  DataTable,
+  EmptyState,
+  Panel,
+  ReauthBanner,
+  Spinner,
+  Tabs,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -16,6 +26,9 @@ const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
 interface Snapshot {
   ordersResult: CachedResult<MarketOrder[]> | null;
   historyResult: CachedResult<MarketOrderHistory[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  ordersNeedsReauth: boolean;
+  historyNeedsReauth: boolean;
   typeNames: Map<number, string>;
 }
 
@@ -23,10 +36,12 @@ async function loadOrdersSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [ordersResult, historyResult] = await Promise.all([
+  const [ordersStatus, historyStatus] = await Promise.all([
     loadOrders(characterId),
     loadOrderHistory(characterId),
   ]);
+  const { cached: ordersResult, needsReauth: ordersNeedsReauth } = ordersStatus;
+  const { cached: historyResult, needsReauth: historyNeedsReauth } = historyStatus;
   const typeIds = new Set<number>();
   // Already superseded: skip the ESI name resolve, its result would be discarded.
   if (!signal.cancelled) {
@@ -34,7 +49,7 @@ async function loadOrdersSnapshot(
     for (const o of historyResult?.data ?? []) typeIds.add(o.type_id);
   }
   const typeNames = await loadTypeNames([...typeIds]);
-  return { ordersResult, historyResult, typeNames };
+  return { ordersResult, historyResult, ordersNeedsReauth, historyNeedsReauth, typeNames };
 }
 
 /** Orders: open orders + history tabs. Read-only, cached for offline. */
@@ -47,6 +62,8 @@ export function Orders() {
 
   const ordersResult = data?.ordersResult ?? null;
   const historyResult = data?.historyResult ?? null;
+  const ordersNeedsReauth = data?.ordersNeedsReauth ?? false;
+  const historyNeedsReauth = data?.historyNeedsReauth ?? false;
   const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
 
   const orders = useMemo(
@@ -116,6 +133,19 @@ export function Orders() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  // Both tabs read the same scope (esi-markets.read_character_orders.v1), so
+  // the same banner covers either panel losing it.
+  const reauthBanner = (
+    <div className="px-3 py-2">
+      <ReauthBanner
+        title={t('orders.reauthTitle')}
+        hint={t('orders.reauthHint')}
+        actionLabel={t('orders.reauthAction')}
+        onLogin={() => void beginEveLogin()}
+      />
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -146,7 +176,9 @@ export function Orders() {
           padded={false}
           actions={ordersResult ? <DataAgeBadge date={ordersResult.fetchedAt} /> : undefined}
         >
-          {!ordersResult || orders.length === 0 ? (
+          {ordersNeedsReauth ? (
+            reauthBanner
+          ) : !ordersResult || orders.length === 0 ? (
             <EmptyState
               title={t('orders.emptyTitle')}
               hint={t('orders.emptyHint')}
@@ -173,7 +205,9 @@ export function Orders() {
           padded={false}
           actions={historyResult ? <DataAgeBadge date={historyResult.fetchedAt} /> : undefined}
         >
-          {!historyResult || history.length === 0 ? (
+          {historyNeedsReauth ? (
+            reauthBanner
+          ) : !historyResult || history.length === 0 ? (
             <EmptyState
               title={t('orders.historyEmptyTitle')}
               hint={t('orders.historyEmptyHint')}
