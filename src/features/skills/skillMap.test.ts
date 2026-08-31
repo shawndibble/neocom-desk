@@ -41,6 +41,12 @@ describe('loadSkillCatalog', () => {
     });
     expect(catalog.bySkillTypeID.get(1)?.groupName).toBe('Spaceship Command');
   });
+
+  it('builds the skill-unlocks reverse index once, from the same prereq data', async () => {
+    const catalog = await loadSkillCatalog();
+    expect(catalog.unlocksByTypeID.get(1)).toEqual([{ typeID: 2, level: 5 }]);
+    expect(catalog.unlocksByTypeID.get(2)).toBeUndefined();
+  });
 });
 
 describe('toTrainedSkillsMap', () => {

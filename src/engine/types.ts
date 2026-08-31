@@ -10,6 +10,17 @@ export interface SkillPrereq {
   level: number;
 }
 
+/**
+ * One entry in a skill's reverse-prereq list: the skill it unlocks, and the
+ * level of *this* skill (the map key) required to unlock it. Same shape as
+ * SkillPrereq but the inverse direction — named separately so the two are
+ * never confused.
+ */
+export interface SkillUnlock {
+  typeID: number;
+  level: number;
+}
+
 /** Minimal skill shape the engine needs (adapt SDE data to this). */
 export interface EngineSkill {
   typeID: number;
