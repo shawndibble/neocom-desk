@@ -1,5 +1,10 @@
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+
+export interface DataTableSort {
+  columnId: string;
+  direction: 'asc' | 'desc';
+}
 
 export interface DataTableColumn<T> {
   id: string;
@@ -11,6 +16,12 @@ export interface DataTableColumn<T> {
   /** Row-dependent cell classes, for per-value tones (`iskToneClass`, status tones). */
   cellClassName?: (row: T) => string | undefined;
   render: (row: T) => ReactNode;
+  /**
+   * Declares the column sortable and extracts its comparable value.
+   * `undefined` sinks the row to the end, in either direction, rather than
+   * being treated as zero.
+   */
+  sortValue?: (row: T) => string | number | undefined;
 }
 
 interface DataTableProps<T> {
@@ -22,13 +33,40 @@ interface DataTableProps<T> {
   /** Accessible name for the table. */
   label: string;
   className?: string;
+  /** Column and direction to sort by before any header click. Column must declare `sortValue`. */
+  defaultSort?: DataTableSort;
+}
+
+function compareValues(a: string | number, b: string | number): number {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b));
+}
+
+/** Stable: ties and rows with no sort value keep their original relative order. */
+function sortRows<T>(
+  rows: readonly T[],
+  column: DataTableColumn<T>,
+  direction: 'asc' | 'desc'
+): T[] {
+  const sortValue = column.sortValue;
+  if (!sortValue) return [...rows];
+  const withValue: { row: T; value: string | number }[] = [];
+  const withoutValue: T[] = [];
+  for (const row of rows) {
+    const value = sortValue(row);
+    if (value === undefined) withoutValue.push(row);
+    else withValue.push({ row, value });
+  }
+  const sign = direction === 'asc' ? 1 : -1;
+  withValue.sort((a, b) => compareValues(a.value, b.value) * sign);
+  return [...withValue.map((entry) => entry.row), ...withoutValue];
 }
 
 /**
  * Dense table. Headers and cell content arrive already translated — no i18n
- * here. Presentational: no sort state (every table pre-sorts in its own
- * `useMemo`), and no empty branch — callers show `EmptyState` instead
- * (docs/DESIGN.md §4, "Never show a bare empty table").
+ * here. No empty branch — callers show `EmptyState` instead (docs/DESIGN.md
+ * §4, "Never show a bare empty table"). Sorting is opt-in per column via
+ * `sortValue`: a table that declares none behaves exactly as before.
  */
 export function DataTable<T>({
   columns,
@@ -37,29 +75,76 @@ export function DataTable<T>({
   rowClassName,
   label,
   className = '',
+  defaultSort,
 }: DataTableProps<T>) {
+  const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
+
   // Per-column classes are invariant across rows, so they are built once
   // rather than per cell — a 1,000-row journal is 5,000 cells.
-  const headerClass = columns.map((column) =>
+  const headerTextClass = columns.map((column) =>
     cx('px-3 py-2 font-semibold uppercase', column.align === 'right' && 'text-right')
   );
+  const headerClass = columns.map((column, i) => cx(column.sortValue ? 'p-0' : headerTextClass[i]));
   const cellClass = columns.map((column) =>
     cx('px-3 py-1.5', column.align === 'right' && 'text-right', column.className)
   );
+
+  const sortColumn = sort ? columns.find((column) => column.id === sort.columnId) : undefined;
+  const sortedRows = useMemo(() => {
+    if (!sort || !sortColumn?.sortValue) return rows;
+    return sortRows(rows, sortColumn, sort.direction);
+  }, [rows, sort, sortColumn]);
+
+  function toggleSort(column: DataTableColumn<T>) {
+    setSort((previous) =>
+      previous?.columnId === column.id
+        ? { columnId: column.id, direction: previous.direction === 'asc' ? 'desc' : 'asc' }
+        : { columnId: column.id, direction: 'asc' }
+    );
+  }
 
   return (
     <table aria-label={label} className={cx('w-full text-xs', className)}>
       <thead>
         <tr className="border-b border-line text-left text-text-dim">
-          {columns.map((column, i) => (
-            <th key={column.id} scope="col" className={headerClass[i]}>
-              {column.header}
-            </th>
-          ))}
+          {columns.map((column, i) => {
+            if (!column.sortValue) {
+              return (
+                <th key={column.id} scope="col" className={headerClass[i]}>
+                  {column.header}
+                </th>
+              );
+            }
+            const active = sort?.columnId === column.id;
+            const direction = active ? sort.direction : undefined;
+            return (
+              <th
+                key={column.id}
+                scope="col"
+                className={headerClass[i]}
+                aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleSort(column)}
+                  className={cx(
+                    headerTextClass[i],
+                    'inline-flex w-full items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                    column.align === 'right' && 'justify-end'
+                  )}
+                >
+                  {column.header}
+                  <span aria-hidden="true" className="text-[0.6875rem]">
+                    {active ? (direction === 'asc' ? '▲' : '▼') : '⇅'}
+                  </span>
+                </button>
+              </th>
+            );
+          })}
         </tr>
       </thead>
       <tbody className="divide-y divide-line">
-        {rows.map((row) => (
+        {sortedRows.map((row) => (
           <tr key={rowKey(row)} className={cx('hover:bg-panel-2', rowClassName?.(row))}>
             {columns.map((column, i) => (
               <td key={column.id} className={cx(cellClass[i], column.cellClassName?.(row))}>
