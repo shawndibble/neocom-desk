@@ -9,10 +9,14 @@ import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { CharacterAsset } from '@/esi/endpoints';
+import { capItems, type Capped } from '@/lib/cap';
+
+/** Rendered rows past this many and grouping/painting the list starts to lag. */
+export const MAX_RENDERED_ASSETS = 1000;
 
 interface Snapshot {
   requestKey: string;
-  assetsResult: CachedResult<CharacterAsset[]> | null;
+  assetsResult: CachedResult<Capped<CharacterAsset>> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   assetsNeedsReauth: boolean;
   typeNames: Map<number, string>;
@@ -62,7 +66,7 @@ export function Assets() {
       const { cached: assetsResult, needsReauth: assetsNeedsReauth } =
         await loadCharacterAssets(activeCharacterId);
       if (cancelled) return;
-      const assets = assetsResult?.data ?? [];
+      const assets = assetsResult?.data.items ?? [];
       const typeNames = await loadTypeNames([...new Set(assets.map((a) => a.type_id))]);
       if (cancelled) return;
 
@@ -92,19 +96,26 @@ export function Assets() {
   const typeNames = current?.typeNames ?? new Map<number, string>();
   const locationNames = current?.locationNames ?? new Map<number, string>();
 
-  const groups = useMemo(() => {
-    const items = assetsResult?.data ?? [];
+  const { groups, shownCount, totalMatches } = useMemo(() => {
+    const items = assetsResult?.data.items ?? [];
     const query = search.trim().toLowerCase();
     const assetsByItemId = new Map(items.map((asset) => [asset.item_id, asset]));
-    const byLocation = new Map<number, { asset: CharacterAsset; name: string }[]>();
+
+    const matches: { asset: CharacterAsset; name: string }[] = [];
     for (const asset of items) {
       const name = typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
       if (query && !name.toLowerCase().includes(query)) continue;
-      const list = byLocation.get(asset.location_id) ?? [];
-      list.push({ asset, name });
-      byLocation.set(asset.location_id, list);
+      matches.push({ asset, name });
     }
-    return [...byLocation.entries()]
+    const capped = capItems(matches, MAX_RENDERED_ASSETS);
+
+    const byLocation = new Map<number, { asset: CharacterAsset; name: string }[]>();
+    for (const entry of capped.items) {
+      const list = byLocation.get(entry.asset.location_id) ?? [];
+      list.push(entry);
+      byLocation.set(entry.asset.location_id, list);
+    }
+    const groups = [...byLocation.entries()]
       .map(([locationId, entries]) => ({
         locationId,
         label: locationLabel(
@@ -118,8 +129,13 @@ export function Assets() {
         entries: entries.sort((a, b) => a.name.localeCompare(b.name)),
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
+
+    return { groups, shownCount: capped.items.length, totalMatches: matches.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
   }, [assetsResult, typeNames, locationNames, search]);
+
+  const fetchTruncated = assetsResult?.data.truncated ?? false;
+  const renderTruncated = shownCount < totalMatches;
 
   if (!hydrated) {
     return (
@@ -169,6 +185,16 @@ export function Assets() {
         <>
           {assetsResult.fromCache && (
             <p className="text-[11px] text-warning uppercase">{t('common.offlineTitle')}</p>
+          )}
+          {fetchTruncated && (
+            <p className="text-[11px] text-warning uppercase">
+              {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.items.length })}
+            </p>
+          )}
+          {renderTruncated && (
+            <p className="text-[11px] text-warning uppercase">
+              {t('assets.renderTruncatedNotice', { shown: shownCount, total: totalMatches })}
+            </p>
           )}
           {groups.length === 0 ? (
             <EmptyState title={t('assets.noResults')} className="py-8" />

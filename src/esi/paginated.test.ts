@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { setupServer } from 'msw/node';
-import { fetchAllPages } from './paginated';
+import { fetchAllPages, fetchAllPagesCapped } from './paginated';
 import { configureEsi, ESI_BASE_URL } from './client';
 import { rejectBadEsiHeaders } from './test-helpers';
 
@@ -100,5 +100,63 @@ describe('fetchAllPages', () => {
     );
 
     await expect(fetchAllPages<string>('/markets/10000002/orders')).rejects.toThrow();
+  });
+});
+
+describe('fetchAllPagesCapped', () => {
+  it('reports untruncated when every page fits under the cap', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page'));
+        return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': '2' } });
+      })
+    );
+
+    const result = await fetchAllPagesCapped<string>('/markets/10000002/orders', 5);
+
+    expect(result).toEqual({ items: ['item-1', 'item-2'], truncated: false });
+  });
+
+  it('reports untruncated when the page count exactly equals the cap', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page'));
+        return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': '3' } });
+      })
+    );
+
+    const result = await fetchAllPagesCapped<string>('/markets/10000002/orders', 3);
+
+    expect(result).toEqual({ items: ['item-1', 'item-2', 'item-3'], truncated: false });
+  });
+
+  it('stops at the cap and reports truncated when more pages exist', async () => {
+    const pagesRequested: number[] = [];
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page'));
+        pagesRequested.push(page);
+        return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': '5' } });
+      })
+    );
+
+    const result = await fetchAllPagesCapped<string>('/markets/10000002/orders', 2);
+
+    expect(pagesRequested).toEqual([1, 2]);
+    expect(result).toEqual({ items: ['item-1', 'item-2'], truncated: true });
+  });
+
+  it('treats a 404 on a later page as end-of-data, not as a truncation (BUG #7 parity)', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page'));
+        if (page >= 2) return new HttpResponse(null, { status: 404 });
+        return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': '3' } });
+      })
+    );
+
+    const result = await fetchAllPagesCapped<string>('/markets/10000002/orders', 10);
+
+    expect(result).toEqual({ items: ['item-1'], truncated: false });
   });
 });

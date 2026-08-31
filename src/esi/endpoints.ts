@@ -5,7 +5,8 @@
  */
 import { esiFetch } from './client';
 import type { EsiResult } from './client';
-import { fetchAllPages } from './paginated';
+import { fetchAllPages, fetchAllPagesCapped } from './paginated';
+import type { Capped } from '@/lib/cap';
 
 /** Options a caller may tune per request (conditional GET, cancellation). */
 export interface EndpointOptions {
@@ -325,12 +326,24 @@ export interface CharacterAsset {
   is_blueprint_copy?: boolean;
 }
 
-/** Paginated (X-Pages); every page is fetched sequentially (see fetchAllPages). */
+/**
+ * A character's asset list can run into the tens of thousands of rows
+ * (BPO libraries, PI, hangars scattered across many stations). Past this
+ * many pages, further fetching costs more in ESI round trips than the view
+ * can usefully render — stop and report the cut rather than fetch forever.
+ */
+const MAX_ASSET_PAGES = 25;
+
+/**
+ * Paginated (X-Pages), capped at MAX_ASSET_PAGES; every page fetched is
+ * sequential (see fetchAllPagesCapped). `truncated` is true when the
+ * character has more assets than were fetched.
+ */
 export function getCharacterAssets(
   characterId: number,
   options: EndpointOptions = {}
-): Promise<CharacterAsset[]> {
-  return fetchAllPages<CharacterAsset>(`/characters/${characterId}/assets`, {
+): Promise<Capped<CharacterAsset>> {
+  return fetchAllPagesCapped<CharacterAsset>(`/characters/${characterId}/assets`, MAX_ASSET_PAGES, {
     ...options,
     characterId,
   });
