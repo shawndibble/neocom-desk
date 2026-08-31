@@ -1,7 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#0d1420"/>
-  <rect x="1" y="1" width="62" height="62" rx="11" fill="none" stroke="#2a3442" stroke-width="1"/>
-  <path d="M32 10 L50.2 20.5 V41.5 L32 52 L13.8 41.5 V20.5 Z" fill="none" stroke="#57c7f4" stroke-width="3.5" stroke-linejoin="round"/>
-  <rect x="24" y="27" width="16" height="3" fill="#57c7f4"/>
-  <rect x="24" y="34" width="10" height="3" fill="#57c7f4" opacity="0.65"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NeoCom Desk">
+  <!-- No plate: the mark sits straight on the tab strip, which is near-black in
+       one theme and near-white in the other. Two independent defences, because
+       a favicon has to survive both:
+
+       1. The dark keyline under every shape. It needs no browser feature, and
+          it is what carries the silver against a white tab strip. favicon.ico
+          gets the same treatment so the two files agree.
+       2. prefers-color-scheme, which additionally flips the body to dark ink on
+          a light strip. Browsers rasterise favicons outside the normal document
+          path and honouring the query there is not guaranteed, so this is an
+          enhancement layered on top of (1), never the thing holding it up. If it
+          is ignored the icon stays silver-on-keyline, which still reads. -->
+  <style>
+    :root { --hull: #cbd6e2; --body: #e6edf4; --trace: #57c7f4; }
+    @media (prefers-color-scheme: light) {
+      :root { --hull: #46566b; --body: #0a0e14; --trace: #0b6f9e; }
+    }
+  </style>
+  <!-- Keyline pass: the same geometry drawn fat and dark underneath. Widths are
+       the top pass +2, i.e. one unit of dark each side (at a 16px favicon the
+       viewBox is scaled by a quarter, so anything fatter closes the gaps between
+       the star arms and the hull and the mark silts up into a solid blob). -->
+  <g stroke="#0a0e14" fill="#0a0e14" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M32 6 54.5 19 54.5 45 32 58 9.5 45 9.5 19Z" fill="none" stroke-width="5"/>
+    <path fill-rule="evenodd" stroke-width="2" d="M32 11 39 25 48 32 39 39 32 53 25 39 16 32 25 25Z M32 28 36 32 32 36 28 32Z"/>
+    <g fill="none" stroke-width="5">
+      <path d="M22.7 17.9 15.1 22.25 15.1 29"/><path d="M41.3 17.9 48.9 22.25 48.9 29"/>
+      <path d="M22.7 46.1 15.1 41.75 15.1 35"/><path d="M41.3 46.1 48.9 41.75 48.9 35"/>
+    </g>
+  </g>
+  <path d="M32 6 54.5 19 54.5 45 32 58 9.5 45 9.5 19Z" fill="none" stroke="var(--hull)" stroke-width="3" stroke-linejoin="round"/>
+  <!-- One path, evenodd: the inner diamond is a hole punched through the body,
+       not a plate-coloured patch laid over it, so it stays a hole now that there
+       is no plate behind it to match. -->
+  <path fill-rule="evenodd" fill="var(--body)" d="M32 11 39 25 48 32 39 39 32 53 25 39 16 32 25 25Z M32 28 36 32 32 36 28 32Z"/>
+  <g fill="none" stroke="var(--trace)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22.7 17.9 15.1 22.25 15.1 29"/><path d="M41.3 17.9 48.9 22.25 48.9 29"/>
+    <path d="M22.7 46.1 15.1 41.75 15.1 35"/><path d="M41.3 46.1 48.9 41.75 48.9 35"/>
+  </g>
 </svg>

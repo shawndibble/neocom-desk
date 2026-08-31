@@ -146,7 +146,7 @@ describe('Calendar', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText('Log in again to see calendar events')).toBeInTheDocument();
+    expect(await screen.findByText('Log in again to see your calendar')).toBeInTheDocument();
     expect(screen.queryByText(/no events cached/i)).not.toBeInTheDocument();
   });
 });

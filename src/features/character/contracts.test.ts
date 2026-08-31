@@ -62,7 +62,12 @@ describe('loadContracts', () => {
     const result = await loadContracts(CHAR_ID);
 
     expect(result.needsReauth).toBe(false);
-    expect(result.cached).toEqual({ data: [CONTRACT(1)], fetchedAt: new Date(9), fromCache: true });
+    expect(result.cached).toEqual({
+      data: [CONTRACT(1)],
+      fetchedAt: new Date(9),
+      fromCache: true,
+      truncated: false,
+    });
   });
 
   it('reports needsReauth when the contracts scope was revoked (403) and nothing is cached', async () => {

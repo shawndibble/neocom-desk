@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore';
+import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
 import { db, type BuildPlanRecord, type SkillPlanRecord } from '@/db';
+import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
   deleteSyncedSetting,
@@ -34,9 +36,9 @@ interface FakeRef {
   id: string;
 }
 
-// In-memory Firestore double: collection path -> doc id -> data. getDocs
-// applies '==' where-filters like the real backend (and like the deployed
-// rules, which only allow filtered list queries).
+// In-memory Firestore double: collection path -> doc id -> data. getDocs applies
+// '==' where-filters like the real backend, and like the deployed rules, which
+// only allow filtered list queries.
 const fake = vi.hoisted(() => {
   const remoteStore = new Map<string, Map<string, Record<string, unknown>>>();
   const getDocsImpl = async (target: {
@@ -55,7 +57,7 @@ const fake = vi.hoisted(() => {
 });
 const remoteStore = fake.remoteStore;
 
-vi.mock('firebase/firestore', () => ({
+vi.mock('firebase/firestore/lite', () => ({
   collection: vi.fn((_firestore: unknown, ...segments: string[]): FakeCol => ({
     path: segments.join('/'),
   })),
@@ -75,6 +77,13 @@ vi.mock('firebase/firestore', () => ({
     remoteStore.get(ref.col.path)?.delete(ref.id);
   }),
 }));
+
+// Real implementation by default — only the outcome is overridden per test,
+// so the purge/spare-global assertions elsewhere still exercise real Dexie.
+vi.mock('@/esi/cachePurge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/esi/cachePurge')>();
+  return { ...actual, purgeCharacterCacheOrSuppress: vi.fn(actual.purgeCharacterCacheOrSuppress) };
+});
 
 vi.mock('./firebaseApp', () => ({
   getSyncFirestore: () => ({}),
@@ -163,6 +172,7 @@ beforeEach(async () => {
     db.skillPlans.clear(),
     db.buildPlans.clear(),
     db.settings.clear(),
+    db.esiCache.clear(),
   ]);
   await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: HASH, addedAt: 1 });
 });
@@ -258,6 +268,41 @@ describe('triggerSync: plans', () => {
     expect(remoteStore.get(PLANS_PATH)?.has('p1')).toBe(false);
   });
 
+  it('wipes the character ESI cache when ownerHash changed, sparing global rows', async () => {
+    // The previous owner's cached wallet/mail/assets must not survive into the
+    // new owner's session. GLOBAL_CACHE_CHARACTER_ID rows are public universe
+    // data owned by nobody — purging them would be churn with no benefit.
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+    await db.esiCache.bulkPut([
+      { characterId: 1, key: 'wallet:journal', value: 'secret', fetchedAt: 1 },
+      { characterId: 1, key: 'mail:headers', value: 'secret', fetchedAt: 1 },
+      { characterId: 2, key: 'wallet:journal', value: 'other char', fetchedAt: 1 },
+      { characterId: GLOBAL_CACHE_CHARACTER_ID, key: 'type:587', value: 'Rifter', fetchedAt: 1 },
+    ]);
+
+    await triggerSync(1);
+
+    const remaining = (await db.esiCache.toArray()).map((r) => `${r.characterId}:${r.key}`).sort();
+    expect(remaining).toEqual(['0:type:587', '2:wallet:journal']);
+  });
+
+  it('leaves the ESI cache alone when ownerHash is unchanged', async () => {
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: HASH });
+    await db.esiCache.put({ characterId: 1, key: 'wallet:journal', value: 'mine', fetchedAt: 1 });
+
+    await triggerSync(1);
+
+    expect(await db.esiCache.count()).toBe(1);
+  });
+
+  it('leaves the ESI cache alone on a first-ever sync (no recorded ownerHash)', async () => {
+    await db.esiCache.put({ characterId: 1, key: 'wallet:journal', value: 'mine', fetchedAt: 1 });
+
+    await triggerSync(1);
+
+    expect(await db.esiCache.count()).toBe(1);
+  });
+
   it('wipes local plans instead of pushing them when ownerHash changed (character sold)', async () => {
     await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
     await db.skillPlans.put(plan());
@@ -267,6 +312,31 @@ describe('triggerSync: plans', () => {
     expect(await db.buildPlans.count()).toBe(0);
     expect(remoteStore.get(PLANS_PATH)?.get('p1')).toBeUndefined();
     expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')).toBeUndefined();
+    expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe(HASH);
+  });
+
+  it('leaves the ownerHash bookmark unadvanced when the purge only reached suppression', async () => {
+    // Suppression can be memory-only, so advancing the bookmark would burn the
+    // last retry: after a reload the marker is gone, the hash matches and the
+    // previous owner's rows read normally again.
+    const purge = vi.mocked(await import('@/esi/cachePurge')).purgeCharacterCacheOrSuppress;
+    purge.mockResolvedValueOnce('suppressed');
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+    await db.skillPlans.put(plan());
+
+    await triggerSync(1);
+
+    expect(await db.skillPlans.count()).toBe(0);
+    expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe('previous-owner-hash');
+  });
+
+  it('advances the bookmark when the purge succeeded', async () => {
+    const purge = vi.mocked(await import('@/esi/cachePurge')).purgeCharacterCacheOrSuppress;
+    purge.mockResolvedValueOnce('targeted');
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+
+    await triggerSync(1);
+
     expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe(HASH);
   });
 });
@@ -365,6 +435,21 @@ describe('triggerSync: settings', () => {
     const doc = remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub');
     expect(doc).toMatchObject({ key: 'sync.tradeHub', value: 'jita', ownerHash: HASH });
     expect(typeof doc?.updatedAt).toBe('number');
+  });
+
+  it('never pushes the device-local cache-purge-pending marker', async () => {
+    // A stuck purge is one device's storage problem; syncing the marker would
+    // suppress the ESI cache on every other device. Not being a 'sync.' key is
+    // what keeps it local.
+    await db.settings.put({ key: `${CACHE_PURGE_PENDING_PREFIX}1`, value: true });
+    // Seeded rather than written through setSyncedSetting: this test is about
+    // the purge marker staying local, not about the synced-key allow-list.
+    await seedLocalSetting('sync.tradeHub', 'jita');
+
+    await triggerSync(1);
+
+    expect(remoteStore.get(SETTINGS_PATH)?.has(`${CACHE_PURGE_PENDING_PREFIX}1`)).toBe(false);
+    expect(remoteStore.get(SETTINGS_PATH)?.has('sync.tradeHub')).toBe(true);
   });
 
   it('pulls newer remote settings into Dexie', async () => {

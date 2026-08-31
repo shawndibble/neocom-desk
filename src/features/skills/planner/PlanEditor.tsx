@@ -7,6 +7,7 @@ import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
   optimizeAtMarkers,
+  MAX_SUPPORTED_REMAPS,
   placeRemaps,
   suggestReorder,
   ATTRIBUTE_NAMES,
@@ -28,6 +29,9 @@ import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
 import { ComputedQueue } from './ComputedQueue';
+import { boostedStepIndices } from '@/engine/boosterImpact';
+import { queueCsvColumns } from './queueCsv';
+import { downloadCsv } from '@/lib/downloadCsv';
 import { formatDate, formatDuration } from '@/lib/duration';
 import { dedupeEntries, removeEntry, upsertEntry, applyReorderSuggestion } from './reorder';
 import {
@@ -208,6 +212,22 @@ export function PlanEditor({
     () => new Set(plan.entries.map((e) => e.skillTypeID)),
     [plan.entries]
   );
+
+  // The plan keeps whatever count the user set (ESI prefills bonus remaps).
+  // Only the optimizer is capped, and the UI says so rather than quietly
+  // answering a different question than the one on screen.
+  const remapCount = Math.min(plan.remapCount, MAX_SUPPORTED_REMAPS);
+  const remapCapped = plan.remapCount > MAX_SUPPORTED_REMAPS;
+
+  // Which queue rows the Booster actually speeds up: trained inside its window
+  // AND on an attribute it raises. Both, or the mark is a lie.
+  const boostedSteps = useMemo(
+    () =>
+      activeBoosters.length > 0
+        ? boostedStepIndices(scheduled, catalog.engineSkills, activeBoosters, startDate)
+        : new Set<number>(),
+    [scheduled, catalog, activeBoosters, startDate]
+  );
   const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0;
   // No steps means no plan finish to project — never invent one for an
   // empty (or all-trained) queue (#20).
@@ -244,13 +264,23 @@ export function PlanEditor({
     setTimeout(() => setCopyConfirm(false), 2000);
   }
 
+  function handleExportCsv() {
+    downloadCsv('skill-queue', scheduled, queueCsvColumns(t, nameFor, userSkillTypeIDs));
+  }
+
   function handleOptimizeRemaps() {
     if (scheduled.length === 0) return;
     setOptimizeResult(
       placeRemaps(scheduled, catalog.engineSkills, {
-        remapCount: plan.remapCount,
+        remapCount,
         currentAttributes: attributes,
         implants: effectiveImplants,
+        // The same Boosters the computed queue schedules with, so the savings
+        // figure and the queue total cannot disagree.
+        booster:
+          activeBoosters.length > 0
+            ? { boosters: activeBoosters, startDate: new Date() }
+            : undefined,
       })
     );
   }
@@ -353,7 +383,7 @@ export function PlanEditor({
       <Panel
         title={t('plans.toolbar')}
         actions={
-          <span className="flex items-center gap-1 text-[11px] text-text-dim">
+          <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
             <label htmlFor="plan-remap-count">{t('plans.remapCount')}</label>
             <InfoTooltip
               label={t('plans.remapCountTooltipLabel')}
@@ -392,6 +422,9 @@ export function PlanEditor({
           </Button>
           <Button size="sm" onClick={() => void handleExport()}>
             {copyConfirm ? t('plans.exportCopied') : t('plans.exportClipboard')}
+          </Button>
+          <Button size="sm" onClick={handleExportCsv} disabled={scheduled.length === 0}>
+            {t('plans.exportCsvQueue')}
           </Button>
           <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
             {t('plans.optimizeRemaps')}
@@ -513,6 +546,14 @@ export function PlanEditor({
 
       {optimizeResult && (
         <Panel title={t('plans.optimizeRemaps')}>
+          {remapCapped && (
+            // The plan asks for more remaps than the optimizer evaluates. Say
+            // so: an answer for one remap presented as the answer for three is
+            // the silent-degradation failure this planner keeps hitting.
+            <p className="mb-2 text-[0.6875rem] text-warning uppercase">
+              {t('plans.remapCapNote', { count: MAX_SUPPORTED_REMAPS })}
+            </p>
+          )}
           {optimizeResult.savingsSeconds < MIN_MEANINGFUL_SAVINGS_SECONDS ? (
             <p className="text-xs text-text-dim">{t('plans.remapNoGain')}</p>
           ) : (
@@ -571,7 +612,7 @@ export function PlanEditor({
       <Panel
         title={t('plans.computedQueue')}
         actions={
-          <div className="flex items-center gap-2 text-[11px] text-text-dim">
+          <div className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
             <span>{formatDuration(totalSeconds)}</span>
             {planFinish && (
               <span>{t('plans.projectedFinish', { date: formatDate(planFinish) })}</span>
@@ -586,6 +627,7 @@ export function PlanEditor({
             steps={scheduled}
             nameFor={nameFor}
             userSkillTypeIDs={userSkillTypeIDs}
+            boostedSteps={boostedSteps}
             hasValidEntries={hasValidEntries}
             startDate={startDate}
           />

@@ -41,19 +41,22 @@ describe('loadCharacterAssets', () => {
     const result = await loadCharacterAssets(CHAR_ID);
 
     expect(result.needsReauth).toBe(false);
-    expect(result.cached?.data).toEqual({ items: [ASSET(1), ASSET(2)], truncated: false });
-    expect((await db.esiCache.get([CHAR_ID, 'assets']))?.value).toEqual({
-      items: [ASSET(1), ASSET(2)],
+    expect(result.cached).toEqual({
+      data: [ASSET(1), ASSET(2)],
+      fetchedAt: expect.any(Date),
+      fromCache: false,
       truncated: false,
     });
+    expect((await db.esiCache.get([CHAR_ID, 'assets']))?.value).toEqual([ASSET(1), ASSET(2)]);
   });
 
   it('falls back to cache offline', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,
       key: 'assets',
-      value: { items: [ASSET(1)], truncated: false },
+      value: [ASSET(1)],
       fetchedAt: 5,
+      truncated: false,
     });
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () => HttpResponse.error())
@@ -63,9 +66,10 @@ describe('loadCharacterAssets', () => {
 
     expect(result.needsReauth).toBe(false);
     expect(result.cached).toEqual({
-      data: { items: [ASSET(1)], truncated: false },
+      data: [ASSET(1)],
       fetchedAt: new Date(5),
       fromCache: true,
+      truncated: false,
     });
   });
 

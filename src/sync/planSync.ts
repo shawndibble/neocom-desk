@@ -1,33 +1,18 @@
 // Two-way sync of Skill Plans, Build Plans + synced settings for one character.
+// Public API and UI wiring live in index.ts.
 //
-// Public API (UI wiring is owned elsewhere — see index.ts):
-//   triggerSync(characterId)      run a sync now (coalesced per character)
-//   scheduleSync(characterId)     debounced sync after edits
-//   subscribeSyncStatus(fn)       observe idle/syncing/error + lastSyncedAt
-//   getSyncStatus(characterId)    last known status for one character
-//   markPlanDeleted(...)          delete a Skill Plan locally AND record a tombstone
-//   markBuildPlanDeleted(...)     same for Build Plans
-//   setSyncedSetting(key, v)      write a synced ('sync.'-prefixed) setting
+// Remote layout: /characters/char:{id}/{plans,buildPlans,settings}. Merge policy
+// is pure and lives in merge.ts: last-write-wins per record id, tombstones for
+// deletes kept 30 days.
 //
-// Remote layout: /characters/char:{id}/plans/{planId},
-// .../buildPlans/{planId} and .../settings/{key}.
-// Merge policy lives in merge.ts (pure): last-write-wins per record id,
-// tombstones for deletes kept 30 days.
+// Syncs are serialized GLOBALLY, not just per character: the Firebase session is
+// a single slot swapped by ensureSignedIn, so two concurrent syncs would race
+// the auth state mid-flight. Status is tracked per character so a later
+// character's success cannot mask an earlier one's failure.
 //
-// Concurrency: syncs are serialized GLOBALLY (a module-level promise chain),
-// not just per character. The Firebase session is a single slot swapped by
-// ensureSignedIn on character switch, so two concurrent syncs for different
-// characters would race the auth state mid-flight (character B's sign-in
-// invalidating character A's in-progress writes). Serializing is the simplest
-// correct fix; syncs are short and rare. Status is tracked per character so a
-// later character's success cannot mask an earlier character's failure.
-//
-// Owner-hash safety: if the character's ownerHash changed since the last sync
-// (character sold/transferred), local plans for it are wiped before syncing so
-// the previous owner's data neither leaks in nor gets pushed up. All reads are
-// queried with where('ownerHash' == current hash); server-side, Firestore
-// rules deny single-doc reads of docs whose ownerHash field doesn't match the
-// auth token's ownerHash claim.
+// Owner-hash safety, so a previous owner's data neither leaks in nor gets
+// pushed up: reads filter on the current hash, and Firestore rules deny
+// single-doc reads whose ownerHash doesn't match the auth token's claim.
 
 import {
   collection,
@@ -39,9 +24,11 @@ import {
   where,
   type CollectionReference,
   type Firestore,
-} from 'firebase/firestore';
+} from 'firebase/firestore/lite';
 import { db, type BuildPlanRecord, type CharacterRecord, type SkillPlanRecord } from '@/db';
+import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import { getSyncFirestore } from './firebaseApp';
+import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
 import {
   mergeRecords,
@@ -58,9 +45,8 @@ import {
 import { isAllowedSyncedSettingKey } from './syncedSettings';
 
 // ---------------------------------------------------------------------------
-// Local bookkeeping (Dexie settings table). Keys under 'sync.__' are internal
-// and never synced; keys under 'sync.' (without the double underscore) are the
-// user settings that DO sync.
+// Local bookkeeping (Dexie settings table). 'sync.__' keys are internal and
+// never synced; 'sync.' keys are the user settings that DO sync.
 // ---------------------------------------------------------------------------
 
 const SYNCED_PREFIX = 'sync.';
@@ -109,47 +95,11 @@ async function writeSettingsTombstones(tombstones: SyncedSettingTombstone[]): Pr
 }
 
 // ---------------------------------------------------------------------------
-// Sync status — tracked per character so character B's later result cannot
-// stomp character A's error. subscribeSyncStatus streams every change (the UI
-// dot shows the most recent one); getSyncStatus(characterId) reads a specific
-// character's last known status.
+// Sync status. Re-exported so the driver stays a single import site; the store
+// itself is in status.ts (Firebase-free, so the UI can subscribe without this).
 // ---------------------------------------------------------------------------
 
-export type SyncState = 'idle' | 'syncing' | 'error';
-
-export interface SyncStatus {
-  state: SyncState;
-  /** Epoch ms of the last successful sync this session, or null. */
-  lastSyncedAt: number | null;
-  error: string | null;
-  /** Character this status refers to; absent only before the first sync. */
-  characterId?: number;
-}
-
-const IDLE_STATUS: SyncStatus = { state: 'idle', lastSyncedAt: null, error: null };
-let latestStatus: SyncStatus = IDLE_STATUS;
-const statusByCharacter = new Map<number, SyncStatus>();
-const listeners = new Set<(status: SyncStatus) => void>();
-
-function setStatus(characterId: number, patch: Partial<SyncStatus>): void {
-  const base = statusByCharacter.get(characterId) ?? { ...IDLE_STATUS, characterId };
-  const next = { ...base, ...patch, characterId };
-  statusByCharacter.set(characterId, next);
-  latestStatus = next;
-  for (const listener of listeners) listener(next);
-}
-
-/** Subscribe to sync status; the listener is called immediately with the current value. */
-export function subscribeSyncStatus(listener: (status: SyncStatus) => void): () => void {
-  listeners.add(listener);
-  listener(latestStatus);
-  return () => listeners.delete(listener);
-}
-
-/** Last known status for one character (idle if it has never synced). */
-export function getSyncStatus(characterId: number): SyncStatus {
-  return statusByCharacter.get(characterId) ?? { ...IDLE_STATUS, characterId };
-}
+export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
 
 // ---------------------------------------------------------------------------
 // Mutation helpers the UI layer should use
@@ -168,12 +118,7 @@ async function recordDeletion(
   scheduleSync(characterId);
 }
 
-/**
- * Delete a Skill Plan locally and record a tombstone so the deletion
- * propagates to other devices on the next sync. Always use this instead of
- * deleting the Dexie row directly, or the plan will resurrect from the remote
- * copy.
- */
+/** Delete a Skill Plan locally + tombstone, so the deletion propagates. */
 export async function markPlanDeleted(characterId: number, planId: string): Promise<void> {
   await recordDeletion(characterId, planId, planTombstonesKey(characterId), () =>
     db.skillPlans.delete(planId)
@@ -236,8 +181,8 @@ export async function deleteSyncedSetting(key: string): Promise<void> {
 const running = new Map<number, Promise<void>>();
 const pendingTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const DEFAULT_DEBOUNCE_MS = 2000;
-// Global serialization chain (see header comment). Never left rejected:
-// failures surface through the per-run promise and the status stream.
+// Global serialization chain. Never left rejected: failures surface through the
+// per-run promise and the status stream.
 let syncChain: Promise<void> = Promise.resolve();
 
 /** Debounced sync — call after each edit. */
@@ -256,9 +201,8 @@ export function scheduleSync(characterId: number, debounceMs = DEFAULT_DEBOUNCE_
 }
 
 /**
- * Run a sync now. Coalesced per character (a sync already running or queued
- * for this character is awaited instead) and serialized globally (a sync for
- * another character must finish before this one starts).
+ * Run a sync now. Coalesced per character (an already-running sync for it is
+ * awaited instead) and serialized globally.
  */
 export function triggerSync(characterId: number): Promise<void> {
   const pending = pendingTimers.get(characterId);
@@ -292,10 +236,9 @@ export function triggerSync(characterId: number): Promise<void> {
 }
 
 /**
- * Owner-hash check: EVE changes a character's ownerHash when it is sold or
- * transferred. If it changed since our last sync, the local editable data
- * belongs to the previous owner — wipe it (and pending tombstones) so nothing
- * leaks into or out of the new owner's account.
+ * EVE changes a character's ownerHash when it is sold or transferred. If it
+ * changed since our last sync, the local editable data belongs to the previous
+ * owner — wipe it, its tombstones and its cached ESI responses.
  */
 async function handleOwnerHashChange(character: CharacterRecord): Promise<void> {
   const key = ownerHashKey(character.characterId);
@@ -305,6 +248,17 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     await db.buildPlans.where('characterId').equals(character.characterId).delete();
     await writeTombstones(planTombstonesKey(character.characterId), []);
     await writeTombstones(buildPlanTombstonesKey(character.characterId), []);
+    // Cached wallet/mail/assets belong to the previous owner just as much as
+    // the plans do. `auth/session` purges on the same signal at login; this
+    // covers a transfer noticed between logins. Degrades rather than throws
+    // (esi/cachePurge.ts) — a failing purge must not fail the sync.
+    const outcome = await purgeCharacterCacheOrSuppress(character.characterId);
+    // 'suppressed' = both purge tiers failed, rows still on disk. Suppression
+    // can be memory-only, so advancing the bookmark would burn the last retry:
+    // after a reload the marker is gone, the hash matches and the previous
+    // owner's data reads normally. Leaving it makes the next sync re-detect;
+    // the plan deletes above are idempotent.
+    if (outcome === 'suppressed') return;
   }
   await db.settings.put({ key, value: character.ownerHash });
 }
@@ -338,9 +292,8 @@ async function fetchOwnedDocs<R extends RemoteDoc>(
   col: CollectionReference,
   ownerHash: string
 ): Promise<R[]> {
-  // ownerHash filter: rules allow listing only what the client's where clause
-  // provably scopes to; unfiltered getDocs would also trip over stale-hash
-  // docs after a character transfer.
+  // Rules allow listing only what the client's where clause provably scopes to;
+  // an unfiltered getDocs would also trip over stale-hash docs after a transfer.
   const snapshot = await getDocs(query(col, where('ownerHash', '==', ownerHash)));
   return snapshot.docs.map((d) => d.data() as R);
 }
@@ -431,7 +384,6 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     rigLevel: p.rigLevel,
     security: p.security,
     hubId: p.hubId,
-    // Firestore rejects undefined field values — omit the optional field.
     ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
     updatedAt: p.updatedAt,
     ownerHash,
@@ -473,9 +425,9 @@ async function syncCharacter(characterId: number): Promise<void> {
   // ---- Synced settings ----
   const settingsCol = collection(firestore, 'characters', uid, 'settings');
   const snapshot = await getDocs(query(settingsCol, where('ownerHash', '==', ownerHash)));
-  // Only honour well-formed synced keys from the remote store: anything else
-  // (hostile or stale doc naming a non-synced Dexie key such as
-  // 'activeCharacterId', or an internal 'sync.__' key) must never reach Dexie.
+  // Only honour well-formed synced keys: a hostile or stale doc naming a
+  // non-synced Dexie key ('activeCharacterId') or an internal 'sync.__' key
+  // must never reach Dexie.
   const remoteSettings = snapshot.docs
     .map((d) => d.data() as RemoteSyncedSetting)
     .filter((s) => typeof s.key === 'string' && isSyncedSettingKey(s.key));

@@ -15,6 +15,8 @@ import {
   type JobsLoadResult,
 } from './jobs';
 import { formatDuration } from '@/lib/duration';
+import { downloadCsv } from '@/lib/downloadCsv';
+import { jobsCsvColumns } from './jobsCsv';
 
 interface ActiveJobsPanelProps {
   characterId: number;
@@ -46,11 +48,19 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [result, types] = await Promise.all([
-        loadCharacterIndustryJobs(characterId),
-        loadTypes(),
-      ]);
-      if (!cancelled) setSnapshot({ requestKey, result, types });
+      try {
+        const [result, types] = await Promise.all([
+          loadCharacterIndustryJobs(characterId),
+          loadTypes(),
+        ]);
+        if (!cancelled) setSnapshot({ requestKey, result, types });
+      } catch {
+        // `loadTypes()` throws when the SDE fetch fails. Stamping an empty
+        // snapshot is what clears the spinner — leaving it unstamped strands
+        // the panel loading forever with its Refresh disabled.
+        if (!cancelled)
+          setSnapshot({ requestKey, result: { cached: null, needsReauth: false }, types: {} });
+      }
     })();
     return () => {
       cancelled = true;
@@ -70,12 +80,21 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
 
   const jobs = useMemo(() => sortJobsBySoonest(result?.cached?.data ?? []), [result]);
 
+  const nameForBlueprint = (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`;
+
   return (
     <Panel
       title={t('industry.jobsTitle')}
       actions={
         <span className="flex items-center gap-2">
           {result?.cached?.fetchedAt && <DataAgeBadge date={result.cached.fetchedAt} />}
+          <Button
+            size="sm"
+            disabled={jobs.length === 0}
+            onClick={() => downloadCsv('industry-jobs', jobs, jobsCsvColumns(t, nameForBlueprint))}
+          >
+            {t('industry.exportCsvJobs')}
+          </Button>
           <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
             {t('industry.jobsRefresh')}
           </Button>
@@ -112,14 +131,13 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       ) : (
         <div className="space-y-2">
           {result?.cached?.fromCache && (
-            <p className="text-[11px] text-warning uppercase">
+            <p className="text-[0.6875rem] text-warning uppercase">
               {refreshKey > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
             </p>
           )}
           <ul className="space-y-2">
             {jobs.map((job) => {
-              const name =
-                types[String(job.blueprint_type_id)]?.name ?? `#${job.blueprint_type_id}`;
+              const name = nameForBlueprint(job.blueprint_type_id);
               const done = isJobDone(job, now);
               const soon = !done && isCompletingSoon(job, now);
               const progress = Math.round(jobProgress(job, now) * 100);
@@ -135,7 +153,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                     <span className="font-medium">{name}</span>
                     <span className="flex items-center gap-1.5">
                       {soon && (
-                        <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-widest text-warning uppercase">
+                        <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
                           {t('industry.jobsCompletingSoon')}
                         </span>
                       )}
@@ -144,7 +162,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
                       </span>
                     </span>
                   </div>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-text-dim">
+                  <div className="mt-1 flex items-center justify-between gap-2 text-[0.6875rem] text-text-dim">
                     <span>{t('industry.jobsRuns', { count: job.runs })}</span>
                     <time
                       dateTime={endDate.toISOString()}

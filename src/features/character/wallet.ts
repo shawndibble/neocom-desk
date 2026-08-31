@@ -9,11 +9,12 @@ import {
 import {
   loadWithCache,
   loadWithCacheStatus,
+  loadPaginatedWithCache,
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
 
-const KEYS = {
+export const KEYS = {
   balance: 'wallet:balance',
   journal: 'wallet:journal',
   transactions: 'wallet:transactions',
@@ -29,9 +30,8 @@ export function loadWalletBalance(characterId: number): Promise<CachedResult<num
 }
 
 /**
- * Same data as loadWalletBalance, but with the auth-failure state exposed
- * (BUG #3) for views that show a re-login affordance instead of a silent
- * "offline" state.
+ * Same data as loadWalletBalance, with the auth-failure state exposed for views
+ * that show a re-login affordance instead of a silent "offline" state.
  */
 export function loadWalletBalanceWithStatus(characterId: number): Promise<StatusResult<number>> {
   return loadWithCacheStatus(
@@ -41,18 +41,20 @@ export function loadWalletBalanceWithStatus(characterId: number): Promise<Status
   );
 }
 
-/** Wallet journal entries (every page). ESI or cache. */
+/** Journal. `truncated` on the result means pages were missing. */
 export function loadWalletJournal(
   characterId: number
 ): Promise<CachedResult<WalletJournalEntry[]> | null> {
-  return loadWithCache(characterId, KEYS.journal, () => getCharacterWalletJournal(characterId));
+  return loadPaginatedWithCache(characterId, KEYS.journal, () =>
+    getCharacterWalletJournal(characterId)
+  );
 }
 
-/** Recent wallet transactions (cursor-followed, see esi/endpoints.ts). ESI or cache. */
+/** Transactions. `truncated` means the fetch stopped at the page cap. */
 export function loadWalletTransactions(
   characterId: number
 ): Promise<CachedResult<WalletTransaction[]> | null> {
-  return loadWithCache(characterId, KEYS.transactions, () =>
+  return loadPaginatedWithCache(characterId, KEYS.transactions, () =>
     getCharacterWalletTransactions(characterId)
   );
 }

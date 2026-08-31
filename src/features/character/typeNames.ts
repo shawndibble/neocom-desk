@@ -19,34 +19,10 @@ import { EsiError } from '@/esi/client';
 import { getUniverseType, postUniverseNames } from '@/esi/endpoints';
 import { loadTypes } from '@/sde/loadSde';
 import { GLOBAL_CACHE_CHARACTER_ID, readCached, writeCached } from '@/esi/cache';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
 /** ESI's documented cap on ids per /universe/names request (maxItems in the spec). */
 const NAMES_BATCH_LIMIT = 1000;
-
-/**
- * Cap on simultaneous per-id GET /universe/types/{id} fallback calls (BUG
- * #6). The 404-batch fallback can be asked to resolve up to NAMES_BATCH_LIMIT
- * ids one at a time; firing all of them via a single Promise.all would be up
- * to 1000 concurrent requests.
- */
-const TYPE_LOOKUP_CONCURRENCY = 10;
-
-/** Runs `fn` over `items`, at most `limit` calls in flight at a time. */
-async function mapWithConcurrencyLimit<T>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T) => Promise<void>
-): Promise<void> {
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const item = items[next];
-      next += 1;
-      await fn(item);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
-}
 
 function cacheKey(typeId: number): string {
   return `type:${typeId}`;
@@ -77,7 +53,7 @@ async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
         // One or more ids in this chunk are unresolvable; ESI won't return
         // partial results for the batch, so resolve what we can one at a time.
         const fetchedAt = Date.now();
-        await mapWithConcurrencyLimit(ids, TYPE_LOOKUP_CONCURRENCY, async (id) => {
+        await mapWithConcurrencyLimit(ids, ESI_FANOUT_CONCURRENCY, async (id) => {
           try {
             const { data } = await getUniverseType(id);
             if (!data) return; // 304 Not Modified: unreachable, no etag is ever sent here.

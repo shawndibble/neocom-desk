@@ -17,5 +17,5 @@ interface SyncErrorNoteProps {
 export function SyncErrorNote({ status, online }: SyncErrorNoteProps) {
   const { t } = useTranslation();
   if (syncDisplayState(status, online) !== 'error') return null;
-  return <p className="text-[11px] text-danger uppercase">{t('sync.errorNote')}</p>;
+  return <p className="text-[0.6875rem] text-danger uppercase">{t('sync.errorNote')}</p>;
 }

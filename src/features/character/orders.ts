@@ -5,7 +5,7 @@ import {
   type MarketOrder,
   type MarketOrderHistory,
 } from '@/esi/endpoints';
-import { loadWithCacheStatus, type StatusResult } from '@/esi/cache';
+import { loadWithCacheStatus, loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
 
 const KEYS = {
   open: 'orders',
@@ -25,9 +25,12 @@ export function loadOrders(characterId: number): Promise<StatusResult<MarketOrde
   );
 }
 
-/** Closed/expired order history (every page). ESI or cache, with the auth-failure state exposed. */
+/**
+ * Closed/expired order history (every page). ESI or cache, with the
+ * auth-failure state exposed. `truncated` means pages were missing.
+ */
 export function loadOrderHistory(characterId: number): Promise<StatusResult<MarketOrderHistory[]>> {
-  return loadWithCacheStatus(characterId, KEYS.history, () =>
+  return loadPaginatedWithCacheStatus(characterId, KEYS.history, () =>
     getCharacterOrderHistory(characterId)
   );
 }

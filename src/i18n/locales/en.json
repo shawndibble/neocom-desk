@@ -21,6 +21,13 @@
     "more": "More",
     "mobileLabel": "Mobile navigation"
   },
+  "reauth": {
+    "navLocked": "Needs a new login",
+    "staleGrantTitle": "EVE access was refused",
+    "staleGrantHint": "EVE turned down a request for this character's data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
+    "staleGrantAction": "Log in again with EVE Online",
+    "dismiss": "Dismiss"
+  },
   "skills": {
     "trainedTab": "Trained",
     "plansTab": "Plans",
@@ -46,6 +53,11 @@
     "reauthTitle": "Log in again to see skills",
     "reauthHint": "Log in again to fetch this character's trained skills.",
     "reauthAction": "Log in again with EVE Online",
+    "exportCsv": "Export CSV",
+    "csvGroup": "Group",
+    "csvSkill": "Skill",
+    "csvLevel": "Level",
+    "csvSp": "Skill points",
     "inspector": {
       "prereqsTitle": "Prerequisites",
       "unlocksTitle": "Unlocks",
@@ -136,7 +148,26 @@
     "markersNoGain": "Remapping at these markers doesn't save time — try moving them.",
     "segmentCurrent": "From {{skill}}, keep current attributes",
     "remapFromEveReady": "From EVE: {{bonus}} bonus + yearly ready",
-    "remapFromEveCooldown": "From EVE: {{bonus}} bonus + yearly on cooldown until {{date}}"
+    "remapFromEveCooldown": "From EVE: {{bonus}} bonus + yearly on cooldown until {{date}}",
+    "exportCsvQueue": "Export CSV",
+    "csvSkill": "Skill",
+    "csvLevel": "Level",
+    "csvSeconds": "Seconds",
+    "csvCumulativeSeconds": "Cumulative seconds",
+    "csvPrereq": "Prerequisite",
+    "csvYes": "yes",
+    "csvNo": "no",
+    "queueTrainingBadge": "Training",
+    "queueDoneBadge": "Done",
+    "queuePausedBadge": "Paused",
+    "queueRemaining": "{{duration}} left",
+    "queueCompletedNote_one": "{{count}} skill finished training. Log in to EVE to apply it.",
+    "queueCompletedNote_other": "{{count}} skills finished training. Log in to EVE to apply them.",
+    "queuePausedNote": "Training is paused, so EVE reports no completion times.",
+    "queueFinishes": "Finishes {{date}}",
+    "boosterAffects": "Booster speeds this skill up",
+    "remapCapNote_one": "Evaluated with {{count}} remap. This plan allows more; placement beyond that is not available yet.",
+    "remapCapNote_other": "Evaluated with {{count}} remaps. This plan allows more; placement beyond that is not available yet."
   },
   "industry": {
     "title": "Build Plans",
@@ -233,7 +264,21 @@
       "invention": "Invention",
       "reaction": "Reaction",
       "unknown": "Activity #{{id}}"
-    }
+    },
+    "exportCsvMaterials": "Export materials",
+    "exportCsvJobs": "Export jobs",
+    "csvMaterial": "Material",
+    "csvQuantity": "Quantity",
+    "csvUnitPriceIsk": "Unit price (ISK)",
+    "csvLineTotalIsk": "Line total (ISK)",
+    "csvJobActivity": "Activity",
+    "csvJobBlueprint": "Blueprint",
+    "csvJobBlueprintTypeId": "Blueprint type ID",
+    "csvJobRuns": "Runs",
+    "csvJobStart": "Start date",
+    "csvJobEnd": "End date",
+    "csvJobCostIsk": "Cost (ISK)",
+    "csvJobStatus": "Status"
   },
   "login": {
     "button": "Log in with EVE Online"
@@ -260,23 +305,30 @@
     "queueEmpty": "No active in-game training queue cached.",
     "training": "Training {{name}}",
     "finishes": "finishes {{date}}",
+    "reauthTitle": "Log in again to see your wallet",
+    "reauthHint": "Log in again to fetch this character's wallet balance.",
+    "reauthAction": "Log in again with EVE Online",
     "queueReauthTitle": "Log in again to see the training queue",
     "queueReauthHint": "Log in again to fetch this character's in-game skill queue.",
     "queueReauthAction": "Log in again with EVE Online"
   },
   "common": {
+    "close": "Close",
     "loading": "Loading",
     "loadingEllipsis": "Loading…",
     "unknown": "—",
     "aboutLabel": "About {{label}}",
     "offlineTitle": "Showing cached data",
     "refreshFailedTitle": "Refresh failed — showing cached data",
+    "incompleteTitle": "Incomplete data — some pages could not be loaded",
     "age": {
       "justNow": "just now",
       "minutes": "{{count}}m ago",
       "hours": "{{count}}h ago",
       "days": "{{count}}d ago"
-    }
+    },
+    "loadFailedTitle": "Could not load",
+    "loadFailedHint": "Something went wrong fetching this. Try Refresh."
   },
   "wallet": {
     "title": "Wallet",
@@ -290,6 +342,7 @@
     "journalEmptyHint": "Reconnect to fetch this character's wallet journal.",
     "transactionsEmptyTitle": "No transactions cached",
     "transactionsEmptyHint": "Reconnect to fetch this character's recent transactions.",
+    "transactionsCapped": "Recent transactions only — older history was not fetched",
     "date": "Date",
     "amount": "Amount",
     "balanceCol": "Balance",
@@ -318,7 +371,7 @@
     "structureLabel": "Structure #{{id}}",
     "inSpaceLabel": "In space (system #{{id}})",
     "containerLabel": "Container",
-    "reauthTitle": "Log in again to see assets",
+    "reauthTitle": "Log in again to see your assets",
     "reauthHint": "Log in again to fetch this character's assets.",
     "reauthAction": "Log in again with EVE Online",
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
@@ -332,7 +385,7 @@
     "selectHint": "Select a message to read it.",
     "unknownSender": "Unknown sender",
     "noSubject": "(no subject)",
-    "reauthTitle": "Log in again to see mail",
+    "reauthTitle": "Log in again to see your mail",
     "reauthHint": "Log in again to fetch this character's mail.",
     "reauthAction": "Log in again with EVE Online"
   },
@@ -347,7 +400,7 @@
     "responseDeclined": "Declined",
     "responseTentative": "Tentative",
     "responseNotResponded": "Not responded",
-    "reauthTitle": "Log in again to see calendar events",
+    "reauthTitle": "Log in again to see your calendar",
     "reauthHint": "Log in again to fetch this character's calendar.",
     "reauthAction": "Log in again with EVE Online"
   },
@@ -361,7 +414,7 @@
     "price": "Price",
     "expires": "Expires",
     "issuer": "Issuer",
-    "reauthTitle": "Log in again to see contracts",
+    "reauthTitle": "Log in again to see your contracts",
     "reauthHint": "Log in again to fetch this character's contracts.",
     "reauthAction": "Log in again with EVE Online"
   },
@@ -384,7 +437,7 @@
     "issued": "Issued",
     "expires": "Expires",
     "state": "State",
-    "reauthTitle": "Log in again to see market orders",
+    "reauthTitle": "Log in again to see your orders",
     "reauthHint": "Log in again to fetch this character's market orders.",
     "reauthAction": "Log in again with EVE Online"
   },
@@ -426,5 +479,15 @@
     "buyVolume": "Buy Volume",
     "remove": "Remove",
     "unpin": "Unpin"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "hint": "Reloading usually fixes this. Your Skill Plans and Build Plans are stored locally and are not affected.",
+    "reload": "Reload"
+  },
+  "settings": {
+    "title": "Settings",
+    "emptyTitle": "No preferences yet",
+    "emptyHint": "Display preferences will appear here as they are added."
   }
 }

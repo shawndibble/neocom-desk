@@ -46,7 +46,12 @@ describe('loadCalendarEvents', () => {
     );
     const result = await loadCalendarEvents(CHAR_ID);
     expect(result.needsReauth).toBe(false);
-    expect(result.cached).toEqual({ data: events, fetchedAt: new Date(3), fromCache: true });
+    expect(result.cached).toEqual({
+      data: events,
+      fetchedAt: new Date(3),
+      fromCache: true,
+      truncated: false,
+    });
   });
 
   it('reports needsReauth when the calendar scope was revoked (403) and nothing is cached', async () => {

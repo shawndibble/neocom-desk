@@ -52,7 +52,12 @@ describe('loadOrders', () => {
     );
     const result = await loadOrders(CHAR_ID);
     expect(result.needsReauth).toBe(false);
-    expect(result.cached).toEqual({ data: [ORDER], fetchedAt: new Date(4), fromCache: true });
+    expect(result.cached).toEqual({
+      data: [ORDER],
+      fetchedAt: new Date(4),
+      fromCache: true,
+      truncated: false,
+    });
   });
 
   it('reports needsReauth when the orders scope was revoked (403) and nothing is cached', async () => {

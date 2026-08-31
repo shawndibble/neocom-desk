@@ -1,5 +1,5 @@
 import { Tooltip } from '@/components/ui';
-import { typeIconUrl } from './typeDisplay';
+import { typeIconUrl } from '@/lib/eveImages';
 
 interface ImplantChipProps {
   typeId: number;

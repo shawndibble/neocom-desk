@@ -105,7 +105,7 @@ export function PlanList({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-[11px] font-semibold tracking-widest text-text-dim uppercase">
+        <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('plans.title')}
         </h2>
         <Button variant="primary" size="sm" onClick={onCreate}>
