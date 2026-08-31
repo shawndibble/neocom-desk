@@ -6,13 +6,16 @@
 import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
 import type { CharacterAttributes, CharacterSkill } from '@/esi/endpoints';
-import type { Attributes, EngineSkill, Implants, TrainedSkill } from '@/engine/types';
+import { buildUnlockIndex } from '@/engine/skillUnlocks';
+import type { Attributes, EngineSkill, Implants, SkillPrereq, TrainedSkill } from '@/engine/types';
 
 export interface SkillCatalog {
   /** All skills, keyed by typeID, in the shape src/engine consumes. */
   engineSkills: Map<number, EngineSkill>;
   /** Raw SDE rows, keyed by typeID (name/groupName for display). */
   bySkillTypeID: Map<number, SkillType>;
+  /** Reverse of prereqs: for a skill, every skill it unlocks and the level needed. Built once. */
+  unlocksByTypeID: Map<number, SkillPrereq[]>;
 }
 
 function toEngineSkill(skill: SkillType): EngineSkill {
@@ -34,7 +37,7 @@ export async function loadSkillCatalog(): Promise<SkillCatalog> {
     engineSkills.set(skill.typeID, toEngineSkill(skill));
     bySkillTypeID.set(skill.typeID, skill);
   }
-  return { engineSkills, bySkillTypeID };
+  return { engineSkills, bySkillTypeID, unlocksByTypeID: buildUnlockIndex(engineSkills) };
 }
 
 /** ESI trained-skills rows -> engine TrainedSkill map, keyed by typeID. */
