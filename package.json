@@ -25,6 +25,7 @@
     "dexie-react-hooks": "^4.4.0",
     "firebase": "^12.18.0",
     "i18next": "^26.4.0",
+    "radix-ui": "^1.6.7",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-i18next": "^17.0.12",
