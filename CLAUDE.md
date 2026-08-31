@@ -34,8 +34,12 @@ Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
 ### Autonomous ticket loop
 
 `/next-ticket` (`.claude/commands/next-ticket.md`) picks the next unblocked
-`ready-for-agent` issue, implements it on a branch, opens a PR, waits for CI to
-go green (fixing failures), then squash-merges and closes the issue. Run it on a
-schedule with `/loop /next-ticket`. Local execution copies of `triage`,
-`implement`, `tdd`, and `code-review` live under `.claude/skills/` so the loop
-can invoke them.
+`ready-for-agent` issue, claims it (`in-progress` label + assignee), does the
+work in its own `git worktree`, opens a PR, waits for CI to go green (fixing
+failures), then squash-merges, closes the issue, and removes the worktree.
+Selection is lock-serialized so multiple `/next-ticket` runs are safe to fire
+concurrently on one machine — see `docs/agents/issue-tracker.md`
+"Concurrency claim". Run it headless in a loop, e.g.
+`claude -p "/next-ticket"` on an interval, or several such loops in parallel.
+Local execution copies of `triage`, `implement`, `tdd`, and `code-review` live
+under `.claude/skills/` so the loop can invoke them.
