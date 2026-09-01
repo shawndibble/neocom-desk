@@ -193,6 +193,49 @@ describe('Industry: Build Plan CRUD', () => {
   });
 });
 
+describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', () => {
+  it('creates and selects a plan for a product typeID with no existing plan, then clears the query param', async () => {
+    window.history.pushState({}, '', '/industry?product=587');
+    render(<App />);
+
+    const row = await screen.findByRole('button', { name: 'Rifter' });
+    expect(row.closest('li')).toHaveClass('bg-panel-2');
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
+    await vi.waitFor(() => expect(window.location.search).toBe(''));
+  });
+
+  it('reuses an existing plan for that blueprint rather than creating a duplicate', async () => {
+    await db.buildPlans.add(seedPlan());
+    window.history.pushState({}, '', '/industry?product=587');
+    render(<App />);
+
+    const row = await screen.findByRole('button', { name: 'Rifter run' });
+    await vi.waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
+  });
+
+  it('selects the reused plan even when it is not the first plan in the list, and the selection survives the URL settling', async () => {
+    // A different (unrelated) plan seeded first, so `plans[0]` is the wrong
+    // answer — this is what the naive "fall back to plans[0] once the
+    // ?product= param clears" bug looked like before the fix: it happened to
+    // pass with a single seeded plan because plans[0] was coincidentally
+    // correct.
+    await db.buildPlans.add(seedPlan({ id: 'bp-0', name: 'Other plan', blueprintTypeID: 999 }));
+    await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run' }));
+    window.history.pushState({}, '', '/industry?product=587');
+    render(<App />);
+
+    const row = await screen.findByRole('button', { name: 'Rifter run' });
+    await vi.waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    await vi.waitFor(() => expect(window.location.search).toBe(''));
+    // The selection must still be the reused plan after the param clears, not plans[0].
+    expect(row.closest('li')).toHaveClass('bg-panel-2');
+    expect(screen.getByRole('button', { name: 'Other plan' }).closest('li')).not.toHaveClass(
+      'bg-panel-2'
+    );
+  });
+});
+
 describe('Industry: owned-blueprint prefill', () => {
   it('prefills ME/TE from the best owned copy and shows the owned hint', async () => {
     server.use(

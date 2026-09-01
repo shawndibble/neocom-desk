@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db, type SkillPlanRecord } from '@/db';
-import { configureClipboard, type ClipboardWriter } from '@/features/skills/clipboard';
+import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';

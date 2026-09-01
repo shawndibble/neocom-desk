@@ -49,6 +49,16 @@ describe('loadBlueprintCatalog', () => {
     expect(entry?.productTypeID).toBeNull();
     expect(entry?.productName).toBe('No Product Blueprint');
   });
+
+  it("also keys entries by product typeID, for looking up an item's blueprint", async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(catalog.byProductTypeID.get(587)?.blueprintTypeID).toBe(638);
+  });
+
+  it('has no product-typeID entry for an item no blueprint produces', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(catalog.byProductTypeID.has(34)).toBe(false);
+  });
 });
 
 describe('searchByProductName', () => {

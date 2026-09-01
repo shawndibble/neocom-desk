@@ -60,12 +60,19 @@ export function resolveOrderLocation(
   };
 }
 
-/** Trade Hub mode narrows a region's book to one station (CONTEXT.md: "filters the rows down to the hub's own station"). */
+/**
+ * Narrows an order book to one location_id: Trade Hub mode's own-station
+ * filter (CONTEXT.md: "filters the rows down to the hub's own station") and
+ * the order-row "filter to this station" context-menu action share this
+ * function. `null` passes every order through, for the context-menu action's
+ * undo.
+ */
 export function filterOrdersByLocation<T extends { location_id: number }>(
   orders: readonly T[],
-  locationId: number
+  locationId: number | null
 ): T[] {
-  return orders.filter((o) => o.location_id === locationId);
+  if (locationId === null) return [...orders];
+  return orders.filter((order) => order.location_id === locationId);
 }
 
 /** An order's expiry: issued + duration (days). */
