@@ -11,6 +11,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache } from '@/features/market/orderBook';
+import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
@@ -186,6 +187,7 @@ beforeEach(async () => {
   usePublicInfo.setState({ byCharacterId: {} });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
+  useCompareSet.setState({ items: [] });
   clearOrderBookCache();
   window.history.pushState({}, '', '/market');
 });
@@ -253,7 +255,7 @@ describe('Market Browser', () => {
 describe('Market Browser item context menu (issue #6)', () => {
   afterEach(() => configureClipboard(null));
 
-  it('opens on right-click with all five actions, three disabled until their target ships', async () => {
+  it('opens on right-click with all five actions, two disabled until their target ships', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'rift');
@@ -265,7 +267,7 @@ describe('Market Browser item context menu (issue #6)', () => {
       'data-disabled'
     );
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toHaveAttribute('data-disabled');
-    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toHaveAttribute(
+    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).not.toHaveAttribute(
       'data-disabled'
     );
     expect(screen.getByRole('menuitem', { name: 'Copy name' })).not.toHaveAttribute(
@@ -279,6 +281,20 @@ describe('Market Browser item context menu (issue #6)', () => {
     ).not.toHaveAttribute('data-disabled');
 
     await user.keyboard('{Escape}');
+  });
+
+  it('adds the item to the Compare Set (issue #8), showing the drawer handle', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Compare' }));
+
+    expect(useCompareSet.getState().items).toEqual([{ typeId: 587, itemName: 'Rifter' }]);
+    expect(screen.getByRole('button', { name: 'Compare (1)' })).toBeInTheDocument();
   });
 
   it('shows "No blueprint options" disabled for an item no blueprint produces', async () => {

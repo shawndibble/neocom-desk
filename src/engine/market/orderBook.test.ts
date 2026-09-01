@@ -4,6 +4,7 @@ import {
   resolveOrderLocation,
   orderExpiry,
   filterOrdersByLocation,
+  summarizeOrderBook,
 } from './orderBook';
 
 interface Order {
@@ -86,6 +87,50 @@ describe('filterOrdersByLocation', () => {
 
   it('returns an empty array when nothing matches', () => {
     expect(filterOrdersByLocation(orders, 999)).toEqual([]);
+  });
+});
+
+describe('summarizeOrderBook', () => {
+  it('reports the cheapest sell, the highest buy, their spread, and total sell-side volume', () => {
+    const orders = [
+      { is_buy_order: false, price: 105, volume_remain: 10 },
+      { is_buy_order: false, price: 100, volume_remain: 5 },
+      { is_buy_order: true, price: 90, volume_remain: 20 },
+      { is_buy_order: true, price: 95, volume_remain: 3 },
+    ];
+    expect(summarizeOrderBook(orders)).toEqual({
+      bestSell: 100,
+      bestBuy: 95,
+      spread: 5,
+      availableVolume: 15,
+    });
+  });
+
+  it('reports a null spread when one side is missing, without treating the absent side as zero', () => {
+    const sellOnly = [{ is_buy_order: false, price: 100, volume_remain: 5 }];
+    expect(summarizeOrderBook(sellOnly)).toEqual({
+      bestSell: 100,
+      bestBuy: null,
+      spread: null,
+      availableVolume: 5,
+    });
+
+    const buyOnly = [{ is_buy_order: true, price: 90, volume_remain: 20 }];
+    expect(summarizeOrderBook(buyOnly)).toEqual({
+      bestSell: null,
+      bestBuy: 90,
+      spread: null,
+      availableVolume: 0,
+    });
+  });
+
+  it('reports an all-null, zero-volume summary for an empty order book', () => {
+    expect(summarizeOrderBook([])).toEqual({
+      bestSell: null,
+      bestBuy: null,
+      spread: null,
+      availableVolume: 0,
+    });
   });
 });
 

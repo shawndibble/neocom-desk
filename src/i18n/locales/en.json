@@ -579,7 +579,21 @@
       "filterToStation": "Filter to this station"
     },
     "stationFilterActive": "Filtered to {{station}}",
-    "clearStationFilter": "Clear filter"
+    "clearStationFilter": "Clear filter",
+    "compare": {
+      "handle": "Compare ({{count}})",
+      "title": "Compare",
+      "columnItem": "Item",
+      "columnBestSell": "Best Sell",
+      "columnBestBuy": "Best Buy",
+      "columnSpread": "Spread",
+      "columnVolume": "Volume",
+      "remove": "Remove {{name}}",
+      "clearAll": "Clear all",
+      "expand": "Expand",
+      "restore": "Restore",
+      "resize": "Resize the drawer"
+    }
   },
   "error": {
     "title": "Something went wrong",
