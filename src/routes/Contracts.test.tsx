@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -94,22 +95,61 @@ beforeEach(async () => {
 });
 
 describe('Contracts', () => {
-  it('renders every page from mocked ESI with resolved issuer name and a status chip', async () => {
+  it('renders every page from mocked ESI with resolved issuer name and a humanized status', async () => {
     render(<App />);
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
-    expect(screen.getByText('courier')).toBeInTheDocument();
+    expect(screen.getByText('Courier')).toBeInTheDocument();
     expect(screen.getAllByText(/Some Trader/).length).toBe(2);
-    expect(screen.getByText('outstanding')).toBeInTheDocument();
-    expect(screen.getByText('finished')).toBeInTheDocument();
+    expect(screen.getByText('Outstanding')).toBeInTheDocument();
+    expect(screen.getByText('Finished')).toBeInTheDocument();
   });
 
-  it('dims the expired contract row', async () => {
+  it('dims only a lapsed, unclaimed contract — not a finished one whose deadline has simply passed', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        if (page === '2') {
+          return HttpResponse.json(contractPage2, { headers: { 'X-Pages': '2' } });
+        }
+        return HttpResponse.json(
+          [
+            ...contractPage1,
+            {
+              ...contractPage1[0],
+              contract_id: 3,
+              title: 'Lapsed offer',
+              date_expired: '2020-01-01T00:00:00Z',
+            },
+          ],
+          { headers: { 'X-Pages': '2' } }
+        );
+      })
+    );
     render(<App />);
     await screen.findByText('Rifter fit');
-    const expiredRow = screen.getByText('courier').closest('tr');
-    expect(expiredRow).toHaveClass('opacity-50');
-    const activeRow = screen.getByText('Rifter fit').closest('tr');
-    expect(activeRow).not.toHaveClass('opacity-50');
+
+    const freshRow = screen.getByText('Rifter fit').closest('tr');
+    expect(freshRow).not.toHaveClass('opacity-50');
+
+    const staleRow = screen.getByText('Lapsed offer').closest('tr');
+    expect(staleRow).toHaveClass('opacity-50');
+
+    // Finished, with a deadline in the past — no longer dims (issue: was
+    // status-blind, so almost every completed contract dimmed).
+    const finishedRow = screen.getByText('Courier').closest('tr');
+    expect(finishedRow).not.toHaveClass('opacity-50');
+  });
+
+  it('opens the contract detail modal on click', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Rifter fit' }));
+    expect(await screen.findByRole('dialog', { name: 'Rifter fit' })).toBeInTheDocument();
   });
 
   it('falls back to cached contracts offline', async () => {

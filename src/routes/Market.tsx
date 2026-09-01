@@ -120,6 +120,7 @@ interface MarketGroupTreeProps {
   typesByGroup: ReadonlyMap<number, MarketTypeEntry[]>;
   filterResult: ReturnType<typeof filterMarketTree>;
   expandedIds: ReadonlySet<number>;
+  searchCollapsedIds: ReadonlySet<number>;
   onToggle: (id: number) => void;
   onSelect: (typeId: number) => void;
   selectedTypeId: number | null;
@@ -135,6 +136,7 @@ function MarketGroupTree({
   typesByGroup,
   filterResult,
   expandedIds,
+  searchCollapsedIds,
   onToggle,
   onSelect,
   selectedTypeId,
@@ -154,7 +156,11 @@ function MarketGroupTree({
       : group.hasTypes
         ? (typesByGroup.get(group.id) ?? [])
         : [];
-    const expanded = filtering || expandedIds.has(group.id);
+    // Matched branches default open (marketTree.ts), but that default is just
+    // a starting point: `onToggle` below lets the user collapse/re-expand any
+    // group while search is active, independent of which items still match.
+    // Search only ever prunes *items*, never forces expand state.
+    const expanded = filtering ? !searchCollapsedIds.has(group.id) : expandedIds.has(group.id);
     const expandable = children.length > 0 || items.length > 0;
 
     return (
@@ -318,6 +324,11 @@ export function Market() {
   const [rawQuery, setRawQuery] = useState('');
   const [query, setQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<number>>(new Set());
+  // Groups the user has explicitly collapsed while a search is filtering the
+  // tree (see MarketGroupTree's `expanded` calc) — kept apart from
+  // `expandedIds` (the plain-browsing expand state) so clearing the search
+  // returns to whatever the tree looked like before it started.
+  const [searchCollapsedIds, setSearchCollapsedIds] = useState<ReadonlySet<number>>(new Set());
 
   // Narrow screens show one column at a time (CONTEXT.md round 8); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
@@ -664,7 +675,8 @@ export function Market() {
   );
 
   function handleToggle(groupId: number) {
-    setExpandedIds((current) => {
+    const setter = filterResult !== null ? setSearchCollapsedIds : setExpandedIds;
+    setter((current) => {
       const next = new Set(current);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
@@ -985,6 +997,7 @@ export function Market() {
                 typesByGroup={typesByGroup}
                 filterResult={filterResult}
                 expandedIds={expandedIds}
+                searchCollapsedIds={searchCollapsedIds}
                 onToggle={handleToggle}
                 onSelect={handleSelectItem}
                 selectedTypeId={selectedTypeId}
