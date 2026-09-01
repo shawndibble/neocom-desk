@@ -27,11 +27,14 @@ on every turn, so a call made late in a long run costs far more than the same
 call made early. A recent 315-turn run spent 58M tokens to produce 75k tokens
 of actual tool output. Context, not reading, is the expense.
 
-- **Batch independent tool calls into one message.** Do not spend a turn on a
-  lone `git status` when you already know the next two calls. Issue
-  independent reads, `gh` queries, and searches together.
-- **Chain shell commands that always run together.** The step 6 gate is one
-  Bash call, not five.
+- **Use the scripts in `scripts/next-ticket/` for every mechanical step below**
+  (selection, worktree setup, the gate, sync-with-main, PR creation, CI
+  driving, CI-failure fetch, merge/cleanup). Each one replaces a multi-call
+  sequence with a single Bash call and prints one line of JSON — read that
+  JSON, don't re-derive what it already tells you. Measured across 58 real
+  runs, models did not reliably batch independent tool calls even with
+  explicit prose telling them to (0/58 batched); these scripts remove the
+  choice instead of asking for it again.
 - **Edit each file once.** Collect every change you intend to make to a file,
   then apply them in a single Edit (or one Write for a rewrite). Nine small
   edits to one file cost nine full context re-reads.
@@ -42,6 +45,12 @@ of actual tool output. Context, not reading, is the expense.
   startup costs more than it saves.
 - **Do not narrate.** Short status lines only; your own output accumulates
   into the context too.
+
+Measured on real runs (2026-09-01, 51 post-batching-fix runs): the mechanical
+steps below (1, 2, 3, 7, 9) average well under a minute combined. Step 5
+(implement) averages ~28 of an average ~31-minute run. The scripts here cut
+token cost and make selection/setup deterministic; they are not primarily a
+wall-clock fix — step 5 is where a run's time actually goes.
 
 ## Abandon procedure (referenced by later steps)
 
@@ -64,12 +73,15 @@ cleanly per the procedure above instead of looping unboundedly.
 Referenced by steps 6 and 8 whenever the branch is behind `main` or a PR
 reports `mergeStateStatus: CONFLICTING`/`DIRTY`. Up to **3 attempts**:
 
-1. `git fetch origin main`
-2. `git merge origin/main --no-edit`
-3. If it reports conflicts, invoke the `resolving-merge-conflicts` skill to
-   resolve them in place — it resolves and commits; never `git merge --abort`.
-4. Re-run the local gate (step 6's Bash chain) against the merged tree. If it
-   fails, follow the local gate failure procedure below.
+1. `node scripts/next-ticket/sync-main.mjs` — fetches and merges
+   `origin/main`. Prints `{"status":"already-up-to-date"}`,
+   `{"status":"merged"}`, or `{"status":"conflict","files":[...]}`.
+2. On `already-up-to-date` or `merged`: skip to step 4.
+3. On `conflict`: invoke the `resolving-merge-conflicts` skill to resolve
+   the listed files in place — it resolves and commits; never
+   `git merge --abort`.
+4. Re-run the gate (`node scripts/next-ticket/gate.mjs --build`) against the
+   merged tree. If it fails, follow the local gate failure procedure below.
 5. If the merge left anything uncommitted, commit it.
 
 If a 3rd attempt still leaves conflicts (main moving faster than this run can
@@ -80,8 +92,9 @@ converge — very unlikely), abandon and report that `main` would not settle.
 Referenced by step 6, and by step 8 whenever a post-merge re-check is needed.
 Up to **5 rounds**:
 
-1. Read the failing command's output directly — it's local, not a CI log, so
-   no sub-agent is needed here.
+1. Read the failing command's output directly from the gate script's JSON
+   (`output.<check-name>`) — it's local, not a CI log, so no sub-agent is
+   needed here.
 2. Fix the actual cause: code or test, whichever is wrong. Never delete,
    skip, or loosen a test just to make it pass.
 3. If a failure looks pre-existing and unrelated to this ticket's diff (e.g.
@@ -89,7 +102,9 @@ Up to **5 rounds**:
 stash`, run just that one check, `git stash pop`. If it fails identically
    without this ticket's changes, note it in the PR's Review notes instead of
    trying to fix it.
-4. Re-run the full gate chain.
+4. Re-run `node scripts/next-ticket/gate.mjs` (no `--build` — that only needs
+   to run once the rest is green, as the final check before step 7 or before
+   pushing a step 8 fix).
 
 If still failing after 5 rounds: comment on the issue with a precise summary
 of the remaining failure, then abandon per the procedure above.
@@ -104,68 +119,51 @@ of the remaining failure, then abandon per the procedure above.
 - `git worktree prune` — clears references to worktrees whose directories were
   already deleted (e.g. by a crashed prior run).
 
+Run these as one chained Bash call.
+
 ## 2. Pick and claim the ticket (lock-protected)
 
-Concurrent runs must not select the same ticket. Serialize selection with a
-local lock shared by every worktree (they share one `.git`):
+`node scripts/next-ticket/select-ticket.mjs [issue-number]` does the whole
+of this step in one call: acquires a local lock shared by every worktree
+(they share one `.git`, so concurrent runs can't select the same ticket),
+lists `ready-for-agent` issues, drops any with an assignee or an
+`in-progress` label, resolves each remaining issue's `## Blocked by` section
+(unblocked only if every referenced issue is `CLOSED`), picks the
+lowest-numbered unblocked one (or checks the given issue number against the
+same rules, if `$ARGUMENTS` has one), claims it
+(`--add-assignee @me --add-label in-progress`), and releases the lock. It
+retries lock acquisition internally (12 attempts over ~2 minutes, reclaiming
+a lock older than 90s as crashed) — that whole wait, if it happens, is inside
+this one call.
 
-```
-LOCK_DIR="$(git rev-parse --git-common-dir)/next-ticket.lock"
-```
+It prints one line of JSON on stdout:
 
-Acquire it before listing issues. **Each attempt is its own Bash tool call —
-never a shell-level `for`/`while` retry loop.** A multi-minute wait folded into
-one Bash call is invisible to anyone watching the run (nothing prints until
-that one call returns); one call per attempt keeps the run observable and lets
-you say a line like "lock held, waiting" between tries.
-
-- Attempt: `mkdir "$LOCK_DIR"` (atomic — fails if it already exists).
-  - On success: `date +%s > "$LOCK_DIR/owner"`, proceed to list issues below.
-  - On failure: read `$LOCK_DIR/owner`. If it's older than **90s**, the
-    holder almost certainly crashed without releasing it (a normal
-    select-and-claim critical section is a handful of `gh` calls, seconds not
-    minutes) — `rm -rf "$LOCK_DIR"` and retry immediately.
-  - Otherwise: report "lock held, waiting", `sleep 10`, and retry.
-- After **12 attempts** (~2 minutes of real waiting — comfortably longer than
-  it ever takes to either finish a legitimate claim or age past the 90s
-  staleness bar) with no success: release nothing (never held it), report
-  that the lock could not be acquired, and **STOP** with
-  `RESULT ticket=none pr=none status=blocked`.
-
-While holding the lock:
-
-- `gh issue list --label ready-for-agent --state open --json number,title,body,assignees,labels --jq 'sort_by(.number)'`
-- Drop any issue that has an assignee **or** already carries the
-  `in-progress` label (claimed by another run, human or automated).
-- For each remaining issue, read its `## Blocked by` section:
-  - "None" / "None — can start immediately" → unblocked.
-  - Otherwise, for every `#<n>` it lists, run `gh issue view <n> --json state`.
-    The ticket is unblocked only if **every** referenced issue is `CLOSED`.
-- Pick the **lowest-numbered** unblocked, unclaimed ticket (or the
-  `$ARGUMENTS` issue if one was given, after the same checks).
-- **If none qualify:** release the lock (`rmdir "$LOCK_DIR"`), report "no
-  unblocked ready-for-agent tickets", and **STOP**.
-- Otherwise, immediately claim it: `gh issue edit <n> --add-assignee @me --add-label in-progress`.
-
-Release the lock (`rmdir "$LOCK_DIR"`) as soon as the claim above lands — do
-**not** hold it through implementation. Other runs can now select the next
-ticket while this one proceeds.
+- `{"status":"claimed","number":<n>,"title":"...","slug":"..."}` → proceed.
+- `{"status":"no-ticket"}` → report "no unblocked ready-for-agent tickets"
+  and **STOP**.
+- `{"status":"lock-timeout"}` → report the lock could not be acquired and
+  **STOP** with `RESULT ticket=none pr=none status=blocked`.
+- `{"status":"override-unavailable","reason":"not-found|assigned-or-in-progress|blocked"}`
+  (only when `$ARGUMENTS` gave an issue number) → report the reason and
+  **STOP**.
 
 ## 3. Create the worktree
 
-- `SLUG=<short-kebab-slug-from-issue-title>`
-- `WORKTREE_ROOT="$(dirname "$(git rev-parse --show-toplevel)")/neocom-desk.worktrees"`
-- `WORKTREE_PATH="$WORKTREE_ROOT/<n>-$SLUG"`
-- If `$WORKTREE_PATH` already exists (stale leftover), `rm -rf` it first.
-- `git worktree add "$WORKTREE_PATH" -b claude/<n>-$SLUG main`
-- Copy local dev config the worktree won't have (gitignored, per-directory):
-  `cp .env "$WORKTREE_PATH/.env"` from the checkout this session started in,
-  if that file exists there.
-- `cd "$WORKTREE_PATH"`, then `npm ci` (fast — reuses the shared npm cache).
+`node scripts/next-ticket/setup-worktree.mjs <n> <slug>` does the rest of
+this step in one call: removes a stale worktree dir at the target path if one
+exists, `git worktree add`s a new one on branch `claude/<n>-<slug>` off
+`main`, copies `.env` from the checkout this session started in (gitignored,
+per-directory — the worktree won't have it otherwise) if that file exists
+there, and runs `npm ci` inside the new worktree.
 
-**Everything from here on runs inside `$WORKTREE_PATH`.** If this step fails
-(worktree add or `npm ci` errors), abandon per the procedure above, report the
-failure, and **STOP**.
+It prints `{"status":"ready","worktreePath":"...","branch":"..."}` or
+`{"status":"error","step":"worktree-add|npm-ci","message":"..."}`.
+
+- On `ready`: `cd "$WORKTREE_PATH"` (the path from the JSON).
+- On `error`: abandon per the procedure above, report the failure, and
+  **STOP**.
+
+**Everything from here on runs inside `$WORKTREE_PATH`.**
 
 ## 4. Revalidate — `/triage <n>` (revalidation mode)
 
@@ -207,16 +205,17 @@ run them inline.
 merge) — catch that now rather than at PR-merge time. Run the sync-with-main
 procedure above once, unconditionally, before the gate.
 
-Then run the gate as **one Bash call** — these always run together, and five
-separate calls cost five full context re-reads:
+Then run `node scripts/next-ticket/gate.mjs --build`. It runs
+`format:check`, `lint`, `typecheck`, and `test:run` concurrently (they're
+independent — this is faster than the old sequential `&&` chain, and one
+Bash call either way), then `build` if the rest passed. It prints
+`{"status":"pass"}` or
+`{"status":"fail","failed":["lint", ...],"output":{"lint":"...tail...", ...}}`
+(each failed check's output, truncated to its last ~4000 characters — read
+`output.<check-name>` directly rather than re-running the check yourself).
 
-```
-npm run format:check && npm run lint && npm run typecheck && npm run test:run && npm run build
-```
-
-`&&` stops at the first failure, which is the one you need to see. If it
-fails, follow the local gate failure procedure above (bounded to 5 rounds)
-rather than looping freely. `npm run format` auto-fixes formatting.
+If it fails, follow the local gate failure procedure above (bounded to 5
+rounds) rather than looping freely. `npm run format` auto-fixes formatting.
 
 Do **not** run `npm run test:e2e` locally — one spec
 (`e2e/plans.spec.ts` clipboard export) fails only on Windows due to a clipboard
@@ -227,39 +226,45 @@ export/clipboard behaviour, reason about e2e impact from the spec instead.
 
 - Ensure everything is committed. Conventional Commit subject; body ends with
   `Closes #<n>`.
-- `git push -u origin HEAD`
-- `gh pr create --base main --title "<type>: <summary> (#<n>)" --body "<body>"`
-  - Body: what changed and why, `Closes #<n>`, any deviations from the ticket,
-    and a "Review notes" section for unaddressed judgement-call findings from
-    `/code-review`.
+- Write the PR body to a scratch file (what changed and why, `Closes #<n>`,
+  any deviations from the ticket, and a "Review notes" section for
+  unaddressed judgement-call findings from `/code-review`).
+- `node scripts/next-ticket/open-pr.mjs "<type>: <summary> (#<n>)" <body-file>`
+  — pushes the branch (`-u origin HEAD`) and creates the PR against `main`.
+  Prints `{"status":"open","number":<pr>,"url":"..."}` or
+  `{"status":"error","message":"..."}`. On `error`, follow the local gate /
+  abandon procedures as appropriate to the failure.
 
 ## 8. Drive to a mergeable, green PR
 
 Loop up to **5 rounds** (this budget is shared across both triggers below —
 it is not 5 conflict rounds plus 5 CI rounds):
 
-- **Mergeability first**: `gh pr view <pr> --json mergeStateStatus --jq
-.mergeStateStatus`. If it's `CONFLICTING` or `DIRTY`, run the
-  sync-with-main / conflict resolution procedure above, push, and restart
-  this round (re-check CI below against the new commit).
-- `gh pr checks <pr> --watch --interval 30` (blocks until `validate` + `e2e`
-  finish).
-- **If any check fails**, within the same round budget:
-  1. Diagnose in a **sub-agent** — CI logs run to tens of thousands of tokens
-     and you only need the conclusion. Give it the run id and have it fetch
-     `gh run view <run-id> --log-failed` (and, for an `e2e` failure,
-     `gh run download <run-id> -n playwright-report -D /tmp/pw-report`), then
-     report back: the failing job and test, the error message, the
-     `file:line`, and its best read of the cause. Never pull raw CI logs into
-     this context. On rounds 2+, tell it what previous rounds already tried —
-     each sub-agent starts fresh and will otherwise re-propose a fix you have
-     already ruled out.
-  2. Fix it on the branch from that report (code or test, whichever is
-     actually wrong — do not delete a failing test to make it pass).
-  3. Re-run the local gate (step 6), commit, `git push`.
-  4. `gh pr checks <pr> --watch --interval 30` again.
-- Once a round trips neither trigger — mergeable and green — proceed to
-  step 9.
+- `node scripts/next-ticket/drive-ci.mjs <pr>` — checks mergeability, and if
+  clean, blocks on `gh pr checks --watch` until `validate` + `e2e` finish
+  (this is the CI runtime itself, not overhead — nothing to speed up here).
+  Prints one of:
+  - `{"status":"conflict"}` — follow the sync-with-main / conflict resolution
+    procedure above (it includes the gate re-run and commit), push, and
+    restart this round.
+  - `{"status":"green","mergeable":true}` — proceed to step 9.
+  - `{"status":"checks-failed","failedRunIds":[<run-id>, ...]}` — for each
+    id, within the same round budget:
+    1. Diagnose in a **sub-agent** — CI logs run to tens of thousands of
+       tokens and you only need the conclusion. Give it the run id and have
+       it run `node scripts/next-ticket/fetch-ci-failure.mjs <run-id>` (one
+       call gets the filtered failed-step log, plus a note if the failing
+       job looks like `e2e` so it knows to also `gh run download <run-id> -n
+playwright-report`), then report back: the failing job and test, the
+       error message, the `file:line`, and its best read of the cause. Never
+       pull raw CI logs into this context. On rounds 2+, tell it what
+       previous rounds already tried — each sub-agent starts fresh and will
+       otherwise re-propose a fix you have already ruled out.
+    2. Fix it on the branch from that report (code or test, whichever is
+       actually wrong — do not delete a failing test to make it pass).
+    3. Re-run the gate (`node scripts/next-ticket/gate.mjs --build`), commit,
+       `git push`.
+    4. Restart this round (`drive-ci.mjs` again against the new commit).
 - If still not both mergeable and green after 5 rounds: comment on the PR
   **and** the issue with a precise summary of the remaining failure, leave the
   PR open, abandon per the procedure above (this removes the claim so a
@@ -268,18 +273,21 @@ it is not 5 conflict rounds plus 5 CI rounds):
 
 ## 9. Merge, close, and clean up
 
-- All checks green and mergeable → `gh pr merge <pr> --squash --delete-branch`.
-  If this fails anyway (a last-second race — something merged to `main`
-  between step 8's check and now), re-run step 8's mergeability check once
-  more; if it still won't merge, abandon per the procedure above.
-- The squash commit carries `Closes #<n>`, so the issue auto-closes on merge to
-  `main`. Verify with `gh issue view <n> --json state`; if still `OPEN`, run
-  `gh issue close <n> --comment "Merged in <pr-url>"`.
-- Also strip the claim label if it somehow survived close:
-  `gh issue edit <n> --remove-label in-progress` (ignore errors — closing
-  usually leaves labels as-is, this is just cleanup).
-- `cd` back to the checkout this session started in, then
-  `git worktree remove "$WORKTREE_PATH" --force` and `git worktree prune`.
+`cd` back to the checkout this session started in (not the worktree — this
+script removes it), then:
+
+`node scripts/next-ticket/finish.mjs <pr> <n> "$WORKTREE_PATH"` —
+squash-merges and deletes the branch, polls the issue for auto-close (the
+squash commit carries `Closes #<n>`; closes it directly if auto-close hasn't
+landed after a few seconds), strips the `in-progress` label, then removes and
+prunes the worktree. Prints `{"status":"merged","issueClosed":true}` or
+`{"status":"merge-failed","message":"..."}`.
+
+- On `merge-failed`: this can be a last-second race (something merged to
+  `main` between step 8's check and now) — re-run
+  `node scripts/next-ticket/drive-ci.mjs <pr>` once more; if it now reports
+  `conflict`, handle it per step 8 and retry `finish.mjs`. If it still won't
+  merge, abandon per the procedure above.
 - Note in your final report: merging to `main` triggered the `deploy` job
   (GitHub Pages).
 

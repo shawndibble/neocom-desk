@@ -65,5 +65,12 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     coverage: { reporter: ['text', 'html'] },
+    // Suppresses passing-test noise, keeps full detail on failures — cuts
+    // `test:run` output (read by CI logs and every agent tool call alike)
+    // without losing anything actually diagnostic. An explicit `reporters`
+    // array replaces Vitest's default set rather than merging with it, so
+    // `github-actions` has to be re-added here or CI's PR-diff annotations
+    // (on by default, undocumented in this config until now) disappear.
+    reporters: process.env.GITHUB_ACTIONS === 'true' ? ['agent', 'github-actions'] : ['agent'],
   },
 });

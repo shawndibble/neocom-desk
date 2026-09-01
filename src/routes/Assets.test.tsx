@@ -10,7 +10,6 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
 import type { TypeMap } from '@/sde/types';
-import { MAX_RENDERED_ASSETS } from './Assets';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -403,8 +402,8 @@ describe('Assets', () => {
     expect(await screen.findByText(/only the first 25 assets were fetched/i)).toBeInTheDocument();
   });
 
-  it('caps what is rendered and says so, when the fetched list is larger than the render cap', async () => {
-    const bigAssetList = Array.from({ length: MAX_RENDERED_ASSETS + 1 }, (_, i) => ({
+  it('virtualizes a large asset list, rendering far fewer rows than exist (issue #86)', async () => {
+    const bigAssetList = Array.from({ length: 2000 }, (_, i) => ({
       item_id: i + 1,
       type_id: 34,
       quantity: 1,
@@ -419,14 +418,15 @@ describe('Assets', () => {
       )
     );
     render(<App />);
-    expect(
-      await screen.findByText(
-        `Showing ${MAX_RENDERED_ASSETS} of ${MAX_RENDERED_ASSETS + 1} assets.`
-      )
-    ).toBeInTheDocument();
+    // The jsdom scroll-container shim reports a fixed ~600px viewport at ~32px/row —
+    // nowhere near the 2000 rows that exist, proving the virtualizer is windowing
+    // rather than rendering everything.
+    const rendered = await screen.findAllByText('Tritanium');
+    expect(rendered.length).toBeLessThan(100);
+    expect(screen.queryByText(/^Showing \d+ of \d+ assets\.$/)).not.toBeInTheDocument();
   });
 
-  it('shows both notices when a character trips the fetch cap and the render cap at once', async () => {
+  it('shows the fetch-cap notice without a render-cap notice, now that rendering is virtualized', async () => {
     const PAGE_SIZE = 50;
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
@@ -440,7 +440,7 @@ describe('Assets', () => {
     );
     render(<App />);
     expect(await screen.findByText(/only the first 1250 assets were fetched/i)).toBeInTheDocument();
-    expect(screen.getByText(`Showing ${MAX_RENDERED_ASSETS} of 1250 assets.`)).toBeInTheDocument();
+    expect(screen.queryByText(/^Showing \d+ of \d+ assets\.$/)).not.toBeInTheDocument();
   });
 
   it('sorts sibling items alphabetically within a station, regardless of ESI response order', async () => {

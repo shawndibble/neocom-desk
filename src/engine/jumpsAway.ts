@@ -13,8 +13,7 @@
 export type JumpsAwayReason = 'noLocation' | 'noRoute';
 
 export type JumpsAwayResult =
-  | { kind: 'known'; jumps: number }
-  | { kind: 'unknown'; reason: JumpsAwayReason };
+  { kind: 'known'; jumps: number } | { kind: 'unknown'; reason: JumpsAwayReason };
 
 /** `route` is ESI's system-id waypoint list (including both ends); null means it could not be resolved. */
 export function jumpsAwayFromRoute(route: readonly number[] | null): JumpsAwayResult {

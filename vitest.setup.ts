@@ -83,6 +83,48 @@ if (typeof Element !== 'undefined') {
 }
 
 /**
+ * jsdom does no layout, so every element's `offsetHeight`/`offsetWidth` is 0 —
+ * `@tanstack/react-virtual` reads those (not `getBoundingClientRect`) to size
+ * its scroll container, and a 0 viewport makes it compute an empty visible
+ * range, hiding every row from the DOM regardless of what a test scrolls to.
+ * The getter itself installs on the whole prototype (there's no way to patch
+ * just one instance ahead of its creation), but the *value* it returns stays
+ * 0 — jsdom's real default — for every element except ones marked
+ * `data-virtual-scroll-root` by the component owning the scroll container, so
+ * this can't skew unrelated layout reads elsewhere (e.g. Radix menu
+ * positioning) even though the property descriptor itself is global.
+ */
+if (typeof HTMLElement !== 'undefined') {
+  const VIRTUAL_SCROLL_SIZE = 600;
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    get(this: HTMLElement) {
+      return this.hasAttribute('data-virtual-scroll-root') ? VIRTUAL_SCROLL_SIZE : 0;
+    },
+  });
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get(this: HTMLElement) {
+      return this.hasAttribute('data-virtual-scroll-root') ? VIRTUAL_SCROLL_SIZE : 0;
+    },
+  });
+}
+
+/**
+ * jsdom has no `ResizeObserver`. `@tanstack/react-virtual` itself tolerates
+ * that fine (its internal observer lazily no-ops when the constructor is
+ * missing), but other libraries assume it exists unconditionally — this stub
+ * is cheap insurance for whichever one hits that path next.
+ */
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
+/**
  * jsdom implements no CSS media queries, so `window.matchMedia` is absent and
  * anything subscribing to a breakpoint throws on mount. The never-matching
  * default is load-bearing, not incidental: `Layout` reads a non-matching

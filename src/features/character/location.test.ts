@@ -32,9 +32,7 @@ describe('loadCharacterSolarSystemId', () => {
     const systemId = await loadCharacterSolarSystemId(CHARACTER_ID);
 
     expect(systemId).toBe(30000142);
-    expect(
-      (await db.esiCache.get([CHARACTER_ID, 'characterLocation']))?.value
-    ).toBe(30000142);
+    expect((await db.esiCache.get([CHARACTER_ID, 'characterLocation']))?.value).toBe(30000142);
   });
 
   it('returns null on a 403 (missing grant) WITHOUT signalling a re-auth failure', async () => {

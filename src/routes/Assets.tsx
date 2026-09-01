@@ -1,12 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -51,7 +44,6 @@ import { useRoutePreference, type RoutePreference } from '@/features/character/r
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
-import { capItems } from '@/lib/cap';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
@@ -62,17 +54,22 @@ import { typeIconUrl } from '@/lib/eveImages';
 import { loadTypes } from '@/sde/loadSde';
 import {
   buildAssetTree,
+  type AssetTreeBayNode,
+  type AssetTreeContainerNode,
   type AssetTreeItemNode,
   type AssetTreeNode,
   type AssetTreeStation,
 } from '@/engine/assetTree';
+import {
+  flattenAssetRows,
+  nodeSegment,
+  stationRowKey,
+  type AssetRow,
+} from '@/features/character/assetRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { addQuickbarItem } from '@/features/market/quickbar';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
-
-/** Rendered rows past this many and grouping/painting the list starts to lag. */
-export const MAX_RENDERED_ASSETS = 1000;
 
 /** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -282,10 +279,6 @@ async function loadCrossCharacterData(activeCharacterId: number): Promise<CrossC
   }
 
   return { entries, typeNames, locationNames, characterIdByItemId, characterNameById };
-}
-
-function nodeSegment(node: AssetTreeNode): string {
-  return node.kind === 'bay' ? `b:${node.bay}` : `i:${node.asset.item_id}`;
 }
 
 /**
@@ -571,7 +564,7 @@ function AssetItemRow({ node, depth, ctx }: AssetItemRowProps) {
   const characterBadge = characterBadgeFor(asset.item_id, ctx);
 
   return (
-    <li style={{ paddingLeft: `${depth * 0.75 + 0.75}rem` }}>
+    <div style={{ paddingLeft: `${depth * 0.75 + 0.75}rem` }}>
       <ItemContextMenu
         typeId={asset.type_id}
         itemName={name}
@@ -632,20 +625,19 @@ function AssetItemRow({ node, depth, ctx }: AssetItemRowProps) {
           )}
         </span>
       </ItemContextMenu>
-    </li>
+    </div>
   );
 }
 
-function renderAssetNode(
-  node: AssetTreeNode,
-  path: string,
-  depth: number,
-  ctx: RenderCtx
-): ReactNode {
-  if (node.kind === 'item') {
-    return <AssetItemRow key={path} node={node} depth={depth} ctx={ctx} />;
-  }
+interface AssetBranchRowProps {
+  node: AssetTreeBayNode | AssetTreeContainerNode;
+  path: string;
+  depth: number;
+  ctx: RenderCtx;
+}
 
+/** A bay/container/ship row: toggles its own children's presence in the flattened row list. */
+function AssetBranchRow({ node, path, depth, ctx }: AssetBranchRowProps) {
   const expanded = ctx.expandedKeys.has(path);
   const label =
     node.kind === 'bay'
@@ -654,35 +646,85 @@ function renderAssetNode(
   const characterBadge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, ctx);
 
   return (
-    <li key={path}>
-      <button
-        type="button"
-        onClick={() => ctx.onToggle(path)}
-        style={{ paddingLeft: `${depth * 0.75}rem` }}
-        className="flex w-full items-center gap-1.5 py-1.5 pr-3 text-left text-xs text-text hover:text-accent"
-      >
-        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-          {expanded ? '▾' : '▸'}
-        </span>
-        {node.kind === 'bay' ? (
-          <span className="text-text-dim">{label}</span>
-        ) : (
-          <h3 className="truncate font-medium">{label}</h3>
-        )}
-        {characterBadge && <CharacterBadge characterName={characterBadge} t={ctx.t} />}
-        <span className="ml-auto shrink-0 tabular-nums text-[0.6875rem] text-text-faint">
-          {formatBadge(node, ctx.t)}
-        </span>
-      </button>
-      {expanded && (
-        <ul>
-          {node.children.map((child) =>
-            renderAssetNode(child, `${path}/${nodeSegment(child)}`, depth + 1, ctx)
-          )}
-        </ul>
+    <button
+      type="button"
+      onClick={() => ctx.onToggle(path)}
+      style={{ paddingLeft: `${depth * 0.75}rem` }}
+      className="flex w-full items-center gap-1.5 py-1.5 pr-3 text-left text-xs text-text hover:text-accent"
+    >
+      <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
+        {expanded ? '▾' : '▸'}
+      </span>
+      {node.kind === 'bay' ? (
+        <span className="truncate text-text-dim">{label}</span>
+      ) : (
+        <h3 className="truncate font-medium">{label}</h3>
       )}
-    </li>
+      {characterBadge && <CharacterBadge characterName={characterBadge} t={ctx.t} />}
+      <span className="ml-auto shrink-0 tabular-nums text-[0.6875rem] text-text-faint">
+        {formatBadge(node, ctx.t)}
+      </span>
+    </button>
   );
+}
+
+interface StationHeaderRowProps {
+  station: AssetTreeStation;
+  label: string;
+  pinState: PinState;
+  /** Undefined while still resolving/out of scope (issue #87) — see `JumpsAwayBadge`. */
+  jumpsAway: JumpsAwayResult | undefined;
+  onTogglePin: () => void;
+  onExpandAll: () => void;
+  onCollapseAll: () => void;
+  t: Translate;
+}
+
+/**
+ * Replaces the old per-station `Panel` header now that every station shares
+ * one virtualizer: a boxed `Panel` per station can't wrap only its own rows
+ * when all rows are absolutely-positioned siblings in one scroll container,
+ * so this renders inline as just another row, styled to still read as a
+ * section boundary (border-top, panel background) rather than a full box.
+ */
+function StationHeaderRow({
+  station,
+  label,
+  pinState,
+  jumpsAway,
+  onTogglePin,
+  onExpandAll,
+  onCollapseAll,
+  t,
+}: StationHeaderRowProps) {
+  return (
+    <div className="flex min-h-10 items-center justify-between gap-2 border-t border-line bg-panel/85 px-3 py-1 backdrop-blur-sm">
+      <h2 className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {label}
+      </h2>
+      <div className="flex items-center gap-2">
+        <StationPinButton label={label} pinState={pinState} onToggle={onTogglePin} t={t} />
+        <JumpsAwayBadge result={jumpsAway} t={t} />
+        <span className="text-[0.6875rem] text-text-faint tabular-nums">
+          {formatBadge(station, t)}
+        </span>
+        <Button size="sm" onClick={onExpandAll}>
+          {t('assets.expandAll')}
+        </Button>
+        <Button size="sm" onClick={onCollapseAll}>
+          {t('assets.collapseAll')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Station header rows read taller (title + pin/badge/expand/collapse controls); every bay/container/ship/item row shares one `py-1.5 text-xs` row button, so one height covers all three. */
+const STATION_ROW_HEIGHT = 41;
+const TREE_ROW_HEIGHT = 32;
+
+function estimateRowHeight(row: AssetRow): number {
+  return row.type === 'station' ? STATION_ROW_HEIGHT : TREE_ROW_HEIGHT;
 }
 
 /** Character assets as a nested Station -> Ship/Container -> ... tree, with a name search filter. Read-only, cached for offline. */
@@ -869,21 +911,15 @@ export function Assets() {
     [mergedAssets]
   );
 
-  const { shownCount, totalMatches, visibleItemIds } = useMemo(() => {
+  // Every search match is rendered — the tree is virtualized (issue #86), so
+  // there is no longer a render-cost reason to cap what's shown separately
+  // from what ESI actually fetched (`assetsTruncated`, upstream, is unrelated
+  // and stays as-is).
+  const visibleItemIds = useMemo(() => {
     const matches = matchAssets(mergedAssets, mergedTypeNames, search);
-    const capped = capItems(matches, MAX_RENDERED_ASSETS);
-    return {
-      shownCount: capped.items.length,
-      totalMatches: matches.length,
-      visibleItemIds: new Set(capped.items.map((m) => m.asset.item_id)),
-    };
+    return new Set(matches.map((m) => m.asset.item_id));
   }, [mergedAssets, mergedTypeNames, search]);
 
-  const renderTruncated = shownCount < totalMatches;
-
-  // Aggregates (itemCount/estimatedValue) are computed from the full, uncapped asset
-  // list so a badge always reflects the character's true holdings — only the rendered
-  // rows are capped/filtered, via pruning below.
   const tree = useMemo(
     () => buildAssetTree(mergedAssets, priceByTypeId),
     [mergedAssets, priceByTypeId]
@@ -929,7 +965,7 @@ export function Assets() {
     const pinnedKeys = sortedTree
       .filter((station) => pinStateFor(station.locationId) !== 'unpinned')
       .flatMap((station) =>
-        collectExpandableKeys(station.children, `station:${station.locationId}`)
+        collectExpandableKeys(station.children, stationRowKey(station.locationId))
       );
     if (pinnedKeys.length > 0) {
       setExpandedKeys((prev) => new Set([...prev, ...pinnedKeys]));
@@ -945,7 +981,7 @@ export function Assets() {
     if (!searchActive) return null;
     const keys = new Set<string>();
     for (const station of sortedTree) {
-      const stationKey = `station:${station.locationId}`;
+      const stationKey = stationRowKey(station.locationId);
       for (const key of collectExpandableKeys(station.children, stationKey)) keys.add(key);
     }
     return keys;
@@ -988,7 +1024,7 @@ export function Assets() {
     const effectiveExpanded = autoExpandedKeys ?? expandedKeys;
     return sortedTree.filter((station) => {
       if (pinStateFor(station.locationId) !== 'unpinned') return true;
-      const prefix = `station:${station.locationId}/`;
+      const prefix = `${stationRowKey(station.locationId)}/`;
       for (const key of effectiveExpanded) {
         if (key.startsWith(prefix)) return true;
       }
@@ -1045,7 +1081,8 @@ export function Assets() {
           : station.locationType === 'other'
             ? await loadStructureSystemId(activeCharacterId, station.locationId)
             : null;
-      if (!cancelled) setStationSystemIds((prev) => new Map(prev).set(station.locationId, systemId));
+      if (!cancelled)
+        setStationSystemIds((prev) => new Map(prev).set(station.locationId, systemId));
     });
     return () => {
       cancelled = true;
@@ -1131,6 +1168,23 @@ export function Assets() {
     onShowInfo: handleShowInfo,
   };
 
+  // One flat row list — station headers and tree nodes interleaved in visual
+  // order — feeds the single virtualizer below (issue #86). Search re-prunes
+  // `sortedTree` above, which re-flattens here; there is no separate
+  // search-specific row path.
+  const flattenedRows = useMemo(
+    () => flattenAssetRows(sortedTree, renderCtx.expandedKeys),
+    [sortedTree, renderCtx.expandedKeys]
+  );
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: flattenedRows.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: (index) => estimateRowHeight(flattenedRows[index]),
+    getItemKey: (index) => flattenedRows[index].key,
+    overscan: 12,
+  });
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -1150,7 +1204,10 @@ export function Assets() {
             value={routePreference}
             onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
           >
-            <SelectTrigger aria-label={t('assets.jumpsAway.routePreference.label')} className="w-28">
+            <SelectTrigger
+              aria-label={t('assets.jumpsAway.routePreference.label')}
+              className="w-28"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1235,63 +1292,74 @@ export function Assets() {
               {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
             </p>
           )}
-          {renderTruncated && (
-            <p className="text-[11px] text-warning uppercase">
-              {t('assets.renderTruncatedNotice', { shown: shownCount, total: totalMatches })}
-            </p>
-          )}
           {sortedTree.length === 0 ? (
             <EmptyState title={t('assets.noResults')} className="py-8" />
           ) : (
             <AssetItemActionsContext.Provider value={itemActions}>
-              {sortedTree.map((station) => {
-                const stationKey = `station:${station.locationId}`;
-                const label = locationLabel(
-                  station.locationId,
-                  station.locationType,
-                  mergedLocationNames,
-                  assetsByItemId,
-                  mergedTypeNames,
-                  t
-                );
-                const pinState = pinStateFor(station.locationId);
-                return (
-                  <Panel
-                    key={station.locationId}
-                    title={label}
-                    padded={false}
-                    actions={
-                      <div className="flex items-center gap-2">
-                        <StationPinButton
-                          label={label}
-                          pinState={pinState}
-                          onToggle={() => void handleTogglePin(station.locationId)}
-                          t={t}
-                        />
-                        <JumpsAwayBadge
-                          result={jumpsAwayByKey.get(`${station.locationId}:${routePreference}`)}
-                          t={t}
-                        />
-                        <span className="text-[0.6875rem] text-text-faint tabular-nums">
-                          {formatBadge(station, t)}
-                        </span>
-                        <Button size="sm" onClick={() => expandAll(station, stationKey)}>
-                          {t('assets.expandAll')}
-                        </Button>
-                        <Button size="sm" onClick={() => collapseAll(station, stationKey)}>
-                          {t('assets.collapseAll')}
-                        </Button>
-                      </div>
-                    }
-                  >
-                    <ul className="divide-y divide-line">
-                      {station.children.map((node) =>
-                        renderAssetNode(node, `${stationKey}/${nodeSegment(node)}`, 0, renderCtx)
-                      )}
-                    </ul>
-                  </Panel>
-                );
-              })}
+              <Panel padded={false}>
+                <div
+                  ref={scrollParentRef}
+                  data-virtual-scroll-root
+                  className="max-h-[32rem] overflow-y-auto"
+                >
+                  <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const row = flattenedRows[virtualRow.index];
+                      const label =
+                        row.type === 'station'
+                          ? locationLabel(
+                              row.station.locationId,
+                              row.station.locationType,
+                              mergedLocationNames,
+                              assetsByItemId,
+                              mergedTypeNames,
+                              t
+                            )
+                          : null;
+                      return (
+                        <div
+                          key={virtualRow.key}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          {row.type === 'station' ? (
+                            <StationHeaderRow
+                              station={row.station}
+                              label={label as string}
+                              pinState={pinStateFor(row.station.locationId)}
+                              jumpsAway={jumpsAwayByKey.get(
+                                `${row.station.locationId}:${routePreference}`
+                              )}
+                              onTogglePin={() => void handleTogglePin(row.station.locationId)}
+                              onExpandAll={() =>
+                                expandAll(row.station, stationRowKey(row.station.locationId))
+                              }
+                              onCollapseAll={() =>
+                                collapseAll(row.station, stationRowKey(row.station.locationId))
+                              }
+                              t={t}
+                            />
+                          ) : row.node.kind === 'item' ? (
+                            <AssetItemRow node={row.node} depth={row.depth} ctx={renderCtx} />
+                          ) : (
+                            <AssetBranchRow
+                              node={row.node}
+                              path={row.key}
+                              depth={row.depth}
+                              ctx={renderCtx}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Panel>
             </AssetItemActionsContext.Provider>
           )}
         </>
