@@ -64,7 +64,7 @@ beforeAll(async () => {
     getKey: createLocalJWKSet(jwks),
     issuer: DEFAULT_ISSUERS,
     audience: DEFAULT_AUDIENCE,
-    clientId: CLIENT_ID,
+    clientIds: [CLIENT_ID],
   };
 });
 
@@ -118,6 +118,22 @@ describe('verifyEveAccessToken', () => {
   it('rejects when neither aud nor azp carries the configured client_id', async () => {
     const token = await makeToken({ audience: 'EVE Online', azp: 'other-apps-client-id' });
     await expect(verifyEveAccessToken(token, opts)).rejects.toThrow(/client/i);
+  });
+
+  it('accepts a token bound to any client_id in a multi-app allow list', async () => {
+    // Dev and prod builds register separate EVE applications (different
+    // callback URLs), so one deployed function must accept both client_ids.
+    const otherAppOpts: VerifyOptions = { ...opts, clientIds: ['dev-app-id', CLIENT_ID] };
+    const token = await makeToken({ audience: [CLIENT_ID, 'EVE Online'] });
+    await expect(verifyEveAccessToken(token, otherAppOpts)).resolves.toMatchObject({
+      characterId: CHARACTER_ID,
+    });
+  });
+
+  it('rejects a token from an app not in the multi-app allow list', async () => {
+    const multiAppOpts: VerifyOptions = { ...opts, clientIds: ['dev-app-id', 'prod-app-id'] };
+    const token = await makeToken({ audience: [CLIENT_ID, 'EVE Online'] });
+    await expect(verifyEveAccessToken(token, multiAppOpts)).rejects.toThrow(/client/i);
   });
 
   it('rejects an expired token', async () => {
@@ -177,6 +193,28 @@ describe('verifyOptionsFromEnv', () => {
   it('rejects tokens minted for another app when using env-derived options', async () => {
     const token = await makeToken({ audience: ['other-apps-client-id', 'EVE Online'] });
     await expect(verifyEveAccessToken(token, verifyOptionsFromEnv())).rejects.toThrow(/client/i);
+  });
+
+  it('accepts either app when EVE_CLIENT_ID lists dev and prod client_ids', async () => {
+    const saved = process.env.EVE_CLIENT_ID;
+    // Whitespace around commas must be tolerated — it's a hand-edited env file.
+    process.env.EVE_CLIENT_ID = ` ${CLIENT_ID} , prod-app-id `;
+    try {
+      const devToken = await makeToken({ audience: [CLIENT_ID, 'EVE Online'] });
+      await expect(verifyEveAccessToken(devToken, verifyOptionsFromEnv())).resolves.toMatchObject({
+        characterId: CHARACTER_ID,
+      });
+      const prodToken = await makeToken({ audience: ['prod-app-id', 'EVE Online'] });
+      await expect(verifyEveAccessToken(prodToken, verifyOptionsFromEnv())).resolves.toMatchObject({
+        characterId: CHARACTER_ID,
+      });
+      const otherToken = await makeToken({ audience: ['some-other-app', 'EVE Online'] });
+      await expect(verifyEveAccessToken(otherToken, verifyOptionsFromEnv())).rejects.toThrow(
+        /client/i
+      );
+    } finally {
+      process.env.EVE_CLIENT_ID = saved;
+    }
   });
 
   it('fails closed: throws at construction when EVE_CLIENT_ID is not set', () => {
