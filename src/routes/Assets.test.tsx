@@ -817,3 +817,93 @@ describe('item tooltip and context menu (issue #83)', () => {
     expect(window.location.search).toContain('type=34');
   });
 });
+
+describe('cross-character search (issue #85)', () => {
+  const CHAR_ID_2 = 92;
+
+  beforeEach(async () => {
+    // The active character (Pilot One) holds only Tritanium in this block;
+    // Pyerite lives exclusively on Pilot Two, so "does the search reach
+    // beyond the active character" is unambiguous.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(assetPage1, { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 200,
+              type_id: 35,
+              quantity: 3,
+              location_id: 60003762,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      ),
+      http.get('https://esi.evetech.net/universe/stations/60003762', () =>
+        HttpResponse.json({
+          station_id: 60003762,
+          name: 'Amarr VIII - Emperor Family Academy',
+          type_id: 1926,
+          system_id: 30002187,
+        })
+      )
+    );
+
+    await db.characters.put({
+      characterId: CHAR_ID_2,
+      name: 'Pilot Two',
+      ownerHash: 'oh2',
+      addedAt: 2,
+    });
+    await db.tokens.put({
+      characterId: CHAR_ID_2,
+      accessToken: 'access-token-2',
+      refreshToken: 'refresh-2',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: ['esi-assets.read_assets.v1'],
+    });
+  });
+
+  it('does not show another character’s items until the toggle is turned on', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Tritanium');
+
+    await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
+    expect(await screen.findByText(/no items match your search/i)).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+  });
+
+  it('reaches other characters once the toggle is on, tagging the match with a character badge', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Tritanium');
+
+    await user.click(screen.getByRole('button', { name: /search all characters/i }));
+    await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
+
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(screen.getByText('Pilot Two')).toBeInTheDocument();
+  });
+
+  it('returns to single-character search once the toggle is turned back off', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Tritanium');
+
+    const toggle = screen.getByRole('button', { name: /search all characters/i });
+    await user.click(toggle);
+    await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(await screen.findByText(/no items match your search/i)).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+  });
+});

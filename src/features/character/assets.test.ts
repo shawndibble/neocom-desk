@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCharacterAssets } from './assets';
+import { loadCharacterAssets, loadOtherCharactersAssets } from './assets';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -12,6 +12,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  await db.characters.clear();
 });
 afterEach(() => {
   server.resetHandlers();
@@ -84,5 +85,57 @@ describe('loadCharacterAssets', () => {
 
     expect(result.needsReauth).toBe(true);
     expect(result.cached).toBeNull();
+  });
+});
+
+describe('loadOtherCharactersAssets (issue #85)', () => {
+  const OTHER_ID = 92;
+  const THIRD_ID = 93;
+
+  beforeEach(async () => {
+    await db.characters.bulkPut([
+      { characterId: CHAR_ID, name: 'Active Pilot', ownerHash: 'oh1', addedAt: 1 },
+      { characterId: OTHER_ID, name: 'Alt Pilot', ownerHash: 'oh2', addedAt: 2 },
+      { characterId: THIRD_ID, name: 'No Scope Pilot', ownerHash: 'oh3', addedAt: 3 },
+    ]);
+  });
+
+  it('fetches every other Character, excluding the active one', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
+        HttpResponse.json([ASSET(3)], { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () => {
+        throw new Error('must not fetch the active character');
+      })
+    );
+
+    const results = await loadOtherCharactersAssets(CHAR_ID);
+
+    expect(results).toEqual(
+      expect.arrayContaining([
+        { characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] },
+        { characterId: THIRD_ID, name: 'No Scope Pilot', assets: [ASSET(3)] },
+      ])
+    );
+    expect(results).toHaveLength(2);
+  });
+
+  it('silently skips a Character whose scope was revoked, keeping the rest', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const results = await loadOtherCharactersAssets(CHAR_ID);
+
+    expect(results).toEqual([{ characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] }]);
   });
 });
