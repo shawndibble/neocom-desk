@@ -10,6 +10,7 @@ import {
   FilterChip,
   Panel,
   Spinner,
+  Tabs,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import { db, type QuickbarItem } from '@/db';
@@ -43,6 +44,7 @@ import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
 import { QuickbarList } from '@/features/market/QuickbarList';
+import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import {
   addQuickbarItem,
   removeQuickbarItem,
@@ -380,6 +382,8 @@ export function Market() {
   // The order row context menu's "filter to this station" action (CONTEXT.md
   // round 10); undone via the banner rendered above the tables.
   const [stationFilter, setStationFilter] = useState<number | null>(null);
+  // Market Data / Price History (issue #11). Market Data selected by default.
+  const [itemTab, setItemTab] = useState<'orders' | 'history'>('orders');
   // "Adjusting state when a prop changes" (react.dev): resets the previous
   // item's row-cap, station filter and order book the instant selection or
   // the resolved region changes, in the same render — an Effect would let
@@ -395,6 +399,7 @@ export function Market() {
     setBuyShowAll(false);
     setOrderBookResult(null);
     setStationFilter(null);
+    setItemTab('orders');
   }
 
   useEffect(() => {
@@ -866,101 +871,125 @@ export function Market() {
               hint={t('market.selectPromptHint')}
               className="py-8"
             />
-          ) : orderBookLoading && !orderBookResult ? (
-            <div className="flex justify-center py-8">
-              <Spinner label={t('common.loading')} />
-            </div>
           ) : (
             <>
-              {resolvedRegion?.override && (
-                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                  {t('market.globalMarketNote', { regionName: resolvedRegion.override.regionName })}
-                </p>
-              )}
-              <div className="divide-y divide-line">
-                {stationFilter !== null && (
-                  <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
-                    <span>
-                      {t('market.stationFilterActive', {
-                        station: stationFilterLabel ?? t('market.unknownStructure'),
+              <Tabs
+                tabs={[
+                  { id: 'orders', label: t('market.tabOrders') },
+                  { id: 'history', label: t('market.tabHistory') },
+                ]}
+                value={itemTab}
+                onChange={(id) => setItemTab(id as 'orders' | 'history')}
+                label={t('market.itemTabsLabel')}
+                className="px-3 pt-2"
+              />
+              {itemTab === 'history' ? (
+                resolvedRegion && (
+                  <PriceHistoryPanel
+                    regionId={resolvedRegion.regionId}
+                    typeId={selectedTypeId}
+                    itemName={selectedItem?.name ?? ''}
+                  />
+                )
+              ) : orderBookLoading && !orderBookResult ? (
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              ) : (
+                <>
+                  {resolvedRegion?.override && (
+                    <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                      {t('market.globalMarketNote', {
+                        regionName: resolvedRegion.override.regionName,
                       })}
-                    </span>
-                    <Button size="sm" onClick={() => setStationFilter(null)}>
-                      {t('market.clearStationFilter')}
-                    </Button>
+                    </p>
+                  )}
+                  <div className="divide-y divide-line">
+                    {stationFilter !== null && (
+                      <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
+                        <span>
+                          {t('market.stationFilterActive', {
+                            station: stationFilterLabel ?? t('market.unknownStructure'),
+                          })}
+                        </span>
+                        <Button size="sm" onClick={() => setStationFilter(null)}>
+                          {t('market.clearStationFilter')}
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className="pb-3">
+                      <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                        {t('market.sell')}
+                      </h2>
+                      {sortedSell.length === 0 ? (
+                        <EmptyState
+                          title={t('market.emptySellTitle')}
+                          hint={
+                            stationFilter !== null
+                              ? t('market.emptyFilteredHint')
+                              : t('market.emptySellHint')
+                          }
+                          className="py-6"
+                        />
+                      ) : (
+                        <>
+                          <DataTable
+                            columns={baseColumns}
+                            rows={sellRows}
+                            rowKey={(o) => o.order_id}
+                            label={t('market.sell')}
+                            defaultSort={{ columnId: 'price', direction: 'asc' }}
+                            rowContextMenu={orderRowContextMenu}
+                          />
+                          {!sellShowAll && sortedSell.length > ROW_CAP && (
+                            <div className="px-3 py-2">
+                              <Button size="sm" onClick={() => setSellShowAll(true)}>
+                                {t('market.showAll', { count: sortedSell.length })}
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="pb-3">
+                      <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                        {t('market.buy')}
+                      </h2>
+                      {sortedBuy.length === 0 ? (
+                        <EmptyState
+                          title={t('market.emptyBuyTitle')}
+                          hint={
+                            stationFilter !== null
+                              ? t('market.emptyFilteredHint')
+                              : t('market.emptyBuyHint')
+                          }
+                          className="py-6"
+                        />
+                      ) : (
+                        <>
+                          <DataTable
+                            columns={buyColumns}
+                            rows={buyRows}
+                            rowKey={(o) => o.order_id}
+                            label={t('market.buy')}
+                            defaultSort={{ columnId: 'price', direction: 'desc' }}
+                            rowContextMenu={orderRowContextMenu}
+                          />
+                          {!buyShowAll && sortedBuy.length > ROW_CAP && (
+                            <div className="px-3 py-2">
+                              <Button size="sm" onClick={() => setBuyShowAll(true)}>
+                                {t('market.showAll', { count: sortedBuy.length })}
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                )}
-
-                <div className="pb-3">
-                  <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('market.sell')}
-                  </h2>
-                  {sortedSell.length === 0 ? (
-                    <EmptyState
-                      title={t('market.emptySellTitle')}
-                      hint={
-                        stationFilter !== null
-                          ? t('market.emptyFilteredHint')
-                          : t('market.emptySellHint')
-                      }
-                      className="py-6"
-                    />
-                  ) : (
-                    <>
-                      <DataTable
-                        columns={baseColumns}
-                        rows={sellRows}
-                        rowKey={(o) => o.order_id}
-                        label={t('market.sell')}
-                        defaultSort={{ columnId: 'price', direction: 'asc' }}
-                        rowContextMenu={orderRowContextMenu}
-                      />
-                      {!sellShowAll && sortedSell.length > ROW_CAP && (
-                        <div className="px-3 py-2">
-                          <Button size="sm" onClick={() => setSellShowAll(true)}>
-                            {t('market.showAll', { count: sortedSell.length })}
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                <div className="pb-3">
-                  <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('market.buy')}
-                  </h2>
-                  {sortedBuy.length === 0 ? (
-                    <EmptyState
-                      title={t('market.emptyBuyTitle')}
-                      hint={
-                        stationFilter !== null
-                          ? t('market.emptyFilteredHint')
-                          : t('market.emptyBuyHint')
-                      }
-                      className="py-6"
-                    />
-                  ) : (
-                    <>
-                      <DataTable
-                        columns={buyColumns}
-                        rows={buyRows}
-                        rowKey={(o) => o.order_id}
-                        label={t('market.buy')}
-                        defaultSort={{ columnId: 'price', direction: 'desc' }}
-                        rowContextMenu={orderRowContextMenu}
-                      />
-                      {!buyShowAll && sortedBuy.length > ROW_CAP && (
-                        <div className="px-3 py-2">
-                          <Button size="sm" onClick={() => setBuyShowAll(true)}>
-                            {t('market.showAll', { count: sortedBuy.length })}
-                          </Button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
+                </>
+              )}
             </>
           )}
         </Panel>

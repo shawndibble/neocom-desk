@@ -582,6 +582,17 @@
     },
     "stationFilterActive": "Filtered to {{station}}",
     "clearStationFilter": "Clear filter",
+    "tabOrders": "Market Data",
+    "tabHistory": "Price History",
+    "itemTabsLabel": "Item view",
+    "priceHistory": {
+      "chartLabel": "Daily average price and traded volume for {{item}}",
+      "date": "Date",
+      "average": "Average Price",
+      "volume": "Volume",
+      "emptyTitle": "No price history",
+      "emptyHint": "ESI has no market history for this item in this region yet."
+    },
     "compare": {
       "handle": "Compare ({{count}})",
       "title": "Compare",
