@@ -254,4 +254,48 @@ describe('useRouteSnapshot', () => {
     rerender();
     expect(inner).toHaveBeenCalledTimes(1);
   });
+
+  describe('prop-supplied character (second case, alongside the active-character store)', () => {
+    it('loads for the prop character immediately, without waiting on store hydration', async () => {
+      // Store never hydrates in this test — a prop-supplied character must not depend on it.
+      const load = vi.fn(async (characterId: number) => `data-${characterId}`);
+      const { result } = renderHook(() => useRouteSnapshot(load, CHAR_A));
+
+      await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_A}`));
+      expect(result.current.hydrated).toBe(true);
+      expect(result.current.activeCharacterId).toBe(CHAR_A);
+      expect(load).toHaveBeenCalledWith(CHAR_A, { cancelled: false });
+    });
+
+    it('ignores the store character while a prop character is supplied', async () => {
+      const load = vi.fn(async (characterId: number) => `data-${characterId}`);
+      setCharacter(CHAR_B);
+      const { result } = renderHook(() => useRouteSnapshot(load, CHAR_A));
+
+      await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_A}`));
+      expect(load).toHaveBeenCalledTimes(1);
+    });
+
+    it('reloads and cancels the in-flight request when the prop character changes', async () => {
+      const { calls, load } = deferredLoader();
+      const { result, rerender } = renderHook(
+        ({ characterId }) => useRouteSnapshot(load, characterId),
+        {
+          initialProps: { characterId: CHAR_A },
+        }
+      );
+      await waitFor(() => expect(calls).toHaveLength(1));
+
+      rerender({ characterId: CHAR_B });
+      await waitFor(() => expect(calls).toHaveLength(2));
+      expect(calls[0].signal.cancelled).toBe(true);
+      expect(calls[1].characterId).toBe(CHAR_B);
+
+      await act(async () => calls[0].resolve('stale'));
+      expect(result.current.data).toBeNull();
+
+      await act(async () => calls[1].resolve('fresh'));
+      expect(result.current.data).toBe('fresh');
+    });
+  });
 });
