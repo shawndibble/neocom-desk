@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
+import type { SkillQueueEntry } from '@/esi/endpoints';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import {
@@ -95,6 +96,33 @@ describe('Characters', () => {
       'src',
       'https://images.evetech.net/characters/91/portrait?size=128'
     );
+  });
+
+  it("shows each character's cached queue state, with a data-age badge when it was fetched", async () => {
+    const now = Date.now();
+    const entries: SkillQueueEntry[] = [
+      {
+        skill_id: 1,
+        queue_position: 0,
+        finished_level: 1,
+        start_date: new Date(now - 60_000).toISOString(),
+        finish_date: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
+    await db.esiCache.put({ characterId: 91, key: 'skillqueue', value: entries, fetchedAt: now });
+    // Pilot Two has no cached queue at all — never fetched.
+
+    renderCharacters();
+    await screen.findByText('Pilot One');
+    await screen.findByText('Training');
+
+    const pilotOneCard = screen.getByText('Pilot One').closest('li');
+    expect(pilotOneCard).toHaveTextContent('Training');
+    expect(pilotOneCard?.querySelector('time')).not.toBeNull();
+
+    const pilotTwoCard = screen.getByText('Pilot Two').closest('li');
+    expect(pilotTwoCard).toHaveTextContent('Unknown');
+    expect(pilotTwoCard?.querySelector('time')).toBeNull();
   });
 
   it('shows corp/alliance names when public info loads, dashes when offline', async () => {

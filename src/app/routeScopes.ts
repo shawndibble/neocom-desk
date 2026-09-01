@@ -58,9 +58,6 @@ export const ROUTE_REQUIREMENTS = {
   // blueprints and jobs; all three read the queue). These need panel-level
   // gating instead.
   '/overview': UNGATED,
-  // Cache-only across every character: reads whatever `loadRosterSnapshot`
-  // already has cached, never calls ESI live, so there is no scope to gate on.
-  '/queue-health': UNGATED,
   '/skills': UNGATED,
   '/industry': UNGATED,
   // Multi-scope, like Overview above: the Balance tab mixes wallet and
