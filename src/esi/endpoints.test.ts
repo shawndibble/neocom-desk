@@ -25,6 +25,7 @@ import {
   getCharacterCalendar,
   getCharacterCalendarEvent,
   getCharacterContracts,
+  getCharacterContractItems,
   getCharacterOrders,
   getCharacterOrderHistory,
   getCharacterIndustryJobs,
@@ -659,6 +660,22 @@ describe('contracts', () => {
     const { items: contracts } = await getCharacterContracts(CHARACTER_ID);
 
     expect(contracts.map((c) => c.contract_id)).toEqual([1, 2]);
+  });
+
+  it('getCharacterContractItems returns the included/requested lines', async () => {
+    server.use(
+      authedJson(`/characters/${CHARACTER_ID}/contracts/12345/items`, [
+        { record_id: 1, type_id: 34, quantity: 100, is_included: true, is_singleton: false },
+        { record_id: 2, type_id: 35, quantity: 1, is_included: false, is_singleton: false },
+      ])
+    );
+
+    const result = await getCharacterContractItems(CHARACTER_ID, 12345);
+
+    expect(result.data).toEqual([
+      { record_id: 1, type_id: 34, quantity: 100, is_included: true, is_singleton: false },
+      { record_id: 2, type_id: 35, quantity: 1, is_included: false, is_singleton: false },
+    ]);
   });
 });
 
