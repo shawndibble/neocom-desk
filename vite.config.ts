@@ -70,6 +70,13 @@ export default defineConfig({
     // test enough room that a slow-but-real render doesn't hit this ceiling
     // first.
     testTimeout: 15000,
+    // Vitest's default is availableParallelism() - 1 forked processes, each
+    // spinning up its own jsdom — on this 16-core dev box that's ~15
+    // concurrent Node processes, multiplied further by however many
+    // `/next-ticket` loops are running (CLAUDE.md), which is what pegs the
+    // machine. CI runners are small enough (2-4 cores) that the default is
+    // already fine there, so only cap it locally.
+    ...(process.env.GITHUB_ACTIONS === 'true' ? {} : { maxWorkers: 2 }),
     coverage: { reporter: ['text', 'html'] },
     // Suppresses passing-test noise, keeps full detail on failures — cuts
     // `test:run` output (read by CI logs and every agent tool call alike)
