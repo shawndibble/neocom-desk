@@ -615,6 +615,11 @@
       "remove": "Remove",
       "removeItem": "Remove {{name}} from Quickbar",
       "reorderItem": "Reorder {{name}}"
+    },
+    "relatedItems": {
+      "title": "Related Items",
+      "noOrders": "No orders",
+      "capped": "Showing {{limit}} of {{total}}"
     }
   },
   "error": {
