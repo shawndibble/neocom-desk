@@ -4,7 +4,7 @@ import {
   resolveOrderLocation,
   orderExpiry,
   filterOrdersByLocation,
-  bestPrices,
+  summarizeOrderBook,
 } from './orderBook';
 
 interface Order {
@@ -90,6 +90,50 @@ describe('filterOrdersByLocation', () => {
   });
 });
 
+describe('summarizeOrderBook', () => {
+  it('reports the cheapest sell, the highest buy, their spread, and total sell-side volume', () => {
+    const orders = [
+      { is_buy_order: false, price: 105, volume_remain: 10 },
+      { is_buy_order: false, price: 100, volume_remain: 5 },
+      { is_buy_order: true, price: 90, volume_remain: 20 },
+      { is_buy_order: true, price: 95, volume_remain: 3 },
+    ];
+    expect(summarizeOrderBook(orders)).toEqual({
+      bestSell: 100,
+      bestBuy: 95,
+      spread: 5,
+      availableVolume: 15,
+    });
+  });
+
+  it('reports a null spread when one side is missing, without treating the absent side as zero', () => {
+    const sellOnly = [{ is_buy_order: false, price: 100, volume_remain: 5 }];
+    expect(summarizeOrderBook(sellOnly)).toEqual({
+      bestSell: 100,
+      bestBuy: null,
+      spread: null,
+      availableVolume: 5,
+    });
+
+    const buyOnly = [{ is_buy_order: true, price: 90, volume_remain: 20 }];
+    expect(summarizeOrderBook(buyOnly)).toEqual({
+      bestSell: null,
+      bestBuy: 90,
+      spread: null,
+      availableVolume: 0,
+    });
+  });
+
+  it('reports an all-null, zero-volume summary for an empty order book', () => {
+    expect(summarizeOrderBook([])).toEqual({
+      bestSell: null,
+      bestBuy: null,
+      spread: null,
+      availableVolume: 0,
+    });
+  });
+});
+
 describe('orderExpiry', () => {
   it('adds duration days to the issued date', () => {
     const expiry = orderExpiry({ issued: '2026-08-01T00:00:00Z', duration: 90 });
@@ -99,29 +143,5 @@ describe('orderExpiry', () => {
   it('handles a zero-duration order (expires the moment it was issued)', () => {
     const expiry = orderExpiry({ issued: '2026-08-01T00:00:00Z', duration: 0 });
     expect(expiry.toISOString()).toBe('2026-08-01T00:00:00.000Z');
-  });
-});
-
-describe('bestPrices', () => {
-  it('picks the lowest sell price and the highest buy price', () => {
-    const orders = [
-      { is_buy_order: false, price: 1200 },
-      { is_buy_order: false, price: 1000 },
-      { is_buy_order: true, price: 800 },
-      { is_buy_order: true, price: 900 },
-    ];
-    expect(bestPrices(orders)).toEqual({ bestSell: 1000, bestBuy: 900 });
-  });
-
-  it('reports null for a side with no orders, never a fabricated zero', () => {
-    const sellOnly = [{ is_buy_order: false, price: 500 }];
-    expect(bestPrices(sellOnly)).toEqual({ bestSell: 500, bestBuy: null });
-
-    const buyOnly = [{ is_buy_order: true, price: 500 }];
-    expect(bestPrices(buyOnly)).toEqual({ bestSell: null, bestBuy: 500 });
-  });
-
-  it('returns nulls for both sides given no orders', () => {
-    expect(bestPrices([])).toEqual({ bestSell: null, bestBuy: null });
   });
 });

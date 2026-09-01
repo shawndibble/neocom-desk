@@ -12,6 +12,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache } from '@/features/market/orderBook';
 import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
+import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
@@ -280,6 +281,7 @@ beforeEach(async () => {
   usePublicInfo.setState({ byCharacterId: {} });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
+  useCompareSet.setState({ items: [] });
   clearOrderBookCache();
   window.history.pushState({}, '', '/market');
 });
@@ -498,7 +500,7 @@ describe('Market Browser item context menu (issue #6)', () => {
       'data-disabled'
     );
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toHaveAttribute('data-disabled');
-    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toHaveAttribute(
+    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).not.toHaveAttribute(
       'data-disabled'
     );
     expect(screen.getByRole('menuitem', { name: 'Copy name' })).not.toHaveAttribute(
@@ -512,6 +514,20 @@ describe('Market Browser item context menu (issue #6)', () => {
     ).not.toHaveAttribute('data-disabled');
 
     await user.keyboard('{Escape}');
+  });
+
+  it('adds the item to the Compare Set (issue #8), showing the drawer handle', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Compare' }));
+
+    expect(useCompareSet.getState().items).toEqual([{ typeId: 587, itemName: 'Rifter' }]);
+    expect(screen.getByRole('button', { name: 'Compare (1)' })).toBeInTheDocument();
   });
 
   it('shows "No blueprint options" disabled for an item no blueprint produces', async () => {
@@ -771,6 +787,168 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     // PLEX orders still carry ordinary station ids, so Trade Hub mode's Jita filter still applies.
     expect(within(sellTable).getByText('3,000,000.00')).toBeInTheDocument();
     expect(hits.count).toBe(1);
+  });
+});
+
+describe('Shareable Market Browser URLs (issue #4)', () => {
+  it('selecting an item and changing location updates the query string', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    expect(window.location.search).toBe('?type=587&hub=jita');
+
+    await user.click(screen.getByRole('button', { name: 'Region' }));
+    expect(window.location.search).toBe('?type=587&region=10000002');
+  });
+
+  it('opening a Market Browser URL with item and location parameters restores that exact view', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    window.history.pushState({}, '', '/market?type=587&hub=jita');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
+  });
+
+  it('an unknown item id in the URL degrades to the default view instead of erroring', async () => {
+    window.history.pushState({}, '', '/market?type=999999');
+    render(<App />);
+
+    expect(await screen.findByText('Select an item')).toBeInTheDocument();
+  });
+
+  it('a malformed location parameter degrades to the default location', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    window.history.pushState({}, '', '/market?type=587&region=not-a-number');
+    render(<App />);
+
+    // Falls back to the persisted default (Trade Hub mode, Jita) rather than erroring.
+    expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).queryByText('2,000,000.00')).not.toBeInTheDocument();
+  });
+
+  it('does not touch the URL while the user is still typing a search', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Ships');
+    const pushSpy = vi.spyOn(window.history, 'pushState');
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+
+    expect(pushSpy).not.toHaveBeenCalled();
+    pushSpy.mockRestore();
+  });
+
+  it('toggling the location mode keeps a URL-supplied hub rather than reverting to the persisted default', async () => {
+    server.use(
+      ordersHandler({ count: 0 }),
+      http.get(`${ESI_BASE_URL}/markets/10000043/orders`, () =>
+        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    window.history.pushState({}, '', '/market?type=587&hub=amarr');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Rifter', level: 2 });
+
+    await user.click(screen.getByRole('button', { name: 'Region' }));
+    expect(window.location.search).toBe('?type=587&region=10000043'); // Domain, Amarr's region
+
+    await user.click(screen.getByRole('button', { name: 'Trade Hub' }));
+    expect(window.location.search).toBe('?type=587&hub=amarr');
+  });
+
+  it('browser back and forward move through previous selections', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
+
+    await user.clear(screen.getByRole('searchbox'));
+    await user.type(screen.getByRole('searchbox'), 'trit');
+    await user.click(await screen.findByText('Tritanium'));
+    expect(await screen.findByRole('heading', { name: 'Tritanium', level: 2 })).toBeInTheDocument();
+
+    window.history.back();
+    expect(await screen.findByRole('heading', { name: 'Rifter', level: 2 })).toBeInTheDocument();
+
+    window.history.forward();
+    expect(await screen.findByRole('heading', { name: 'Tritanium', level: 2 })).toBeInTheDocument();
+  });
+});
+
+describe('Market Browser narrow-screen layout (issue #4)', () => {
+  it('shows one column at a time, with a back control that returns to the finder', async () => {
+    // jsdom's default `window.matchMedia` (vitest.setup.ts) never matches,
+    // so this already runs as a narrow viewport.
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    const searchBox = await screen.findByRole('searchbox');
+    const finderPanel = searchBox.closest('section');
+    const itemPanel = (await screen.findByText('Select an item')).closest('section');
+    expect(finderPanel).not.toHaveClass('hidden');
+    expect(itemPanel).toHaveClass('hidden');
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+
+    expect(finderPanel).toHaveClass('hidden');
+    expect(itemPanel).not.toHaveClass('hidden');
+    const backButton = await screen.findByRole('button', { name: 'Back' });
+
+    await user.click(backButton);
+
+    expect(finderPanel).not.toHaveClass('hidden');
+    expect(itemPanel).toHaveClass('hidden');
+    // The tree state (search text, matched item) survived being hidden rather than unmounted.
+    expect(screen.getByRole('searchbox')).toHaveValue('rift');
+    expect(screen.getByText('Rifter')).toBeInTheDocument();
+  });
+
+  it('keeps the desktop two-column layout unchanged, with no back control', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const original = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+
+    try {
+      const user = userEvent.setup();
+      render(<App />);
+
+      const searchBox = await screen.findByRole('searchbox');
+      const finderPanel = searchBox.closest('section');
+      await user.type(searchBox, 'rift');
+      await user.click(await screen.findByText('Rifter'));
+
+      expect(finderPanel).not.toHaveClass('hidden');
+      const itemPanel = screen
+        .getByRole('heading', { name: 'Rifter', level: 2 })
+        .closest('section');
+      expect(itemPanel).not.toHaveClass('hidden');
+      expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
 

@@ -7,14 +7,14 @@
 import { useTranslation } from 'react-i18next';
 import { formatIsk } from '@/lib/isk';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
-import type { BestPrices } from '@/engine/market/orderBook';
+import type { OrderBookSummary } from '@/engine/market/orderBook';
 
 export interface RelatedItemsStripProps {
   siblings: readonly MarketTypeEntry[];
   totalCount: number;
   truncated: boolean;
   /** Absent key = not yet requested; undefined value = still loading. */
-  prices: ReadonlyMap<number, BestPrices | undefined>;
+  prices: ReadonlyMap<number, OrderBookSummary | undefined>;
   onSelect: (typeId: number) => void;
 }
 

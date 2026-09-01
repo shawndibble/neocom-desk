@@ -1,7 +1,7 @@
 /**
  * Right-click menu for an item — the tree, search results (same tree,
- * CONTEXT.md round 8) and the Quickbar. Show info and add to Compare Set have
- * no target yet (#8, #6-detail-modal).
+ * CONTEXT.md round 8) and the Quickbar. Show info has no target yet
+ * (#6-detail-modal).
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +13,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
+import { useCompareSet } from './compareSet';
 
 export interface ItemContextMenuProps {
   typeId: number;
@@ -38,6 +39,7 @@ export function ItemContextMenu({
 }: ItemContextMenuProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const addToCompare = useCompareSet((state) => state.add);
 
   const buildPlanLabel =
     blueprintTypeID === undefined
@@ -60,7 +62,7 @@ export function ItemContextMenu({
         <ContextMenuItem disabled title={t('market.contextMenu.unavailable')}>
           {t('market.contextMenu.showInfo')}
         </ContextMenuItem>
-        <ContextMenuItem disabled title={t('market.contextMenu.unavailable')}>
+        <ContextMenuItem onSelect={() => addToCompare({ typeId, itemName })}>
           {t('market.contextMenu.addToCompare')}
         </ContextMenuItem>
         <ContextMenuItem onSelect={() => void writeToClipboard(itemName)}>
