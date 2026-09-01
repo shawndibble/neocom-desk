@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { DataTable, type DataTableColumn } from '@/components/ui';
 import type { EffectiveMaterial, HubPrices } from '@/engine/industry/types';
 import { formatIsk } from '@/lib/isk';
 
@@ -6,7 +8,7 @@ interface MaterialsTableProps {
   materials: readonly EffectiveMaterial[];
   nameFor: (typeID: number) => string;
   hubPrices: HubPrices;
-  /** False when prices couldn't be fetched at all (offline) — hides price/total columns entirely. */
+  /** False when prices couldn't be fetched at all (offline) — unit price and line total fall back to placeholder text. */
   pricesReady: boolean;
 }
 
@@ -19,42 +21,59 @@ export function MaterialsTable({
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
+  const columns = useMemo<DataTableColumn<EffectiveMaterial>[]>(
+    () => [
+      {
+        id: 'material',
+        header: t('industry.material'),
+        render: (material) => nameFor(material.typeID),
+      },
+      {
+        id: 'quantity',
+        header: t('industry.quantity'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (material) => material.quantity.toLocaleString(),
+      },
+      {
+        id: 'unitPrice',
+        header: t('industry.unitPrice'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (material) => {
+          const unitPrice = hubPrices[material.typeID];
+          const priced = pricesReady && unitPrice !== undefined;
+          return priced ? (
+            formatIsk(unitPrice)
+          ) : (
+            <span className="text-warning">{t('industry.unpriced')}</span>
+          );
+        },
+      },
+      {
+        id: 'lineTotal',
+        header: t('industry.lineTotal'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (material) => {
+          const unitPrice = hubPrices[material.typeID];
+          const priced = pricesReady && unitPrice !== undefined;
+          return priced ? formatIsk(unitPrice * material.quantity) : t('common.unknown');
+        },
+      },
+    ],
+    [t, nameFor, hubPrices, pricesReady]
+  );
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead>
-          <tr className="border-b border-line text-[0.6875rem] tracking-widest text-text-dim uppercase">
-            <th className="py-1 pr-2 font-semibold">{t('industry.material')}</th>
-            <th className="py-1 pr-2 text-right font-semibold">{t('industry.quantity')}</th>
-            <th className="py-1 pr-2 text-right font-semibold">{t('industry.unitPrice')}</th>
-            <th className="py-1 text-right font-semibold">{t('industry.lineTotal')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {materials.map((material) => {
-            const unitPrice = hubPrices[material.typeID];
-            const priced = pricesReady && unitPrice !== undefined;
-            return (
-              <tr key={material.typeID} className="border-b border-line last:border-b-0">
-                <td className="py-1 pr-2">{nameFor(material.typeID)}</td>
-                <td className="py-1 pr-2 text-right tabular-nums">
-                  {material.quantity.toLocaleString()}
-                </td>
-                <td className="py-1 pr-2 text-right tabular-nums">
-                  {priced ? (
-                    formatIsk(unitPrice)
-                  ) : (
-                    <span className="text-warning">{t('industry.unpriced')}</span>
-                  )}
-                </td>
-                <td className="py-1 text-right tabular-nums">
-                  {priced ? formatIsk(unitPrice * material.quantity) : t('common.unknown')}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <DataTable
+        columns={columns}
+        rows={materials}
+        rowKey={(material) => material.typeID}
+        label={t('industry.materials')}
+        density="compact"
+      />
     </div>
   );
 }

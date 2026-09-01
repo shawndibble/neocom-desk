@@ -35,6 +35,8 @@ interface DataTableProps<T> {
   className?: string;
   /** Column and direction to sort by before any header click. Column must declare `sortValue`. */
   defaultSort?: DataTableSort;
+  /** `'compact'` tightens header and cell padding on both axes. Table-level, not per-column — a table is compact as a whole. */
+  density?: 'default' | 'compact';
   /**
    * Wraps a row's `<tr>` — e.g. a right-click menu. When set, the `<tr>`
    * gets `tabIndex={0}` so a keyboard user can focus it and open the menu
@@ -83,18 +85,22 @@ export function DataTable<T>({
   label,
   className = '',
   defaultSort,
+  density = 'default',
   rowContextMenu,
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
 
+  const headerPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-2';
+  const cellPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-1.5';
+
   // Per-column classes are invariant across rows, so they are built once
   // rather than per cell — a 1,000-row journal is 5,000 cells.
   const headerTextClass = columns.map((column) =>
-    cx('px-3 py-2 font-semibold uppercase', column.align === 'right' && 'text-right')
+    cx(headerPadding, 'font-semibold uppercase', column.align === 'right' && 'text-right')
   );
   const headerClass = columns.map((column, i) => cx(column.sortValue ? 'p-0' : headerTextClass[i]));
   const cellClass = columns.map((column) =>
-    cx('px-3 py-1.5', column.align === 'right' && 'text-right', column.className)
+    cx(cellPadding, column.align === 'right' && 'text-right', column.className)
   );
 
   const sortColumn = sort ? columns.find((column) => column.id === sort.columnId) : undefined;
