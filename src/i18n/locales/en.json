@@ -468,7 +468,16 @@
     "reauthHint": "Log in again to fetch this character's assets.",
     "reauthAction": "Log in again with EVE Online",
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
-    "renderTruncatedNotice": "Showing {{shown}} of {{total}} assets."
+    "renderTruncatedNotice": "Showing {{shown}} of {{total}} assets.",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "nodeBadge_one": "{{count}} item · {{value}} ISK",
+    "nodeBadge_other": "{{count}} items · {{value}} ISK",
+    "bay": {
+      "cargoHold": "Cargo Hold",
+      "droneBay": "Drone Bay",
+      "fitting": "Fitting"
+    }
   },
   "mail": {
     "title": "Mail",
