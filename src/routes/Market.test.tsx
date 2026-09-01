@@ -47,6 +47,7 @@ const SDE_TYPES: TypeMap = {
 vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
   loadTypes: vi.fn(async () => SDE_TYPES),
+  loadSkills: vi.fn(async () => []),
 }));
 
 vi.mock('@/features/market/PriceHistoryChart', () => ({

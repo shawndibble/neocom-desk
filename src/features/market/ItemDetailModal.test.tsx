@@ -8,12 +8,17 @@ import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
+import { loadSkills } from '@/sde/loadSde';
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(),
 }));
+vi.mock('@/sde/loadSde', () => ({
+  loadSkills: vi.fn(),
+}));
 
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
+const mockedLoadSkills = vi.mocked(loadSkills);
 
 const TYPE_ID = 587;
 
@@ -62,6 +67,7 @@ describe('ItemDetailModal', () => {
       9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
       37: { name: 'Maximum Velocity', unit: 'm/sec', category: 'Speed and Travel' },
     });
+    mockedLoadSkills.mockResolvedValue([]);
 
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
@@ -73,6 +79,53 @@ describe('ItemDetailModal', () => {
     expect(screen.getByText('Speed and Travel')).toBeInTheDocument();
     expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
     expect(screen.getByText('250 m/sec')).toBeInTheDocument();
+  });
+
+  it('renders description markup as formatting instead of literal tags, and resolves required skills to names', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Brand Manager Expert System',
+          description:
+            '<font size="14"><b>Brand Manager Expert System</b></font>\n\nGrants access.',
+          group_id: 25,
+          published: true,
+          volume: 0.1,
+          dogma_attributes: [
+            { attribute_id: 182, value: 24241 },
+            { attribute_id: 277, value: 3 },
+          ],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      182: { name: 'Primary Skill required', unit: 'typeID', category: 'Required Skills' },
+    });
+    mockedLoadSkills.mockResolvedValue([
+      {
+        typeID: 24241,
+        name: 'Caldari Frigate',
+        description: '',
+        groupID: 0,
+        groupName: '',
+        rank: 1,
+        primaryAttr: 'perception',
+        secondaryAttr: 'willpower',
+        prereqs: [],
+      },
+    ]);
+
+    render(
+      <ItemDetailModal typeId={TYPE_ID} itemName="Brand Manager Expert System" onClose={() => {}} />
+    );
+
+    expect(
+      await screen.findByText('Brand Manager Expert System', { selector: 'b' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/<font/)).not.toBeInTheDocument();
+    expect(screen.getByText('Primary Skill required')).toBeInTheDocument();
+    expect(screen.getByText('Caldari Frigate III')).toBeInTheDocument();
   });
 
   it('closes on Escape and returns focus to the trigger', async () => {
@@ -88,6 +141,7 @@ describe('ItemDetailModal', () => {
       )
     );
     mockedLoadDictionary.mockResolvedValue({});
+    mockedLoadSkills.mockResolvedValue([]);
 
     function Harness() {
       const [open, setOpen] = useState(true);
