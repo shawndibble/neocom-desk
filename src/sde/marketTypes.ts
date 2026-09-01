@@ -39,3 +39,15 @@ export interface MarketRegionEntry {
   id: number;
   name: string;
 }
+
+/**
+ * One entry in public/data/market/globalMarkets.json — a type that trades in
+ * a Global Market Region (CONTEXT.md round 12) instead of the normal
+ * regional books, e.g. PLEX in GPMR-01. Read live at build time, not
+ * hardcoded — see scripts/build-sde.mjs.
+ */
+export interface GlobalMarketEntry {
+  typeId: number;
+  regionId: number;
+  regionName: string;
+}

@@ -43,8 +43,17 @@ const PROBE_CACHE_FILE = join(CACHE_DIR, 'market-regions-probe.json');
 // Delve: canary region with no NPC station that still carries busy
 // player-structure markets (CONTEXT.md — "31 nullsec regions have none").
 const DELVE_REGION_ID = 10000060;
-const MARKET_REGIONS_MIN = 80;
+const MARKET_REGIONS_MIN = 78;
 const MARKET_REGIONS_MAX = 116;
+// A region whose every solar system sits within this many meters of the
+// coordinate origin is not a place in the game universe — the nearest real
+// system (Zarzakh) sits ~5.66e15 m out, ~5.7 billion times farther than this
+// bound. GPMR-01, the region PLEX trades in, holds one such system (GPMS-01,
+// position 1,1,1 — verified against Fuzzwork's mapSolarSystems.csv and ESI
+// 2026-08-31): CCP synthesized it purely to hold a cluster-wide market, so it
+// is a Global Market Region (CONTEXT.md round 12) rather than a place a
+// picker should offer.
+const SYNTHETIC_POSITION_MAX_M = 1_000_000;
 
 // Dogma attribute IDs (verified against fuzzwork dgmAttributeTypes.csv):
 // 275 skillTimeConstant (rank), 180 primaryAttribute, 181 secondaryAttribute
@@ -167,9 +176,9 @@ function probeRetryWaitMs(res) {
   return Math.min(Math.max(ms, 0), PROBE_MAX_RETRY_WAIT_MS);
 }
 
-/** True if regionId's market-types listing (a lightweight endpoint) is non-empty. */
-async function probeRegionHasMarket(regionId) {
-  const url = `${ESI_BASE}/markets/${regionId}/types/?page=1`;
+/** Fetches one page of regionId's market-types listing, retrying on rate limits/errors. */
+async function fetchMarketTypesPage(regionId, page) {
+  const url = `${ESI_BASE}/markets/${regionId}/types/?page=${page}`;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const res = await fetch(url, {
@@ -186,7 +195,7 @@ async function probeRegionHasMarket(regionId) {
         await new Promise((r) => setTimeout(r, probeRetryWaitMs(res)));
         continue;
       }
-      if (res.status === 404) return false;
+      if (res.status === 404) return { typeIds: [], pages: 1 };
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
       // Proactively back off well before the error budget runs out, rather
       // than waiting to be told — ~150 sequential probes is enough traffic
@@ -196,13 +205,30 @@ async function probeRegionHasMarket(regionId) {
         await new Promise((r) => setTimeout(r, 1000));
       }
       const body = await res.json();
-      return Array.isArray(body) && body.length > 0;
+      const pages = Number(res.headers.get('x-pages')) || 1;
+      return { typeIds: Array.isArray(body) ? body : [], pages };
     } catch (err) {
       if (attempt === 3) throw err;
       await new Promise((r) => setTimeout(r, 500 * attempt));
     }
   }
-  return false;
+  return { typeIds: [], pages: 1 };
+}
+
+/** True if regionId's market-types listing (a lightweight endpoint) is non-empty. */
+async function probeRegionHasMarket(regionId) {
+  const { typeIds } = await fetchMarketTypesPage(regionId, 1);
+  return typeIds.length > 0;
+}
+
+/** Every type ID with orders in regionId — used only for the handful of Global Market Regions. */
+async function fetchAllMarketTypeIds(regionId) {
+  const first = await fetchMarketTypesPage(regionId, 1);
+  const typeIds = [...first.typeIds];
+  for (let page = 2; page <= first.pages; page++) {
+    typeIds.push(...(await fetchMarketTypesPage(regionId, page)).typeIds);
+  }
+  return typeIds;
 }
 
 /**
@@ -452,21 +478,36 @@ async function main() {
   marketTypes.sort((a, b) => a.typeId - b.typeId);
 
   // --- market/systems.json: mapSolarSystems -> SolarSystemEntry[] ---
+  // Also tracks, per region, whether every one of its systems sits at a
+  // synthetic (near-origin) position — see SYNTHETIC_POSITION_MAX_M.
   const solarSystems = [];
+  const regionAllSystemsSynthetic = new Map();
   {
     const rows = raw['mapSolarSystems.csv'];
     const h = indexHeader(rows);
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
+      const regionId = Number(r[h.regionID]);
       solarSystems.push({
         id: Number(r[h.solarSystemID]),
         name: r[h.solarSystemName],
         security: num(r[h.security]) ?? 0,
-        regionId: Number(r[h.regionID]),
+        regionId,
       });
+      const x = num(r[h.x]) ?? 0;
+      const y = num(r[h.y]) ?? 0;
+      const z = num(r[h.z]) ?? 0;
+      const synthetic = Math.hypot(x, y, z) < SYNTHETIC_POSITION_MAX_M;
+      regionAllSystemsSynthetic.set(
+        regionId,
+        synthetic && (regionAllSystemsSynthetic.get(regionId) ?? true)
+      );
     }
     solarSystems.sort((a, b) => a.id - b.id);
   }
+  const globalMarketRegionIds = new Set(
+    [...regionAllSystemsSynthetic].filter(([, synthetic]) => synthetic).map(([id]) => id)
+  );
 
   // --- market/stations.json: staStations -> NpcStationEntry[] ---
   const npcStations = [];
@@ -495,7 +536,25 @@ async function main() {
     }
   }
   console.log(`Probing ${regionCandidates.length} regions against ESI for live orders...`);
-  const marketRegions = await probeMarketRegions(regionCandidates);
+  const regionsWithOrders = await probeMarketRegions(regionCandidates);
+  const marketRegions = regionsWithOrders.filter((r) => !globalMarketRegionIds.has(r.id));
+  const globalMarketRegions = regionsWithOrders.filter((r) => globalMarketRegionIds.has(r.id));
+
+  // --- market/globalMarkets.json: which types trade in a Global Market
+  // Region (CONTEXT.md round 12) instead of the normal regional books, and
+  // where — read live per region, not hardcoded (only a handful of regions
+  // qualify, so this is a few requests, not hundreds).
+  console.log(
+    `Reading traded items for ${globalMarketRegions.length} Global Market Region(s): ${globalMarketRegions.map((r) => r.name).join(', ') || '(none)'}`
+  );
+  const globalMarkets = [];
+  for (const region of globalMarketRegions) {
+    const typeIds = await fetchAllMarketTypeIds(region.id);
+    for (const typeId of typeIds) {
+      globalMarkets.push({ typeId, regionId: region.id, regionName: region.name });
+    }
+  }
+  globalMarkets.sort((a, b) => a.typeId - b.typeId);
 
   // --- write outputs (compact) ---
   await mkdir(OUT_DIR, { recursive: true });
@@ -518,6 +577,7 @@ async function main() {
     ['systems.json', solarSystems],
     ['stations.json', npcStations],
     ['regions.json', marketRegions],
+    ['globalMarkets.json', globalMarkets],
   ];
   for (const [name, data] of marketOutputs) {
     const json = JSON.stringify(data);
@@ -550,6 +610,10 @@ async function main() {
   console.log(`  solar systems: ${solarSystems.length}`);
   console.log(`  npc stations: ${npcStations.length}`);
   console.log(`  market regions: ${marketRegions.length}`);
+  console.log(
+    `  global market regions: ${globalMarketRegions.length} (${globalMarketRegions.map((r) => r.name).join(', ') || 'none'})`
+  );
+  console.log(`  globally-traded items: ${globalMarkets.length}`);
   if (
     marketGroups.length === 0 ||
     marketTypes.length === 0 ||

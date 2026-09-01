@@ -11,6 +11,7 @@ import type {
   SolarSystemEntry,
   NpcStationEntry,
   MarketRegionEntry,
+  GlobalMarketEntry,
 } from './marketTypes';
 
 async function fetchJson<T>(file: string): Promise<T> {
@@ -35,3 +36,4 @@ export const loadMarketTypes = cached<MarketTypeEntry[]>('types.json');
 export const loadSolarSystems = cached<SolarSystemEntry[]>('systems.json');
 export const loadNpcStations = cached<NpcStationEntry[]>('stations.json');
 export const loadMarketRegions = cached<MarketRegionEntry[]>('regions.json');
+export const loadGlobalMarkets = cached<GlobalMarketEntry[]>('globalMarkets.json');
