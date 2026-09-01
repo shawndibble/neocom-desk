@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { invalidateFreshness } from '@/esi/cache';
 
 /**
  * Flipped by the effect cleanup when the character changes, a refresh starts,
@@ -110,9 +111,12 @@ export function useRouteSnapshot<T>(
     hydrated,
     activeCharacterId,
     refreshCount: lifecycle.refreshCount,
-    refresh: useCallback(
-      () => setLifecycle((s) => ({ ...s, epoch: s.epoch + 1, refreshCount: s.refreshCount + 1 })),
-      []
-    ),
+    refresh: useCallback(() => {
+      // A manual refresh must always reach ESI, not a freshness-window hit
+      // from the page's own last load (issue #41) — invalidate before the
+      // epoch bump re-runs the loader, so this reload is exempt.
+      invalidateFreshness();
+      setLifecycle((s) => ({ ...s, epoch: s.epoch + 1, refreshCount: s.refreshCount + 1 }));
+    }, []),
   };
 }

@@ -19,6 +19,7 @@ import {
   loadWithCacheStatus,
   GLOBAL_CACHE_CHARACTER_ID,
   type CachedResult,
+  type ExpiresCapture,
   type StatusResult,
 } from '@/esi/cache';
 import type { Implants } from '@/engine/types';
@@ -79,15 +80,31 @@ export function loadCharacterImplants(characterId: number): Promise<CachedResult
   );
 }
 
+/**
+ * Fetches the skill queue, capturing that response's own `Expires` header so
+ * the shared cache can size a freshness window from it (issue #41) — read on
+ * four routes (Overview, Skills, Plans, Industry), so a window here is what
+ * turns a page-to-page nav into one round trip instead of four.
+ */
+function fetchSkillQueue(
+  characterId: number,
+  expiresCapture: ExpiresCapture
+): () => Promise<SkillQueueEntry[] | null> {
+  return async () => {
+    const result = await getCharacterSkillQueue(characterId);
+    expiresCapture.value = result.expires;
+    return result.data;
+  };
+}
+
 /** In-game skill training queue. ESI or cache. */
 export function loadCharacterSkillQueue(
   characterId: number
 ): Promise<CachedResult<SkillQueueEntry[]> | null> {
-  return loadWithCache(
-    characterId,
-    KEYS.skillqueue,
-    async () => (await getCharacterSkillQueue(characterId)).data
-  );
+  const expiresCapture: ExpiresCapture = { value: null };
+  return loadWithCache(characterId, KEYS.skillqueue, fetchSkillQueue(characterId, expiresCapture), {
+    expiresCapture,
+  });
 }
 
 /**
@@ -98,10 +115,12 @@ export function loadCharacterSkillQueue(
 export function loadCharacterSkillQueueWithStatus(
   characterId: number
 ): Promise<StatusResult<SkillQueueEntry[]>> {
+  const expiresCapture: ExpiresCapture = { value: null };
   return loadWithCacheStatus(
     characterId,
     KEYS.skillqueue,
-    async () => (await getCharacterSkillQueue(characterId)).data
+    fetchSkillQueue(characterId, expiresCapture),
+    { expiresCapture }
   );
 }
 

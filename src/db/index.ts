@@ -62,6 +62,13 @@ export interface EsiCacheRecord {
    * always claimed to be. Not indexed, so no Dexie version bump.
    */
   truncated?: boolean;
+  /**
+   * Epoch ms until which this row may be served without a live ESI call,
+   * taken from that response's own `Expires` header rather than a guessed
+   * constant. Optional and additive like `truncated` — absent means "no
+   * freshness window," which is what every row claimed before this existed.
+   */
+  expiresAt?: number;
 }
 
 /** One saved shortcut in the Quickbar (CONTEXT.md). */
