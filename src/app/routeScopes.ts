@@ -116,6 +116,10 @@ export const ROUTE_REQUIREMENTS = {
     endpoints: ['getCharacterContacts', 'postUniverseNames'],
     strings: 'contacts',
   },
+  '/loyalty': {
+    endpoints: ['getCharacterLoyaltyPoints', 'postUniverseNames'],
+    strings: 'loyalty',
+  },
 } as const satisfies Record<string, RouteRequirement>;
 
 export type AppRoutePath = keyof typeof ROUTE_REQUIREMENTS;
