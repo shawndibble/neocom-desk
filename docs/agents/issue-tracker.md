@@ -47,6 +47,6 @@ Create a GitHub issue.
 ## CI and merge
 
 - On every PR to `main`, `.github/workflows/ci.yml` runs a `validate` job (`lint`, `format:check`, `typecheck`, `test:run`, `build`) and an `e2e` job (Playwright). Watch with `gh pr checks <pr> --watch`.
-- `main` has no branch protection: a merge is not blocked by red checks, so any automation must enforce "green before merge" itself.
+- `main` is protected by a ruleset requiring the `validate` and `e2e` checks to pass (plus no force-push/deletion) — GitHub blocks merge on red checks itself. There is no review requirement.
 - Merging to `main` triggers the `deploy` job → GitHub Pages (production).
 - Squash-merge with `Closes #<n>` in the PR body auto-closes the issue.
