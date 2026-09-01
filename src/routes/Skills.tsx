@@ -358,25 +358,27 @@ export function Skills() {
                   key={group.groupName}
                   className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
                 >
-                  <button
-                    type="button"
-                    aria-expanded={expanded}
-                    disabled={searching}
-                    onClick={() => toggleGroup(group.groupName)}
-                    className={`flex min-h-8 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 disabled:hover:bg-transparent ${
-                      expanded ? 'border-b' : ''
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-                        {expanded ? '▾' : '▸'}
+                  <h2>
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      disabled={searching}
+                      onClick={() => toggleGroup(group.groupName)}
+                      className={`flex min-h-8 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 disabled:hover:bg-transparent ${
+                        expanded ? 'border-b' : ''
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
+                          {expanded ? '▾' : '▸'}
+                        </span>
+                        {group.groupName}
                       </span>
-                      {group.groupName}
-                    </span>
-                    <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-faint">
-                      {skillsToShow.length}
-                    </span>
-                  </button>
+                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-faint">
+                        {skillsToShow.length}
+                      </span>
+                    </button>
+                  </h2>
                   {expanded && (
                     <div className="p-3">
                       <ul className="divide-y divide-line">
