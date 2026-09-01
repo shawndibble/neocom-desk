@@ -8,7 +8,7 @@
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
-- **Build Plan**: An industry plan for manufacturing: blueprints needed, materials, costs, fees/taxes, time, and build-vs-buy comparison. v1 scope: manufacturing only (no invention/reactions).
+- **Build Plan**: An industry plan for manufacturing: blueprints needed, materials, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). v1 scope: manufacturing only (no invention/reactions).
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
 
 ## Scope decisions (v1)
@@ -278,3 +278,28 @@
   server-side and needs no local pathfinding graph. The two pages' call
   volumes and rendering models differ enough that this is not a reversal of
   the round 9 decision, just a narrower case it didn't rule out.
+
+## Glossary (round 15 additions)
+
+- **EIV (Estimated Item Value)**: The SCC's reference price for the materials
+  a manufacturing job consumes, at ME0 quantities. Used only to size the
+  **Job Fee** — it is not what the materials actually cost to buy.
+- **Job Fee**: The ISK ESI charges to install a manufacturing job, separate
+  from material cost. Sized from EIV, the system's **Cost Index**, a fixed
+  SCC surcharge, and the facility's tax.
+- **Cost Index**: A solar system's current manufacturing activity level
+  (read live from ESI). Higher activity in a system drives its Job Fee up;
+  distinct from EIV, which prices the materials rather than the system.
+- **Acquisition Verdict**: Whether a Build Plan's product costs less to build
+  than to buy outright at the trade hub. A personal-use comparison — no
+  sales tax or broker fee applies, because nothing is being sold.
+- **Sale Profitability**: Whether manufacturing a Build Plan's product and
+  selling it on the market turns a profit, net of sales tax and broker fee.
+  Distinct from the **Acquisition Verdict** — a product can be cheaper to
+  build than buy while still losing ISK if resold, since selling fees only
+  apply to the sale, not the build-vs-buy comparison.
+- **Gross Profit** / **Net Profit**: Sale Profitability before vs after sales
+  tax and broker fee are subtracted. **Break-even Price** — the sell price
+  at which profit is exactly zero — is always a Net figure, since it answers
+  "at what price do I stop losing ISK," which only holds net of the fees an
+  actual sale pays.
