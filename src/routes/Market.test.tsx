@@ -334,6 +334,23 @@ describe('Market Browser', () => {
     expect(screen.queryByText('Ore')).not.toBeInTheDocument();
   });
 
+  it('lets a matched group be collapsed and re-expanded while a search is active', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    expect(await screen.findByText('Rifter')).toBeInTheDocument();
+
+    // Collapsing "Ships" only hides its own contents — it must not touch the
+    // search filter, so it stays a no-op on which items matched.
+    await user.click(screen.getByRole('button', { name: 'Ships' }));
+    expect(screen.queryByText('Rifter')).not.toBeInTheDocument();
+    expect(screen.getByText('Ships')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Ships' }));
+    expect(await screen.findByText('Rifter')).toBeInTheDocument();
+  });
+
   it('prompts to search or browse when nothing is selected', async () => {
     render(<App />);
     expect(await screen.findByText('Select an item')).toBeInTheDocument();
