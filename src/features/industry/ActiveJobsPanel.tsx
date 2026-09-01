@@ -17,19 +17,34 @@ import {
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { jobsCsvColumns } from './jobsCsv';
+import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 
 interface ActiveJobsPanelProps {
   characterId: number;
 }
 
 interface Snapshot {
-  requestKey: string;
   result: JobsLoadResult;
   types: TypeMap;
 }
 
 /** Countdown recompute cadence; coarse (minutes granularity display) so 30s is plenty fresh. */
 const TICK_MS = 30_000;
+
+async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
+  try {
+    const [result, types] = await Promise.all([
+      loadCharacterIndustryJobs(characterId),
+      loadTypes(),
+    ]);
+    return { result, types };
+  } catch {
+    // `loadTypes()` throws when the SDE fetch fails. Resolving with an empty
+    // snapshot rather than rejecting is what clears the spinner — a rejected
+    // load would strand the panel with no data-cached branch to fall into.
+    return { result: { cached: null, needsReauth: false }, types: {} };
+  }
+}
 
 /**
  * "Active jobs" panel: the character's running industry jobs (all
@@ -40,43 +55,19 @@ const TICK_MS = 30_000;
  */
 export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-  const requestKey = `${characterId}:${refreshKey}`;
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [result, types] = await Promise.all([
-          loadCharacterIndustryJobs(characterId),
-          loadTypes(),
-        ]);
-        if (!cancelled) setSnapshot({ requestKey, result, types });
-      } catch {
-        // `loadTypes()` throws when the SDE fetch fails. Stamping an empty
-        // snapshot is what clears the spinner — leaving it unstamped strands
-        // the panel loading forever with its Refresh disabled.
-        if (!cancelled)
-          setSnapshot({ requestKey, result: { cached: null, needsReauth: false }, types: {} });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestKey is derived from these same deps
-  }, [characterId, refreshKey]);
+  const { data, loading, refreshCount, refresh } = useRouteSnapshot(
+    loadActiveJobsSnapshot,
+    characterId
+  );
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(id);
   }, []);
 
-  const current = snapshot?.requestKey === requestKey ? snapshot : null;
-  const loading = current === null;
-  const result = current?.result ?? null;
-  const types = current?.types ?? {};
+  const result = data?.result ?? null;
+  const types = data?.types ?? {};
 
   const jobs = useMemo(() => sortJobsBySoonest(result?.cached?.data ?? []), [result]);
 
@@ -95,7 +86,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
           >
             {t('industry.exportCsvJobs')}
           </Button>
-          <Button size="sm" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+          <Button size="sm" onClick={refresh} disabled={loading}>
             {t('industry.jobsRefresh')}
           </Button>
         </span>
@@ -132,7 +123,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         <div className="space-y-2">
           {result?.cached?.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">
-              {refreshKey > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
+              {refreshCount > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
             </p>
           )}
           <ul className="space-y-2">

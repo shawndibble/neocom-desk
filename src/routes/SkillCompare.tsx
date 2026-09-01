@@ -23,6 +23,7 @@ import {
   type SavedComparison,
 } from '@/features/skills/comparisons';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { invalidateFreshness } from '@/esi/cache';
 import type { TrainedSkill } from '@/engine/types';
 
 const FOCUS_RING =
@@ -326,7 +327,16 @@ export function SkillCompare() {
         <>
           <div className="flex items-center justify-end gap-2">
             {oldestFetchedAt && <DataAgeBadge date={oldestFetchedAt} />}
-            <Button size="sm" onClick={() => setRefreshNonce((n) => n + 1)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                // loadCorrectedSkills reads the skill queue through the
+                // windowed path (issue #41); a manual refresh here must
+                // bypass it the same way useRouteSnapshot's refresh does.
+                invalidateFreshness();
+                setRefreshNonce((n) => n + 1);
+              }}
+            >
               {t('skillCompare.refresh')}
             </Button>
           </div>

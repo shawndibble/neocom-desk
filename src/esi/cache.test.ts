@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import { EsiError } from './client';
 import {
+  invalidateFreshness,
   loadPaginatedWithCache,
+  loadPaginatedWithCacheStatus,
   loadWithCache,
   loadWithCacheStatus,
   readCached,
@@ -386,5 +388,206 @@ describe('loadPaginatedWithCache', () => {
     const row = await db.esiCache.get([7, 'k3']);
     expect(row?.value).toEqual(['a', 'b']);
     expect(row?.truncated).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// In-flight dedupe: concurrent identical reads share one fetchLive call
+// rather than racing (issue #41).
+// ---------------------------------------------------------------------------
+
+describe('in-flight dedupe', () => {
+  it('loadWithCacheStatus: two concurrent calls for the same key share one fetchLive call', async () => {
+    let calls = 0;
+    const fetchLive = vi.fn(async () => {
+      calls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return 'live-value';
+    });
+
+    const [a, b] = await Promise.all([
+      loadWithCacheStatus(CHAR_ID, KEY, fetchLive),
+      loadWithCacheStatus(CHAR_ID, KEY, fetchLive),
+    ]);
+
+    expect(calls).toBe(1);
+    expect(a.cached?.data).toBe('live-value');
+    expect(b.cached?.data).toBe('live-value');
+    expect(a).toEqual(b);
+  });
+
+  it('a call after the in-flight one settles gets its own fresh fetchLive call', async () => {
+    const fetchLive = vi.fn(async () => 'live-value');
+
+    await loadWithCacheStatus(CHAR_ID, KEY, fetchLive);
+    await loadWithCacheStatus(CHAR_ID, KEY, fetchLive);
+
+    expect(fetchLive).toHaveBeenCalledTimes(2);
+  });
+
+  it('a rejection does not poison the dedupe entry for the next call', async () => {
+    const failing = vi.fn(async () => {
+      throw new Error('offline');
+    });
+    await loadWithCacheStatus(CHAR_ID, KEY, failing);
+
+    const succeeding = vi.fn(async () => 'live-value');
+    const result = await loadWithCacheStatus(CHAR_ID, KEY, succeeding);
+
+    expect(succeeding).toHaveBeenCalledTimes(1);
+    expect(result.cached?.data).toBe('live-value');
+  });
+
+  it('does not dedupe across different keys or characters', async () => {
+    const fetchA = vi.fn(async () => 'a');
+    const fetchB = vi.fn(async () => 'b');
+
+    await Promise.all([
+      loadWithCacheStatus(CHAR_ID, 'key-a', fetchA),
+      loadWithCacheStatus(CHAR_ID, 'key-b', fetchB),
+    ]);
+
+    expect(fetchA).toHaveBeenCalledTimes(1);
+    expect(fetchB).toHaveBeenCalledTimes(1);
+  });
+
+  it('loadPaginatedWithCacheStatus: two concurrent calls for the same key share one fetchLive call', async () => {
+    const fetchLive = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { items: ['a', 'b'], truncated: false };
+    });
+
+    const [a, b] = await Promise.all([
+      loadPaginatedWithCacheStatus(CHAR_ID, KEY, fetchLive),
+      loadPaginatedWithCacheStatus(CHAR_ID, KEY, fetchLive),
+    ]);
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+    expect(a.cached?.data).toEqual(['a', 'b']);
+    expect(b.cached?.data).toEqual(['a', 'b']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Freshness window: a repeated read inside the window ESI's own Expires
+// header declared is served from the Dexie row without a network call
+// (issue #41). Driven by `expiresCapture`, written by fetchLive itself so
+// the window reflects that specific response rather than a guessed constant.
+// ---------------------------------------------------------------------------
+
+describe('freshness window', () => {
+  beforeEach(async () => {
+    // freshnessInvalidatedAt is module state shared across the whole file; a
+    // prior test's real-clock invalidateFreshness() call would otherwise
+    // outrank every mocked (small) timestamp used below. Pin it to 0 first.
+    vi.spyOn(Date, 'now').mockReturnValue(0);
+    invalidateFreshness();
+    await clearCachePurgePending(CHAR_ID);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('a second read inside the window is served from the row without calling fetchLive again', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => {
+      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      return 'live-value';
+    });
+    const capture = { value: null as string | null };
+
+    await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    vi.spyOn(Date, 'now').mockReturnValue(1_010_000); // 10s later, still inside the 60s window
+    const result = await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+    expect(result.cached).toEqual({
+      data: 'live-value',
+      fetchedAt: new Date(1_000_000),
+      fromCache: false,
+      truncated: false,
+    });
+    expect(result.needsReauth).toBe(false);
+  });
+
+  it('a read after the window calls fetchLive again', async () => {
+    const capture = { value: null as string | null };
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => {
+      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      return 'live-value';
+    });
+
+    await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + 70_000); // past the 60s window
+    await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    expect(fetchLive).toHaveBeenCalledTimes(2);
+  });
+
+  it('a call with no expiresCapture never gets a freshness window (safe default)', async () => {
+    const fetchLive = vi.fn(async () => 'live-value');
+
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+
+    expect(fetchLive).toHaveBeenCalledTimes(2);
+  });
+
+  it('invalidateFreshness makes the very next call bypass an active window (manual refresh)', async () => {
+    const capture = { value: null as string | null };
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => {
+      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      return 'live-value';
+    });
+
+    await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+    invalidateFreshness();
+    await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    expect(fetchLive).toHaveBeenCalledTimes(2);
+  });
+
+  it('a freshness hit is still suppressed while a purge is pending for that character', async () => {
+    await clearCachePurgePending(CHAR_ID);
+    const capture = { value: null as string | null };
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => {
+      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      return 'live-value';
+    });
+
+    await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+    await suppressViaFailedPurge(CHAR_ID);
+    const result = await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    // Suppressed, so the window can't be read back — falls through to fetchLive,
+    // which itself fails to write (purge suppression only gates reads), so this
+    // just proves the stale row wasn't silently served.
+    expect(fetchLive).toHaveBeenCalledTimes(2);
+    expect(result.cached?.data).toBe('live-value');
+  });
+
+  it('loadPaginatedWithCacheStatus also honors expiresCapture (not just the singular path)', async () => {
+    const capture = { value: null as string | null };
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => {
+      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      return { items: ['a', 'b'], truncated: false };
+    });
+
+    await loadPaginatedWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+    vi.spyOn(Date, 'now').mockReturnValue(1_010_000);
+    const result = await loadPaginatedWithCacheStatus(CHAR_ID, KEY, fetchLive, {
+      expiresCapture: capture,
+    });
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+    expect(result.cached?.data).toEqual(['a', 'b']);
+    expect(result.cached?.fromCache).toBe(false);
   });
 });

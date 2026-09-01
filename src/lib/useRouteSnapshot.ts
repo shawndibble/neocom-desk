@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { invalidateFreshness } from '@/esi/cache';
 
 /**
  * Flipped by the effect cleanup when the character changes, a refresh starts,
@@ -56,10 +57,20 @@ export interface RouteSnapshot<T> {
 }
 
 export function useRouteSnapshot<T>(
-  load: (characterId: number, signal: RouteSnapshotSignal) => Promise<T>
+  load: (characterId: number, signal: RouteSnapshotSignal) => Promise<T>,
+  /**
+   * Second case alongside the active-character store: a caller that already
+   * resolved its own character (e.g. a panel embedded in a route that reads
+   * the store itself) supplies it directly. Bypasses the store entirely —
+   * `hydrated` is `true` from the first render, since there is no store wait
+   * to report.
+   */
+  propCharacterId?: number
 ): RouteSnapshot<T> {
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const storeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const storeHydrated = useActiveCharacter((state) => state.hydrated);
+  const activeCharacterId = propCharacterId ?? storeCharacterId;
+  const hydrated = propCharacterId !== undefined ? true : storeHydrated;
 
   const [lifecycle, setLifecycle] = useState<Lifecycle>({
     characterId: activeCharacterId,
@@ -110,9 +121,12 @@ export function useRouteSnapshot<T>(
     hydrated,
     activeCharacterId,
     refreshCount: lifecycle.refreshCount,
-    refresh: useCallback(
-      () => setLifecycle((s) => ({ ...s, epoch: s.epoch + 1, refreshCount: s.refreshCount + 1 })),
-      []
-    ),
+    refresh: useCallback(() => {
+      // A manual refresh must always reach ESI, not a freshness-window hit
+      // from the page's own last load (issue #41) — invalidate before the
+      // epoch bump re-runs the loader, so this reload is exempt.
+      invalidateFreshness();
+      setLifecycle((s) => ({ ...s, epoch: s.epoch + 1, refreshCount: s.refreshCount + 1 }));
+    }, []),
   };
 }
