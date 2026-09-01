@@ -201,13 +201,13 @@ describe('verifyOptionsFromEnv', () => {
     process.env.EVE_CLIENT_ID = ` ${CLIENT_ID} , prod-app-id `;
     try {
       const devToken = await makeToken({ audience: [CLIENT_ID, 'EVE Online'] });
-      await expect(verifyEveAccessToken(devToken, verifyOptionsFromEnv())).resolves.toMatchObject(
-        { characterId: CHARACTER_ID }
-      );
+      await expect(verifyEveAccessToken(devToken, verifyOptionsFromEnv())).resolves.toMatchObject({
+        characterId: CHARACTER_ID,
+      });
       const prodToken = await makeToken({ audience: ['prod-app-id', 'EVE Online'] });
-      await expect(
-        verifyEveAccessToken(prodToken, verifyOptionsFromEnv())
-      ).resolves.toMatchObject({ characterId: CHARACTER_ID });
+      await expect(verifyEveAccessToken(prodToken, verifyOptionsFromEnv())).resolves.toMatchObject({
+        characterId: CHARACTER_ID,
+      });
       const otherToken = await makeToken({ audience: ['some-other-app', 'EVE Online'] });
       await expect(verifyEveAccessToken(otherToken, verifyOptionsFromEnv())).rejects.toThrow(
         /client/i
