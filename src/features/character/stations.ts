@@ -1,8 +1,8 @@
 /**
  * Station name lookups for Assets grouping: GET /universe/stations/{id} is
- * public and cacheable (see cache.ts). Player structures need an auth scope
- * this app doesn't request (v1 is read-only, station-only per CONTEXT.md);
- * callers show "Structure #id" for those instead of calling this loader.
+ * public and cacheable (see cache.ts). Player structures are a different
+ * endpoint with a different auth shape (ACL-checked, not merely
+ * scope-gated) — see `structures.ts`'s `loadStructureName`.
  */
 import { getUniverseStation } from '@/esi/endpoints';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';

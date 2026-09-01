@@ -801,3 +801,124 @@ export function getCharacterCorporationHistory(
     endpointId: 'getCharacterCorporationHistory',
   });
 }
+
+// --- GET /characters/{character_id}/clones (esi-clones.read_clones.v1) ---
+
+export interface JumpClone {
+  jump_clone_id: number;
+  location_id: number;
+  location_type: 'station' | 'structure';
+  implants: number[];
+  name?: string;
+}
+
+export interface CharacterClones {
+  home_location?: { location_id?: number; location_type?: 'station' | 'structure' };
+  jump_clones: JumpClone[];
+  last_clone_jump_date?: string;
+  last_station_change_date?: string;
+}
+
+export function getCharacterClones(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterClones>> {
+  return esiFetch<CharacterClones>(`/characters/${characterId}/clones`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterClones',
+  });
+}
+
+// --- GET /universe/structures/{structure_id} (esi-universe.read_structures.v1) ---
+
+/**
+ * ACL-checked: ESI returns 403 for any structure outside the token's ACL,
+ * even when the scope is held, so this is an authenticated call
+ * (`characterId` attaches the bearer token) despite living beside the public
+ * universe wrappers. Callers must not treat that 403 as a re-auth signal —
+ * see `features/character/structures.ts`.
+ */
+export interface UniverseStructure {
+  name: string;
+  owner_id: number;
+  solar_system_id: number;
+  type_id?: number;
+  position?: { x: number; y: number; z: number };
+}
+
+export function getUniverseStructure(
+  characterId: number,
+  structureId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<UniverseStructure>> {
+  return esiFetch<UniverseStructure>(`/universe/structures/${structureId}`, {
+    ...options,
+    characterId,
+    endpointId: 'getUniverseStructure',
+  });
+}
+
+// --- GET /characters/{character_id}/planets (esi-planets.manage_planets.v1) ---
+
+export interface CharacterPlanet {
+  solar_system_id: number;
+  planet_id: number;
+  planet_type: 'temperate' | 'barren' | 'oceanic' | 'ice' | 'gas' | 'lava' | 'storm' | 'plasma';
+  owner_id: number;
+  last_update: string;
+  upgrade_level: number;
+  num_pins: number;
+}
+
+export function getCharacterPlanets(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterPlanet[]>> {
+  return esiFetch<CharacterPlanet[]>(`/characters/${characterId}/planets`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterPlanets',
+  });
+}
+
+// --- GET /characters/{character_id}/contacts (esi-characters.read_contacts.v1) ---
+
+export interface CharacterContact {
+  contact_id: number;
+  contact_type: 'character' | 'corporation' | 'alliance' | 'faction';
+  standing: number;
+  is_blocked?: boolean;
+  is_watched?: boolean;
+  label_ids?: number[];
+}
+
+/** Paginated (X-Pages); see fetchAllPagesStatus. */
+export function getCharacterContacts(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<TruncatableResult<CharacterContact>> {
+  return fetchAllPagesStatus<CharacterContact>(`/characters/${characterId}/contacts`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterContacts',
+  });
+}
+
+// --- GET /characters/{character_id}/loyalty/points (esi-characters.read_loyalty.v1) ---
+
+export interface CharacterLoyaltyPoints {
+  corporation_id: number;
+  loyalty_points: number;
+}
+
+export function getCharacterLoyaltyPoints(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterLoyaltyPoints[]>> {
+  return esiFetch<CharacterLoyaltyPoints[]>(`/characters/${characterId}/loyalty/points`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterLoyaltyPoints',
+  });
+}

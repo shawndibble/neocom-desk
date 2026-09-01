@@ -134,6 +134,26 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/corporationhistory',
     scope: PUBLIC,
   },
+  getCharacterClones: {
+    route: '/characters/{character_id}/clones',
+    scope: 'esi-clones.read_clones.v1',
+  },
+  getUniverseStructure: {
+    route: '/universe/structures/{structure_id}',
+    scope: 'esi-universe.read_structures.v1',
+  },
+  getCharacterPlanets: {
+    route: '/characters/{character_id}/planets',
+    scope: 'esi-planets.manage_planets.v1',
+  },
+  getCharacterContacts: {
+    route: '/characters/{character_id}/contacts',
+    scope: 'esi-characters.read_contacts.v1',
+  },
+  getCharacterLoyaltyPoints: {
+    route: '/characters/{character_id}/loyalty/points',
+    scope: 'esi-characters.read_loyalty.v1',
+  },
   getAlliancePublicInfo: {
     route: '/alliances/{alliance_id}',
     scope: PUBLIC,

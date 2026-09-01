@@ -331,7 +331,8 @@
     "csvJobStatus": "Status"
   },
   "login": {
-    "button": "Log in with EVE Online"
+    "button": "Log in with EVE Online",
+    "permissionsHint": "Grants read-only access to your skills, assets, wallet, mail, calendar, contracts, market orders, industry, clones, player structure names, planetary colonies, contacts and loyalty points. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — NeoCom Desk only reads that data and never writes to it. Log in again after an update to pick up newly requested permissions."
   },
   "callback": {
     "completing": "Completing login…",

@@ -39,6 +39,9 @@ export function Login() {
         </span>
         {t('login.button')}
       </button>
+      <p className="max-w-sm text-center text-[0.6875rem] text-text-faint">
+        {t('login.permissionsHint')}
+      </p>
     </main>
   );
 }

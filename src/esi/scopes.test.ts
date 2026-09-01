@@ -19,6 +19,11 @@ describe('SCOPES', () => {
         'esi-markets.read_character_orders.v1',
         'esi-characters.read_blueprints.v1',
         'esi-industry.read_character_jobs.v1',
+        'esi-clones.read_clones.v1',
+        'esi-universe.read_structures.v1',
+        'esi-planets.manage_planets.v1',
+        'esi-characters.read_contacts.v1',
+        'esi-characters.read_loyalty.v1',
       ].sort()
     );
   });
