@@ -49,13 +49,18 @@ const skillsPayload = {
   unallocated_sp: 12_000,
 };
 
+// Relative to the instant the suite runs, not a fixed pair of calendar dates:
+// Overview.tsx feeds this into selectActiveQueueEntry(..., Date.now()), so a
+// hardcoded past/future pair eventually falls out of that window and this
+// entry silently stops being "active" — see the BUG #10 postmortem below for
+// why that failure mode is exactly the one this file is guarding against.
 const queuePayload = [
   {
     skill_id: 3300,
     queue_position: 0,
     finished_level: 5,
-    start_date: '2026-08-01T00:00:00Z',
-    finish_date: '2026-09-01T00:00:00Z',
+    start_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    finish_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   },
 ];
 

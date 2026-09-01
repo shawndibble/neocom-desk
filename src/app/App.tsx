@@ -14,6 +14,7 @@ import { Overview } from '@/routes/Overview';
 import { QueueHealth } from '@/routes/QueueHealth';
 import { Skills } from '@/routes/Skills';
 import { SkillPlans } from '@/routes/SkillPlans';
+import { SkillCompare } from '@/routes/SkillCompare';
 import { Industry } from '@/routes/Industry';
 import { Market } from '@/routes/Market';
 import { Wallet } from '@/routes/Wallet';
@@ -57,6 +58,7 @@ const ROUTE_ELEMENTS = {
   '/queue-health': <QueueHealth />,
   '/skills': <Skills />,
   '/skills/plans': <SkillPlans />,
+  '/skills/compare': <SkillCompare />,
   '/industry': <Industry />,
   '/market': <Market />,
   '/wallet': <Wallet />,
