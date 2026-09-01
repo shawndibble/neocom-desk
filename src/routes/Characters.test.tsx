@@ -211,7 +211,11 @@ describe('Characters', () => {
 
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Pilot One'));
     await waitFor(() => expect(screen.queryByText('Pilot One')).not.toBeInTheDocument());
-    expect(await db.characters.get(91)).toBeUndefined();
+    // Folded into waitFor rather than a bare `await db.characters.get(91)`:
+    // a raw Dexie read after the DOM settles still leaves room for a
+    // trailing live-query update (e.g. another mounted component reacting to
+    // the same deletion) to land outside `act`.
+    await waitFor(async () => expect(await db.characters.get(91)).toBeUndefined());
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
   });
 

@@ -758,14 +758,13 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     const item = await screen.findByText('Rifter');
     item.focus();
-    // App's own hydration read (Dexie settings, no active-character key
-    // seeded in this describe) must settle before the context menu opens,
-    // or its resolution lands after this test's synchronous assertions —
-    // outside any `act`.
-    await waitFor(() => expect(useActiveCharacter.getState().hydrated).toBe(true));
     fireEvent.contextMenu(item);
 
-    const menuItem = screen.getByRole('menuitem', { name: 'Add to Quickbar' });
+    // Radix's menu positions itself post-mount (Popper), a step that settles
+    // async — every other contextMenu test in this file awaits something
+    // afterward (a menu click, a findBy*) that gives it room; this one must
+    // too, or that settling lands outside `act`.
+    const menuItem = await screen.findByRole('menuitem', { name: 'Add to Quickbar' });
     expect(menuItem).toHaveAttribute('data-disabled');
     expect(menuItem).toHaveAttribute('title', 'Select a character to use the Quickbar');
   });

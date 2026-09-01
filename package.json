@@ -66,5 +66,10 @@
     "@swc/core@1.16.1": true,
     "msw@2.15.0": true,
     "protobufjs@7.6.6": true
+  },
+  "overrides": {
+    "workbox-build": {
+      "glob": "^13.0.0"
+    }
   }
 }
