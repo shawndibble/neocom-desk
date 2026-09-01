@@ -31,17 +31,22 @@ export function PriceHistoryPanel({ regionId, typeId, itemName }: PriceHistoryPa
   const { t } = useTranslation();
   const [points, setPoints] = useState<MarketHistoryPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
+  // Distinct from "no history": a thrown fetch failure (network/rate-limit/5xx)
+  // is not the same fact as ESI genuinely having nothing for this item, and
+  // folding the two into one EmptyState would misreport failures as data.
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       setLoading(true);
       setPoints(null);
+      setError(false);
       try {
         const result = await loadPriceHistory(regionId, typeId);
         if (!cancelled) setPoints(result.points);
       } catch {
-        if (!cancelled) setPoints([]);
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -52,6 +57,16 @@ export function PriceHistoryPanel({ regionId, typeId, itemName }: PriceHistoryPa
   }, [regionId, typeId]);
 
   if (loading) return <ChartFallback label={t('common.loading')} />;
+
+  if (error) {
+    return (
+      <EmptyState
+        title={t('market.priceHistory.errorTitle')}
+        hint={t('market.priceHistory.errorHint')}
+        className="py-8"
+      />
+    );
+  }
 
   if (!points || points.length === 0) {
     return (

@@ -399,7 +399,6 @@ export function Market() {
     setBuyShowAll(false);
     setOrderBookResult(null);
     setStationFilter(null);
-    setItemTab('orders');
   }
 
   useEffect(() => {
@@ -724,15 +723,20 @@ export function Market() {
     (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
   const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
   const showBackControl = !isDesktop && selectedTypeId !== null;
+  // The Data Age badge reflects the order book, so it only belongs on the
+  // Market Data tab — showing it while Price History is open would misreport
+  // the history's own fetch time as the order book's.
   const itemPanelActions =
-    showBackControl || orderBookResult ? (
+    showBackControl || (itemTab === 'orders' && orderBookResult) ? (
       <>
         {showBackControl && (
           <Button size="sm" onClick={handleBackToFinder}>
             {t('market.backToFinder')}
           </Button>
         )}
-        {orderBookResult && <DataAgeBadge date={new Date(orderBookResult.fetchedAt)} />}
+        {itemTab === 'orders' && orderBookResult && (
+          <DataAgeBadge date={new Date(orderBookResult.fetchedAt)} />
+        )}
       </>
     ) : undefined;
 
