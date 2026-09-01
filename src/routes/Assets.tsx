@@ -69,8 +69,8 @@ export const MAX_RENDERED_ASSETS = 1000;
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_PRICES: ReadonlyMap<number, number> = new Map();
 const NO_VOLUMES: ReadonlyMap<number, number> = new Map();
-const NO_CHARACTER_IDS: ReadonlyMap<number, number> = new Map();
-const NO_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
+const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
+const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
 
 interface Snapshot {
   assetsResult: CachedResult<CharacterAsset[]> | null;
@@ -113,6 +113,27 @@ function locationLabel(
   }
   // Exhaustiveness fallback: every current location_type is handled above.
   return t('assets.structureLabel', { id: locationId });
+}
+
+interface AssetMatch {
+  asset: CharacterAsset;
+  name: string;
+}
+
+/** Name-substring search over a flat asset list, shared by the CSV export path and the on-screen tree path. */
+function matchAssets(
+  assets: readonly CharacterAsset[],
+  typeNames: ReadonlyMap<number, string>,
+  query: string
+): AssetMatch[] {
+  const q = query.trim().toLowerCase();
+  const matches: AssetMatch[] = [];
+  for (const asset of assets) {
+    const name = typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
+    if (q && !name.toLowerCase().includes(q)) continue;
+    matches.push({ asset, name });
+  }
+  return matches;
 }
 
 /** Global average market prices, best-effort — a Fuzzwork/ESI outage degrades badges to 0 rather than the whole page. */
@@ -343,15 +364,24 @@ function collectExpandableKeys(nodes: readonly AssetTreeNode[], parentPath: stri
   return keys;
 }
 
+/**
+ * Cross-character search (issue #85): who owns which row, relative to the
+ * active Character — the three pieces always travel together, so they get
+ * one field on `RenderCtx` instead of three. `EMPTY_CHARACTER_BADGES` below
+ * is the off/inactive value: every row resolves to "no badge".
+ */
+interface CharacterBadgeContext {
+  activeCharacterId: number | null;
+  idByItemId: ReadonlyMap<number, number>;
+  nameById: ReadonlyMap<number, string>;
+}
+
 interface RenderCtx {
   expandedKeys: ReadonlySet<string>;
   onToggle: (key: string) => void;
   typeNames: ReadonlyMap<number, string>;
   t: Translate;
-  /** Cross-character search (issue #85): empty maps when the toggle is off or inactive. */
-  activeCharacterId: number | null;
-  characterIdByItemId: ReadonlyMap<number, number>;
-  characterNameById: ReadonlyMap<number, string>;
+  characterBadges: CharacterBadgeContext;
 }
 
 function formatBadge(totals: { itemCount: number; estimatedValue: number }, t: Translate): string {
@@ -363,9 +393,10 @@ function formatBadge(totals: { itemCount: number; estimatedValue: number }, t: T
 
 /** The owning Character's name, only when it isn't the active Character — null means "no badge". */
 function characterBadgeFor(itemId: number, ctx: RenderCtx): string | null {
-  const ownerId = ctx.characterIdByItemId.get(itemId);
-  if (ownerId === undefined || ownerId === ctx.activeCharacterId) return null;
-  return ctx.characterNameById.get(ownerId) ?? null;
+  const { activeCharacterId, idByItemId, nameById } = ctx.characterBadges;
+  const ownerId = idByItemId.get(itemId);
+  if (ownerId === undefined || ownerId === activeCharacterId) return null;
+  return nameById.get(ownerId) ?? null;
 }
 
 interface CharacterBadgeProps {
@@ -735,17 +766,9 @@ export function Assets() {
     [assetsResult]
   );
   const csvGroups = useMemo(() => {
-    const items = assetsResult?.data ?? [];
-    const query = search.trim().toLowerCase();
+    const matches = matchAssets(assetsResult?.data ?? [], typeNames, search);
 
-    const matches: { asset: CharacterAsset; name: string }[] = [];
-    for (const asset of items) {
-      const name = typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
-      if (query && !name.toLowerCase().includes(query)) continue;
-      matches.push({ asset, name });
-    }
-
-    const byLocation = new Map<number, { asset: CharacterAsset; name: string }[]>();
+    const byLocation = new Map<number, AssetMatch[]>();
     for (const entry of matches) {
       const list = byLocation.get(entry.asset.location_id) ?? [];
       list.push(entry);
@@ -794,8 +817,11 @@ export function Assets() {
     }
     return merged;
   }, [locationNames, activeCrossCharacterData]);
-  const characterIdByItemId = activeCrossCharacterData?.characterIdByItemId ?? NO_CHARACTER_IDS;
-  const characterNameById = activeCrossCharacterData?.characterNameById ?? NO_CHARACTER_NAMES;
+  const characterBadges: CharacterBadgeContext = {
+    activeCharacterId,
+    idByItemId: activeCrossCharacterData?.characterIdByItemId ?? EMPTY_ITEM_OWNERS,
+    nameById: activeCrossCharacterData?.characterNameById ?? EMPTY_CHARACTER_NAMES,
+  };
 
   const assetsByItemId = useMemo(
     () => new Map(mergedAssets.map((asset) => [asset.item_id, asset])),
@@ -803,13 +829,7 @@ export function Assets() {
   );
 
   const { shownCount, totalMatches, visibleItemIds } = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const matches: { asset: CharacterAsset; name: string }[] = [];
-    for (const asset of mergedAssets) {
-      const name = mergedTypeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
-      if (query && !name.toLowerCase().includes(query)) continue;
-      matches.push({ asset, name });
-    }
+    const matches = matchAssets(mergedAssets, mergedTypeNames, search);
     const capped = capItems(matches, MAX_RENDERED_ASSETS);
     return {
       shownCount: capped.items.length,
@@ -917,9 +937,7 @@ export function Assets() {
     onToggle: toggleKey,
     typeNames: mergedTypeNames,
     t,
-    activeCharacterId,
-    characterIdByItemId,
-    characterNameById,
+    characterBadges,
   };
   const itemActions: AssetItemActions = {
     priceByTypeId,
