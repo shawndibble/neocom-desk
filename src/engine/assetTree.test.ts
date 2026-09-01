@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   buildAssetTree,
   compareStations,
+  collectItemIds,
+  collectStationItemIds,
   type AssetTreeContainerNode,
   type AssetTreeStation,
   type EngineAsset,
@@ -269,6 +271,68 @@ describe('buildAssetTree', () => {
     expect(inner.children).toEqual([
       { kind: 'item', asset: expect.objectContaining({ item_id: outer.asset.item_id }) },
     ]);
+  });
+});
+
+describe('collectItemIds', () => {
+  it('returns a single-item leaf as its own id', () => {
+    const tree = buildAssetTree([asset({ item_id: 1, quantity: 500, type_id: 34 })]);
+    const item = tree[0].children[0];
+    expect(collectItemIds(item)).toEqual([1]);
+  });
+
+  it('recurses through bay/ship/container nesting to collect every descendant leaf', () => {
+    const tree = buildAssetTree([
+      asset({ item_id: 10, type_id: 650, location_id: 60003760, location_flag: 'Hangar' }),
+      asset({
+        item_id: 11,
+        type_id: 34,
+        quantity: 50,
+        location_id: 10,
+        location_type: 'item',
+        location_flag: 'Cargo',
+      }),
+      asset({
+        item_id: 12,
+        type_id: 35,
+        quantity: 3,
+        location_id: 10,
+        location_type: 'item',
+        location_flag: 'DroneBay',
+      }),
+      asset({
+        item_id: 13,
+        type_id: 2454,
+        location_id: 10,
+        location_type: 'item',
+        location_flag: 'HiSlot0',
+      }),
+    ]);
+
+    const ship = tree[0].children[0] as AssetTreeContainerNode;
+    expect(collectItemIds(ship).sort()).toEqual([11, 12, 13]);
+  });
+});
+
+describe('collectStationItemIds', () => {
+  it('collects every descendant leaf across all of a station’s top-level children', () => {
+    const tree = buildAssetTree([
+      asset({ item_id: 1, quantity: 1, type_id: 34, location_id: 60003760 }),
+      asset({ item_id: 2, quantity: 1, type_id: 35, location_id: 60003760 }),
+    ]);
+
+    expect(collectStationItemIds(tree[0]).sort()).toEqual([1, 2]);
+  });
+
+  it('returns an empty list for an empty station', () => {
+    const station: AssetTreeStation = {
+      locationId: 1,
+      locationType: 'station',
+      children: [],
+      itemCount: 0,
+      estimatedValue: 0,
+    };
+    expect(collectStationItemIds(station)).toEqual([]);
   });
 });
 
