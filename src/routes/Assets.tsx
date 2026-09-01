@@ -6,6 +6,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterAssets } from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
+import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
@@ -47,6 +48,8 @@ function locationLabel(
 ): string {
   if (locationType === 'station')
     return locationNames.get(locationId) ?? t('assets.stationLabel', { id: locationId });
+  if (locationType === 'other')
+    return locationNames.get(locationId) ?? t('assets.structureLabel', { id: locationId });
   if (locationType === 'solar_system') return t('assets.inSpaceLabel', { id: locationId });
   if (locationType === 'item') {
     // The parent is another asset (container or ship) in this same list; label
@@ -58,6 +61,7 @@ function locationLabel(
     }
     return t('assets.containerLabel');
   }
+  // Exhaustiveness fallback: every current location_type is handled above.
   return t('assets.structureLabel', { id: locationId });
 }
 
@@ -91,10 +95,20 @@ async function loadAssetsSnapshot(
   const stationIds = signal.cancelled
     ? []
     : [...new Set(assets.filter((a) => a.location_type === 'station').map((a) => a.location_id))];
-  const resolvedStations = await Promise.all(stationIds.map((id) => loadStationName(id)));
+  const structureIds = signal.cancelled
+    ? []
+    : [...new Set(assets.filter((a) => a.location_type === 'other').map((a) => a.location_id))];
+  const [resolvedStations, resolvedStructures] = await Promise.all([
+    Promise.all(stationIds.map((id) => loadStationName(id))),
+    Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
+  ]);
   const locationNames = new Map<number, string>();
   stationIds.forEach((id, i) => {
     const name = resolvedStations[i];
+    if (name) locationNames.set(id, name);
+  });
+  structureIds.forEach((id, i) => {
+    const name = resolvedStructures[i];
     if (name) locationNames.set(id, name);
   });
 

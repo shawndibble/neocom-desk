@@ -71,6 +71,12 @@ const server = setupServer(
       system_id: 30000142,
     })
   ),
+  // This character's token predates esi-universe.read_structures.v1 (see the
+  // token fixture below), so ESI 403s — the structure falls back to its bare
+  // id label rather than triggering a re-auth banner.
+  http.get('https://esi.evetech.net/universe/structures/1000000000001', () =>
+    HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+  ),
   http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.json([]))
 );
 
