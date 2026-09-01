@@ -483,6 +483,12 @@
       "droneBay": "Drone Bay",
       "fitting": "Fitting"
     },
+    "pin": {
+      "unpinned": "Pin to top",
+      "character": "Pinned for this character",
+      "account": "Pinned for all characters",
+      "ariaLabel": "Pin toggle for {{station}}: {{state}}"
+    },
     "tooltip": {
       "value": "Value: {{value}} ISK",
       "volume": "Volume: {{volume}} m3",

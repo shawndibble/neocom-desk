@@ -11,7 +11,7 @@
 //   mergeSettings — keyed by setting key; local tombstones never expire (only a
 //                   newer write to the key supersedes them). See issue #13.
 
-import type { BuildPlanRecord, QuickbarRecord, SkillPlanRecord } from '@/db';
+import type { BuildPlanRecord, QuickbarRecord, SkillPlanRecord, StationPinRecord } from '@/db';
 
 export const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -43,6 +43,9 @@ export type RemoteBuildPlanDoc = BuildPlanRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/quickbars/{id}. */
 export type RemoteQuickbarDoc = QuickbarRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/stationPins/{id}. */
+export type RemoteStationPinDoc = StationPinRecord & RemoteDoc;
 
 /** Locally recorded deletion awaiting propagation to the remote store. */
 export interface LocalTombstone {

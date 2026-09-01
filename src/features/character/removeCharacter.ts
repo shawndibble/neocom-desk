@@ -45,6 +45,7 @@ export async function removeCharacter(
   await db.skillPlans.where('characterId').equals(characterId).delete();
   await db.buildPlans.where('characterId').equals(characterId).delete();
   await db.quickbars.where('characterId').equals(characterId).delete();
+  await db.stationPins.where('characterId').equals(characterId).delete();
   await clearCharacterSyncBookkeeping(characterId);
   await purgeCharacterCacheOrSuppress(characterId);
 

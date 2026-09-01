@@ -113,6 +113,28 @@ export interface BuildPlanRecord {
   updatedAt: number;
 }
 
+/** A station's pin scope (issue #84). */
+export type StationPinScope = 'character' | 'account';
+
+/**
+ * User-editable station pin: one record per (characterId, locationId). A
+ * `character` pin elevates the station to the top of the list only while that
+ * Character is active; an `account` pin elevates it regardless of which
+ * Character is active. Account-wide pins have no shared account identity to
+ * key off (Account has no storage/sync — CONTEXT.md) so they fan out: one row
+ * per Character currently known on this device, each synced under that
+ * Character's own ownerHash (see docs/plans/feature-parity/README.md §5.7).
+ */
+export interface StationPinRecord {
+  /** Always `${characterId}:${locationId}` — one record per Character per station. */
+  id: string;
+  characterId: number;
+  locationId: number;
+  scope: StationPinScope;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -121,6 +143,7 @@ export const db = new Dexie('neocom') as Dexie & {
   esiCache: Dexie.Table<EsiCacheRecord, [number, string]>;
   buildPlans: EntityTable<BuildPlanRecord, 'id'>;
   quickbars: EntityTable<QuickbarRecord, 'id'>;
+  stationPins: EntityTable<StationPinRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -157,4 +180,16 @@ db.version(4).stores({
   esiCache: '[characterId+key]',
   buildPlans: 'id, characterId',
   quickbars: 'id, characterId',
+});
+
+// Additive: v1-v4 stores unchanged, plus Station Pins.
+db.version(5).stores({
+  characters: 'characterId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
 });

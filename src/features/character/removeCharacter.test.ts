@@ -46,6 +46,13 @@ async function seedCharacter(characterId: number): Promise<void> {
     updatedAt: 1,
   });
   await db.quickbars.add({ id: String(characterId), characterId, items: [], updatedAt: 1 });
+  await db.stationPins.add({
+    id: `${characterId}:60003760`,
+    characterId,
+    locationId: 60003760,
+    scope: 'character',
+    updatedAt: 1,
+  });
   await db.esiCache.put({ characterId, key: 'wallet', value: 100, fetchedAt: 1 });
 }
 
@@ -59,6 +66,7 @@ beforeEach(async () => {
     db.skillPlans.clear(),
     db.buildPlans.clear(),
     db.quickbars.clear(),
+    db.stationPins.clear(),
     db.esiCache.clear(),
     db.settings.clear(),
   ]);
@@ -76,6 +84,7 @@ describe('removeCharacter', () => {
     expect(await db.skillPlans.where('characterId').equals(1).count()).toBe(0);
     expect(await db.buildPlans.where('characterId').equals(1).count()).toBe(0);
     expect(await db.quickbars.where('characterId').equals(1).count()).toBe(0);
+    expect(await db.stationPins.where('characterId').equals(1).count()).toBe(0);
     expect(await db.esiCache.where('[characterId+key]').equals([1, 'wallet']).count()).toBe(0);
   });
 

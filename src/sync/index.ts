@@ -47,6 +47,31 @@ export async function markBuildPlanDeleted(characterId: number, planId: string):
   return markBuildPlanDeleted(characterId, planId);
 }
 
+/** Pin a station for one Character only (issue #84's per-character pin state). */
+export async function setCharacterStationPin(
+  characterId: number,
+  locationId: number
+): Promise<void> {
+  const { setCharacterStationPin } = await import('./planSync');
+  return setCharacterStationPin(characterId, locationId);
+}
+
+/**
+ * Elevate a station's pin to account-wide — fanned out to every Character
+ * currently known on this device (parity-plan §5.7), each syncing under its
+ * own ownerHash.
+ */
+export async function setAccountStationPin(locationId: number): Promise<void> {
+  const { setAccountStationPin } = await import('./planSync');
+  return setAccountStationPin(locationId);
+}
+
+/** Unpin a station entirely, tombstoning its pin row for every Character it was written under. */
+export async function clearStationPin(locationId: number): Promise<void> {
+  const { clearStationPin } = await import('./planSync');
+  return clearStationPin(locationId);
+}
+
 /** Write a synced setting ('sync.'-prefixed key) and stamp it for LWW merging. */
 export async function setSyncedSetting(key: string, value: unknown): Promise<void> {
   const { setSyncedSetting } = await import('./planSync');
@@ -67,7 +92,7 @@ export async function ensureSignedIn(characterId: number): Promise<string> {
 
 /**
  * Purge a removed Character's remote Firestore docs (plans, buildPlans,
- * quickbars, settings) right now. If it can't run (most commonly a dead
+ * quickbars, stationPins, settings) right now. If it can't run (most commonly a dead
  * refresh token — the Character can no longer sign in), records a pending
  * purge that the next successful sync for it retries automatically. Returns
  * whether the purge ran immediately.
