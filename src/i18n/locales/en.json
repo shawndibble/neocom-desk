@@ -12,6 +12,7 @@
     "market": "Market",
     "characterSection": "Character",
     "wallet": "Wallet",
+    "clones": "Clones",
     "employmentHistory": "Employment History",
     "assets": "Assets",
     "mail": "Mail",
@@ -516,6 +517,22 @@
     "csvResponse": "Response",
     "reauthTitle": "Log in again to see your calendar",
     "reauthHint": "Log in again to fetch this character's calendar.",
+    "reauthAction": "Log in again with EVE Online"
+  },
+  "clones": {
+    "title": "Clones",
+    "refresh": "Refresh",
+    "emptyTitle": "No jump clones cached",
+    "emptyHint": "Reconnect to fetch this character's jump clones.",
+    "location": "Location",
+    "implants": "Implants",
+    "noImplants": "No implants",
+    "stationLabel": "Station #{{id}}",
+    "structureLabel": "Structure #{{id}}",
+    "cooldownReady": "Ready to jump now",
+    "cooldownOnCooldown": "On cooldown until {{date}} ({{duration}} left)",
+    "reauthTitle": "Log in again to see your clones",
+    "reauthHint": "Log in again to fetch this character's jump clones.",
     "reauthAction": "Log in again with EVE Online"
   },
   "employmentHistory": {

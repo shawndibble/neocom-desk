@@ -25,6 +25,7 @@ describe('scope derivation', () => {
       'esi-contracts.read_character_contracts.v1',
     ]);
     expect(requiredScopesForRoute('/orders')).toEqual(['esi-markets.read_character_orders.v1']);
+    expect(requiredScopesForRoute('/clones')).toEqual(['esi-clones.read_clones.v1']);
   });
 
   it('drops PUBLIC endpoints, so a route reading only public data needs nothing', () => {
@@ -79,6 +80,7 @@ describe('gated routes', () => {
     expect(paths.filter(isGatedRoute).sort()).toEqual([
       '/assets',
       '/calendar',
+      '/clones',
       '/contracts',
       '/mail',
       '/orders',
