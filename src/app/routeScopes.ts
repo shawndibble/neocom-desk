@@ -66,6 +66,9 @@ export const ROUTE_REQUIREMENTS = {
   // Single-scope, but already renders `ReauthBanner` from its own
   // `needsReauth` result.
   '/wallet': UNGATED,
+  // corporationhistory has "security": [] in the ESI spec — public, no scope
+  // to gate on, same reasoning as /market.
+  '/employment-history': UNGATED,
 
   // One scope each, so a missing grant leaves the page with literally nothing
   // to show.

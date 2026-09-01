@@ -12,6 +12,7 @@
     "market": "Market",
     "characterSection": "Character",
     "wallet": "Wallet",
+    "employmentHistory": "Employment History",
     "assets": "Assets",
     "mail": "Mail",
     "calendar": "Calendar",
@@ -463,6 +464,15 @@
     "reauthTitle": "Log in again to see your calendar",
     "reauthHint": "Log in again to fetch this character's calendar.",
     "reauthAction": "Log in again with EVE Online"
+  },
+  "employmentHistory": {
+    "title": "Employment History",
+    "refresh": "Refresh",
+    "emptyTitle": "No employment history cached",
+    "emptyHint": "Reconnect to fetch this character's corporation history.",
+    "corporation": "Corporation",
+    "started": "Joined",
+    "duration": "Duration"
   },
   "contracts": {
     "title": "Contracts",

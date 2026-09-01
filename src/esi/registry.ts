@@ -130,6 +130,10 @@ export const ESI_REGISTRY = {
     route: '/corporations/{corporation_id}',
     scope: PUBLIC,
   },
+  getCharacterCorporationHistory: {
+    route: '/characters/{character_id}/corporationhistory',
+    scope: PUBLIC,
+  },
   getAlliancePublicInfo: {
     route: '/alliances/{alliance_id}',
     scope: PUBLIC,
