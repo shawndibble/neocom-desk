@@ -23,7 +23,6 @@ export interface EmploymentHistoryRow {
   recordId: number;
   corporationId: number;
   startDate: string;
-  isDeleted: boolean;
   /** Seconds spent at this corp: gap to the next record, or to `now` for the current one. */
   tenureSeconds: number;
 }
@@ -44,7 +43,6 @@ export function deriveEmploymentHistoryRows(
       recordId: entry.record_id,
       corporationId: entry.corporation_id,
       startDate: entry.start_date,
-      isDeleted: entry.is_deleted ?? false,
       tenureSeconds: Math.max(0, (endMs - startMs) / 1000),
     };
   });

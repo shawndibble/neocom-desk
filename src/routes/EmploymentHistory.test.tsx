@@ -74,6 +74,8 @@ describe('EmploymentHistory', () => {
     // Row 0 is the header; row 1 should be the most recent corp.
     expect(rows[1]).toHaveTextContent('Current Corp');
     expect(rows[2]).toHaveTextContent('Past Corp');
+    // Past Corp ran exactly 2025-01-01 to 2026-01-01: a full non-leap year.
+    expect(rows[2]).toHaveTextContent('365d');
   });
 
   it('falls back to cached history offline', async () => {
