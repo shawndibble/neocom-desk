@@ -60,7 +60,13 @@ export function resolveOrderLocation(
   };
 }
 
-/** Narrows an order book to one location_id (the "filter to this station" context-menu action); null passes every order through. */
+/**
+ * Narrows an order book to one location_id: Trade Hub mode's own-station
+ * filter (CONTEXT.md: "filters the rows down to the hub's own station") and
+ * the order-row "filter to this station" context-menu action share this
+ * function. `null` passes every order through, for the context-menu action's
+ * undo.
+ */
 export function filterOrdersByLocation<T extends { location_id: number }>(
   orders: readonly T[],
   locationId: number | null
