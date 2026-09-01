@@ -69,6 +69,12 @@ import {
   stationRowKey,
   type AssetRow,
 } from '@/features/character/assetRows';
+import {
+  arrowLeft,
+  arrowRight,
+  typeAheadIndex,
+  type NavRow,
+} from '@/features/character/assetTreeNav';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { addQuickbarItem } from '@/features/market/quickbar';
@@ -390,6 +396,16 @@ interface RenderCtx {
   typeNames: ReadonlyMap<number, string>;
   t: Translate;
   characterBadges: CharacterBadgeContext;
+  /** Roving-tabindex bookkeeping (issue #89): tells this row's `role="treeitem"` it now has DOM focus. */
+  onRowFocus: (key: string) => void;
+}
+
+/** `aria-level`/`aria-posinset`/`aria-setsize` plus roving-tabindex state for one row — see `assetRows.ts` for how the first three are computed. */
+interface TreeRowA11y {
+  level: number;
+  posinset: number;
+  setsize: number;
+  focused: boolean;
 }
 
 function formatBadge(totals: { itemCount: number; estimatedValue: number }, t: Translate): string {
@@ -544,6 +560,8 @@ interface AssetItemRowProps {
   node: AssetTreeItemNode;
   depth: number;
   ctx: RenderCtx;
+  rowKey: string;
+  a11y: TreeRowA11y;
 }
 
 /**
@@ -556,7 +574,7 @@ interface AssetItemRowProps {
  * looking at doesn't scale the way it does for the handful of static tooltips
  * that component serves.
  */
-function AssetItemRow({ node, depth, ctx }: AssetItemRowProps) {
+function AssetItemRow({ node, depth, ctx, rowKey, a11y }: AssetItemRowProps) {
   const { tooltipOpen, tooltipId, triggerHandlers } = useHoverTooltip();
   const actions = useAssetItemActions();
   const { asset } = node;
@@ -589,7 +607,17 @@ function AssetItemRow({ node, depth, ctx }: AssetItemRowProps) {
         <span className="group relative block">
           <button
             type="button"
+            role="treeitem"
+            aria-level={a11y.level}
+            aria-posinset={a11y.posinset}
+            aria-setsize={a11y.setsize}
+            tabIndex={a11y.focused ? 0 : -1}
+            data-row-key={rowKey}
             {...triggerHandlers}
+            onFocus={() => {
+              triggerHandlers.onFocus();
+              ctx.onRowFocus(rowKey);
+            }}
             className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-accent"
           >
             <span className="flex min-w-0 items-center">
@@ -640,20 +668,27 @@ interface AssetBranchRowProps {
   path: string;
   depth: number;
   ctx: RenderCtx;
+  a11y: TreeRowA11y;
+  /** From the shared `rowLabels` array (Assets()) — the one place this is computed, so it never drifts from what type-ahead searches against. */
+  label: string;
 }
 
 /** A bay/container/ship row: toggles its own children's presence in the flattened row list. */
-function AssetBranchRow({ node, path, depth, ctx }: AssetBranchRowProps) {
+function AssetBranchRow({ node, path, depth, ctx, a11y, label }: AssetBranchRowProps) {
   const expanded = ctx.expandedKeys.has(path);
-  const label =
-    node.kind === 'bay'
-      ? ctx.t(`assets.bay.${node.bay}`)
-      : (ctx.typeNames.get(node.asset.type_id) ?? `Type #${node.asset.type_id}`);
   const characterBadge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, ctx);
 
   return (
     <button
       type="button"
+      role="treeitem"
+      aria-expanded={expanded}
+      aria-level={a11y.level}
+      aria-posinset={a11y.posinset}
+      aria-setsize={a11y.setsize}
+      tabIndex={a11y.focused ? 0 : -1}
+      data-row-key={path}
+      onFocus={() => ctx.onRowFocus(path)}
       onClick={() => ctx.onToggle(path)}
       style={{ paddingLeft: `${depth * 0.75}rem` }}
       className="flex w-full items-center gap-1.5 py-1.5 pr-3 text-left text-xs text-text hover:text-accent"
@@ -683,7 +718,9 @@ interface StationHeaderRowProps {
   onTogglePin: () => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  onFocusRow: (key: string) => void;
   t: Translate;
+  a11y: TreeRowA11y;
 }
 
 /**
@@ -701,11 +738,29 @@ function StationHeaderRow({
   onTogglePin,
   onExpandAll,
   onCollapseAll,
+  onFocusRow,
   t,
+  a11y,
 }: StationHeaderRowProps) {
+  const rowKey = stationRowKey(station.locationId);
+  const labelId = `${rowKey}-label`;
   return (
-    <div className="flex min-h-10 items-center justify-between gap-2 border-t border-line bg-panel/85 px-3 py-1 backdrop-blur-sm">
-      <h2 className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+    <div
+      role="treeitem"
+      aria-expanded="true"
+      aria-level={a11y.level}
+      aria-posinset={a11y.posinset}
+      aria-setsize={a11y.setsize}
+      aria-labelledby={labelId}
+      tabIndex={a11y.focused ? 0 : -1}
+      data-row-key={rowKey}
+      onFocus={() => onFocusRow(rowKey)}
+      className="flex min-h-10 items-center justify-between gap-2 border-t border-line bg-panel/85 px-3 py-1 backdrop-blur-sm"
+    >
+      <h2
+        id={labelId}
+        className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+      >
         {label}
       </h2>
       <div className="flex items-center gap-2">
@@ -1061,6 +1116,179 @@ export function Assets() {
     overscan: 12,
   });
 
+  // Per-row display label, aligned index-for-index with `flattenedRows` — the
+  // one place a bay's translated name or a station's resolved location name
+  // is computed, so both the rendered row text and keyboard type-ahead below
+  // read the same value instead of duplicating this logic.
+  const rowLabels = useMemo(
+    () =>
+      flattenedRows.map((row) =>
+        row.type === 'station'
+          ? locationLabel(
+              row.station.locationId,
+              row.station.locationType,
+              mergedLocationNames,
+              assetsByItemId,
+              mergedTypeNames,
+              t
+            )
+          : row.node.kind === 'bay'
+            ? t(`assets.bay.${row.node.bay}`)
+            : (mergedTypeNames.get(row.node.asset.type_id) ?? `Type #${row.node.asset.type_id}`)
+      ),
+    [flattenedRows, mergedLocationNames, assetsByItemId, mergedTypeNames, t]
+  );
+
+  // `flattenedRows` reduced to what `assetTreeNav.ts`'s pure keyboard-nav
+  // functions need — decoupled on purpose from the asset tree's own types. A
+  // station models as an always-open, never-toggleable branch: pruning
+  // guarantees every rendered station has at least one child, and (unlike a
+  // bay/ship/container) those direct children are never gated behind
+  // `expandedKeys`.
+  const navRows = useMemo<NavRow[]>(
+    () =>
+      flattenedRows.map((row, index) => {
+        if (row.type === 'station') {
+          return {
+            key: row.key,
+            level: row.level,
+            hasChildren: true,
+            isOpen: true,
+            canToggle: false,
+            label: rowLabels[index],
+          };
+        }
+        const hasChildren = row.node.kind !== 'item';
+        return {
+          key: row.key,
+          level: row.level,
+          hasChildren,
+          isOpen: hasChildren && effectiveExpandedKeys.has(row.key),
+          canToggle: hasChildren && !searchActive,
+          label: rowLabels[index],
+        };
+      }),
+    [flattenedRows, rowLabels, effectiveExpandedKeys, searchActive]
+  );
+
+  // Roving tabindex (issue #89): `focusedRowKey` is the logical focus
+  // target, kept in React state rather than read off the DOM because the
+  // virtualizer may not have that row mounted. `pendingFocusRowKey` bridges
+  // a target that was just scrolled into view but isn't mounted yet — the
+  // effect below has no dependency array (retries every render) rather than
+  // depending on `focusedRowKey`, which wouldn't change again if a render
+  // lands with the row still unmounted.
+  const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
+  const pendingFocusRowKey = useRef<string | null>(null);
+  const effectiveFocusedRowKey =
+    focusedRowKey !== null && flattenedRows.some((row) => row.key === focusedRowKey)
+      ? focusedRowKey
+      : (flattenedRows[0]?.key ?? null);
+
+  useEffect(() => {
+    const key = pendingFocusRowKey.current;
+    if (key === null) return;
+    const node = scrollParentRef.current?.querySelector<HTMLElement>(`[data-row-key="${key}"]`);
+    if (node) {
+      node.focus();
+      pendingFocusRowKey.current = null;
+    }
+  });
+
+  function focusRowAtIndex(index: number) {
+    const row = flattenedRows[index];
+    if (!row) return;
+    setFocusedRowKey(row.key);
+    pendingFocusRowKey.current = row.key;
+    rowVirtualizer.scrollToIndex(index, { align: 'auto' });
+  }
+
+  function handleRowFocus(key: string) {
+    setFocusedRowKey(key);
+  }
+
+  function activateFocusedRow(index: number) {
+    const row = flattenedRows[index];
+    if (!row || row.type === 'station') return;
+    if (row.node.kind === 'item') {
+      handleShowInfo(row.node.asset.type_id, rowLabels[index]);
+    } else {
+      toggleKey(row.key);
+    }
+  }
+
+  function handleTreeKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    // Only the tree rows themselves (`role="treeitem"`) drive roving nav — a
+    // station header also hosts real, independently-tabbable buttons (pin,
+    // expand all, collapse all); their own native Enter/Space/click handling
+    // must not be swallowed by this delegated handler.
+    if ((event.target as HTMLElement).getAttribute('role') !== 'treeitem') return;
+    if (flattenedRows.length === 0) return;
+    const currentIndex = Math.max(
+      0,
+      flattenedRows.findIndex((row) => row.key === effectiveFocusedRowKey)
+    );
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        focusRowAtIndex(Math.min(currentIndex + 1, flattenedRows.length - 1));
+        return;
+      case 'ArrowUp':
+        event.preventDefault();
+        focusRowAtIndex(Math.max(currentIndex - 1, 0));
+        return;
+      case 'Home':
+        event.preventDefault();
+        focusRowAtIndex(0);
+        return;
+      case 'End':
+        event.preventDefault();
+        focusRowAtIndex(flattenedRows.length - 1);
+        return;
+      case 'ArrowRight': {
+        const action = arrowRight(navRows, currentIndex);
+        if (action.kind === 'toggle') {
+          event.preventDefault();
+          toggleKey(action.key);
+        } else if (action.kind === 'moveTo') {
+          event.preventDefault();
+          focusRowAtIndex(action.index);
+        }
+        return;
+      }
+      case 'ArrowLeft': {
+        const action = arrowLeft(navRows, currentIndex);
+        if (action.kind === 'toggle') {
+          event.preventDefault();
+          toggleKey(action.key);
+        } else if (action.kind === 'moveTo') {
+          event.preventDefault();
+          focusRowAtIndex(action.index);
+        }
+        return;
+      }
+      case 'Enter':
+      case ' ':
+        event.preventDefault();
+        activateFocusedRow(currentIndex);
+        return;
+      default:
+        if (
+          event.key.length === 1 &&
+          event.key.trim().length > 0 &&
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey
+        ) {
+          const nextIndex = typeAheadIndex(navRows, currentIndex, event.key);
+          if (nextIndex !== null) {
+            event.preventDefault();
+            focusRowAtIndex(nextIndex);
+          }
+        }
+    }
+  }
+
   // Jumps-away distances (issue #87): the active character's current solar
   // system, fetched once per page load (not polled) via ESI's location
   // endpoint. Re-fetched whenever the active character changes.
@@ -1249,6 +1477,7 @@ export function Assets() {
     typeNames: mergedTypeNames,
     t,
     characterBadges,
+    onRowFocus: handleRowFocus,
   };
   const itemActions: AssetItemActions = {
     priceByTypeId,
@@ -1389,25 +1618,27 @@ export function Assets() {
                 <div
                   ref={scrollParentRef}
                   data-virtual-scroll-root
+                  role="tree"
+                  aria-label={t('assets.treeLabel')}
+                  onKeyDown={handleTreeKeyDown}
                   className="max-h-[32rem] overflow-y-auto"
                 >
-                  <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+                  <div
+                    role="presentation"
+                    style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
+                  >
                     {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                       const row = flattenedRows[virtualRow.index];
-                      const label =
-                        row.type === 'station'
-                          ? locationLabel(
-                              row.station.locationId,
-                              row.station.locationType,
-                              mergedLocationNames,
-                              assetsByItemId,
-                              mergedTypeNames,
-                              t
-                            )
-                          : null;
+                      const a11y: TreeRowA11y = {
+                        level: row.level,
+                        posinset: row.posinset,
+                        setsize: row.setsize,
+                        focused: row.key === effectiveFocusedRowKey,
+                      };
                       return (
                         <div
                           key={virtualRow.key}
+                          role="presentation"
                           style={{
                             position: 'absolute',
                             top: 0,
@@ -1419,7 +1650,7 @@ export function Assets() {
                           {row.type === 'station' ? (
                             <StationHeaderRow
                               station={row.station}
-                              label={label as string}
+                              label={rowLabels[virtualRow.index]}
                               pinState={pinStateFor(row.station.locationId)}
                               jumpsAway={jumpsAwayByKey.get(
                                 `${row.station.locationId}:${routePreference}`
@@ -1431,16 +1662,26 @@ export function Assets() {
                               onCollapseAll={() =>
                                 collapseAll(row.station, stationRowKey(row.station.locationId))
                               }
+                              onFocusRow={handleRowFocus}
                               t={t}
+                              a11y={a11y}
                             />
                           ) : row.node.kind === 'item' ? (
-                            <AssetItemRow node={row.node} depth={row.depth} ctx={renderCtx} />
+                            <AssetItemRow
+                              node={row.node}
+                              depth={row.depth}
+                              ctx={renderCtx}
+                              rowKey={row.key}
+                              a11y={a11y}
+                            />
                           ) : (
                             <AssetBranchRow
                               node={row.node}
                               path={row.key}
                               depth={row.depth}
                               ctx={renderCtx}
+                              a11y={a11y}
+                              label={rowLabels[virtualRow.index]}
                             />
                           )}
                         </div>

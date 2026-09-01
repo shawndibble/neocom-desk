@@ -455,6 +455,7 @@
   },
   "assets": {
     "title": "Assets",
+    "treeLabel": "Character assets",
     "refresh": "Refresh",
     "searchPlaceholder": "Search items…",
     "emptyTitle": "No assets cached",

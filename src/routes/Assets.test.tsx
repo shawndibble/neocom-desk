@@ -585,6 +585,233 @@ describe('Assets', () => {
   });
 });
 
+describe('keyboard tree navigation (issue #89)', () => {
+  it('exposes tree/treeitem roles, aria-level, aria-setsize/posinset, and roving tabindex', async () => {
+    render(<App />);
+    const tree = await screen.findByRole('tree', { name: /character assets/i });
+    const items = within(tree).getAllByRole('treeitem');
+    // Two stations, each with one top-level leaf item (assetPage1/assetPage2 from the shared fixture).
+    expect(items).toHaveLength(4);
+
+    const [station1, item1, station2, item2] = items;
+    expect(station1).toHaveAttribute('tabindex', '0');
+    for (const other of [item1, station2, item2]) expect(other).toHaveAttribute('tabindex', '-1');
+
+    expect(station1).toHaveAttribute('aria-level', '1');
+    expect(station1).toHaveAttribute('aria-posinset', '1');
+    expect(station1).toHaveAttribute('aria-setsize', '2');
+    expect(station1).toHaveAttribute('aria-expanded', 'true');
+    expect(station2).toHaveAttribute('aria-posinset', '2');
+
+    expect(item1).toHaveAttribute('aria-level', '2');
+    expect(item1).not.toHaveAttribute('aria-expanded');
+  });
+
+  it('ArrowDown/ArrowUp move roving focus between visible rows', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const tree = await screen.findByRole('tree', { name: /character assets/i });
+    const [station1, item1] = within(tree).getAllByRole('treeitem');
+
+    station1.focus();
+    await user.keyboard('{ArrowDown}');
+    await waitFor(() => expect(document.activeElement).toBe(item1));
+    expect(item1).toHaveAttribute('tabindex', '0');
+    expect(station1).toHaveAttribute('tabindex', '-1');
+
+    await user.keyboard('{ArrowUp}');
+    await waitFor(() => expect(document.activeElement).toBe(station1));
+  });
+
+  it('Home/End jump focus to the first/last visible row', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const tree = await screen.findByRole('tree', { name: /character assets/i });
+    const items = within(tree).getAllByRole('treeitem');
+    const last = items[items.length - 1];
+
+    items[0].focus();
+    await user.keyboard('{End}');
+    await waitFor(() => expect(document.activeElement).toBe(last));
+
+    await user.keyboard('{Home}');
+    await waitFor(() => expect(document.activeElement).toBe(items[0]));
+  });
+
+  it('type-ahead moves focus to the next row whose label starts with the typed letter', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const tree = await screen.findByRole('tree', { name: /character assets/i });
+    const items = within(tree).getAllByRole('treeitem');
+    // Labels: "Jita IV…", "Tritanium", "Structure #…", "Pyerite" — 'p' has exactly one match.
+    const pyerite = items.find((el) => el.textContent?.includes('Pyerite'))!;
+
+    items[0].focus();
+    await user.keyboard('p');
+    await waitFor(() => expect(document.activeElement).toBe(pyerite));
+  });
+
+  it('ArrowRight expands a branch and then moves into its first child; ArrowLeft moves to parent, then collapses', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+
+    const shipHeading = await screen.findByRole('heading', { name: 'Drake' });
+    const shipRow = shipHeading.closest('[role="treeitem"]') as HTMLElement;
+    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+
+    shipRow.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
+    expect(shipRow).toHaveAttribute('aria-expanded', 'true');
+    expect(document.activeElement).toBe(shipRow);
+
+    const cargoHoldRow = screen.getByText('Cargo Hold').closest('[role="treeitem"]') as HTMLElement;
+    await user.keyboard('{ArrowRight}');
+    await waitFor(() => expect(document.activeElement).toBe(cargoHoldRow));
+
+    await user.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(document.activeElement).toBe(shipRow));
+    expect(screen.getByText('Cargo Hold')).toBeInTheDocument();
+
+    await user.keyboard('{ArrowLeft}');
+    await waitFor(() => expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument());
+    expect(shipRow).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('Enter/Space toggles a focused branch row', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+
+    const shipHeading = await screen.findByRole('heading', { name: 'Drake' });
+    const shipRow = shipHeading.closest('[role="treeitem"]') as HTMLElement;
+    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+
+    shipRow.focus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
+
+    await user.keyboard(' ');
+    await waitFor(() => expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument());
+  });
+
+  it('Enter/Space on a focused leaf row opens its item detail', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get('https://esi.evetech.net/universe/types/34', () =>
+        HttpResponse.json({
+          type_id: 34,
+          name: 'Tritanium',
+          description: '',
+          group_id: 18,
+          published: true,
+        })
+      )
+    );
+    render(<App />);
+    const tree = await screen.findByRole('tree', { name: /character assets/i });
+    const itemRow = within(tree).getByRole('treeitem', { name: /Tritanium/ });
+
+    itemRow.focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument()
+    );
+  });
+
+  it('does not swallow Enter on a station header button that is not the roving-focus treeitem itself', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Drake' });
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+
+    const expandAllButton = screen.getByRole('button', { name: /expand all/i });
+    expandAllButton.focus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+  });
+});
+
 describe('station pins (issue #84)', () => {
   const JITA = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
   const STRUCTURE = 'Structure #1000000000001';
