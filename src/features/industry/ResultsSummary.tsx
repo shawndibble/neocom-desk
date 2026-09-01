@@ -88,7 +88,7 @@ export function ResultsSummary({
         </p>
       )}
 
-      <div className="divide-y divide-line rounded-xs border border-line bg-panel-2">
+      <div className="divide-y divide-line rounded-xs border border-line">
         <CostRow label={t('industry.materialCost')} value={formatIsk(result.materialCost)} />
 
         <Disclosure

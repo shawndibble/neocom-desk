@@ -31,7 +31,7 @@ export function Disclosure({
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="flex min-h-8 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className="flex min-h-8 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
         <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
@@ -44,7 +44,7 @@ export function Disclosure({
         )}
       </button>
       {expanded && (
-        <div className="divide-y divide-line border-t border-line bg-panel">{children}</div>
+        <div className="divide-y divide-line border-t border-line bg-panel-2">{children}</div>
       )}
     </div>
   );
