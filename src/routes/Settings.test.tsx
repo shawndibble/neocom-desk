@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -87,11 +87,13 @@ describe('Settings', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    useActivityLog.getState().record({
-      endpointId: 'getCharacterSkills',
-      characterId: CHAR_ID,
-      timestamp: Date.now(),
-      outcome: 'success',
+    act(() => {
+      useActivityLog.getState().record({
+        endpointId: 'getCharacterSkills',
+        characterId: CHAR_ID,
+        timestamp: Date.now(),
+        outcome: 'success',
+      });
     });
 
     expect(await screen.findByText('/characters/{character_id}/skills')).toBeInTheDocument();
@@ -105,10 +107,12 @@ describe('Settings', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    useActivityLog.getState().record({
-      endpointId: 'getUniverseType',
-      timestamp: Date.now(),
-      outcome: 'authFailure',
+    act(() => {
+      useActivityLog.getState().record({
+        endpointId: 'getUniverseType',
+        timestamp: Date.now(),
+        outcome: 'authFailure',
+      });
     });
 
     expect(await screen.findByText('Public')).toBeInTheDocument();

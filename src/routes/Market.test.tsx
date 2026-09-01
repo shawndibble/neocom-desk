@@ -420,6 +420,10 @@ describe('Price History tab (issue #11)', () => {
     const historyHits = { count: 0 };
     server.use(
       ordersHandler({ count: 0 }),
+      // Tritanium's Related Items strip includes PLEX (same market group,
+      // fixtures above), whose order book lives at its own Global Market
+      // Region rather than Tritanium's.
+      plexOrdersHandler({ count: 0 }),
       historyHandler(historyHits, RIFTER_REGION_ID, {
         587: [
           {
@@ -754,6 +758,11 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     const item = await screen.findByText('Rifter');
     item.focus();
+    // App's own hydration read (Dexie settings, no active-character key
+    // seeded in this describe) must settle before the context menu opens,
+    // or its resolution lands after this test's synchronous assertions —
+    // outside any `act`.
+    await waitFor(() => expect(useActiveCharacter.getState().hydrated).toBe(true));
     fireEvent.contextMenu(item);
 
     const menuItem = screen.getByRole('menuitem', { name: 'Add to Quickbar' });
@@ -993,7 +1002,13 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
 
   it('a globally-traded item reads its Global Market Region regardless of Location Mode, with an explanatory note', async () => {
     const hits = { count: 0 };
-    server.use(plexOrdersHandler(hits));
+    server.use(
+      plexOrdersHandler(hits),
+      // PLEX's Related Items strip includes Tritanium (same market group,
+      // fixtures above), whose order book lives at the Forge region rather
+      // than PLEX's Global Market Region.
+      ordersHandler({ count: 0 })
+    );
     const user = userEvent.setup();
     render(<App />);
 
@@ -1082,7 +1097,13 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   });
 
   it('browser back and forward move through previous selections', async () => {
-    server.use(ordersHandler({ count: 0 }));
+    server.use(
+      ordersHandler({ count: 0 }),
+      // Tritanium's Related Items strip includes PLEX (same market group,
+      // fixtures above), whose order book lives at its own Global Market
+      // Region rather than Tritanium's.
+      plexOrdersHandler({ count: 0 })
+    );
     const user = userEvent.setup();
     render(<App />);
 

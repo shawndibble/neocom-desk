@@ -239,7 +239,10 @@ describe('useRouteSnapshot', () => {
     act(() => result.current.refresh());
     await waitFor(() => expect(result.current.refreshCount).toBe(1));
 
-    setCharacter(CHAR_B);
+    // The character switch is synchronous, but it also kicks off CHAR_B's
+    // load — an already-resolved promise whose `.then` still needs a
+    // microtask flush, or its state update lands outside `act`.
+    await act(async () => setCharacter(CHAR_B));
     expect(result.current.refreshCount).toBe(0);
   });
 

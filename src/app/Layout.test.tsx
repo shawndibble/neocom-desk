@@ -25,6 +25,9 @@ function renderLayout() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/overview" element={<div>page content</div>} />
+          {/* The "More" sheet links to /wallet; without a route for it, clicking
+              through logs React Router's "No routes matched" console error. */}
+          <Route path="/wallet" element={<div>wallet page</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
