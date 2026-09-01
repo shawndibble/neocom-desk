@@ -87,9 +87,12 @@ if (typeof Element !== 'undefined') {
  * `@tanstack/react-virtual` reads those (not `getBoundingClientRect`) to size
  * its scroll container, and a 0 viewport makes it compute an empty visible
  * range, hiding every row from the DOM regardless of what a test scrolls to.
- * Scoped to elements marked `data-virtual-scroll-root` (set by the component
- * owning the scroll container) rather than patched globally, so this can't
- * skew unrelated layout reads elsewhere (e.g. Radix menu positioning).
+ * The getter itself installs on the whole prototype (there's no way to patch
+ * just one instance ahead of its creation), but the *value* it returns stays
+ * 0 — jsdom's real default — for every element except ones marked
+ * `data-virtual-scroll-root` by the component owning the scroll container, so
+ * this can't skew unrelated layout reads elsewhere (e.g. Radix menu
+ * positioning) even though the property descriptor itself is global.
  */
 if (typeof HTMLElement !== 'undefined') {
   const VIRTUAL_SCROLL_SIZE = 600;

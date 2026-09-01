@@ -5,6 +5,11 @@ export function nodeSegment(node: AssetTreeNode): string {
   return node.kind === 'bay' ? `b:${node.bay}` : `i:${node.asset.item_id}`;
 }
 
+/** Row key for a station header — the root of every path under it. */
+export function stationRowKey(locationId: number): string {
+  return `station:${locationId}`;
+}
+
 export interface StationRow {
   type: 'station';
   key: string;
@@ -35,11 +40,20 @@ export function flattenAssetRows(
 ): AssetRow[] {
   const rows: AssetRow[] = [];
   for (const station of stations) {
-    const stationKey = `station:${station.locationId}`;
+    const stationKey = stationRowKey(station.locationId);
     rows.push({ type: 'station', key: stationKey, station });
-    pushNodeRows(rows, station.children, stationKey, 0, station.locationId, expandedKeys);
+    pushNodeRows(rows, station.children, stationKey, 0, {
+      stationLocationId: station.locationId,
+      expandedKeys,
+    });
   }
   return rows;
+}
+
+/** Carried unchanged through the recursion below — only `parentPath`/`depth` vary per call. */
+interface PushContext {
+  stationLocationId: number;
+  expandedKeys: ReadonlySet<string>;
 }
 
 function pushNodeRows(
@@ -47,14 +61,13 @@ function pushNodeRows(
   nodes: readonly AssetTreeNode[],
   parentPath: string,
   depth: number,
-  stationLocationId: number,
-  expandedKeys: ReadonlySet<string>
+  ctx: PushContext
 ): void {
   for (const node of nodes) {
     const path = `${parentPath}/${nodeSegment(node)}`;
-    rows.push({ type: 'node', key: path, node, depth, stationLocationId });
-    if (node.kind !== 'item' && expandedKeys.has(path)) {
-      pushNodeRows(rows, node.children, path, depth + 1, stationLocationId, expandedKeys);
+    rows.push({ type: 'node', key: path, node, depth, stationLocationId: ctx.stationLocationId });
+    if (node.kind !== 'item' && ctx.expandedKeys.has(path)) {
+      pushNodeRows(rows, node.children, path, depth + 1, ctx);
     }
   }
 }

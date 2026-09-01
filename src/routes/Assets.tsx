@@ -51,7 +51,12 @@ import {
   type AssetTreeNode,
   type AssetTreeStation,
 } from '@/engine/assetTree';
-import { flattenAssetRows, nodeSegment, type AssetRow } from '@/features/character/assetRows';
+import {
+  flattenAssetRows,
+  nodeSegment,
+  stationRowKey,
+  type AssetRow,
+} from '@/features/character/assetRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { addQuickbarItem } from '@/features/market/quickbar';
@@ -610,7 +615,7 @@ function AssetBranchRow({ node, path, depth, ctx }: AssetBranchRowProps) {
         {expanded ? '▾' : '▸'}
       </span>
       {node.kind === 'bay' ? (
-        <span className="text-text-dim">{label}</span>
+        <span className="truncate text-text-dim">{label}</span>
       ) : (
         <h3 className="truncate font-medium">{label}</h3>
       )}
@@ -915,7 +920,7 @@ export function Assets() {
     const pinnedKeys = sortedTree
       .filter((station) => pinStateFor(station.locationId) !== 'unpinned')
       .flatMap((station) =>
-        collectExpandableKeys(station.children, `station:${station.locationId}`)
+        collectExpandableKeys(station.children, stationRowKey(station.locationId))
       );
     if (pinnedKeys.length > 0) {
       setExpandedKeys((prev) => new Set([...prev, ...pinnedKeys]));
@@ -931,7 +936,7 @@ export function Assets() {
     if (!searchActive) return null;
     const keys = new Set<string>();
     for (const station of sortedTree) {
-      const stationKey = `station:${station.locationId}`;
+      const stationKey = stationRowKey(station.locationId);
       for (const key of collectExpandableKeys(station.children, stationKey)) keys.add(key);
     }
     return keys;
@@ -1125,10 +1130,10 @@ export function Assets() {
                               pinState={pinStateFor(row.station.locationId)}
                               onTogglePin={() => void handleTogglePin(row.station.locationId)}
                               onExpandAll={() =>
-                                expandAll(row.station, `station:${row.station.locationId}`)
+                                expandAll(row.station, stationRowKey(row.station.locationId))
                               }
                               onCollapseAll={() =>
-                                collapseAll(row.station, `station:${row.station.locationId}`)
+                                collapseAll(row.station, stationRowKey(row.station.locationId))
                               }
                               t={t}
                             />
