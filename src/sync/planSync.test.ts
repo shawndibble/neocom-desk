@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
-import { db, type BuildPlanRecord, type SkillPlanRecord } from '@/db';
+import { db, type BuildPlanRecord, type QuickbarRecord, type SkillPlanRecord } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { TOMBSTONE_TTL_MS } from './merge';
@@ -96,6 +96,7 @@ vi.mock('./syncAuth', () => ({
 
 const PLANS_PATH = 'characters/char:1/plans';
 const BUILD_PLANS_PATH = 'characters/char:1/buildPlans';
+const QUICKBARS_PATH = 'characters/char:1/quickbars';
 const SETTINGS_PATH = 'characters/char:1/settings';
 const HASH = 'hash-a';
 
@@ -137,6 +138,20 @@ function remoteBuildDoc(overrides: DocData = {}): DocData {
   return { ...buildPlan(), ownerHash: HASH, deleted: false, ...overrides };
 }
 
+function quickbar(overrides: Partial<QuickbarRecord> = {}): QuickbarRecord {
+  return {
+    id: '1',
+    characterId: 1,
+    items: [{ typeId: 587, name: 'Rifter' }],
+    updatedAt: Date.now() - 1000,
+    ...overrides,
+  };
+}
+
+function remoteQuickbarDoc(overrides: DocData = {}): DocData {
+  return { ...quickbar(), ownerHash: HASH, deleted: false, ...overrides };
+}
+
 function seedRemote(path: string, docs: DocData[]): void {
   remoteStore.set(path, new Map(docs.map((d) => [String(d.id ?? d.key), d])));
 }
@@ -171,6 +186,7 @@ beforeEach(async () => {
     db.characters.clear(),
     db.skillPlans.clear(),
     db.buildPlans.clear(),
+    db.quickbars.clear(),
     db.settings.clear(),
     db.esiCache.clear(),
   ]);
@@ -307,11 +323,14 @@ describe('triggerSync: plans', () => {
     await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
     await db.skillPlans.put(plan());
     await db.buildPlans.put(buildPlan());
+    await db.quickbars.put(quickbar());
     await triggerSync(1);
     expect(await db.skillPlans.count()).toBe(0);
     expect(await db.buildPlans.count()).toBe(0);
+    expect(await db.quickbars.count()).toBe(0);
     expect(remoteStore.get(PLANS_PATH)?.get('p1')).toBeUndefined();
     expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')).toBeUndefined();
+    expect(remoteStore.get(QUICKBARS_PATH)?.get('1')).toBeUndefined();
     expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe(HASH);
   });
 
@@ -344,8 +363,8 @@ describe('triggerSync: plans', () => {
 describe('triggerSync: ownerHash-scoped reads', () => {
   it('queries every collection filtered by the character ownerHash', async () => {
     await triggerSync(1);
-    // plans + buildPlans + settings, each read through a where clause.
-    expect(vi.mocked(where)).toHaveBeenCalledTimes(3);
+    // plans + buildPlans + quickbars + settings, each read through a where clause.
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(4);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
       expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
@@ -425,6 +444,39 @@ describe('triggerSync: build plans', () => {
     seedRemote(BUILD_PLANS_PATH, [remoteBuildDoc({ deleted: true, updatedAt: Date.now() - 100 })]);
     await triggerSync(1);
     expect(await db.buildPlans.get('b1')).toBeUndefined();
+  });
+});
+
+describe('triggerSync: quickbar', () => {
+  it('pushes a local-only quickbar with ownerHash and deleted: false', async () => {
+    const q = quickbar();
+    await db.quickbars.put(q);
+    await triggerSync(1);
+    expect(remoteStore.get(QUICKBARS_PATH)?.get('1')).toEqual({
+      id: '1',
+      characterId: 1,
+      items: [{ typeId: 587, name: 'Rifter' }],
+      updatedAt: q.updatedAt,
+      ownerHash: HASH,
+      deleted: false,
+    });
+  });
+
+  it('pulls a remote-only quickbar into Dexie without remote-only fields', async () => {
+    const expected = quickbar();
+    seedRemote(QUICKBARS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    await triggerSync(1);
+    expect(await db.quickbars.get('1')).toEqual(expected);
+  });
+
+  it('LWW: newer remote quickbar overwrites local', async () => {
+    const now = Date.now();
+    await db.quickbars.put(quickbar({ items: [{ typeId: 1, name: 'Old' }], updatedAt: now - 900 }));
+    seedRemote(QUICKBARS_PATH, [
+      remoteQuickbarDoc({ items: [{ typeId: 2, name: 'New' }], updatedAt: now - 10 }),
+    ]);
+    await triggerSync(1);
+    expect((await db.quickbars.get('1'))?.items).toEqual([{ typeId: 2, name: 'New' }]);
   });
 });
 
@@ -617,7 +669,7 @@ describe('sync orchestration', () => {
 
     release();
     await Promise.all([p1, p2]);
-    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(3);
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(4);
   });
 
   it('a queued sync still runs after the previous one fails', async () => {
@@ -632,10 +684,10 @@ describe('sync orchestration', () => {
     scheduleSync(1, 20);
     scheduleSync(1, 20);
     scheduleSync(1, 20);
-    // One sync = one getDocs per collection (plans + buildPlans + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(3));
+    // One sync = one getDocs per collection (plans + buildPlans + quickbars + settings).
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(4));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(4);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
   });
 });

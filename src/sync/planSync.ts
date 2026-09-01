@@ -1,9 +1,9 @@
-// Two-way sync of Skill Plans, Build Plans + synced settings for one character.
-// Public API and UI wiring live in index.ts.
+// Two-way sync of Skill Plans, Build Plans, the Quickbar + synced settings for
+// one character. Public API and UI wiring live in index.ts.
 //
-// Remote layout: /characters/char:{id}/{plans,buildPlans,settings}. Merge policy
-// is pure and lives in merge.ts: last-write-wins per record id, tombstones for
-// deletes kept 30 days.
+// Remote layout: /characters/char:{id}/{plans,buildPlans,quickbars,settings}.
+// Merge policy is pure and lives in merge.ts: last-write-wins per record id,
+// tombstones for deletes kept 30 days.
 //
 // Syncs are serialized GLOBALLY, not just per character: the Firebase session is
 // a single slot swapped by ensureSignedIn, so two concurrent syncs would race
@@ -25,7 +25,13 @@ import {
   type CollectionReference,
   type Firestore,
 } from 'firebase/firestore/lite';
-import { db, type BuildPlanRecord, type CharacterRecord, type SkillPlanRecord } from '@/db';
+import {
+  db,
+  type BuildPlanRecord,
+  type CharacterRecord,
+  type QuickbarRecord,
+  type SkillPlanRecord,
+} from '@/db';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import { getSyncFirestore } from './firebaseApp';
 import { setStatus } from './status';
@@ -37,6 +43,7 @@ import {
   type RemoteBuildPlanDoc,
   type RemoteDoc,
   type RemotePlanDoc,
+  type RemoteQuickbarDoc,
   type RemoteSyncedSetting,
   type SyncedSettingTombstone,
   type SyncedSettingValue,
@@ -54,6 +61,11 @@ const INTERNAL_PREFIX = 'sync.__';
 const planTombstonesKey = (characterId: number) => `${INTERNAL_PREFIX}tombstones.${characterId}`;
 const buildPlanTombstonesKey = (characterId: number) =>
   `${INTERNAL_PREFIX}buildTombstones.${characterId}`;
+// The Quickbar is one record per character, never deleted (only emptied), so
+// this stays empty in practice — kept for symmetry with syncEditableCollection,
+// which needs a tombstone key for every CollectionSpec.
+const quickbarTombstonesKey = (characterId: number) =>
+  `${INTERNAL_PREFIX}quickbarTombstones.${characterId}`;
 const ownerHashKey = (characterId: number) => `${INTERNAL_PREFIX}ownerHash.${characterId}`;
 const SETTINGS_META_KEY = `${INTERNAL_PREFIX}settingsMeta`;
 // Synced settings are a single global set (not per-character, like plans), so
@@ -246,8 +258,10 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
   if (stored !== undefined && stored.value !== character.ownerHash) {
     await db.skillPlans.where('characterId').equals(character.characterId).delete();
     await db.buildPlans.where('characterId').equals(character.characterId).delete();
+    await db.quickbars.where('characterId').equals(character.characterId).delete();
     await writeTombstones(planTombstonesKey(character.characterId), []);
     await writeTombstones(buildPlanTombstonesKey(character.characterId), []);
+    await writeTombstones(quickbarTombstonesKey(character.characterId), []);
     // Cached wallet/mail/assets belong to the previous owner just as much as
     // the plans do. `auth/session` purges on the same signal at login; this
     // covers a transfer noticed between logins. Degrades rather than throws
@@ -408,6 +422,28 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
   bulkDeleteLocal: (ids) => db.buildPlans.bulkDelete(ids),
 };
 
+const quickbarSpec: CollectionSpec<QuickbarRecord, RemoteQuickbarDoc> = {
+  name: 'quickbars',
+  tombstoneKey: quickbarTombstonesKey,
+  loadLocal: (characterId) => db.quickbars.where('characterId').equals(characterId).toArray(),
+  toRemoteDoc: (q, ownerHash) => ({
+    id: q.id,
+    characterId: q.characterId,
+    items: q.items,
+    updatedAt: q.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    items: r.items,
+    updatedAt: r.updatedAt,
+  }),
+  bulkPutLocal: (records) => db.quickbars.bulkPut(records),
+  bulkDeleteLocal: (ids) => db.quickbars.bulkDelete(ids),
+};
+
 async function syncCharacter(characterId: number): Promise<void> {
   const character = await db.characters.get(characterId);
   if (!character) throw new Error(`Unknown character ${characterId}`);
@@ -421,6 +457,7 @@ async function syncCharacter(characterId: number): Promise<void> {
 
   await syncEditableCollection(skillPlanSpec, ctx);
   await syncEditableCollection(buildPlanSpec, ctx);
+  await syncEditableCollection(quickbarSpec, ctx);
 
   // ---- Synced settings ----
   const settingsCol = collection(firestore, 'characters', uid, 'settings');

@@ -1,9 +1,7 @@
 /**
  * Right-click menu for an item — the tree, search results (same tree,
- * CONTEXT.md round 8) and, once #7 ships, the Quickbar. Add to Quickbar, show
- * info and add to Compare Set have no target yet (#7, #8, #6-detail-modal);
- * this ticket puts the menu in place and connects what already exists: copy
- * name and the jump to a Build Plan (issue #6).
+ * CONTEXT.md round 8) and the Quickbar. Show info and add to Compare Set have
+ * no target yet (#8, #6-detail-modal).
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +19,7 @@ export interface ItemContextMenuProps {
   itemName: string;
   /** Undefined while the blueprint catalog hasn't been checked yet; null once checked and no blueprint produces this item. */
   blueprintTypeID: number | null | undefined;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }
@@ -30,6 +29,7 @@ export function ItemContextMenu({
   typeId,
   itemName,
   blueprintTypeID,
+  onAddToQuickbar,
   onOpenChange,
   children,
 }: ItemContextMenuProps) {
@@ -47,7 +47,7 @@ export function ItemContextMenu({
     <ContextMenu onOpenChange={onOpenChange}>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem disabled title={t('market.contextMenu.unavailable')}>
+        <ContextMenuItem onSelect={() => onAddToQuickbar(typeId, itemName)}>
           {t('market.contextMenu.addToQuickbar')}
         </ContextMenuItem>
         <ContextMenuItem disabled title={t('market.contextMenu.unavailable')}>

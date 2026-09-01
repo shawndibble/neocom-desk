@@ -6,7 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
-import { useActiveCharacter } from '@/stores/activeCharacter';
+import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
@@ -179,6 +179,7 @@ afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
+  await db.quickbars.clear();
   // Market needs no ESI scope and no *active* Character, but the feature area
   // sits behind RequireCharacter, so one must exist for the route to render.
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
@@ -253,7 +254,7 @@ describe('Market Browser', () => {
 describe('Market Browser item context menu (issue #6)', () => {
   afterEach(() => configureClipboard(null));
 
-  it('opens on right-click with all five actions, three disabled until their target ships', async () => {
+  it('opens on right-click with all five actions, two disabled until their target ships', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'rift');
@@ -261,7 +262,7 @@ describe('Market Browser item context menu (issue #6)', () => {
     item.focus();
     fireEvent.contextMenu(item);
 
-    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toHaveAttribute(
+    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).not.toHaveAttribute(
       'data-disabled'
     );
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toHaveAttribute('data-disabled');
@@ -306,6 +307,87 @@ describe('Market Browser item context menu (issue #6)', () => {
 
     await user.click(screen.getByRole('menuitem', { name: 'Copy name' }));
     expect(writeText).toHaveBeenCalledWith('Rifter');
+  });
+});
+
+describe('Quickbar (issue #7)', () => {
+  beforeEach(async () => {
+    // App.tsx re-hydrates useActiveCharacter from Dexie on every mount, which
+    // would clobber a direct store setState — seed the setting it reads instead.
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
+  });
+
+  it('shows a short hint when empty', async () => {
+    render(<App />);
+    expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
+  });
+
+  it('adds an item from its context menu, and a re-add does not duplicate it', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+
+    const quickbar = (await screen.findByRole('heading', { name: 'Quickbar' })).closest('div')!;
+    await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
+
+    fireEvent.contextMenu(item);
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+    await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
+  });
+
+  it('removes an item, restoring the empty hint', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+    await screen.findByRole('button', { name: 'Remove Rifter from Quickbar' });
+
+    await user.click(screen.getByRole('button', { name: 'Remove Rifter from Quickbar' }));
+
+    expect(await screen.findByText(/No items yet/)).toBeInTheDocument();
+  });
+
+  it('clicking a Quickbar item selects it and loads its order book', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+
+    // Clear the search so the tree's own collapsed "Rifter" row is gone,
+    // leaving the Quickbar's row as the only "Rifter" button.
+    await user.clear(screen.getByRole('searchbox'));
+    await waitFor(() => expect(screen.getAllByText('Rifter')).toHaveLength(1));
+
+    await user.click(screen.getByRole('button', { name: 'Rifter' }));
+
+    await screen.findByRole('table', { name: 'Sell Orders' });
+  });
+
+  it('survives a reload from local storage alone (Firebase sync is not configured in tests)', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+    await screen.findByRole('button', { name: 'Remove Rifter from Quickbar' });
+    unmount();
+
+    render(<App />);
+    const quickbar = (await screen.findByRole('heading', { name: 'Quickbar' })).closest('div')!;
+    expect(await within(quickbar).findByText('Rifter')).toBeInTheDocument();
   });
 });
 
