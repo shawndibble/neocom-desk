@@ -67,6 +67,7 @@ beforeEach(async () => {
   useAuthFailure.setState({ failure: null });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   await db.tokens.clear();
+  await db.characters.clear();
 });
 
 describe('Layout sync status dot', () => {
@@ -211,7 +212,7 @@ describe('Layout nav marks routes the character cannot use', () => {
     // Granted, so unmarked — and so is every ungated route.
     expect(within(rail).getByRole('link', { name: 'Mail' })).not.toHaveAttribute('title');
     expect(within(rail).getByRole('link', { name: 'Market' })).not.toHaveAttribute('title');
-    expect(within(rail).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('title');
+    expect(within(rail).getByRole('link', { name: 'Home' })).not.toHaveAttribute('title');
     expect(within(rail).getByRole('link', { name: 'Settings' })).not.toHaveAttribute('title');
   });
 
@@ -225,6 +226,76 @@ describe('Layout nav marks routes the character cannot use', () => {
       expect(within(rail).getByRole('link', { name: 'Mail' })).toHaveAttribute('title')
     );
     expect(within(rail).getByRole('link', { name: 'Mail' })).toHaveAttribute('href', '/mail');
+  });
+});
+
+describe('Layout desktop rail domain grouping', () => {
+  it('renders the character switcher above the nav, not in a bottom footer', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh',
+      addedAt: 0,
+    });
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+    renderLayout();
+    await screen.findByRole('link', { name: 'Switch character' });
+
+    const rail = screen.getAllByRole('navigation')[0];
+    const switcher = screen.getByRole('link', { name: 'Switch character' });
+    // The switcher must precede the nav landmark in document order — it sits
+    // above the groups, not below them.
+    expect(switcher.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('labels the Overview link "Home", not "Overview"', () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    renderLayout();
+
+    const rail = screen.getAllByRole('navigation')[0];
+    expect(within(rail).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/overview');
+    expect(within(rail).queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument();
+  });
+
+  it('orders the rail as Home, then Account/Progression/Economy/Social groups in full', () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    renderLayout();
+
+    const rail = screen.getAllByRole('navigation')[0];
+    const items = Array.from(rail.children).map((el) =>
+      el.tagName === 'P' ? `[${el.textContent}]` : el.textContent
+    );
+    expect(items).toEqual([
+      'Home',
+      '[Account]',
+      'Characters',
+      'Market',
+      'Settings',
+      '[Progression]',
+      'Skills',
+      'Industry',
+      'Planetary Industry',
+      'Clones',
+      'Employment History',
+      '[Economy]',
+      'Wallet',
+      'Assets',
+      'Orders',
+      'Contracts',
+      '[Social]',
+      'Mail',
+      'Calendar',
+      'Contacts',
+    ]);
+  });
+
+  it('no longer renders the old stale "Character" divider', () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    renderLayout();
+
+    const rail = screen.getAllByRole('navigation')[0];
+    expect(within(rail).queryByText('Character')).not.toBeInTheDocument();
   });
 });
 

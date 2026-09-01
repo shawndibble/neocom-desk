@@ -5,11 +5,16 @@
   },
   "nav": {
     "characters": "Characters",
-    "overview": "Overview",
+    "overview": "Home",
     "skills": "Skills",
     "industry": "Industry",
     "market": "Market",
-    "characterSection": "Character",
+    "groups": {
+      "account": "Account",
+      "progression": "Progression",
+      "economy": "Economy",
+      "social": "Social"
+    },
     "wallet": "Wallet",
     "clones": "Clones",
     "pi": "Planetary Industry",
