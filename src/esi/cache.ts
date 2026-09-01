@@ -38,13 +38,14 @@ export const GLOBAL_CACHE_CHARACTER_ID = 0;
 
 /**
  * Written by `fetchLive` itself, right after a successful live call, with
- * ESI's raw `Expires` header (or null). `loadWithCacheStatus` reads it back
- * once `fetchLive` resolves and uses it to size that row's freshness window —
- * this is how the window reflects what that specific response declared
- * rather than a guessed constant. A plain shared box rather than widening
- * `fetchLive`'s return type: only the handful of callers that opt in via
- * `expiresCapture` need to touch this; every other caller's `fetchLive`
- * keeps returning bare `T | null`.
+ * ESI's raw `Expires` header (or null). `loadWithCacheStatus` and
+ * `loadPaginatedWithCacheStatus` both read it back once `fetchLive` resolves
+ * and use it to size that row's freshness window — this is how the window
+ * reflects what that specific response declared rather than a guessed
+ * constant. A plain shared box rather than widening `fetchLive`'s return
+ * type: only the handful of callers that opt in via `expiresCapture` need to
+ * touch this; every other caller's `fetchLive` keeps returning bare `T | null`
+ * (or `TruncatableResult<T>`).
  */
 export interface ExpiresCapture {
   value: string | null;
@@ -107,6 +108,26 @@ function dedupeKey(characterId: number, key: string): string {
 }
 
 /**
+ * Collapses concurrent identical reads onto one in-flight promise. The single
+ * shared `inFlightLoads` map serves both `T` (singular) and `T[]` (paginated)
+ * callers, so the cast on a dedupe hit is unavoidable without two maps; this
+ * is the one place it happens rather than one per caller.
+ */
+async function withDedupe<R>(characterId: number, key: string, run: () => Promise<R>): Promise<R> {
+  const dkey = dedupeKey(characterId, key);
+  const existing = inFlightLoads.get(dkey);
+  if (existing) return existing as Promise<R>;
+
+  const promise = run();
+  inFlightLoads.set(dkey, promise);
+  try {
+    return await promise;
+  } finally {
+    inFlightLoads.delete(dkey);
+  }
+}
+
+/**
  * Like `loadWithCache`, but surfaces an auth failure (401 expired token, 403
  * missing scope, failed refresh) as `needsReauth` instead of silently falling
  * back. Any other failure (offline, 5xx, timeout) still falls through.
@@ -124,17 +145,9 @@ export async function loadWithCacheStatus<T>(
   const fresh = await readFreshRow<T>(characterId, key);
   if (fresh) return { cached: fresh, needsReauth: false };
 
-  const dkey = dedupeKey(characterId, key);
-  const existing = inFlightLoads.get(dkey);
-  if (existing) return existing as Promise<StatusResult<T>>;
-
-  const promise = loadWithCacheStatusLive(characterId, key, fetchLive, options);
-  inFlightLoads.set(dkey, promise);
-  try {
-    return await promise;
-  } finally {
-    inFlightLoads.delete(dkey);
-  }
+  return withDedupe(characterId, key, () =>
+    loadWithCacheStatusLive(characterId, key, fetchLive, options)
+  );
 }
 
 async function loadWithCacheStatusLive<T>(
@@ -241,17 +254,12 @@ export async function loadPaginatedWithCacheStatus<T>(
   fetchLive: () => Promise<TruncatableResult<T>>,
   options: LoadWithCacheStatusOptions = {}
 ): Promise<StatusResult<T[]>> {
-  const dkey = dedupeKey(characterId, key);
-  const existing = inFlightLoads.get(dkey);
-  if (existing) return existing as Promise<StatusResult<T[]>>;
+  const fresh = await readFreshRow<T[]>(characterId, key);
+  if (fresh) return { cached: fresh, needsReauth: false };
 
-  const promise = loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options);
-  inFlightLoads.set(dkey, promise);
-  try {
-    return await promise;
-  } finally {
-    inFlightLoads.delete(dkey);
-  }
+  return withDedupe(characterId, key, () =>
+    loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options)
+  );
 }
 
 async function loadPaginatedWithCacheStatusLive<T>(
@@ -268,7 +276,15 @@ async function loadPaginatedWithCacheStatusLive<T>(
     const existing = truncated ? await readCachedRow(characterId, key) : undefined;
     const wouldClobberCompleteList = existing !== undefined && existing.truncated !== true;
     if (!wouldClobberCompleteList) {
-      await db.esiCache.put({ characterId, key, value: items, fetchedAt, truncated });
+      const expiresAt = parseExpiresHeader(options.expiresCapture?.value);
+      await db.esiCache.put({
+        characterId,
+        key,
+        value: items,
+        fetchedAt,
+        truncated,
+        ...(expiresAt !== undefined ? { expiresAt } : {}),
+      });
       return {
         cached: { data: items, fetchedAt: new Date(fetchedAt), fromCache: false, truncated },
         needsReauth: false,

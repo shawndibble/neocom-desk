@@ -571,4 +571,23 @@ describe('freshness window', () => {
     expect(fetchLive).toHaveBeenCalledTimes(2);
     expect(result.cached?.data).toBe('live-value');
   });
+
+  it('loadPaginatedWithCacheStatus also honors expiresCapture (not just the singular path)', async () => {
+    const capture = { value: null as string | null };
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => {
+      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      return { items: ['a', 'b'], truncated: false };
+    });
+
+    await loadPaginatedWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+    vi.spyOn(Date, 'now').mockReturnValue(1_010_000);
+    const result = await loadPaginatedWithCacheStatus(CHAR_ID, KEY, fetchLive, {
+      expiresCapture: capture,
+    });
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+    expect(result.cached?.data).toEqual(['a', 'b']);
+    expect(result.cached?.fromCache).toBe(false);
+  });
 });
