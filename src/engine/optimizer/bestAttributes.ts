@@ -220,6 +220,52 @@ function withBonus(implants: Implants, bonus: Partial<Attributes>): Implants {
   return merged;
 }
 
+/** The stacked bonus in effect for elapsed times `< endSeconds` (`Infinity` for the last segment). */
+interface BonusSegment {
+  bonus: Partial<Attributes>;
+  endSeconds: number;
+}
+
+/**
+ * Break a set of live Boosters into time-ordered segments of constant stacked
+ * bonus, so a walk can price each Booster for its own lifetime instead of the
+ * whole stack for the shortest one's. Segment `k` runs from the previous
+ * segment's `endSeconds` up to its own; the bonus drops by each Booster's
+ * share as that Booster's own expiry is crossed. Always ends with a
+ * zero-bonus, `Infinity`-ended segment once every live Booster has lapsed.
+ */
+function bonusSegments(live: readonly Booster[], startMs: number): BonusSegment[] {
+  const byExpiry = new Map<number, Booster[]>();
+  for (const b of live) {
+    const t = (b.expiresAt.getTime() - startMs) / 1000;
+    const group = byExpiry.get(t);
+    if (group) group.push(b);
+    else byExpiry.set(t, [b]);
+  }
+  const times = [...byExpiry.keys()].sort((a, b) => a - b);
+
+  const remaining: Partial<Attributes> = {};
+  for (const b of live) {
+    for (const name of ATTRIBUTE_NAMES) {
+      const add = b.bonus[name] ?? 0;
+      if (add) remaining[name] = (remaining[name] ?? 0) + add;
+    }
+  }
+
+  const segments: BonusSegment[] = [];
+  for (const t of times) {
+    segments.push({ bonus: { ...remaining }, endSeconds: t });
+    for (const b of byExpiry.get(t)!) {
+      for (const name of ATTRIBUTE_NAMES) {
+        const add = b.bonus[name] ?? 0;
+        if (add) remaining[name] = (remaining[name] ?? 0) - add;
+      }
+    }
+  }
+  segments.push({ bonus: remaining, endSeconds: Infinity });
+  return segments;
+}
+
 /**
  * Longest this segment can take while fully boosted, over every allocation.
  * Uses the slowest reachable attributes (`BASE_MIN`), so if a Booster outlives
@@ -243,14 +289,16 @@ function maxBoostedSeconds(spByPair: SpByPair, boostedImplants: Implants): numbe
 }
 
 /**
- * Brute force with a Booster expiring mid-segment.
+ * Brute force with one or more Boosters expiring mid-segment.
  *
  * The pair aggregation above is order-independent, which a mid-segment expiry
  * breaks: the rate a step trains at depends on *when* it trains. So walk the
- * steps in order while the Booster is live, then hand the constant-rate tail
- * back to the aggregation. Suffix SP-per-pair sums are precomputed once, so
- * the tail costs O(pairs) at any plan length and only the boosted prefix is
- * walked — that prefix is bounded by the Booster window, not by plan length.
+ * steps in order while any Booster is still live, crossing each Booster's own
+ * expiry as a breakpoint that drops the stacked bonus to `segments[seg + 1]`,
+ * then hand the constant-rate (fully-lapsed) tail back to the aggregation.
+ * Suffix SP-per-pair sums are precomputed once, so the tail costs O(pairs) at
+ * any plan length and only the boosted prefix is walked — that prefix is
+ * bounded by the last Booster's window, not by plan length.
  *
  * Matches `computeSchedule`'s semantics exactly, including the strict `<`
  * on expiry; a test cross-checks the two.
@@ -259,8 +307,7 @@ function bestAttributesWalking(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
   implants: Implants,
-  bonus: Partial<Attributes>,
-  expirySeconds: number
+  segments: readonly BonusSegment[]
 ): BestAttributesResult {
   const stepSp: number[] = [];
   const stepPrimary: AttributeName[] = [];
@@ -288,37 +335,39 @@ function bestAttributesWalking(
   }
 
   const implantOf = (n: AttributeName) => implants[n] ?? 0;
-  const bonusOf = (n: AttributeName) => bonus[n] ?? 0;
+  const lastSeg = segments.length - 1;
 
   let bestSeconds = Infinity;
   let bestExtras: readonly number[] = [];
 
   for (const extras of allAllocations()) {
-    const value = (n: AttributeName, boosted: boolean) =>
-      BASE_MIN + extras[ATTRIBUTE_NAMES.indexOf(n)] + implantOf(n) + (boosted ? bonusOf(n) : 0);
+    const valueAt = (n: AttributeName, seg: number) =>
+      BASE_MIN + extras[ATTRIBUTE_NAMES.indexOf(n)] + implantOf(n) + (segments[seg].bonus[n] ?? 0);
 
     let elapsed = 0;
+    let seg = 0;
     let i = 0;
-    for (; i < steps.length && elapsed < expirySeconds; i++) {
+    for (; i < steps.length && seg < lastSeg; i++) {
       let spLeft = stepSp[i];
-      while (spLeft > 0 && elapsed < expirySeconds) {
-        const rate = trainingRate(value(stepPrimary[i], true), value(stepSecondary[i], true));
+      while (spLeft > 0 && seg < lastSeg) {
+        const rate = trainingRate(valueAt(stepPrimary[i], seg), valueAt(stepSecondary[i], seg));
         const needed = timeToTrain(spLeft, rate);
-        const room = expirySeconds - elapsed;
+        const room = segments[seg].endSeconds - elapsed;
         if (needed <= room) {
           elapsed += needed;
           spLeft = 0;
         } else {
           elapsed += room;
           spLeft -= (rate / 60) * room;
+          seg++;
         }
       }
       if (spLeft > 0) {
-        // The Booster lapsed mid-step: finish this one unboosted, then the
-        // rest of the segment is constant-rate and can be aggregated.
+        // Every Booster has now lapsed: finish this step at the final
+        // (zero-bonus) segment, then the rest of the plan is constant-rate.
         elapsed += timeToTrain(
           spLeft,
-          trainingRate(value(stepPrimary[i], false), value(stepSecondary[i], false))
+          trainingRate(valueAt(stepPrimary[i], lastSeg), valueAt(stepSecondary[i], lastSeg))
         );
         i++;
         break;
@@ -333,7 +382,10 @@ function bestAttributesWalking(
       const sp = tail[k];
       if (sp <= 0) continue;
       const [primary, secondary] = keyPairs[k];
-      elapsed += timeToTrain(sp, trainingRate(value(primary, false), value(secondary, false)));
+      elapsed += timeToTrain(
+        sp,
+        trainingRate(valueAt(primary, lastSeg), valueAt(secondary, lastSeg))
+      );
     }
 
     if (elapsed < bestSeconds) {
@@ -368,24 +420,17 @@ export function bestAttributes(
   const live = booster.boosters.filter((b) => b.expiresAt.getTime() > startMs);
   if (live.length === 0) return bestAttributesForPairs(spByPair, implants);
 
-  // Stacked bonus, and the first expiry — the only breakpoint that matters
-  // while all live Boosters share it. Multiple distinct expiries fall back to
-  // the earliest, which under-credits the longer one rather than over-crediting.
-  const bonus: Partial<Attributes> = {};
-  for (const b of live) {
-    for (const name of ATTRIBUTE_NAMES) {
-      const add = b.bonus[name] ?? 0;
-      if (add) bonus[name] = (bonus[name] ?? 0) + add;
-    }
-  }
-  const expirySeconds = Math.min(...live.map((b) => (b.expiresAt.getTime() - startMs) / 1000));
+  // Piecewise: the full stacked bonus holds until the earliest live Booster's
+  // own expiry, then drops segment by segment as each one lapses in turn.
+  const segments = bonusSegments(live, startMs);
+  const earliestExpiry = segments[0].endSeconds;
 
-  const boostedImplants = withBonus(implants, bonus);
-  if (expirySeconds >= maxBoostedSeconds(spByPair, boostedImplants)) {
+  const boostedImplants = withBonus(implants, segments[0].bonus);
+  if (earliestExpiry >= maxBoostedSeconds(spByPair, boostedImplants)) {
     return bestAttributesForPairs(spByPair, boostedImplants);
   }
 
-  return bestAttributesWalking(steps, skills, implants, bonus, expirySeconds);
+  return bestAttributesWalking(steps, skills, implants, segments);
 }
 
 /**
@@ -409,19 +454,10 @@ export function bestAttributesAtBoundaries(
   startStep: number,
   boundaries: readonly number[]
 ): BestAttributesResult[] {
-  const bonus: Partial<Attributes> = {};
   const startMs = booster.startDate.getTime();
   const live = booster.boosters.filter((b) => b.expiresAt.getTime() > startMs);
-  for (const b of live) {
-    for (const name of ATTRIBUTE_NAMES) {
-      const add = b.bonus[name] ?? 0;
-      if (add) bonus[name] = (bonus[name] ?? 0) + add;
-    }
-  }
-  const expirySeconds =
-    live.length > 0
-      ? Math.min(...live.map((b) => (b.expiresAt.getTime() - startMs) / 1000))
-      : -Infinity;
+  const segments = bonusSegments(live, startMs);
+  const lastSeg = segments.length - 1;
 
   const end = boundaries[boundaries.length - 1];
   const sp: number[] = [];
@@ -439,13 +475,14 @@ export function bestAttributesAtBoundaries(
   const bestExtras: (readonly number[])[] = boundaries.map(() => []);
 
   for (const extras of allAllocations()) {
-    const value = (n: AttributeName, boosted: boolean) =>
+    const valueAt = (n: AttributeName, seg: number) =>
       BASE_MIN +
       extras[ATTRIBUTE_NAMES.indexOf(n)] +
       (implants[n] ?? 0) +
-      (boosted ? (bonus[n] ?? 0) : 0);
+      (segments[seg].bonus[n] ?? 0);
 
     let elapsed = 0;
+    let seg = 0;
     let b = 0;
     for (let i = 0; i < sp.length; i++) {
       // A boundary can sit before this step (an empty segment) or between any
@@ -459,16 +496,16 @@ export function bestAttributesAtBoundaries(
       }
       let spLeft = sp[i];
       while (spLeft > 0) {
-        const boosted = elapsed < expirySeconds;
-        const rate = trainingRate(value(primary[i], boosted), value(secondary[i], boosted));
+        const rate = trainingRate(valueAt(primary[i], seg), valueAt(secondary[i], seg));
         const needed = timeToTrain(spLeft, rate);
-        const room = boosted ? expirySeconds - elapsed : Infinity;
+        const room = seg < lastSeg ? segments[seg].endSeconds - elapsed : Infinity;
         if (needed <= room) {
           elapsed += needed;
           spLeft = 0;
         } else {
           elapsed += room;
           spLeft -= (rate / 60) * room;
+          seg++;
         }
       }
     }
