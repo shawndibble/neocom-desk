@@ -698,3 +698,22 @@ export function getCharacterIndustryJobs(
     query: { include_completed: includeCompleted ?? false },
   });
 }
+
+// --- GET /characters/{character_id}/corporationhistory (public) ---
+
+export interface CorporationHistoryEntry {
+  record_id: number;
+  corporation_id: number;
+  start_date: string;
+  is_deleted?: boolean;
+}
+
+export function getCharacterCorporationHistory(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationHistoryEntry[]>> {
+  return esiFetch<CorporationHistoryEntry[]>(
+    `/characters/${characterId}/corporationhistory`,
+    options
+  );
+}
