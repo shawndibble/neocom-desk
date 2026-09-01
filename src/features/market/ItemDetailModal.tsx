@@ -7,12 +7,14 @@
  * table for a panel that is rarely opened. The snapshot instead carries the
  * small attribute dictionary that turns attribute ids into names/units/categories.
  */
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Modal, Spinner } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
+import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
 import { getUniverseType, type UniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
+import { loadSkills } from '@/sde/loadSde';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatAttributeValue, formatVolume } from './format';
 
@@ -41,13 +43,18 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
       setData(null);
       setError(false);
       try {
-        const [{ data: type }, dictionary] = await Promise.all([
+        const [{ data: type }, dictionary, skills] = await Promise.all([
           getUniverseType(typeId),
           loadAttributeDictionary(),
+          loadSkills(),
         ]);
         if (cancelled) return;
         if (!type) throw new Error(`No type data for ${typeId}`);
-        setData({ type, groups: groupItemAttributes(type.dogma_attributes, dictionary) });
+        const skillNames = Object.fromEntries(skills.map((s) => [s.typeID, s.name]));
+        setData({
+          type,
+          groups: groupItemAttributes(type.dogma_attributes, dictionary, skillNames),
+        });
       } catch {
         if (!cancelled) setError(true);
       } finally {
@@ -86,7 +93,11 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
                 {t('market.itemDetail.volume', { volume: formatVolume(data.type.volume ?? 0) })}
               </p>
               {data.type.description && (
-                <p className="whitespace-pre-line text-text">{data.type.description}</p>
+                <p className="whitespace-pre-line text-text">
+                  {parseItemDescription(data.type.description).map((run, i) => (
+                    <DescriptionRunNode key={i} run={run} />
+                  ))}
+                </p>
               )}
             </div>
           </div>
@@ -104,8 +115,8 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
                     <div key={attribute.attributeId} className="contents">
                       <dt className="text-text-dim">{attribute.name}</dt>
                       <dd className="text-right text-text">
-                        {formatAttributeValue(attribute.value)}
-                        {attribute.unit ? ` ${attribute.unit}` : ''}
+                        {attribute.displayValue ??
+                          `${formatAttributeValue(attribute.value)}${attribute.unit ? ` ${attribute.unit}` : ''}`}
                       </dd>
                     </div>
                   ))}
@@ -117,4 +128,13 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
       )}
     </Modal>
   );
+}
+
+/** Renders one parsed description run as nested inline elements — never `dangerouslySetInnerHTML`. */
+function DescriptionRunNode({ run }: { run: DescriptionRun }) {
+  let node: ReactNode = run.text;
+  if (run.underline) node = <u>{node}</u>;
+  if (run.italic) node = <i>{node}</i>;
+  if (run.bold) node = <b>{node}</b>;
+  return <Fragment>{node}</Fragment>;
 }

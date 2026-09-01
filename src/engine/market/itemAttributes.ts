@@ -27,6 +27,8 @@ export interface DisplayAttribute {
   name: string;
   unit: string | null;
   value: number;
+  /** Set only for required-skill rows: "<Skill name> <roman level>", overriding value/unit in display. */
+  displayValue?: string;
 }
 
 export interface AttributeGroup {
@@ -34,23 +36,72 @@ export interface AttributeGroup {
   attributes: DisplayAttribute[];
 }
 
+const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
+
+/**
+ * requiredSkillN -> requiredSkillNLevel dogma attribute id pairs (verified
+ * against fuzzwork dgmAttributeTypes.csv, same source as
+ * scripts/build-sde.mjs's PREREQ_PAIRS). The level half of each pair is
+ * unpublished in dgmAttributeTypes.csv, so it never reaches `dictionary` —
+ * these must be read from the raw dogma attributes before the generic
+ * per-attribute loop below, or the level is silently lost. ESI omits a level
+ * attribute entirely when the item requires level 1 (dogma's own default),
+ * so a missing level pairs to 1 rather than being dropped.
+ */
+const SKILL_REQUIREMENT_PAIRS: ReadonlyArray<readonly [number, number]> = [
+  [182, 277],
+  [183, 278],
+  [184, 279],
+  [1285, 1286],
+  [1289, 1287],
+  [1290, 1288],
+];
+
 /** Groups by category, sorted alphabetically; attributes within a group sorted by display name. */
 export function groupItemAttributes(
   dogmaAttributes: readonly RawDogmaAttribute[] | undefined,
-  dictionary: AttributeDictionary
+  dictionary: AttributeDictionary,
+  skillNames: Readonly<Record<number, string>> = {}
 ): AttributeGroup[] {
   if (!dogmaAttributes || dogmaAttributes.length === 0) return [];
 
+  const byId = new Map(dogmaAttributes.map((a) => [a.attribute_id, a.value]));
+  const pairedAttributeIds = new Set(SKILL_REQUIREMENT_PAIRS.flat());
+
   const byCategory = new Map<string, DisplayAttribute[]>();
-  for (const { attribute_id, value } of dogmaAttributes) {
-    const entry = dictionary[attribute_id];
-    if (!entry) continue;
-    let list = byCategory.get(entry.category);
+  const push = (attribute: DisplayAttribute, category: string) => {
+    let list = byCategory.get(category);
     if (!list) {
       list = [];
-      byCategory.set(entry.category, list);
+      byCategory.set(category, list);
     }
-    list.push({ attributeId: attribute_id, name: entry.name, unit: entry.unit, value });
+    list.push(attribute);
+  };
+
+  for (const [skillAttrId, levelAttrId] of SKILL_REQUIREMENT_PAIRS) {
+    const skillTypeId = byId.get(skillAttrId);
+    if (skillTypeId === undefined) continue;
+    const entry = dictionary[skillAttrId];
+    if (!entry) continue;
+    const level = byId.get(levelAttrId) ?? 1;
+    const skillName = skillNames[skillTypeId] ?? `#${skillTypeId}`;
+    push(
+      {
+        attributeId: skillAttrId,
+        name: entry.name,
+        unit: null,
+        value: skillTypeId,
+        displayValue: `${skillName} ${ROMAN[Math.max(1, Math.min(5, level)) - 1]}`,
+      },
+      entry.category
+    );
+  }
+
+  for (const { attribute_id, value } of dogmaAttributes) {
+    if (pairedAttributeIds.has(attribute_id)) continue;
+    const entry = dictionary[attribute_id];
+    if (!entry) continue;
+    push({ attributeId: attribute_id, name: entry.name, unit: entry.unit, value }, entry.category);
   }
 
   const groups = [...byCategory.entries()].map(([category, attributes]) => ({
