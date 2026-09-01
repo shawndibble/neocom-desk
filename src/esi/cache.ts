@@ -36,6 +36,20 @@ export interface StatusResult<T> {
  */
 export const GLOBAL_CACHE_CHARACTER_ID = 0;
 
+/**
+ * Written by `fetchLive` itself, right after a successful live call, with
+ * ESI's raw `Expires` header (or null). `loadWithCacheStatus` reads it back
+ * once `fetchLive` resolves and uses it to size that row's freshness window —
+ * this is how the window reflects what that specific response declared
+ * rather than a guessed constant. A plain shared box rather than widening
+ * `fetchLive`'s return type: only the handful of callers that opt in via
+ * `expiresCapture` need to touch this; every other caller's `fetchLive`
+ * keeps returning bare `T | null`.
+ */
+export interface ExpiresCapture {
+  value: string | null;
+}
+
 export interface LoadWithCacheStatusOptions {
   /**
    * Defaults to `isAuthFailure` (401/403 EsiError, or a failed refresh).
@@ -50,6 +64,46 @@ export interface LoadWithCacheStatusOptions {
    * to.
    */
   skipCacheOnAuthFailure?: boolean;
+  /** See `ExpiresCapture`. Omitted means this key never gets a freshness window. */
+  expiresCapture?: ExpiresCapture;
+}
+
+/**
+ * Epoch ms of the last `invalidateFreshness()` call. A row is only eligible
+ * for a freshness-window skip if it was fetched at or after this instant —
+ * so a manual refresh (which calls `invalidateFreshness()` first) always
+ * forces a live call for whatever it's about to reload, without threading a
+ * "force" flag through every loader and route.
+ */
+let freshnessInvalidatedAt = 0;
+
+/**
+ * Call before a manual refresh re-runs its loader(s), so the freshness window
+ * added in issue #41 never holds back a user-requested reload. Global and
+ * coarse on purpose: over-invalidating costs a few extra live calls; a
+ * per-key flag threaded through every route would cost a lot more surface
+ * area for the same guarantee.
+ */
+export function invalidateFreshness(): void {
+  freshnessInvalidatedAt = Date.now();
+}
+
+function parseExpiresHeader(expires: string | null | undefined): number | undefined {
+  if (!expires) return undefined;
+  const ms = Date.parse(expires);
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+/**
+ * One shared map for both the singular and paginated read-through paths:
+ * concurrent identical reads (same characterId + key) collapse onto the one
+ * in-flight promise instead of racing separate ESI calls. Deleted in a
+ * `finally` so a rejection never poisons the entry for the next call.
+ */
+const inFlightLoads = new Map<string, Promise<unknown>>();
+
+function dedupeKey(characterId: number, key: string): string {
+  return `${characterId}:${key}`;
 }
 
 /**
@@ -67,13 +121,42 @@ export async function loadWithCacheStatus<T>(
   fetchLive: () => Promise<T | null>,
   options: LoadWithCacheStatusOptions = {}
 ): Promise<StatusResult<T>> {
+  const fresh = await readFreshRow<T>(characterId, key);
+  if (fresh) return { cached: fresh, needsReauth: false };
+
+  const dkey = dedupeKey(characterId, key);
+  const existing = inFlightLoads.get(dkey);
+  if (existing) return existing as Promise<StatusResult<T>>;
+
+  const promise = loadWithCacheStatusLive(characterId, key, fetchLive, options);
+  inFlightLoads.set(dkey, promise);
+  try {
+    return await promise;
+  } finally {
+    inFlightLoads.delete(dkey);
+  }
+}
+
+async function loadWithCacheStatusLive<T>(
+  characterId: number,
+  key: string,
+  fetchLive: () => Promise<T | null>,
+  options: LoadWithCacheStatusOptions
+): Promise<StatusResult<T>> {
   const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
   let needsReauth = false;
   try {
     const data = await fetchLive();
     if (data !== null) {
       const fetchedAt = Date.now();
-      await db.esiCache.put({ characterId, key, value: data, fetchedAt });
+      const expiresAt = parseExpiresHeader(options.expiresCapture?.value);
+      await db.esiCache.put({
+        characterId,
+        key,
+        value: data,
+        fetchedAt,
+        ...(expiresAt !== undefined ? { expiresAt } : {}),
+      });
       return {
         cached: { data, fetchedAt: new Date(fetchedAt), fromCache: false, truncated: false },
         needsReauth: false,
@@ -100,6 +183,30 @@ export async function loadWithCacheStatus<T>(
       truncated: cached.truncated === true,
     },
     needsReauth,
+  };
+}
+
+/**
+ * A row still inside the freshness window ESI's own `Expires` header (via
+ * `expiresCapture`) declared for it — served without a live call. `fromCache`
+ * is `false` here: this is a successful, on-time read, not the degraded
+ * "live call failed, fell back to a stale row" case that flag otherwise
+ * means, and views use it to decide whether to show an offline banner.
+ */
+async function readFreshRow<T>(characterId: number, key: string): Promise<CachedResult<T> | null> {
+  const row = await readCachedRow(characterId, key);
+  if (!row || row.expiresAt === undefined) return null;
+  const now = Date.now();
+  if (row.expiresAt <= now) return null;
+  // <=, not <: a manual refresh calling invalidateFreshness() right after a
+  // fetch that landed in the same millisecond must still force the next call
+  // live, not read the row it just invalidated as still-fresh.
+  if (row.fetchedAt <= freshnessInvalidatedAt) return null;
+  return {
+    data: row.value as T,
+    fetchedAt: new Date(row.fetchedAt),
+    fromCache: false,
+    truncated: row.truncated === true,
   };
 }
 
@@ -133,6 +240,25 @@ export async function loadPaginatedWithCacheStatus<T>(
   key: string,
   fetchLive: () => Promise<TruncatableResult<T>>,
   options: LoadWithCacheStatusOptions = {}
+): Promise<StatusResult<T[]>> {
+  const dkey = dedupeKey(characterId, key);
+  const existing = inFlightLoads.get(dkey);
+  if (existing) return existing as Promise<StatusResult<T[]>>;
+
+  const promise = loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options);
+  inFlightLoads.set(dkey, promise);
+  try {
+    return await promise;
+  } finally {
+    inFlightLoads.delete(dkey);
+  }
+}
+
+async function loadPaginatedWithCacheStatusLive<T>(
+  characterId: number,
+  key: string,
+  fetchLive: () => Promise<TruncatableResult<T>>,
+  options: LoadWithCacheStatusOptions
 ): Promise<StatusResult<T[]>> {
   const detectAuthFailure = options.detectAuthFailure ?? isAuthFailure;
   let needsReauth = false;
@@ -201,7 +327,9 @@ export async function loadPaginatedWithCache<T>(
 async function readCachedRow(
   characterId: number,
   key: string
-): Promise<{ value: unknown; fetchedAt: number; truncated?: boolean } | undefined> {
+): Promise<
+  { value: unknown; fetchedAt: number; truncated?: boolean; expiresAt?: number } | undefined
+> {
   if (await isCachePurgePending(characterId)) return undefined;
   return db.esiCache.get([characterId, key]);
 }

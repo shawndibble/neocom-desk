@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
+import { invalidateFreshness } from '@/esi/cache';
 import { db } from '@/db';
 import {
   loadCharacterSkills,
@@ -217,6 +218,47 @@ describe('loadCharacterSkillQueueWithStatus (issue #14)', () => {
 
     expect(result.needsReauth).toBe(false);
     expect(result.cached?.data).toEqual(queue);
+  });
+});
+
+describe('loadCharacterSkillQueue — freshness window (issue #41)', () => {
+  it('serves the second read from the row, without a network call, inside the window ESI declared', async () => {
+    const queue = [{ skill_id: 3300, queue_position: 0, finished_level: 5 }];
+    let calls = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/skillqueue`, () => {
+        calls += 1;
+        return HttpResponse.json(queue, {
+          headers: { Expires: new Date(Date.now() + 60_000).toUTCString() },
+        });
+      })
+    );
+
+    await loadCharacterSkillQueue(CHAR_ID);
+    const second = await loadCharacterSkillQueue(CHAR_ID);
+
+    expect(calls).toBe(1);
+    expect(second?.data).toEqual(queue);
+    expect(second?.fromCache).toBe(false);
+  });
+
+  it('invalidateFreshness forces the next read back to the network (manual refresh)', async () => {
+    const queue = [{ skill_id: 3300, queue_position: 0, finished_level: 5 }];
+    let calls = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/skillqueue`, () => {
+        calls += 1;
+        return HttpResponse.json(queue, {
+          headers: { Expires: new Date(Date.now() + 60_000).toUTCString() },
+        });
+      })
+    );
+
+    await loadCharacterSkillQueueWithStatus(CHAR_ID);
+    invalidateFreshness();
+    await loadCharacterSkillQueueWithStatus(CHAR_ID);
+
+    expect(calls).toBe(2);
   });
 });
 
