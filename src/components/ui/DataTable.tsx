@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 
 export interface DataTableSort {
@@ -35,6 +35,13 @@ interface DataTableProps<T> {
   className?: string;
   /** Column and direction to sort by before any header click. Column must declare `sortValue`. */
   defaultSort?: DataTableSort;
+  /**
+   * Wraps a row's `<tr>` — e.g. a right-click menu. When set, the `<tr>`
+   * gets `tabIndex={0}` so a keyboard user can focus it and open the menu
+   * with Shift+F10 / the Menu key, the same way `ContextMenu.test.tsx`
+   * drives a focused trigger.
+   */
+  rowContextMenu?: (row: T, tr: ReactElement) => ReactElement;
 }
 
 function compareValues(a: string | number, b: string | number): number {
@@ -76,6 +83,7 @@ export function DataTable<T>({
   label,
   className = '',
   defaultSort,
+  rowContextMenu,
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
 
@@ -144,15 +152,28 @@ export function DataTable<T>({
         </tr>
       </thead>
       <tbody className="divide-y divide-line">
-        {sortedRows.map((row) => (
-          <tr key={rowKey(row)} className={cx('hover:bg-panel-2', rowClassName?.(row))}>
-            {columns.map((column, i) => (
-              <td key={column.id} className={cx(cellClass[i], column.cellClassName?.(row))}>
-                {column.render(row)}
-              </td>
-            ))}
-          </tr>
-        ))}
+        {sortedRows.map((row) => {
+          const tr = (
+            <tr
+              className={cx(
+                'hover:bg-panel-2',
+                rowContextMenu &&
+                  'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                rowClassName?.(row)
+              )}
+              tabIndex={rowContextMenu ? 0 : undefined}
+            >
+              {columns.map((column, i) => (
+                <td key={column.id} className={cx(cellClass[i], column.cellClassName?.(row))}>
+                  {column.render(row)}
+                </td>
+              ))}
+            </tr>
+          );
+          return (
+            <Fragment key={rowKey(row)}>{rowContextMenu ? rowContextMenu(row, tr) : tr}</Fragment>
+          );
+        })}
       </tbody>
     </table>
   );

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { splitOrderBook, resolveOrderLocation, orderExpiry } from './orderBook';
+import {
+  splitOrderBook,
+  resolveOrderLocation,
+  orderExpiry,
+  filterOrdersByLocation,
+} from './orderBook';
 
 interface Order {
   is_buy_order: boolean;
@@ -58,6 +63,29 @@ describe('resolveOrderLocation', () => {
       solarSystems
     );
     expect(result).toEqual({ stationName: null, systemName: '', security: 0 });
+  });
+});
+
+describe('filterOrdersByLocation', () => {
+  const orders = [
+    { order_id: 1, location_id: 60003760 },
+    { order_id: 2, location_id: 1035466617946 },
+    { order_id: 3, location_id: 60003760 },
+  ];
+
+  it('keeps only orders at the given location_id', () => {
+    expect(filterOrdersByLocation(orders, 60003760)).toEqual([
+      { order_id: 1, location_id: 60003760 },
+      { order_id: 3, location_id: 60003760 },
+    ]);
+  });
+
+  it('passes every order through unfiltered when the location is null', () => {
+    expect(filterOrdersByLocation(orders, null)).toEqual(orders);
+  });
+
+  it('returns an empty array when nothing matches', () => {
+    expect(filterOrdersByLocation(orders, 999)).toEqual([]);
   });
 });
 

@@ -20,6 +20,12 @@ export interface BlueprintCatalogEntry {
 export interface BlueprintCatalog {
   entries: BlueprintCatalogEntry[];
   byBlueprintTypeID: Map<number, BlueprintCatalogEntry>;
+  /**
+   * First blueprint producing a given item (Market Browser's "jump to a
+   * Build Plan" context-menu action). Multiple blueprints can share a
+   * product in principle; v1 data doesn't, so first-wins is fine.
+   */
+  byProductTypeID: Map<number, BlueprintCatalogEntry>;
   /** Raw type-info map (name lookups for materials), keyed by typeID string. */
   typesById: TypeMap;
 }
@@ -28,6 +34,7 @@ export async function loadBlueprintCatalog(): Promise<BlueprintCatalog> {
   const [blueprints, types] = await Promise.all([loadBlueprints(), loadTypes()]);
   const entries: BlueprintCatalogEntry[] = [];
   const byBlueprintTypeID = new Map<number, BlueprintCatalogEntry>();
+  const byProductTypeID = new Map<number, BlueprintCatalogEntry>();
 
   for (const [idStr, blueprint] of Object.entries(blueprints)) {
     const blueprintTypeID = Number(idStr);
@@ -38,9 +45,12 @@ export async function loadBlueprintCatalog(): Promise<BlueprintCatalog> {
     const entry: BlueprintCatalogEntry = { blueprintTypeID, blueprint, productTypeID, productName };
     entries.push(entry);
     byBlueprintTypeID.set(blueprintTypeID, entry);
+    if (productTypeID !== null && !byProductTypeID.has(productTypeID)) {
+      byProductTypeID.set(productTypeID, entry);
+    }
   }
 
-  return { entries, byBlueprintTypeID, typesById: types };
+  return { entries, byBlueprintTypeID, byProductTypeID, typesById: types };
 }
 
 /** Item name for a typeID (materials, products), falling back to `#typeID` when unknown. */

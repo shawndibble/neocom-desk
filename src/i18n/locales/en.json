@@ -536,6 +536,7 @@
     "emptySellHint": "No one is selling this item in this Trade Hub's region.",
     "emptyBuyTitle": "No buy orders",
     "emptyBuyHint": "No one is buying this item in this Trade Hub's region.",
+    "emptyFilteredHint": "No orders at the filtered station. Clear the filter to see the full region.",
     "price": "Price",
     "quantity": "Quantity",
     "location": "Location",
@@ -548,7 +549,22 @@
     "rangeRegion": "Region",
     "rangeSystem": "System",
     "rangeJumps_one": "{{count}} jump",
-    "rangeJumps_other": "{{count}} jumps"
+    "rangeJumps_other": "{{count}} jumps",
+    "contextMenu": {
+      "addToQuickbar": "Add to Quickbar",
+      "showInfo": "Show info",
+      "addToCompare": "Add to Compare",
+      "unavailable": "Not available yet",
+      "copyName": "Copy name",
+      "buildPlan": "Build Plan",
+      "buildPlanChecking": "Build Plan (checking…)",
+      "noBlueprintOptions": "No blueprint options",
+      "copyLocation": "Copy location",
+      "copyPrice": "Copy price",
+      "filterToStation": "Filter to this station"
+    },
+    "stationFilterActive": "Filtered to {{station}}",
+    "clearStationFilter": "Clear filter"
   },
   "error": {
     "title": "Something went wrong",

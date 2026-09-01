@@ -1,7 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { DataTable, type DataTableColumn } from './DataTable';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from './ContextMenu';
 
 interface Row {
   id: number;
@@ -189,6 +195,65 @@ describe('DataTable', () => {
       const cells = screen.getAllByRole('cell');
       expect(cells[0]).toHaveTextContent('Tritanium');
       expect(cells[2]).toHaveTextContent('Pyerite');
+    });
+  });
+
+  describe('rowContextMenu', () => {
+    it('wraps each row without breaking the table structure', () => {
+      renderTable({
+        rowContextMenu: (row, tr) => (
+          <ContextMenu key={row.id}>
+            <ContextMenuTrigger asChild>{tr}</ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem>Copy {row.item}</ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        ),
+      });
+      expect(screen.getAllByRole('row')).toHaveLength(rows.length + 1);
+      expect(screen.getAllByRole('cell')[0]).toHaveTextContent('Tritanium');
+    });
+
+    it('gives a focusable row a visible focus ring (DESIGN.md §6, never outline-none without a replacement)', () => {
+      renderTable({
+        rowContextMenu: (row, tr) => (
+          <ContextMenu key={row.id}>
+            <ContextMenuTrigger asChild>{tr}</ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem>Copy {row.item}</ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        ),
+      });
+      const [, firstRow] = screen.getAllByRole('row');
+      expect(firstRow).toHaveClass('focus-visible:outline-accent');
+    });
+
+    it('makes rows focusable so a keyboard user can open the menu without a mouse', async () => {
+      const user = userEvent.setup();
+      renderTable({
+        rowContextMenu: (row, tr) => (
+          <ContextMenu key={row.id}>
+            <ContextMenuTrigger asChild>{tr}</ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem>Copy {row.item}</ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        ),
+      });
+      const [, firstRow] = screen.getAllByRole('row');
+      firstRow.focus();
+      fireEvent.contextMenu(firstRow);
+      expect(await screen.findByRole('menuitem', { name: 'Copy Tritanium' })).toBeInTheDocument();
+
+      await user.keyboard('{Escape}');
+      expect(firstRow).toHaveFocus();
+    });
+
+    it('leaves rows non-focusable when no context menu is wired up', () => {
+      renderTable();
+      const [, firstRow] = screen.getAllByRole('row');
+      expect(firstRow).not.toHaveAttribute('tabindex');
     });
   });
 });

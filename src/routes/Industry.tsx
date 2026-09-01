@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
@@ -49,6 +49,7 @@ export function Industry() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const plans = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
@@ -93,6 +94,75 @@ export function Industry() {
     };
   }, [activeCharacterId]);
 
+  // Writes the plan only — never selects it. A `useEffect` may call this
+  // (see below): React's set-state-in-effect check traces into called
+  // functions, so a helper an effect calls must never itself call a
+  // `useState` setter, even after an `await`. Callers that need the new
+  // plan selected (the blueprint-picker click handler; the render-time sync
+  // below) do that themselves, outside the effect.
+  const createPlan = useCallback(
+    async (entry: BlueprintCatalogEntry): Promise<string | null> => {
+      if (activeCharacterId === null) return null;
+      const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
+      const plan = newBuildPlan(activeCharacterId, entry, owned);
+      await db.buildPlans.add(plan);
+      scheduleSync(activeCharacterId);
+      return plan.id;
+    },
+    [activeCharacterId, ownedBlueprints]
+  );
+
+  // The Market Browser's item context menu "jump to a Build Plan" action
+  // (issue #6) lands here with `?product=<typeId>`. The blueprint this
+  // resolves to, and whether the character already has a plan for it, are
+  // pure lookups against data already in hand — computed here so the
+  // render-time sync below and the effect's create-if-missing branch read
+  // the same answer instead of re-deriving it twice.
+  const productParam = searchParams.get('product');
+  const pendingEntry =
+    productParam && catalog ? (catalog.byProductTypeID.get(Number(productParam)) ?? null) : null;
+  const pendingExistingPlan =
+    pendingEntry && plans
+      ? (plans.find((p) => p.blueprintTypeID === pendingEntry.blueprintTypeID) ?? null)
+      : null;
+
+  // Render-time state adjustment ("Adjusting state when a prop changes",
+  // react.dev): once the plan a `?product=` param points at exists — already
+  // there, or just created by the effect below once `plans` catches up —
+  // adopt it as the selection. Pure and synchronous, so it belongs here
+  // rather than in the effect, which React's set-state-in-effect check flags
+  // as cascading-render risk for exactly this shape.
+  if (pendingExistingPlan && selectedId !== pendingExistingPlan.id) {
+    setSelectedId(pendingExistingPlan.id);
+  }
+
+  // Creating a missing plan is a real side effect (a Dexie write), so it
+  // stays here — but only the write (`createPlan`, never selects). The param
+  // is cleared only once resolved to an existing plan: immediately if one
+  // was already there, or once the create above lands and the render-time
+  // sync picks it up — so the URL and the selection never disagree about
+  // which plan the click was pointing at.
+  useEffect(() => {
+    if (!productParam || activeCharacterId === null || !plans || !catalog) return;
+    if (pendingEntry && !pendingExistingPlan) {
+      void createPlan(pendingEntry);
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('product');
+    setSearchParams(next, { replace: true });
+  }, [
+    productParam,
+    activeCharacterId,
+    plans,
+    catalog,
+    pendingEntry,
+    pendingExistingPlan,
+    searchParams,
+    setSearchParams,
+    createPlan,
+  ]);
+
   // Derived, not effect-synced: falls back to the first plan whenever the
   // explicitly selected one is missing (first load, or it was just deleted).
   const effectiveSelectedId = useMemo(() => {
@@ -114,15 +184,6 @@ export function Industry() {
     );
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
-
-  async function handleCreate(entry: BlueprintCatalogEntry) {
-    if (activeCharacterId === null) return;
-    const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
-    const plan = newBuildPlan(activeCharacterId, entry, owned);
-    await db.buildPlans.add(plan);
-    scheduleSync(activeCharacterId);
-    setSelectedId(plan.id);
-  }
 
   async function handleDuplicate(id: string) {
     const source = plans?.find((p) => p.id === id);
@@ -192,7 +253,11 @@ export function Industry() {
               catalog={catalog}
               selectedId={effectiveSelectedId}
               onSelect={setSelectedId}
-              onCreate={(entry) => void handleCreate(entry)}
+              onCreate={(entry) =>
+                void createPlan(entry).then((id) => {
+                  if (id) setSelectedId(id);
+                })
+              }
               onDuplicate={(id) => void handleDuplicate(id)}
               onDelete={(id) => void handleDelete(id)}
               onRename={(id, name) => void handleRename(id, name)}

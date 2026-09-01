@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { Button, DataAgeBadge, DataTable, EmptyState, Panel, Spinner } from '@/components/ui';
@@ -19,17 +19,21 @@ import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/mar
 import { useMarketHub } from '@/features/market/hub';
 import { filterMarketTree, MARKET_TREE_MATCH_LIMIT } from '@/features/market/marketTree';
 import { getOrderBook, clearOrderBookCache } from '@/features/market/orderBook';
-import { formatVolume } from '@/features/market/format';
+import { formatVolume, formatOrderLocationText } from '@/features/market/format';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import {
   splitOrderBook,
   resolveOrderLocation,
   orderExpiry,
+  filterOrdersByLocation,
   type NpcStationLookup,
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
+import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 
 /** Debounce for the catalogue search, so a fast typist doesn't re-filter the tree on every keystroke. */
 const SEARCH_DEBOUNCE_MS = 250;
@@ -77,6 +81,8 @@ interface MarketGroupTreeProps {
   onToggle: (id: number) => void;
   onSelect: (typeId: number) => void;
   selectedTypeId: number | null;
+  blueprintCatalog: BlueprintCatalog | null;
+  onRequestBlueprintCatalog: () => void;
 }
 
 function MarketGroupTree({
@@ -87,6 +93,8 @@ function MarketGroupTree({
   onToggle,
   onSelect,
   selectedTypeId,
+  blueprintCatalog,
+  onRequestBlueprintCatalog,
 }: MarketGroupTreeProps) {
   const filtering = filterResult !== null;
 
@@ -120,21 +128,36 @@ function MarketGroupTree({
         {expanded && (children.length > 0 || items.length > 0) && (
           <ul>
             {children.map((child) => renderGroup(child, depth + 1))}
-            {items.map((item) => (
-              <li key={item.typeId}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(item.typeId)}
-                  style={{ paddingLeft: `${(depth + 1) * 0.75 + 0.75}rem` }}
-                  aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
-                  className={`w-full truncate py-1 text-left text-xs hover:text-accent ${
-                    selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
-                  }`}
-                >
-                  {item.name}
-                </button>
-              </li>
-            ))}
+            {items.map((item) => {
+              const blueprintTypeID =
+                blueprintCatalog === null
+                  ? undefined
+                  : (blueprintCatalog.byProductTypeID.get(item.typeId)?.blueprintTypeID ?? null);
+              return (
+                <li key={item.typeId}>
+                  <ItemContextMenu
+                    typeId={item.typeId}
+                    itemName={item.name}
+                    blueprintTypeID={blueprintTypeID}
+                    onOpenChange={(open) => {
+                      if (open) onRequestBlueprintCatalog();
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onSelect(item.typeId)}
+                      style={{ paddingLeft: `${(depth + 1) * 0.75 + 0.75}rem` }}
+                      aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
+                      className={`w-full truncate py-1 text-left text-xs hover:text-accent ${
+                        selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
+                      }`}
+                    >
+                      {item.name}
+                    </button>
+                  </ItemContextMenu>
+                </li>
+              );
+            })}
           </ul>
         )}
       </li>
@@ -168,6 +191,22 @@ export function Market() {
   const [solarSystems, setSolarSystems] = useState<SolarSystemEntry[] | null>(null);
   const [catalogueError, setCatalogueError] = useState(false);
 
+  // Blueprint catalog for the item context menu's Build Plan action, loaded
+  // lazily on the first menu open rather than on mount — it pulls the full
+  // SDE types.json, and CONTEXT.md keeps /market's own payloads out of the
+  // install precache because most installs never open this page at all.
+  const [blueprintCatalog, setBlueprintCatalog] = useState<BlueprintCatalog | null>(null);
+  const blueprintCatalogRequested = useRef(false);
+  function ensureBlueprintCatalog() {
+    if (blueprintCatalogRequested.current) return;
+    blueprintCatalogRequested.current = true;
+    void loadBlueprintCatalog()
+      .then(setBlueprintCatalog)
+      .catch(() => {
+        // Build Plan action degrades to "No blueprint options" on failure — not core functionality.
+      });
+  }
+
   const [rawQuery, setRawQuery] = useState('');
   const [query, setQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<number>>(new Set());
@@ -181,15 +220,21 @@ export function Market() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [sellShowAll, setSellShowAll] = useState(false);
   const [buyShowAll, setBuyShowAll] = useState(false);
+  // The order row context menu's "filter to this station" action (CONTEXT.md
+  // round 10); undone via the banner rendered above the tables.
+  const [stationFilter, setStationFilter] = useState<number | null>(null);
   // "Adjusting state when a prop changes" (react.dev): resets the previous
-  // item's row-cap and order book the instant selection changes, in the same
-  // render — an Effect would let the old item's rows flash under the new title.
-  const [resetForTypeId, setResetForTypeId] = useState<number | null>(null);
-  if (selectedTypeId !== resetForTypeId) {
-    setResetForTypeId(selectedTypeId);
+  // item's row-cap, station filter and order book the instant selection or
+  // hub changes, in the same render — an Effect would let the old item's (or
+  // old hub's) rows flash under the new title.
+  const resetKey = `${selectedTypeId ?? 'none'}:${hubId}`;
+  const [resetForKey, setResetForKey] = useState<string | null>(null);
+  if (resetKey !== resetForKey) {
+    setResetForKey(resetKey);
     setSellShowAll(false);
     setBuyShowAll(false);
     setOrderBookResult(null);
+    setStationFilter(null);
   }
 
   useEffect(() => {
@@ -286,10 +331,32 @@ export function Market() {
     () => (orderBookResult ? splitOrderBook(orderBookResult.orders) : { sell: [], buy: [] }),
     [orderBookResult]
   );
-  const sortedSell = useMemo(() => [...sell].sort((a, b) => a.price - b.price), [sell]);
-  const sortedBuy = useMemo(() => [...buy].sort((a, b) => b.price - a.price), [buy]);
+  const filteredSell = useMemo(
+    () => filterOrdersByLocation(sell, stationFilter),
+    [sell, stationFilter]
+  );
+  const filteredBuy = useMemo(
+    () => filterOrdersByLocation(buy, stationFilter),
+    [buy, stationFilter]
+  );
+  const sortedSell = useMemo(
+    () => [...filteredSell].sort((a, b) => a.price - b.price),
+    [filteredSell]
+  );
+  const sortedBuy = useMemo(
+    () => [...filteredBuy].sort((a, b) => b.price - a.price),
+    [filteredBuy]
+  );
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
+
+  const stationFilterLabel = useMemo(() => {
+    if (stationFilter === null || !orderBookResult) return null;
+    const order = orderBookResult.orders.find((o) => o.location_id === stationFilter);
+    if (!order) return null;
+    const location = resolveOrderLocation(order, npcStationMap, solarSystemMap);
+    return formatOrderLocationText(location, t('market.unknownStructure'));
+  }, [stationFilter, orderBookResult, npcStationMap, solarSystemMap, t]);
 
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(
     () => [
@@ -361,6 +428,18 @@ export function Market() {
     // "Data Age": refresh happens on app open + manual button only).
     clearOrderBookCache();
     setRefreshTick((n) => n + 1);
+  }
+
+  function orderRowContextMenu(order: RegionOrder, tr: ReactElement) {
+    return (
+      <OrderRowContextMenu
+        order={order}
+        trigger={tr}
+        npcStations={npcStationMap}
+        solarSystems={solarSystemMap}
+        onFilterToStation={setStationFilter}
+      />
+    );
   }
 
   const catalogueLoading = !catalogueError && (!groups || !types || !npcStations || !solarSystems);
@@ -441,6 +520,8 @@ export function Market() {
                 onToggle={handleToggle}
                 onSelect={setSelectedTypeId}
                 selectedTypeId={selectedTypeId}
+                blueprintCatalog={blueprintCatalog}
+                onRequestBlueprintCatalog={ensureBlueprintCatalog}
               />
             </div>
           )}
@@ -467,6 +548,19 @@ export function Market() {
             </div>
           ) : (
             <div className="divide-y divide-line">
+              {stationFilter !== null && (
+                <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
+                  <span>
+                    {t('market.stationFilterActive', {
+                      station: stationFilterLabel ?? t('market.unknownStructure'),
+                    })}
+                  </span>
+                  <Button size="sm" onClick={() => setStationFilter(null)}>
+                    {t('market.clearStationFilter')}
+                  </Button>
+                </div>
+              )}
+
               <div className="pb-3">
                 <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('market.sell')}
@@ -474,7 +568,11 @@ export function Market() {
                 {sortedSell.length === 0 ? (
                   <EmptyState
                     title={t('market.emptySellTitle')}
-                    hint={t('market.emptySellHint')}
+                    hint={
+                      stationFilter !== null
+                        ? t('market.emptyFilteredHint')
+                        : t('market.emptySellHint')
+                    }
                     className="py-6"
                   />
                 ) : (
@@ -485,6 +583,7 @@ export function Market() {
                       rowKey={(o) => o.order_id}
                       label={t('market.sell')}
                       defaultSort={{ columnId: 'price', direction: 'asc' }}
+                      rowContextMenu={orderRowContextMenu}
                     />
                     {!sellShowAll && sortedSell.length > ROW_CAP && (
                       <div className="px-3 py-2">
@@ -504,7 +603,11 @@ export function Market() {
                 {sortedBuy.length === 0 ? (
                   <EmptyState
                     title={t('market.emptyBuyTitle')}
-                    hint={t('market.emptyBuyHint')}
+                    hint={
+                      stationFilter !== null
+                        ? t('market.emptyFilteredHint')
+                        : t('market.emptyBuyHint')
+                    }
                     className="py-6"
                   />
                 ) : (
@@ -515,6 +618,7 @@ export function Market() {
                       rowKey={(o) => o.order_id}
                       label={t('market.buy')}
                       defaultSort={{ columnId: 'price', direction: 'desc' }}
+                      rowContextMenu={orderRowContextMenu}
                     />
                     {!buyShowAll && sortedBuy.length > ROW_CAP && (
                       <div className="px-3 py-2">

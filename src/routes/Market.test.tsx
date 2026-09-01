@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -11,6 +11,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { clearOrderBookCache } from '@/features/market/orderBook';
 import { ESI_BASE_URL } from '@/esi/client';
+import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
 import { Market } from './Market';
 import type {
@@ -19,6 +20,29 @@ import type {
   NpcStationEntry,
   SolarSystemEntry,
 } from '@/sde/marketTypes';
+import type { BlueprintMap, TypeMap } from '@/sde/types';
+
+// Rifter (typeId 587, the market TYPES fixture below) has a blueprint;
+// Tritanium (typeId 34) doesn't — exercises the item context menu's Build
+// Plan action in both states (issue #6).
+const BLUEPRINTS: BlueprintMap = {
+  '638': {
+    name: 'Rifter Blueprint',
+    time: 1200,
+    materials: [{ typeID: 34, quantity: 4500 }],
+    products: [{ typeID: 587, quantity: 1 }],
+    skills: [],
+  },
+};
+const SDE_TYPES: TypeMap = {
+  '587': { name: 'Rifter', groupID: 25, volume: 27289 },
+  '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
+};
+
+vi.mock('@/sde/loadSde', () => ({
+  loadBlueprints: vi.fn(async () => BLUEPRINTS),
+  loadTypes: vi.fn(async () => SDE_TYPES),
+}));
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -170,6 +194,118 @@ describe('Market Browser', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
     await vi.waitFor(() => expect(hits.count).toBe(2));
+  });
+});
+
+describe('Market Browser item context menu (issue #6)', () => {
+  afterEach(() => configureClipboard(null));
+
+  it('opens on right-click with all five actions, three disabled until their target ships', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toHaveAttribute(
+      'data-disabled'
+    );
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toHaveAttribute('data-disabled');
+    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toHaveAttribute(
+      'data-disabled'
+    );
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).not.toHaveAttribute(
+      'data-disabled'
+    );
+
+    // Build Plan starts unresolved (blueprint catalog not requested until the
+    // menu opens) then flips to enabled once it resolves — Rifter has one.
+    expect(
+      await screen.findByRole('menuitem', { name: 'Build Plan' }, { timeout: 2000 })
+    ).not.toHaveAttribute('data-disabled');
+
+    await user.keyboard('{Escape}');
+  });
+
+  it('shows "No blueprint options" disabled for an item no blueprint produces', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'trit');
+    const item = await screen.findByText('Tritanium');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    expect(
+      await screen.findByRole('menuitem', { name: 'No blueprint options' }, { timeout: 2000 })
+    ).toHaveAttribute('data-disabled');
+  });
+
+  it('copies the item name to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    await user.click(screen.getByRole('menuitem', { name: 'Copy name' }));
+    expect(writeText).toHaveBeenCalledWith('Rifter');
+  });
+});
+
+describe('Market Browser order row context menu (issue #6)', () => {
+  afterEach(() => configureClipboard(null));
+
+  it('copies the location and price to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    const [, sellRow] = within(sellTable).getAllByRole('row');
+    sellRow.focus();
+    fireEvent.contextMenu(sellRow);
+
+    await user.click(await screen.findByRole('menuitem', { name: 'Copy location' }));
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining('Jita IV - Moon 4 - Caldari Navy Assembly Plant')
+    );
+
+    fireEvent.contextMenu(sellRow);
+    await user.click(await screen.findByRole('menuitem', { name: 'Copy price' }));
+    expect(writeText).toHaveBeenCalledWith('1,000,000.00 ISK');
+  });
+
+  it('filters the book to one station, undone via the banner', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    await screen.findByRole('table', { name: 'Buy Orders' });
+    const [, sellRow] = within(sellTable).getAllByRole('row');
+    sellRow.focus();
+    fireEvent.contextMenu(sellRow);
+
+    await user.click(await screen.findByRole('menuitem', { name: 'Filter to this station' }));
+
+    expect(
+      await screen.findByText(/Filtered to Jita IV - Moon 4 - Caldari Navy Assembly Plant/)
+    ).toBeInTheDocument();
+    // The buy order sits at a different (unknown-structure) location, so it drops out of view.
+    expect(screen.queryByRole('table', { name: 'Buy Orders' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear filter' }));
+    expect(await screen.findByRole('table', { name: 'Buy Orders' })).toBeInTheDocument();
   });
 });
 

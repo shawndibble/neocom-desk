@@ -60,6 +60,15 @@ export function resolveOrderLocation(
   };
 }
 
+/** Narrows an order book to one location_id (the "filter to this station" context-menu action); null passes every order through. */
+export function filterOrdersByLocation<T extends { location_id: number }>(
+  orders: readonly T[],
+  locationId: number | null
+): T[] {
+  if (locationId === null) return [...orders];
+  return orders.filter((order) => order.location_id === locationId);
+}
+
 /** An order's expiry: issued + duration (days). */
 export function orderExpiry(order: { issued: string; duration: number }): Date {
   const issued = new Date(order.issued);

@@ -25,7 +25,7 @@ import type {
 } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
 import { loadCharacterSkillQueue } from '../data';
-import { writeToClipboard } from '../clipboard';
+import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
