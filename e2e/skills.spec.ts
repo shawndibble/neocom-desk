@@ -22,11 +22,11 @@ test('renders trained skills grouped by SDE group, with SP totals', async ({ pag
   await page.getByRole('button', { name: 'Expand all' }).click();
 
   await expect(page.getByRole('heading', { name: 'Spaceship Command' })).toBeVisible();
-  await expect(page.getByText('Caldari Frigate')).toBeVisible();
+  await expect(page.getByText('Caldari Frigate', { exact: true })).toBeVisible();
   await expect(page.getByText('256,000 SP')).toBeVisible();
 
   await expect(page.getByRole('heading', { name: 'Gunnery' })).toBeVisible();
-  await expect(page.getByText('Small Hybrid Turret')).toBeVisible();
+  await expect(page.getByText('Small Hybrid Turret', { exact: true })).toBeVisible();
   await expect(page.getByText('8,000 SP')).toBeVisible();
 });
 
