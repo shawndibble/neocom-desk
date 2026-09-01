@@ -48,7 +48,7 @@ import { useFontScale } from '@/lib/fontScale';
 // surfacing as an empty view in whichever feature happened to ask first.
 configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
 
-// '/neocom-desk/' on GitHub Pages, '/' in dev/tests.
+// Vite's BASE_URL (set by `base` in vite.config.ts, currently '/').
 const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
 /**

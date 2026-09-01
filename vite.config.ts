@@ -11,7 +11,7 @@ const { version } = JSON.parse(
 ) as { version: string };
 
 export default defineConfig({
-  base: '/neocom-desk/',
+  base: '/',
   // Port pinned: the EVE SSO dev callback URL must match exactly, so the
   // port cannot be allowed to drift when 5173 happens to be busy.
   server: { port: 5173, strictPort: true },
@@ -30,8 +30,8 @@ export default defineConfig({
         theme_color: '#0d1117',
         background_color: '#0d1117',
         display: 'standalone',
-        start_url: '/neocom-desk/',
-        scope: '/neocom-desk/',
+        start_url: '/',
+        scope: '/',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -51,7 +51,7 @@ export default defineConfig({
         // open it, so an install should not pay for it up front (CONTEXT.md).
         globIgnores: ['**/data/market/**'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        navigateFallback: '/neocom-desk/index.html',
+        navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
       },
     }),

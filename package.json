@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "homepage": "https://shawndibble.github.io/neocom-desk",
+  "homepage": "https://neocomdesk.com",
   "scripts": {
     "dev": "vite",
     "build": "tsc --project tsconfig.build.json && vite build",

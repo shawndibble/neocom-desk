@@ -3,7 +3,7 @@
 Installable, offline-capable PWA companion for EVE Online: character overview,
 skill planning with remap optimization, and industry planning.
 
-Live: https://shawndibble.github.io/neocom-desk
+Live: https://neocomdesk.com
 
 ## Features (v1 roadmap)
 

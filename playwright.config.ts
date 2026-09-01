@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 5199;
-const BASE_URL = `http://localhost:${PORT}/neocom-desk/`;
+const BASE_URL = `http://localhost:${PORT}/`;
 
 /**
  * Fully-offline E2E: every real network destination (EVE SSO, ESI, fuzzwork,
