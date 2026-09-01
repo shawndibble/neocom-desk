@@ -42,35 +42,39 @@ function decodeEntities(text: string): string {
 
 const TAG = /<\/?([a-zA-Z][\w-]*)\b[^>]*?\/?>/g;
 
+/** Open-tag depth per style, so nested `<b>...<b>...</b>...</b>` stays bold until the outer close. */
+interface StyleDepth {
+  b: number;
+  i: number;
+  u: number;
+}
+
+function currentStyle(depth: StyleDepth): DescriptionRun {
+  return { text: '', bold: depth.b > 0, italic: depth.i > 0, underline: depth.u > 0 };
+}
+
+function sameStyle(a: DescriptionRun, b: DescriptionRun): boolean {
+  return a.bold === b.bold && a.italic === b.italic && a.underline === b.underline;
+}
+
 export function parseItemDescription(raw: string): DescriptionRun[] {
   if (!raw) return [];
 
   const runs: DescriptionRun[] = [];
-  let bold = 0;
-  let italic = 0;
-  let underline = 0;
-  let buffer = '';
-  let bufferBold = false;
-  let bufferItalic = false;
-  let bufferUnderline = false;
+  const depth: StyleDepth = { b: 0, i: 0, u: 0 };
+  let buffer: DescriptionRun | null = null;
 
   const flush = () => {
-    if (buffer) runs.push({ text: buffer, bold: bufferBold, italic: bufferItalic, underline: bufferUnderline });
-    buffer = '';
+    if (buffer?.text) runs.push(buffer);
+    buffer = null;
   };
 
   const append = (text: string) => {
     if (!text) return;
-    const style = { b: bold > 0, i: italic > 0, u: underline > 0 };
-    if (buffer && (style.b !== bufferBold || style.i !== bufferItalic || style.u !== bufferUnderline)) {
-      flush();
-    }
-    if (!buffer) {
-      bufferBold = style.b;
-      bufferItalic = style.i;
-      bufferUnderline = style.u;
-    }
-    buffer += text;
+    const style = currentStyle(depth);
+    if (buffer && !sameStyle(buffer, style)) flush();
+    buffer ??= style;
+    buffer.text += text;
   };
 
   let lastIndex = 0;
@@ -82,13 +86,13 @@ export function parseItemDescription(raw: string): DescriptionRun[] {
     const isClosing = match[0].startsWith('</');
     switch (match[1].toLowerCase()) {
       case 'b':
-        bold = isClosing ? Math.max(0, bold - 1) : bold + 1;
+        depth.b = isClosing ? Math.max(0, depth.b - 1) : depth.b + 1;
         break;
       case 'i':
-        italic = isClosing ? Math.max(0, italic - 1) : italic + 1;
+        depth.i = isClosing ? Math.max(0, depth.i - 1) : depth.i + 1;
         break;
       case 'u':
-        underline = isClosing ? Math.max(0, underline - 1) : underline + 1;
+        depth.u = isClosing ? Math.max(0, depth.u - 1) : depth.u + 1;
         break;
       case 'br':
         append('\n');

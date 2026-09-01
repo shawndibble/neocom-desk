@@ -6,6 +6,9 @@
  * every item's attributes into the snapshot would ship a slice of a 16 MB
  * table for a panel that is rarely opened. The snapshot instead carries the
  * small attribute dictionary that turns attribute ids into names/units/categories.
+ * Required-skill rows resolve their skill name from `skills.json`
+ * (public/data, PWA-precached — not the market snapshot vite.config.ts
+ * excludes from precache) rather than from anything item-specific.
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';

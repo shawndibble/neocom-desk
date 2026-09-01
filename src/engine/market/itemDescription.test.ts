@@ -26,7 +26,9 @@ describe('parseItemDescription', () => {
 
   it('italicizes text wrapped in <i>', () => {
     const runs = parseItemDescription('<i>Legal disclaimer text.</i>');
-    expect(runs).toEqual([{ text: 'Legal disclaimer text.', bold: false, italic: true, underline: false }]);
+    expect(runs).toEqual([
+      { text: 'Legal disclaimer text.', bold: false, italic: true, underline: false },
+    ]);
   });
 
   it('underlines text wrapped in <u>', () => {
@@ -42,14 +44,18 @@ describe('parseItemDescription', () => {
   });
 
   it('keeps the label text of a showinfo link and drops the tag', () => {
-    const runs = parseItemDescription('See <a href="showinfo:962//1234">Paragon Hub</a> for details.');
+    const runs = parseItemDescription(
+      'See <a href="showinfo:962//1234">Paragon Hub</a> for details.'
+    );
     expect(runs).toEqual([
       { text: 'See Paragon Hub for details.', bold: false, italic: false, underline: false },
     ]);
   });
 
   it('decodes HTML entities', () => {
-    const runs = parseItemDescription('Tom &amp; Jerry &lt;3 &gt; 2 &quot;quoted&quot; &#39;s&#39;');
+    const runs = parseItemDescription(
+      'Tom &amp; Jerry &lt;3 &gt; 2 &quot;quoted&quot; &#39;s&#39;'
+    );
     expect(runs).toEqual([
       { text: `Tom & Jerry <3 > 2 "quoted" 's'`, bold: false, italic: false, underline: false },
     ]);

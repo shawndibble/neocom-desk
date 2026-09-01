@@ -87,7 +87,8 @@ describe('ItemDetailModal', () => {
         HttpResponse.json({
           type_id: TYPE_ID,
           name: 'Brand Manager Expert System',
-          description: '<font size="14"><b>Brand Manager Expert System</b></font>\n\nGrants access.',
+          description:
+            '<font size="14"><b>Brand Manager Expert System</b></font>\n\nGrants access.',
           group_id: 25,
           published: true,
           volume: 0.1,
@@ -115,9 +116,13 @@ describe('ItemDetailModal', () => {
       },
     ]);
 
-    render(<ItemDetailModal typeId={TYPE_ID} itemName="Brand Manager Expert System" onClose={() => {}} />);
+    render(
+      <ItemDetailModal typeId={TYPE_ID} itemName="Brand Manager Expert System" onClose={() => {}} />
+    );
 
-    expect(await screen.findByText('Brand Manager Expert System', { selector: 'b' })).toBeInTheDocument();
+    expect(
+      await screen.findByText('Brand Manager Expert System', { selector: 'b' })
+    ).toBeInTheDocument();
     expect(screen.queryByText(/<font/)).not.toBeInTheDocument();
     expect(screen.getByText('Primary Skill required')).toBeInTheDocument();
     expect(screen.getByText('Caldari Frigate III')).toBeInTheDocument();
