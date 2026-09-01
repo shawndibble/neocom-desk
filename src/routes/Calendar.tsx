@@ -8,6 +8,8 @@ import type { CachedResult } from '@/esi/cache';
 import type { CalendarEventDetail, CalendarEventSummary } from '@/esi/endpoints';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
+import { downloadCsv } from '@/lib/downloadCsv';
+import { calendarCsvColumns } from '@/features/character/calendarCsv';
 
 interface Snapshot {
   eventsResult: CachedResult<CalendarEventSummary[]> | null;
@@ -76,6 +78,13 @@ export function Calendar() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('calendar.title')}</h1>
         <div className="flex items-center gap-2">
           {eventsResult && <DataAgeBadge date={eventsResult.fetchedAt} />}
+          <Button
+            size="sm"
+            disabled={events.length === 0}
+            onClick={() => downloadCsv('calendar', events, calendarCsvColumns(t))}
+          >
+            {t('calendar.exportCsv')}
+          </Button>
           <Button size="sm" onClick={refresh} disabled={loading}>
             {t('calendar.refresh')}
           </Button>

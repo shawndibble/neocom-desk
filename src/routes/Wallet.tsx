@@ -23,6 +23,12 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
+import { downloadCsv } from '@/lib/downloadCsv';
+import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
+import {
+  transactionTotal,
+  walletTransactionsCsvColumns,
+} from '@/features/character/walletTransactionsCsv';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
 /** Stable identity, so the fallback doesn't invalidate the column memos every render. */
@@ -39,11 +45,6 @@ interface Snapshot {
   /** The fetch stopped at the transactions page cap; older history is missing. */
   transactionsTruncated: boolean;
   typeNames: Map<number, string>;
-}
-
-/** Buys are money out, so the signed total is what carries the ISK tone. */
-function transactionTotal(txn: WalletTransaction): number {
-  return txn.unit_price * txn.quantity * (txn.is_buy ? -1 : 1);
 }
 
 async function loadWalletSnapshot(
@@ -251,7 +252,28 @@ export function Wallet() {
         <Panel
           padded={false}
           title={t('wallet.journalTab')}
-          actions={journalResult ? <DataAgeBadge date={journalResult.fetchedAt} /> : undefined}
+          actions={
+            journalResult ? (
+              <span className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={journal.length === 0}
+                  onClick={() =>
+                    downloadCsv(
+                      'wallet-journal',
+                      journal,
+                      walletJournalCsvColumns(t),
+                      new Date(),
+                      journalTruncated
+                    )
+                  }
+                >
+                  {t('wallet.exportCsvJournal')}
+                </Button>
+                <DataAgeBadge date={journalResult.fetchedAt} />
+              </span>
+            ) : undefined
+          }
         >
           {!journalResult || journal.length === 0 ? (
             <EmptyState
@@ -285,7 +307,26 @@ export function Wallet() {
           padded={false}
           title={t('wallet.transactionsTab')}
           actions={
-            transactionsResult ? <DataAgeBadge date={transactionsResult.fetchedAt} /> : undefined
+            transactionsResult ? (
+              <span className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={transactions.length === 0}
+                  onClick={() =>
+                    downloadCsv(
+                      'wallet-transactions',
+                      transactions,
+                      walletTransactionsCsvColumns(t, (id) => typeNames.get(id) ?? `Type #${id}`),
+                      new Date(),
+                      transactionsTruncated
+                    )
+                  }
+                >
+                  {t('wallet.exportCsvTransactions')}
+                </Button>
+                <DataAgeBadge date={transactionsResult.fetchedAt} />
+              </span>
+            ) : undefined
           }
         >
           {!transactionsResult || transactions.length === 0 ? (

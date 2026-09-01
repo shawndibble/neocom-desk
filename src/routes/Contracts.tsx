@@ -17,12 +17,16 @@ import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
+import { downloadCsv } from '@/lib/downloadCsv';
+import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { Contract } from '@/esi/endpoints';
 
 interface Snapshot {
   contractsResult: CachedResult<Contract[]> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   contractsNeedsReauth: boolean;
+  /** Fewer pages came back than ESI advertised — the list below is partial. */
+  contractsTruncated: boolean;
   issuerNames: Map<number, string>;
 }
 
@@ -52,10 +56,11 @@ async function loadContractsSnapshot(
 ): Promise<Snapshot> {
   const { cached: contractsResult, needsReauth: contractsNeedsReauth } =
     await loadContracts(characterId);
+  const contractsTruncated = contractsResult?.truncated ?? false;
   // Already superseded: skip the name lookup, its result would be discarded.
   const issuerIds = signal.cancelled ? [] : (contractsResult?.data ?? []).map((c) => c.issuer_id);
   const issuerNames = await resolveNames(issuerIds);
-  return { contractsResult, contractsNeedsReauth, issuerNames };
+  return { contractsResult, contractsNeedsReauth, contractsTruncated, issuerNames };
 }
 
 /** Contracts: table with status chips, expired dimmed. Read-only, cached for offline. */
@@ -66,6 +71,7 @@ export function Contracts() {
 
   const contractsResult = data?.contractsResult ?? null;
   const contractsNeedsReauth = data?.contractsNeedsReauth ?? false;
+  const contractsTruncated = data?.contractsTruncated ?? false;
   const issuerNames = data?.issuerNames ?? NO_NAMES;
 
   const columns = useMemo<DataTableColumn<Contract>[]>(
@@ -130,6 +136,21 @@ export function Contracts() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('contracts.title')}</h1>
         <div className="flex items-center gap-2">
           {contractsResult && <DataAgeBadge date={contractsResult.fetchedAt} />}
+          <Button
+            size="sm"
+            disabled={contracts.length === 0}
+            onClick={() =>
+              downloadCsv(
+                'contracts',
+                contracts,
+                contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`),
+                new Date(),
+                contractsTruncated
+              )
+            }
+          >
+            {t('contracts.exportCsv')}
+          </Button>
           <Button size="sm" onClick={refresh} disabled={loading}>
             {t('contracts.refresh')}
           </Button>
@@ -156,6 +177,11 @@ export function Contracts() {
           {contractsResult.fromCache && (
             <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
               {t('common.offlineTitle')}
+            </p>
+          )}
+          {contractsTruncated && (
+            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+              {t('common.incompleteTitle')}
             </p>
           )}
           <DataTable

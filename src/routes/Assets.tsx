@@ -10,6 +10,8 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
 import { capItems } from '@/lib/cap';
+import { downloadCsv } from '@/lib/downloadCsv';
+import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
 
 /** Rendered rows past this many and grouping/painting the list starts to lag. */
 export const MAX_RENDERED_ASSETS = 1000;
@@ -91,7 +93,7 @@ export function Assets() {
   const typeNames = data?.typeNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
 
-  const { groups, shownCount, totalMatches } = useMemo(() => {
+  const { groups, csvGroups, shownCount, totalMatches } = useMemo(() => {
     const items = assetsResult?.data ?? [];
     const query = search.trim().toLowerCase();
     const assetsByItemId = new Map(items.map((asset) => [asset.item_id, asset]));
@@ -104,28 +106,38 @@ export function Assets() {
     }
     const capped = capItems(matches, MAX_RENDERED_ASSETS);
 
-    const byLocation = new Map<number, { asset: CharacterAsset; name: string }[]>();
-    for (const entry of capped.items) {
-      const list = byLocation.get(entry.asset.location_id) ?? [];
-      list.push(entry);
-      byLocation.set(entry.asset.location_id, list);
-    }
-    const groups = [...byLocation.entries()]
-      .map(([locationId, entries]) => ({
-        locationId,
-        label: locationLabel(
+    const groupEntries = (entries: readonly { asset: CharacterAsset; name: string }[]) => {
+      const byLocation = new Map<number, { asset: CharacterAsset; name: string }[]>();
+      for (const entry of entries) {
+        const list = byLocation.get(entry.asset.location_id) ?? [];
+        list.push(entry);
+        byLocation.set(entry.asset.location_id, list);
+      }
+      return [...byLocation.entries()]
+        .map(([locationId, locationEntries]) => ({
           locationId,
-          entries[0].asset.location_type,
-          locationNames,
-          assetsByItemId,
-          typeNames,
-          t
-        ),
-        entries: entries.sort((a, b) => a.name.localeCompare(b.name)),
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+          label: locationLabel(
+            locationId,
+            locationEntries[0].asset.location_type,
+            locationNames,
+            assetsByItemId,
+            typeNames,
+            t
+          ),
+          entries: locationEntries.sort((a, b) => a.name.localeCompare(b.name)),
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    };
 
-    return { groups, shownCount: capped.items.length, totalMatches: matches.length };
+    // Rendering caps at MAX_RENDERED_ASSETS for paint performance; CSV export
+    // uses the full matched set (still respecting `search`) — a UI cap must
+    // never silently drop rows from the exported file.
+    return {
+      groups: groupEntries(capped.items),
+      csvGroups: groupEntries(matches),
+      shownCount: capped.items.length,
+      totalMatches: matches.length,
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
   }, [assetsResult, typeNames, locationNames, search]);
 
@@ -146,6 +158,29 @@ export function Assets() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('assets.title')}</h1>
         <div className="flex items-center gap-2">
           {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+          <Button
+            size="sm"
+            disabled={csvGroups.length === 0}
+            onClick={() =>
+              downloadCsv(
+                'assets',
+                assetCsvRows(
+                  csvGroups.map((group) => ({
+                    label: group.label,
+                    entries: group.entries.map((entry) => ({
+                      name: entry.name,
+                      quantity: entry.asset.quantity,
+                    })),
+                  }))
+                ),
+                assetsCsvColumns(t),
+                new Date(),
+                assetsTruncated
+              )
+            }
+          >
+            {t('assets.exportCsv')}
+          </Button>
           <Button size="sm" onClick={refresh} disabled={loading}>
             {t('assets.refresh')}
           </Button>
