@@ -18,6 +18,8 @@ export const buildPlanTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}buildTombstones.${characterId}`;
 export const quickbarTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}quickbarTombstones.${characterId}`;
+export const stationPinTombstonesKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}stationPinTombstones.${characterId}`;
 
 /**
  * Drop every device-local sync bookkeeping key for one Character (owner-hash
@@ -31,5 +33,6 @@ export async function clearCharacterSyncBookkeeping(characterId: number): Promis
     planTombstonesKey(characterId),
     buildPlanTombstonesKey(characterId),
     quickbarTombstonesKey(characterId),
+    stationPinTombstonesKey(characterId),
   ]);
 }

@@ -1,16 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
-import { db, type BuildPlanRecord, type QuickbarRecord, type SkillPlanRecord } from '@/db';
+import {
+  db,
+  type BuildPlanRecord,
+  type QuickbarRecord,
+  type SkillPlanRecord,
+  type StationPinRecord,
+} from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { remotePurgePendingKey } from './characterPurge';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
+  clearStationPin,
   deleteSyncedSetting,
   getSyncStatus,
   markBuildPlanDeleted,
   markPlanDeleted,
   scheduleSync,
+  setAccountStationPin,
+  setCharacterStationPin,
   setSyncedSetting,
   subscribeSyncStatus,
   triggerSync,
@@ -98,6 +107,7 @@ vi.mock('./syncAuth', () => ({
 const PLANS_PATH = 'characters/char:1/plans';
 const BUILD_PLANS_PATH = 'characters/char:1/buildPlans';
 const QUICKBARS_PATH = 'characters/char:1/quickbars';
+const STATION_PINS_PATH = 'characters/char:1/stationPins';
 const SETTINGS_PATH = 'characters/char:1/settings';
 const HASH = 'hash-a';
 
@@ -153,6 +163,21 @@ function remoteQuickbarDoc(overrides: DocData = {}): DocData {
   return { ...quickbar(), ownerHash: HASH, deleted: false, ...overrides };
 }
 
+function stationPin(overrides: Partial<StationPinRecord> = {}): StationPinRecord {
+  return {
+    id: '1:60003760',
+    characterId: 1,
+    locationId: 60003760,
+    scope: 'character',
+    updatedAt: Date.now() - 1000,
+    ...overrides,
+  };
+}
+
+function remoteStationPinDoc(overrides: DocData = {}): DocData {
+  return { ...stationPin(), ownerHash: HASH, deleted: false, ...overrides };
+}
+
 function seedRemote(path: string, docs: DocData[]): void {
   remoteStore.set(path, new Map(docs.map((d) => [String(d.id ?? d.key), d])));
 }
@@ -188,6 +213,7 @@ beforeEach(async () => {
     db.skillPlans.clear(),
     db.buildPlans.clear(),
     db.quickbars.clear(),
+    db.stationPins.clear(),
     db.settings.clear(),
     db.esiCache.clear(),
   ]);
@@ -325,13 +351,16 @@ describe('triggerSync: plans', () => {
     await db.skillPlans.put(plan());
     await db.buildPlans.put(buildPlan());
     await db.quickbars.put(quickbar());
+    await db.stationPins.put(stationPin());
     await triggerSync(1);
     expect(await db.skillPlans.count()).toBe(0);
     expect(await db.buildPlans.count()).toBe(0);
     expect(await db.quickbars.count()).toBe(0);
+    expect(await db.stationPins.count()).toBe(0);
     expect(remoteStore.get(PLANS_PATH)?.get('p1')).toBeUndefined();
     expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')).toBeUndefined();
     expect(remoteStore.get(QUICKBARS_PATH)?.get('1')).toBeUndefined();
+    expect(remoteStore.get(STATION_PINS_PATH)?.get('1:60003760')).toBeUndefined();
     expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe(HASH);
   });
 
@@ -364,8 +393,8 @@ describe('triggerSync: plans', () => {
 describe('triggerSync: ownerHash-scoped reads', () => {
   it('queries every collection filtered by the character ownerHash', async () => {
     await triggerSync(1);
-    // plans + buildPlans + quickbars + settings, each read through a where clause.
-    expect(vi.mocked(where)).toHaveBeenCalledTimes(4);
+    // plans + buildPlans + quickbars + stationPins + settings, each read through a where clause.
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(5);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
       expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
@@ -502,6 +531,80 @@ describe('triggerSync: quickbar', () => {
     ]);
     await triggerSync(1);
     expect((await db.quickbars.get('1'))?.items).toEqual([{ typeId: 2, name: 'New' }]);
+  });
+});
+
+describe('triggerSync: station pins', () => {
+  it('pushes a local-only station pin with ownerHash and deleted: false', async () => {
+    const p = stationPin();
+    await db.stationPins.put(p);
+    await triggerSync(1);
+    expect(remoteStore.get(STATION_PINS_PATH)?.get('1:60003760')).toEqual({
+      id: '1:60003760',
+      characterId: 1,
+      locationId: 60003760,
+      scope: 'character',
+      updatedAt: p.updatedAt,
+      ownerHash: HASH,
+      deleted: false,
+    });
+  });
+
+  it('pulls a remote-only station pin into Dexie without remote-only fields', async () => {
+    const expected = stationPin();
+    seedRemote(STATION_PINS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    await triggerSync(1);
+    expect(await db.stationPins.get('1:60003760')).toEqual(expected);
+  });
+
+  it('LWW: newer remote pin overwrites local', async () => {
+    const now = Date.now();
+    await db.stationPins.put(stationPin({ scope: 'character', updatedAt: now - 900 }));
+    seedRemote(STATION_PINS_PATH, [remoteStationPinDoc({ scope: 'account', updatedAt: now - 10 })]);
+    await triggerSync(1);
+    expect((await db.stationPins.get('1:60003760'))?.scope).toBe('account');
+  });
+
+  it('setCharacterStationPin writes a character-scoped pin for that Character only', async () => {
+    await setCharacterStationPin(1, 60003760);
+    expect(await db.stationPins.get('1:60003760')).toMatchObject({
+      characterId: 1,
+      locationId: 60003760,
+      scope: 'character',
+    });
+  });
+
+  it('setAccountStationPin fans the pin out to every known Character', async () => {
+    await db.characters.put({ characterId: 2, name: 'Alt', ownerHash: HASH, addedAt: 1 });
+    await setAccountStationPin(60003760);
+    expect(await db.stationPins.get('1:60003760')).toMatchObject({
+      characterId: 1,
+      locationId: 60003760,
+      scope: 'account',
+    });
+    expect(await db.stationPins.get('2:60003760')).toMatchObject({
+      characterId: 2,
+      locationId: 60003760,
+      scope: 'account',
+    });
+  });
+
+  it('clearStationPin tombstones every fanned-out row so the removal propagates for every Character', async () => {
+    await db.characters.put({ characterId: 2, name: 'Alt', ownerHash: HASH, addedAt: 1 });
+    await setAccountStationPin(60003760);
+    seedRemote(STATION_PINS_PATH, [
+      remoteStationPinDoc({ id: '1:60003760', characterId: 1, scope: 'account' }),
+    ]);
+
+    await clearStationPin(60003760);
+    expect(await db.stationPins.get('1:60003760')).toBeUndefined();
+    expect(await db.stationPins.get('2:60003760')).toBeUndefined();
+
+    await triggerSync(1);
+    const doc = remoteStore.get(STATION_PINS_PATH)?.get('1:60003760');
+    expect(doc?.deleted).toBe(true);
+    const tombstones = await db.settings.get('sync.__stationPinTombstones.1');
+    expect(tombstones?.value).toEqual([]);
   });
 });
 
@@ -694,7 +797,7 @@ describe('sync orchestration', () => {
 
     release();
     await Promise.all([p1, p2]);
-    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(4);
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(5);
   });
 
   it('a queued sync still runs after the previous one fails', async () => {
@@ -709,10 +812,10 @@ describe('sync orchestration', () => {
     scheduleSync(1, 20);
     scheduleSync(1, 20);
     scheduleSync(1, 20);
-    // One sync = one getDocs per collection (plans + buildPlans + quickbars + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(4));
+    // One sync = one getDocs per collection (plans + buildPlans + quickbars + stationPins + settings).
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(5));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(4);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(5);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
   });
 });

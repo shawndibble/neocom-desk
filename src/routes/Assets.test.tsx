@@ -105,6 +105,7 @@ beforeEach(async () => {
   await db.tokens.clear();
   await db.settings.clear();
   await db.esiCache.clear();
+  await db.stationPins.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
 
@@ -571,6 +572,127 @@ describe('Assets', () => {
 
     await user.click(screen.getByRole('button', { name: /collapse all/i }));
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+  });
+});
+
+describe('station pins (issue #84)', () => {
+  const JITA = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
+  const STRUCTURE = 'Structure #1000000000001';
+
+  function stationOrder(): string[] {
+    return screen
+      .getAllByRole('heading', { name: new RegExp(`^(${JITA}|${STRUCTURE})$`) })
+      .map((h) => h.textContent);
+  }
+
+  it('cycles a station pin unpinned -> character -> account -> unpinned, persisting to Dexie', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const pinButton = await screen.findByRole('button', {
+      name: new RegExp(`Pin toggle for ${JITA}`),
+    });
+
+    await user.click(pinButton);
+    await waitFor(async () => {
+      expect(await db.stationPins.get(`${CHAR_ID}:60003760`)).toMatchObject({
+        characterId: CHAR_ID,
+        locationId: 60003760,
+        scope: 'character',
+      });
+    });
+
+    await user.click(pinButton);
+    await waitFor(async () => {
+      expect((await db.stationPins.get(`${CHAR_ID}:60003760`))?.scope).toBe('account');
+    });
+
+    await user.click(pinButton);
+    await waitFor(async () => {
+      expect(await db.stationPins.get(`${CHAR_ID}:60003760`)).toBeUndefined();
+    });
+  });
+
+  it('sorts a pinned station to the top of the list, regardless of its label', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { name: JITA });
+    expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+
+    const pinButton = screen.getByRole('button', {
+      name: new RegExp(`Pin toggle for ${STRUCTURE}`),
+    });
+    await user.click(pinButton);
+
+    await waitFor(() => {
+      expect(stationOrder()).toEqual([STRUCTURE, JITA]);
+    });
+  });
+
+  it('a pin scoped to a different character does not elevate the station for the active one', async () => {
+    await db.stationPins.put({
+      id: `999:1000000000001`,
+      characterId: 999,
+      locationId: 1000000000001,
+      scope: 'character',
+      updatedAt: Date.now(),
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: JITA });
+    expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+  });
+
+  it('an account-wide pin elevates the station for every character', async () => {
+    await db.stationPins.put({
+      id: `999:1000000000001`,
+      characterId: 999,
+      locationId: 1000000000001,
+      scope: 'account',
+      updatedAt: Date.now(),
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: JITA });
+    expect(stationOrder()).toEqual([STRUCTURE, JITA]);
+  });
+
+  it('a pinned station with nested nodes starts expanded on page load', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    await db.stationPins.put({
+      id: `${CHAR_ID}:60003760`,
+      characterId: CHAR_ID,
+      locationId: 60003760,
+      scope: 'character',
+      updatedAt: Date.now(),
+    });
+
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Drake' });
+    expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
   });
 });
 

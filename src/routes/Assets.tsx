@@ -1,12 +1,20 @@
-import { createContext, useContext, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { scheduleSync } from '@/sync';
+import {
+  clearStationPin,
+  scheduleSync,
+  setAccountStationPin,
+  setCharacterStationPin,
+} from '@/sync';
 import { db, type QuickbarItem } from '@/db';
+import { cx } from '@/lib/cx';
+import { useHoverTooltip } from '@/lib/useHoverTooltip';
+import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
 import { loadCharacterAssets } from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
@@ -222,14 +230,21 @@ function sortNodes(
   return [...bays, ...rest];
 }
 
+/** Pinned stations (either scope) sort ahead of unpinned ones; each group stays alphabetical. */
 function sortStations(
   stations: readonly AssetTreeStation[],
   labelFor: (station: AssetTreeStation) => string,
-  typeNames: ReadonlyMap<number, string>
+  typeNames: ReadonlyMap<number, string>,
+  pinStateFor: (station: AssetTreeStation) => PinState
 ): AssetTreeStation[] {
   return [...stations]
     .map((station) => ({ ...station, children: sortNodes(station.children, typeNames) }))
-    .sort((a, b) => labelFor(a).localeCompare(labelFor(b)));
+    .sort((a, b) => {
+      const pinnedA = pinStateFor(a) !== 'unpinned';
+      const pinnedB = pinStateFor(b) !== 'unpinned';
+      if (pinnedA !== pinnedB) return pinnedA ? -1 : 1;
+      return labelFor(a).localeCompare(labelFor(b));
+    });
 }
 
 function collectExpandableKeys(nodes: readonly AssetTreeNode[], parentPath: string): string[] {
@@ -254,6 +269,62 @@ function formatBadge(totals: { itemCount: number; estimatedValue: number }, t: T
     count: totals.itemCount,
     value: formatIsk(totals.estimatedValue),
   });
+}
+
+interface StationPinButtonProps {
+  label: string;
+  pinState: PinState;
+  onToggle: () => void;
+  t: Translate;
+}
+
+/**
+ * Station pin toggle (issue #84): cycles unpinned -> pinned-for-this-character
+ * -> pinned-account-wide -> unpinned. Both pinned states use the `accent`
+ * family (a stronger, filled treatment for account-wide, since it's the more
+ * far-reaching of the two) rather than `warning` — DESIGN.md reserves that
+ * token for caution states (stale data, low skill), and an account-wide pin
+ * is a deliberate elevated choice, not a caution. `aria-pressed` follows the
+ * `FilterChip` toggle-button precedent (DESIGN.md); the finer character-vs-
+ * account distinction is carried by the label/tooltip text, not by
+ * `aria-pressed` itself (only true/false/mixed, none of which map cleanly to
+ * "which of two pinned states").
+ */
+function StationPinButton({ label, pinState, onToggle, t }: StationPinButtonProps) {
+  const { tooltipOpen, tooltipId, triggerHandlers } = useHoverTooltip();
+  const tooltipText = t(`assets.pin.${pinState}`);
+  const glyph = pinState === 'unpinned' ? '☆' : pinState === 'character' ? '★' : '✦';
+
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-pressed={pinState !== 'unpinned'}
+        aria-label={t('assets.pin.ariaLabel', { station: label, state: tooltipText })}
+        onClick={onToggle}
+        {...triggerHandlers}
+        className={cx(
+          'flex size-7 shrink-0 items-center justify-center rounded-xs border text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+          pinState === 'account'
+            ? 'border-accent bg-accent text-accent-contrast'
+            : pinState === 'character'
+              ? 'border-accent-dim bg-accent/15 text-accent'
+              : 'border-line bg-panel-2 text-text-dim hover:border-line-bright hover:text-text'
+        )}
+      >
+        <span aria-hidden="true">{glyph}</span>
+      </button>
+      {tooltipOpen && (
+        <span
+          id={tooltipId}
+          role="tooltip"
+          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 w-max max-w-56 -translate-x-1/2 rounded-xs border border-line bg-panel px-2 py-1 text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
+        >
+          {tooltipText}
+        </span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -301,8 +372,7 @@ interface AssetItemRowProps {
  * that component serves.
  */
 function AssetItemRow({ node, depth, ctx }: AssetItemRowProps) {
-  const tooltipId = useId();
-  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const { tooltipOpen, tooltipId, triggerHandlers } = useHoverTooltip();
   const actions = useAssetItemActions();
   const { asset } = node;
   const name = ctx.typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
@@ -333,11 +403,7 @@ function AssetItemRow({ node, depth, ctx }: AssetItemRowProps) {
         <span className="group relative block">
           <button
             type="button"
-            aria-describedby={tooltipOpen ? tooltipId : undefined}
-            onMouseEnter={() => setTooltipOpen(true)}
-            onMouseLeave={() => setTooltipOpen(false)}
-            onFocus={() => setTooltipOpen(true)}
-            onBlur={() => setTooltipOpen(false)}
+            {...triggerHandlers}
             className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-accent"
           >
             <span className="truncate">{name}</span>
@@ -458,6 +524,27 @@ export function Assets() {
     void writeQuickbar(addQuickbarItem(quickbarItems, { typeId, name: itemName }));
   }
 
+  // Station Pins (issue #84): also Editable Data, synced the same way as the
+  // Quickbar. Loaded whole (every Character's pin rows, not just the active
+  // one) because an account-wide pin from ANY Character elevates a station
+  // regardless of who's active — see pinStateForStation.
+  const pinsQuery = useLiveQuery(() => db.stationPins.toArray(), []);
+  const pins = pinsQuery ?? [];
+
+  function pinStateFor(locationId: number): PinState {
+    return activeCharacterId === null
+      ? 'unpinned'
+      : pinStateForStation(pins, activeCharacterId, locationId);
+  }
+
+  async function handleTogglePin(locationId: number) {
+    if (activeCharacterId === null) return;
+    const next = nextPinState(pinStateFor(locationId));
+    if (next === 'character') await setCharacterStationPin(activeCharacterId, locationId);
+    else if (next === 'account') await setAccountStationPin(locationId);
+    else await clearStationPin(locationId);
+  }
+
   // Blueprint catalog for the context menu's Build Plan action, loaded
   // lazily on the first menu open — same trade-off as the Market Browser:
   // it pulls the full SDE types.json and most page visits never open a menu.
@@ -563,10 +650,39 @@ export function Assets() {
             typeNames,
             t
           ),
-        typeNames
+        typeNames,
+        (station) => pinStateFor(station.locationId)
       ),
-    [visibleTree, locationNames, assetsByItemId, typeNames, t]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
+    [visibleTree, locationNames, assetsByItemId, typeNames, t, pins, activeCharacterId]
   );
+
+  // Pinned stations start expanded on page load (issue #84) — the same effect
+  // as clicking "Expand All" on each pinned station, seeded once pins and the
+  // tree are both available so a later manual collapse isn't fought on every
+  // render. Re-arms itself if the active character changes (a fresh page
+  // context, in effect). Seeded during render (React's "adjusting state on a
+  // change" pattern: https://react.dev/learn/you-might-not-need-an-effect),
+  // not a useEffect — the guard below makes it run at most once per character
+  // before the extra render settles, and an effect would only add a redundant
+  // commit-then-setState round trip for a plain derived seed.
+  const [pinnedSeededForCharacter, setPinnedSeededForCharacter] = useState<number | null>(null);
+  if (
+    activeCharacterId !== null &&
+    pinsQuery !== undefined &&
+    sortedTree.length > 0 &&
+    pinnedSeededForCharacter !== activeCharacterId
+  ) {
+    setPinnedSeededForCharacter(activeCharacterId);
+    const pinnedKeys = sortedTree
+      .filter((station) => pinStateFor(station.locationId) !== 'unpinned')
+      .flatMap((station) =>
+        collectExpandableKeys(station.children, `station:${station.locationId}`)
+      );
+    if (pinnedKeys.length > 0) {
+      setExpandedKeys((prev) => new Set([...prev, ...pinnedKeys]));
+    }
+  }
 
   // While searching, every surviving branch is by construction an ancestor of a match
   // (pruneStations already dropped anything that isn't) — force it open so the match is
@@ -721,6 +837,7 @@ export function Assets() {
                   typeNames,
                   t
                 );
+                const pinState = pinStateFor(station.locationId);
                 return (
                   <Panel
                     key={station.locationId}
@@ -728,6 +845,12 @@ export function Assets() {
                     padded={false}
                     actions={
                       <div className="flex items-center gap-2">
+                        <StationPinButton
+                          label={label}
+                          pinState={pinState}
+                          onToggle={() => void handleTogglePin(station.locationId)}
+                          t={t}
+                        />
                         <span className="text-[0.6875rem] text-text-faint tabular-nums">
                           {formatBadge(station, t)}
                         </span>

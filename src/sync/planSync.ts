@@ -1,7 +1,7 @@
-// Two-way sync of Skill Plans, Build Plans, the Quickbar + synced settings for
-// one character. Public API and UI wiring live in index.ts.
+// Two-way sync of Skill Plans, Build Plans, the Quickbar, Station Pins +
+// synced settings for one character. Public API and UI wiring live in index.ts.
 //
-// Remote layout: /characters/char:{id}/{plans,buildPlans,quickbars,settings}.
+// Remote layout: /characters/char:{id}/{plans,buildPlans,quickbars,stationPins,settings}.
 // Merge policy is pure and lives in merge.ts: last-write-wins per record id,
 // tombstones for deletes kept 30 days.
 //
@@ -31,6 +31,7 @@ import {
   type CharacterRecord,
   type QuickbarRecord,
   type SkillPlanRecord,
+  type StationPinRecord,
 } from '@/db';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import { retryPendingRemotePurge } from './characterPurge';
@@ -41,6 +42,7 @@ import {
   ownerHashKey,
   planTombstonesKey,
   quickbarTombstonesKey,
+  stationPinTombstonesKey,
 } from './localBookkeeping';
 import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
@@ -52,6 +54,7 @@ import {
   type RemoteDoc,
   type RemotePlanDoc,
   type RemoteQuickbarDoc,
+  type RemoteStationPinDoc,
   type RemoteSyncedSetting,
   type SyncedSettingTombstone,
   type SyncedSettingValue,
@@ -145,6 +148,72 @@ export async function markPlanDeleted(characterId: number, planId: string): Prom
 export async function markBuildPlanDeleted(characterId: number, planId: string): Promise<void> {
   await recordDeletion(characterId, planId, buildPlanTombstonesKey(characterId), () =>
     db.buildPlans.delete(planId)
+  );
+}
+
+function stationPinId(characterId: number, locationId: number): string {
+  return `${characterId}:${locationId}`;
+}
+
+/** Pin a station for one Character only (issue #84's per-character pin state). */
+export async function setCharacterStationPin(
+  characterId: number,
+  locationId: number
+): Promise<void> {
+  await db.stationPins.put({
+    id: stationPinId(characterId, locationId),
+    characterId,
+    locationId,
+    scope: 'character',
+    updatedAt: Date.now(),
+  });
+  scheduleSync(characterId);
+}
+
+/**
+ * Elevate a station's pin to account-wide: fan out one row per Character
+ * currently known on this device — there is no shared account identity to key
+ * a single record off (Account has no storage/sync, CONTEXT.md), so each row
+ * syncs under its own Character's ownerHash instead (parity-plan §5.7).
+ *
+ * This overwrites every known Character's existing row for the station,
+ * including one that was previously `character`-scoped for a Character other
+ * than whoever clicked. That's intentional, not a race: "account-wide" (issue
+ * #84) means one shared elevated state for every Character, which by
+ * definition supersedes any Character-specific opt-in that predates it.
+ */
+export async function setAccountStationPin(locationId: number): Promise<void> {
+  const characters = await db.characters.toArray();
+  const now = Date.now();
+  await db.stationPins.bulkPut(
+    characters.map((c) => ({
+      id: stationPinId(c.characterId, locationId),
+      characterId: c.characterId,
+      locationId,
+      scope: 'account' as const,
+      updatedAt: now,
+    }))
+  );
+  for (const c of characters) scheduleSync(c.characterId);
+}
+
+/**
+ * Unpin a station entirely, tombstoning its pin row under every Character it
+ * was written for so the removal propagates on the next sync. The UI's own
+ * pin cycle (unpinned -> character -> account -> unpinned, Assets.tsx) only
+ * ever calls this from the `account` state — the blanket delete-by-location
+ * is correct there because an account-wide pin is by definition shared across
+ * every Character; there is no reachable path where this clears a single
+ * Character's still-independent, not-yet-elevated pin out from under them.
+ */
+export async function clearStationPin(locationId: number): Promise<void> {
+  const rows = await db.stationPins.where('locationId').equals(locationId).toArray();
+  await Promise.all(
+    rows.map((row) =>
+      recordDeletion(row.characterId, row.id, stationPinTombstonesKey(row.characterId), () =>
+        db.stationPins.delete(row.id)
+      )
+    )
   );
 }
 
@@ -263,9 +332,11 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     await db.skillPlans.where('characterId').equals(character.characterId).delete();
     await db.buildPlans.where('characterId').equals(character.characterId).delete();
     await db.quickbars.where('characterId').equals(character.characterId).delete();
+    await db.stationPins.where('characterId').equals(character.characterId).delete();
     await writeTombstones(planTombstonesKey(character.characterId), []);
     await writeTombstones(buildPlanTombstonesKey(character.characterId), []);
     await writeTombstones(quickbarTombstonesKey(character.characterId), []);
+    await writeTombstones(stationPinTombstonesKey(character.characterId), []);
     // Cached wallet/mail/assets belong to the previous owner just as much as
     // the plans do. `auth/session` purges on the same signal at login; this
     // covers a transfer noticed between logins. Degrades rather than throws
@@ -448,6 +519,30 @@ const quickbarSpec: CollectionSpec<QuickbarRecord, RemoteQuickbarDoc> = {
   bulkDeleteLocal: (ids) => db.quickbars.bulkDelete(ids),
 };
 
+const stationPinSpec: CollectionSpec<StationPinRecord, RemoteStationPinDoc> = {
+  name: 'stationPins',
+  tombstoneKey: stationPinTombstonesKey,
+  loadLocal: (characterId) => db.stationPins.where('characterId').equals(characterId).toArray(),
+  toRemoteDoc: (p, ownerHash) => ({
+    id: p.id,
+    characterId: p.characterId,
+    locationId: p.locationId,
+    scope: p.scope,
+    updatedAt: p.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    locationId: r.locationId,
+    scope: r.scope,
+    updatedAt: r.updatedAt,
+  }),
+  bulkPutLocal: (records) => db.stationPins.bulkPut(records),
+  bulkDeleteLocal: (ids) => db.stationPins.bulkDelete(ids),
+};
+
 async function syncCharacter(characterId: number): Promise<void> {
   const character = await db.characters.get(characterId);
   if (!character) throw new Error(`Unknown character ${characterId}`);
@@ -466,6 +561,7 @@ async function syncCharacter(characterId: number): Promise<void> {
   await syncEditableCollection(skillPlanSpec, ctx);
   await syncEditableCollection(buildPlanSpec, ctx);
   await syncEditableCollection(quickbarSpec, ctx);
+  await syncEditableCollection(stationPinSpec, ctx);
 
   // ---- Synced settings ----
   const settingsCol = collection(firestore, 'characters', uid, 'settings');

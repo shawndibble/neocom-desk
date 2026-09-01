@@ -158,6 +158,14 @@
   keeps the same refresh promise as every other API-derived view.
 - The Quickbar is **Editable Data** — it syncs across devices. The Location Mode
   is not; it stays a device-local view preference like the current hub setting.
+- **Station Pins** (issue #84, Assets page) are also **Editable Data**: a
+  three-state pin per station (unpinned / pinned for one Character / pinned
+  account-wide) that sorts the pinned station to the top of the tree and
+  starts it expanded. An account-wide pin has no shared account identity to
+  key a single record off — Account has no storage or sync (see below) — so it
+  fans out: one pin row per Character currently known on this device, each
+  synced under that Character's own ownerHash rather than a new account-level
+  identity (parity plan §5.7's "write under every Character" recipe).
 - A context-menu jump to a Build Plan stays visible for items no blueprint
   produces, reading "No blueprint options" rather than vanishing.
 - The rebuild ships in two passes. Pass 1: two-column layout, search, Market
