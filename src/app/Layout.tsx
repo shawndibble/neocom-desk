@@ -99,6 +99,15 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
   );
 }
 
+/** Small heading introducing a group of NavItems in the desktop rail. */
+function NavGroupLabel({ children }: { children: string }) {
+  return (
+    <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+      {children}
+    </p>
+  );
+}
+
 const MORE_SHEET_ID = 'mobile-more-sheet';
 
 interface MobileMoreSheetProps {
@@ -261,9 +270,7 @@ export function Layout() {
         )}
         <nav className="flex flex-1 flex-col gap-1 p-2">
           <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
-          <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
-            {t('nav.groups.account')}
-          </p>
+          <NavGroupLabel>{t('nav.groups.general')}</NavGroupLabel>
           <NavItem
             to="/characters"
             label={t('nav.characters')}
@@ -271,9 +278,7 @@ export function Layout() {
           />
           <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
           <NavItem to="/settings" label={t('nav.settings')} locked={locked.has('/settings')} />
-          <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
-            {t('nav.groups.progression')}
-          </p>
+          <NavGroupLabel>{t('nav.groups.progression')}</NavGroupLabel>
           <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
           <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
           <NavItem
@@ -287,16 +292,12 @@ export function Layout() {
             label={t('nav.employmentHistory')}
             locked={locked.has('/employment-history')}
           />
-          <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
-            {t('nav.groups.economy')}
-          </p>
+          <NavGroupLabel>{t('nav.groups.economy')}</NavGroupLabel>
           <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
           <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
           <NavItem to="/orders" label={t('nav.orders')} locked={locked.has('/orders')} />
           <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
-          <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
-            {t('nav.groups.social')}
-          </p>
+          <NavGroupLabel>{t('nav.groups.social')}</NavGroupLabel>
           <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} />
           <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
           <NavItem to="/contacts" label={t('nav.contacts')} locked={locked.has('/contacts')} />

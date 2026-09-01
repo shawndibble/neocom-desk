@@ -258,7 +258,7 @@ describe('Layout desktop rail domain grouping', () => {
     expect(within(rail).queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument();
   });
 
-  it('orders the rail as Home, then Account/Progression/Economy/Social groups in full', () => {
+  it('orders the rail as Home, then General/Progression/Economy/Social groups in full', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
 
@@ -268,7 +268,7 @@ describe('Layout desktop rail domain grouping', () => {
     );
     expect(items).toEqual([
       'Home',
-      '[Account]',
+      '[General]',
       'Characters',
       'Market',
       'Settings',
