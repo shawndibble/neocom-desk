@@ -11,6 +11,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache } from '@/features/market/orderBook';
+import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
@@ -63,11 +64,23 @@ const GROUPS: MarketGroupNode[] = [
   { id: 1, name: 'Ships', parentId: null, hasTypes: false },
   { id: 2, name: 'Frigates', parentId: 1, hasTypes: true },
   { id: 3, name: 'Ore', parentId: null, hasTypes: true },
+  { id: 4, name: 'Destroyers', parentId: 1, hasTypes: true },
 ];
+// Destroyers (issue #10 "Related Items strip"): four Market Group siblings
+// sharing group 4 — Merlin and Kestrel have sell orders, Corax has a buy
+// order only (no sell), and Cormorant has none at all.
+const MERLIN_TYPE_ID = 608;
+const KESTREL_TYPE_ID = 609;
+const CORMORANT_TYPE_ID = 610;
+const CORAX_TYPE_ID = 611;
 const TYPES: MarketTypeEntry[] = [
   { typeId: 587, name: 'Rifter', marketGroupId: 2 },
   { typeId: 34, name: 'Tritanium', marketGroupId: 3 },
   { typeId: PLEX_TYPE_ID, name: 'PLEX', marketGroupId: 3 },
+  { typeId: MERLIN_TYPE_ID, name: 'Merlin', marketGroupId: 4 },
+  { typeId: KESTREL_TYPE_ID, name: 'Kestrel', marketGroupId: 4 },
+  { typeId: CORMORANT_TYPE_ID, name: 'Cormorant', marketGroupId: 4 },
+  { typeId: CORAX_TYPE_ID, name: 'Corax', marketGroupId: 4 },
 ];
 const STATIONS: NpcStationEntry[] = [
   { id: 60003760, name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: 30000142 },
@@ -144,6 +157,86 @@ function ordersHandler(hits: { count: number }) {
       ],
       { headers: { 'X-Pages': '1' } }
     );
+  });
+}
+
+// Related Items strip (issue #10): a type_id-aware handler so each Destroyer
+// sibling's own order book differs, unlike ordersHandler above which answers
+// identically for any type_id in its region. hits counts requests per type_id
+// so a test can tell "the strip refetched" apart from "the main item refetched".
+function destroyerOrdersHandler(hits: Map<number, number>) {
+  const ordersByType: Record<number, unknown[]> = {
+    [MERLIN_TYPE_ID]: [
+      {
+        order_id: 100,
+        type_id: MERLIN_TYPE_ID,
+        is_buy_order: false,
+        price: 900000,
+        location_id: 60003760,
+        system_id: 30000142,
+        volume_remain: 2,
+        volume_total: 2,
+        min_volume: 1,
+        duration: 90,
+        issued: '2026-08-01T00:00:00Z',
+        range: 'region',
+      },
+      {
+        // A second location, hidden by Trade Hub mode, so the station-filter
+        // test below can filter down to a location the siblings have no
+        // orders at.
+        order_id: 103,
+        type_id: MERLIN_TYPE_ID,
+        is_buy_order: false,
+        price: 850000,
+        location_id: 1035466617946,
+        system_id: 30000142,
+        volume_remain: 1,
+        volume_total: 1,
+        min_volume: 1,
+        duration: 90,
+        issued: '2026-08-01T00:00:00Z',
+        range: 'region',
+      },
+    ],
+    [KESTREL_TYPE_ID]: [
+      {
+        order_id: 101,
+        type_id: KESTREL_TYPE_ID,
+        is_buy_order: false,
+        price: 1500000,
+        location_id: 60003760,
+        system_id: 30000142,
+        volume_remain: 1,
+        volume_total: 1,
+        min_volume: 1,
+        duration: 90,
+        issued: '2026-08-01T00:00:00Z',
+        range: 'region',
+      },
+    ],
+    [CORMORANT_TYPE_ID]: [],
+    [CORAX_TYPE_ID]: [
+      {
+        order_id: 102,
+        type_id: CORAX_TYPE_ID,
+        is_buy_order: true,
+        price: 700000,
+        location_id: 60003760,
+        system_id: 30000142,
+        volume_remain: 1,
+        volume_total: 1,
+        min_volume: 1,
+        duration: 90,
+        issued: '2026-08-01T00:00:00Z',
+        range: 'region',
+      },
+    ],
+  };
+  return http.get(`${ESI_BASE_URL}/markets/${RIFTER_REGION_ID}/orders`, ({ request }) => {
+    const typeId = Number(new URL(request.url).searchParams.get('type_id'));
+    hits.set(typeId, (hits.get(typeId) ?? 0) + 1);
+    return HttpResponse.json(ordersByType[typeId] ?? [], { headers: { 'X-Pages': '1' } });
   });
 }
 
@@ -250,6 +343,139 @@ describe('Market Browser', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
     await vi.waitFor(() => expect(hits.count).toBe(2));
+  });
+});
+
+describe('Related Items strip (issue #10)', () => {
+  it("shows the selected item's Market Group siblings with their own sell price, excluding itself, and plainly marks a sibling with no sell orders (buy-only or none at all)", async () => {
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    await screen.findByRole('table', { name: 'Sell Orders' });
+
+    const strip = await screen.findByRole('list', { name: 'Related Items' });
+    expect(await screen.findByText('Kestrel')).toBeInTheDocument();
+    expect(await screen.findByText('1,500,000.00')).toBeInTheDocument();
+    // Corax has a buy order but no sell order — never a fabricated zero, and
+    // never conflated with Cormorant's true "no orders at all".
+    expect(within(strip).getByText('Corax')).toBeInTheDocument();
+    expect(within(strip).getByText('No sell orders')).toBeInTheDocument();
+    expect(within(strip).getByText('Cormorant')).toBeInTheDocument();
+    expect(within(strip).getByText('No orders')).toBeInTheDocument();
+  });
+
+  it('clicking a sibling selects it, reloading the order book and re-anchoring the strip on it', async () => {
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    await screen.findByText('Related Items');
+
+    await user.click(await screen.findByText('Kestrel'));
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('1,500,000.00')).toBeInTheDocument();
+    // Re-anchored: Merlin, the previously-selected item, is now the sibling
+    // (the tree still shows its own "Merlin" match for the lingering search).
+    const strip = await screen.findByRole('list', { name: 'Related Items' });
+    expect(within(strip).getByText('Merlin')).toBeInTheDocument();
+  });
+
+  it('a manual Refresh also refetches sibling prices, not just the on-screen order book', async () => {
+    const hits = new Map<number, number>();
+    server.use(destroyerOrdersHandler(hits));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    await screen.findByRole('table', { name: 'Sell Orders' });
+    await screen.findByRole('list', { name: 'Related Items' });
+    await vi.waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(1));
+
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    await vi.waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(2));
+    expect(hits.get(MERLIN_TYPE_ID)).toBe(2);
+  });
+
+  it('respects the order-row station filter, matching the on-screen tables (CONTEXT.md round 10)', async () => {
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    await user.click(screen.getByRole('button', { name: 'Region' })); // reveal Merlin's second, out-of-hub order
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument();
+    const strip = await screen.findByRole('list', { name: 'Related Items' });
+    expect(within(strip).getByText('1,500,000.00')).toBeInTheDocument(); // Kestrel, unfiltered
+
+    const rows = within(sellTable).getAllByRole('row');
+    const targetRow = rows.find((row) => within(row).queryByText('850,000.00'));
+    if (!targetRow) throw new Error('expected a row with the out-of-hub Merlin order');
+    targetRow.focus();
+    fireEvent.contextMenu(targetRow);
+    await user.click(await screen.findByRole('menuitem', { name: 'Filter to this station' }));
+
+    // Kestrel and Corax have no orders at all at that location — the strip
+    // degrades exactly as the on-screen tables do under the same filter.
+    await waitFor(() => {
+      expect(within(strip).queryByText('1,500,000.00')).not.toBeInTheDocument();
+    });
+    expect(within(strip).getAllByText('No orders').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('an item whose Market Group has no other members shows nothing, not an empty strip', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    await screen.findByRole('table', { name: 'Sell Orders' });
+
+    expect(screen.queryByText('Related Items')).not.toBeInTheDocument();
+  });
+
+  it('bounds a large Market Group at the cap and states the true total', async () => {
+    const bigGroupId = 99;
+    const selected: MarketTypeEntry = {
+      typeId: 1999,
+      name: 'Selected Widget',
+      marketGroupId: bigGroupId,
+    };
+    const many: MarketTypeEntry[] = Array.from({ length: 25 }, (_, i) => ({
+      typeId: 2000 + i,
+      name: `Widget ${i}`,
+      marketGroupId: bigGroupId,
+    }));
+    vi.mocked(loadMarketGroups).mockResolvedValueOnce([
+      ...GROUPS,
+      { id: bigGroupId, name: 'Widgets', parentId: null, hasTypes: true },
+    ]);
+    vi.mocked(loadMarketTypes).mockResolvedValueOnce([...TYPES, selected, ...many]);
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () =>
+        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'Selected Widget');
+    await user.click(await screen.findByText('Selected Widget'));
+
+    expect(await screen.findByText('Related Items')).toBeInTheDocument();
+    expect(screen.getByText('Showing 20 of 25')).toBeInTheDocument();
   });
 });
 
