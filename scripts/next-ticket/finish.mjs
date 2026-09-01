@@ -19,8 +19,14 @@ if (!prArg || !issueArg || !worktreePath) {
 
 const merge = tryRun('gh', ['pr', 'merge', prArg, '--squash', '--delete-branch']);
 if (!merge.ok) {
-  printResult({ status: 'merge-failed', message: merge.stderr.trim() });
-  process.exit(1);
+  // open-pr.mjs arms auto-merge on this PR; it may have already merged
+  // (e.g. while drive-ci.mjs's watch was still running or had errored),
+  // which makes this direct merge attempt fail even though the PR is done.
+  const state = ghJson(['pr', 'view', prArg, '--json', 'state']).state;
+  if (state !== 'MERGED') {
+    printResult({ status: 'merge-failed', message: merge.stderr.trim() });
+    process.exit(1);
+  }
 }
 
 function sleep(ms) {
