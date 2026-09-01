@@ -64,6 +64,27 @@ export interface EsiCacheRecord {
   truncated?: boolean;
 }
 
+/** One saved shortcut in the Quickbar (CONTEXT.md). */
+export interface QuickbarItem {
+  typeId: number;
+  name: string;
+}
+
+/**
+ * User-editable Quickbar: one record per character holding the ordered list
+ * of saved item shortcuts (CONTEXT.md). Modelled as a single record, like a
+ * Skill Plan's `entries`, rather than one row per item — the whole list edits
+ * and merges together, and a flat drag-ordered list needs no per-item id.
+ */
+export interface QuickbarRecord {
+  /** Always String(characterId) — one record per character. */
+  id: string;
+  characterId: number;
+  items: QuickbarItem[];
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
 /** User-editable Build Plan: manufacturing inputs for one blueprint (CONTEXT.md). */
 export interface BuildPlanRecord {
   id: string;
@@ -92,6 +113,7 @@ export const db = new Dexie('neocom') as Dexie & {
   skillPlans: EntityTable<SkillPlanRecord, 'id'>;
   esiCache: Dexie.Table<EsiCacheRecord, [number, string]>;
   buildPlans: EntityTable<BuildPlanRecord, 'id'>;
+  quickbars: EntityTable<QuickbarRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -117,4 +139,15 @@ db.version(3).stores({
   skillPlans: 'id, characterId',
   esiCache: '[characterId+key]',
   buildPlans: 'id, characterId',
+});
+
+// Additive: v1/v2/v3 stores unchanged, plus the Quickbar.
+db.version(4).stores({
+  characters: 'characterId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
 });

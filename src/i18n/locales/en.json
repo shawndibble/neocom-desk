@@ -570,6 +570,7 @@
       "showInfo": "Show info",
       "addToCompare": "Add to Compare",
       "unavailable": "Not available yet",
+      "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",
@@ -579,7 +580,14 @@
       "filterToStation": "Filter to this station"
     },
     "stationFilterActive": "Filtered to {{station}}",
-    "clearStationFilter": "Clear filter"
+    "clearStationFilter": "Clear filter",
+    "quickbar": {
+      "title": "Quickbar",
+      "empty": "No items yet — right-click an item and choose Add to Quickbar.",
+      "remove": "Remove",
+      "removeItem": "Remove {{name}} from Quickbar",
+      "reorderItem": "Reorder {{name}}"
+    }
   },
   "error": {
     "title": "Something went wrong",
