@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
+import { clearMarketPriceCache } from '@/market/prices';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
@@ -29,6 +30,19 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => ({})),
+}));
+
+// Only reached by the "View in Market" navigation test below: Market Browser
+// lazy-loads its own SDE payloads on mount, which this file otherwise never
+// touches. Empty catalogues are enough to mount it without an unhandled fetch.
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadMarketGroups: vi.fn(async () => []),
+  loadMarketTypes: vi.fn(async () => []),
+  loadNpcStations: vi.fn(async () => []),
+  loadSolarSystems: vi.fn(async () => []),
+  loadMarketRegions: vi.fn(async () => []),
+  loadGlobalMarkets: vi.fn(async () => []),
+  loadAttributeDictionary: vi.fn(async () => new Map()),
 }));
 
 const CHAR_ID = 91;
@@ -82,7 +96,10 @@ const server = setupServer(
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  clearMarketPriceCache();
+});
 beforeEach(async () => {
   await db.characters.clear();
   await db.tokens.clear();
@@ -423,5 +440,127 @@ describe('Assets', () => {
 
     await user.click(screen.getByRole('button', { name: /collapse all/i }));
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+  });
+});
+
+describe('item tooltip and context menu (issue #83)', () => {
+  it('shows a tooltip with name, icon, quantity, estimated value and volume on hover', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 30,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      ),
+      http.get('https://esi.evetech.net/markets/prices', () =>
+        HttpResponse.json([{ type_id: 650, adjusted_price: 1000000, average_price: 1200000 }])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const name = await screen.findByText('Drake');
+    await user.hover(name);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(within(tooltip).getByText('Drake')).toBeInTheDocument();
+    expect(within(tooltip).getByText(/Qty 1/)).toBeInTheDocument();
+    expect(within(tooltip).getByText('Value: 1,200,000 ISK')).toBeInTheDocument();
+    expect(within(tooltip).getByText('Volume: 92,150 m3')).toBeInTheDocument();
+    expect(tooltip.querySelector('img')?.getAttribute('src')).toContain('/types/650/icon');
+
+    await user.unhover(name);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('shows the volume as unknown for a type outside the slim SDE snapshot', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 40,
+              type_id: 999,
+              quantity: 3,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      ),
+      http.post('https://esi.evetech.net/universe/names', () =>
+        HttpResponse.json([{ id: 999, name: 'Mystery Module', category: 'inventory_type' }])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const name = await screen.findByText('Mystery Module');
+    await user.hover(name);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(within(tooltip).getByText('Volume: unknown')).toBeInTheDocument();
+  });
+
+  it('opens the shared item context menu on right-click, with a View in Market action', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const item = await screen.findByText('Tritanium');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('menuitem', { name: 'No blueprint options' }, { timeout: 2000 })
+    ).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+  });
+
+  it('adds an item to the Quickbar from the Assets context menu, persisting to Dexie', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const item = await screen.findByText('Tritanium');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+
+    await waitFor(async () => {
+      const record = await db.quickbars.get(String(CHAR_ID));
+      expect(record?.items).toEqual([{ typeId: 34, name: 'Tritanium' }]);
+    });
+  });
+
+  it('navigates to the Market Browser with the item preselected via View in Market', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const item = await screen.findByText('Tritanium');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/market');
+    });
+    expect(window.location.search).toContain('type=34');
   });
 });

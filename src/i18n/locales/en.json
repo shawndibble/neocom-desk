@@ -481,6 +481,11 @@
       "cargoHold": "Cargo Hold",
       "droneBay": "Drone Bay",
       "fitting": "Fitting"
+    },
+    "tooltip": {
+      "value": "Value: {{value}} ISK",
+      "volume": "Volume: {{volume}} m3",
+      "volumeUnknown": "Volume: unknown"
     }
   },
   "mail": {
@@ -728,6 +733,7 @@
       "addToQuickbar": "Add to Quickbar",
       "showInfo": "Show info",
       "addToCompare": "Add to Compare",
+      "viewInMarket": "View in Market",
       "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
       "buildPlan": "Build Plan",

@@ -723,6 +723,26 @@ describe('Market Browser item context menu (issue #6)', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Copy name' }));
     expect(writeText).toHaveBeenCalledWith('Rifter');
   });
+
+  it('View in Market sets the type param, preserving an existing hub param (issue #83)', async () => {
+    window.history.pushState({}, '', '/market?hub=jita');
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () =>
+        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
+
+    expect(window.location.pathname).toBe('/market');
+    expect(window.location.search).toBe('?type=587&hub=jita');
+  });
 });
 
 describe('Quickbar unavailable with no active character (issue #7)', () => {
