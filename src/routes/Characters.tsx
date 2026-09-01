@@ -6,6 +6,7 @@ import { db, type CharacterRecord } from '@/db';
 import {
   Button,
   CharacterAvatar,
+  DataAgeBadge,
   EmptyState,
   FilterChip,
   Select,
@@ -23,7 +24,7 @@ import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { loadRosterSnapshot } from '@/features/character/roster';
-import { deriveQueueHealth, type QueueHealthState } from '@/features/skills/queueStatus';
+import { deriveQueueState, type QueueState } from '@/features/skills/queueStatus';
 import { removeCharacter } from '@/features/character/removeCharacter';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
@@ -44,7 +45,7 @@ import {
 
 const UNGROUPED_VALUE = '__ungrouped__';
 
-const QUEUE_STATE_TONE: Record<QueueHealthState, StatChipTone> = {
+const QUEUE_STATE_TONE: Record<QueueState, StatChipTone> = {
   training: 'success',
   endingSoon: 'warning',
   paused: 'danger',
@@ -61,10 +62,16 @@ const DENSITY_LABEL_KEYS = {
 
 const SORT_KEYS: readonly CharacterSortKey[] = ['name', 'skillPoints', 'wallet'];
 
+interface QueueInfo {
+  state: QueueState;
+  /** When this character's cached queue was last fetched; null when never fetched. */
+  fetchedAt: Date | null;
+}
+
 interface CharacterCardProps {
   character: CharacterRecord;
   info: PublicInfoEntry | undefined;
-  queueState: QueueHealthState | undefined;
+  queue: QueueInfo | undefined;
   groups: readonly CharacterGroup[];
   groupId: string | null;
   onSelect: (characterId: number) => void;
@@ -75,7 +82,7 @@ interface CharacterCardProps {
 function CharacterCard({
   character,
   info,
-  queueState,
+  queue,
   groups,
   groupId,
   onSelect,
@@ -105,13 +112,15 @@ function CharacterCard({
           <span className="block truncate text-xs text-text-faint">
             {info?.allianceName ?? t('common.unknown')}
           </span>
-          {queueState && (
-            <StatChip
-              className="mt-1"
-              label={t('characters.queueState')}
-              tone={QUEUE_STATE_TONE[queueState]}
-              value={t(`characters.queueStates.${queueState}`)}
-            />
+          {queue && (
+            <span className="mt-1 flex items-center gap-2">
+              <StatChip
+                label={t('characters.queueState')}
+                tone={QUEUE_STATE_TONE[queue.state]}
+                value={t(`characters.queueStates.${queue.state}`)}
+              />
+              {queue.fetchedAt && <DataAgeBadge date={queue.fetchedAt} />}
+            </span>
           )}
         </span>
       </button>
@@ -260,7 +269,7 @@ export function Characters() {
   const [sortKey, setSortKey] = useState<CharacterSortKey>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [stats, setStats] = useState<Map<number, CharacterSortStats>>(new Map());
-  const [queueStateById, setQueueStateById] = useState<Map<number, QueueHealthState>>(new Map());
+  const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
 
@@ -283,7 +292,7 @@ export function Characters() {
       if (!characters || characters.length === 0) {
         if (!cancelled) {
           setStats(new Map());
-          setQueueStateById(new Map());
+          setQueueById(new Map());
         }
         return;
       }
@@ -302,9 +311,15 @@ export function Characters() {
           ])
         )
       );
-      setQueueStateById(
+      setQueueById(
         new Map(
-          roster.map((entry) => [entry.characterId, deriveQueueHealth(entry.queue?.data, now)])
+          roster.map((entry) => [
+            entry.characterId,
+            {
+              state: deriveQueueState(entry.queue?.data, now),
+              fetchedAt: entry.queue?.fetchedAt ?? null,
+            },
+          ])
         )
       );
     })();
@@ -399,7 +414,7 @@ export function Characters() {
               key={characterId}
               character={character}
               info={publicInfo[characterId]}
-              queueState={queueStateById.get(characterId)}
+              queue={queueById.get(characterId)}
               groups={groupsValue.groups}
               groupId={groupIdByCharacterId.get(characterId) ?? null}
               onSelect={(id) => void select(id)}

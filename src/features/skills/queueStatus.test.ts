@@ -4,7 +4,7 @@ import {
   classifySkillQueue,
   completedQueueLevels,
   completedSpGain,
-  deriveQueueHealth,
+  deriveQueueState,
   isQueuePaused,
   type CompletedLevel,
 } from './queueStatus';
@@ -286,23 +286,23 @@ describe('completedSpGain', () => {
   });
 });
 
-describe('deriveQueueHealth', () => {
+describe('deriveQueueState', () => {
   it('reports unknown for a character with no cached queue data', () => {
-    expect(deriveQueueHealth(undefined, NOW)).toBe('unknown');
+    expect(deriveQueueState(undefined, NOW)).toBe('unknown');
   });
 
   it('reports idle for an empty cached queue', () => {
-    expect(deriveQueueHealth([], NOW)).toBe('idle');
+    expect(deriveQueueState([], NOW)).toBe('idle');
   });
 
   it('reports paused when queued entries have no start/finish dates', () => {
     const entries = [entry({ queue_position: 0 }), entry({ queue_position: 1 })];
-    expect(deriveQueueHealth(entries, NOW)).toBe('paused');
+    expect(deriveQueueState(entries, NOW)).toBe('paused');
   });
 
   it('never reports a paused queue as "starts now" or idle', () => {
     const entries = [entry({ queue_position: 0 })];
-    const state = deriveQueueHealth(entries, NOW);
+    const state = deriveQueueState(entries, NOW);
     expect(state).not.toBe('training');
     expect(state).not.toBe('idle');
     expect(state).toBe('paused');
@@ -321,7 +321,7 @@ describe('deriveQueueHealth', () => {
         finish_date: new Date(NOW + 30 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     ];
-    expect(deriveQueueHealth(entries, NOW)).toBe('training');
+    expect(deriveQueueState(entries, NOW)).toBe('training');
   });
 
   it('reports endingSoon when the last queued entry finishes within the threshold', () => {
@@ -332,7 +332,7 @@ describe('deriveQueueHealth', () => {
         finish_date: new Date(NOW + 60 * 60 * 1000).toISOString(),
       }),
     ];
-    expect(deriveQueueHealth(entries, NOW)).toBe('endingSoon');
+    expect(deriveQueueState(entries, NOW)).toBe('endingSoon');
   });
 
   it('reports training (not endingSoon) when the last entry finishes well beyond the threshold', () => {
@@ -343,7 +343,7 @@ describe('deriveQueueHealth', () => {
         finish_date: new Date(NOW + 10 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     ];
-    expect(deriveQueueHealth(entries, NOW)).toBe('training');
+    expect(deriveQueueState(entries, NOW)).toBe('training');
   });
 
   it('reports idle when every queued entry is already completed (stale-until-login ESI leftovers)', () => {
@@ -354,7 +354,7 @@ describe('deriveQueueHealth', () => {
         finish_date: new Date(NOW - 60_000).toISOString(),
       }),
     ];
-    expect(deriveQueueHealth(entries, NOW)).toBe('idle');
+    expect(deriveQueueState(entries, NOW)).toBe('idle');
   });
 });
 

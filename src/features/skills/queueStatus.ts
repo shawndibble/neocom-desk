@@ -128,21 +128,21 @@ export function applyCompletedQueueEntries(
   return merged;
 }
 
-export type QueueHealthState = 'training' | 'idle' | 'paused' | 'endingSoon' | 'unknown';
+export type QueueState = 'training' | 'idle' | 'paused' | 'endingSoon' | 'unknown';
 
 /** How close the last queued entry's finish must be to count as "about to run dry". */
 const ENDING_SOON_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Cache-only queue-health classification for one character, for roster-wide
+ * Cache-only queue-state classification for one character, for roster-wide
  * "who needs my attention" views. Built on `isQueuePaused`/`classifySkillQueue`
  * rather than restating their paused rule: an absent date means paused with an
  * unknown ETA, never "starts now" (peterhaneve/evemon#40).
  */
-export function deriveQueueHealth(
+export function deriveQueueState(
   entries: readonly SkillQueueEntry[] | undefined,
   nowMs: number
-): QueueHealthState {
+): QueueState {
   if (entries === undefined) return 'unknown';
   if (entries.length === 0) return 'idle';
   if (isQueuePaused(entries)) return 'paused';
