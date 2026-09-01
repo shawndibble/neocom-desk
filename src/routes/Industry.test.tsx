@@ -210,7 +210,11 @@ describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', 
     const row = await screen.findByRole('button', { name: 'Rifter' });
     expect(row.closest('li')).toHaveClass('bg-panel-2');
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
-    await vi.waitFor(() => expect(window.location.search).toBe(''));
+    // `vi.waitFor` polls without React's act() wrapping — the query-param
+    // clear it's waiting on is a router/component state update, so an
+    // unwrapped poll here is exactly what triggers "not wrapped in act(...)".
+    // `@testing-library/react`'s `waitFor` wraps every retry.
+    await waitFor(() => expect(window.location.search).toBe(''));
   });
 
   it('reuses an existing plan for that blueprint rather than creating a duplicate', async () => {
@@ -219,7 +223,7 @@ describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', 
     render(<App />);
 
     const row = await screen.findByRole('button', { name: 'Rifter run' });
-    await vi.waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    await waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
   });
 
@@ -235,8 +239,8 @@ describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', 
     render(<App />);
 
     const row = await screen.findByRole('button', { name: 'Rifter run' });
-    await vi.waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
-    await vi.waitFor(() => expect(window.location.search).toBe(''));
+    await waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    await waitFor(() => expect(window.location.search).toBe(''));
     // The selection must still be the reused plan after the param clears, not plans[0].
     expect(row.closest('li')).toHaveClass('bg-panel-2');
     expect(screen.getByRole('button', { name: 'Other plan' }).closest('li')).not.toHaveClass(

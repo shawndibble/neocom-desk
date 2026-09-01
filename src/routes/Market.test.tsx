@@ -375,7 +375,7 @@ describe('Market Browser', () => {
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
-    await vi.waitFor(() => expect(hits.count).toBe(2));
+    await waitFor(() => expect(hits.count).toBe(2));
   });
 });
 
@@ -533,11 +533,11 @@ describe('Related Items strip (issue #10)', () => {
     await user.click(await screen.findByText('Merlin'));
     await screen.findByRole('table', { name: 'Sell Orders' });
     await screen.findByRole('list', { name: 'Related Items' });
-    await vi.waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(1));
+    await waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(1));
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
-    await vi.waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(2));
+    await waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(2));
     expect(hits.get(MERLIN_TYPE_ID)).toBe(2);
   });
 
