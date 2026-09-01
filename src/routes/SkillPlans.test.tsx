@@ -135,6 +135,9 @@ const server = setupServer(
       { skill_id: 3, queue_position: 1, finished_level: 1 },
     ])
   ),
+  // Loaded alongside attributes for the What-If Implants lens (PlanEditor);
+  // no test in this file exercises real implant bonuses, so no implants.
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () => HttpResponse.json([])),
   http.get(`https://esi.evetech.net/universe/types/${RIFTER_TYPE_ID}`, () =>
     HttpResponse.json({
       type_id: RIFTER_TYPE_ID,

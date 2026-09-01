@@ -990,6 +990,10 @@ export function Assets() {
     [sortedTree, renderCtx.expandedKeys]
   );
   const scrollParentRef = useRef<HTMLDivElement>(null);
+  // React Compiler isn't enabled in this build (no babel plugin configured);
+  // this is eslint-plugin-react-hooks flagging TanStack Virtual's returned
+  // functions as unsafe to memoize *if* the compiler is ever turned on.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: flattenedRows.length,
     getScrollElement: () => scrollParentRef.current,
