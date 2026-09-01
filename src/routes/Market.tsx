@@ -1,32 +1,47 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { Button, DataAgeBadge, DataTable, EmptyState, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  DataTable,
+  EmptyState,
+  FilterChip,
+  Panel,
+  Spinner,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import {
   loadMarketGroups,
   loadMarketTypes,
   loadNpcStations,
   loadSolarSystems,
+  loadMarketRegions,
+  loadGlobalMarkets,
 } from '@/sde/loadMarketSde';
 import type {
   MarketGroupNode,
   MarketTypeEntry,
   NpcStationEntry,
   SolarSystemEntry,
+  MarketRegionEntry,
+  GlobalMarketEntry,
 } from '@/sde/marketTypes';
 import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
+import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
 import { filterMarketTree, MARKET_TREE_MATCH_LIMIT } from '@/features/market/marketTree';
 import { getOrderBook, clearOrderBookCache } from '@/features/market/orderBook';
 import { formatVolume } from '@/features/market/format';
 import {
   splitOrderBook,
   resolveOrderLocation,
+  filterOrdersByLocation,
   orderExpiry,
   type NpcStationLookup,
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
+import { resolveOrderBookRegion, type GlobalMarketOverride } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
@@ -149,8 +164,13 @@ function MarketGroupTree({
 
 /**
  * Market Browser: find an item (search + Market Group tree, left) and see its
- * live Order Book at the current Trade Hub's region (right), read from ESI
- * (ADR 0003). The catalogue (groups/types/systems/stations) is lazy-loaded,
+ * live Order Book at the current Location Mode's region (right), read from
+ * ESI (ADR 0003). Location Mode (CONTEXT.md round 9) is either Trade Hub
+ * (that hub's region, filtered to its station) or Region (the whole region,
+ * every station) — a device-local preference like the hub setting it
+ * replaces as the sole location control. A globally-traded item (PLEX today)
+ * overrides either mode: its own Global Market Region always wins (round
+ * 12). The catalogue (groups/types/systems/stations/regions) is lazy-loaded,
  * not precached (CONTEXT.md round 10) — most installs never open /market.
  */
 export function Market() {
@@ -161,11 +181,19 @@ export function Market() {
   const hubHydrated = useMarketHub((state) => state.hydrated);
   const hydrateHub = useMarketHub((state) => state.hydrate);
   const setHubId = useMarketHub((state) => state.setValue);
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+
+  const locationModeValue = useLocationMode((state) => state.value);
+  const locationModeHydrated = useLocationMode((state) => state.hydrated);
+  const hydrateLocationMode = useLocationMode((state) => state.hydrate);
+  const setLocationModeValue = useLocationMode((state) => state.setValue);
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   const [types, setTypes] = useState<MarketTypeEntry[] | null>(null);
   const [npcStations, setNpcStations] = useState<NpcStationEntry[] | null>(null);
   const [solarSystems, setSolarSystems] = useState<SolarSystemEntry[] | null>(null);
+  const [marketRegions, setMarketRegions] = useState<MarketRegionEntry[] | null>(null);
+  const [globalMarkets, setGlobalMarkets] = useState<GlobalMarketEntry[] | null>(null);
   const [catalogueError, setCatalogueError] = useState(false);
 
   const [rawQuery, setRawQuery] = useState('');
@@ -194,7 +222,8 @@ export function Market() {
 
   useEffect(() => {
     void hydrateHub();
-  }, [hydrateHub]);
+    void hydrateLocationMode();
+  }, [hydrateHub, hydrateLocationMode]);
 
   // The "jump to search" shortcut (`lib/shortcuts.ts`) navigates here with
   // this state to focus the box in one step, from anywhere in the app.
@@ -206,13 +235,22 @@ export function Market() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([loadMarketGroups(), loadMarketTypes(), loadNpcStations(), loadSolarSystems()])
-      .then(([g, ty, stations, systems]) => {
+    void Promise.all([
+      loadMarketGroups(),
+      loadMarketTypes(),
+      loadNpcStations(),
+      loadSolarSystems(),
+      loadMarketRegions(),
+      loadGlobalMarkets(),
+    ])
+      .then(([g, ty, stations, systems, regions, global]) => {
         if (cancelled) return;
         setGroups(g);
         setTypes(ty);
         setNpcStations(stations);
         setSolarSystems(systems);
+        setMarketRegions(regions);
+        setGlobalMarkets(global);
       })
       .catch(() => {
         if (!cancelled) setCatalogueError(true);
@@ -227,16 +265,40 @@ export function Market() {
     return () => clearTimeout(id);
   }, [rawQuery]);
 
-  // Refetches on selection, hub, or a manual Refresh click. Gated on
-  // hubHydrated so this doesn't fire once for the default hub and again once
-  // the persisted 'marketHub' setting resolves.
+  const globalMarketsMap = useMemo<ReadonlyMap<number, GlobalMarketOverride>>(
+    () =>
+      new Map(
+        (globalMarkets ?? []).map((g) => [
+          g.typeId,
+          { regionId: g.regionId, regionName: g.regionName },
+        ])
+      ),
+    [globalMarkets]
+  );
+
+  const chosenRegionId =
+    locationModeValue.mode === 'region'
+      ? (locationModeValue.regionId ?? hub.regionId)
+      : hub.regionId;
+
+  const resolvedRegion = useMemo(
+    () =>
+      selectedTypeId === null
+        ? null
+        : resolveOrderBookRegion(selectedTypeId, chosenRegionId, globalMarketsMap),
+    [selectedTypeId, chosenRegionId, globalMarketsMap]
+  );
+
+  // Refetches on selection, region, or a manual Refresh click. Gated on both
+  // *Hydrated flags so this doesn't fire once for the defaults and again once
+  // the persisted settings resolve.
   useEffect(() => {
-    if (selectedTypeId === null || !hubHydrated) return;
+    if (selectedTypeId === null || !hubHydrated || !locationModeHydrated || resolvedRegion === null)
+      return;
     let cancelled = false;
-    const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
     void (async () => {
       setOrderBookLoading(true);
-      const result = await getOrderBook(hub.regionId, selectedTypeId);
+      const result = await getOrderBook(resolvedRegion.regionId, selectedTypeId);
       if (cancelled) return;
       setOrderBookResult(result);
       setOrderBookLoading(false);
@@ -244,7 +306,7 @@ export function Market() {
     return () => {
       cancelled = true;
     };
-  }, [selectedTypeId, hubId, hubHydrated, refreshTick]);
+  }, [selectedTypeId, resolvedRegion, hubHydrated, locationModeHydrated, refreshTick]);
 
   const childrenByParent = useMemo(() => {
     const map = new Map<number | null, MarketGroupNode[]>();
@@ -282,10 +344,18 @@ export function Market() {
     [solarSystems]
   );
 
-  const { sell, buy } = useMemo(
-    () => (orderBookResult ? splitOrderBook(orderBookResult.orders) : { sell: [], buy: [] }),
-    [orderBookResult]
-  );
+  // Trade Hub mode narrows the fetched region down to the hub's own station;
+  // Region mode shows every station in the region as fetched (CONTEXT.md).
+  // A Global Market Region override still carries ordinary station
+  // identifiers, so Trade Hub mode's filter still applies on top of it.
+  const displayOrders = useMemo(() => {
+    if (!orderBookResult) return [];
+    return locationModeValue.mode === 'hub'
+      ? filterOrdersByLocation(orderBookResult.orders, hub.stationId)
+      : orderBookResult.orders;
+  }, [orderBookResult, locationModeValue.mode, hub.stationId]);
+
+  const { sell, buy } = useMemo(() => splitOrderBook(displayOrders), [displayOrders]);
   const sortedSell = useMemo(() => [...sell].sort((a, b) => a.price - b.price), [sell]);
   const sortedBuy = useMemo(() => [...buy].sort((a, b) => b.price - a.price), [buy]);
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
@@ -356,6 +426,15 @@ export function Market() {
     });
   }
 
+  function handleModeChange(mode: LocationMode) {
+    if (mode === locationModeValue.mode) return;
+    void setLocationModeValue({ mode, regionId: locationModeValue.regionId ?? hub.regionId });
+  }
+
+  function handleRegionChange(regionId: number) {
+    void setLocationModeValue({ mode: 'region', regionId });
+  }
+
   function handleRefresh() {
     // Manual refresh must bypass getOrderBook's 300s TTL cache (CONTEXT.md
     // "Data Age": refresh happens on app open + manual button only).
@@ -363,30 +442,63 @@ export function Market() {
     setRefreshTick((n) => n + 1);
   }
 
-  const catalogueLoading = !catalogueError && (!groups || !types || !npcStations || !solarSystems);
+  const catalogueLoading =
+    !catalogueError &&
+    (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
   const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('market.title')}</h1>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-xs">
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.tradeHub')}
-            </span>
-            <select
-              value={hubId}
-              onChange={(e) => void setHubId(e.target.value as TradeHub['id'])}
-              className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
-            >
-              {TRADE_HUBS.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.systemName}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="group" aria-label={t('market.locationMode')} className="flex gap-1.5">
+            <FilterChip
+              label={t('market.modeHub')}
+              selected={locationModeValue.mode === 'hub'}
+              onToggle={() => handleModeChange('hub')}
+            />
+            <FilterChip
+              label={t('market.modeRegion')}
+              selected={locationModeValue.mode === 'region'}
+              onToggle={() => handleModeChange('region')}
+            />
+          </div>
+          {locationModeValue.mode === 'hub' ? (
+            <label className="flex items-center gap-2 text-xs">
+              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('market.tradeHub')}
+              </span>
+              <select
+                value={hubId}
+                onChange={(e) => void setHubId(e.target.value as TradeHub['id'])}
+                className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
+              >
+                {TRADE_HUBS.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.systemName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label className="flex items-center gap-2 text-xs">
+              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('market.region')}
+              </span>
+              <select
+                value={chosenRegionId}
+                onChange={(e) => handleRegionChange(Number(e.target.value))}
+                className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
+              >
+                {(marketRegions ?? []).map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <Button
             size="sm"
             onClick={handleRefresh}
@@ -466,67 +578,74 @@ export function Market() {
               <Spinner label={t('common.loading')} />
             </div>
           ) : (
-            <div className="divide-y divide-line">
-              <div className="pb-3">
-                <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('market.sell')}
-                </h2>
-                {sortedSell.length === 0 ? (
-                  <EmptyState
-                    title={t('market.emptySellTitle')}
-                    hint={t('market.emptySellHint')}
-                    className="py-6"
-                  />
-                ) : (
-                  <>
-                    <DataTable
-                      columns={baseColumns}
-                      rows={sellRows}
-                      rowKey={(o) => o.order_id}
-                      label={t('market.sell')}
-                      defaultSort={{ columnId: 'price', direction: 'asc' }}
+            <>
+              {resolvedRegion?.override && (
+                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                  {t('market.globalMarketNote', { regionName: resolvedRegion.override.regionName })}
+                </p>
+              )}
+              <div className="divide-y divide-line">
+                <div className="pb-3">
+                  <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('market.sell')}
+                  </h2>
+                  {sortedSell.length === 0 ? (
+                    <EmptyState
+                      title={t('market.emptySellTitle')}
+                      hint={t('market.emptySellHint')}
+                      className="py-6"
                     />
-                    {!sellShowAll && sortedSell.length > ROW_CAP && (
-                      <div className="px-3 py-2">
-                        <Button size="sm" onClick={() => setSellShowAll(true)}>
-                          {t('market.showAll', { count: sortedSell.length })}
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+                  ) : (
+                    <>
+                      <DataTable
+                        columns={baseColumns}
+                        rows={sellRows}
+                        rowKey={(o) => o.order_id}
+                        label={t('market.sell')}
+                        defaultSort={{ columnId: 'price', direction: 'asc' }}
+                      />
+                      {!sellShowAll && sortedSell.length > ROW_CAP && (
+                        <div className="px-3 py-2">
+                          <Button size="sm" onClick={() => setSellShowAll(true)}>
+                            {t('market.showAll', { count: sortedSell.length })}
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
 
-              <div className="pb-3">
-                <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('market.buy')}
-                </h2>
-                {sortedBuy.length === 0 ? (
-                  <EmptyState
-                    title={t('market.emptyBuyTitle')}
-                    hint={t('market.emptyBuyHint')}
-                    className="py-6"
-                  />
-                ) : (
-                  <>
-                    <DataTable
-                      columns={buyColumns}
-                      rows={buyRows}
-                      rowKey={(o) => o.order_id}
-                      label={t('market.buy')}
-                      defaultSort={{ columnId: 'price', direction: 'desc' }}
+                <div className="pb-3">
+                  <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('market.buy')}
+                  </h2>
+                  {sortedBuy.length === 0 ? (
+                    <EmptyState
+                      title={t('market.emptyBuyTitle')}
+                      hint={t('market.emptyBuyHint')}
+                      className="py-6"
                     />
-                    {!buyShowAll && sortedBuy.length > ROW_CAP && (
-                      <div className="px-3 py-2">
-                        <Button size="sm" onClick={() => setBuyShowAll(true)}>
-                          {t('market.showAll', { count: sortedBuy.length })}
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <DataTable
+                        columns={buyColumns}
+                        rows={buyRows}
+                        rowKey={(o) => o.order_id}
+                        label={t('market.buy')}
+                        defaultSort={{ columnId: 'price', direction: 'desc' }}
+                      />
+                      {!buyShowAll && sortedBuy.length > ROW_CAP && (
+                        <div className="px-3 py-2">
+                          <Button size="sm" onClick={() => setBuyShowAll(true)}>
+                            {t('market.showAll', { count: sortedBuy.length })}
+                          </Button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
         </Panel>
       </div>
