@@ -432,17 +432,18 @@ and the next person to reach for it will not otherwise know what it breaks.
    adding one is a one-line change whose failure only shows up on a second
    device weeks later. A colocated test asserting the production `sync.` key
    set matches an explicit allow-list makes it a deliberate two-file edit.
-3. **Character removal, with its purge.** No removal flow exists today —
-   `Characters.tsx` has none. Design, for when it is built: purge that
-   Character's remote docs inline at removal, and if its refresh token is dead
-   (the common case for a sold Character) record a pending purge and run it
-   the next time that Character authenticates. This needs no new privileged
-   endpoint: `firestore.rules` grants `delete` on uid alone, deliberately, so
-   a purge must hold a session as that Character. **Caveat:** if the user never
-   signs in as it again, the remote data stays. Only a privileged Cloud
-   Function would guarantee the purge, and that is a new trust surface.
+3. ~~**Character removal, with its purge.**~~ **Done** (#39,
+   `features/character/removeCharacter.ts`) — purges that Character's remote
+   docs inline at removal, and if its refresh token is dead (the common case
+   for a sold Character) records a pending purge (`sync/characterPurge.ts`)
+   that `sync/planSync.syncCharacter` runs the next time that Character
+   authenticates. No new privileged endpoint: `firestore.rules` grants
+   `delete` on uid alone, deliberately, so a purge only needs a session as
+   that Character. **Caveat, still true:** if the user never signs in as it
+   again, the remote data stays. Only a privileged Cloud Function would
+   guarantee the purge, and that is a new trust surface.
    Closes the asymmetry D1 leaves open — D1 handles a Character sold out from
-   under you; nothing handles one you deliberately drop.
+   under you; this handles one you deliberately drop.
 
 ### CONTEXT.md change, not yet applied
 

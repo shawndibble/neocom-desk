@@ -10,6 +10,8 @@ interface ActiveCharacterState {
   hydrated: boolean;
   hydrate: () => Promise<void>;
   setActiveCharacter: (characterId: number) => Promise<void>;
+  /** Drop the active selection — used when the active Character is removed and no other exists to fall back to. */
+  clearActiveCharacter: () => Promise<void>;
 }
 
 export const useActiveCharacter = create<ActiveCharacterState>((set) => ({
@@ -25,5 +27,9 @@ export const useActiveCharacter = create<ActiveCharacterState>((set) => ({
   setActiveCharacter: async (characterId) => {
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: characterId });
     set({ activeCharacterId: characterId, hydrated: true });
+  },
+  clearActiveCharacter: async () => {
+    await db.settings.delete(ACTIVE_CHARACTER_KEY);
+    set({ activeCharacterId: null, hydrated: true });
   },
 }));

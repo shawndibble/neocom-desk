@@ -17,6 +17,10 @@ import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
+vi.mock('@/features/character/removeCharacter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/character/removeCharacter')>()),
+}));
+
 const server = setupServer(
   http.get('https://esi.evetech.net/characters/:id', ({ params }) => {
     if (params.id === '91') {
@@ -195,6 +199,62 @@ describe('Characters', () => {
     await user.click(screen.getByRole('button', { name: 'Spacious' }));
     await waitForSettingsValue(FONT_SCALE_KEY, (value) => value === 1.25);
     expect(useFontScale.getState().value).toBe(1.25);
+  });
+
+  it('removes a character after confirmation, deleting its Dexie rows', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Pilot One'));
+    await waitFor(() => expect(screen.queryByText('Pilot One')).not.toBeInTheDocument());
+    expect(await db.characters.get(91)).toBeUndefined();
+    expect(screen.getByText('Pilot Two')).toBeInTheDocument();
+  });
+
+  it('keeps the character when the removal confirmation is declined', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+
+    expect(await db.characters.get(91)).toBeDefined();
+    expect(screen.getByText('Pilot One')).toBeInTheDocument();
+  });
+
+  it('reassigns the active character when the removed one was active', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await useActiveCharacter.getState().setActiveCharacter(91);
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
+  });
+
+  it('alerts when the remote purge is deferred', async () => {
+    const removeCharacterModule = await import('@/features/character/removeCharacter');
+    vi.spyOn(removeCharacterModule, 'removeCharacter').mockResolvedValueOnce({
+      remotePurged: false,
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+
+    await waitFor(() =>
+      expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Pilot One'))
+    );
   });
 
   it('drops a character from its group once the character no longer exists', async () => {

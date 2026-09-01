@@ -16,10 +16,12 @@ import {
   Spinner,
 } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { loadRosterSnapshot } from '@/features/character/roster';
+import { removeCharacter } from '@/features/character/removeCharacter';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
   addGroup,
@@ -55,6 +57,7 @@ interface CharacterCardProps {
   groupId: string | null;
   onSelect: (characterId: number) => void;
   onMoveToGroup: (characterId: number, groupId: string | null) => void;
+  onRemove: (characterId: number, name: string) => void;
 }
 
 function CharacterCard({
@@ -64,6 +67,7 @@ function CharacterCard({
   groupId,
   onSelect,
   onMoveToGroup,
+  onRemove,
 }: CharacterCardProps) {
   const { t } = useTranslation();
   return (
@@ -113,6 +117,14 @@ function CharacterCard({
           </SelectContent>
         </Select>
       )}
+      <Button
+        variant="danger"
+        size="sm"
+        onClick={() => onRemove(character.characterId, character.name)}
+        aria-label={t('characters.removeButtonLabel', { name: character.name })}
+      >
+        {t('characters.remove')}
+      </Button>
     </li>
   );
 }
@@ -295,6 +307,12 @@ export function Characters() {
     navigate('/overview');
   }
 
+  async function handleRemoveCharacter(characterId: number, name: string) {
+    if (!window.confirm(t('characters.removeConfirm', { name }))) return;
+    const { remotePurged } = await removeCharacter(characterId, isSyncConfigured());
+    if (!remotePurged) window.alert(t('characters.removeDeferredNotice', { name }));
+  }
+
   async function handleMoveToGroup(characterId: number, groupId: string | null) {
     await setGroupsValue(
       updateGroups(
@@ -354,6 +372,7 @@ export function Characters() {
               groupId={groupIdByCharacterId.get(characterId) ?? null}
               onSelect={(id) => void select(id)}
               onMoveToGroup={(id, groupId) => void handleMoveToGroup(id, groupId)}
+              onRemove={(id, name) => void handleRemoveCharacter(id, name)}
             />
           );
         })}

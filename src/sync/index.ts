@@ -11,6 +11,7 @@
 export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
 export { uidForCharacter } from './uid';
 export { TOMBSTONE_TTL_MS } from './merge';
+export { clearCharacterSyncBookkeeping } from './localBookkeeping';
 
 /**
  * Run a sync now. Coalesced per character and serialized globally (planSync.ts).
@@ -62,4 +63,16 @@ export async function deleteSyncedSetting(key: string): Promise<void> {
 export async function ensureSignedIn(characterId: number): Promise<string> {
   const { ensureSignedIn } = await import('./syncAuth');
   return ensureSignedIn(characterId);
+}
+
+/**
+ * Purge a removed Character's remote Firestore docs (plans, buildPlans,
+ * quickbars, settings) right now. If it can't run (most commonly a dead
+ * refresh token — the Character can no longer sign in), records a pending
+ * purge that the next successful sync for it retries automatically. Returns
+ * whether the purge ran immediately.
+ */
+export async function purgeCharacterRemoteDataOrDefer(characterId: number): Promise<boolean> {
+  const { purgeCharacterRemoteDataOrDefer } = await import('./characterPurge');
+  return purgeCharacterRemoteDataOrDefer(characterId);
 }
