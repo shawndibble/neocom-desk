@@ -20,6 +20,8 @@ export interface ItemContextMenuProps {
   /** Undefined while the blueprint catalog hasn't been checked yet; null once checked and no blueprint produces this item. */
   blueprintTypeID: number | null | undefined;
   onAddToQuickbar: (typeId: number, itemName: string) => void;
+  /** False with no active character — the Quickbar has nobody to save the item under. */
+  quickbarAvailable: boolean;
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }
@@ -30,6 +32,7 @@ export function ItemContextMenu({
   itemName,
   blueprintTypeID,
   onAddToQuickbar,
+  quickbarAvailable,
   onOpenChange,
   children,
 }: ItemContextMenuProps) {
@@ -47,7 +50,11 @@ export function ItemContextMenu({
     <ContextMenu onOpenChange={onOpenChange}>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onSelect={() => onAddToQuickbar(typeId, itemName)}>
+        <ContextMenuItem
+          disabled={!quickbarAvailable}
+          title={quickbarAvailable ? undefined : t('market.contextMenu.quickbarNoCharacter')}
+          onSelect={() => onAddToQuickbar(typeId, itemName)}
+        >
           {t('market.contextMenu.addToQuickbar')}
         </ContextMenuItem>
         <ContextMenuItem disabled title={t('market.contextMenu.unavailable')}>

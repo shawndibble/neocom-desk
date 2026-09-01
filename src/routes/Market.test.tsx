@@ -252,6 +252,12 @@ describe('Market Browser', () => {
 });
 
 describe('Market Browser item context menu (issue #6)', () => {
+  beforeEach(async () => {
+    // Ordinary usage always has an active character; Add to Quickbar is
+    // enabled in that state (see the "Quickbar (issue #7)" describe block
+    // below for the no-active-character edge case).
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
+  });
   afterEach(() => configureClipboard(null));
 
   it('opens on right-click with all five actions, two disabled until their target ships', async () => {
@@ -307,6 +313,22 @@ describe('Market Browser item context menu (issue #6)', () => {
 
     await user.click(screen.getByRole('menuitem', { name: 'Copy name' }));
     expect(writeText).toHaveBeenCalledWith('Rifter');
+  });
+});
+
+describe('Quickbar unavailable with no active character (issue #7)', () => {
+  it('disables Add to Quickbar with an explanatory title', async () => {
+    // Ambient state from the outer beforeEach: no active character.
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    const menuItem = screen.getByRole('menuitem', { name: 'Add to Quickbar' });
+    expect(menuItem).toHaveAttribute('data-disabled');
+    expect(menuItem).toHaveAttribute('title', 'Select a character to use the Quickbar');
   });
 });
 

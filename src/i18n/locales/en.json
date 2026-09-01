@@ -570,6 +570,7 @@
       "showInfo": "Show info",
       "addToCompare": "Add to Compare",
       "unavailable": "Not available yet",
+      "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",

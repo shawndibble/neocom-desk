@@ -109,6 +109,7 @@ interface MarketGroupTreeProps {
   blueprintCatalog: BlueprintCatalog | null;
   onRequestBlueprintCatalog: () => void;
   onAddToQuickbar: (typeId: number, itemName: string) => void;
+  quickbarAvailable: boolean;
 }
 
 function MarketGroupTree({
@@ -122,6 +123,7 @@ function MarketGroupTree({
   blueprintCatalog,
   onRequestBlueprintCatalog,
   onAddToQuickbar,
+  quickbarAvailable,
 }: MarketGroupTreeProps) {
   const filtering = filterResult !== null;
 
@@ -167,6 +169,7 @@ function MarketGroupTree({
                     itemName={item.name}
                     blueprintTypeID={blueprintTypeID}
                     onAddToQuickbar={onAddToQuickbar}
+                    quickbarAvailable={quickbarAvailable}
                     onOpenChange={(open) => {
                       if (open) onRequestBlueprintCatalog();
                     }}
@@ -681,6 +684,7 @@ export function Market() {
                 blueprintCatalog={blueprintCatalog}
                 onRequestBlueprintCatalog={ensureBlueprintCatalog}
                 onAddToQuickbar={handleAddToQuickbar}
+                quickbarAvailable={activeCharacterId !== null}
               />
             </div>
           )}
