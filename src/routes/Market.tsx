@@ -40,6 +40,8 @@ import { getOrderBook, clearOrderBookCache } from '@/features/market/orderBook';
 import { formatVolume, formatOrderLocationText } from '@/features/market/format';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
+import { CompareDrawer } from '@/features/market/CompareDrawer';
+import { useCompareSet } from '@/features/market/compareSet';
 import { QuickbarList } from '@/features/market/QuickbarList';
 import {
   addQuickbarItem,
@@ -232,6 +234,8 @@ export function Market() {
   const hydrateHub = useMarketHub((state) => state.hydrate);
   const setHubId = useMarketHub((state) => state.setValue);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+
+  const compareCount = useCompareSet((state) => state.items.length);
 
   const locationModeValue = useLocationMode((state) => state.value);
   const locationModeHydrated = useLocationMode((state) => state.hydrated);
@@ -961,6 +965,16 @@ export function Market() {
           )}
         </Panel>
       </div>
+
+      {compareCount > 0 && (
+        <CompareDrawer
+          chosenRegionId={chosenRegionId}
+          globalMarkets={globalMarketsMap}
+          locationMode={locationModeValue.mode}
+          hubStationId={hub.stationId}
+          refreshTick={refreshTick}
+        />
+      )}
     </div>
   );
 }

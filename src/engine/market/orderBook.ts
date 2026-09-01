@@ -75,6 +75,38 @@ export function filterOrdersByLocation<T extends { location_id: number }>(
   return orders.filter((order) => order.location_id === locationId);
 }
 
+export interface OrderBookSummary {
+  /** Cheapest sell order's price; null when the side has no orders. */
+  bestSell: number | null;
+  /** Highest buy order's price; null when the side has no orders. */
+  bestBuy: number | null;
+  /** bestSell - bestBuy; null unless both sides have an order — never derived from a missing side treated as zero. */
+  spread: number | null;
+  /**
+   * Sum of sell-side volume_remain: what a buyer could actually acquire right
+   * now. Buy-side volume is demand, not supply, so it is not part of this.
+   */
+  availableVolume: number;
+}
+
+interface PricedOrder extends RawOrder {
+  price: number;
+  volume_remain: number;
+}
+
+/** Compare Set summary (CONTEXT.md "Compare"): best sell, best buy, spread and available volume for one item's order book. Pure; callers pass an already location-filtered order list. */
+export function summarizeOrderBook<T extends PricedOrder>(orders: readonly T[]): OrderBookSummary {
+  const { sell, buy } = splitOrderBook(orders);
+  const bestSell = sell.length === 0 ? null : Math.min(...sell.map((o) => o.price));
+  const bestBuy = buy.length === 0 ? null : Math.max(...buy.map((o) => o.price));
+  return {
+    bestSell,
+    bestBuy,
+    spread: bestSell === null || bestBuy === null ? null : bestSell - bestBuy,
+    availableVolume: sell.reduce((total, o) => total + o.volume_remain, 0),
+  };
+}
+
 /** An order's expiry: issued + duration (days). */
 export function orderExpiry(order: { issued: string; duration: number }): Date {
   const issued = new Date(order.issued);
