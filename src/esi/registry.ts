@@ -146,6 +146,18 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/planets',
     scope: 'esi-planets.manage_planets.v1',
   },
+  getCharacterPlanet: {
+    route: '/characters/{character_id}/planets/{planet_id}',
+    scope: 'esi-planets.manage_planets.v1',
+  },
+  getUniversePlanet: {
+    route: '/universe/planets/{planet_id}',
+    scope: PUBLIC,
+  },
+  getUniverseSchematic: {
+    route: '/universe/schematics/{schematic_id}',
+    scope: PUBLIC,
+  },
   getCharacterContacts: {
     route: '/characters/{character_id}/contacts',
     scope: 'esi-characters.read_contacts.v1',

@@ -20,6 +20,7 @@ import { Industry } from '@/routes/Industry';
 import { Market } from '@/routes/Market';
 import { Wallet } from '@/routes/Wallet';
 import { Clones } from '@/routes/Clones';
+import { PlanetaryIndustry } from '@/routes/PlanetaryIndustry';
 import { Assets } from '@/routes/Assets';
 import { Mail } from '@/routes/Mail';
 import { Calendar } from '@/routes/Calendar';
@@ -66,6 +67,7 @@ const ROUTE_ELEMENTS = {
   '/market': <Market />,
   '/wallet': <Wallet />,
   '/clones': <Clones />,
+  '/planetary-industry': <PlanetaryIndustry />,
   '/employment-history': <EmploymentHistory />,
   '/assets': <Assets />,
   '/mail': <Mail />,
