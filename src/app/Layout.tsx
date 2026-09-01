@@ -31,6 +31,22 @@ function navClass({ isActive }: { isActive: boolean }): string {
   return `${NAV_LINK} ${isActive ? NAV_ACTIVE : NAV_IDLE}`;
 }
 
+// Distinct from NAV_LINK (used by the desktop rail and the More sheet, both
+// of which scroll and have room to spare): the bottom tab bar is a fixed
+// five-way split of a viewport that can be as narrow as ~320px. `flex-1
+// min-w-0` forces every tab — including "More" — to always get an equal,
+// bounded share of the width, so a long label truncates instead of pushing
+// later tabs off-screen. `min-h-11` (44px) meets the mobile touch-target
+// minimum regardless of how little padding the text needs.
+const MOBILE_NAV_ITEM =
+  'flex min-h-11 min-w-0 flex-1 items-center justify-center border-t-2 border-transparent px-1 py-2 text-[0.625rem] font-semibold uppercase transition-colors';
+const MOBILE_NAV_ACTIVE = 'border-accent bg-panel-2 text-accent';
+const MOBILE_NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text';
+
+function mobileNavClass({ isActive }: { isActive: boolean }): string {
+  return `${MOBILE_NAV_ITEM} ${isActive ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`;
+}
+
 /** Nav-reachable routes, so `useLockedRoutes` answers for all of them at once. */
 const NAV_PATHS = [
   '/characters',
@@ -278,27 +294,30 @@ export function Layout() {
         )}
       </aside>
 
-      <main className="min-w-0 flex-1 p-4 pb-20 md:pb-4">
+      <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
         <AuthFailureNotice />
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar: 4 primary destinations + More. */}
+      {/* Mobile bottom tab bar: 4 primary destinations + More. Fixed-width
+          items (see MOBILE_NAV_ITEM) so the bar never overflows the
+          viewport; `env(safe-area-inset-bottom)` keeps it clear of the
+          home-indicator gesture area on notched phones. */}
       <nav
         aria-label={t('nav.mobileLabel')}
-        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-panel/95 backdrop-blur-sm md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
       >
-        <NavLink to="/characters" className={navClass}>
-          {t('nav.characters')}
+        <NavLink to="/characters" className={mobileNavClass}>
+          <span className="truncate">{t('nav.characters')}</span>
         </NavLink>
-        <NavLink to="/overview" className={navClass}>
-          {t('nav.overview')}
+        <NavLink to="/overview" className={mobileNavClass}>
+          <span className="truncate">{t('nav.overview')}</span>
         </NavLink>
-        <NavLink to="/skills" className={navClass}>
-          {t('nav.skills')}
+        <NavLink to="/skills" className={mobileNavClass}>
+          <span className="truncate">{t('nav.skills')}</span>
         </NavLink>
-        <NavLink to="/industry" className={navClass}>
-          {t('nav.industry')}
+        <NavLink to="/industry" className={mobileNavClass}>
+          <span className="truncate">{t('nav.industry')}</span>
         </NavLink>
         <button
           type="button"
@@ -307,9 +326,9 @@ export function Layout() {
           aria-expanded={moreOpen}
           aria-controls={MORE_SHEET_ID}
           onClick={() => setMoreOpen((open) => !open)}
-          className={`${NAV_LINK} ${moreOpen ? NAV_ACTIVE : NAV_IDLE}`}
+          className={`${MOBILE_NAV_ITEM} ${moreOpen ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
         >
-          {t('nav.more')}
+          <span className="truncate">{t('nav.more')}</span>
         </button>
       </nav>
 
