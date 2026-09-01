@@ -1035,3 +1035,94 @@ describe('jumps-away distance (issue #87)', () => {
     await waitFor(() => expect(seenFlags).toEqual(['shortest', 'secure']));
   });
 });
+
+describe('station sort (issue #88)', () => {
+  const JITA = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
+  const STRUCTURE = 'Structure #1000000000001';
+
+  function stationOrder(): string[] {
+    return screen
+      .getAllByRole('heading', { name: new RegExp(`^(${JITA}|${STRUCTURE})$`) })
+      .map((h) => h.textContent);
+  }
+
+  // Default fixture: Jita holds 500 Tritanium (type 34), the structure holds
+  // 10 Pyerite (type 35) — pricing Pyerite far above Tritanium makes the
+  // structure's estimated value the larger one while its name still sorts
+  // after Jita's, so a switch to "Value" is only visible if sorting actually
+  // changed rather than leaving the default alphabetical order in place.
+  function priceStructureAboveJita() {
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', () =>
+        HttpResponse.json([
+          { type_id: 34, adjusted_price: 1, average_price: 1 },
+          { type_id: 35, adjusted_price: 10_000, average_price: 10_000 },
+        ])
+      )
+    );
+  }
+
+  it('defaults to sorting stations by name', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { name: JITA });
+    expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+    expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveTextContent('Name');
+  });
+
+  it('re-sorts the station list by estimated value when "Value" is selected', async () => {
+    const user = userEvent.setup();
+    priceStructureAboveJita();
+    render(<App />);
+    await screen.findByRole('heading', { name: JITA });
+    expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+
+    await user.click(screen.getByRole('combobox', { name: 'Sort' }));
+    await user.click(await screen.findByRole('option', { name: 'Value' }));
+
+    await waitFor(() => {
+      expect(stationOrder()).toEqual([STRUCTURE, JITA]);
+    });
+  });
+
+  it('keeps a pinned station on top even under a "Value" sort it would otherwise lose', async () => {
+    const user = userEvent.setup();
+    priceStructureAboveJita();
+    await db.stationPins.put({
+      id: `${CHAR_ID}:60003760`,
+      characterId: CHAR_ID,
+      locationId: 60003760,
+      scope: 'character',
+      updatedAt: Date.now(),
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: JITA });
+
+    await user.click(screen.getByRole('combobox', { name: 'Sort' }));
+    await user.click(await screen.findByRole('option', { name: 'Value' }));
+
+    await waitFor(() => {
+      expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+    });
+  });
+
+  it('persists the chosen sort field across a remount', async () => {
+    const user = userEvent.setup();
+    priceStructureAboveJita();
+    const { unmount } = render(<App />);
+    await screen.findByRole('heading', { name: JITA });
+
+    await user.click(screen.getByRole('combobox', { name: 'Sort' }));
+    await user.click(await screen.findByRole('option', { name: 'Value' }));
+    await waitFor(() => {
+      expect(stationOrder()).toEqual([STRUCTURE, JITA]);
+    });
+    unmount();
+
+    render(<App />);
+    await screen.findByRole('heading', { name: JITA });
+    await waitFor(() => {
+      expect(stationOrder()).toEqual([STRUCTURE, JITA]);
+    });
+    expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveTextContent('Value');
+  });
+});

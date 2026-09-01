@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { buildAssetTree, type AssetTreeContainerNode, type EngineAsset } from './assetTree';
+import {
+  buildAssetTree,
+  compareStations,
+  type AssetTreeContainerNode,
+  type AssetTreeStation,
+  type EngineAsset,
+  type StationSortContext,
+} from './assetTree';
+import type { JumpsAwayResult } from './jumpsAway';
 
 const asset = (overrides: Partial<EngineAsset> & Pick<EngineAsset, 'item_id'>): EngineAsset => ({
   type_id: 34,
@@ -262,4 +270,103 @@ describe('buildAssetTree', () => {
       { kind: 'item', asset: expect.objectContaining({ item_id: outer.asset.item_id }) },
     ]);
   });
+});
+
+describe('compareStations', () => {
+  const station = (
+    overrides: Partial<AssetTreeStation> & Pick<AssetTreeStation, 'locationId'>
+  ) => ({
+    locationType: 'station' as const,
+    children: [],
+    itemCount: 0,
+    estimatedValue: 0,
+    ...overrides,
+  });
+
+  const labels = new Map<number, string>();
+  const jumps = new Map<number, JumpsAwayResult>();
+  const pinned = new Set<number>();
+
+  function makeContext(): StationSortContext {
+    return {
+      labelFor: (s) => labels.get(s.locationId) ?? String(s.locationId),
+      pinnedFor: (s) => pinned.has(s.locationId),
+      jumpsAwayFor: (s) => jumps.get(s.locationId),
+    };
+  }
+
+  function reset() {
+    labels.clear();
+    jumps.clear();
+    pinned.clear();
+  }
+
+  it('sorts by name ascending', () => {
+    reset();
+    labels.set(1, 'Jita IV - Moon 4');
+    labels.set(2, 'Amarr VIII');
+    const stations = [station({ locationId: 1 }), station({ locationId: 2 })];
+    const sorted = [...stations].sort((a, b) => compareStations(a, b, 'name', makeContext()));
+    expect(sorted.map((s) => s.locationId)).toEqual([2, 1]);
+  });
+
+  it('sorts by estimated value, highest first', () => {
+    reset();
+    const stations = [
+      station({ locationId: 1, estimatedValue: 100 }),
+      station({ locationId: 2, estimatedValue: 5_000 }),
+    ];
+    const sorted = [...stations].sort((a, b) => compareStations(a, b, 'value', makeContext()));
+    expect(sorted.map((s) => s.locationId)).toEqual([2, 1]);
+  });
+
+  it('sorts by item count, highest first', () => {
+    reset();
+    const stations = [
+      station({ locationId: 1, itemCount: 3 }),
+      station({ locationId: 2, itemCount: 40 }),
+    ];
+    const sorted = [...stations].sort((a, b) => compareStations(a, b, 'itemCount', makeContext()));
+    expect(sorted.map((s) => s.locationId)).toEqual([2, 1]);
+  });
+
+  it('sorts by jumps-away ascending, with unknown distances sorted last', () => {
+    reset();
+    jumps.set(1, { kind: 'unknown', reason: 'noRoute' });
+    jumps.set(2, { kind: 'known', jumps: 5 });
+    jumps.set(3, { kind: 'known', jumps: 1 });
+    const stations = [
+      station({ locationId: 1 }),
+      station({ locationId: 2 }),
+      station({ locationId: 3 }),
+    ];
+    const sorted = [...stations].sort((a, b) => compareStations(a, b, 'jumpsAway', makeContext()));
+    expect(sorted.map((s) => s.locationId)).toEqual([3, 2, 1]);
+  });
+
+  it('treats a missing jumps-away lookup the same as unknown', () => {
+    reset();
+    jumps.set(2, { kind: 'known', jumps: 2 });
+    const stations = [station({ locationId: 1 }), station({ locationId: 2 })];
+    const sorted = [...stations].sort((a, b) => compareStations(a, b, 'jumpsAway', makeContext()));
+    expect(sorted.map((s) => s.locationId)).toEqual([2, 1]);
+  });
+
+  it.each(['name', 'value', 'itemCount', 'jumpsAway'] as const)(
+    "keeps a pinned station first regardless of the %s field, even if it loses that field's comparison",
+    (field) => {
+      reset();
+      pinned.add(1);
+      labels.set(1, 'Zzz Unpinned-losing station');
+      labels.set(2, 'Aaa');
+      jumps.set(1, { kind: 'known', jumps: 99 });
+      jumps.set(2, { kind: 'known', jumps: 1 });
+      const stations = [
+        station({ locationId: 1, estimatedValue: 1, itemCount: 1 }),
+        station({ locationId: 2, estimatedValue: 9_999, itemCount: 9_999 }),
+      ];
+      const sorted = [...stations].sort((a, b) => compareStations(a, b, field, makeContext()));
+      expect(sorted.map((s) => s.locationId)).toEqual([1, 2]);
+    }
+  );
 });

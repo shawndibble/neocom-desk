@@ -11,6 +11,8 @@
  * there is nothing to expand into either way.
  */
 
+import type { JumpsAwayResult } from './jumpsAway';
+
 export interface EngineAsset {
   item_id: number;
   type_id: number;
@@ -53,6 +55,42 @@ export interface AssetTreeStation {
   children: AssetTreeNode[];
   itemCount: number;
   estimatedValue: number;
+}
+
+export type StationSortField = 'name' | 'value' | 'itemCount' | 'jumpsAway';
+
+export interface StationSortContext {
+  labelFor: (station: AssetTreeStation) => string;
+  pinnedFor: (station: AssetTreeStation) => boolean;
+  /** Undefined and `{ kind: 'unknown', ... }` are treated the same: sorted after every known distance. */
+  jumpsAwayFor: (station: AssetTreeStation) => JumpsAwayResult | undefined;
+}
+
+function jumpsAwayValue(result: JumpsAwayResult | undefined): number {
+  return result?.kind === 'known' ? result.jumps : Number.POSITIVE_INFINITY;
+}
+
+/** Pinned stations (issue #84) always sort first; the chosen field only orders within each group. */
+export function compareStations(
+  a: AssetTreeStation,
+  b: AssetTreeStation,
+  field: StationSortField,
+  ctx: StationSortContext
+): number {
+  const pinnedA = ctx.pinnedFor(a);
+  const pinnedB = ctx.pinnedFor(b);
+  if (pinnedA !== pinnedB) return pinnedA ? -1 : 1;
+
+  switch (field) {
+    case 'name':
+      return ctx.labelFor(a).localeCompare(ctx.labelFor(b));
+    case 'value':
+      return b.estimatedValue - a.estimatedValue;
+    case 'itemCount':
+      return b.itemCount - a.itemCount;
+    case 'jumpsAway':
+      return jumpsAwayValue(ctx.jumpsAwayFor(a)) - jumpsAwayValue(ctx.jumpsAwayFor(b));
+  }
 }
 
 const FITTING_SLOT_PATTERN = /^(Hi|Med|Lo|Rig|SubSystem|Service)Slot\d+$/;
