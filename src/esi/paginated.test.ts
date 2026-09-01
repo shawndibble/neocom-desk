@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { fetchAllPagesStatus } from './paginated';
 import { configureEsi, ESI_BASE_URL } from './client';
 import { rejectBadEsiHeaders } from './test-helpers';
+import { onEsiActivity, type ActivityEvent } from './activityLog';
 
 const server = setupServer();
 
@@ -187,5 +188,63 @@ describe('fetchAllPagesStatus', () => {
 
     expect(result.truncated).toBe(false);
     expect(result.items).toEqual(['item-1', 'item-2', 'item-3']);
+  });
+});
+
+/**
+ * A multi-page read must log once, not once per page — otherwise a single
+ * large asset/journal load could crowd the bounded activity buffer with
+ * near-identical rows (issue #32).
+ */
+describe('fetchAllPagesStatus — activity log (issue #32)', () => {
+  it('emits exactly one success event for a multi-page read', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page')) || 1;
+        return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': '3' } });
+      })
+    );
+    const events: ActivityEvent[] = [];
+    const unsubscribe = onEsiActivity((event) => events.push(event));
+
+    await fetchAllPagesStatus<string>('/markets/10000002/orders', {
+      endpointId: 'getMarketOrders',
+    });
+
+    expect(events).toEqual([
+      {
+        endpointId: 'getMarketOrders',
+        characterId: undefined,
+        timestamp: expect.any(Number),
+        outcome: 'success',
+      },
+    ]);
+    unsubscribe();
+  });
+
+  it('emits exactly one error event when a later page fails (not a 404 end-of-data)', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/10000002/orders`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page')) || 1;
+        if (page === 2) return new HttpResponse(null, { status: 500 });
+        return HttpResponse.json([`item-${page}`], { headers: { 'X-Pages': '3' } });
+      })
+    );
+    const events: ActivityEvent[] = [];
+    const unsubscribe = onEsiActivity((event) => events.push(event));
+
+    await expect(
+      fetchAllPagesStatus<string>('/markets/10000002/orders', { endpointId: 'getMarketOrders' })
+    ).rejects.toThrow();
+
+    expect(events).toEqual([
+      {
+        endpointId: 'getMarketOrders',
+        characterId: undefined,
+        timestamp: expect.any(Number),
+        outcome: 'error',
+      },
+    ]);
+    unsubscribe();
   });
 });

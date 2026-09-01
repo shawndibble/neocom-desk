@@ -2,6 +2,7 @@ import { useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ErrorBoundary } from './ErrorBoundary';
 import { subscribeToEsiAuthFailures } from '@/stores/authFailure';
+import { subscribeToEsiActivity } from '@/stores/activityLog';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { configureEsi } from '@/esi/client';
 import { triggerSync } from '@/sync';
@@ -100,6 +101,9 @@ export function App() {
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).
   useEffect(() => subscribeToEsiAuthFailures(), []);
+
+  // Same wiring as the auth-failure signal, for the activity log (issue #32).
+  useEffect(() => subscribeToEsiActivity(), []);
 
   // Fire-and-forget, on app start (once hydration resolves an active character)
   // and every character switch. Errors (offline, no Firebase config) are

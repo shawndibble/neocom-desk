@@ -698,5 +698,19 @@
     "switchCharacter": "Switch character",
     "openSettings": "Open Settings",
     "close": "Close the open dialog"
+  },
+  "activityLog": {
+    "title": "Activity Log",
+    "hint": "Recent requests this device has made to EVE's servers — useful for your own reference, or for a support conversation. Clears on reload.",
+    "columnEndpoint": "Endpoint",
+    "columnCharacter": "Character",
+    "columnTime": "Time",
+    "columnOutcome": "Outcome",
+    "outcomeSuccess": "Succeeded",
+    "outcomeAuthFailure": "Needs re-login",
+    "outcomeError": "Failed",
+    "publicCall": "Public",
+    "emptyTitle": "No activity yet",
+    "emptyHint": "Requests the app makes will appear here as you use it."
   }
 }
