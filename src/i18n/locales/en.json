@@ -533,6 +533,7 @@
     "noResults": "No items match your search.",
     "selectPromptTitle": "Select an item",
     "selectPromptHint": "Search or browse the tree to see its live order book.",
+    "backToFinder": "Back",
     "loadFailedTitle": "Couldn't load the market catalogue",
     "loadFailedHint": "Reload the page to try again.",
     "sell": "Sell Orders",
