@@ -7,6 +7,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
+import { cx } from '@/lib/cx';
 
 /** Matches Material UI's `enterTouchDelay` — long enough to not fire on an incidental brush, short enough to feel responsive. */
 const TOUCH_LONG_PRESS_MS = 500;
@@ -85,7 +86,7 @@ export function Tooltip({ content, children, className = '' }: TooltipProps) {
   return (
     <span
       ref={rootRef}
-      className={`group relative inline-flex ${className}`}
+      className={cx('group relative inline-flex', className)}
       onTouchStart={handleTouchStart}
       onTouchEnd={cancelLongPress}
       onTouchMove={cancelLongPress}
