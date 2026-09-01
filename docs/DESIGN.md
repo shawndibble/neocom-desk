@@ -100,7 +100,10 @@ Sources live in `assets/brand/` (not shipped). Everything under
   not overridden by this project's `@theme` block, which only sets
   colors/fonts) — sizes below are the values at the browser-default 16px
   root and scale with it. Dense defaults — panel padding `p-3`, table cell
-  `px-3 py-1.5`, control heights `h-7` (28px, compact) / `h-9` (36px, default).
+  `px-3 py-1.5` (header `px-3 py-2`), control heights `h-7` (28px, compact) /
+  `h-9` (36px, default). `DataTable`'s `density="compact"` option tightens
+  both to `px-2 py-1`, for tables embedded in already-dense surfaces (e.g.
+  the build-plan materials table inside a `Panel`).
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
 - Borders: always 1px (`border`), never 2px.

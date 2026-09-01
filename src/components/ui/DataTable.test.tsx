@@ -99,6 +99,18 @@ describe('DataTable', () => {
     expect(cells[0]).not.toHaveClass('text-right');
   });
 
+  it('defaults to comfortable header and cell padding', () => {
+    renderTable();
+    expect(screen.getByRole('columnheader', { name: 'Item' })).toHaveClass('px-3', 'py-2');
+    expect(screen.getAllByRole('cell')[0]).toHaveClass('px-3', 'py-1.5');
+  });
+
+  it('tightens header and cell padding when density is compact', () => {
+    renderTable({ density: 'compact' });
+    expect(screen.getByRole('columnheader', { name: 'Item' })).toHaveClass('px-2', 'py-1');
+    expect(screen.getAllByRole('cell')[0]).toHaveClass('px-2', 'py-1');
+  });
+
   it('applies cellClassName per row', () => {
     renderTable();
     const cells = screen.getAllByRole('cell');

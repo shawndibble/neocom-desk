@@ -15,7 +15,9 @@ import {
   Line,
   type TooltipContentProps,
 } from 'recharts';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { formatVolume } from './format';
 import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
@@ -66,6 +68,23 @@ function HistoryTooltip({
 export default function PriceHistoryChart({ points, itemName }: PriceHistoryChartProps) {
   const { t } = useTranslation();
   const chartData = points.map((p) => ({ ...p, dateLabel: formatTick(p.date) }));
+
+  const columns = useMemo<DataTableColumn<MarketHistoryPoint>[]>(
+    () => [
+      { id: 'date', header: t('market.priceHistory.date'), render: (p) => p.date },
+      {
+        id: 'average',
+        header: t('market.priceHistory.average'),
+        render: (p) => formatIsk(p.average, 2),
+      },
+      {
+        id: 'volume',
+        header: t('market.priceHistory.volume'),
+        render: (p) => formatVolume(p.volume),
+      },
+    ],
+    [t]
+  );
 
   // `role="img"` collapses everything inside it into one opaque image for
   // assistive tech, so the sr-only table below must be a *sibling*, not a
@@ -119,25 +138,13 @@ export default function PriceHistoryChart({ points, itemName }: PriceHistoryChar
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <table className="sr-only">
-        <caption>{t('market.priceHistory.chartLabel', { item: itemName })}</caption>
-        <thead>
-          <tr>
-            <th>{t('market.priceHistory.date')}</th>
-            <th>{t('market.priceHistory.average')}</th>
-            <th>{t('market.priceHistory.volume')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {points.map((p) => (
-            <tr key={p.date}>
-              <td>{p.date}</td>
-              <td>{formatIsk(p.average, 2)}</td>
-              <td>{formatVolume(p.volume)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable
+        columns={columns}
+        rows={points}
+        rowKey={(p) => p.date}
+        label={t('market.priceHistory.chartLabel', { item: itemName })}
+        className="sr-only"
+      />
     </div>
   );
 }
