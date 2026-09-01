@@ -202,6 +202,28 @@ describe('bestAttributes with Boosters', () => {
     expect(result.seconds).toBeCloseTo(total, 6);
   });
 
+  it('agrees with computeSchedule when two Boosters expire at different times', async () => {
+    // Same load-bearing check as above, but for the piecewise case: two
+    // Boosters with different expiries. `computeSchedule` already tracks each
+    // Booster's own liveness independently (`attributeAt` in schedule.ts), so
+    // this is the cross-check that the optimizer's new piecewise walk landed
+    // on the same semantics rather than a second, disagreeing model of it.
+    const { computeSchedule } = await import('@/engine/schedule');
+    const boosters = [
+      { bonus: { intelligence: 12 }, expiresAt: after(2000) },
+      { bonus: { perception: 12 }, expiresAt: after(6000) },
+    ];
+    const result = bestAttributes(steps, skills, { memory: 3 }, { boosters, startDate: START });
+
+    const scheduled = computeSchedule(
+      steps,
+      { attributes: result.attributes, implants: { memory: 3 }, boosters, startDate: START },
+      skills
+    );
+    const total = scheduled[scheduled.length - 1].cumulativeSeconds;
+    expect(result.seconds).toBeCloseTo(total, 6);
+  });
+
   it('can choose a different allocation than it would without the Booster', () => {
     // A Booster large enough on one pair should pull the optimum away from
     // the unboosted choice; if it never does, the parameter is decorative.
@@ -220,6 +242,136 @@ describe('bestAttributes with Boosters', () => {
       }
     );
     expect(boosted.seconds).toBeLessThan(plain.seconds);
+  });
+
+  it('pins exact single-Booster seconds and attributes (regression against the piecewise walk)', () => {
+    // Locked to pre-piecewise-refactor output at double precision: the single
+    // Booster path must stay bit-identical once the walk generalizes to carry
+    // more than one Booster's worth of breakpoints.
+    const midExpiry = bestAttributes(
+      steps,
+      skills,
+      {},
+      {
+        boosters: [
+          {
+            bonus: { intelligence: 10, memory: 10, perception: 10, willpower: 10, charisma: 10 },
+            expiresAt: after(6000),
+          },
+        ],
+        startDate: START,
+      }
+    );
+    expect(midExpiry.seconds.toPrecision(17)).toBe('685015.38461538462');
+    expect(midExpiry.attributes).toEqual({
+      intelligence: 24,
+      memory: 17,
+      perception: 24,
+      willpower: 17,
+      charisma: 17,
+    });
+
+    const withImplants = bestAttributes(
+      steps,
+      skills,
+      { memory: 3 },
+      {
+        boosters: [{ bonus: { intelligence: 12, perception: 12 }, expiresAt: after(4000) }],
+        startDate: START,
+      }
+    );
+    expect(withImplants.seconds.toPrecision(17)).toBe('670875.84803256439');
+    expect(withImplants.attributes).toEqual({
+      intelligence: 23,
+      memory: 17,
+      perception: 25,
+      willpower: 17,
+      charisma: 17,
+    });
+
+    const lateStart = bestAttributes(
+      steps,
+      skills,
+      {},
+      {
+        boosters: [
+          {
+            bonus: { intelligence: 10, memory: 10, perception: 10, willpower: 10, charisma: 10 },
+            expiresAt: after(6000),
+          },
+        ],
+        startDate: after(5000),
+      }
+    );
+    expect(lateStart.seconds.toPrecision(17)).toBe('687323.07692307699');
+    expect(lateStart.attributes).toEqual({
+      intelligence: 24,
+      memory: 17,
+      perception: 24,
+      willpower: 17,
+      charisma: 17,
+    });
+  });
+
+  it('credits two Boosters with different expiries each for their own lifetime', () => {
+    // The bug: stacking both bonuses until the EARLIEST expiry, then dropping
+    // to zero, undercredits the longer-lived Booster for the time between the
+    // two expiries. The fix must land in that gap: better than crediting
+    // neither bonus there, and no better than crediting both (which would
+    // mean the short Booster's own expiry was ignored).
+    //
+    // A single intelligence/memory pair, sized so unboosted training runs well
+    // past both expiries — long enough for all three regimes (both boosted,
+    // long-only, neither) to actually be walked in every scenario below.
+    const pairSkills = skillMap(skill(1, 'intelligence', 'memory', 5));
+    const pairSteps: PlanStep[] = [{ skillTypeID: 1, level: 4 }];
+    const shortBonus = { intelligence: 6 };
+    const longBonus = { memory: 6 };
+    const shortExpiry = after(2000);
+    const longExpiry = after(8000);
+
+    const piecewise = bestAttributes(
+      pairSteps,
+      pairSkills,
+      {},
+      {
+        boosters: [
+          { bonus: shortBonus, expiresAt: shortExpiry },
+          { bonus: longBonus, expiresAt: longExpiry },
+        ],
+        startDate: START,
+      }
+    );
+    // Undercrediting comparator: exactly what today's earliest-cutoff bug
+    // computes — both bonuses stacked until the short one lapses, then zero.
+    const undercredited = bestAttributes(
+      pairSteps,
+      pairSkills,
+      {},
+      {
+        boosters: [
+          { bonus: shortBonus, expiresAt: shortExpiry },
+          { bonus: longBonus, expiresAt: shortExpiry },
+        ],
+        startDate: START,
+      }
+    );
+    // Overcrediting comparator: as if the long bonus alone ran the full
+    // long-Booster window with no early loss of the short one's contribution.
+    const fullyBoth = bestAttributes(
+      pairSteps,
+      pairSkills,
+      {},
+      {
+        boosters: [
+          { bonus: shortBonus, expiresAt: longExpiry },
+          { bonus: longBonus, expiresAt: longExpiry },
+        ],
+        startDate: START,
+      }
+    );
+    expect(piecewise.seconds).toBeLessThan(undercredited.seconds);
+    expect(piecewise.seconds).toBeGreaterThan(fullyBoth.seconds);
   });
 
   it('honours a segment that starts partway through the Booster window', () => {

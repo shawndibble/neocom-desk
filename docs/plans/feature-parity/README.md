@@ -629,18 +629,22 @@ longer Booster was still running — holding a throwaway Booster could make the
 optimizer return a _worse_ answer than not holding it. Fixed here: the cutoff
 is the last lapse, and a test pins it.
 
-Underneath it sits a second, deeper one that is **not** fixed.
-`bestAttributes` stacks every live Booster's bonus but applies the stack only
-until the earliest expiry — its own docstring says so, calling it
-under-crediting rather than over-crediting. With a long Booster and a short
-one that is a large under-credit, and at `remapCount >= 2` it still picks a
-worse split. Fixing it means giving the ordered walk piecewise bonuses over
-time, which is the multi-Booster model, not D5.
+Underneath it sat a second, deeper one, now also **fixed**. `bestAttributes`
+and `bestAttributesAtBoundaries` stacked every live Booster's bonus but
+applied the stack only until the earliest expiry — under-crediting rather than
+over-crediting. With a long Booster and a short one that was a large
+under-credit, and at `remapCount >= 2` it still picked a worse split. The
+ordered walk now carries piecewise bonuses that drop segment by segment as
+each Booster's own expiry is crossed, so a long Booster is credited for its
+own lifetime regardless of a shorter one held alongside it. A property test
+(`placeRemaps.test.ts`, "does not let a short extra Booster make the answer
+worse") asserts this holds at every `remapCount` up to `MAX_SUPPORTED_REMAPS`,
+not just 1.
 
-**Unreachable today:** `PlanEditor.tsx` builds `activeBoosters` from a single
-Booster form, so the list never holds two. `BoosterContext.boosters` is
-`readonly Booster[]`, so it is reachable the moment a second Booster becomes
-enterable — schedule this before that UI, not after.
+**Still unreachable today:** `PlanEditor.tsx` builds `activeBoosters` from a
+single Booster form, so the list never holds two. `BoosterContext.boosters` is
+`readonly Booster[]`, so the fix above is exercised by the engine's tests now
+and takes effect automatically the moment a second Booster becomes enterable.
 
 ### Also found while reviewing, also not fixed
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { bestAttributes } from '@/engine/optimizer/bestAttributes';
 import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
-import { placeRemaps } from '@/engine/optimizer/placeRemaps';
+import { placeRemaps, MAX_SUPPORTED_REMAPS } from '@/engine/optimizer/placeRemaps';
 import type { AttributeName, Attributes, EngineSkill, PlanStep } from '@/engine/types';
 
 const skill = (
@@ -903,30 +903,26 @@ describe('placeRemaps with Boosters', () => {
     charisma: 12,
   };
 
-  it('does not let a short extra Booster make the answer worse', () => {
-    // The expiry cutoff decides how far into the plan segments are still
-    // worth costing against a Booster. Taking the EARLIEST expiry stopped
-    // that at the first lapse while a longer Booster was still running, so
-    // holding a throwaway Booster made the optimizer pick a worse split.
-    //
-    // remapCount 1 only: above that the answer is still governed by
-    // `bestAttributes` crediting stacked bonuses until the earliest expiry
-    // (its own documented limitation), which no cutoff here can undo. The
-    // planner builds at most one Booster today, so that stays recorded
-    // rather than fixed — see plan §5.6.
+  it('does not let a short extra Booster make the answer worse, at every supported remap count', () => {
+    // Two Boosters with different expiries are now credited piecewise, each
+    // for its own lifetime, so adding a short extra Booster on top of a long
+    // one must never cost more than the long one alone — at any remap count
+    // the planner evaluates, not just remapCount 1.
     const long = { bonus, expiresAt: after(5_000_000) };
     const short = { bonus: { charisma: 3 }, expiresAt: after(60) };
-    const one = placeRemaps(steps, skills, {
-      remapCount: 1,
-      currentAttributes: CURRENT,
-      booster: { boosters: [long], startDate: START },
-    });
-    const two = placeRemaps(steps, skills, {
-      remapCount: 1,
-      currentAttributes: CURRENT,
-      booster: { boosters: [long, short], startDate: START },
-    });
-    expect(two.totalSeconds).toBeLessThanOrEqual(one.totalSeconds + 1e-6);
+    for (let remapCount = 1; remapCount <= MAX_SUPPORTED_REMAPS; remapCount++) {
+      const one = placeRemaps(steps, skills, {
+        remapCount,
+        currentAttributes: CURRENT,
+        booster: { boosters: [long], startDate: START },
+      });
+      const two = placeRemaps(steps, skills, {
+        remapCount,
+        currentAttributes: CURRENT,
+        booster: { boosters: [long, short], startDate: START },
+      });
+      expect(two.totalSeconds).toBeLessThanOrEqual(one.totalSeconds + 1e-6);
+    }
   });
 
   it('leaves the Booster-blind result untouched when no context is passed', () => {
