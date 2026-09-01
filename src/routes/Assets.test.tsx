@@ -8,6 +8,8 @@ import { db } from '@/db';
 import { clearMarketPriceCache } from '@/market/prices';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { useCompareSet } from '@/features/market/compareSet';
+import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
 import type { TypeMap } from '@/sde/types';
 
@@ -117,6 +119,7 @@ beforeEach(async () => {
   await db.stationPins.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  useCompareSet.setState({ items: [] });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -1351,5 +1354,124 @@ describe('station sort (issue #88)', () => {
       expect(stationOrder()).toEqual([STRUCTURE, JITA]);
     });
     expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveTextContent('Value');
+  });
+});
+
+describe('multi-select and bulk actions (issue #90)', () => {
+  afterEach(() => configureClipboard(null));
+
+  it('shows no checkboxes in browsing mode; toggling select mode reveals them', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Tritanium');
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+
+    expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0);
+  });
+
+  it('checking a ship/container node cascades selection to all of its descendant items', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Drake' });
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Drake and its contents' }));
+
+    expect(await screen.findByText('1 item selected')).toBeInTheDocument();
+  });
+
+  it('turning off select mode clears the current selection', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Tritanium');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
+    expect(await screen.findByText('1 item selected')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+
+    expect(screen.queryByText('1 item selected')).not.toBeInTheDocument();
+    for (const checkbox of screen.getAllByRole('checkbox')) {
+      expect(checkbox).not.toBeChecked();
+    }
+  });
+
+  it('adds every selected item to the Quickbar via the bulk action bar', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Tritanium');
+    await screen.findByText('Pyerite');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Pyerite' }));
+    await user.click(screen.getByRole('button', { name: 'Add to Quickbar' }));
+
+    await waitFor(async () => {
+      const record = await db.quickbars.get(String(CHAR_ID));
+      expect(record?.items).toEqual([
+        { typeId: 34, name: 'Tritanium' },
+        { typeId: 35, name: 'Pyerite' },
+      ]);
+    });
+  });
+
+  it('adds every selected item to the Compare set via the bulk action bar', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Tritanium');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
+    await user.click(screen.getByRole('button', { name: 'Add to Compare' }));
+
+    expect(useCompareSet.getState().items).toEqual([{ typeId: 34, itemName: 'Tritanium' }]);
+  });
+
+  it('copies every selected item’s name, newline-separated, to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Tritanium');
+    await screen.findByText('Pyerite');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Pyerite' }));
+    await user.click(screen.getByRole('button', { name: 'Copy names' }));
+
+    expect(writeText).toHaveBeenCalledWith('Tritanium\nPyerite');
   });
 });

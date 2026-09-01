@@ -517,6 +517,17 @@
       "value": "Value",
       "itemCount": "Item count",
       "jumpsAway": "Jumps away"
+    },
+    "select": {
+      "toggle": "Select",
+      "itemAriaLabel": "Select {{name}}",
+      "branchAriaLabel": "Select {{name}} and its contents",
+      "stationAriaLabel": "Select all items at {{station}}",
+      "selectedCount_one": "{{count}} item selected",
+      "selectedCount_other": "{{count}} items selected",
+      "addToQuickbar": "Add to Quickbar",
+      "addToCompare": "Add to Compare",
+      "copyNames": "Copy names"
     }
   },
   "mail": {

@@ -55,6 +55,8 @@ import { loadTypes } from '@/sde/loadSde';
 import {
   buildAssetTree,
   compareStations,
+  collectItemIds,
+  collectStationItemIds,
   type AssetTreeBayNode,
   type AssetTreeContainerNode,
   type AssetTreeItemNode,
@@ -75,9 +77,17 @@ import {
   typeAheadIndex,
   type NavRow,
 } from '@/features/character/assetTreeNav';
+import {
+  namesForSelection,
+  selectionStateForIds,
+  toggleSelection,
+  type SelectionState,
+} from '@/features/character/assetSelection';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { addQuickbarItem } from '@/features/market/quickbar';
+import { useCompareSet } from '@/features/market/compareSet';
+import { writeToClipboard } from '@/lib/clipboard';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 
 /** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
@@ -398,6 +408,11 @@ interface RenderCtx {
   characterBadges: CharacterBadgeContext;
   /** Roving-tabindex bookkeeping (issue #89): tells this row's `role="treeitem"` it now has DOM focus. */
   onRowFocus: (key: string) => void;
+  /** Select mode (issue #90): browsing mode (off) renders exactly as before this ticket. */
+  selectMode: boolean;
+  selectedIds: ReadonlySet<number>;
+  /** Cascades the checkbox's node/station ids into the selection set — see `toggleSelection`. */
+  onToggleSelection: (ids: readonly number[]) => void;
 }
 
 /** `aria-level`/`aria-posinset`/`aria-setsize` plus roving-tabindex state for one row — see `assetRows.ts` for how the first three are computed. */
@@ -556,6 +571,32 @@ function useAssetItemActions(): AssetItemActions {
   return actions;
 }
 
+interface SelectionCheckboxProps {
+  state: SelectionState;
+  onToggle: () => void;
+  label: string;
+}
+
+/** Tri-state checkbox for select mode (issue #90) — indeterminate can only be set imperatively, not via a JSX prop. */
+function SelectionCheckbox({ state, onToggle, label }: SelectionCheckboxProps) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = state === 'indeterminate';
+  }, [state]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={state === 'checked'}
+      onChange={onToggle}
+      onClick={(e) => e.stopPropagation()}
+      aria-label={label}
+      className="size-3.5 shrink-0 cursor-pointer accent-accent"
+    />
+  );
+}
+
 interface AssetItemRowProps {
   node: AssetTreeItemNode;
   depth: number;
@@ -588,7 +629,14 @@ function AssetItemRow({ node, depth, ctx, rowKey, a11y }: AssetItemRowProps) {
   const characterBadge = characterBadgeFor(asset.item_id, ctx);
 
   return (
-    <div style={{ paddingLeft: `${depth * 0.75 + 0.75}rem` }}>
+    <div style={{ paddingLeft: `${depth * 0.75 + 0.75}rem` }} className="flex items-center gap-1.5">
+      {ctx.selectMode && (
+        <SelectionCheckbox
+          state={ctx.selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
+          onToggle={() => ctx.onToggleSelection([asset.item_id])}
+          label={ctx.t('assets.select.itemAriaLabel', { name })}
+        />
+      )}
       <ItemContextMenu
         typeId={asset.type_id}
         itemName={name}
@@ -604,7 +652,7 @@ function AssetItemRow({ node, depth, ctx, rowKey, a11y }: AssetItemRowProps) {
             nested inside, its text would fold into the button's accessible
             name (computed from its content, since it has no aria-label of
             its own) whenever the tooltip is open. */}
-        <span className="group relative block">
+        <span className="group relative block min-w-0 flex-1">
           <button
             type="button"
             role="treeitem"
@@ -679,33 +727,41 @@ function AssetBranchRow({ node, path, depth, ctx, a11y, label }: AssetBranchRowP
   const characterBadge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, ctx);
 
   return (
-    <button
-      type="button"
-      role="treeitem"
-      aria-expanded={expanded}
-      aria-level={a11y.level}
-      aria-posinset={a11y.posinset}
-      aria-setsize={a11y.setsize}
-      tabIndex={a11y.focused ? 0 : -1}
-      data-row-key={path}
-      onFocus={() => ctx.onRowFocus(path)}
-      onClick={() => ctx.onToggle(path)}
-      style={{ paddingLeft: `${depth * 0.75}rem` }}
-      className="flex w-full items-center gap-1.5 py-1.5 pr-3 text-left text-xs text-text hover:text-accent"
-    >
-      <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-        {expanded ? '▾' : '▸'}
-      </span>
-      {node.kind === 'bay' ? (
-        <span className="truncate text-text-dim">{label}</span>
-      ) : (
-        <h3 className="truncate font-medium">{label}</h3>
+    <div style={{ paddingLeft: `${depth * 0.75}rem` }} className="flex items-center gap-1.5 pr-3">
+      {ctx.selectMode && (
+        <SelectionCheckbox
+          state={selectionStateForIds(collectItemIds(node), ctx.selectedIds)}
+          onToggle={() => ctx.onToggleSelection(collectItemIds(node))}
+          label={ctx.t('assets.select.branchAriaLabel', { name: label })}
+        />
       )}
-      {characterBadge && <CharacterBadge characterName={characterBadge} t={ctx.t} />}
-      <span className="ml-auto shrink-0 tabular-nums text-[0.6875rem] text-text-faint">
-        {formatBadge(node, ctx.t)}
-      </span>
-    </button>
+      <button
+        type="button"
+        role="treeitem"
+        aria-expanded={expanded}
+        aria-level={a11y.level}
+        aria-posinset={a11y.posinset}
+        aria-setsize={a11y.setsize}
+        tabIndex={a11y.focused ? 0 : -1}
+        data-row-key={path}
+        onFocus={() => ctx.onRowFocus(path)}
+        onClick={() => ctx.onToggle(path)}
+        className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left text-xs text-text hover:text-accent"
+      >
+        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
+          {expanded ? '▾' : '▸'}
+        </span>
+        {node.kind === 'bay' ? (
+          <span className="truncate text-text-dim">{label}</span>
+        ) : (
+          <h3 className="truncate font-medium">{label}</h3>
+        )}
+        {characterBadge && <CharacterBadge characterName={characterBadge} t={ctx.t} />}
+        <span className="ml-auto shrink-0 tabular-nums text-[0.6875rem] text-text-faint">
+          {formatBadge(node, ctx.t)}
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -721,6 +777,9 @@ interface StationHeaderRowProps {
   onFocusRow: (key: string) => void;
   t: Translate;
   a11y: TreeRowA11y;
+  selectMode: boolean;
+  selectionState: SelectionState;
+  onToggleSelection: () => void;
 }
 
 /**
@@ -741,6 +800,9 @@ function StationHeaderRow({
   onFocusRow,
   t,
   a11y,
+  selectMode,
+  selectionState,
+  onToggleSelection,
 }: StationHeaderRowProps) {
   const rowKey = stationRowKey(station.locationId);
   const labelId = `${rowKey}-label`;
@@ -757,12 +819,21 @@ function StationHeaderRow({
       onFocus={() => onFocusRow(rowKey)}
       className="flex min-h-10 items-center justify-between gap-2 border-t border-line bg-panel/85 px-3 py-1 backdrop-blur-sm"
     >
-      <h2
-        id={labelId}
-        className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-      >
-        {label}
-      </h2>
+      <div className="flex min-w-0 items-center gap-1.5">
+        {selectMode && (
+          <SelectionCheckbox
+            state={selectionState}
+            onToggle={onToggleSelection}
+            label={t('assets.select.stationAriaLabel', { station: label })}
+          />
+        )}
+        <h2
+          id={labelId}
+          className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+        >
+          {label}
+        </h2>
+      </div>
       <div className="flex items-center gap-2">
         <StationPinButton label={label} pinState={pinState} onToggle={onTogglePin} t={t} />
         <JumpsAwayBadge result={jumpsAway} t={t} />
@@ -797,6 +868,21 @@ export function Assets() {
   const [search, setSearch] = useState('');
   const searchActive = search.trim().length > 0;
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set());
+
+  // Multi-select and bulk actions (issue #90): select mode is off by default and
+  // browsing (select mode off) renders exactly as it did before this ticket.
+  // Turning select mode off clears the selection rather than merely hiding it.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(new Set());
+  function toggleSelectMode() {
+    setSelectMode((prev) => {
+      if (prev) setSelectedIds(new Set());
+      return !prev;
+    });
+  }
+  function toggleNodeSelection(ids: readonly number[]) {
+    setSelectedIds((prev) => toggleSelection(prev, ids));
+  }
 
   // Cross-character search (issue #85): off by default, and device/session-local
   // rather than a synced or persisted preference — flipping it on fetches every
@@ -1471,6 +1557,36 @@ export function Assets() {
     setExpandedKeys((prev) => new Set([...prev].filter((k) => !keys.has(k))));
   }
 
+  // Bulk actions (issue #90): the three actions the item context menu already
+  // offers per row, applied to every selected item_id at once. Quickbar and
+  // Compare have different lifetimes (CONTEXT.md) — bulk-adding to Quickbar
+  // schedules a sync, like `handleAddToQuickbar`; bulk-adding to Compare does
+  // not, matching `ItemContextMenu`'s own single-item path.
+  function handleBulkAddToQuickbar() {
+    if (activeCharacterId === null) return;
+    let items = quickbarItems;
+    for (const id of selectedIds) {
+      const asset = assetsByItemId.get(id);
+      if (!asset) continue;
+      const name = mergedTypeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
+      items = addQuickbarItem(items, { typeId: asset.type_id, name });
+    }
+    void writeQuickbar(items);
+  }
+  function handleBulkAddToCompare() {
+    const addToCompare = useCompareSet.getState().add;
+    for (const id of selectedIds) {
+      const asset = assetsByItemId.get(id);
+      if (!asset) continue;
+      const name = mergedTypeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
+      addToCompare({ typeId: asset.type_id, itemName: name });
+    }
+  }
+  function handleBulkCopyNames() {
+    const names = namesForSelection([...selectedIds], assetsByItemId, mergedTypeNames);
+    void writeToClipboard(names.join('\n'));
+  }
+
   const renderCtx: RenderCtx = {
     expandedKeys: effectiveExpandedKeys,
     onToggle: toggleKey,
@@ -1478,6 +1594,9 @@ export function Assets() {
     t,
     characterBadges,
     onRowFocus: handleRowFocus,
+    selectMode,
+    selectedIds,
+    onToggleSelection: toggleNodeSelection,
   };
   const itemActions: AssetItemActions = {
     priceByTypeId,
@@ -1581,6 +1700,28 @@ export function Assets() {
           {crossCharacterSearch && crossCharacterLoading && (
             <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
           )}
+          <FilterChip
+            label={t('assets.select.toggle')}
+            selected={selectMode}
+            onToggle={toggleSelectMode}
+          />
+        </div>
+      )}
+
+      {selectMode && selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+          <span className="text-[0.6875rem] text-text-dim tabular-nums">
+            {t('assets.select.selectedCount', { count: selectedIds.size })}
+          </span>
+          <Button size="sm" disabled={activeCharacterId === null} onClick={handleBulkAddToQuickbar}>
+            {t('assets.select.addToQuickbar')}
+          </Button>
+          <Button size="sm" onClick={handleBulkAddToCompare}>
+            {t('assets.select.addToCompare')}
+          </Button>
+          <Button size="sm" onClick={handleBulkCopyNames}>
+            {t('assets.select.copyNames')}
+          </Button>
         </div>
       )}
 
@@ -1665,6 +1806,14 @@ export function Assets() {
                               onFocusRow={handleRowFocus}
                               t={t}
                               a11y={a11y}
+                              selectMode={selectMode}
+                              selectionState={selectionStateForIds(
+                                collectStationItemIds(row.station),
+                                selectedIds
+                              )}
+                              onToggleSelection={() =>
+                                toggleNodeSelection(collectStationItemIds(row.station))
+                              }
                             />
                           ) : row.node.kind === 'item' ? (
                             <AssetItemRow

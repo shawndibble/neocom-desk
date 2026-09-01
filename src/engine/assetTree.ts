@@ -188,6 +188,17 @@ function sumNodes(
   return { itemCount, estimatedValue };
 }
 
+/** Every leaf `item_id` under this node, recursing through bay/ship/container nesting exactly like `sumNodes` — the cascade-selection seam for issue #90. */
+export function collectItemIds(node: AssetTreeNode): number[] {
+  if (node.kind === 'item') return [node.asset.item_id];
+  return node.children.flatMap(collectItemIds);
+}
+
+/** Every leaf `item_id` under a station, across all of its top-level children. */
+export function collectStationItemIds(station: AssetTreeStation): number[] {
+  return station.children.flatMap(collectItemIds);
+}
+
 interface RootGroup {
   locationType: EngineAsset['location_type'];
   roots: EngineAsset[];
