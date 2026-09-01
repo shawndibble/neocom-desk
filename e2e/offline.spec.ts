@@ -22,7 +22,7 @@ test('shows cached character and skills after external hosts go unreachable', as
   await page.getByRole('button', { name: 'Expand all' }).click();
 
   // Live data first: no "showing cached data" banner yet.
-  await expect(page.getByText('Caldari Frigate')).toBeVisible();
+  await expect(page.getByText('Caldari Frigate', { exact: true })).toBeVisible();
   await expect(page.getByText('Showing cached data')).toHaveCount(0);
 
   await goExternallyOffline(page);
@@ -36,7 +36,7 @@ test('shows cached character and skills after external hosts go unreachable', as
 
   // Skills data served from esiCache: cached rows + the "stale" banner + a data-age badge.
   await expect(page.getByText('Showing cached data')).toBeVisible();
-  await expect(page.getByText('Caldari Frigate')).toBeVisible();
-  await expect(page.getByText('Small Hybrid Turret')).toBeVisible();
+  await expect(page.getByText('Caldari Frigate', { exact: true })).toBeVisible();
+  await expect(page.getByText('Small Hybrid Turret', { exact: true })).toBeVisible();
   await expect(page.locator('time')).toBeVisible();
 });

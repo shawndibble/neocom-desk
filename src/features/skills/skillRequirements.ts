@@ -1,5 +1,6 @@
 import type { SkillCatalog } from './skillMap';
 import type { TrainedSkill } from '@/engine/types';
+import { stripEveMarkup } from './typeDisplay';
 
 export interface PrereqRow {
   typeID: number;
@@ -13,6 +14,8 @@ export type UnlockRow = Omit<PrereqRow, 'trained'>;
 
 export interface SkillRequirements {
   name: string;
+  /** Markup-stripped skill description, for display above the requirements. Null when the skill has none. */
+  description: string | null;
   prereqs: PrereqRow[];
   unlocks: UnlockRow[];
 }
@@ -48,5 +51,10 @@ export function buildSkillRequirements(
     level: u.level,
   }));
 
-  return { name: info.name, prereqs, unlocks };
+  return {
+    name: info.name,
+    description: info.description ? stripEveMarkup(info.description) : null,
+    prereqs,
+    unlocks,
+  };
 }
