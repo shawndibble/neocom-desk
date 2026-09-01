@@ -12,6 +12,7 @@ import {
 } from './client';
 import { AuthError } from '@/auth/sso';
 import { rejectBadEsiHeaders } from './test-helpers';
+import { onEsiActivity, type ActivityEvent } from './activityLog';
 
 const server = setupServer();
 
@@ -341,6 +342,144 @@ describe('esiFetch — POST rate limiting (BUG #12)', () => {
     expect(attempts).toBe(2);
     expect(bodies).toEqual([[34], [34]]);
     expect(result.data).toEqual([{ id: 34, name: 'Tritanium', category: 'inventory_type' }]);
+  });
+});
+
+describe('esiFetch — activity log (issue #32)', () => {
+  function collectActivity(): { events: ActivityEvent[]; unsubscribe: () => void } {
+    const events: ActivityEvent[] = [];
+    const unsubscribe = onEsiActivity((event) => events.push(event));
+    return { events, unsubscribe };
+  }
+
+  it('emits a success event with the route template endpoint id, never a built URL', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/123/skills`, () =>
+        HttpResponse.json({ skills: [], total_sp: 0 })
+      )
+    );
+    configureEsi({ getToken: async () => 'test-token' });
+    const { events, unsubscribe } = collectActivity();
+
+    await esiFetch('/characters/123/skills', {
+      characterId: 123,
+      endpointId: 'getCharacterSkills',
+    });
+
+    expect(events).toEqual([
+      {
+        endpointId: 'getCharacterSkills',
+        characterId: 123,
+        timestamp: expect.any(Number),
+        outcome: 'success',
+      },
+    ]);
+    unsubscribe();
+  });
+
+  it('emits an error event, never the raw ESI error body, on a non-auth failure', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/999`, () =>
+        HttpResponse.json({ error: 'super secret internal detail' }, { status: 500 })
+      )
+    );
+    const { events, unsubscribe } = collectActivity();
+
+    await expect(
+      esiFetch('/characters/999', { endpointId: 'getCharacterPublicInfo' })
+    ).rejects.toThrow();
+
+    expect(events).toEqual([
+      {
+        endpointId: 'getCharacterPublicInfo',
+        characterId: undefined,
+        timestamp: expect.any(Number),
+        outcome: 'error',
+      },
+    ]);
+    unsubscribe();
+  });
+
+  it('leak canary: an activity event from a real authenticated failure carries no token, id, or response body', async () => {
+    const SECRET_TOKEN = 'super-secret-access-token';
+    const SECRET_BODY = 'internal-stack-trace-do-not-leak';
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/456/wallet`, () =>
+        HttpResponse.json({ error: SECRET_BODY }, { status: 401 })
+      )
+    );
+    configureEsi({ getToken: async () => SECRET_TOKEN });
+    const { events, unsubscribe } = collectActivity();
+
+    await expect(
+      esiFetch('/characters/456/wallet', { characterId: 456, endpointId: 'getCharacterWallet' })
+    ).rejects.toThrow();
+
+    expect(events).toHaveLength(1);
+    const [event] = events;
+    expect(Object.keys(event).sort()).toEqual(
+      ['characterId', 'endpointId', 'outcome', 'timestamp'].sort()
+    );
+    const serialized = JSON.stringify(event);
+    expect(serialized).not.toContain(SECRET_TOKEN);
+    expect(serialized).not.toContain(SECRET_BODY);
+    expect(serialized).not.toContain('/characters/456/wallet');
+    unsubscribe();
+  });
+
+  it('emits an authFailure event on 401/403, not a generic error', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/123/wallet`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      )
+    );
+    configureEsi({ getToken: async () => 'stale-token' });
+    const { events, unsubscribe } = collectActivity();
+
+    await expect(
+      esiFetch('/characters/123/wallet', { characterId: 123, endpointId: 'getCharacterWallet' })
+    ).rejects.toThrow();
+
+    expect(events).toEqual([
+      {
+        endpointId: 'getCharacterWallet',
+        characterId: 123,
+        timestamp: expect.any(Number),
+        outcome: 'authFailure',
+      },
+    ]);
+    unsubscribe();
+  });
+
+  it('does not emit when the caller omits endpointId', async () => {
+    server.use(http.get(`${ESI_BASE_URL}/alliances/99000001`, () => HttpResponse.json({})));
+    const { events, unsubscribe } = collectActivity();
+
+    await esiFetch('/alliances/99000001');
+
+    expect(events).toEqual([]);
+    unsubscribe();
+  });
+
+  it('does not emit for a cancelled (aborted) request', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/alliances/99000001`, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return HttpResponse.json({});
+      })
+    );
+    const { events, unsubscribe } = collectActivity();
+    const controller = new AbortController();
+
+    const promise = esiFetch('/alliances/99000001', {
+      endpointId: 'getAlliancePublicInfo',
+      signal: controller.signal,
+    });
+    controller.abort();
+
+    await expect(promise).rejects.toThrow();
+    expect(events).toEqual([]);
+    unsubscribe();
   });
 });
 

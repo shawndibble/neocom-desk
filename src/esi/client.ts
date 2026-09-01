@@ -6,6 +6,8 @@
  * X-User-Agent, per ESI guidelines.
  */
 import { AuthError } from '@/auth/sso';
+import { emitEsiActivity } from './activityLog';
+import type { EsiEndpointId } from './registry';
 
 export const ESI_BASE_URL = 'https://esi.evetech.net';
 export const COMPATIBILITY_DATE = '2026-08-01';
@@ -36,6 +38,12 @@ export interface EsiFetchOptions {
   method?: 'GET' | 'POST';
   /** JSON-serialized as the request body when `method` is 'POST'. */
   body?: unknown;
+  /**
+   * Identifies the call for the activity log (issue #32). Every
+   * `endpoints.ts` wrapper passes its own registry key; omitted only by
+   * direct `esiFetch` callers (tests) that don't need an entry.
+   */
+  endpointId?: EsiEndpointId;
 }
 
 export interface EsiResult<T> {
@@ -145,7 +153,7 @@ export async function esiFetch<T>(
   path: string,
   options: EsiFetchOptions = {}
 ): Promise<EsiResult<T>> {
-  const { characterId, query, page, etag, signal, method = 'GET', body } = options;
+  const { characterId, query, page, etag, signal, method = 'GET', body, endpointId } = options;
   const url = buildUrl(path, query, page);
 
   const headers: Record<string, string> = {
@@ -162,27 +170,58 @@ export async function esiFetch<T>(
     headers.Authorization = `Bearer ${await tokenProvider(characterId)}`;
   }
 
-  const requestBody = body !== undefined ? JSON.stringify(body) : undefined;
-  let response = await fetch(url, { method, headers, body: requestBody, signal });
-  if (response.status === 429 || response.status === 420) {
-    await sleep(retryWaitMs(response), signal);
-    response = await fetch(url, { method, headers, body: requestBody, signal });
-  }
+  try {
+    const requestBody = body !== undefined ? JSON.stringify(body) : undefined;
+    let response = await fetch(url, { method, headers, body: requestBody, signal });
+    if (response.status === 429 || response.status === 420) {
+      await sleep(retryWaitMs(response), signal);
+      response = await fetch(url, { method, headers, body: requestBody, signal });
+    }
 
-  if (response.status === 304) {
+    if (response.status === 304) {
+      recordEsiActivity(endpointId, characterId, 'success');
+      return {
+        data: null,
+        etag: response.headers.get('etag') ?? etag ?? null,
+        pages: parsePages(response),
+        expires: response.headers.get('expires'),
+      };
+    }
+    if (!response.ok) throw await errorFromResponse(response);
+
+    // Parsed before recordActivity: a body that fails to parse is this
+    // request's outcome, not a second event stacked on top of a 'success'
+    // already recorded for it.
+    const data = (await response.json()) as T;
+    recordEsiActivity(endpointId, characterId, 'success');
     return {
-      data: null,
-      etag: response.headers.get('etag') ?? etag ?? null,
+      data,
+      etag: response.headers.get('etag'),
       pages: parsePages(response),
       expires: response.headers.get('expires'),
     };
+  } catch (err) {
+    // A cancelled route load (useRouteSnapshot discarding a stale response)
+    // never reached a real outcome — not activity worth showing a user. Name
+    // check, not `instanceof DOMException`: msw/undici don't agree on the
+    // concrete error class, only on `name`.
+    if (err instanceof Error && err.name === 'AbortError') throw err;
+    recordEsiActivity(endpointId, characterId, outcomeForError(err));
+    throw err;
   }
-  if (!response.ok) throw await errorFromResponse(response);
+}
 
-  return {
-    data: (await response.json()) as T,
-    etag: response.headers.get('etag'),
-    pages: parsePages(response),
-    expires: response.headers.get('expires'),
-  };
+/** Shared with `paginated.ts` and the wallet-transactions loop, so a multi-request read logs once, not once per page. */
+export function outcomeForError(err: unknown): 'authFailure' | 'error' {
+  return isAuthFailure(err) ? 'authFailure' : 'error';
+}
+
+/** No-op when the caller didn't identify the endpoint (direct esiFetch callers in tests). */
+export function recordEsiActivity(
+  endpointId: EsiEndpointId | undefined,
+  characterId: number | undefined,
+  outcome: 'success' | 'authFailure' | 'error'
+): void {
+  if (!endpointId) return;
+  emitEsiActivity({ endpointId, characterId, timestamp: Date.now(), outcome });
 }

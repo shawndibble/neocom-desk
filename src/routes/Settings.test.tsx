@@ -5,6 +5,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_KEY, DEFAULT_FONT_SCALE } from '@/lib/fontScale';
+import { useActivityLog } from '@/stores/activityLog';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -35,6 +36,7 @@ beforeEach(async () => {
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
+  useActivityLog.setState({ entries: [] });
   window.history.pushState({}, '', '/settings');
 });
 
@@ -71,5 +73,45 @@ describe('Settings', () => {
     expect(screen.getByText('Switch character')).toBeInTheDocument();
     expect(screen.getByText('Open Settings')).toBeInTheDocument();
     expect(screen.getByText('Close the open dialog')).toBeInTheDocument();
+  });
+
+  it('shows an empty state when nothing has been fetched yet (issue #32)', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(screen.getByRole('heading', { name: /activity log/i })).toBeInTheDocument();
+    expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
+  });
+
+  it('lists a recorded entry by route template, character name, and outcome (issue #32)', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    useActivityLog.getState().record({
+      endpointId: 'getCharacterSkills',
+      characterId: CHAR_ID,
+      timestamp: Date.now(),
+      outcome: 'success',
+    });
+
+    expect(await screen.findByText('/characters/{character_id}/skills')).toBeInTheDocument();
+    // The character name comes from a Dexie useLiveQuery, resolved async — wait for it
+    // rather than asserting it's already there, or this races the query on a slow run.
+    expect(await screen.findByText('Pilot One')).toBeInTheDocument();
+    expect(screen.getByText('Succeeded')).toBeInTheDocument();
+  });
+
+  it('labels a public call and an auth-failure outcome distinctly (issue #32)', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    useActivityLog.getState().record({
+      endpointId: 'getUniverseType',
+      timestamp: Date.now(),
+      outcome: 'authFailure',
+    });
+
+    expect(await screen.findByText('Public')).toBeInTheDocument();
+    expect(screen.getByText('Needs re-login')).toBeInTheDocument();
   });
 });

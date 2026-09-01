@@ -2,8 +2,14 @@
  * Thin typed wrappers over the ESI endpoints NeoCom Desk v1 consumes.
  * Field names verified against https://esi.evetech.net/meta/openapi.json
  * (2026-08). Optional fields mirror the spec's non-required properties.
+ *
+ * Every wrapper passes its own name as `endpointId` on the `esiFetch`/
+ * `fetchAllPagesStatus` call — that's the same key `ESI_REGISTRY` uses, so
+ * the activity log (issue #32) can name the endpoint without a second
+ * registry, and `endpointId` being typed `EsiEndpointId` makes a typo a
+ * compile error.
  */
-import { esiFetch } from './client';
+import { esiFetch, recordEsiActivity, outcomeForError } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
 import type { PaginatedResult, TruncatableResult } from './paginated';
@@ -37,6 +43,7 @@ export function getCharacterSkills(
   return esiFetch<CharacterSkills>(`/characters/${characterId}/skills`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterSkills',
   });
 }
 
@@ -61,6 +68,7 @@ export function getCharacterSkillQueue(
   return esiFetch<SkillQueueEntry[]>(`/characters/${characterId}/skillqueue`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterSkillQueue',
   });
 }
 
@@ -85,6 +93,7 @@ export function getCharacterAttributes(
   return esiFetch<CharacterAttributes>(`/characters/${characterId}/attributes`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterAttributes',
   });
 }
 
@@ -98,6 +107,7 @@ export function getCharacterImplants(
   return esiFetch<number[]>(`/characters/${characterId}/implants`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterImplants',
   });
 }
 
@@ -121,6 +131,7 @@ export function getCharacterBlueprints(
   return fetchAllPagesStatus<CharacterBlueprint>(`/characters/${characterId}/blueprints`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterBlueprints',
   });
 }
 
@@ -134,6 +145,7 @@ export function getCharacterWallet(
   return esiFetch<number>(`/characters/${characterId}/wallet`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterWallet',
   });
 }
 
@@ -157,7 +169,10 @@ export function getCharacterPublicInfo(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CharacterPublicInfo>> {
-  return esiFetch<CharacterPublicInfo>(`/characters/${characterId}`, options);
+  return esiFetch<CharacterPublicInfo>(`/characters/${characterId}`, {
+    ...options,
+    endpointId: 'getCharacterPublicInfo',
+  });
 }
 
 // --- GET /corporations/{corporation_id} (public) ---
@@ -183,7 +198,10 @@ export function getCorporationPublicInfo(
   corporationId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CorporationPublicInfo>> {
-  return esiFetch<CorporationPublicInfo>(`/corporations/${corporationId}`, options);
+  return esiFetch<CorporationPublicInfo>(`/corporations/${corporationId}`, {
+    ...options,
+    endpointId: 'getCorporationPublicInfo',
+  });
 }
 
 // --- GET /universe/types/{type_id} (public) ---
@@ -213,7 +231,10 @@ export function getUniverseType(
   typeId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<UniverseType>> {
-  return esiFetch<UniverseType>(`/universe/types/${typeId}`, options);
+  return esiFetch<UniverseType>(`/universe/types/${typeId}`, {
+    ...options,
+    endpointId: 'getUniverseType',
+  });
 }
 
 // --- GET /alliances/{alliance_id} (public) ---
@@ -232,7 +253,10 @@ export function getAlliancePublicInfo(
   allianceId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<AlliancePublicInfo>> {
-  return esiFetch<AlliancePublicInfo>(`/alliances/${allianceId}`, options);
+  return esiFetch<AlliancePublicInfo>(`/alliances/${allianceId}`, {
+    ...options,
+    endpointId: 'getAlliancePublicInfo',
+  });
 }
 
 // --- GET /characters/{character_id}/wallet/journal (esi-wallet.read_character_wallet.v1) ---
@@ -264,6 +288,7 @@ export function getCharacterWalletJournal(
   return fetchAllPagesStatus<WalletJournalEntry>(`/characters/${characterId}/wallet/journal`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterWalletJournal',
   });
 }
 
@@ -289,6 +314,12 @@ export interface WalletTransaction {
  */
 const MAX_TRANSACTION_PAGES = 5;
 
+/**
+ * Cursored, not X-Pages, so `fetchAllPagesStatus`'s own once-per-read
+ * activity logging doesn't apply here — this loop does the same thing
+ * itself: `endpointId` withheld from the per-page `esiFetch` calls, one
+ * `recordEsiActivity` for the whole cursor walk (issue #32).
+ */
 export async function getCharacterWalletTransactions(
   characterId: number,
   options: Omit<EndpointOptions, 'etag'> = {}
@@ -300,23 +331,30 @@ export async function getCharacterWalletTransactions(
   // only case where history may remain unfetched — it may also have ended
   // exactly there, and ESI gives no way to tell, so this errs toward warning.
   let truncated = false;
-  for (let page = 0; page < MAX_TRANSACTION_PAGES; page += 1) {
-    const result = await esiFetch<WalletTransaction[]>(
-      `/characters/${characterId}/wallet/transactions`,
-      {
-        ...options,
-        characterId,
-        query: fromId === undefined ? undefined : { from_id: fromId },
-      }
-    );
-    const page_ = result.data ?? [];
-    if (page_.length === 0) break;
-    items.push(...page_);
-    truncated = page === MAX_TRANSACTION_PAGES - 1;
-    // from_id is exclusive, so the lowest id seen is already excluded from
-    // the next page; subtracting 1 would skip the transaction `minId - 1`.
-    fromId = Math.min(...page_.map((t) => t.transaction_id));
+  try {
+    for (let page = 0; page < MAX_TRANSACTION_PAGES; page += 1) {
+      const result = await esiFetch<WalletTransaction[]>(
+        `/characters/${characterId}/wallet/transactions`,
+        {
+          ...options,
+          characterId,
+          query: fromId === undefined ? undefined : { from_id: fromId },
+        }
+      );
+      const page_ = result.data ?? [];
+      if (page_.length === 0) break;
+      items.push(...page_);
+      truncated = page === MAX_TRANSACTION_PAGES - 1;
+      // from_id is exclusive, so the lowest id seen is already excluded from
+      // the next page; subtracting 1 would skip the transaction `minId - 1`.
+      fromId = Math.min(...page_.map((t) => t.transaction_id));
+    }
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') throw err;
+    recordEsiActivity('getCharacterWalletTransactions', characterId, outcomeForError(err));
+    throw err;
   }
+  recordEsiActivity('getCharacterWalletTransactions', characterId, 'success');
   return { items, truncated };
 }
 
@@ -353,6 +391,7 @@ export function getCharacterAssets(
   return fetchAllPagesStatus<CharacterAsset>(`/characters/${characterId}/assets`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterAssets',
     maxPages: MAX_ASSET_PAGES,
   });
 }
@@ -370,7 +409,10 @@ export function getUniverseStation(
   stationId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<UniverseStation>> {
-  return esiFetch<UniverseStation>(`/universe/stations/${stationId}`, options);
+  return esiFetch<UniverseStation>(`/universe/stations/${stationId}`, {
+    ...options,
+    endpointId: 'getUniverseStation',
+  });
 }
 
 // --- GET /characters/{character_id}/mail (esi-mail.read_mail.v1) ---
@@ -399,6 +441,7 @@ export function getCharacterMailHeaders(
   return esiFetch<MailHeader[]>(`/characters/${characterId}/mail`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterMailHeaders',
   });
 }
 
@@ -423,6 +466,7 @@ export function getCharacterMail(
   return esiFetch<MailBody>(`/characters/${characterId}/mail/${mailId}`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterMail',
   });
 }
 
@@ -436,7 +480,10 @@ export interface MarketPrice {
 
 /** Global market prices — fallback price source and EIV input (ADR 0002). */
 export function getMarketsPrices(options: EndpointOptions = {}): Promise<EsiResult<MarketPrice[]>> {
-  return esiFetch<MarketPrice[]>('/markets/prices', options);
+  return esiFetch<MarketPrice[]>('/markets/prices', {
+    ...options,
+    endpointId: 'getMarketsPrices',
+  });
 }
 
 // --- GET /markets/{region_id}/orders (public) ---
@@ -468,6 +515,7 @@ export function getMarketOrders(
 ): Promise<TruncatableResult<RegionOrder>> {
   return fetchAllPagesStatus<RegionOrder>(`/markets/${regionId}/orders`, {
     ...options,
+    endpointId: 'getMarketOrders',
     query: { order_type: 'all', type_id: typeId },
   });
 }
@@ -491,6 +539,7 @@ export function getMarketHistory(
 ): Promise<EsiResult<MarketHistoryEntry[]>> {
   return esiFetch<MarketHistoryEntry[]>(`/markets/${regionId}/history`, {
     ...options,
+    endpointId: 'getMarketHistory',
     query: { type_id: typeId },
   });
 }
@@ -511,7 +560,10 @@ export interface SystemCostIndices {
 export function getIndustrySystemCostIndices(
   options: EndpointOptions = {}
 ): Promise<EsiResult<SystemCostIndices[]>> {
-  return esiFetch<SystemCostIndices[]>('/industry/systems', options);
+  return esiFetch<SystemCostIndices[]>('/industry/systems', {
+    ...options,
+    endpointId: 'getIndustrySystemCostIndices',
+  });
 }
 
 // --- POST /universe/names (public) ---
@@ -540,6 +592,7 @@ export async function postUniverseNames(
     method: 'POST',
     body: ids,
     signal: options.signal,
+    endpointId: 'postUniverseNames',
   });
   return result.data ?? [];
 }
@@ -562,6 +615,7 @@ export function getCharacterCalendar(
   return esiFetch<CalendarEventSummary[]>(`/characters/${characterId}/calendar`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterCalendar',
   });
 }
 
@@ -588,6 +642,7 @@ export function getCharacterCalendarEvent(
   return esiFetch<CalendarEventDetail>(`/characters/${characterId}/calendar/${eventId}`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterCalendarEvent',
   });
 }
 
@@ -636,6 +691,7 @@ export function getCharacterContracts(
   return fetchAllPagesStatus<Contract>(`/characters/${characterId}/contracts`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterContracts',
   });
 }
 
@@ -666,6 +722,7 @@ export function getCharacterOrders(
   return esiFetch<MarketOrder[]>(`/characters/${characterId}/orders`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterOrders',
   });
 }
 
@@ -683,6 +740,7 @@ export function getCharacterOrderHistory(
   return fetchAllPagesStatus<MarketOrderHistory>(`/characters/${characterId}/orders/history`, {
     ...options,
     characterId,
+    endpointId: 'getCharacterOrderHistory',
   });
 }
 
@@ -720,6 +778,7 @@ export function getCharacterIndustryJobs(
   return esiFetch<IndustryJob[]>(`/characters/${characterId}/industry/jobs`, {
     ...rest,
     characterId,
+    endpointId: 'getCharacterIndustryJobs',
     query: { include_completed: includeCompleted ?? false },
   });
 }
@@ -737,8 +796,8 @@ export function getCharacterCorporationHistory(
   characterId: number,
   options: EndpointOptions = {}
 ): Promise<EsiResult<CorporationHistoryEntry[]>> {
-  return esiFetch<CorporationHistoryEntry[]>(
-    `/characters/${characterId}/corporationhistory`,
-    options
-  );
+  return esiFetch<CorporationHistoryEntry[]>(`/characters/${characterId}/corporationhistory`, {
+    ...options,
+    endpointId: 'getCharacterCorporationHistory',
+  });
 }
