@@ -83,6 +83,45 @@ if (typeof Element !== 'undefined') {
 }
 
 /**
+ * jsdom does no layout, so every element's `offsetHeight`/`offsetWidth` is 0 —
+ * `@tanstack/react-virtual` reads those (not `getBoundingClientRect`) to size
+ * its scroll container, and a 0 viewport makes it compute an empty visible
+ * range, hiding every row from the DOM regardless of what a test scrolls to.
+ * Scoped to elements marked `data-virtual-scroll-root` (set by the component
+ * owning the scroll container) rather than patched globally, so this can't
+ * skew unrelated layout reads elsewhere (e.g. Radix menu positioning).
+ */
+if (typeof HTMLElement !== 'undefined') {
+  const VIRTUAL_SCROLL_SIZE = 600;
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    get(this: HTMLElement) {
+      return this.hasAttribute('data-virtual-scroll-root') ? VIRTUAL_SCROLL_SIZE : 0;
+    },
+  });
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get(this: HTMLElement) {
+      return this.hasAttribute('data-virtual-scroll-root') ? VIRTUAL_SCROLL_SIZE : 0;
+    },
+  });
+}
+
+/**
+ * jsdom has no `ResizeObserver`. `@tanstack/react-virtual` itself tolerates
+ * that fine (its internal observer lazily no-ops when the constructor is
+ * missing), but other libraries assume it exists unconditionally — this stub
+ * is cheap insurance for whichever one hits that path next.
+ */
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
+/**
  * jsdom implements no CSS media queries, so `window.matchMedia` is absent and
  * anything subscribing to a breakpoint throws on mount. The never-matching
  * default is load-bearing, not incidental: `Layout` reads a non-matching
