@@ -8,6 +8,8 @@ import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
+import { downloadCsv } from '@/lib/downloadCsv';
+import { mailCsvColumns } from '@/features/character/mailCsv';
 import type { MailBody, MailHeader } from '@/esi/endpoints';
 
 interface Snapshot {
@@ -86,6 +88,19 @@ export function Mail() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('mail.title')}</h1>
         <div className="flex items-center gap-2">
           {headersResult && <DataAgeBadge date={headersResult.fetchedAt} />}
+          <Button
+            size="sm"
+            disabled={headers.length === 0}
+            onClick={() =>
+              downloadCsv(
+                'mail',
+                headers,
+                mailCsvColumns(t, (id) => senderNames.get(id) ?? t('mail.unknownSender'))
+              )
+            }
+          >
+            {t('mail.exportCsv')}
+          </Button>
           <Button size="sm" onClick={refresh} disabled={loading}>
             {t('mail.refresh')}
           </Button>

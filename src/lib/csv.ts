@@ -59,9 +59,13 @@ export function toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): 
  * `new Date()` inside, so callers' tests pin the name without freezing the
  * clock. Local calendar parts, not `toISOString()` — the file is named for
  * the user's day.
+ *
+ * `options.partial` appends `-partial`: a truncated fetch (pages missing)
+ * must never hand out a file that looks complete just because it opens fine.
  */
-export function csvFilename(base: string, date: Date): string {
+export function csvFilename(base: string, date: Date, options?: { partial?: boolean }): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  return `neocom-${base}-${stamp}.csv`;
+  const suffix = options?.partial ? '-partial' : '';
+  return `neocom-${base}-${stamp}${suffix}.csv`;
 }

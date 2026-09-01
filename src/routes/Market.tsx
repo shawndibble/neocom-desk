@@ -37,7 +37,11 @@ import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/mar
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
 import { filterMarketTree, MARKET_TREE_MATCH_LIMIT } from '@/features/market/marketTree';
-import { getOrderBook, clearOrderBookCache } from '@/features/market/orderBook';
+import {
+  getOrderBook,
+  clearOrderBookCache,
+  type OrderBookResult,
+} from '@/features/market/orderBook';
 import { formatVolume, formatOrderLocationText } from '@/features/market/format';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
@@ -75,6 +79,8 @@ import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { downloadCsv } from '@/lib/downloadCsv';
+import { orderBookCsvColumns, rangeLabel } from '@/features/market/orderBookCsv';
 
 /** Debounce for the catalogue search, so a fast typist doesn't re-filter the tree on every keystroke. */
 const SEARCH_DEBOUNCE_MS = 250;
@@ -87,14 +93,6 @@ const DESKTOP_QUERY = '(min-width: 64rem)';
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
-
-function rangeLabel(range: string, t: Translate): string {
-  if (range === 'station') return t('market.rangeStation');
-  if (range === 'region') return t('market.rangeRegion');
-  if (range === 'solarsystem') return t('market.rangeSystem');
-  const jumps = Number(range);
-  return Number.isFinite(jumps) ? t('market.rangeJumps', { count: jumps }) : range;
-}
 
 interface LocationCellProps {
   order: RegionOrder;
@@ -389,10 +387,7 @@ export function Market() {
   const chosenRegionId =
     effectiveLocation.mode === 'region' ? effectiveLocation.regionId : effectiveHub.regionId;
 
-  const [orderBookResult, setOrderBookResult] = useState<{
-    orders: RegionOrder[];
-    fetchedAt: number;
-  } | null>(null);
+  const [orderBookResult, setOrderBookResult] = useState<OrderBookResult | null>(null);
   const [orderBookLoading, setOrderBookLoading] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   const [sellShowAll, setSellShowAll] = useState(false);
@@ -756,7 +751,47 @@ export function Market() {
           </Button>
         )}
         {itemTab === 'orders' && orderBookResult && (
-          <DataAgeBadge date={new Date(orderBookResult.fetchedAt)} />
+          <>
+            <Button
+              size="sm"
+              disabled={sortedSell.length === 0}
+              onClick={() =>
+                downloadCsv(
+                  'market-sell',
+                  sortedSell,
+                  orderBookCsvColumns(t, {
+                    npcStations: npcStationMap,
+                    solarSystems: solarSystemMap,
+                    isBuy: false,
+                  }),
+                  new Date(),
+                  orderBookResult.truncated
+                )
+              }
+            >
+              {t('market.exportCsvSell')}
+            </Button>
+            <Button
+              size="sm"
+              disabled={sortedBuy.length === 0}
+              onClick={() =>
+                downloadCsv(
+                  'market-buy',
+                  sortedBuy,
+                  orderBookCsvColumns(t, {
+                    npcStations: npcStationMap,
+                    solarSystems: solarSystemMap,
+                    isBuy: true,
+                  }),
+                  new Date(),
+                  orderBookResult.truncated
+                )
+              }
+            >
+              {t('market.exportCsvBuy')}
+            </Button>
+            <DataAgeBadge date={new Date(orderBookResult.fetchedAt)} />
+          </>
         )}
       </>
     ) : undefined;

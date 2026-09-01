@@ -45,6 +45,11 @@ describe('toCsv', () => {
     expect(toCsv([], columns).startsWith('﻿')).toBe(true);
   });
 
+  it('emits exactly one BOM, never two — a call site prepending its own would double it silently', () => {
+    const csv = toCsv([{ name: 'a', qty: 1 }], columns);
+    expect(csv.match(new RegExp('\u{FEFF}', 'gu'))).toHaveLength(1);
+  });
+
   it('quotes fields containing the delimiter, a double quote, CR, or LF, doubling internal quotes', () => {
     const rows: Row[] = [
       { name: 'Widget, Large', qty: 1 },
@@ -95,5 +100,18 @@ describe('csvFilename', () => {
     // offset — the file is named for the user's day, not Greenwich's.
     const localNewYear = new Date(2026, 0, 1, 0, 30);
     expect(csvFilename('jobs', localNewYear)).toBe('neocom-jobs-2026-01-01.csv');
+  });
+
+  it('appends -partial when options.partial is true, so a truncated export never looks complete', () => {
+    expect(csvFilename('assets', new Date(2026, 7, 5), { partial: true })).toBe(
+      'neocom-assets-2026-08-05-partial.csv'
+    );
+  });
+
+  it('omits the suffix when options.partial is false or omitted', () => {
+    expect(csvFilename('assets', new Date(2026, 7, 5), { partial: false })).toBe(
+      'neocom-assets-2026-08-05.csv'
+    );
+    expect(csvFilename('assets', new Date(2026, 7, 5))).toBe('neocom-assets-2026-08-05.csv');
   });
 });

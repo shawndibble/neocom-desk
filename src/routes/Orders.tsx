@@ -18,6 +18,8 @@ import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
+import { downloadCsv } from '@/lib/downloadCsv';
+import { ordersCsvColumns, orderHistoryCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrder, MarketOrderHistory } from '@/esi/endpoints';
 
 /** Stable identity, so the fallback doesn't invalidate the column memos every render. */
@@ -29,6 +31,8 @@ interface Snapshot {
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   ordersNeedsReauth: boolean;
   historyNeedsReauth: boolean;
+  /** Fewer pages came back than ESI advertised — the history list below is partial. */
+  historyTruncated: boolean;
   typeNames: Map<number, string>;
 }
 
@@ -42,6 +46,7 @@ async function loadOrdersSnapshot(
   ]);
   const { cached: ordersResult, needsReauth: ordersNeedsReauth } = ordersStatus;
   const { cached: historyResult, needsReauth: historyNeedsReauth } = historyStatus;
+  const historyTruncated = historyResult?.truncated ?? false;
   const typeIds = new Set<number>();
   // Already superseded: skip the ESI name resolve, its result would be discarded.
   if (!signal.cancelled) {
@@ -49,7 +54,14 @@ async function loadOrdersSnapshot(
     for (const o of historyResult?.data ?? []) typeIds.add(o.type_id);
   }
   const typeNames = await loadTypeNames([...typeIds]);
-  return { ordersResult, historyResult, ordersNeedsReauth, historyNeedsReauth, typeNames };
+  return {
+    ordersResult,
+    historyResult,
+    ordersNeedsReauth,
+    historyNeedsReauth,
+    historyTruncated,
+    typeNames,
+  };
 }
 
 /** Orders: open orders + history tabs. Read-only, cached for offline. */
@@ -64,7 +76,9 @@ export function Orders() {
   const historyResult = data?.historyResult ?? null;
   const ordersNeedsReauth = data?.ordersNeedsReauth ?? false;
   const historyNeedsReauth = data?.historyNeedsReauth ?? false;
+  const historyTruncated = data?.historyTruncated ?? false;
   const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
+  const nameFor = (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`;
 
   const orders = useMemo(
     () => [...(ordersResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
@@ -174,7 +188,20 @@ export function Orders() {
       ) : tab === 'open' ? (
         <Panel
           padded={false}
-          actions={ordersResult ? <DataAgeBadge date={ordersResult.fetchedAt} /> : undefined}
+          actions={
+            ordersResult ? (
+              <span className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={orders.length === 0}
+                  onClick={() => downloadCsv('orders-open', orders, ordersCsvColumns(t, nameFor))}
+                >
+                  {t('orders.exportCsvOpen')}
+                </Button>
+                <DataAgeBadge date={ordersResult.fetchedAt} />
+              </span>
+            ) : undefined
+          }
         >
           {ordersNeedsReauth ? (
             reauthBanner
@@ -203,7 +230,28 @@ export function Orders() {
       ) : (
         <Panel
           padded={false}
-          actions={historyResult ? <DataAgeBadge date={historyResult.fetchedAt} /> : undefined}
+          actions={
+            historyResult ? (
+              <span className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={history.length === 0}
+                  onClick={() =>
+                    downloadCsv(
+                      'orders-history',
+                      history,
+                      orderHistoryCsvColumns(t, nameFor),
+                      new Date(),
+                      historyTruncated
+                    )
+                  }
+                >
+                  {t('orders.exportCsvHistory')}
+                </Button>
+                <DataAgeBadge date={historyResult.fetchedAt} />
+              </span>
+            ) : undefined
+          }
         >
           {historyNeedsReauth ? (
             reauthBanner
@@ -218,6 +266,11 @@ export function Orders() {
               {historyResult.fromCache && (
                 <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                   {t('common.offlineTitle')}
+                </p>
+              )}
+              {historyTruncated && (
+                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                  {t('common.incompleteTitle')}
                 </p>
               )}
               <DataTable
