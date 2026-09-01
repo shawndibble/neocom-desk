@@ -7,6 +7,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { useCalendarView, DEFAULT_CALENDAR_VIEW } from '@/features/character/calendarViewPref';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -25,10 +26,15 @@ vi.mock('@/sde/loadSde', () => ({
 
 const CHAR_ID = 91;
 
+// Anchored to "today" (not a fixed date) so the fixture always lands inside
+// the default Month view's visible grid, whenever the suite actually runs.
+const TODAY = new Date();
+const EVENT_DATE = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), 18, 0, 0);
+
 const events = [
   {
     event_id: 1,
-    event_date: '2026-09-01T18:00:00Z',
+    event_date: EVENT_DATE.toISOString(),
     title: 'Fleet Op',
     importance: 1,
     event_response: 'accepted' as const,
@@ -43,7 +49,7 @@ const server = setupServer(
     HttpResponse.json({
       event_id: 1,
       title: 'Fleet Op',
-      date: '2026-09-01T18:00:00Z',
+      date: EVENT_DATE.toISOString(),
       duration: 60,
       importance: 1,
       owner_id: 1,
@@ -65,6 +71,7 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  useCalendarView.setState({ value: DEFAULT_CALENDAR_VIEW, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -79,17 +86,71 @@ beforeEach(async () => {
 });
 
 describe('Calendar', () => {
-  it('lists events from mocked ESI', async () => {
+  it('defaults to Month view and lists an event from mocked ESI', async () => {
     render(<App />);
+    expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Month' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('Agenda view shows the response alongside the event', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet Op');
+    await user.click(screen.getByRole('tab', { name: 'Agenda' }));
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     expect(screen.getByText(/Accepted/)).toBeInTheDocument();
   });
 
-  it('shows detail on click', async () => {
+  it('remembers the last-picked view across a reload', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByText('Fleet Op');
+    await user.click(screen.getByRole('tab', { name: 'Week' }));
+    expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true');
+    unmount();
+
+    // Simulate a fresh page load: drop the in-memory store so the remount
+    // must re-read the choice from Dexie rather than just reusing React state
+    // that happens to have survived the unmount.
+    useCalendarView.setState({ value: DEFAULT_CALENDAR_VIEW, hydrated: false });
+
+    render(<App />);
+    await screen.findByText(/Fleet Op/);
+    expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('Month\'s "+N more" switches to Week, anchored on that day', async () => {
+    const busyDayEvents = Array.from({ length: 4 }, (_, i) => ({
+      event_id: i + 1,
+      event_date: new Date(
+        EVENT_DATE.getFullYear(),
+        EVENT_DATE.getMonth(),
+        EVENT_DATE.getDate(),
+        9 + i
+      ).toISOString(),
+      title: `Op ${i + 1}`,
+      importance: 1,
+      event_response: 'accepted' as const,
+    }));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json(busyDayEvents)
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const more = await screen.findByText('+1 more');
+    await user.click(more);
+    expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByText(/Op 4/)).toBeInTheDocument();
+  });
+
+  it('shows detail in a modal on click', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByText('Fleet Op'));
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Fleet Op' })).toBeInTheDocument();
   });
 
   it('strips EVE markup from the event detail text (BUG #4)', async () => {
@@ -98,7 +159,7 @@ describe('Calendar', () => {
         HttpResponse.json({
           event_id: 1,
           title: 'Fleet Op',
-          date: '2026-09-01T18:00:00Z',
+          date: EVENT_DATE.toISOString(),
           duration: 60,
           importance: 1,
           owner_id: 1,
