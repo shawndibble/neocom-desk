@@ -1032,3 +1032,43 @@ export function getCharacterLoyaltyPoints(
     endpointId: 'getCharacterLoyaltyPoints',
   });
 }
+
+// --- GET /characters/{character_id}/location (esi-location.read_location.v1) ---
+
+export interface CharacterLocation {
+  solar_system_id: number;
+  station_id?: number;
+  structure_id?: number;
+}
+
+export function getCharacterLocation(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterLocation>> {
+  return esiFetch<CharacterLocation>(`/characters/${characterId}/location`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterLocation',
+  });
+}
+
+// --- GET /route/{origin}/{destination} (public) ---
+
+export interface RouteOptions extends EndpointOptions {
+  /** Only 'shortest'/'safest' are ever surfaced in the UI (issue #87); 'fastest' is omitted deliberately. */
+  flag?: 'shortest' | 'fastest' | 'safest';
+}
+
+/** Waypoint solar-system ids, including both origin and destination. */
+export function getRoute(
+  origin: number,
+  destination: number,
+  options: RouteOptions = {}
+): Promise<EsiResult<number[]>> {
+  const { flag, ...rest } = options;
+  return esiFetch<number[]>(`/route/${origin}/${destination}`, {
+    ...rest,
+    endpointId: 'getRoute',
+    query: { flag },
+  });
+}

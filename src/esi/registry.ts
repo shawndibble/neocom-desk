@@ -166,6 +166,14 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/loyalty/points',
     scope: 'esi-characters.read_loyalty.v1',
   },
+  getCharacterLocation: {
+    route: '/characters/{character_id}/location',
+    scope: 'esi-location.read_location.v1',
+  },
+  getRoute: {
+    route: '/route/{origin}/{destination}',
+    scope: PUBLIC,
+  },
   getAlliancePublicInfo: {
     route: '/alliances/{alliance_id}',
     scope: PUBLIC,

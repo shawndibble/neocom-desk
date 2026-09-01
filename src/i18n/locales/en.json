@@ -496,6 +496,20 @@
       "value": "Value: {{value}} ISK",
       "volume": "Volume: {{volume}} m3",
       "volumeUnknown": "Volume: unknown"
+    },
+    "jumpsAway": {
+      "value_one": "{{count}} jump",
+      "value_other": "{{count}} jumps",
+      "unknown": "-",
+      "unknownReason": {
+        "noLocation": "Character location unavailable.",
+        "noRoute": "No route found to this station."
+      },
+      "routePreference": {
+        "label": "Route",
+        "shortest": "Shortest",
+        "safest": "Safest"
+      }
     }
   },
   "mail": {

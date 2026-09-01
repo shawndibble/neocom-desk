@@ -17,6 +17,11 @@ import {
   FilterChip,
   Panel,
   ReauthBanner,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
 } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -37,11 +42,15 @@ import {
   type OtherCharacterAssets,
 } from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
-import { loadStationName } from '@/features/character/stations';
-import { loadStructureName } from '@/features/character/structures';
+import { loadStationName, loadStationSystemId } from '@/features/character/stations';
+import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { loadCharacterSolarSystemId } from '@/features/character/location';
+import { loadJumpsAway } from '@/features/character/routeDistance';
+import { useRoutePreference, type RoutePreference } from '@/features/character/routePreference';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
+import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { capItems } from '@/lib/cap';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -468,6 +477,38 @@ function StationPinButton({ label, pinState, onToggle, t }: StationPinButtonProp
           {tooltipText}
         </span>
       )}
+    </span>
+  );
+}
+
+interface JumpsAwayBadgeProps {
+  result: JumpsAwayResult | undefined;
+  t: Translate;
+}
+
+/**
+ * Jumps-away distance for a station row (issue #87). Renders nothing while
+ * still resolving (undefined) rather than a placeholder — the badge is a
+ * progressive enhancement that pops in once its route call settles, never a
+ * load-blocking part of the row. `title` (not the hover-tooltip pattern used
+ * elsewhere on this page) mirrors `CharacterBadge`'s own plain-annotation
+ * treatment just above — this is the same kind of small supplementary label.
+ */
+function JumpsAwayBadge({ result, t }: JumpsAwayBadgeProps) {
+  if (!result) return null;
+  if (result.kind === 'known') {
+    return (
+      <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
+        {t('assets.jumpsAway.value', { count: result.jumps })}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums"
+      title={t(`assets.jumpsAway.unknownReason.${result.reason}`)}
+    >
+      {t('assets.jumpsAway.unknown')}
     </span>
   );
 }
@@ -910,6 +951,147 @@ export function Assets() {
     return keys;
   }, [searchActive, sortedTree]);
 
+  // Jumps-away distances (issue #87): the active character's current solar
+  // system, fetched once per page load (not polled) via ESI's location
+  // endpoint. Re-fetched whenever the active character changes.
+  const [characterSystemId, setCharacterSystemId] = useState<number | null>(null);
+  const [characterLocationResolved, setCharacterLocationResolved] = useState(false);
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    setCharacterLocationResolved(false);
+    let cancelled = false;
+    void loadCharacterSolarSystemId(activeCharacterId).then((systemId) => {
+      if (cancelled) return;
+      setCharacterSystemId(systemId);
+      setCharacterLocationResolved(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId]);
+
+  const routePreference = useRoutePreference((state) => state.value);
+  const hydrateRoutePreference = useRoutePreference((state) => state.hydrate);
+  const setRoutePreference = useRoutePreference((state) => state.setValue);
+  useEffect(() => {
+    void hydrateRoutePreference();
+  }, [hydrateRoutePreference]);
+
+  // Lazy, scoped to pinned stations and ones the user has actually drilled
+  // into (CONTEXT.md round 14: "only for pinned and currently visible/
+  // expanded stations") — every station Panel always renders, so "visible"
+  // alone would mean every station on the page; requiring at least one
+  // expanded descendant (pinned stations auto-expand on load, see above)
+  // keeps this to stations the user is actually looking at, bounding the
+  // route-call fan-out for characters with many stations.
+  const jumpsAwayScopedStations = useMemo(() => {
+    const effectiveExpanded = autoExpandedKeys ?? expandedKeys;
+    return sortedTree.filter((station) => {
+      if (pinStateFor(station.locationId) !== 'unpinned') return true;
+      const prefix = `station:${station.locationId}/`;
+      for (const key of effectiveExpanded) {
+        if (key.startsWith(prefix)) return true;
+      }
+      return false;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
+  }, [sortedTree, expandedKeys, autoExpandedKeys, pins, activeCharacterId]);
+
+  // Each station's own solar system id (resolved once, then reused across a
+  // preference switch) and the resulting jumps-away result per (station,
+  // preference) pair — keying by preference means switching it never needs
+  // an explicit cache invalidation, a stale entry under the old preference
+  // is simply never read again. Both effects below guard against
+  // re-requesting a key with a ref (not just the `pending` filter over
+  // state): resolving one station's system id updates `stationSystemIds`,
+  // which is itself a dependency of the jumps-away effect, so that effect
+  // legitimately re-runs mid-flight for *other* still-pending stations — the
+  // ref is what stops that re-run from re-issuing a request already inflight
+  // for the same key, which the state-only filter cannot do since the write
+  // that would exclude it hasn't landed yet.
+  const [stationSystemIds, setStationSystemIds] = useState<ReadonlyMap<number, number | null>>(
+    new Map()
+  );
+  const [jumpsAwayByKey, setJumpsAwayByKey] = useState<ReadonlyMap<string, JumpsAwayResult>>(
+    new Map()
+  );
+  const systemIdRequested = useRef<Set<number>>(new Set());
+  const jumpsAwayRequested = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // A fresh character is a fresh page context: a structure's system id is
+    // ACL-checked per character, so a previous character's resolved/inflight
+    // set must not suppress this one's requests.
+    setStationSystemIds(new Map());
+    setJumpsAwayByKey(new Map());
+    systemIdRequested.current = new Set();
+    jumpsAwayRequested.current = new Set();
+  }, [activeCharacterId]);
+
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    const missing = jumpsAwayScopedStations.filter(
+      (station) =>
+        !stationSystemIds.has(station.locationId) &&
+        !systemIdRequested.current.has(station.locationId)
+    );
+    if (missing.length === 0) return;
+    for (const station of missing) systemIdRequested.current.add(station.locationId);
+
+    let cancelled = false;
+    void mapWithConcurrencyLimit(missing, ESI_FANOUT_CONCURRENCY, async (station) => {
+      const systemId =
+        station.locationType === 'station'
+          ? await loadStationSystemId(station.locationId)
+          : station.locationType === 'other'
+            ? await loadStructureSystemId(activeCharacterId, station.locationId)
+            : null;
+      if (!cancelled) setStationSystemIds((prev) => new Map(prev).set(station.locationId, systemId));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId, jumpsAwayScopedStations, stationSystemIds]);
+
+  useEffect(() => {
+    if (activeCharacterId === null || !characterLocationResolved) return;
+    const pending = jumpsAwayScopedStations.filter((station) => {
+      const key = `${station.locationId}:${routePreference}`;
+      if (jumpsAwayByKey.has(key) || jumpsAwayRequested.current.has(key)) return false;
+      return characterSystemId === null || stationSystemIds.has(station.locationId);
+    });
+    if (pending.length === 0) return;
+    for (const station of pending) {
+      jumpsAwayRequested.current.add(`${station.locationId}:${routePreference}`);
+    }
+
+    let cancelled = false;
+    void mapWithConcurrencyLimit(pending, ESI_FANOUT_CONCURRENCY, async (station) => {
+      const key = `${station.locationId}:${routePreference}`;
+      let result: JumpsAwayResult;
+      if (characterSystemId === null) {
+        result = { kind: 'unknown', reason: 'noLocation' };
+      } else {
+        const systemId = stationSystemIds.get(station.locationId) ?? null;
+        result =
+          systemId === null
+            ? { kind: 'unknown', reason: 'noRoute' }
+            : await loadJumpsAway(characterSystemId, systemId, routePreference);
+      }
+      if (!cancelled) setJumpsAwayByKey((prev) => new Map(prev).set(key, result));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeCharacterId,
+    characterLocationResolved,
+    characterSystemId,
+    jumpsAwayScopedStations,
+    jumpsAwayByKey,
+    stationSystemIds,
+    routePreference,
+  ]);
+
   function toggleKey(key: string) {
     if (searchActive) return;
     setExpandedKeys((prev) => {
@@ -964,6 +1146,20 @@ export function Assets() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('assets.title')}</h1>
         <div className="flex items-center gap-2">
           {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+          <Select
+            value={routePreference}
+            onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
+          >
+            <SelectTrigger aria-label={t('assets.jumpsAway.routePreference.label')} className="w-28">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="shortest">
+                {t('assets.jumpsAway.routePreference.shortest')}
+              </SelectItem>
+              <SelectItem value="safest">{t('assets.jumpsAway.routePreference.safest')}</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             size="sm"
             disabled={csvGroups.length === 0}
@@ -1070,6 +1266,10 @@ export function Assets() {
                           label={label}
                           pinState={pinState}
                           onToggle={() => void handleTogglePin(station.locationId)}
+                          t={t}
+                        />
+                        <JumpsAwayBadge
+                          result={jumpsAwayByKey.get(`${station.locationId}:${routePreference}`)}
                           t={t}
                         />
                         <span className="text-[0.6875rem] text-text-faint tabular-nums">
