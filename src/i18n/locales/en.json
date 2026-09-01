@@ -719,8 +719,7 @@
     "detailItemsRequested": "Requested",
     "detailItemName": "Name",
     "detailQuantity": "Qty",
-    "detailNoItems": "No item data for this contract",
-    "detailErrorHint": "Reconnect to fetch this contract's items."
+    "detailNoItems": "No item data for this contract"
   },
   "contacts": {
     "title": "Contacts",

@@ -14,7 +14,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, Modal, Spinner, type DataTableColumn } from '@/components/ui';
+import { DataTable, EmptyState, Modal, Spinner, type DataTableColumn } from '@/components/ui';
 import { loadContractItems } from './contractItems';
 import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
@@ -95,43 +95,38 @@ export function ContractDetailModal({
 
   const included = items?.list.filter((item) => item.is_included) ?? [];
   const requested = items?.list.filter((item) => !item.is_included) ?? [];
-
-  function itemColumns(typeNames: Map<number, string>): DataTableColumn<ContractItem>[] {
-    return [
-      {
-        id: 'name',
-        header: t('contracts.detailItemName'),
-        render: (item) => (
-          <span className="flex items-center gap-1.5">
-            <img
-              src={typeIconUrl(item.type_id, 32)}
-              alt=""
-              width={20}
-              height={20}
-              className="shrink-0 rounded-xs border border-line"
-            />
-            {typeNames.get(item.type_id) ?? `#${item.type_id}`}
-          </span>
-        ),
-      },
-      {
-        id: 'quantity',
-        header: t('contracts.detailQuantity'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (item) => item.quantity.toLocaleString(),
-      },
-    ];
-  }
+  // Built once per render (not once per table) — both Included and Requested share it.
+  const itemColumns: DataTableColumn<ContractItem>[] | undefined = items && [
+    {
+      id: 'name',
+      header: t('contracts.detailItemName'),
+      render: (item) => (
+        <span className="flex items-center gap-1.5">
+          <img
+            src={typeIconUrl(item.type_id, 32)}
+            alt=""
+            width={20}
+            height={20}
+            className="shrink-0 rounded-xs border border-line"
+          />
+          {items.typeNames.get(item.type_id) ?? `#${item.type_id}`}
+        </span>
+      ),
+    },
+    {
+      id: 'quantity',
+      header: t('contracts.detailQuantity'),
+      align: 'right',
+      className: 'tabular-nums',
+      render: (item) => item.quantity.toLocaleString(),
+    },
+  ];
 
   return (
     <Modal open onClose={onClose} title={title}>
       <div className="space-y-4 text-xs">
         <div>
-          <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('contracts.title')}
-          </h3>
-          <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             <dt className="text-text-dim uppercase">{t('contracts.detailType')}</dt>
             <dd>{t(CONTRACT_TYPE_KEY[contract.type])}</dd>
 
@@ -232,10 +227,10 @@ export function ContractDetailModal({
               <Spinner size="sm" label={t('common.loading')} />
             </div>
           ) : items.list.length === 0 ? (
-            <p className="text-text-dim">{t('contracts.detailNoItems')}</p>
+            <EmptyState title={t('contracts.detailNoItems')} className="py-4" />
           ) : (
             <>
-              {included.length > 0 && (
+              {included.length > 0 && itemColumns && (
                 <div>
                   <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('contracts.detailItemsIncluded')}
@@ -243,7 +238,7 @@ export function ContractDetailModal({
                   <div className="overflow-x-auto">
                     <DataTable
                       label={t('contracts.detailItemsIncluded')}
-                      columns={itemColumns(items.typeNames)}
+                      columns={itemColumns}
                       rows={included}
                       rowKey={(item) => item.record_id}
                       density="compact"
@@ -251,7 +246,7 @@ export function ContractDetailModal({
                   </div>
                 </div>
               )}
-              {requested.length > 0 && (
+              {requested.length > 0 && itemColumns && (
                 <div>
                   <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('contracts.detailItemsRequested')}
@@ -259,7 +254,7 @@ export function ContractDetailModal({
                   <div className="overflow-x-auto">
                     <DataTable
                       label={t('contracts.detailItemsRequested')}
-                      columns={itemColumns(items.typeNames)}
+                      columns={itemColumns}
                       rows={requested}
                       rowKey={(item) => item.record_id}
                       density="compact"
@@ -274,11 +269,18 @@ export function ContractDetailModal({
   );
 }
 
+/**
+ * Neutral color, not `isk-pos`/`isk-neg` — those tokens signal gain/loss
+ * *to this character*, but a `Contract` alone doesn't say whether the active
+ * character is the issuer or the acceptor, so "Acceptor Pays" could be this
+ * character's outflow or the other side's. Coloring it as a gain either way
+ * would be a wrong signal, not just a missing one.
+ */
 function IskRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
       <span className="text-text-dim">{label}</span>
-      <span className="tabular-nums text-isk-pos font-semibold">{formatIsk(value, 2)}</span>
+      <span className="tabular-nums font-semibold">{formatIsk(value, 2)}</span>
     </div>
   );
 }
