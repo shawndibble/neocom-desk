@@ -161,7 +161,22 @@ export function CompareDrawer({
   );
 
   return (
-    <div className="fixed inset-x-0 bottom-16 z-30 flex flex-col items-stretch md:bottom-0">
+    // Fixed-position overlay, not page flow, so `Panel` (DESIGN.md §4) doesn't
+    // fit; a plain bordered surface matches its look without the component.
+    // `flex-col-reverse` with the handle as the *first* DOM child (below)
+    // keeps it visually below the drawer while keeping it before the drawer's
+    // content in tab order, so Tab from the handle enters the drawer next.
+    <div className="fixed inset-x-0 bottom-16 z-30 flex flex-col-reverse items-stretch md:bottom-0">
+      <button
+        ref={handleRef}
+        type="button"
+        aria-expanded={mode !== 'closed'}
+        aria-controls={DRAWER_ID}
+        onClick={() => setMode((m) => (m === 'closed' ? 'open' : 'closed'))}
+        className="flex h-9 items-center justify-center border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      >
+        {t('market.compare.handle', { count: items.length })}
+      </button>
       {mode !== 'closed' && (
         <section
           id={DRAWER_ID}
@@ -173,7 +188,7 @@ export function CompareDrawer({
             }
           }}
           style={{ height: mode === 'full' ? FULL_HEIGHT : heightPx }}
-          className="flex flex-col border border-b-0 border-line bg-panel shadow-lg shadow-black/50"
+          className="flex flex-col border border-b-0 border-line bg-panel"
         >
           <div
             role="separator"
@@ -224,16 +239,6 @@ export function CompareDrawer({
           </div>
         </section>
       )}
-      <button
-        ref={handleRef}
-        type="button"
-        aria-expanded={mode !== 'closed'}
-        aria-controls={DRAWER_ID}
-        onClick={() => setMode((m) => (m === 'closed' ? 'open' : 'closed'))}
-        className="flex h-9 items-center justify-center border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase shadow-lg shadow-black/50 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-      >
-        {t('market.compare.handle', { count: items.length })}
-      </button>
     </div>
   );
 }

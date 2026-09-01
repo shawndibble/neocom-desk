@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
   DataAgeBadge,
@@ -11,6 +12,10 @@ import {
   Spinner,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
+import { db, type QuickbarItem } from '@/db';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { scheduleSync } from '@/sync';
+import { isSyncConfigured } from '@/app/syncStatus';
 import {
   loadMarketGroups,
   loadMarketTypes,
@@ -37,6 +42,12 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
+import { QuickbarList } from '@/features/market/QuickbarList';
+import {
+  addQuickbarItem,
+  removeQuickbarItem,
+  reorderQuickbarItems,
+} from '@/features/market/quickbar';
 import {
   splitOrderBook,
   resolveOrderLocation,
@@ -99,6 +110,8 @@ interface MarketGroupTreeProps {
   selectedTypeId: number | null;
   blueprintCatalog: BlueprintCatalog | null;
   onRequestBlueprintCatalog: () => void;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  quickbarAvailable: boolean;
 }
 
 function MarketGroupTree({
@@ -111,6 +124,8 @@ function MarketGroupTree({
   selectedTypeId,
   blueprintCatalog,
   onRequestBlueprintCatalog,
+  onAddToQuickbar,
+  quickbarAvailable,
 }: MarketGroupTreeProps) {
   const filtering = filterResult !== null;
 
@@ -155,6 +170,8 @@ function MarketGroupTree({
                     typeId={item.typeId}
                     itemName={item.name}
                     blueprintTypeID={blueprintTypeID}
+                    onAddToQuickbar={onAddToQuickbar}
+                    quickbarAvailable={quickbarAvailable}
                     onOpenChange={(open) => {
                       if (open) onRequestBlueprintCatalog();
                     }}
@@ -213,6 +230,37 @@ export function Market() {
   const locationModeHydrated = useLocationMode((state) => state.hydrated);
   const hydrateLocationMode = useLocationMode((state) => state.hydrate);
   const setLocationModeValue = useLocationMode((state) => state.setValue);
+
+  // The Quickbar (CONTEXT.md): Editable Data, one record per character. Reads
+  // as [] rather than requiring an active character — Market Browser itself
+  // needs none — so Add to Quickbar silently no-ops with nobody active.
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const quickbarRecord = useLiveQuery(async () => {
+    if (activeCharacterId === null) return undefined;
+    return db.quickbars.get(String(activeCharacterId));
+  }, [activeCharacterId]);
+  const quickbarItems = quickbarRecord?.items ?? [];
+
+  async function writeQuickbar(items: QuickbarItem[]) {
+    if (activeCharacterId === null) return;
+    await db.quickbars.put({
+      id: String(activeCharacterId),
+      characterId: activeCharacterId,
+      items,
+      updatedAt: Date.now(),
+    });
+    if (isSyncConfigured()) scheduleSync(activeCharacterId);
+  }
+
+  function handleAddToQuickbar(typeId: number, itemName: string) {
+    void writeQuickbar(addQuickbarItem(quickbarItems, { typeId, name: itemName }));
+  }
+  function handleRemoveFromQuickbar(typeId: number) {
+    void writeQuickbar(removeQuickbarItem(quickbarItems, typeId));
+  }
+  function handleReorderQuickbar(activeTypeId: number, overTypeId: number) {
+    void writeQuickbar(reorderQuickbarItems(quickbarItems, activeTypeId, overTypeId));
+  }
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   const [types, setTypes] = useState<MarketTypeEntry[] | null>(null);
@@ -639,9 +687,19 @@ export function Market() {
                 selectedTypeId={selectedTypeId}
                 blueprintCatalog={blueprintCatalog}
                 onRequestBlueprintCatalog={ensureBlueprintCatalog}
+                onAddToQuickbar={handleAddToQuickbar}
+                quickbarAvailable={activeCharacterId !== null}
               />
             </div>
           )}
+
+          <QuickbarList
+            items={quickbarItems}
+            selectedTypeId={selectedTypeId}
+            onSelect={setSelectedTypeId}
+            onRemove={handleRemoveFromQuickbar}
+            onReorder={handleReorderQuickbar}
+          />
         </Panel>
 
         <Panel
