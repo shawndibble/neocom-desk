@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
+import { db } from '@/db';
 
 vi.mock('./data', () => ({
   loadCharacterSkillsWithStatus: vi.fn(),
@@ -33,9 +34,10 @@ function queueStatus(
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.mocked(loadCharacterSkillsWithStatus).mockReset();
   vi.mocked(loadCharacterSkillQueueWithStatus).mockReset();
+  await db.tokens.clear();
 });
 
 describe('loadCorrectedSkills', () => {
@@ -173,5 +175,76 @@ describe('loadCorrectedSkills', () => {
 
     expect(result.skillsNeedsReauth).toBe(true);
     expect(result.queueNeedsReauth).toBe(false);
+  });
+
+  describe('skipQueueWithoutScope', () => {
+    const QUEUE_SCOPE = 'esi-skills.read_skillqueue.v1';
+
+    beforeEach(() => {
+      vi.mocked(loadCharacterSkillsWithStatus).mockResolvedValue(
+        skillsStatus({
+          data: {
+            skills: [
+              {
+                skill_id: 3300,
+                trained_skill_level: 3,
+                active_skill_level: 3,
+                skillpoints_in_skill: 8000,
+              },
+            ],
+            total_sp: 264_000,
+            unallocated_sp: 0,
+          },
+        })
+      );
+    });
+
+    it('skips the /skillqueue read entirely and reports no reauth when the character has no queue scope', async () => {
+      await db.tokens.put({
+        characterId: CHAR_ID,
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        expiresAt: NOW + 1_000,
+        scopes: ['esi-skills.read_skills.v1'],
+      });
+
+      const result = await loadCorrectedSkills(CHAR_ID, NOW, { skipQueueWithoutScope: true });
+
+      expect(loadCharacterSkillQueueWithStatus).not.toHaveBeenCalled();
+      expect(result.queueResult).toBeNull();
+      expect(result.queueNeedsReauth).toBe(false);
+      expect(result.trained.get(3300)).toEqual({ level: 3, sp: 8000 });
+    });
+
+    it('skips the /skillqueue read when there is no token row at all', async () => {
+      const result = await loadCorrectedSkills(CHAR_ID, NOW, { skipQueueWithoutScope: true });
+
+      expect(loadCharacterSkillQueueWithStatus).not.toHaveBeenCalled();
+      expect(result.queueNeedsReauth).toBe(false);
+    });
+
+    it('still reads the /skillqueue when the scope is granted', async () => {
+      await db.tokens.put({
+        characterId: CHAR_ID,
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        expiresAt: NOW + 1_000,
+        scopes: [QUEUE_SCOPE],
+      });
+      vi.mocked(loadCharacterSkillQueueWithStatus).mockResolvedValue(queueStatus({ data: [] }));
+
+      const result = await loadCorrectedSkills(CHAR_ID, NOW, { skipQueueWithoutScope: true });
+
+      expect(loadCharacterSkillQueueWithStatus).toHaveBeenCalledWith(CHAR_ID);
+      expect(result.queueResult).not.toBeNull();
+    });
+
+    it('reads the /skillqueue by default, without the option, even absent a token row', async () => {
+      vi.mocked(loadCharacterSkillQueueWithStatus).mockResolvedValue(queueStatus({ data: [] }));
+
+      await loadCorrectedSkills(CHAR_ID, NOW);
+
+      expect(loadCharacterSkillQueueWithStatus).toHaveBeenCalledWith(CHAR_ID);
+    });
   });
 });

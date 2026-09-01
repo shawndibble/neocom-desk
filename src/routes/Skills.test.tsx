@@ -110,7 +110,7 @@ beforeEach(async () => {
     accessToken: 'access-token',
     refreshToken: 'refresh',
     expiresAt: Date.now() + 3_600_000,
-    scopes: ['esi-skills.read_skills.v1'],
+    scopes: ['esi-skills.read_skills.v1', 'esi-skills.read_skillqueue.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/skills');
@@ -218,6 +218,32 @@ describe('Skills', () => {
     const row = screen.getByText('#1337').closest('li')!;
     expect(within(row).getByText('—')).toBeInTheDocument(); // common.unknown
     expect(within(row).queryByText('0 SP')).not.toBeInTheDocument();
+  });
+
+  it('skips the queue read and shows no reauth notice when the character never granted the queue scope', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'access-token',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: ['esi-skills.read_skills.v1'],
+    });
+    let queueRequests = 0;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () => {
+        queueRequests += 1;
+        return HttpResponse.json([], { status: 403 });
+      })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
+    // Trained level comes from /skills alone — no queue correction attempted.
+    expect(screen.getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
+    expect(screen.getByText('8,000 SP')).toBeInTheDocument();
+    expect(queueRequests).toBe(0);
+    expect(screen.queryByText('EVE access was refused')).not.toBeInTheDocument();
   });
 
   it('falls back to cached skills when ESI is unreachable', async () => {

@@ -7,6 +7,7 @@ import '@/i18n';
 import { db, type BuildPlanRecord } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
@@ -142,6 +143,7 @@ beforeEach(async () => {
   await db.buildPlans.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  useAuthFailure.setState({ failure: null });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -149,7 +151,7 @@ beforeEach(async () => {
     accessToken: 'access-token',
     refreshToken: 'refresh',
     expiresAt: Date.now() + 3_600_000,
-    scopes: [],
+    scopes: ['esi-skills.read_skillqueue.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -352,6 +354,30 @@ describe('Industry: /skills is stale until the character logs in', () => {
     render(<App />);
 
     expect(await screen.findByText('20m')).toBeInTheDocument();
+  });
+
+  it('skips the queue read and shows no reauth notice when the character never granted the queue scope', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'access-token',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: [],
+    });
+    let queueRequests = 0;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () => {
+        queueRequests += 1;
+        return HttpResponse.json([], { status: 403 });
+      })
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    // No queue correction applied: base blueprint time stands.
+    expect(await screen.findByText('20m')).toBeInTheDocument();
+    expect(queueRequests).toBe(0);
+    expect(screen.queryByText('EVE access was refused')).not.toBeInTheDocument();
   });
 });
 

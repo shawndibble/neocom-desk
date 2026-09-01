@@ -10,6 +10,9 @@
  */
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import type { TrainedSkill } from '@/engine/types';
+import { db } from '@/db';
+import { ESI_REGISTRY } from '@/esi/registry';
+import type { StatusResult } from '@/esi/cache';
 import {
   loadCharacterSkillsWithStatus,
   loadCharacterSkillQueueWithStatus,
@@ -18,6 +21,14 @@ import {
 import { toTrainedSkillsMap } from './skillMap';
 import { applyCompletedQueueEntries, completedQueueLevels, completedSpGain } from './queueStatus';
 import type { CompletedLevel } from './queueStatus';
+
+const QUEUE_SCOPE = ESI_REGISTRY.getCharacterSkillQueue.scope;
+
+/** Whether the character's stored token grants the /skillqueue scope. No token row means no grant. */
+async function hasQueueScope(characterId: number): Promise<boolean> {
+  const token = await db.tokens.get(characterId);
+  return (token?.scopes ?? []).includes(QUEUE_SCOPE);
+}
 
 export interface CorrectedSkills {
   /** Raw /skills payload + cache metadata. `.data.total_sp` is *not* corrected — use `totalSp`. */
@@ -51,15 +62,31 @@ function olderOf(a: Date | undefined, b: Date | undefined): Date | null {
   return a < b ? a : b;
 }
 
+export interface LoadCorrectedSkillsOptions {
+  /**
+   * Skip the /skillqueue read entirely when the active character has not
+   * granted its scope, rather than attempting it and letting the guaranteed
+   * 401 raise the shell-wide re-auth notice. Only for callers that use
+   * `trained`/`totalSp` and don't otherwise show queue data (Skills,
+   * Industry) — a page that displays the queue itself still needs the
+   * attempt, and its own re-auth prompt, to explain a missing grant.
+   */
+  skipQueueWithoutScope?: boolean;
+}
+
 /** Corrected skills for one character. `nowMs` is a parameter, keeping this clock-free. */
 export async function loadCorrectedSkills(
   characterId: number,
-  nowMs: number
+  nowMs: number,
+  options: LoadCorrectedSkillsOptions = {}
 ): Promise<CorrectedSkills> {
-  const [skillsStatus, queueStatus] = await Promise.all([
-    loadCharacterSkillsWithStatus(characterId),
-    loadCharacterSkillQueueWithStatus(characterId),
-  ]);
+  const skillsStatusPromise = loadCharacterSkillsWithStatus(characterId);
+  const queueScopeGranted = options.skipQueueWithoutScope ? await hasQueueScope(characterId) : true;
+  const queueStatusPromise: Promise<StatusResult<SkillQueueEntry[]>> = queueScopeGranted
+    ? loadCharacterSkillQueueWithStatus(characterId)
+    : Promise.resolve({ cached: null, needsReauth: false });
+
+  const [skillsStatus, queueStatus] = await Promise.all([skillsStatusPromise, queueStatusPromise]);
   const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
   const { cached: queueResult, needsReauth: queueNeedsReauth } = queueStatus;
 
