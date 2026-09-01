@@ -18,7 +18,12 @@ import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { loadPlanetName, loadSchematicName } from '@/features/pi/names';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { extractorProgramsFromPins, pinRole } from '@/features/pi/adapters';
+import {
+  extractorExpiryMs,
+  extractorProgramsFromPins,
+  hasUnverifiedExtractors,
+  pinRole,
+} from '@/features/pi/adapters';
 import {
   colonyAttention,
   colonyStatus,
@@ -125,10 +130,20 @@ async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal):
   };
 }
 
-const ATTENTION_TONE: Record<ColonyAttention, 'danger' | 'warning' | 'success'> = {
+/**
+ * `colonyAttention` only ever sees full, successfully-fetched data — it can't
+ * tell "verified healthy" from "we have no idea". `unknown` is that missing
+ * case: a colony whose detail failed to load, or that has an extractor pin
+ * `extractorProgramsFromPins` had to drop for missing data. Route-level only
+ * (not in `engine/pi`, which stays pure and never sees fetch outcomes).
+ */
+type EffectiveAttention = ColonyAttention | 'unknown';
+
+const ATTENTION_TONE: Record<EffectiveAttention, 'danger' | 'warning' | 'success' | 'default'> = {
   idle: 'danger',
   'expiring-soon': 'warning',
   healthy: 'success',
+  unknown: 'default',
 };
 
 const STATE_CLASS: Record<'active' | 'expiring-soon' | 'expired', string> = {
@@ -161,7 +176,13 @@ function ColonyPanel({
   loadedAt,
 }: ColonyPanelProps) {
   const { t } = useTranslation();
-  const attention = colonyAttention(status, loadedAt);
+  // No cached detail at all, or an extractor pin the adapter had to drop for
+  // missing data: either way, computing "healthy" from what's left would be
+  // exactly the confident-wrong-number the staleness rule exists to avoid.
+  const attention: EffectiveAttention =
+    detail === null || hasUnverifiedExtractors(detail.pins)
+      ? 'unknown'
+      : colonyAttention(status, loadedAt);
 
   const columns = useMemo<DataTableColumn<PlanetPin>[]>(
     () => [
@@ -199,17 +220,15 @@ function ColonyPanel({
         id: 'status',
         header: t('pi.column.status'),
         cellClassName: (pin) => {
-          if (pinRole(pin) !== 'extractor' || !pin.expiry_time) return undefined;
-          const expiryMs = Date.parse(pin.expiry_time);
-          if (Number.isNaN(expiryMs)) return undefined;
-          return STATE_CLASS[extractorState(expiryMs, loadedAt)];
+          const expiryMs = extractorExpiryMs(pin);
+          return expiryMs === null ? undefined : STATE_CLASS[extractorState(expiryMs, loadedAt)];
         },
         render: (pin) => {
           if (pinRole(pin) !== 'extractor') return '—';
-          if (!pin.expiry_time) return t('pi.programDataUnavailable');
-          const expiryMs = Date.parse(pin.expiry_time);
-          if (Number.isNaN(expiryMs)) return t('pi.programDataUnavailable');
-          return t(`pi.state.${extractorState(expiryMs, loadedAt)}`);
+          const expiryMs = extractorExpiryMs(pin);
+          return expiryMs === null
+            ? t('pi.programDataUnavailable')
+            : t(`pi.state.${extractorState(expiryMs, loadedAt)}`);
         },
       },
       {
@@ -217,9 +236,8 @@ function ColonyPanel({
         header: t('pi.column.expires'),
         className: 'tabular-nums',
         render: (pin) => {
-          if (pinRole(pin) !== 'extractor' || !pin.expiry_time) return '—';
-          const expiryMs = Date.parse(pin.expiry_time);
-          if (Number.isNaN(expiryMs)) return '—';
+          const expiryMs = extractorExpiryMs(pin);
+          if (expiryMs === null) return '—';
           return expiryMs <= loadedAt
             ? t('pi.expired')
             : t('pi.expiresIn', { duration: formatDuration((expiryMs - loadedAt) / 1000) });
@@ -243,6 +261,7 @@ function ColonyPanel({
             label={t('pi.attentionLabel')}
             value={t(`pi.attention.${attention}`)}
             tone={ATTENTION_TONE[attention]}
+            tooltip={attention === 'unknown' ? t('pi.attentionUnknownTooltip') : undefined}
           />
           <StatChip
             label={t('pi.lastUpdate')}

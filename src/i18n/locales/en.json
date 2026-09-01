@@ -553,8 +553,10 @@
     "attention": {
       "idle": "Idle",
       "expiring-soon": "Expiring soon",
-      "healthy": "Healthy"
+      "healthy": "Healthy",
+      "unknown": "Unknown"
     },
+    "attentionUnknownTooltip": "This colony's detail couldn't be loaded from ESI, so its status can't be shown with confidence. Try Refresh — if you revoked this app's planetary access, log in again.",
     "planetType": {
       "temperate": "Temperate",
       "barren": "Barren",

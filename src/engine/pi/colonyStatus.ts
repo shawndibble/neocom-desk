@@ -39,8 +39,11 @@ export function colonyAttention(status: ColonyStatus, nowMs: number): ColonyAtte
 const ATTENTION_RANK: Record<ColonyAttention, number> = { idle: 0, 'expiring-soon': 1, healthy: 2 };
 
 /**
- * Colonies needing attention first: idle, then soonest-expiring, then
- * healthy/no-extractor colonies last (stable within each group).
+ * Colonies needing attention first: idle, then soonest-expiring, then every
+ * other colony last as one group — a healthy colony and a no-extractor
+ * colony are not distinguished from each other, so their relative order
+ * within that trailing group is whatever `colonies` was already in (stable
+ * sort), not a further "no-extractor after healthy" ordering.
  */
 export function sortColoniesByAttention<T>(
   colonies: readonly T[],

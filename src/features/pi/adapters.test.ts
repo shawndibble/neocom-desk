@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pinRole, extractorProgramsFromPins } from './adapters';
+import { pinRole, extractorProgramsFromPins, hasUnverifiedExtractors } from './adapters';
 import type { PlanetPin } from '@/esi/endpoints';
 
 const extractorHeads = [{ head_id: 1, latitude: 0, longitude: 0 }];
@@ -80,5 +80,41 @@ describe('extractorProgramsFromPins', () => {
       extractor_details: { heads: extractorHeads },
     };
     expect(extractorProgramsFromPins([pin])).toEqual([]);
+  });
+});
+
+describe('hasUnverifiedExtractors', () => {
+  it('is false when every extractor pin has a valid program', () => {
+    const pin: PlanetPin = {
+      pin_id: 1,
+      type_id: 100,
+      latitude: 0,
+      longitude: 0,
+      expiry_time: '2026-09-05T00:00:00Z',
+      extractor_details: { heads: extractorHeads },
+    };
+    expect(hasUnverifiedExtractors([pin])).toBe(false);
+  });
+
+  it('is false for a colony with no extractor pins at all', () => {
+    const pin: PlanetPin = {
+      pin_id: 1,
+      type_id: 100,
+      latitude: 0,
+      longitude: 0,
+      factory_details: { schematic_id: 5 },
+    };
+    expect(hasUnverifiedExtractors([pin])).toBe(false);
+  });
+
+  it('is true when an extractor pin is missing expiry_time — a status computed from the rest would overclaim confidence', () => {
+    const pin: PlanetPin = {
+      pin_id: 1,
+      type_id: 100,
+      latitude: 0,
+      longitude: 0,
+      extractor_details: { heads: extractorHeads },
+    };
+    expect(hasUnverifiedExtractors([pin])).toBe(true);
   });
 });
