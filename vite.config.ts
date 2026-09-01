@@ -65,5 +65,9 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     coverage: { reporter: ['text', 'html'] },
+    // Suppresses passing-test noise, keeps full detail on failures — cuts
+    // `test:run` output (read by CI logs and every agent tool call alike)
+    // without losing anything actually diagnostic.
+    reporters: ['agent'],
   },
 });

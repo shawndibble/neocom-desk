@@ -255,7 +255,7 @@ it is not 5 conflict rounds plus 5 CI rounds):
        it run `node scripts/next-ticket/fetch-ci-failure.mjs <run-id>` (one
        call gets the filtered failed-step log, plus a note if the failing
        job looks like `e2e` so it knows to also `gh run download <run-id> -n
-       playwright-report`), then report back: the failing job and test, the
+playwright-report`), then report back: the failing job and test, the
        error message, the `file:line`, and its best read of the cause. Never
        pull raw CI logs into this context. On rounds 2+, tell it what
        previous rounds already tried — each sub-agent starts fresh and will
