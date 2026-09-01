@@ -1,5 +1,17 @@
 import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
+import { configure } from '@testing-library/react';
+
+/**
+ * Default is 1000ms. Under the CPU contention of several `/next-ticket`
+ * worktrees running `vitest` in parallel on one machine, that's tight enough
+ * that a real (already-fired) state update can lose the race against the
+ * timeout — a different `findBy*`/`waitFor` call flakes each run depending on
+ * which test happened to be mid-wait when the scheduler starved it. Widening
+ * the budget doesn't mask a hung update (those still fail, just slower); it
+ * only buys back time lost to scheduling, not to a broken assertion.
+ */
+configure({ asyncUtilTimeout: 5000 });
 
 /**
  * jsdom 30 ships the `HTMLDialogElement` interface but none of its behaviour, so

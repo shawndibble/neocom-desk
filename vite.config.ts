@@ -64,6 +64,12 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // Default 5000ms. A test can chain several `findBy*`/`waitFor` calls,
+    // each now with up to 5000ms of its own headroom (vitest.setup.ts) for
+    // CPU contention under parallel `/next-ticket` runs — give the overall
+    // test enough room that a slow-but-real render doesn't hit this ceiling
+    // first.
+    testTimeout: 15000,
     coverage: { reporter: ['text', 'html'] },
     // Suppresses passing-test noise, keeps full detail on failures — cuts
     // `test:run` output (read by CI logs and every agent tool call alike)
