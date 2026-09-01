@@ -70,7 +70,8 @@ const server = setupServer(
       type_id: 1531,
       system_id: 30000142,
     })
-  )
+  ),
+  http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.json([]))
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -275,5 +276,146 @@ describe('Assets', () => {
     render(<App />);
     expect(await screen.findByText(/only the first 1250 assets were fetched/i)).toBeInTheDocument();
     expect(screen.getByText(`Showing ${MAX_RENDERED_ASSETS} of 1250 assets.`)).toBeInTheDocument();
+  });
+
+  it('sorts sibling items alphabetically within a station, regardless of ESI response order', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            { ...assetPage1[0], item_id: 1, type_id: 34 }, // Tritanium
+            { ...assetPage1[0], item_id: 2, type_id: 35 }, // Pyerite
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    await screen.findByText('Tritanium');
+    const names = screen.getAllByText(/Tritanium|Pyerite/).map((el) => el.textContent);
+    expect(names).toEqual(['Pyerite', 'Tritanium']);
+  });
+
+  it('shows the singular "item" form of the badge when a node holds exactly one', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 1,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Drake' });
+    expect(screen.getByText('1 item · 0 ISK')).toBeInTheDocument();
+  });
+
+  it('still renders cached assets when global market prices are unreachable', async () => {
+    server.use(http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.error()));
+    render(<App />);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+  });
+
+  it('nests a ship into named sub-bays, collapsed by default, with a nested-item badge', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+
+    const shipHeading = await screen.findByRole('heading', { name: 'Drake' });
+    expect(screen.getByText('50 items · 0 ISK')).toBeInTheDocument();
+    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+
+    await user.click(shipHeading.closest('button')!);
+    expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+
+    await user.click(screen.getByText('Cargo Hold'));
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+  });
+
+  it('expand all / collapse all at the station level opens or closes every nested node at once', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Drake' });
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /expand all/i }));
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /collapse all/i }));
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
   });
 });
