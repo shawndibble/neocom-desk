@@ -58,8 +58,22 @@ describe('flattenAssetRows', () => {
   it('emits one station row per station, even with no children', () => {
     const rows = flattenAssetRows([station(1, []), station(2, [])], new Set());
     expect(rows).toEqual([
-      { type: 'station', key: 'station:1', station: expect.objectContaining({ locationId: 1 }) },
-      { type: 'station', key: 'station:2', station: expect.objectContaining({ locationId: 2 }) },
+      {
+        type: 'station',
+        key: 'station:1',
+        station: expect.objectContaining({ locationId: 1 }),
+        level: 1,
+        posinset: 1,
+        setsize: 2,
+      },
+      {
+        type: 'station',
+        key: 'station:2',
+        station: expect.objectContaining({ locationId: 2 }),
+        level: 1,
+        posinset: 2,
+        setsize: 2,
+      },
     ]);
   });
 
@@ -115,5 +129,16 @@ describe('flattenAssetRows', () => {
     for (const row of rows) {
       if (row.type === 'node') expect(row.stationLocationId).toBe(1);
     }
+  });
+
+  it('stamps aria-level and 1-based sibling position/count on node rows', () => {
+    const tree = [station(1, [container(10, [item(11), item(12)])])];
+    const rows = flattenAssetRows(tree, new Set(['station:1/i:10']));
+    const container10 = rows.find((r) => r.key === 'station:1/i:10');
+    const item11 = rows.find((r) => r.key === 'station:1/i:10/i:11');
+    const item12 = rows.find((r) => r.key === 'station:1/i:10/i:12');
+    expect(container10).toMatchObject({ level: 2, posinset: 1, setsize: 1 });
+    expect(item11).toMatchObject({ level: 3, posinset: 1, setsize: 2 });
+    expect(item12).toMatchObject({ level: 3, posinset: 2, setsize: 2 });
   });
 });

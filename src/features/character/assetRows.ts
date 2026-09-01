@@ -14,6 +14,12 @@ export interface StationRow {
   type: 'station';
   key: string;
   station: AssetTreeStation;
+  /** 1-based tree depth, for `aria-level` — a station is always the tree root level. */
+  level: number;
+  /** 1-based position among sibling stations, for `aria-posinset`. */
+  posinset: number;
+  /** Sibling station count, for `aria-setsize`. */
+  setsize: number;
 }
 
 export interface NodeRow {
@@ -22,6 +28,12 @@ export interface NodeRow {
   node: AssetTreeNode;
   depth: number;
   stationLocationId: number;
+  /** 1-based tree depth, for `aria-level` — `depth + 2` (a station occupies level 1). */
+  level: number;
+  /** 1-based position among sibling nodes at this depth, for `aria-posinset`. */
+  posinset: number;
+  /** Sibling count at this depth, for `aria-setsize`. */
+  setsize: number;
 }
 
 export type AssetRow = StationRow | NodeRow;
@@ -39,14 +51,22 @@ export function flattenAssetRows(
   expandedKeys: ReadonlySet<string>
 ): AssetRow[] {
   const rows: AssetRow[] = [];
-  for (const station of stations) {
+  const setsize = stations.length;
+  stations.forEach((station, index) => {
     const stationKey = stationRowKey(station.locationId);
-    rows.push({ type: 'station', key: stationKey, station });
+    rows.push({
+      type: 'station',
+      key: stationKey,
+      station,
+      level: 1,
+      posinset: index + 1,
+      setsize,
+    });
     pushNodeRows(rows, station.children, stationKey, 0, {
       stationLocationId: station.locationId,
       expandedKeys,
     });
-  }
+  });
   return rows;
 }
 
@@ -63,11 +83,21 @@ function pushNodeRows(
   depth: number,
   ctx: PushContext
 ): void {
-  for (const node of nodes) {
+  const setsize = nodes.length;
+  nodes.forEach((node, index) => {
     const path = `${parentPath}/${nodeSegment(node)}`;
-    rows.push({ type: 'node', key: path, node, depth, stationLocationId: ctx.stationLocationId });
+    rows.push({
+      type: 'node',
+      key: path,
+      node,
+      depth,
+      stationLocationId: ctx.stationLocationId,
+      level: depth + 2,
+      posinset: index + 1,
+      setsize,
+    });
     if (node.kind !== 'item' && ctx.expandedKeys.has(path)) {
       pushNodeRows(rows, node.children, path, depth + 1, ctx);
     }
-  }
+  });
 }
