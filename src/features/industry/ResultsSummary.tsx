@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, InfoTooltip, StatChip } from '@/components/ui';
+import { Disclosure, EmptyState, InfoTooltip, StatChip } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -91,51 +91,36 @@ export function ResultsSummary({
       <div className="divide-y divide-line rounded-xs border border-line bg-panel-2">
         <CostRow label={t('industry.materialCost')} value={formatIsk(result.materialCost)} />
 
-        <div>
-          <button
-            type="button"
-            aria-expanded={jobFeeExpanded}
-            onClick={() => setJobFeeExpanded((expanded) => !expanded)}
-            className="flex min-h-8 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-          >
-            <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-                {jobFeeExpanded ? '▾' : '▸'}
-              </span>
-              {t('industry.jobFee')}
-            </span>
-            <span className="font-medium tabular-nums text-[0.6875rem] text-text">
-              {formatIsk(result.jobFee.total)}
-            </span>
-          </button>
-          {jobFeeExpanded && (
-            <div className="divide-y divide-line border-t border-line bg-panel">
-              <CostRow
-                label={t('industry.eiv')}
-                value={formatIsk(result.jobFee.eiv)}
-                tooltip={t('industry.eivTooltip')}
-                indented
-              />
-              <CostRow
-                label={t('industry.costIndexFee')}
-                value={formatIsk(result.jobFee.grossCost)}
-                tooltip={t('industry.costIndexFeeTooltip')}
-                indented
-              />
-              <CostRow
-                label={t('industry.sccSurcharge')}
-                value={formatIsk(result.jobFee.sccSurcharge)}
-                tooltip={t('industry.sccSurchargeTooltip')}
-                indented
-              />
-              <CostRow
-                label={t('industry.facilityTaxAmount')}
-                value={formatIsk(result.jobFee.facilityTax)}
-                indented
-              />
-            </div>
-          )}
-        </div>
+        <Disclosure
+          label={t('industry.jobFee')}
+          trailing={formatIsk(result.jobFee.total)}
+          expanded={jobFeeExpanded}
+          onToggle={() => setJobFeeExpanded((expanded) => !expanded)}
+        >
+          <CostRow
+            label={t('industry.eiv')}
+            value={formatIsk(result.jobFee.eiv)}
+            tooltip={t('industry.eivTooltip')}
+            indented
+          />
+          <CostRow
+            label={t('industry.costIndexFee')}
+            value={formatIsk(result.jobFee.grossCost)}
+            tooltip={t('industry.costIndexFeeTooltip')}
+            indented
+          />
+          <CostRow
+            label={t('industry.sccSurcharge')}
+            value={formatIsk(result.jobFee.sccSurcharge)}
+            tooltip={t('industry.sccSurchargeTooltip')}
+            indented
+          />
+          <CostRow
+            label={t('industry.facilityTaxAmount')}
+            value={formatIsk(result.jobFee.facilityTax)}
+            indented
+          />
+        </Disclosure>
 
         <CostRow label={t('industry.totalCost')} value={formatIsk(result.totalCost)} emphasized />
         <CostRow label={t('industry.time')} value={formatDuration(result.seconds)} />
