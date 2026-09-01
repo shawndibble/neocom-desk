@@ -54,12 +54,15 @@ import { typeIconUrl } from '@/lib/eveImages';
 import { loadTypes } from '@/sde/loadSde';
 import {
   buildAssetTree,
+  compareStations,
   type AssetTreeBayNode,
   type AssetTreeContainerNode,
   type AssetTreeItemNode,
   type AssetTreeNode,
   type AssetTreeStation,
+  type StationSortField,
 } from '@/engine/assetTree';
+import { useStationSort } from '@/features/character/stationSortPreference';
 import {
   flattenAssetRows,
   nodeSegment,
@@ -339,21 +342,24 @@ function sortNodes(
   return [...bays, ...rest];
 }
 
-/** Pinned stations (either scope) sort ahead of unpinned ones; each group stays alphabetical. */
+/** Pinned stations (either scope) sort ahead of unpinned ones; each group orders by `sortField` (issue #88). */
 function sortStations(
   stations: readonly AssetTreeStation[],
   labelFor: (station: AssetTreeStation) => string,
   typeNames: ReadonlyMap<number, string>,
-  pinStateFor: (station: AssetTreeStation) => PinState
+  pinStateFor: (station: AssetTreeStation) => PinState,
+  sortField: StationSortField,
+  jumpsAwayFor: (station: AssetTreeStation) => JumpsAwayResult | undefined
 ): AssetTreeStation[] {
   return [...stations]
     .map((station) => ({ ...station, children: sortNodes(station.children, typeNames) }))
-    .sort((a, b) => {
-      const pinnedA = pinStateFor(a) !== 'unpinned';
-      const pinnedB = pinStateFor(b) !== 'unpinned';
-      if (pinnedA !== pinnedB) return pinnedA ? -1 : 1;
-      return labelFor(a).localeCompare(labelFor(b));
-    });
+    .sort((a, b) =>
+      compareStations(a, b, sortField, {
+        labelFor,
+        pinnedFor: (station) => pinStateFor(station) !== 'unpinned',
+        jumpsAwayFor,
+      })
+    );
 }
 
 function collectExpandableKeys(nodes: readonly AssetTreeNode[], parentPath: string): string[] {
@@ -920,6 +926,37 @@ export function Assets() {
     return new Set(matches.map((m) => m.asset.item_id));
   }, [mergedAssets, mergedTypeNames, search]);
 
+  // Declared here (ahead of their other, non-sort-related usages further down)
+  // because `sortedTree` below needs both to resolve jumps-away sort order:
+  // the lookup key is `${locationId}:${routePreference}`, and the values
+  // themselves live in `jumpsAwayByKey`, populated asynchronously by the
+  // ESI-fetching effects further down once `sortedTree` tells them which
+  // stations are in view.
+  const routePreference = useRoutePreference((state) => state.value);
+  const hydrateRoutePreference = useRoutePreference((state) => state.hydrate);
+  const setRoutePreference = useRoutePreference((state) => state.setValue);
+  useEffect(() => {
+    void hydrateRoutePreference();
+  }, [hydrateRoutePreference]);
+
+  const stationSortField = useStationSort((state) => state.value);
+  const hydrateStationSort = useStationSort((state) => state.hydrate);
+  const setStationSortField = useStationSort((state) => state.setValue);
+  useEffect(() => {
+    void hydrateStationSort();
+  }, [hydrateStationSort]);
+
+  const [jumpsAwayByKey, setJumpsAwayByKey] = useState<ReadonlyMap<string, JumpsAwayResult>>(
+    new Map()
+  );
+
+  // Sorting by "jumps away" (issue #88) can only reflect distances already
+  // fetched — CONTEXT.md round 14 bounds that fetch to pinned, visible, and
+  // expanded stations (issue #87), deliberately, to cap ESI fan-out. A
+  // station outside that scope has no entry in `jumpsAwayByKey` yet and
+  // sorts last (see `compareStations`'s unknown-last rule) until it's
+  // pinned or scrolled into view, rather than this memo widening the fetch
+  // scope to "everything" just because this field is selected.
   const tree = useMemo(
     () => buildAssetTree(mergedAssets, priceByTypeId),
     [mergedAssets, priceByTypeId]
@@ -939,10 +976,23 @@ export function Assets() {
             t
           ),
         mergedTypeNames,
-        (station) => pinStateFor(station.locationId)
+        (station) => pinStateFor(station.locationId),
+        stationSortField,
+        (station) => jumpsAwayByKey.get(`${station.locationId}:${routePreference}`)
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
-    [visibleTree, mergedLocationNames, assetsByItemId, mergedTypeNames, t, pins, activeCharacterId]
+    [
+      visibleTree,
+      mergedLocationNames,
+      assetsByItemId,
+      mergedTypeNames,
+      t,
+      pins,
+      activeCharacterId,
+      stationSortField,
+      jumpsAwayByKey,
+      routePreference,
+    ]
   );
 
   // Pinned stations start expanded on page load (issue #84) — the same effect
@@ -1030,13 +1080,6 @@ export function Assets() {
     };
   }, [activeCharacterId]);
 
-  const routePreference = useRoutePreference((state) => state.value);
-  const hydrateRoutePreference = useRoutePreference((state) => state.hydrate);
-  const setRoutePreference = useRoutePreference((state) => state.setValue);
-  useEffect(() => {
-    void hydrateRoutePreference();
-  }, [hydrateRoutePreference]);
-
   // Stations with at least one row (their own header, or a descendant) in
   // the virtualizer's current visible range — the "currently visible"
   // half of CONTEXT.md round 14's "only for pinned and currently
@@ -1087,9 +1130,6 @@ export function Assets() {
   // for the same key, which the state-only filter cannot do since the write
   // that would exclude it hasn't landed yet.
   const [stationSystemIds, setStationSystemIds] = useState<ReadonlyMap<number, number | null>>(
-    new Map()
-  );
-  const [jumpsAwayByKey, setJumpsAwayByKey] = useState<ReadonlyMap<string, JumpsAwayResult>>(
     new Map()
   );
   const systemIdRequested = useRef<Set<number>>(new Set());
@@ -1235,6 +1275,20 @@ export function Assets() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('assets.title')}</h1>
         <div className="flex items-center gap-2">
           {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+          <Select
+            value={stationSortField}
+            onValueChange={(value) => void setStationSortField(value as StationSortField)}
+          >
+            <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
+              <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
+              <SelectItem value="itemCount">{t('assets.stationSort.itemCount')}</SelectItem>
+              <SelectItem value="jumpsAway">{t('assets.stationSort.jumpsAway')}</SelectItem>
+            </SelectContent>
+          </Select>
           <Select
             value={routePreference}
             onValueChange={(value) => void setRoutePreference(value as RoutePreference)}

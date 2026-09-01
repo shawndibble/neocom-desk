@@ -509,6 +509,13 @@
         "shortest": "Shortest",
         "safest": "Safest"
       }
+    },
+    "stationSort": {
+      "label": "Sort",
+      "name": "Name",
+      "value": "Value",
+      "itemCount": "Item count",
+      "jumpsAway": "Jumps away"
     }
   },
   "mail": {
