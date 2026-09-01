@@ -344,7 +344,29 @@
     "emptyTitle": "No characters yet",
     "emptyHint": "Log in with EVE Online to add your first character.",
     "portraitAlt": "Portrait of {{name}}",
-    "select": "Select {{name}}"
+    "select": "Select {{name}}",
+    "sortBy": "Sort by",
+    "sortDirection": "Reverse sort direction",
+    "sortKeys": {
+      "name": "Name",
+      "skillPoints": "Skill points",
+      "wallet": "Wallet"
+    },
+    "newGroup": "New group",
+    "newGroupName": "New group name",
+    "renameGroup": "Rename group",
+    "deleteGroup": "Delete group",
+    "deleteGroupConfirm": "Delete this group? Its characters become ungrouped.",
+    "moveGroupUp": "Move {{name}} up",
+    "moveGroupDown": "Move {{name}} down",
+    "ungrouped": "Ungrouped",
+    "emptyGroup": "No characters in this group yet. Assign one from its card.",
+    "groupFor": "Group for {{name}}",
+    "densityLabel": "Density",
+    "densityCompact": "Compact",
+    "densityCozy": "Cozy",
+    "densityComfortable": "Comfortable",
+    "densitySpacious": "Spacious"
   },
   "overview": {
     "title": "Overview",
