@@ -13,6 +13,7 @@
     "characterSection": "Character",
     "wallet": "Wallet",
     "clones": "Clones",
+    "pi": "Planetary Industry",
     "employmentHistory": "Employment History",
     "assets": "Assets",
     "mail": "Mail",
@@ -534,6 +535,66 @@
     "reauthTitle": "Log in again to see your clones",
     "reauthHint": "Log in again to fetch this character's jump clones.",
     "reauthAction": "Log in again with EVE Online"
+  },
+  "pi": {
+    "title": "Planetary Industry",
+    "refresh": "Refresh",
+    "emptyTitle": "No planetary colonies cached",
+    "emptyHint": "Reconnect to fetch this character's planetary colonies.",
+    "reauthTitle": "Log in again to see your colonies",
+    "reauthHint": "Log in again to fetch this character's planetary colonies.",
+    "reauthAction": "Log in again with EVE Online",
+    "stalenessLabel": "About colony data freshness",
+    "stalenessHint": "ESI only recalculates a colony's data when it's opened in the EVE client.",
+    "stalenessTooltip": "Extractor expiry times are fixed at install and always accurate. Stored quantities and the last extraction cycle only update once you open the colony in the game client, so this app never shows those.",
+    "lastUpdate": "Last Update",
+    "lastUpdateTooltip": "When CCP last recalculated this colony — only changes when the colony is opened in the EVE client.",
+    "attentionLabel": "Status",
+    "attention": {
+      "idle": "Idle",
+      "expiring-soon": "Expiring soon",
+      "healthy": "Healthy",
+      "unknown": "Unknown"
+    },
+    "attentionUnknownTooltip": "This colony's detail couldn't be loaded from ESI, so its status can't be shown with confidence. Try Refresh — if you revoked this app's planetary access, log in again.",
+    "planetType": {
+      "temperate": "Temperate",
+      "barren": "Barren",
+      "oceanic": "Oceanic",
+      "ice": "Ice",
+      "gas": "Gas",
+      "lava": "Lava",
+      "storm": "Storm",
+      "plasma": "Plasma"
+    },
+    "upgradeLevel": "Upgrade level {{level}}",
+    "pinCount": "{{count}} pins",
+    "planetLabel": "Planet #{{id}}",
+    "systemLabel": "System #{{id}}",
+    "pinTableLabel": "Pins on {{planet}}",
+    "noPinsTitle": "No pin data cached for this colony",
+    "column": {
+      "pin": "Pin",
+      "role": "Role",
+      "detail": "Detail",
+      "status": "Status",
+      "expires": "Expires"
+    },
+    "role": {
+      "extractor": "Extractor",
+      "factory": "Factory",
+      "other": "Other"
+    },
+    "state": {
+      "active": "Active",
+      "expiring-soon": "Expiring soon",
+      "expired": "Expired"
+    },
+    "programDataUnavailable": "Program data unavailable",
+    "unknownProduct": "Unknown product",
+    "unknownSchematic": "Unknown schematic",
+    "expired": "Expired",
+    "expiresIn": "in {{duration}}"
   },
   "employmentHistory": {
     "title": "Employment History",

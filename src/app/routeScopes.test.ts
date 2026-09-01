@@ -84,6 +84,7 @@ describe('gated routes', () => {
       '/contracts',
       '/mail',
       '/orders',
+      '/planetary-industry',
     ]);
   });
 

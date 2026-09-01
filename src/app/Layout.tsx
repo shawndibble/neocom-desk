@@ -41,6 +41,7 @@ const NAV_PATHS = [
   '/market',
   '/wallet',
   '/clones',
+  '/planetary-industry',
   '/employment-history',
   '/assets',
   '/mail',
@@ -137,6 +138,12 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           to="/clones"
           label={t('nav.clones')}
           locked={locked.has('/clones')}
+          onClick={onClose}
+        />
+        <NavItem
+          to="/planetary-industry"
+          label={t('nav.pi')}
+          locked={locked.has('/planetary-industry')}
           onClick={onClose}
         />
         <NavItem
@@ -247,6 +254,11 @@ export function Layout() {
           </p>
           <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
           <NavItem to="/clones" label={t('nav.clones')} locked={locked.has('/clones')} />
+          <NavItem
+            to="/planetary-industry"
+            label={t('nav.pi')}
+            locked={locked.has('/planetary-industry')}
+          />
           <NavItem
             to="/employment-history"
             label={t('nav.employmentHistory')}

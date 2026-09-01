@@ -108,6 +108,10 @@ export const ROUTE_REQUIREMENTS = {
     endpoints: ['getCharacterClones'],
     strings: 'clones',
   },
+  '/planetary-industry': {
+    endpoints: ['getCharacterPlanets', 'getCharacterPlanet'],
+    strings: 'pi',
+  },
 } as const satisfies Record<string, RouteRequirement>;
 
 export type AppRoutePath = keyof typeof ROUTE_REQUIREMENTS;
