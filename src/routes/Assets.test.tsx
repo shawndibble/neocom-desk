@@ -178,6 +178,137 @@ describe('Assets', () => {
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 
+  it('auto-expands ancestors of a search match, then collapses back to default once the search clears', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Drake' });
+    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+
+    const search = screen.getByPlaceholderText(/search items/i);
+    await user.type(search, 'tritanium');
+    expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
+    expect(screen.getByText('Tritanium')).toBeInTheDocument();
+
+    await user.clear(search);
+    expect(await screen.findByRole('heading', { name: 'Drake' })).toBeInTheDocument();
+    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+  });
+
+  it('restores a manually-expanded branch after the search clears', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    const shipHeading = await screen.findByRole('heading', { name: 'Drake' });
+    await user.click(shipHeading.closest('button')!);
+    await user.click(await screen.findByText('Cargo Hold'));
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+
+    const search = screen.getByPlaceholderText(/search items/i);
+    await user.type(search, 'zzz-no-match');
+    expect(await screen.findByText(/no items match your search/i)).toBeInTheDocument();
+
+    await user.clear(search);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+  });
+
+  it('ignores a click on an auto-expanded row during search, so it does not corrupt the state search restores to', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Drake' });
+    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+
+    const search = screen.getByPlaceholderText(/search items/i);
+    await user.type(search, 'tritanium');
+    const cargoHold = await screen.findByText('Cargo Hold');
+    // A user might reasonably try to collapse the auto-opened row while searching;
+    // that click must not mutate the hidden expand state search restores to on clear.
+    await user.click(cargoHold);
+
+    await user.clear(search);
+    expect(await screen.findByRole('heading', { name: 'Drake' })).toBeInTheDocument();
+    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+  });
+
   it('falls back to cached data offline', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,
