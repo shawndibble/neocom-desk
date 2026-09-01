@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -188,6 +188,13 @@ describe('Industry: Build Plan CRUD', () => {
 
     const originalRow = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
     await user.click(within(originalRow).getByRole('button', { name: 'Delete' }));
+    // handleDelete is fire-and-forget from the click handler (Industry.tsx),
+    // so wait for the live-query-driven UI to drop the row before reading
+    // Dexie directly — otherwise the read can race the still-in-flight
+    // delete (tombstone write included) and see two rows instead of one.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Rifter run' })).not.toBeInTheDocument()
+    );
     const remaining = await db.buildPlans.where('characterId').equals(CHAR_ID).toArray();
     expect(remaining).toHaveLength(1);
     expect(remaining[0].name).toBe('Rifter run (copy)');
