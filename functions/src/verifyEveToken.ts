@@ -10,9 +10,14 @@
 //
 // App binding: "EVE Online" alone is NOT enough — every EVE app's tokens carry
 // it, so a token minted by any third-party EVE app would otherwise be accepted
-// here. The token must additionally name THIS app's client_id (EVE_CLIENT_ID),
-// either in the aud array (EVE tokens carry [client_id, "EVE Online"]) or as
-// the azp (authorized party) claim.
+// here. The token must additionally name one of THIS deployment's client_ids
+// (EVE_CLIENT_ID), either in the aud array (EVE tokens carry
+// [client_id, "EVE Online"]) or as the azp (authorized party) claim.
+//
+// EVE_CLIENT_ID is a comma-separated list, not a single value: dev
+// (localhost callback) and prod (GitHub Pages callback) are separate EVE
+// application registrations with different client_ids, but both point at
+// this one deployed function — it must accept either.
 //
 // JWKS URL / issuer / audience are injectable via env so tests can point at a
 // locally served key set.
@@ -31,8 +36,8 @@ export interface VerifyOptions {
   getKey: JWTVerifyGetKey;
   issuer: string | string[];
   audience: string;
-  /** This app's EVE client_id; tokens minted for other apps are rejected. */
-  clientId: string;
+  /** This deployment's EVE client_ids; tokens minted for other apps are rejected. */
+  clientIds: readonly string[];
 }
 
 export const DEFAULT_JWKS_URL = 'https://login.eveonline.com/oauth/jwks';
@@ -58,9 +63,12 @@ export async function verifyEveAccessToken(
   });
 
   // jwtVerify only proved the generic "EVE Online" audience. Also require the
-  // token to be bound to THIS app (see header comment).
+  // token to be bound to one of THIS deployment's apps (see header comment).
   const audiences = Array.isArray(payload.aud) ? payload.aud : payload.aud ? [payload.aud] : [];
-  if (!audiences.includes(opts.clientId) && payload.azp !== opts.clientId) {
+  const boundToKnownApp =
+    audiences.some((aud) => opts.clientIds.includes(aud)) ||
+    (typeof payload.azp === 'string' && opts.clientIds.includes(payload.azp));
+  if (!boundToKnownApp) {
     throw new Error('Token was minted for a different EVE application (client_id mismatch)');
   }
 
@@ -81,16 +89,23 @@ export async function verifyEveAccessToken(
 
 /**
  * Production verify options. EVE_CLIENT_ID is REQUIRED (fail closed: without
- * it any EVE app's tokens would be accepted); env overrides exist for tests
- * (EVE_JWKS_URL, EVE_ISSUER, EVE_AUDIENCE).
+ * it any EVE app's tokens would be accepted) and is comma-separated — dev and
+ * prod are separate EVE application registrations sharing this one deployed
+ * function. Env overrides exist for tests (EVE_JWKS_URL, EVE_ISSUER,
+ * EVE_AUDIENCE).
  */
 export function verifyOptionsFromEnv(): VerifyOptions {
-  const clientId = process.env.EVE_CLIENT_ID;
-  if (!clientId) {
+  const raw = process.env.EVE_CLIENT_ID;
+  const clientIds = (raw ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+  if (clientIds.length === 0) {
     throw new Error(
       'EVE_CLIENT_ID is not set. Set it (functions/.env or deploy-time env) to this ' +
-        "app's EVE application client_id — without it, access tokens minted for ANY " +
-        'EVE application would be accepted. See docs/SYNC-SETUP.md.'
+        "deployment's EVE application client_id(s) — without it, access tokens minted " +
+        'for ANY EVE application would be accepted. Comma-separate multiple values ' +
+        '(e.g. dev + prod client_ids). See docs/SYNC-SETUP.md.'
     );
   }
   const jwksUrl = process.env.EVE_JWKS_URL ?? DEFAULT_JWKS_URL;
@@ -98,6 +113,6 @@ export function verifyOptionsFromEnv(): VerifyOptions {
     getKey: createRemoteJWKSet(new URL(jwksUrl)),
     issuer: process.env.EVE_ISSUER ?? DEFAULT_ISSUERS,
     audience: process.env.EVE_AUDIENCE ?? DEFAULT_AUDIENCE,
-    clientId,
+    clientIds,
   };
 }

@@ -26,14 +26,20 @@ The function only accepts EVE access tokens minted for **this** application.
 Every EVE token carries the generic `"EVE Online"` audience, so without this
 check a token from _any_ third-party EVE app would be accepted.
 
-Set `EVE_CLIENT_ID` to the app's EVE application client ID (the same value as
-`VITE_EVE_CLIENT_ID` in the root `.env`). Cloud Functions v2 loads it from a
-dotenv file in `functions/`:
+Set `EVE_CLIENT_ID` to the app's EVE application client ID(s). It's
+comma-separated: dev (`localhost` callback) and prod (GitHub Pages callback)
+are separate EVE application registrations, but both point at this one
+deployed function, so it must accept either. Cloud Functions v2 loads it from
+a dotenv file in `functions/`:
 
 ```sh
 # functions/.env  (picked up by firebase deploy and the emulator)
-EVE_CLIENT_ID=<your EVE application client_id>
+EVE_CLIENT_ID=<dev client_id>,<prod client_id>
 ```
+
+The dev value matches `VITE_EVE_CLIENT_ID` in the root `.env`; the prod value
+matches the `VITE_EVE_CLIENT_ID` GitHub Actions repo variable that the deploy
+workflow builds with.
 
 The function **fails closed**: it throws at cold start (and deployment fails)
 when `EVE_CLIENT_ID` is missing, instead of silently accepting any EVE app's

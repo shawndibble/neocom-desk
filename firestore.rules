@@ -1,7 +1,7 @@
 rules_version = '2';
 
-// Sync data only: user-editable Skill Plans, Build Plans + synced settings,
-// per character. uid format is "char:{characterId}" (minted by the
+// Sync data only: user-editable Skill Plans, Build Plans, Quickbars + synced
+// settings, per character. uid format is "char:{characterId}" (minted by the
 // mintFirebaseToken function after verifying an EVE access token against
 // CCP's JWKS).
 //
@@ -39,6 +39,14 @@ service cloud.firestore {
       }
 
       match /buildPlans/{planId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
+      match /quickbars/{quickbarId} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();
         allow create: if isOwner() && incomingHashMatches();
