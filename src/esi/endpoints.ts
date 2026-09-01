@@ -470,6 +470,29 @@ export function getMarketOrders(
   });
 }
 
+// --- GET /markets/{region_id}/history (public) ---
+
+export interface MarketHistoryEntry {
+  date: string;
+  average: number;
+  highest: number;
+  lowest: number;
+  order_count: number;
+  volume: number;
+}
+
+/** One item's daily market history for a region — average/high/low price and traded volume, not paginated. */
+export function getMarketHistory(
+  regionId: number,
+  typeId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<MarketHistoryEntry[]>> {
+  return esiFetch<MarketHistoryEntry[]>(`/markets/${regionId}/history`, {
+    ...options,
+    query: { type_id: typeId },
+  });
+}
+
 // --- GET /industry/systems (public) ---
 
 export interface SystemCostIndexEntry {

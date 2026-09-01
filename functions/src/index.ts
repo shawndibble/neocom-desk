@@ -4,6 +4,7 @@
 // against EVE's published JWKS before any Firebase credential is minted.
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { error as logError } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import {
@@ -31,8 +32,11 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
     let claims: EveTokenClaims;
     try {
       claims = await verifyEveAccessToken(accessToken, verifyOptions);
-    } catch {
-      // Deliberately opaque: don't leak which validation step failed.
+    } catch (err) {
+      // Client response stays opaque (don't leak which validation step
+      // failed), but the real cause still needs to be diagnosable from Cloud
+      // Logging — the previous bare `catch {}` discarded it entirely.
+      logError('EVE access token rejected', { error: err instanceof Error ? err.message : err });
       throw new HttpsError('unauthenticated', 'EVE access token rejected');
     }
 

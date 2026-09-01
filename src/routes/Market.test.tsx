@@ -49,6 +49,14 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => SDE_TYPES),
 }));
 
+vi.mock('@/features/market/PriceHistoryChart', () => ({
+  default: ({ points, itemName }: { points: { date: string }[]; itemName: string }) => (
+    <div data-testid="price-history-chart">
+      {itemName}: {points.length} points
+    </div>
+  ),
+}));
+
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
     needRefresh: [false, vi.fn()],
@@ -265,6 +273,18 @@ function plexOrdersHandler(hits: { count: number }) {
   });
 }
 
+function historyHandler(
+  hits: { count: number },
+  regionId: number,
+  byType: Record<number, unknown[]>
+) {
+  return http.get(`${ESI_BASE_URL}/markets/${regionId}/history`, ({ request }) => {
+    hits.count += 1;
+    const typeId = Number(new URL(request.url).searchParams.get('type_id'));
+    return HttpResponse.json(byType[typeId] ?? []);
+  });
+}
+
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -343,6 +363,106 @@ describe('Market Browser', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
     await vi.waitFor(() => expect(hits.count).toBe(2));
+  });
+});
+
+describe('Price History tab (issue #11)', () => {
+  it("defaults to Market Data; opening Price History fetches and shows the chart, hiding the order book's Data Age", async () => {
+    const historyHits = { count: 0 };
+    server.use(
+      ordersHandler({ count: 0 }),
+      historyHandler(historyHits, RIFTER_REGION_ID, {
+        587: [
+          {
+            date: '2026-08-01',
+            average: 5,
+            highest: 5.5,
+            lowest: 4.5,
+            order_count: 2,
+            volume: 100,
+          },
+        ],
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(screen.getByRole('tab', { name: 'Market Data', selected: true })).toBeInTheDocument();
+    expect(screen.getByText('just now')).toBeInTheDocument();
+    expect(historyHits.count).toBe(0); // not fetched until the tab is opened
+
+    await user.click(screen.getByRole('tab', { name: 'Price History' }));
+
+    expect(await screen.findByTestId('price-history-chart')).toHaveTextContent('Rifter: 1 points');
+    expect(historyHits.count).toBe(1);
+    // The Data Age badge reflects the order book — it must not linger once
+    // Price History (with its own, unrelated fetch time) is what's on screen.
+    expect(screen.queryByText('just now')).not.toBeInTheDocument();
+  });
+
+  it('keeps Price History selected and refetches when a different item is chosen', async () => {
+    const historyHits = { count: 0 };
+    server.use(
+      ordersHandler({ count: 0 }),
+      historyHandler(historyHits, RIFTER_REGION_ID, {
+        587: [
+          {
+            date: '2026-08-01',
+            average: 5,
+            highest: 5.5,
+            lowest: 4.5,
+            order_count: 2,
+            volume: 100,
+          },
+        ],
+        34: [
+          {
+            date: '2026-08-01',
+            average: 6,
+            highest: 6.5,
+            lowest: 5.5,
+            order_count: 3,
+            volume: 200,
+          },
+        ],
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    await user.click(screen.getByRole('tab', { name: 'Price History' }));
+    await screen.findByTestId('price-history-chart');
+
+    await user.clear(screen.getByRole('searchbox'));
+    await user.type(screen.getByRole('searchbox'), 'trit');
+    await user.click(await screen.findByText('Tritanium'));
+
+    expect(screen.getByRole('tab', { name: 'Price History', selected: true })).toBeInTheDocument();
+    expect(await screen.findByTestId('price-history-chart')).toHaveTextContent(
+      'Tritanium: 1 points'
+    );
+    expect(historyHits.count).toBe(2);
+  });
+
+  it('shows an empty state, not a blank chart, when ESI has no history for the item', async () => {
+    server.use(
+      ordersHandler({ count: 0 }),
+      historyHandler({ count: 0 }, RIFTER_REGION_ID, { 587: [] })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    await user.click(screen.getByRole('tab', { name: 'Price History' }));
+
+    expect(await screen.findByText('No price history')).toBeInTheDocument();
+    expect(screen.queryByTestId('price-history-chart')).not.toBeInTheDocument();
   });
 });
 
