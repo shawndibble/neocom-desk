@@ -22,6 +22,7 @@ import { Assets } from '@/routes/Assets';
 import { Mail } from '@/routes/Mail';
 import { Calendar } from '@/routes/Calendar';
 import { Contracts } from '@/routes/Contracts';
+import { EmploymentHistory } from '@/routes/EmploymentHistory';
 import { Orders } from '@/routes/Orders';
 import { Settings } from '@/routes/Settings';
 import { Styleguide } from '@/routes/Styleguide';
@@ -62,6 +63,7 @@ const ROUTE_ELEMENTS = {
   '/industry': <Industry />,
   '/market': <Market />,
   '/wallet': <Wallet />,
+  '/employment-history': <EmploymentHistory />,
   '/assets': <Assets />,
   '/mail': <Mail />,
   '/calendar': <Calendar />,
