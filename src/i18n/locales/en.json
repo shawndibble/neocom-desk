@@ -241,6 +241,8 @@
     "blueprintMissing": "This plan's blueprint isn't in the current SDE snapshot.",
     "computeError": "Couldn't compute this plan: {{message}}",
     "refresh": "Refresh",
+    "groupBlueprint": "Blueprint",
+    "groupLocationMarket": "Location & market",
     "runs": "Runs",
     "me": "ME",
     "meTooltipLabel": "About ME",
