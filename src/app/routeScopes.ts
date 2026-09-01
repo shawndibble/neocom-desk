@@ -63,8 +63,9 @@ export const ROUTE_REQUIREMENTS = {
   '/queue-health': UNGATED,
   '/skills': UNGATED,
   '/industry': UNGATED,
-  // Single-scope, but already renders `ReauthBanner` from its own
-  // `needsReauth` result.
+  // Multi-scope, like Overview above: the Balance tab mixes wallet and
+  // loyalty-point (EverMarks) reads, each panel already rendering its own
+  // `ReauthBanner` from its own `needsReauth` result.
   '/wallet': UNGATED,
   // corporationhistory has "security": [] in the ESI spec — public, no scope
   // to gate on, same reasoning as /market.
@@ -123,10 +124,6 @@ export const ROUTE_REQUIREMENTS = {
   '/contacts': {
     endpoints: ['getCharacterContacts', 'postUniverseNames'],
     strings: 'contacts',
-  },
-  '/loyalty': {
-    endpoints: ['getCharacterLoyaltyPoints', 'postUniverseNames'],
-    strings: 'loyalty',
   },
 } as const satisfies Record<string, RouteRequirement>;
 

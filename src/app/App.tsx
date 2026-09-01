@@ -26,7 +26,6 @@ import { Mail } from '@/routes/Mail';
 import { Calendar } from '@/routes/Calendar';
 import { Contracts } from '@/routes/Contracts';
 import { Contacts } from '@/routes/Contacts';
-import { Loyalty } from '@/routes/Loyalty';
 import { EmploymentHistory } from '@/routes/EmploymentHistory';
 import { Orders } from '@/routes/Orders';
 import { Settings } from '@/routes/Settings';
@@ -76,7 +75,6 @@ const ROUTE_ELEMENTS = {
   '/calendar': <Calendar />,
   '/contracts': <Contracts />,
   '/contacts': <Contacts />,
-  '/loyalty': <Loyalty />,
   '/orders': <Orders />,
   '/settings': <Settings />,
 } satisfies Record<AppRoutePath, ReactElement>;

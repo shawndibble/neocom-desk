@@ -98,7 +98,7 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/location`, () =>
     HttpResponse.json({ solar_system_id: 30000142 })
   ),
-  http.get('https://esi.evetech.net/route/:origin/:destination', ({ params }) =>
+  http.get('https://esi.evetech.net/latest/route/:origin/:destination', ({ params }) =>
     HttpResponse.json([Number(params.origin), Number(params.destination)])
   )
 );
@@ -1150,7 +1150,7 @@ describe('jumps-away distance (issue #87)', () => {
     const user = userEvent.setup();
     let routeCalled = false;
     server.use(
-      http.get('https://esi.evetech.net/route/:origin/:destination', () => {
+      http.get('https://esi.evetech.net/latest/route/:origin/:destination', () => {
         routeCalled = true;
         return HttpResponse.json([30000142]);
       })
@@ -1174,7 +1174,7 @@ describe('jumps-away distance (issue #87)', () => {
           solar_system_id: 30002187,
         })
       ),
-      http.get('https://esi.evetech.net/route/30000142/30002187', () =>
+      http.get('https://esi.evetech.net/latest/route/30000142/30002187', () =>
         HttpResponse.json([30000142, 30002053, 30002187])
       )
     );
@@ -1237,7 +1237,7 @@ describe('jumps-away distance (issue #87)', () => {
           solar_system_id: 30002187,
         })
       ),
-      http.get('https://esi.evetech.net/route/30000142/30002187', ({ request }) => {
+      http.get('https://esi.evetech.net/latest/route/30000142/30002187', ({ request }) => {
         seenFlags.push(new URL(request.url).searchParams.get('flag'));
         return HttpResponse.json([30000142, 30002187]);
       })

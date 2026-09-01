@@ -22,7 +22,7 @@ describe('loadJumpsAway', () => {
 
   it('resolves jumps from the ESI route waypoint list', async () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/route/30000142/30002187`, () =>
+      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, () =>
         HttpResponse.json([30000142, 30002053, 30002187])
       )
     );
@@ -38,7 +38,7 @@ describe('loadJumpsAway', () => {
     // own UI wording (per issue #87), translated at the ESI boundary.
     let capturedFlag: string | null = null;
     server.use(
-      http.get(`${ESI_BASE_URL}/route/30000142/30002187`, ({ request }) => {
+      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) => {
         capturedFlag = new URL(request.url).searchParams.get('flag');
         return HttpResponse.json([30000142, 30002187]);
       })
@@ -52,7 +52,7 @@ describe('loadJumpsAway', () => {
   it('sends the app\'s "shortest" preference as ESI\'s "shortest" flag value unchanged', async () => {
     let capturedFlag: string | null = null;
     server.use(
-      http.get(`${ESI_BASE_URL}/route/30000142/30002187`, ({ request }) => {
+      http.get(`${ESI_BASE_URL}/latest/route/30000142/30002187`, ({ request }) => {
         capturedFlag = new URL(request.url).searchParams.get('flag');
         return HttpResponse.json([30000142, 30002187]);
       })
@@ -64,7 +64,9 @@ describe('loadJumpsAway', () => {
   });
 
   it('returns unknown/noRoute when the route cannot be resolved', async () => {
-    server.use(http.get(`${ESI_BASE_URL}/route/30000142/30999999`, () => HttpResponse.error()));
+    server.use(
+      http.get(`${ESI_BASE_URL}/latest/route/30000142/30999999`, () => HttpResponse.error())
+    );
 
     const result = await loadJumpsAway(30000142, 30999999, 'shortest');
 

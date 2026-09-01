@@ -1072,7 +1072,12 @@ export function getRoute(
   options: RouteOptions = {}
 ): Promise<EsiResult<number[]>> {
   const { flag, ...rest } = options;
-  return esiFetch<number[]>(`/route/${origin}/${destination}`, {
+  // Verified live against esi.evetech.net: /route/ 404s on the unversioned
+  // path once X-Compatibility-Date is set (every request here sends it) —
+  // every other endpoint tolerates the unversioned path fine, so the
+  // /latest/ prefix is scoped to this one call rather than a client-wide
+  // change.
+  return esiFetch<number[]>(`/latest/route/${origin}/${destination}`, {
     ...rest,
     endpointId: 'getRoute',
     query: { flag },

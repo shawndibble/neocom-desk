@@ -18,3 +18,20 @@ export function loadCharacterLoyaltyPoints(
     async () => (await getCharacterLoyaltyPoints(characterId)).data
   );
 }
+
+/**
+ * Paragon, the NPC corp behind EverMarks — in-client they read as a distinct
+ * currency, but ESI carries them as an ordinary entry in this same loyalty
+ * points array. Confirmed live: GET /corporations/1000419/ returns Paragon.
+ */
+export const PARAGON_CORPORATION_ID = 1000419;
+
+/** Pulls the Paragon (EverMarks) entry out of a loyalty points list, for the Wallet balance box. */
+export function splitEverMarks(entries: readonly CharacterLoyaltyPoints[]): {
+  everMarks: number;
+  otherLoyalty: CharacterLoyaltyPoints[];
+} {
+  const paragon = entries.find((entry) => entry.corporation_id === PARAGON_CORPORATION_ID);
+  const otherLoyalty = entries.filter((entry) => entry.corporation_id !== PARAGON_CORPORATION_ID);
+  return { everMarks: paragon?.loyalty_points ?? 0, otherLoyalty };
+}
