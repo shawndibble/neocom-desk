@@ -50,6 +50,10 @@
     "offlineTitle": "Showing cached data",
     "sp": "{{value}} SP",
     "levelOfFive": "Level {{level}} of 5",
+    "searchPlaceholder": "Search skills…",
+    "noResults": "No skills match your search.",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
     "attr": {
       "intelligence": "Intelligence",
       "memory": "Memory",

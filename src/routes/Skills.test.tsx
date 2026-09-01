@@ -124,6 +124,9 @@ describe('Skills', () => {
     expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
     expect(screen.getByText('264,000')).toBeInTheDocument(); // total SP
     expect(screen.getByText('1,500')).toBeInTheDocument(); // unallocated SP
+    // Groups start collapsed — expand both before asserting row content.
+    fireEvent.click(screen.getByRole('button', { name: /Gunnery/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Spaceship Command/ }));
     expect(screen.getByText('256,000 SP')).toBeInTheDocument();
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Level 5 of 5' })).toBeInTheDocument();
@@ -158,7 +161,7 @@ describe('Skills', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
     expect(screen.getByText('45,255 SP')).toBeInTheDocument();
     // The stale /skills reading is gone, not shown alongside.
@@ -187,7 +190,7 @@ describe('Skills', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     expect(screen.getByRole('img', { name: 'Level 4 of 5' })).toBeInTheDocument();
     // The last known SP stands, and so does the total. Neither is guessed up.
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
@@ -214,6 +217,8 @@ describe('Skills', () => {
 
     render(<App />);
 
+    const unknownGroupButton = await screen.findByText('—');
+    fireEvent.click(unknownGroupButton.closest('button')!);
     expect(await screen.findByText('#1337')).toBeInTheDocument();
     const row = screen.getByText('#1337').closest('li')!;
     expect(within(row).getByText('—')).toBeInTheDocument(); // common.unknown
@@ -238,7 +243,7 @@ describe('Skills', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Spaceship Command')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     // Trained level comes from /skills alone — no queue correction attempted.
     expect(screen.getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
@@ -317,6 +322,7 @@ describe('Skills', () => {
   it("shows a selected skill's prerequisites, marking an already-trained one distinct", async () => {
     render(<App />);
 
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     const frigateRow = await screen.findByRole('button', { name: /Frigate/ });
     fireEvent.click(frigateRow);
 
@@ -330,6 +336,7 @@ describe('Skills', () => {
   it('shows what a selected skill unlocks, derived from the reverse of prereqs', async () => {
     render(<App />);
 
+    fireEvent.click(await screen.findByRole('button', { name: /^Gunnery/ }));
     const turretRow = await screen.findByRole('button', { name: /Small Hybrid Turret/ });
     fireEvent.click(turretRow);
 
@@ -342,11 +349,82 @@ describe('Skills', () => {
   it('deselects a skill (closing the inspector) on a second click', async () => {
     render(<App />);
 
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
     const frigateRow = await screen.findByRole('button', { name: /Frigate/ });
     fireEvent.click(frigateRow);
     expect(await screen.findByText('Prerequisites')).toBeInTheDocument();
 
     fireEvent.click(frigateRow);
     expect(screen.queryByText('Prerequisites')).not.toBeInTheDocument();
+  });
+
+  it('starts every group collapsed, expands on header click, and collapses again on a second click', async () => {
+    render(<App />);
+
+    await screen.findByText('Gunnery');
+    expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
+
+    const spaceshipHeader = screen.getByRole('button', { name: /Spaceship Command/ });
+    expect(spaceshipHeader).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(spaceshipHeader);
+    expect(spaceshipHeader).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Frigate')).toBeInTheDocument();
+
+    fireEvent.click(spaceshipHeader);
+    expect(spaceshipHeader).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
+  });
+
+  it('"Expand all" opens every group; a separate control collapses them again', async () => {
+    render(<App />);
+
+    await screen.findByText('Gunnery');
+    expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
+    expect(screen.queryByText('Small Hybrid Turret')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand all' }));
+    expect(screen.getByText('Frigate')).toBeInTheDocument();
+    expect(screen.getByText('Small Hybrid Turret')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }));
+    expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
+    expect(screen.queryByText('Small Hybrid Turret')).not.toBeInTheDocument();
+  });
+
+  it('search hides non-matching groups, auto-expands a matching one, and restores prior state on clear', async () => {
+    render(<App />);
+
+    await screen.findByText('Gunnery');
+    // Manually expand Gunnery so we can confirm its state survives a search.
+    fireEvent.click(screen.getByRole('button', { name: /^Gunnery/ }));
+    expect(screen.getByText('Small Hybrid Turret')).toBeInTheDocument();
+
+    const search = screen.getByPlaceholderText('Search skills…');
+    fireEvent.change(search, { target: { value: 'fr' } });
+    // Under the 3-character threshold: no filtering, Gunnery still expanded, Spaceship Command still collapsed.
+    expect(screen.getByText('Small Hybrid Turret')).toBeInTheDocument();
+    expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'frigate' } });
+    // Spaceship Command auto-expands to show the match; Gunnery has no match and disappears entirely.
+    expect(await screen.findByText('Frigate')).toBeInTheDocument();
+    expect(screen.queryByText('Gunnery')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: '' } });
+    // Clearing restores prior state: Gunnery (manually expanded) is back and still expanded,
+    // Spaceship Command (only auto-expanded by the search) is collapsed again.
+    expect(await screen.findByText('Gunnery')).toBeInTheDocument();
+    expect(screen.getByText('Small Hybrid Turret')).toBeInTheDocument();
+    expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
+  });
+
+  it('shows an empty state when the search matches no skill', async () => {
+    render(<App />);
+
+    await screen.findByText('Gunnery');
+    fireEvent.change(screen.getByPlaceholderText('Search skills…'), {
+      target: { value: 'nonexistent' },
+    });
+    expect(await screen.findByText('No skills match your search.')).toBeInTheDocument();
   });
 });
