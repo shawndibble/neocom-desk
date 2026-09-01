@@ -230,10 +230,15 @@ export/clipboard behaviour, reason about e2e impact from the spec instead.
   any deviations from the ticket, and a "Review notes" section for
   unaddressed judgement-call findings from `/code-review`).
 - `node scripts/next-ticket/open-pr.mjs "<type>: <summary> (#<n>)" <body-file>`
-  — pushes the branch (`-u origin HEAD`) and creates the PR against `main`.
-  Prints `{"status":"open","number":<pr>,"url":"..."}` or
+  — pushes the branch (`-u origin HEAD`), creates the PR against `main`, and
+  arms auto-merge (`gh pr merge --squash --auto --delete-branch`) so GitHub
+  squash-merges it itself the instant it's mergeable and green — no need to
+  win a manual race in step 9, and a check-watch hiccup in step 8 can't
+  strand an otherwise-green PR. Prints
+  `{"status":"open","number":<pr>,"url":"...","autoMergeArmed":true}` or
   `{"status":"error","message":"..."}`. On `error`, follow the local gate /
-  abandon procedures as appropriate to the failure.
+  abandon procedures as appropriate to the failure. If `autoMergeArmed` is
+  `false`, note it and continue — step 9 still merges directly as a fallback.
 
 ## 8. Drive to a mergeable, green PR
 
@@ -277,10 +282,12 @@ playwright-report`), then report back: the failing job and test, the
 script removes it), then:
 
 `node scripts/next-ticket/finish.mjs <pr> <n> "$WORKTREE_PATH"` —
-squash-merges and deletes the branch, polls the issue for auto-close (the
-squash commit carries `Closes #<n>`; closes it directly if auto-close hasn't
-landed after a few seconds), strips the `in-progress` label, then removes and
-prunes the worktree. Prints `{"status":"merged","issueClosed":true}` or
+squash-merges and deletes the branch (a no-op if auto-merge, armed in step 7,
+already merged it — the script detects `state == MERGED` and treats that as
+success rather than a failure), polls the issue for auto-close (the squash
+commit carries `Closes #<n>`; closes it directly if auto-close hasn't landed
+after a few seconds), strips the `in-progress` label, then removes and prunes
+the worktree. Prints `{"status":"merged","issueClosed":true}` or
 `{"status":"merge-failed","message":"..."}`.
 
 - On `merge-failed`: this can be a last-second race (something merged to
