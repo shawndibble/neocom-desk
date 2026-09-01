@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
@@ -55,6 +55,13 @@ import {
   type SolarSystemLookup,
 } from '@/engine/market/orderBook';
 import { resolveOrderBookRegion, type GlobalMarketOverride } from '@/engine/market/locationMode';
+import {
+  parseMarketParams,
+  buildMarketParams,
+  resolveAgainstCatalogue,
+  resolveMarketLocation,
+  type MarketLocationParam,
+} from '@/engine/market/urlState';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
@@ -65,6 +72,9 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
+
+/** Matches the `lg:` breakpoint the two-column grid switches on below. */
+const DESKTOP_QUERY = '(min-width: 64rem)';
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -215,6 +225,7 @@ function MarketGroupTree({
 export function Market() {
   const { t } = useTranslation();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const hubId = useMarketHub((state) => state.value);
   const hubHydrated = useMarketHub((state) => state.hydrated);
@@ -285,7 +296,74 @@ export function Market() {
   const [rawQuery, setRawQuery] = useState('');
   const [query, setQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<number>>(new Set());
-  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+
+  // Narrow screens show one column at a time (CONTEXT.md round 8); matches
+  // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
+  // layout switch at the same width.
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_QUERY).matches
+  );
+  useEffect(() => {
+    const desktop = window.matchMedia(DESKTOP_QUERY);
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    desktop.addEventListener('change', onChange);
+    return () => desktop.removeEventListener('change', onChange);
+  }, []);
+
+  // The selected item and the current location are read from the URL
+  // (CONTEXT.md round 7, issue #4), not held in component state: the query
+  // string is the single source of truth, so a shared link and the browser's
+  // own back/forward both just work. A parsed id that doesn't (yet, or ever)
+  // resolve against the loaded catalogue falls back to the default view
+  // rather than erroring — `types`/`marketRegions` still being null (first
+  // load) is treated as "not yet known to be invalid", not "invalid".
+  const parsedParams = useMemo(
+    () => parseMarketParams((key) => searchParams.get(key)),
+    [searchParams]
+  );
+
+  const typeIsValid = resolveAgainstCatalogue(
+    parsedParams.typeId,
+    types,
+    (ty, id) => ty.typeId === id
+  );
+  const selectedTypeId = parsedParams.typeId !== null && typeIsValid ? parsedParams.typeId : null;
+
+  const regionIsValid = resolveAgainstCatalogue(
+    parsedParams.regionId,
+    marketRegions,
+    (r, id) => r.id === id
+  );
+  // A hub id is a small static set (`TRADE_HUBS`), so unlike the region
+  // catalogue there's no loading window to be optimistic about.
+  const hubIsValid =
+    parsedParams.hubId !== null && getTradeHub(parsedParams.hubId as TradeHub['id']) !== undefined;
+
+  // Whichever of region/hub the URL names wins, falling back to the
+  // device-local Location Mode preference when neither param resolves.
+  const fallbackLocation: MarketLocationParam = useMemo(
+    () =>
+      locationModeValue.mode === 'region'
+        ? { mode: 'region', regionId: locationModeValue.regionId ?? hub.regionId }
+        : { mode: 'hub', hubId: hub.id },
+    [locationModeValue, hub]
+  );
+  const effectiveLocation: MarketLocationParam = useMemo(
+    () =>
+      resolveMarketLocation(
+        parsedParams,
+        { region: regionIsValid, hub: hubIsValid },
+        fallbackLocation
+      ),
+    [parsedParams, regionIsValid, hubIsValid, fallbackLocation]
+  );
+  const effectiveHub =
+    effectiveLocation.mode === 'hub'
+      ? (getTradeHub(effectiveLocation.hubId as TradeHub['id']) ?? hub)
+      : hub;
+
+  const chosenRegionId =
+    effectiveLocation.mode === 'region' ? effectiveLocation.regionId : effectiveHub.regionId;
 
   const [orderBookResult, setOrderBookResult] = useState<{
     orders: RegionOrder[];
@@ -300,9 +378,12 @@ export function Market() {
   const [stationFilter, setStationFilter] = useState<number | null>(null);
   // "Adjusting state when a prop changes" (react.dev): resets the previous
   // item's row-cap, station filter and order book the instant selection or
-  // hub changes, in the same render — an Effect would let the old item's (or
-  // old hub's) rows flash under the new title.
-  const resetKey = `${selectedTypeId ?? 'none'}:${hubId}`;
+  // the resolved region changes, in the same render — an Effect would let
+  // the old item's (or old region's) rows flash under the new title. Keyed
+  // on `chosenRegionId` rather than the persisted `hubId` store: the two can
+  // diverge when a shared link or browser back/forward drives a different
+  // effective hub without writing the device's persisted default.
+  const resetKey = `${selectedTypeId ?? 'none'}:${chosenRegionId}`;
   const [resetForKey, setResetForKey] = useState<string | null>(null);
   if (resetKey !== resetForKey) {
     setResetForKey(resetKey);
@@ -316,6 +397,39 @@ export function Market() {
     void hydrateHub();
     void hydrateLocationMode();
   }, [hydrateHub, hydrateLocationMode]);
+
+  // Catches the device's persisted Location Mode up to a valid URL override.
+  // `buildMarketParams` only ever writes one of `hub`/`region` at a time, so
+  // a URL-supplied hub is dropped from the query string the moment the mode
+  // toggles to Region — without this, toggling back to Trade Hub would have
+  // nothing left to read and would fall back to whatever hub was persisted
+  // before the link was opened, silently abandoning what the link pointed
+  // at. `effectiveLocation`/`effectiveHub` still read the URL directly for
+  // the render that shows the link's own view, so this is purely about what
+  // survives a later, unrelated interaction.
+  useEffect(() => {
+    if (!hubHydrated || !locationModeHydrated) return;
+    if (hubIsValid && parsedParams.hubId !== null && parsedParams.hubId !== hubId) {
+      void setHubId(parsedParams.hubId as TradeHub['id']);
+    }
+    if (
+      regionIsValid &&
+      parsedParams.regionId !== null &&
+      (locationModeValue.mode !== 'region' || locationModeValue.regionId !== parsedParams.regionId)
+    ) {
+      void setLocationModeValue({ mode: 'region', regionId: parsedParams.regionId });
+    }
+  }, [
+    parsedParams,
+    hubIsValid,
+    regionIsValid,
+    hubId,
+    locationModeValue,
+    hubHydrated,
+    locationModeHydrated,
+    setHubId,
+    setLocationModeValue,
+  ]);
 
   // The "jump to search" shortcut (`lib/shortcuts.ts`) navigates here with
   // this state to focus the box in one step, from anywhere in the app.
@@ -367,11 +481,6 @@ export function Market() {
       ),
     [globalMarkets]
   );
-
-  const chosenRegionId =
-    locationModeValue.mode === 'region'
-      ? (locationModeValue.regionId ?? hub.regionId)
-      : hub.regionId;
 
   const resolvedRegion = useMemo(
     () =>
@@ -442,10 +551,10 @@ export function Market() {
   // identifiers, so Trade Hub mode's filter still applies on top of it.
   const displayOrders = useMemo(() => {
     if (!orderBookResult) return [];
-    return locationModeValue.mode === 'hub'
-      ? filterOrdersByLocation(orderBookResult.orders, hub.stationId)
+    return effectiveLocation.mode === 'hub'
+      ? filterOrdersByLocation(orderBookResult.orders, effectiveHub.stationId)
       : orderBookResult.orders;
-  }, [orderBookResult, locationModeValue.mode, hub.stationId]);
+  }, [orderBookResult, effectiveLocation, effectiveHub.stationId]);
 
   const { sell, buy } = useMemo(() => splitOrderBook(displayOrders), [displayOrders]);
   // The order-row context menu's "filter to this station" action narrows
@@ -542,13 +651,44 @@ export function Market() {
     });
   }
 
+  // Every handler that changes the selected item or the location writes the
+  // persisted device setting (unchanged) *and* pushes the new query string,
+  // as its own history entry, so a URL grabbed right after matches what's on
+  // screen and the browser's back/forward walks through prior selections.
+  function navigateTo(typeId: number | null, next: MarketLocationParam) {
+    setSearchParams(buildMarketParams(typeId, next));
+  }
+
   function handleModeChange(mode: LocationMode) {
-    if (mode === locationModeValue.mode) return;
-    void setLocationModeValue({ mode, regionId: locationModeValue.regionId ?? hub.regionId });
+    if (mode === effectiveLocation.mode) return;
+    // Toggling off a URL-supplied location keeps *that* hub/region, not the
+    // device's persisted default — otherwise a shared `?hub=amarr` link
+    // reverts to the visitor's own Jita default the instant they touch the
+    // toggle, which isn't "restores exactly what the sender saw" anymore.
+    const regionId = locationModeValue.regionId ?? effectiveHub.regionId;
+    void setLocationModeValue({ mode, regionId });
+    navigateTo(
+      selectedTypeId,
+      mode === 'region' ? { mode: 'region', regionId } : { mode: 'hub', hubId: effectiveHub.id }
+    );
+  }
+
+  function handleHubChange(id: TradeHub['id']) {
+    void setHubId(id);
+    navigateTo(selectedTypeId, { mode: 'hub', hubId: id });
   }
 
   function handleRegionChange(regionId: number) {
     void setLocationModeValue({ mode: 'region', regionId });
+    navigateTo(selectedTypeId, { mode: 'region', regionId });
+  }
+
+  function handleSelectItem(typeId: number) {
+    navigateTo(typeId, effectiveLocation);
+  }
+
+  function handleBackToFinder() {
+    navigateTo(null, effectiveLocation);
   }
 
   function handleRefresh() {
@@ -574,6 +714,18 @@ export function Market() {
     !catalogueError &&
     (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
   const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
+  const showBackControl = !isDesktop && selectedTypeId !== null;
+  const itemPanelActions =
+    showBackControl || orderBookResult ? (
+      <>
+        {showBackControl && (
+          <Button size="sm" onClick={handleBackToFinder}>
+            {t('market.backToFinder')}
+          </Button>
+        )}
+        {orderBookResult && <DataAgeBadge date={new Date(orderBookResult.fetchedAt)} />}
+      </>
+    ) : undefined;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -583,23 +735,23 @@ export function Market() {
           <div role="group" aria-label={t('market.locationMode')} className="flex gap-1.5">
             <FilterChip
               label={t('market.modeHub')}
-              selected={locationModeValue.mode === 'hub'}
+              selected={effectiveLocation.mode === 'hub'}
               onToggle={() => handleModeChange('hub')}
             />
             <FilterChip
               label={t('market.modeRegion')}
-              selected={locationModeValue.mode === 'region'}
+              selected={effectiveLocation.mode === 'region'}
               onToggle={() => handleModeChange('region')}
             />
           </div>
-          {locationModeValue.mode === 'hub' ? (
+          {effectiveLocation.mode === 'hub' ? (
             <label className="flex items-center gap-2 text-xs">
               <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('market.tradeHub')}
               </span>
               <select
-                value={hubId}
-                onChange={(e) => void setHubId(e.target.value as TradeHub['id'])}
+                value={effectiveHub.id}
+                onChange={(e) => handleHubChange(e.target.value as TradeHub['id'])}
                 className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
               >
                 {TRADE_HUBS.map((h) => (
@@ -638,7 +790,7 @@ export function Market() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr]">
-        <Panel>
+        <Panel className={isDesktop || selectedTypeId === null ? '' : 'hidden'}>
           <input
             ref={searchInputRef}
             type="search"
@@ -679,7 +831,7 @@ export function Market() {
                 filterResult={filterResult}
                 expandedIds={expandedIds}
                 onToggle={handleToggle}
-                onSelect={setSelectedTypeId}
+                onSelect={handleSelectItem}
                 selectedTypeId={selectedTypeId}
                 blueprintCatalog={blueprintCatalog}
                 onRequestBlueprintCatalog={ensureBlueprintCatalog}
@@ -692,20 +844,17 @@ export function Market() {
           <QuickbarList
             items={quickbarItems}
             selectedTypeId={selectedTypeId}
-            onSelect={setSelectedTypeId}
+            onSelect={handleSelectItem}
             onRemove={handleRemoveFromQuickbar}
             onReorder={handleReorderQuickbar}
           />
         </Panel>
 
         <Panel
+          className={isDesktop || selectedTypeId !== null ? '' : 'hidden'}
           title={selectedItem?.name}
           padded={selectedTypeId === null}
-          actions={
-            orderBookResult ? (
-              <DataAgeBadge date={new Date(orderBookResult.fetchedAt)} />
-            ) : undefined
-          }
+          actions={itemPanelActions}
         >
           {selectedTypeId === null ? (
             <EmptyState
