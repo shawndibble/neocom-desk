@@ -47,6 +47,7 @@ const NAV_PATHS = [
   '/mail',
   '/calendar',
   '/contracts',
+  '/contacts',
   '/orders',
   '/settings',
 ] as const satisfies readonly AppRoutePath[];
@@ -172,6 +173,12 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           onClick={onClose}
         />
         <NavItem
+          to="/contacts"
+          label={t('nav.contacts')}
+          locked={locked.has('/contacts')}
+          onClick={onClose}
+        />
+        <NavItem
           to="/orders"
           label={t('nav.orders')}
           locked={locked.has('/orders')}
@@ -268,6 +275,7 @@ export function Layout() {
           <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} />
           <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
           <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
+          <NavItem to="/contacts" label={t('nav.contacts')} locked={locked.has('/contacts')} />
           <NavItem to="/orders" label={t('nav.orders')} locked={locked.has('/orders')} />
         </nav>
         {activeCharacter && (

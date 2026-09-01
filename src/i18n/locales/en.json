@@ -19,6 +19,7 @@
     "mail": "Mail",
     "calendar": "Calendar",
     "contracts": "Contracts",
+    "contacts": "Contacts",
     "orders": "Orders",
     "settings": "Settings",
     "soon": "Soon",
@@ -618,6 +619,25 @@
     "exportCsv": "Export CSV",
     "reauthTitle": "Log in again to see your contracts",
     "reauthHint": "Log in again to fetch this character's contracts.",
+    "reauthAction": "Log in again with EVE Online"
+  },
+  "contacts": {
+    "title": "Contacts",
+    "refresh": "Refresh",
+    "emptyTitle": "No contacts cached",
+    "emptyHint": "Reconnect to fetch this character's contacts.",
+    "noResults": "No contacts match the selected filters",
+    "name": "Name",
+    "type": "Type",
+    "standing": "Standing",
+    "flags": "Flags",
+    "blocked": "Blocked",
+    "watched": "Watched",
+    "filterGood": "Good",
+    "filterNeutral": "Neutral",
+    "filterBad": "Bad",
+    "reauthTitle": "Log in again to see your contacts",
+    "reauthHint": "Log in again to fetch this character's contacts.",
     "reauthAction": "Log in again with EVE Online"
   },
   "orders": {
