@@ -270,7 +270,7 @@ export function Characters() {
             entry.characterId,
             {
               name: entry.name,
-              skillPoints: entry.skills?.data.total_sp,
+              skillPoints: entry.correctedTotalSp ?? undefined,
               wallet: entry.wallet?.data,
             },
           ])

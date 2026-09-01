@@ -13,16 +13,10 @@ import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import {
   loadSkillCatalog,
   toEngineAttributes,
-  toTrainedSkillsMap,
   type SkillCatalog,
 } from '@/features/skills/skillMap';
-import {
-  loadCharacterAttributes,
-  loadCharacterSkillQueue,
-  loadCharacterSkills,
-  loadImplantBonuses,
-} from '@/features/skills/data';
-import { applyCompletedQueueEntries } from '@/features/skills/queueStatus';
+import { loadCharacterAttributes, loadImplantBonuses } from '@/features/skills/data';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { PlanList } from '@/features/skills/planner/PlanList';
 import { PlanEditor } from '@/features/skills/planner/PlanEditor';
 import {
@@ -76,10 +70,9 @@ export function SkillPlans() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [cat, skills, queue, attrs, implantBonuses] = await Promise.all([
+      const [cat, corrected, attrs, implantBonuses] = await Promise.all([
         loadSkillCatalog(),
-        loadCharacterSkills(activeCharacterId),
-        loadCharacterSkillQueue(activeCharacterId),
+        loadCorrectedSkills(activeCharacterId, Date.now()),
         loadCharacterAttributes(activeCharacterId),
         loadImplantBonuses(activeCharacterId),
       ]);
@@ -88,14 +81,7 @@ export function SkillPlans() {
       // /skills is stale until the character next logs in. ESI says to apply
       // past-finish_date queue entries on top, or a plan gets normalized and
       // optimized against levels the character already trained past.
-      if (skills?.data)
-        setTrainedSkills(
-          applyCompletedQueueEntries(
-            toTrainedSkillsMap(skills.data.skills),
-            queue?.data ?? [],
-            Date.now()
-          )
-        );
+      setTrainedSkills(corrected.trained);
       if (attrs?.data) setAttributes(toEngineAttributes(attrs.data, implantBonuses));
       setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
       setImplants(implantBonuses);
