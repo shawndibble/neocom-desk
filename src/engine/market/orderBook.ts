@@ -80,3 +80,30 @@ export function orderExpiry(order: { issued: string; duration: number }): Date {
   const issued = new Date(order.issued);
   return new Date(issued.getTime() + order.duration * 86_400_000);
 }
+
+export interface BestPrices {
+  /** Lowest sell price, or null when nobody is selling. */
+  bestSell: number | null;
+  /** Highest buy price, or null when nobody is buying. */
+  bestBuy: number | null;
+}
+
+/**
+ * The Related Items strip's per-sibling comparison figure: cheapest sell,
+ * richest buy. Null rather than 0 for an empty side — a missing side is not
+ * a free item.
+ */
+export function bestPrices<T extends RawOrder & { price: number }>(
+  orders: readonly T[]
+): BestPrices {
+  let bestSell: number | null = null;
+  let bestBuy: number | null = null;
+  for (const order of orders) {
+    if (order.is_buy_order) {
+      if (bestBuy === null || order.price > bestBuy) bestBuy = order.price;
+    } else if (bestSell === null || order.price < bestSell) {
+      bestSell = order.price;
+    }
+  }
+  return { bestSell, bestBuy };
+}

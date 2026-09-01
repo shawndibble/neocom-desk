@@ -4,6 +4,7 @@ import {
   resolveOrderLocation,
   orderExpiry,
   filterOrdersByLocation,
+  bestPrices,
 } from './orderBook';
 
 interface Order {
@@ -98,5 +99,29 @@ describe('orderExpiry', () => {
   it('handles a zero-duration order (expires the moment it was issued)', () => {
     const expiry = orderExpiry({ issued: '2026-08-01T00:00:00Z', duration: 0 });
     expect(expiry.toISOString()).toBe('2026-08-01T00:00:00.000Z');
+  });
+});
+
+describe('bestPrices', () => {
+  it('picks the lowest sell price and the highest buy price', () => {
+    const orders = [
+      { is_buy_order: false, price: 1200 },
+      { is_buy_order: false, price: 1000 },
+      { is_buy_order: true, price: 800 },
+      { is_buy_order: true, price: 900 },
+    ];
+    expect(bestPrices(orders)).toEqual({ bestSell: 1000, bestBuy: 900 });
+  });
+
+  it('reports null for a side with no orders, never a fabricated zero', () => {
+    const sellOnly = [{ is_buy_order: false, price: 500 }];
+    expect(bestPrices(sellOnly)).toEqual({ bestSell: 500, bestBuy: null });
+
+    const buyOnly = [{ is_buy_order: true, price: 500 }];
+    expect(bestPrices(buyOnly)).toEqual({ bestSell: null, bestBuy: 500 });
+  });
+
+  it('returns nulls for both sides given no orders', () => {
+    expect(bestPrices([])).toEqual({ bestSell: null, bestBuy: null });
   });
 });

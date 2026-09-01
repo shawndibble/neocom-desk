@@ -41,6 +41,8 @@ import { formatVolume, formatOrderLocationText } from '@/features/market/format'
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { QuickbarList } from '@/features/market/QuickbarList';
+import { getRelatedItems } from '@/features/market/relatedItems';
+import { RelatedItemsStrip } from '@/features/market/RelatedItemsStrip';
 import {
   addQuickbarItem,
   removeQuickbarItem,
@@ -51,8 +53,10 @@ import {
   resolveOrderLocation,
   filterOrdersByLocation,
   orderExpiry,
+  bestPrices,
   type NpcStationLookup,
   type SolarSystemLookup,
+  type BestPrices,
 } from '@/engine/market/orderBook';
 import { resolveOrderBookRegion, type GlobalMarketOverride } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
@@ -575,6 +579,87 @@ export function Market() {
     (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
   const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
 
+  // Related Items (CONTEXT.md round 6): the selected item's Market Group
+  // siblings, re-anchored whenever selectedItem changes — including a click
+  // on a sibling itself, which just becomes the new selectedItem.
+  const relatedResult = useMemo(
+    () => (selectedItem ? getRelatedItems(typesByGroup, selectedItem) : null),
+    [typesByGroup, selectedItem]
+  );
+
+  const [relatedPrices, setRelatedPrices] = useState<ReadonlyMap<number, BestPrices | undefined>>(
+    new Map()
+  );
+  // Same "adjusting state when a prop changes" pattern as resetKey above:
+  // clears stale sibling prices the instant the sibling set or the location
+  // changes, in the same render — an Effect would let the old item's prices
+  // flash under the new strip. stationFilter is included so the strip stays
+  // in step with the order-row "filter to this station" action (CONTEXT.md
+  // round 10) the same way the on-screen tables do; refreshTick deliberately
+  // isn't, so a manual refresh updates prices in place instead of blanking
+  // the strip back to a loading state.
+  const relatedResetKey = relatedResult
+    ? `${relatedResult.siblings.map((sibling) => sibling.typeId).join(',')}:${chosenRegionId}:${locationModeValue.mode}:${hub.stationId}:${stationFilter ?? 'none'}`
+    : 'none';
+  const [relatedResetForKey, setRelatedResetForKey] = useState<string | null>(null);
+  if (relatedResetKey !== relatedResetForKey) {
+    setRelatedResetForKey(relatedResetKey);
+    setRelatedPrices(new Map());
+  }
+
+  // Fetched independently of the main order book, so a slow sibling price
+  // never delays the order book's own render (acceptance criteria). Also
+  // reruns on refreshTick so a manual Refresh — which clears getOrderBook's
+  // cache — refetches sibling prices too, not just the on-screen tables.
+  useEffect(() => {
+    if (
+      !relatedResult ||
+      relatedResult.siblings.length === 0 ||
+      !hubHydrated ||
+      !locationModeHydrated
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      relatedResult.siblings.map(async (sibling) => {
+        const region = resolveOrderBookRegion(sibling.typeId, chosenRegionId, globalMarketsMap);
+        try {
+          const result = await getOrderBook(region.regionId, sibling.typeId);
+          if (cancelled) return;
+          const locationFiltered =
+            locationModeValue.mode === 'hub'
+              ? filterOrdersByLocation(result.orders, hub.stationId)
+              : result.orders;
+          const orders = filterOrdersByLocation(locationFiltered, stationFilter);
+          setRelatedPrices((prev) => new Map(prev).set(sibling.typeId, bestPrices(orders)));
+        } catch {
+          // A sibling's own price is a nice-to-have next to the order book
+          // that did load; one failed fetch reads as "no orders" rather than
+          // stalling the strip on a spinner forever.
+          if (!cancelled) {
+            setRelatedPrices((prev) =>
+              new Map(prev).set(sibling.typeId, { bestSell: null, bestBuy: null })
+            );
+          }
+        }
+      })
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    relatedResult,
+    chosenRegionId,
+    globalMarketsMap,
+    locationModeValue.mode,
+    hub.stationId,
+    stationFilter,
+    hubHydrated,
+    locationModeHydrated,
+    refreshTick,
+  ]);
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -808,6 +893,16 @@ export function Market() {
                   )}
                 </div>
               </div>
+
+              {relatedResult && (
+                <RelatedItemsStrip
+                  siblings={relatedResult.siblings}
+                  totalCount={relatedResult.totalCount}
+                  truncated={relatedResult.truncated}
+                  prices={relatedPrices}
+                  onSelect={setSelectedTypeId}
+                />
+              )}
             </>
           )}
         </Panel>
