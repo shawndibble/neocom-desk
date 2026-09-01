@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { Button, DataAgeBadge, DataTable, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import {
@@ -28,6 +29,7 @@ import {
 } from '@/engine/market/orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
+import type { MarketFocusSearchState } from '@/lib/shortcuts';
 
 /** Debounce for the catalogue search, so a fast typist doesn't re-filter the tree on every keystroke. */
 const SEARCH_DEBOUNCE_MS = 250;
@@ -153,6 +155,8 @@ function MarketGroupTree({
  */
 export function Market() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const hubId = useMarketHub((state) => state.value);
   const hubHydrated = useMarketHub((state) => state.hydrated);
   const hydrateHub = useMarketHub((state) => state.hydrate);
@@ -191,6 +195,14 @@ export function Market() {
   useEffect(() => {
     void hydrateHub();
   }, [hydrateHub]);
+
+  // The "jump to search" shortcut (`lib/shortcuts.ts`) navigates here with
+  // this state to focus the box in one step, from anywhere in the app.
+  useEffect(() => {
+    if ((location.state as Partial<MarketFocusSearchState> | null)?.focusSearch) {
+      searchInputRef.current?.focus();
+    }
+  }, [location.state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -388,6 +400,7 @@ export function Market() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr]">
         <Panel>
           <input
+            ref={searchInputRef}
             type="search"
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
