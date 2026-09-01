@@ -90,7 +90,17 @@ const server = setupServer(
   http.get('https://esi.evetech.net/universe/structures/1000000000001', () =>
     HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
   ),
-  http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.json([]))
+  http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.json([])),
+  // Jumps-away (issue #87): the active character starts in Jita's system
+  // (30000142, same as the fixture station above), and any route call that
+  // does end up needed (e.g. cross-character search reaching a different
+  // system) gets a harmless generic route so no test has to know about it.
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/location`, () =>
+    HttpResponse.json({ solar_system_id: 30000142 })
+  ),
+  http.get('https://esi.evetech.net/route/:origin/:destination', ({ params }) =>
+    HttpResponse.json([Number(params.origin), Number(params.destination)])
+  )
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -905,5 +915,123 @@ describe('cross-character search (issue #85)', () => {
     await user.click(toggle);
     expect(await screen.findByText(/no items match your search/i)).toBeInTheDocument();
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+  });
+});
+
+describe('jumps-away distance (issue #87)', () => {
+  it('shows 0 jumps for a pinned station in the character’s own system, without a route call', async () => {
+    const user = userEvent.setup();
+    let routeCalled = false;
+    server.use(
+      http.get('https://esi.evetech.net/route/:origin/:destination', () => {
+        routeCalled = true;
+        return HttpResponse.json([30000142]);
+      })
+    );
+    render(<App />);
+    const pinButton = await screen.findByRole('button', {
+      name: /Pin toggle for Jita IV/,
+    });
+    await user.click(pinButton);
+
+    expect(await screen.findByText('0 jumps')).toBeInTheDocument();
+    expect(routeCalled).toBe(false);
+  });
+
+  it('shows jumps resolved from the ESI route waypoint list for a pinned structure', async () => {
+    server.use(
+      http.get('https://esi.evetech.net/universe/structures/1000000000001', () =>
+        HttpResponse.json({
+          name: 'A Structure',
+          owner_id: 1,
+          solar_system_id: 30002187,
+        })
+      ),
+      http.get('https://esi.evetech.net/route/30000142/30002187', () =>
+        HttpResponse.json([30000142, 30002053, 30002187])
+      )
+    );
+    await db.stationPins.put({
+      id: `${CHAR_ID}:1000000000001`,
+      characterId: CHAR_ID,
+      locationId: 1000000000001,
+      scope: 'character',
+      updatedAt: Date.now(),
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('2 jumps')).toBeInTheDocument();
+  });
+
+  it('shows "-" with a reason tooltip when the destination system cannot be resolved', async () => {
+    // Default handler 403s this structure, so its system id never resolves.
+    await db.stationPins.put({
+      id: `${CHAR_ID}:1000000000001`,
+      characterId: CHAR_ID,
+      locationId: 1000000000001,
+      scope: 'character',
+      updatedAt: Date.now(),
+    });
+
+    render(<App />);
+
+    const badge = await screen.findByTitle('No route found to this station.');
+    expect(badge).toHaveTextContent('-');
+  });
+
+  it('shows "-" with a reason tooltip when the character\'s own location is unavailable', async () => {
+    // A character who hasn't re-consented to esi-location.read_location.v1
+    // yet (the default for every existing user until they next log in) —
+    // this must degrade the badge, not trip the shell-wide re-auth banner.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/location`, () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+      )
+    );
+
+    render(<App />);
+
+    // Both visible stations degrade the same way — no pin needed for either.
+    const badges = await screen.findAllByTitle('Character location unavailable.');
+    expect(badges.length).toBeGreaterThan(0);
+    for (const badge of badges) expect(badge).toHaveTextContent('-');
+    expect(screen.queryByText('Log in again to see your assets')).not.toBeInTheDocument();
+  });
+
+  it('lets the user switch route preference, re-requesting the route with the new flag', async () => {
+    const user = userEvent.setup();
+    const seenFlags: (string | null)[] = [];
+    server.use(
+      http.get('https://esi.evetech.net/universe/structures/1000000000001', () =>
+        HttpResponse.json({
+          name: 'A Structure',
+          owner_id: 1,
+          solar_system_id: 30002187,
+        })
+      ),
+      http.get('https://esi.evetech.net/route/30000142/30002187', ({ request }) => {
+        seenFlags.push(new URL(request.url).searchParams.get('flag'));
+        return HttpResponse.json([30000142, 30002187]);
+      })
+    );
+    await db.stationPins.put({
+      id: `${CHAR_ID}:1000000000001`,
+      characterId: CHAR_ID,
+      locationId: 1000000000001,
+      scope: 'character',
+      updatedAt: Date.now(),
+    });
+
+    render(<App />);
+    await screen.findByText('1 jump');
+    expect(seenFlags).toEqual(['shortest']);
+
+    await user.click(screen.getByRole('combobox', { name: 'Route' }));
+    await user.click(await screen.findByRole('option', { name: 'Safest' }));
+
+    // ESI's real flag enum is shortest/secure/insecure — "Safest" is this
+    // app's own UI wording, translated to ESI's "secure" at the boundary.
+    await waitFor(() => expect(seenFlags).toEqual(['shortest', 'secure']));
   });
 });

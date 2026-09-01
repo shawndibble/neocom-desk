@@ -13,7 +13,7 @@
  * globally would leak it to a character not on that ACL.
  */
 import { AuthError } from '@/auth/sso';
-import { getUniverseStructure } from '@/esi/endpoints';
+import { getUniverseStructure, type UniverseStructure } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
 import { loadWithCache } from '@/esi/cache';
 
@@ -21,11 +21,10 @@ function cacheKey(structureId: number): string {
   return `structure:${structureId}`;
 }
 
-/** Structure name, or null if unresolvable (no ACL access, offline, or uncached). */
-export async function loadStructureName(
+async function loadStructure(
   characterId: number,
   structureId: number
-): Promise<string | null> {
+): Promise<UniverseStructure | null> {
   const result = await loadWithCache(
     characterId,
     cacheKey(structureId),
@@ -35,5 +34,21 @@ export async function loadStructureName(
         err instanceof AuthError || (err instanceof EsiError && err.status === 401),
     }
   );
-  return result?.data.name ?? null;
+  return result?.data ?? null;
+}
+
+/** Structure name, or null if unresolvable (no ACL access, offline, or uncached). */
+export async function loadStructureName(
+  characterId: number,
+  structureId: number
+): Promise<string | null> {
+  return (await loadStructure(characterId, structureId))?.name ?? null;
+}
+
+/** Structure's solar system id, for jumps-away distances (issue #87), or null if unresolvable. */
+export async function loadStructureSystemId(
+  characterId: number,
+  structureId: number
+): Promise<number | null> {
+  return (await loadStructure(characterId, structureId))?.solar_system_id ?? null;
 }

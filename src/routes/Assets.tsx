@@ -10,6 +10,11 @@ import {
   FilterChip,
   Panel,
   ReauthBanner,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
 } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -30,11 +35,15 @@ import {
   type OtherCharacterAssets,
 } from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
-import { loadStationName } from '@/features/character/stations';
-import { loadStructureName } from '@/features/character/structures';
+import { loadStationName, loadStationSystemId } from '@/features/character/stations';
+import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { loadCharacterSolarSystemId } from '@/features/character/location';
+import { loadJumpsAway } from '@/features/character/routeDistance';
+import { useRoutePreference, type RoutePreference } from '@/features/character/routePreference';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
+import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
@@ -465,6 +474,38 @@ function StationPinButton({ label, pinState, onToggle, t }: StationPinButtonProp
   );
 }
 
+interface JumpsAwayBadgeProps {
+  result: JumpsAwayResult | undefined;
+  t: Translate;
+}
+
+/**
+ * Jumps-away distance for a station row (issue #87). Renders nothing while
+ * still resolving (undefined) rather than a placeholder — the badge is a
+ * progressive enhancement that pops in once its route call settles, never a
+ * load-blocking part of the row. `title` (not the hover-tooltip pattern used
+ * elsewhere on this page) mirrors `CharacterBadge`'s own plain-annotation
+ * treatment just above — this is the same kind of small supplementary label.
+ */
+function JumpsAwayBadge({ result, t }: JumpsAwayBadgeProps) {
+  if (!result) return null;
+  if (result.kind === 'known') {
+    return (
+      <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
+        {t('assets.jumpsAway.value', { count: result.jumps })}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums"
+      title={t(`assets.jumpsAway.unknownReason.${result.reason}`)}
+    >
+      {t('assets.jumpsAway.unknown')}
+    </span>
+  );
+}
+
 /**
  * The item context menu's actions and their supporting data (Quickbar,
  * blueprint catalog, tooltip pricing/volume) — everything an `AssetItemRow`
@@ -631,6 +672,8 @@ interface StationHeaderRowProps {
   station: AssetTreeStation;
   label: string;
   pinState: PinState;
+  /** Undefined while still resolving/out of scope (issue #87) — see `JumpsAwayBadge`. */
+  jumpsAway: JumpsAwayResult | undefined;
   onTogglePin: () => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
@@ -648,6 +691,7 @@ function StationHeaderRow({
   station,
   label,
   pinState,
+  jumpsAway,
   onTogglePin,
   onExpandAll,
   onCollapseAll,
@@ -660,6 +704,7 @@ function StationHeaderRow({
       </h2>
       <div className="flex items-center gap-2">
         <StationPinButton label={label} pinState={pinState} onToggle={onTogglePin} t={t} />
+        <JumpsAwayBadge result={jumpsAway} t={t} />
         <span className="text-[0.6875rem] text-text-faint tabular-nums">
           {formatBadge(station, t)}
         </span>
@@ -942,6 +987,200 @@ export function Assets() {
     return keys;
   }, [searchActive, sortedTree]);
 
+  // One flat row list — station headers and tree nodes interleaved in visual
+  // order — feeds the single virtualizer below (issue #86). Search re-prunes
+  // `sortedTree` above, which re-flattens here; there is no separate
+  // search-specific row path. Computed here (rather than down by the render,
+  // where the old pre-virtualization layout had it) because the jumps-away
+  // scoping below needs the virtualizer's visible range.
+  const effectiveExpandedKeys = autoExpandedKeys ?? expandedKeys;
+  const flattenedRows = useMemo(
+    () => flattenAssetRows(sortedTree, effectiveExpandedKeys),
+    [sortedTree, effectiveExpandedKeys]
+  );
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+  // React Compiler isn't enabled in this build (no babel plugin configured);
+  // this is eslint-plugin-react-hooks flagging TanStack Virtual's returned
+  // functions as unsafe to memoize *if* the compiler is ever turned on.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: flattenedRows.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: (index) => estimateRowHeight(flattenedRows[index]),
+    getItemKey: (index) => flattenedRows[index].key,
+    overscan: 12,
+  });
+
+  // Jumps-away distances (issue #87): the active character's current solar
+  // system, fetched once per page load (not polled) via ESI's location
+  // endpoint. Re-fetched whenever the active character changes.
+  const [characterSystemId, setCharacterSystemId] = useState<number | null>(null);
+  const [characterLocationResolved, setCharacterLocationResolved] = useState(false);
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    setCharacterLocationResolved(false);
+    let cancelled = false;
+    void loadCharacterSolarSystemId(activeCharacterId).then((systemId) => {
+      if (cancelled) return;
+      setCharacterSystemId(systemId);
+      setCharacterLocationResolved(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId]);
+
+  const routePreference = useRoutePreference((state) => state.value);
+  const hydrateRoutePreference = useRoutePreference((state) => state.hydrate);
+  const setRoutePreference = useRoutePreference((state) => state.setValue);
+  useEffect(() => {
+    void hydrateRoutePreference();
+  }, [hydrateRoutePreference]);
+
+  // Stations with at least one row (their own header, or a descendant) in
+  // the virtualizer's current visible range — the "currently visible"
+  // half of CONTEXT.md round 14's "only for pinned and currently
+  // visible/expanded stations". Keyed on the range's indices, not
+  // `getVirtualItems()`'s array (a fresh reference every render), so this
+  // only recomputes when the visible window actually moves.
+  const rangeStart = rowVirtualizer.range?.startIndex ?? null;
+  const rangeEnd = rowVirtualizer.range?.endIndex ?? null;
+  const visibleStationLocationIds = useMemo(() => {
+    if (rangeStart === null || rangeEnd === null) return new Set<number>();
+    const ids = new Set<number>();
+    for (let i = rangeStart; i <= rangeEnd; i += 1) {
+      const row = flattenedRows[i];
+      if (!row) continue;
+      ids.add(row.type === 'station' ? row.station.locationId : row.stationLocationId);
+    }
+    return ids;
+  }, [rangeStart, rangeEnd, flattenedRows]);
+
+  // Lazy, scoped to pinned stations, stations in the virtualizer's visible
+  // range, and stations the user has actually drilled into (CONTEXT.md round
+  // 14: "only for pinned and currently visible/expanded stations") — bounds
+  // the route-call fan-out to what's pinned or actually on screen, rather
+  // than every station a character owns.
+  const jumpsAwayScopedStations = useMemo(() => {
+    return sortedTree.filter((station) => {
+      if (pinStateFor(station.locationId) !== 'unpinned') return true;
+      if (visibleStationLocationIds.has(station.locationId)) return true;
+      const prefix = `${stationRowKey(station.locationId)}/`;
+      for (const key of effectiveExpandedKeys) {
+        if (key.startsWith(prefix)) return true;
+      }
+      return false;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
+  }, [sortedTree, effectiveExpandedKeys, visibleStationLocationIds, pins, activeCharacterId]);
+
+  // Each station's own solar system id (resolved once, then reused across a
+  // preference switch) and the resulting jumps-away result per (station,
+  // preference) pair — keying by preference means switching it never needs
+  // an explicit cache invalidation, a stale entry under the old preference
+  // is simply never read again. Both effects below guard against
+  // re-requesting a key with a ref (not just the `pending` filter over
+  // state): resolving one station's system id updates `stationSystemIds`,
+  // which is itself a dependency of the jumps-away effect, so that effect
+  // legitimately re-runs mid-flight for *other* still-pending stations — the
+  // ref is what stops that re-run from re-issuing a request already inflight
+  // for the same key, which the state-only filter cannot do since the write
+  // that would exclude it hasn't landed yet.
+  const [stationSystemIds, setStationSystemIds] = useState<ReadonlyMap<number, number | null>>(
+    new Map()
+  );
+  const [jumpsAwayByKey, setJumpsAwayByKey] = useState<ReadonlyMap<string, JumpsAwayResult>>(
+    new Map()
+  );
+  const systemIdRequested = useRef<Set<number>>(new Set());
+  const jumpsAwayRequested = useRef<Set<string>>(new Set());
+  // Tracks which character an in-flight request was made for. A plain
+  // per-effect `cancelled` closure would also be tripped by an *unrelated*
+  // re-render that merely gives `jumpsAwayScopedStations`/`stationSystemIds`
+  // a new array/Map identity with the same content (e.g. clicking a pin
+  // writes to Dexie, which re-renders `pins` mid-flight) — since the
+  // request is already marked in the refs above, that spurious cancellation
+  // would discard the result and it would never be retried. Comparing
+  // against the character a request was actually made for is the correct,
+  // narrower staleness check: only a real character switch should discard
+  // a write, and the reset effect below already clears state for that case.
+  const activeCharacterIdRef = useRef(activeCharacterId);
+  useEffect(() => {
+    activeCharacterIdRef.current = activeCharacterId;
+  }, [activeCharacterId]);
+  useEffect(() => {
+    // A fresh character is a fresh page context: a structure's system id is
+    // ACL-checked per character, so a previous character's resolved/inflight
+    // set must not suppress this one's requests.
+    setStationSystemIds(new Map());
+    setJumpsAwayByKey(new Map());
+    systemIdRequested.current = new Set();
+    jumpsAwayRequested.current = new Set();
+  }, [activeCharacterId]);
+
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    const missing = jumpsAwayScopedStations.filter(
+      (station) =>
+        !stationSystemIds.has(station.locationId) &&
+        !systemIdRequested.current.has(station.locationId)
+    );
+    if (missing.length === 0) return;
+    for (const station of missing) systemIdRequested.current.add(station.locationId);
+
+    const requestedForCharacterId = activeCharacterId;
+    void mapWithConcurrencyLimit(missing, ESI_FANOUT_CONCURRENCY, async (station) => {
+      const systemId =
+        station.locationType === 'station'
+          ? await loadStationSystemId(station.locationId)
+          : station.locationType === 'other'
+            ? await loadStructureSystemId(activeCharacterId, station.locationId)
+            : null;
+      if (activeCharacterIdRef.current === requestedForCharacterId) {
+        setStationSystemIds((prev) => new Map(prev).set(station.locationId, systemId));
+      }
+    });
+  }, [activeCharacterId, jumpsAwayScopedStations, stationSystemIds]);
+
+  useEffect(() => {
+    if (activeCharacterId === null || !characterLocationResolved) return;
+    const pending = jumpsAwayScopedStations.filter((station) => {
+      const key = `${station.locationId}:${routePreference}`;
+      if (jumpsAwayByKey.has(key) || jumpsAwayRequested.current.has(key)) return false;
+      return characterSystemId === null || stationSystemIds.has(station.locationId);
+    });
+    if (pending.length === 0) return;
+    for (const station of pending) {
+      jumpsAwayRequested.current.add(`${station.locationId}:${routePreference}`);
+    }
+
+    const requestedForCharacterId = activeCharacterId;
+    void mapWithConcurrencyLimit(pending, ESI_FANOUT_CONCURRENCY, async (station) => {
+      const key = `${station.locationId}:${routePreference}`;
+      let result: JumpsAwayResult;
+      if (characterSystemId === null) {
+        result = { kind: 'unknown', reason: 'noLocation' };
+      } else {
+        const systemId = stationSystemIds.get(station.locationId) ?? null;
+        result =
+          systemId === null
+            ? { kind: 'unknown', reason: 'noRoute' }
+            : await loadJumpsAway(characterSystemId, systemId, routePreference);
+      }
+      if (activeCharacterIdRef.current === requestedForCharacterId) {
+        setJumpsAwayByKey((prev) => new Map(prev).set(key, result));
+      }
+    });
+  }, [
+    activeCharacterId,
+    characterLocationResolved,
+    characterSystemId,
+    jumpsAwayScopedStations,
+    jumpsAwayByKey,
+    stationSystemIds,
+    routePreference,
+  ]);
+
   function toggleKey(key: string) {
     if (searchActive) return;
     setExpandedKeys((prev) => {
@@ -965,7 +1204,7 @@ export function Assets() {
   }
 
   const renderCtx: RenderCtx = {
-    expandedKeys: autoExpandedKeys ?? expandedKeys,
+    expandedKeys: effectiveExpandedKeys,
     onToggle: toggleKey,
     typeNames: mergedTypeNames,
     t,
@@ -980,27 +1219,6 @@ export function Assets() {
     onAddToQuickbar: handleAddToQuickbar,
     onShowInfo: handleShowInfo,
   };
-
-  // One flat row list — station headers and tree nodes interleaved in visual
-  // order — feeds the single virtualizer below (issue #86). Search re-prunes
-  // `sortedTree` above, which re-flattens here; there is no separate
-  // search-specific row path.
-  const flattenedRows = useMemo(
-    () => flattenAssetRows(sortedTree, renderCtx.expandedKeys),
-    [sortedTree, renderCtx.expandedKeys]
-  );
-  const scrollParentRef = useRef<HTMLDivElement>(null);
-  // React Compiler isn't enabled in this build (no babel plugin configured);
-  // this is eslint-plugin-react-hooks flagging TanStack Virtual's returned
-  // functions as unsafe to memoize *if* the compiler is ever turned on.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const rowVirtualizer = useVirtualizer({
-    count: flattenedRows.length,
-    getScrollElement: () => scrollParentRef.current,
-    estimateSize: (index) => estimateRowHeight(flattenedRows[index]),
-    getItemKey: (index) => flattenedRows[index].key,
-    overscan: 12,
-  });
 
   if (!hydrated) {
     return (
@@ -1017,6 +1235,23 @@ export function Assets() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('assets.title')}</h1>
         <div className="flex items-center gap-2">
           {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+          <Select
+            value={routePreference}
+            onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
+          >
+            <SelectTrigger
+              aria-label={t('assets.jumpsAway.routePreference.label')}
+              className="w-28"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="shortest">
+                {t('assets.jumpsAway.routePreference.shortest')}
+              </SelectItem>
+              <SelectItem value="safest">{t('assets.jumpsAway.routePreference.safest')}</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             size="sm"
             disabled={csvGroups.length === 0}
@@ -1132,6 +1367,9 @@ export function Assets() {
                               station={row.station}
                               label={label as string}
                               pinState={pinStateFor(row.station.locationId)}
+                              jumpsAway={jumpsAwayByKey.get(
+                                `${row.station.locationId}:${routePreference}`
+                              )}
                               onTogglePin={() => void handleTogglePin(row.station.locationId)}
                               onExpandAll={() =>
                                 expandAll(row.station, stationRowKey(row.station.locationId))

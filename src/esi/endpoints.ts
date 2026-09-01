@@ -1032,3 +1032,49 @@ export function getCharacterLoyaltyPoints(
     endpointId: 'getCharacterLoyaltyPoints',
   });
 }
+
+// --- GET /characters/{character_id}/location (esi-location.read_location.v1) ---
+
+export interface CharacterLocation {
+  solar_system_id: number;
+  station_id?: number;
+  structure_id?: number;
+}
+
+export function getCharacterLocation(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterLocation>> {
+  return esiFetch<CharacterLocation>(`/characters/${characterId}/location`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterLocation',
+  });
+}
+
+// --- GET /route/{origin}/{destination} (public) ---
+
+export interface RouteOptions extends EndpointOptions {
+  /**
+   * ESI's real route-preference enum — verified live against
+   * `GET /route/{origin}/{destination}/`: `shortest`/`secure`/`insecure` are
+   * accepted, `fastest`/`safest` both 400. `secure` prefers highsec systems
+   * (the "Safest" choice issue #87's UI surfaces); `insecure` has no UI use
+   * today but is included so this wrapper reflects the endpoint it wraps.
+   */
+  flag?: 'shortest' | 'secure' | 'insecure';
+}
+
+/** Waypoint solar-system ids, including both origin and destination. */
+export function getRoute(
+  origin: number,
+  destination: number,
+  options: RouteOptions = {}
+): Promise<EsiResult<number[]>> {
+  const { flag, ...rest } = options;
+  return esiFetch<number[]>(`/route/${origin}/${destination}`, {
+    ...rest,
+    endpointId: 'getRoute',
+    query: { flag },
+  });
+}
