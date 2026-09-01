@@ -6,6 +6,7 @@ import { db, type CharacterRecord } from '@/db';
 import {
   Button,
   CharacterAvatar,
+  DataAgeBadge,
   EmptyState,
   FilterChip,
   Select,
@@ -14,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  StatChip,
+  type StatChipTone,
 } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -21,6 +24,7 @@ import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { loadRosterSnapshot } from '@/features/character/roster';
+import { deriveQueueState, type QueueState } from '@/features/skills/queueStatus';
 import { removeCharacter } from '@/features/character/removeCharacter';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
@@ -41,6 +45,14 @@ import {
 
 const UNGROUPED_VALUE = '__ungrouped__';
 
+const QUEUE_STATE_TONE: Record<QueueState, StatChipTone> = {
+  training: 'success',
+  endingSoon: 'warning',
+  paused: 'danger',
+  idle: 'default',
+  unknown: 'default',
+};
+
 const DENSITY_LABEL_KEYS = {
   0.875: 'characters.densityCompact',
   1: 'characters.densityCozy',
@@ -50,9 +62,16 @@ const DENSITY_LABEL_KEYS = {
 
 const SORT_KEYS: readonly CharacterSortKey[] = ['name', 'skillPoints', 'wallet'];
 
+interface QueueInfo {
+  state: QueueState;
+  /** When this character's cached queue was last fetched; null when never fetched. */
+  fetchedAt: Date | null;
+}
+
 interface CharacterCardProps {
   character: CharacterRecord;
   info: PublicInfoEntry | undefined;
+  queue: QueueInfo | undefined;
   groups: readonly CharacterGroup[];
   groupId: string | null;
   onSelect: (characterId: number) => void;
@@ -63,6 +82,7 @@ interface CharacterCardProps {
 function CharacterCard({
   character,
   info,
+  queue,
   groups,
   groupId,
   onSelect,
@@ -92,6 +112,16 @@ function CharacterCard({
           <span className="block truncate text-xs text-text-faint">
             {info?.allianceName ?? t('common.unknown')}
           </span>
+          {queue && (
+            <span className="mt-1 flex items-center gap-2">
+              <StatChip
+                label={t('characters.queueState')}
+                tone={QUEUE_STATE_TONE[queue.state]}
+                value={t(`characters.queueStates.${queue.state}`)}
+              />
+              {queue.fetchedAt && <DataAgeBadge date={queue.fetchedAt} />}
+            </span>
+          )}
         </span>
       </button>
       {groups.length > 0 && (
@@ -239,6 +269,7 @@ export function Characters() {
   const [sortKey, setSortKey] = useState<CharacterSortKey>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [stats, setStats] = useState<Map<number, CharacterSortStats>>(new Map());
+  const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
 
@@ -259,9 +290,13 @@ export function Characters() {
     let cancelled = false;
     void (async () => {
       if (!characters || characters.length === 0) {
-        if (!cancelled) setStats(new Map());
+        if (!cancelled) {
+          setStats(new Map());
+          setQueueById(new Map());
+        }
         return;
       }
+      const now = Date.now();
       const roster = await loadRosterSnapshot();
       if (cancelled) return;
       setStats(
@@ -272,6 +307,17 @@ export function Characters() {
               name: entry.name,
               skillPoints: entry.correctedTotalSp ?? undefined,
               wallet: entry.wallet?.data,
+            },
+          ])
+        )
+      );
+      setQueueById(
+        new Map(
+          roster.map((entry) => [
+            entry.characterId,
+            {
+              state: deriveQueueState(entry.queue?.data, now),
+              fetchedAt: entry.queue?.fetchedAt ?? null,
             },
           ])
         )
@@ -368,6 +414,7 @@ export function Characters() {
               key={characterId}
               character={character}
               info={publicInfo[characterId]}
+              queue={queueById.get(characterId)}
               groups={groupsValue.groups}
               groupId={groupIdByCharacterId.get(characterId) ?? null}
               onSelect={(id) => void select(id)}
