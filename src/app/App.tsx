@@ -19,6 +19,7 @@ import { SkillCompare } from '@/routes/SkillCompare';
 import { Industry } from '@/routes/Industry';
 import { Market } from '@/routes/Market';
 import { Wallet } from '@/routes/Wallet';
+import { Clones } from '@/routes/Clones';
 import { Assets } from '@/routes/Assets';
 import { Mail } from '@/routes/Mail';
 import { Calendar } from '@/routes/Calendar';
@@ -64,6 +65,7 @@ const ROUTE_ELEMENTS = {
   '/industry': <Industry />,
   '/market': <Market />,
   '/wallet': <Wallet />,
+  '/clones': <Clones />,
   '/employment-history': <EmploymentHistory />,
   '/assets': <Assets />,
   '/mail': <Mail />,

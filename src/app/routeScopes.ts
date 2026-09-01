@@ -97,6 +97,17 @@ export const ROUTE_REQUIREMENTS = {
     ],
     strings: 'orders',
   },
+  // Deliberately does not list getCharacterSkills, even though the loader
+  // reads it for the cooldown's Infomorph Synchronizing level: skills is a
+  // secondary enhancement here, and gating the whole tab on it would repeat
+  // the mistake round 4 already ruled out for multi-scope pages (CONTEXT.md
+  // "Missing-scope handling"). A character without the skills grant still
+  // sees clones/locations/implants; the cooldown just degrades to the
+  // untrained (24h) estimate instead of erroring.
+  '/clones': {
+    endpoints: ['getCharacterClones'],
+    strings: 'clones',
+  },
 } as const satisfies Record<string, RouteRequirement>;
 
 export type AppRoutePath = keyof typeof ROUTE_REQUIREMENTS;
