@@ -669,15 +669,13 @@ interface AssetBranchRowProps {
   depth: number;
   ctx: RenderCtx;
   a11y: TreeRowA11y;
+  /** From the shared `rowLabels` array (Assets()) — the one place this is computed, so it never drifts from what type-ahead searches against. */
+  label: string;
 }
 
 /** A bay/container/ship row: toggles its own children's presence in the flattened row list. */
-function AssetBranchRow({ node, path, depth, ctx, a11y }: AssetBranchRowProps) {
+function AssetBranchRow({ node, path, depth, ctx, a11y, label }: AssetBranchRowProps) {
   const expanded = ctx.expandedKeys.has(path);
-  const label =
-    node.kind === 'bay'
-      ? ctx.t(`assets.bay.${node.bay}`)
-      : (ctx.typeNames.get(node.asset.type_id) ?? `Type #${node.asset.type_id}`);
   const characterBadge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, ctx);
 
   return (
@@ -1213,14 +1211,18 @@ export function Assets() {
     const row = flattenedRows[index];
     if (!row || row.type === 'station') return;
     if (row.node.kind === 'item') {
-      const name = mergedTypeNames.get(row.node.asset.type_id) ?? `Type #${row.node.asset.type_id}`;
-      handleShowInfo(row.node.asset.type_id, name);
+      handleShowInfo(row.node.asset.type_id, rowLabels[index]);
     } else {
       toggleKey(row.key);
     }
   }
 
   function handleTreeKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    // Only the tree rows themselves (`role="treeitem"`) drive roving nav — a
+    // station header also hosts real, independently-tabbable buttons (pin,
+    // expand all, collapse all); their own native Enter/Space/click handling
+    // must not be swallowed by this delegated handler.
+    if ((event.target as HTMLElement).getAttribute('role') !== 'treeitem') return;
     if (flattenedRows.length === 0) return;
     const currentIndex = Math.max(
       0,
@@ -1679,6 +1681,7 @@ export function Assets() {
                               depth={row.depth}
                               ctx={renderCtx}
                               a11y={a11y}
+                              label={rowLabels[virtualRow.index]}
                             />
                           )}
                         </div>

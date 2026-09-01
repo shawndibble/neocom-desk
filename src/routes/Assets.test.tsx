@@ -771,6 +771,45 @@ describe('keyboard tree navigation (issue #89)', () => {
       expect(screen.getByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument()
     );
   });
+
+  it('does not swallow Enter on a station header button that is not the roving-focus treeitem itself', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 10,
+              type_id: 650,
+              quantity: 1,
+              location_id: 60003760,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+            {
+              item_id: 11,
+              type_id: 34,
+              quantity: 50,
+              location_id: 10,
+              location_type: 'item' as const,
+              location_flag: 'Cargo',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Drake' });
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+
+    const expandAllButton = screen.getByRole('button', { name: /expand all/i });
+    expandAllButton.focus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+  });
 });
 
 describe('station pins (issue #84)', () => {
