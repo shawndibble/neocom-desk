@@ -1055,8 +1055,14 @@ export function getCharacterLocation(
 // --- GET /route/{origin}/{destination} (public) ---
 
 export interface RouteOptions extends EndpointOptions {
-  /** Only 'shortest'/'safest' are ever surfaced in the UI (issue #87); 'fastest' is omitted deliberately. */
-  flag?: 'shortest' | 'fastest' | 'safest';
+  /**
+   * ESI's real route-preference enum — verified live against
+   * `GET /route/{origin}/{destination}/`: `shortest`/`secure`/`insecure` are
+   * accepted, `fastest`/`safest` both 400. `secure` prefers highsec systems
+   * (the "Safest" choice issue #87's UI surfaces); `insecure` has no UI use
+   * today but is included so this wrapper reflects the endpoint it wraps.
+   */
+  flag?: 'shortest' | 'secure' | 'insecure';
 }
 
 /** Waypoint solar-system ids, including both origin and destination. */

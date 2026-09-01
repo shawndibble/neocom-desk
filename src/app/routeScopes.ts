@@ -72,6 +72,14 @@ export const ROUTE_REQUIREMENTS = {
 
   // One scope each, so a missing grant leaves the page with literally nothing
   // to show.
+  //
+  // Deliberately does not list getCharacterLocation, even though the page
+  // uses it for jumps-away distances (issue #87): that scope is a secondary
+  // enhancement layered on an already-working page, the same reasoning
+  // round 4 already ruled out for /clones below. A character who hasn't
+  // re-granted it still sees every asset; jumps-away just degrades to "-"
+  // with a tooltip (Assets.tsx / features/character/location.ts) instead of
+  // gating the whole tab on a grant most existing users don't have yet.
   '/assets': {
     endpoints: ['getCharacterAssets', 'getUniverseStation', 'postUniverseNames', 'getUniverseType'],
     strings: 'assets',

@@ -16,4 +16,8 @@ describe('jumpsAwayFromRoute', () => {
   it('is unknown with reason noRoute when no route could be resolved', () => {
     expect(jumpsAwayFromRoute(null)).toEqual({ kind: 'unknown', reason: 'noRoute' });
   });
+
+  it('is unknown with reason noRoute for an empty waypoint list (ESI always includes at least the origin)', () => {
+    expect(jumpsAwayFromRoute([])).toEqual({ kind: 'unknown', reason: 'noRoute' });
+  });
 });

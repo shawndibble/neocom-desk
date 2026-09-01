@@ -980,6 +980,25 @@ describe('jumps-away distance (issue #87)', () => {
     expect(badge).toHaveTextContent('-');
   });
 
+  it('shows "-" with a reason tooltip when the character\'s own location is unavailable', async () => {
+    // A character who hasn't re-consented to esi-location.read_location.v1
+    // yet (the default for every existing user until they next log in) —
+    // this must degrade the badge, not trip the shell-wide re-auth banner.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/location`, () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+      )
+    );
+
+    render(<App />);
+
+    // Both visible stations degrade the same way — no pin needed for either.
+    const badges = await screen.findAllByTitle('Character location unavailable.');
+    expect(badges.length).toBeGreaterThan(0);
+    for (const badge of badges) expect(badge).toHaveTextContent('-');
+    expect(screen.queryByText('Log in again to see your assets')).not.toBeInTheDocument();
+  });
+
   it('lets the user switch route preference, re-requesting the route with the new flag', async () => {
     const user = userEvent.setup();
     const seenFlags: (string | null)[] = [];
@@ -1011,6 +1030,8 @@ describe('jumps-away distance (issue #87)', () => {
     await user.click(screen.getByRole('combobox', { name: 'Route' }));
     await user.click(await screen.findByRole('option', { name: 'Safest' }));
 
-    await waitFor(() => expect(seenFlags).toEqual(['shortest', 'safest']));
+    // ESI's real flag enum is shortest/secure/insecure — "Safest" is this
+    // app's own UI wording, translated to ESI's "secure" at the boundary.
+    await waitFor(() => expect(seenFlags).toEqual(['shortest', 'secure']));
   });
 });

@@ -987,6 +987,26 @@ export function Assets() {
     return keys;
   }, [searchActive, sortedTree]);
 
+  // One flat row list — station headers and tree nodes interleaved in visual
+  // order — feeds the single virtualizer below (issue #86). Search re-prunes
+  // `sortedTree` above, which re-flattens here; there is no separate
+  // search-specific row path. Computed here (rather than down by the render,
+  // where the old pre-virtualization layout had it) because the jumps-away
+  // scoping below needs the virtualizer's visible range.
+  const effectiveExpandedKeys = autoExpandedKeys ?? expandedKeys;
+  const flattenedRows = useMemo(
+    () => flattenAssetRows(sortedTree, effectiveExpandedKeys),
+    [sortedTree, effectiveExpandedKeys]
+  );
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: flattenedRows.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: (index) => estimateRowHeight(flattenedRows[index]),
+    getItemKey: (index) => flattenedRows[index].key,
+    overscan: 12,
+  });
+
   // Jumps-away distances (issue #87): the active character's current solar
   // system, fetched once per page load (not polled) via ESI's location
   // endpoint. Re-fetched whenever the active character changes.
@@ -1013,25 +1033,42 @@ export function Assets() {
     void hydrateRoutePreference();
   }, [hydrateRoutePreference]);
 
-  // Lazy, scoped to pinned stations and ones the user has actually drilled
-  // into (CONTEXT.md round 14: "only for pinned and currently visible/
-  // expanded stations") — every station Panel always renders, so "visible"
-  // alone would mean every station on the page; requiring at least one
-  // expanded descendant (pinned stations auto-expand on load, see above)
-  // keeps this to stations the user is actually looking at, bounding the
-  // route-call fan-out for characters with many stations.
+  // Stations with at least one row (their own header, or a descendant) in
+  // the virtualizer's current visible range — the "currently visible"
+  // half of CONTEXT.md round 14's "only for pinned and currently
+  // visible/expanded stations". Keyed on the range's indices, not
+  // `getVirtualItems()`'s array (a fresh reference every render), so this
+  // only recomputes when the visible window actually moves.
+  const rangeStart = rowVirtualizer.range?.startIndex ?? null;
+  const rangeEnd = rowVirtualizer.range?.endIndex ?? null;
+  const visibleStationLocationIds = useMemo(() => {
+    if (rangeStart === null || rangeEnd === null) return new Set<number>();
+    const ids = new Set<number>();
+    for (let i = rangeStart; i <= rangeEnd; i += 1) {
+      const row = flattenedRows[i];
+      if (!row) continue;
+      ids.add(row.type === 'station' ? row.station.locationId : row.stationLocationId);
+    }
+    return ids;
+  }, [rangeStart, rangeEnd, flattenedRows]);
+
+  // Lazy, scoped to pinned stations, stations in the virtualizer's visible
+  // range, and stations the user has actually drilled into (CONTEXT.md round
+  // 14: "only for pinned and currently visible/expanded stations") — bounds
+  // the route-call fan-out to what's pinned or actually on screen, rather
+  // than every station a character owns.
   const jumpsAwayScopedStations = useMemo(() => {
-    const effectiveExpanded = autoExpandedKeys ?? expandedKeys;
     return sortedTree.filter((station) => {
       if (pinStateFor(station.locationId) !== 'unpinned') return true;
+      if (visibleStationLocationIds.has(station.locationId)) return true;
       const prefix = `${stationRowKey(station.locationId)}/`;
-      for (const key of effectiveExpanded) {
+      for (const key of effectiveExpandedKeys) {
         if (key.startsWith(prefix)) return true;
       }
       return false;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
-  }, [sortedTree, expandedKeys, autoExpandedKeys, pins, activeCharacterId]);
+  }, [sortedTree, effectiveExpandedKeys, visibleStationLocationIds, pins, activeCharacterId]);
 
   // Each station's own solar system id (resolved once, then reused across a
   // preference switch) and the resulting jumps-away result per (station,
@@ -1053,6 +1090,20 @@ export function Assets() {
   );
   const systemIdRequested = useRef<Set<number>>(new Set());
   const jumpsAwayRequested = useRef<Set<string>>(new Set());
+  // Tracks which character an in-flight request was made for. A plain
+  // per-effect `cancelled` closure would also be tripped by an *unrelated*
+  // re-render that merely gives `jumpsAwayScopedStations`/`stationSystemIds`
+  // a new array/Map identity with the same content (e.g. clicking a pin
+  // writes to Dexie, which re-renders `pins` mid-flight) — since the
+  // request is already marked in the refs above, that spurious cancellation
+  // would discard the result and it would never be retried. Comparing
+  // against the character a request was actually made for is the correct,
+  // narrower staleness check: only a real character switch should discard
+  // a write, and the reset effect below already clears state for that case.
+  const activeCharacterIdRef = useRef(activeCharacterId);
+  useEffect(() => {
+    activeCharacterIdRef.current = activeCharacterId;
+  }, [activeCharacterId]);
   useEffect(() => {
     // A fresh character is a fresh page context: a structure's system id is
     // ACL-checked per character, so a previous character's resolved/inflight
@@ -1073,7 +1124,7 @@ export function Assets() {
     if (missing.length === 0) return;
     for (const station of missing) systemIdRequested.current.add(station.locationId);
 
-    let cancelled = false;
+    const requestedForCharacterId = activeCharacterId;
     void mapWithConcurrencyLimit(missing, ESI_FANOUT_CONCURRENCY, async (station) => {
       const systemId =
         station.locationType === 'station'
@@ -1081,12 +1132,10 @@ export function Assets() {
           : station.locationType === 'other'
             ? await loadStructureSystemId(activeCharacterId, station.locationId)
             : null;
-      if (!cancelled)
+      if (activeCharacterIdRef.current === requestedForCharacterId) {
         setStationSystemIds((prev) => new Map(prev).set(station.locationId, systemId));
+      }
     });
-    return () => {
-      cancelled = true;
-    };
   }, [activeCharacterId, jumpsAwayScopedStations, stationSystemIds]);
 
   useEffect(() => {
@@ -1101,7 +1150,7 @@ export function Assets() {
       jumpsAwayRequested.current.add(`${station.locationId}:${routePreference}`);
     }
 
-    let cancelled = false;
+    const requestedForCharacterId = activeCharacterId;
     void mapWithConcurrencyLimit(pending, ESI_FANOUT_CONCURRENCY, async (station) => {
       const key = `${station.locationId}:${routePreference}`;
       let result: JumpsAwayResult;
@@ -1114,11 +1163,10 @@ export function Assets() {
             ? { kind: 'unknown', reason: 'noRoute' }
             : await loadJumpsAway(characterSystemId, systemId, routePreference);
       }
-      if (!cancelled) setJumpsAwayByKey((prev) => new Map(prev).set(key, result));
+      if (activeCharacterIdRef.current === requestedForCharacterId) {
+        setJumpsAwayByKey((prev) => new Map(prev).set(key, result));
+      }
     });
-    return () => {
-      cancelled = true;
-    };
   }, [
     activeCharacterId,
     characterLocationResolved,
@@ -1152,7 +1200,7 @@ export function Assets() {
   }
 
   const renderCtx: RenderCtx = {
-    expandedKeys: autoExpandedKeys ?? expandedKeys,
+    expandedKeys: effectiveExpandedKeys,
     onToggle: toggleKey,
     typeNames: mergedTypeNames,
     t,
@@ -1167,23 +1215,6 @@ export function Assets() {
     onAddToQuickbar: handleAddToQuickbar,
     onShowInfo: handleShowInfo,
   };
-
-  // One flat row list — station headers and tree nodes interleaved in visual
-  // order — feeds the single virtualizer below (issue #86). Search re-prunes
-  // `sortedTree` above, which re-flattens here; there is no separate
-  // search-specific row path.
-  const flattenedRows = useMemo(
-    () => flattenAssetRows(sortedTree, renderCtx.expandedKeys),
-    [sortedTree, renderCtx.expandedKeys]
-  );
-  const scrollParentRef = useRef<HTMLDivElement>(null);
-  const rowVirtualizer = useVirtualizer({
-    count: flattenedRows.length,
-    getScrollElement: () => scrollParentRef.current,
-    estimateSize: (index) => estimateRowHeight(flattenedRows[index]),
-    getItemKey: (index) => flattenedRows[index].key,
-    overscan: 12,
-  });
 
   if (!hydrated) {
     return (

@@ -32,7 +32,10 @@ describe('loadJumpsAway', () => {
     expect(result).toEqual({ kind: 'known', jumps: 2 });
   });
 
-  it('sends the route preference as the flag query param', async () => {
+  it('sends the app\'s "safest" preference as ESI\'s real "secure" flag value', async () => {
+    // ESI's actual /route/ enum is shortest/secure/insecure — verified live
+    // against the endpoint; fastest/safest both 400. "Safest" is this app's
+    // own UI wording (per issue #87), translated at the ESI boundary.
     let capturedFlag: string | null = null;
     server.use(
       http.get(`${ESI_BASE_URL}/route/30000142/30002187`, ({ request }) => {
@@ -43,7 +46,21 @@ describe('loadJumpsAway', () => {
 
     await loadJumpsAway(30000142, 30002187, 'safest');
 
-    expect(capturedFlag).toBe('safest');
+    expect(capturedFlag).toBe('secure');
+  });
+
+  it('sends the app\'s "shortest" preference as ESI\'s "shortest" flag value unchanged', async () => {
+    let capturedFlag: string | null = null;
+    server.use(
+      http.get(`${ESI_BASE_URL}/route/30000142/30002187`, ({ request }) => {
+        capturedFlag = new URL(request.url).searchParams.get('flag');
+        return HttpResponse.json([30000142, 30002187]);
+      })
+    );
+
+    await loadJumpsAway(30000142, 30002187, 'shortest');
+
+    expect(capturedFlag).toBe('shortest');
   });
 
   it('returns unknown/noRoute when the route cannot be resolved', async () => {

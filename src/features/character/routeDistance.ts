@@ -18,6 +18,11 @@ function cacheKey(
   return `route:${originSystemId}:${destinationSystemId}:${preference}`;
 }
 
+/** The app's "Shortest"/"Safest" wording maps to ESI's real `shortest`/`secure` flag values — see `RouteOptions` in `esi/endpoints.ts`. */
+function routeFlagFor(preference: RoutePreference): 'shortest' | 'secure' {
+  return preference === 'safest' ? 'secure' : 'shortest';
+}
+
 export async function loadJumpsAway(
   originSystemId: number,
   destinationSystemId: number,
@@ -27,7 +32,8 @@ export async function loadJumpsAway(
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     cacheKey(originSystemId, destinationSystemId, preference),
-    async () => (await getRoute(originSystemId, destinationSystemId, { flag: preference })).data
+    async () =>
+      (await getRoute(originSystemId, destinationSystemId, { flag: routeFlagFor(preference) })).data
   );
   return jumpsAwayFromRoute(result?.data ?? null);
 }
