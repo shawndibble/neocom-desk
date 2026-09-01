@@ -51,3 +51,17 @@ export interface GlobalMarketEntry {
   regionId: number;
   regionName: string;
 }
+
+/**
+ * One entry in public/data/market/attributes.json — turns a dogma
+ * attribute_id from Item Detail's live ESI read into a display name, unit
+ * and category (CONTEXT.md round 6). Published attributes only; an id
+ * absent here has no display name and is skipped rather than shown raw.
+ */
+export interface AttributeDictionaryEntry {
+  name: string;
+  unit: string | null;
+  category: string;
+}
+
+export type AttributeDictionary = Readonly<Record<number, AttributeDictionaryEntry>>;

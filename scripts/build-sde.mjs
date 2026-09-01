@@ -22,6 +22,9 @@ const FILES = [
   'invTypes.csv',
   'invGroups.csv',
   'dgmTypeAttributes.csv',
+  'dgmAttributeTypes.csv',
+  'dgmAttributeCategories.csv',
+  'eveUnits.csv',
   'industryActivity.csv',
   'industryActivityMaterials.csv',
   'industryActivityProducts.csv',
@@ -556,6 +559,55 @@ async function main() {
   }
   globalMarkets.sort((a, b) => a.typeId - b.typeId);
 
+  // --- market/attributes.json: dgmAttributeTypes -> attribute dictionary
+  // (display name, unit, category), published only. Item Detail (CONTEXT.md
+  // round 6) reads dogma_attributes live from ESI per item; this dictionary
+  // is the small piece the snapshot carries instead, so attribute_ids become
+  // readable without shipping every item's own attributes. An attribute with
+  // no displayName is left out of the dictionary entirely, which is how the
+  // app skips it rather than showing a raw identifier.
+  const attributeCategoryNames = new Map();
+  {
+    const rows = raw['dgmAttributeCategories.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      attributeCategoryNames.set(Number(r[h.categoryID]), r[h.categoryName]);
+    }
+  }
+  const unitDisplayNames = new Map();
+  {
+    const rows = raw['eveUnits.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      unitDisplayNames.set(Number(r[h.unitID]), r[h.displayName]);
+    }
+  }
+  // categoryID 9 is CCP's own dumping ground for "attributes already checked
+  // and not going into a category" — the CSV literally names it "NULL".
+  const OTHER_ATTRIBUTE_CATEGORY = 'Other';
+  const attributeDictionary = {};
+  {
+    const rows = raw['dgmAttributeTypes.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (r[h.published] !== '1') continue;
+      const displayName = r[h.displayName];
+      if (!displayName) continue;
+      const attributeID = Number(r[h.attributeID]);
+      const unitID = r[h.unitID] === '' ? null : Number(r[h.unitID]);
+      const categoryName = attributeCategoryNames.get(Number(r[h.categoryID]));
+      attributeDictionary[attributeID] = {
+        name: displayName,
+        unit: unitID === null ? null : (unitDisplayNames.get(unitID) ?? null),
+        category:
+          !categoryName || categoryName === 'NULL' ? OTHER_ATTRIBUTE_CATEGORY : categoryName,
+      };
+    }
+  }
+
   // --- write outputs (compact) ---
   await mkdir(OUT_DIR, { recursive: true });
   await mkdir(MARKET_OUT_DIR, { recursive: true });
@@ -578,6 +630,7 @@ async function main() {
     ['stations.json', npcStations],
     ['regions.json', marketRegions],
     ['globalMarkets.json', globalMarkets],
+    ['attributes.json', attributeDictionary],
   ];
   for (const [name, data] of marketOutputs) {
     const json = JSON.stringify(data);
@@ -614,12 +667,14 @@ async function main() {
     `  global market regions: ${globalMarketRegions.length} (${globalMarketRegions.map((r) => r.name).join(', ') || 'none'})`
   );
   console.log(`  globally-traded items: ${globalMarkets.length}`);
+  console.log(`  attribute dictionary entries: ${Object.keys(attributeDictionary).length}`);
   if (
     marketGroups.length === 0 ||
     marketTypes.length === 0 ||
     solarSystems.length === 0 ||
     npcStations.length === 0 ||
-    marketRegions.length === 0
+    marketRegions.length === 0 ||
+    Object.keys(attributeDictionary).length === 0
   ) {
     console.error('  FAIL: a market payload came out empty');
     process.exitCode = 1;

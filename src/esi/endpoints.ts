@@ -203,6 +203,8 @@ export interface UniverseType {
   description: string;
   group_id: number;
   published: boolean;
+  /** Absent for types with no volume (e.g. skills, some non-item types). */
+  volume?: number;
   /** Absent for types with no dogma (most non-item types). */
   dogma_attributes?: DogmaAttribute[];
 }

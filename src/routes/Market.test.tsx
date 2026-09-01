@@ -104,6 +104,17 @@ const GLOBAL_MARKETS: GlobalMarketEntry[] = [
   { typeId: PLEX_TYPE_ID, regionId: GPMR_REGION_ID, regionName: 'GPMR-01' },
 ];
 
+// Rifter's own detail attribute (issue #9 "Item Detail"): matches the
+// dogma_attributes fixture the ESI /universe/types/587 handler below returns.
+const STRUCTURE_HITPOINTS_ATTR_ID = 9;
+const ATTRIBUTE_DICTIONARY = {
+  [STRUCTURE_HITPOINTS_ATTR_ID]: {
+    name: 'Structure Hitpoints',
+    unit: 'HP',
+    category: 'Structure',
+  },
+};
+
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketGroups: vi.fn(async () => GROUPS),
   loadMarketTypes: vi.fn(async () => TYPES),
@@ -111,6 +122,7 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadSolarSystems: vi.fn(async () => SYSTEMS),
   loadMarketRegions: vi.fn(async () => REGIONS),
   loadGlobalMarkets: vi.fn(async () => GLOBAL_MARKETS),
+  loadAttributeDictionary: vi.fn(async () => ATTRIBUTE_DICTIONARY),
 }));
 
 const RIFTER_REGION_ID = 10000002; // The Forge (Jita hub's region)
@@ -608,7 +620,7 @@ describe('Market Browser item context menu (issue #6)', () => {
   });
   afterEach(() => configureClipboard(null));
 
-  it('opens on right-click with all five actions, two disabled until their target ships', async () => {
+  it('opens on right-click with all five actions, one disabled until its target ships', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.type(await screen.findByRole('searchbox'), 'rift');
@@ -619,7 +631,9 @@ describe('Market Browser item context menu (issue #6)', () => {
     expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).not.toHaveAttribute(
       'data-disabled'
     );
-    expect(screen.getByRole('menuitem', { name: 'Show info' })).toHaveAttribute('data-disabled');
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).not.toHaveAttribute(
+      'data-disabled'
+    );
     expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).not.toHaveAttribute(
       'data-disabled'
     );
@@ -634,6 +648,39 @@ describe('Market Browser item context menu (issue #6)', () => {
     ).not.toHaveAttribute('data-disabled');
 
     await user.keyboard('{Escape}');
+  });
+
+  it('opens the Item Detail modal from Show info (issue #9), reading live ESI attributes', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/587`, () =>
+        HttpResponse.json({
+          type_id: 587,
+          name: 'Rifter',
+          description: 'A rugged little frigate.',
+          group_id: 25,
+          published: true,
+          volume: 27289,
+          dogma_attributes: [{ attribute_id: STRUCTURE_HITPOINTS_ATTR_ID, value: 1200 }],
+        })
+      )
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const item = await screen.findByText('Rifter');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Rifter' });
+    expect(within(dialog).getByText('A rugged little frigate.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Structure Hitpoints')).toBeInTheDocument();
+    expect(within(dialog).getByText('1,200 HP')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('adds the item to the Compare Set (issue #8), showing the drawer handle', async () => {
@@ -803,6 +850,36 @@ describe('Market Browser order row context menu (issue #6)', () => {
     fireEvent.contextMenu(sellRow);
     await user.click(await screen.findByRole('menuitem', { name: 'Copy price' }));
     expect(writeText).toHaveBeenCalledWith('1,000,000.00 ISK');
+  });
+
+  it('opens the Item Detail modal from an order row (issue #9)', async () => {
+    server.use(
+      ordersHandler({ count: 0 }),
+      http.get(`${ESI_BASE_URL}/universe/types/587`, () =>
+        HttpResponse.json({
+          type_id: 587,
+          name: 'Rifter',
+          description: 'A rugged little frigate.',
+          group_id: 25,
+          published: true,
+          dogma_attributes: [{ attribute_id: STRUCTURE_HITPOINTS_ATTR_ID, value: 1200 }],
+        })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    const [, sellRow] = within(sellTable).getAllByRole('row');
+    sellRow.focus();
+    fireEvent.contextMenu(sellRow);
+
+    await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Rifter' });
+    expect(within(dialog).getByText('Structure Hitpoints')).toBeInTheDocument();
   });
 
   it('filters the book to one station, undone via the banner', async () => {

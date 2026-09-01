@@ -592,7 +592,6 @@
       "addToQuickbar": "Add to Quickbar",
       "showInfo": "Show info",
       "addToCompare": "Add to Compare",
-      "unavailable": "Not available yet",
       "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
       "buildPlan": "Build Plan",
@@ -642,6 +641,12 @@
       "title": "Related Items",
       "noOrders": "No orders",
       "capped": "Showing {{limit}} of {{total}}"
+    },
+    "itemDetail": {
+      "volume": "Volume: {{volume}} m3",
+      "noAttributes": "No fitting attributes for this item.",
+      "errorTitle": "Couldn't load item info",
+      "errorHint": "Try again, or reload the page."
     }
   },
   "error": {
