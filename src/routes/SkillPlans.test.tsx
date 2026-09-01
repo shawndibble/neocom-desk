@@ -440,7 +440,12 @@ describe('CurrentQueuePanel: what ESI knows that /skills does not', () => {
   });
 
   it("shows the training skill's remaining time from ESI's finish_date", async () => {
-    const finish = new Date(Date.now() + 2 * 3600_000).toISOString();
+    // CurrentQueuePanel recomputes secondsRemaining from Date.now() at render
+    // time, and formatDuration floors to whole hours — a finish_date exactly
+    // 2h out is right on that floor's boundary, so any wall-clock time spent
+    // between here and the panel's render (a real risk under CPU contention)
+    // rounds it down to "1h ...". Landing mid-hour instead gives real margin.
+    const finish = new Date(Date.now() + 2 * 3600_000 + 30 * 60_000).toISOString();
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
         HttpResponse.json([
