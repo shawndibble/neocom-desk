@@ -38,7 +38,7 @@
 - EVE refresh tokens never leave the device; per-device SSO login.
 - Trade hubs v1: Jita 4-4 (default), Amarr, Dodixie, Rens, Hek.
 - i18n wired from day one (i18next), English-only catalog until stable.
-- Hosting: https://shawndibble.github.io/neocom-desk (project page).
+- Hosting: https://neocomdesk.com (GitHub Pages, custom domain).
 - Design system: docs/DESIGN.md + hidden /styleguide route; Photon-UI-inspired dark theme.
 
 ## Glossary (round 3 additions)
