@@ -109,6 +109,42 @@ describe('Tooltip touch support', () => {
     fireEvent.pointerDown(outside);
     expect(tooltip.className).toContain('hidden');
   });
+
+  it('resets the auto-dismiss window on a second long-press, instead of closing on the first one’s stale timer', () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="One-line explanation.">
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+    const tooltip = screen.getByRole('tooltip');
+
+    fireEvent.touchStart(trigger);
+    act(() => {
+      vi.advanceTimersByTime(500); // t=500: revealed, first auto-dismiss would fire at t=2000
+    });
+    fireEvent.touchEnd(trigger);
+
+    act(() => {
+      vi.advanceTimersByTime(500); // t=1000
+    });
+    fireEvent.touchStart(trigger);
+    act(() => {
+      vi.advanceTimersByTime(500); // t=1500: second reveal, resets auto-dismiss to fire at t=3000
+    });
+    expect(tooltip.className).not.toContain('hidden');
+
+    act(() => {
+      vi.advanceTimersByTime(500); // t=2000: first press's stale timer must not fire here
+    });
+    expect(tooltip.className).not.toContain('hidden');
+
+    act(() => {
+      vi.advanceTimersByTime(1000); // t=3000: second press's own auto-dismiss fires
+    });
+    expect(tooltip.className).toContain('hidden');
+  });
 });
 
 describe('InfoTooltip', () => {

@@ -44,8 +44,13 @@ export function Tooltip({ content, children }: TooltipProps) {
     clearTimeout(longPressTimer.current);
   }
 
+  function cancelAutoDismiss() {
+    clearTimeout(dismissTimer.current);
+  }
+
   function handleTouchStart() {
     cancelLongPress();
+    cancelAutoDismiss();
     longPressTimer.current = setTimeout(() => {
       setTouchOpen(true);
       dismissTimer.current = setTimeout(() => setTouchOpen(false), TOUCH_AUTO_DISMISS_MS);
@@ -55,7 +60,7 @@ export function Tooltip({ content, children }: TooltipProps) {
   useEffect(() => {
     return () => {
       cancelLongPress();
-      clearTimeout(dismissTimer.current);
+      cancelAutoDismiss();
     };
   }, []);
 
@@ -63,6 +68,7 @@ export function Tooltip({ content, children }: TooltipProps) {
     if (!touchOpen) return;
     function dismissOnOutsideTap(event: PointerEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
+        cancelAutoDismiss();
         setTouchOpen(false);
       }
     }
