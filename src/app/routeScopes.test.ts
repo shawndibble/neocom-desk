@@ -83,6 +83,7 @@ describe('gated routes', () => {
       '/clones',
       '/contacts',
       '/contracts',
+      '/loyalty',
       '/mail',
       '/orders',
       '/planetary-industry',
