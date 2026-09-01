@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -8,6 +8,11 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import {
+  OVERVIEW_GROUPS_SETTING_KEY,
+  useOverviewGroups,
+} from '@/features/character/overviewGroups';
+import { FONT_SCALE_KEY, useFontScale } from '@/lib/fontScale';
 import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
@@ -57,6 +62,8 @@ beforeEach(async () => {
   await db.settings.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   usePublicInfo.setState({ byCharacterId: {} });
+  useOverviewGroups.setState({ value: { groups: [], updatedAt: 0 }, hydrated: false });
+  useFontScale.setState({ value: 1, hydrated: false });
   await db.characters.bulkPut([
     { characterId: 91, name: 'Pilot One', ownerHash: 'oh-1', addedAt: 1 },
     { characterId: 92, name: 'Pilot Two', ownerHash: 'oh-2', addedAt: 2 },
@@ -117,4 +124,106 @@ describe('Characters', () => {
     renderCharacters();
     expect(await screen.findByText(/no characters yet/i)).toBeInTheDocument();
   });
+
+  it('creates a group, moves a character into it, and persists the grouping device-locally', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'New group' }));
+    await user.type(screen.getByRole('textbox', { name: 'New group name' }), 'Miners{Enter}');
+
+    expect(await screen.findByRole('heading', { name: 'Miners' })).toBeInTheDocument();
+
+    const groupSelect = screen.getByRole('combobox', { name: 'Group for Pilot One' });
+    await user.click(groupSelect);
+    await user.click(await screen.findByRole('option', { name: 'Miners' }));
+
+    await waitForSettingsValue(OVERVIEW_GROUPS_SETTING_KEY, (value) => {
+      const groups = (value as { groups: { name: string; characterIds: number[] }[] }).groups;
+      return (
+        groups.length === 1 && groups[0].name === 'Miners' && groups[0].characterIds.includes(91)
+      );
+    });
+  });
+
+  it('renames and reorders groups', async () => {
+    await useOverviewGroups.getState().setValue({
+      groups: [
+        { id: 'a', name: 'Alts', characterIds: [] },
+        { id: 'b', name: 'Mains', characterIds: [] },
+      ],
+      updatedAt: 1,
+    });
+    const user = userEvent.setup();
+    renderCharacters();
+
+    await user.click(await screen.findByRole('button', { name: 'Rename group Alts' }));
+    const input = screen.getByRole('textbox', { name: 'Rename group' });
+    await user.clear(input);
+    await user.type(input, 'Scouts{Enter}');
+    expect(await screen.findByRole('heading', { name: 'Scouts' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Move Mains up' }));
+    await waitForSettingsValue(OVERVIEW_GROUPS_SETTING_KEY, (value) => {
+      const groups = (value as { groups: { id: string }[] }).groups;
+      return groups[0]?.id === 'b';
+    });
+  });
+
+  it('sorts characters by name and reverses direction', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    function firstCardName() {
+      return screen.getAllByRole('button', { name: /^Select /i })[0]?.textContent ?? '';
+    }
+
+    await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
+    await waitFor(() => expect(firstCardName()).toContain('Pilot Two'));
+
+    await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
+    await waitFor(() => expect(firstCardName()).toContain('Pilot One'));
+  });
+
+  it('changes density via the shared font-scale mechanism, not a second one', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Spacious' }));
+    await waitForSettingsValue(FONT_SCALE_KEY, (value) => value === 1.25);
+    expect(useFontScale.getState().value).toBe(1.25);
+  });
+
+  it('drops a character from its group once the character no longer exists', async () => {
+    await useOverviewGroups.getState().setValue({
+      groups: [{ id: 'a', name: 'Alts', characterIds: [91, 999] }],
+      updatedAt: 1,
+    });
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await waitForSettingsValue(OVERVIEW_GROUPS_SETTING_KEY, (value) => {
+      const groups = (value as { groups: { characterIds: number[] }[] }).groups;
+      return groups[0]?.characterIds.length === 1 && groups[0].characterIds[0] === 91;
+    });
+  });
 });
+
+async function waitForSettingsValue(
+  key: string,
+  predicate: (value: unknown) => boolean,
+  timeoutMs = 2000
+): Promise<void> {
+  const start = Date.now();
+  for (;;) {
+    const record = await db.settings.get(key);
+    if (record && predicate(record.value)) return;
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(`Timed out waiting for settings key "${key}" to match predicate`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
