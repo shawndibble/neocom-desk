@@ -129,8 +129,8 @@ function nodeSegment(node: AssetTreeNode): string {
 /**
  * A leaf survives if its own name matches; a container/ship survives if its own name
  * matches OR at least one descendant does (so a non-matching ship isn't dropped out from
- * under a matching item inside it). This keeps search working without making it
- * tree-aware (no ancestor auto-expand) — that refinement is #82's job.
+ * under a matching item inside it). Ancestor auto-expand for the surviving tree is handled
+ * separately, in the `autoExpandedKeys` computation below.
  */
 function pruneNode(node: AssetTreeNode, visibleItemIds: ReadonlySet<number>): AssetTreeNode | null {
   if (node.kind === 'item') return visibleItemIds.has(node.asset.item_id) ? node : null;
@@ -373,7 +373,24 @@ export function Assets() {
     [visibleTree, locationNames, assetsByItemId, typeNames, t]
   );
 
+  // While searching, every surviving branch is by construction an ancestor of a match
+  // (pruneStations already dropped anything that isn't) — force it open so the match is
+  // visible without the user pre-expanding the right path. Toggling/expand-all/collapse-all
+  // are no-ops during search so the manual `expandedKeys` state underneath stays untouched,
+  // and clearing the search restores the prior expand/collapse state exactly.
+  const searchActive = search.trim().length > 0;
+  const autoExpandedKeys = useMemo(() => {
+    if (!searchActive) return null;
+    const keys = new Set<string>();
+    for (const station of sortedTree) {
+      const stationKey = `station:${station.locationId}`;
+      for (const key of collectExpandableKeys(station.children, stationKey)) keys.add(key);
+    }
+    return keys;
+  }, [searchActive, sortedTree]);
+
   function toggleKey(key: string) {
+    if (searchActive) return;
     setExpandedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -383,16 +400,23 @@ export function Assets() {
   }
 
   function expandAll(station: AssetTreeStation, stationKey: string) {
+    if (searchActive) return;
     const keys = collectExpandableKeys(station.children, stationKey);
     setExpandedKeys((prev) => new Set([...prev, ...keys]));
   }
 
   function collapseAll(station: AssetTreeStation, stationKey: string) {
+    if (searchActive) return;
     const keys = new Set(collectExpandableKeys(station.children, stationKey));
     setExpandedKeys((prev) => new Set([...prev].filter((k) => !keys.has(k))));
   }
 
-  const renderCtx: RenderCtx = { expandedKeys, onToggle: toggleKey, typeNames, t };
+  const renderCtx: RenderCtx = {
+    expandedKeys: autoExpandedKeys ?? expandedKeys,
+    onToggle: toggleKey,
+    typeNames,
+    t,
+  };
 
   if (!hydrated) {
     return (
