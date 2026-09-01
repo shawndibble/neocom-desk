@@ -485,7 +485,7 @@
   an empty queue or a stalled/alpha-incapable queue head. ESI exposes no
   Omega/Alpha or subscription field at all (confirmed on CCP's own forums —
   deliberately excluded so characters can't be correlated to one account), so
-  the *cause* can never be distinguished; only this one unified symptom is
+  the _cause_ can never be distinguished; only this one unified symptom is
   detectable. Distinct from **Skill Level Complete**, which fires per
   finished queue entry while training continues.
 - **Market Order Filled**: Fires when any of a Character's market orders
