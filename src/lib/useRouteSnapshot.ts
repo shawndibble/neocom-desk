@@ -56,10 +56,20 @@ export interface RouteSnapshot<T> {
 }
 
 export function useRouteSnapshot<T>(
-  load: (characterId: number, signal: RouteSnapshotSignal) => Promise<T>
+  load: (characterId: number, signal: RouteSnapshotSignal) => Promise<T>,
+  /**
+   * Second case alongside the active-character store: a caller that already
+   * resolved its own character (e.g. a panel embedded in a route that reads
+   * the store itself) supplies it directly. Bypasses the store entirely —
+   * `hydrated` is `true` from the first render, since there is no store wait
+   * to report.
+   */
+  propCharacterId?: number
 ): RouteSnapshot<T> {
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const storeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const storeHydrated = useActiveCharacter((state) => state.hydrated);
+  const activeCharacterId = propCharacterId ?? storeCharacterId;
+  const hydrated = propCharacterId !== undefined ? true : storeHydrated;
 
   const [lifecycle, setLifecycle] = useState<Lifecycle>({
     characterId: activeCharacterId,
