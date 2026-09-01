@@ -3,6 +3,7 @@ import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
 import { db, type BuildPlanRecord, type QuickbarRecord, type SkillPlanRecord } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
+import { remotePurgePendingKey } from './characterPurge';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
   deleteSyncedSetting,
@@ -48,9 +49,9 @@ const fake = vi.hoisted(() => {
   }) => {
     const path = target.col?.path ?? target.path ?? '';
     const filters = target.filters ?? [];
-    const docs = [...(remoteStore.get(path)?.values() ?? [])]
-      .filter((d) => filters.every((f) => (f.op === '==' ? d[f.field] === f.value : true)))
-      .map((data) => ({ data: () => data }));
+    const docs = [...(remoteStore.get(path)?.entries() ?? [])]
+      .filter(([, d]) => filters.every((f) => (f.op === '==' ? d[f.field] === f.value : true)))
+      .map(([id, data]) => ({ id, data: () => data }));
     return { docs };
   };
   return { remoteStore, getDocsImpl };
@@ -375,6 +376,30 @@ describe('triggerSync: ownerHash-scoped reads', () => {
     seedRemote(PLANS_PATH, [remoteDoc({ id: 'stale', ownerHash: 'previous-owner' })]);
     await triggerSync(1);
     expect(await db.skillPlans.get('stale')).toBeUndefined();
+  });
+});
+
+describe('triggerSync: deferred remote purge retry', () => {
+  it('retries and clears a pending remote-purge marker left by a removed character', async () => {
+    await db.settings.put({ key: remotePurgePendingKey(1), value: true });
+    seedRemote(PLANS_PATH, [remoteDoc({ id: 'stale' })]);
+
+    await triggerSync(1);
+
+    // The retry (ensureSignedIn now succeeds, per the module-level mock)
+    // deletes every doc in the character's remote collections before the
+    // normal push/pull below ever runs — an empty local table pulls nothing
+    // back to replace it.
+    expect(remoteStore.get(PLANS_PATH)?.has('stale')).toBe(false);
+    expect(await db.settings.get(remotePurgePendingKey(1))).toBeUndefined();
+  });
+
+  it('does nothing extra when no purge is pending', async () => {
+    seedRemote(PLANS_PATH, [remoteDoc({ id: 'kept' })]);
+
+    await triggerSync(1);
+
+    expect(remoteStore.get(PLANS_PATH)?.has('kept')).toBe(true);
   });
 });
 

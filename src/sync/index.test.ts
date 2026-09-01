@@ -7,6 +7,7 @@ import {
   ensureSignedIn,
   markBuildPlanDeleted,
   markPlanDeleted,
+  purgeCharacterRemoteDataOrDefer,
   scheduleSync,
   setSyncedSetting,
   subscribeSyncStatus,
@@ -25,9 +26,15 @@ vi.mock('./planSync', () => driver);
 const auth = vi.hoisted(() => ({ ensureSignedIn: vi.fn(async () => 'char:1') }));
 vi.mock('./syncAuth', () => auth);
 
+const characterPurge = vi.hoisted(() => ({
+  purgeCharacterRemoteDataOrDefer: vi.fn(async () => true),
+}));
+vi.mock('./characterPurge', () => characterPurge);
+
 beforeEach(() => {
   for (const fn of Object.values(driver)) fn.mockClear();
   auth.ensureSignedIn.mockClear();
+  characterPurge.purgeCharacterRemoteDataOrDefer.mockClear();
 });
 
 describe('lazy sync driver', () => {
@@ -54,6 +61,12 @@ describe('lazy sync driver', () => {
 
   it('forwards ensureSignedIn to the auth bridge', async () => {
     await expect(ensureSignedIn(1)).resolves.toBe('char:1');
+  });
+
+  it('forwards purgeCharacterRemoteDataOrDefer to the character-purge module', async () => {
+    characterPurge.purgeCharacterRemoteDataOrDefer.mockResolvedValueOnce(false);
+    await expect(purgeCharacterRemoteDataOrDefer(7)).resolves.toBe(false);
+    expect(characterPurge.purgeCharacterRemoteDataOrDefer).toHaveBeenCalledWith(7);
   });
 
   it('exposes the status store synchronously, without awaiting the driver', () => {

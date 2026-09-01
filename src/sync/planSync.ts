@@ -33,7 +33,15 @@ import {
   type SkillPlanRecord,
 } from '@/db';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
+import { retryPendingRemotePurge } from './characterPurge';
 import { getSyncFirestore } from './firebaseApp';
+import {
+  buildPlanTombstonesKey,
+  INTERNAL_PREFIX,
+  ownerHashKey,
+  planTombstonesKey,
+  quickbarTombstonesKey,
+} from './localBookkeeping';
 import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
 import {
@@ -57,16 +65,12 @@ import { isAllowedSyncedSettingKey } from './syncedSettings';
 // ---------------------------------------------------------------------------
 
 const SYNCED_PREFIX = 'sync.';
-const INTERNAL_PREFIX = 'sync.__';
-const planTombstonesKey = (characterId: number) => `${INTERNAL_PREFIX}tombstones.${characterId}`;
-const buildPlanTombstonesKey = (characterId: number) =>
-  `${INTERNAL_PREFIX}buildTombstones.${characterId}`;
-// The Quickbar is one record per character, never deleted (only emptied), so
-// this stays empty in practice — kept for symmetry with syncEditableCollection,
-// which needs a tombstone key for every CollectionSpec.
-const quickbarTombstonesKey = (characterId: number) =>
-  `${INTERNAL_PREFIX}quickbarTombstones.${characterId}`;
-const ownerHashKey = (characterId: number) => `${INTERNAL_PREFIX}ownerHash.${characterId}`;
+// Key builders (ownerHashKey, planTombstonesKey, buildPlanTombstonesKey,
+// quickbarTombstonesKey) live in localBookkeeping.ts, Firebase-free, so
+// features/character/removeCharacter.ts can clear them without pulling in
+// Firebase. The Quickbar is one record per character, never deleted (only
+// emptied), so its tombstone key stays empty in practice — kept for symmetry
+// with syncEditableCollection, which needs one for every CollectionSpec.
 const SETTINGS_META_KEY = `${INTERNAL_PREFIX}settingsMeta`;
 // Synced settings are a single global set (not per-character, like plans), so
 // their tombstones live under one global key too — a delete recorded during
@@ -448,6 +452,10 @@ async function syncCharacter(characterId: number): Promise<void> {
   const character = await db.characters.get(characterId);
   if (!character) throw new Error(`Unknown character ${characterId}`);
   await handleOwnerHashChange(character);
+  // A purge deferred by an earlier removal (features/character/removeCharacter)
+  // because the refresh token was dead at the time — retry now that this
+  // Character has authenticated again. No-op the moment nothing is pending.
+  await retryPendingRemotePurge(characterId);
 
   const uid = await ensureSignedIn(characterId);
   const firestore = getSyncFirestore();
