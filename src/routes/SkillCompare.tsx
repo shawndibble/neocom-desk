@@ -12,13 +12,8 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
-import { loadCharacterSkillQueue, loadCharacterSkills } from '@/features/skills/data';
-import { applyCompletedQueueEntries } from '@/features/skills/queueStatus';
-import {
-  loadSkillCatalog,
-  toTrainedSkillsMap,
-  type SkillCatalog,
-} from '@/features/skills/skillMap';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
 import { buildComparisonRows, type ComparisonRow } from '@/features/skills/compareSkills';
 import {
   removeComparison,
@@ -48,17 +43,10 @@ async function loadSkillsForCharacters(characterIds: readonly number[]): Promise
   const skillsByCharacter = new Map<number, ReadonlyMap<number, TrainedSkill>>();
   let oldestFetchedAt: Date | null = null;
   const requests = characterIds.map((characterId) => async () => {
-    const [skills, queue] = await Promise.all([
-      loadCharacterSkills(characterId),
-      loadCharacterSkillQueue(characterId),
-    ]);
-    const trained = toTrainedSkillsMap(skills?.data?.skills ?? []);
-    skillsByCharacter.set(
-      characterId,
-      applyCompletedQueueEntries(trained, queue?.data ?? [], Date.now())
-    );
-    if (skills?.fetchedAt && (!oldestFetchedAt || skills.fetchedAt < oldestFetchedAt)) {
-      oldestFetchedAt = skills.fetchedAt;
+    const corrected = await loadCorrectedSkills(characterId, Date.now());
+    skillsByCharacter.set(characterId, corrected.trained);
+    if (corrected.fetchedAt && (!oldestFetchedAt || corrected.fetchedAt < oldestFetchedAt)) {
+      oldestFetchedAt = corrected.fetchedAt;
     }
   });
   await mapWithConcurrencyLimit(requests, ESI_FANOUT_CONCURRENCY, async (run) => {

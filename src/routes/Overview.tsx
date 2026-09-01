@@ -13,26 +13,22 @@ import {
 } from '@/components/ui';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { beginEveLogin } from '@/app/loginFlow';
-import {
-  loadCharacterSkills,
-  loadCharacterSkillQueueWithStatus,
-  type CachedResult,
-} from '@/features/skills/data';
+import type { CachedResult } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { selectActiveQueueEntry } from './overviewQueue';
-import { completedQueueLevels, completedSpGain } from '@/features/skills/queueStatus';
 
 interface Snapshot {
   walletResult: CachedResult<number> | null;
   walletNeedsReauth: boolean;
   skillsResult: CachedResult<CharacterSkills> | null;
   queueResult: CachedResult<SkillQueueEntry[]> | null;
-  /** SP the finished queue adds to a stale total_sp. */
-  completedSp: number;
+  /** ESI's total_sp corrected for queue entries /skills has not caught up to. */
+  totalSp: number | null;
   /** 401/403 on the queue read means "log in again", not "queue is empty". */
   queueNeedsReauth: boolean;
   catalog: SkillCatalog;
@@ -42,23 +38,18 @@ async function loadOverviewSnapshot(characterId: number): Promise<Snapshot> {
   // Fire-and-forget: the header reads corp/alliance from the store as they
   // arrive, so the panels below must not wait on that chain of public fetches.
   void usePublicInfo.getState().load(characterId);
-  const [wallet, skillsResult, queueStatus, catalog] = await Promise.all([
+  const [wallet, corrected, catalog] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
-    loadCharacterSkills(characterId),
-    loadCharacterSkillQueueWithStatus(characterId),
+    loadCorrectedSkills(characterId, Date.now()),
     loadSkillCatalog(),
   ]);
-  const queueResult = queueStatus.cached;
   return {
     walletResult: wallet.cached,
     walletNeedsReauth: wallet.needsReauth,
-    skillsResult,
-    queueResult,
-    queueNeedsReauth: queueStatus.needsReauth,
-    completedSp: completedSpGain(
-      skillsResult?.data?.skills ?? [],
-      completedQueueLevels(queueResult?.data ?? [], Date.now())
-    ),
+    skillsResult: corrected.skillsResult,
+    queueResult: corrected.queueResult,
+    queueNeedsReauth: corrected.queueNeedsReauth,
+    totalSp: corrected.totalSp,
     catalog,
   };
 }
@@ -90,7 +81,7 @@ export function Overview() {
   const skillsResult = data?.skillsResult ?? null;
   const queueResult = data?.queueResult ?? null;
   const queueNeedsReauth = data?.queueNeedsReauth ?? false;
-  const completedSp = data?.completedSp ?? 0;
+  const totalSp = data?.totalSp ?? null;
   const catalog = data?.catalog ?? null;
 
   // Reads the wall clock to pick "the entry training right now" — unavoidably
@@ -122,11 +113,7 @@ export function Overview() {
         <div className="flex flex-wrap gap-2">
           <StatChip
             label={t('skills.totalSp')}
-            value={
-              skillsResult?.data
-                ? (skillsResult.data.total_sp + completedSp).toLocaleString()
-                : t('common.unknown')
-            }
+            value={totalSp !== null ? totalSp.toLocaleString() : t('common.unknown')}
           />
           <StatChip
             label={t('skills.unallocatedSp')}

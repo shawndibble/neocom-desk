@@ -24,15 +24,10 @@ import {
 import {
   loadCharacterAttributes,
   loadCharacterImplants,
-  loadCharacterSkillQueue,
-  loadCharacterSkillsWithStatus,
   loadUniverseType,
 } from '@/features/skills/data';
-import {
-  completedQueueLevels,
-  completedSpGain,
-  type CompletedLevel,
-} from '@/features/skills/queueStatus';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import type { CompletedLevel } from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
@@ -58,11 +53,14 @@ interface Snapshot {
   attributesResult: CachedResult<CharacterAttributes> | null;
   /**
    * Levels finished in the queue that /skills has not caught up to. ESI says
-   * to apply these on top; computed here so the render stays free of a clock.
+   * to apply these on top; computed by the corrected-skills loader so the
+   * render stays free of a clock.
    */
   completedLevels: Map<number, CompletedLevel>;
   /** SP those credited levels add to ESI's total_sp, which is stale by the same amount. */
   completedSp: number;
+  /** Older of /skills' and the queue's fetchedAt — the true freshness of the corrected total. */
+  fetchedAt: Date | null;
   implantDetails: ImplantDetail[];
   implantBonuses: Implants;
 }
@@ -71,16 +69,13 @@ async function loadSkillsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [skillsStatus, attributesResult, implantsResult, queueResult, catalog] = await Promise.all([
-    loadCharacterSkillsWithStatus(characterId),
+  const [corrected, attributesResult, implantsResult, catalog] = await Promise.all([
+    loadCorrectedSkills(characterId, Date.now()),
     loadCharacterAttributes(characterId),
     loadCharacterImplants(characterId),
-    loadCharacterSkillQueue(characterId),
     loadSkillCatalog(),
   ]);
-  const { cached: skillsResult, needsReauth: skillsNeedsReauth } = skillsStatus;
-  const completedLevels = completedQueueLevels(queueResult?.data ?? [], Date.now());
-  const completedSp = completedSpGain(skillsResult?.data?.skills ?? [], completedLevels);
+  const { skillsResult, skillsNeedsReauth, completedLevels, completedSp, fetchedAt } = corrected;
 
   // Already superseded: skip the per-implant type lookups, their results would
   // be discarded.
@@ -105,6 +100,7 @@ async function loadSkillsSnapshot(
     attributesResult,
     completedLevels,
     completedSp,
+    fetchedAt,
     implantDetails,
     implantBonuses,
   };
@@ -122,6 +118,7 @@ export function Skills() {
   const attributesResult = data?.attributesResult ?? null;
   const completedLevels = data?.completedLevels ?? null;
   const completedSp = data?.completedSp ?? 0;
+  const fetchedAt = data?.fetchedAt ?? null;
   const implantDetails = data?.implantDetails ?? [];
   const implantBonuses = data?.implantBonuses ?? {};
 
@@ -209,7 +206,7 @@ export function Skills() {
           />
         </div>
         <div className="flex items-center gap-2">
-          {skillsResult?.fetchedAt && <DataAgeBadge date={skillsResult.fetchedAt} />}
+          {fetchedAt && <DataAgeBadge date={fetchedAt} />}
           <Button
             size="sm"
             disabled={groups.length === 0 || skillsNeedsReauth}

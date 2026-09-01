@@ -9,6 +9,7 @@ import { db, type CharacterRecord } from '@/db';
 import { readCachedRows, type CachedResult } from '@/esi/cache';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { completedQueueLevels, completedSpGain } from '@/features/skills/queueStatus';
 import { loadWalletBalance, KEYS as WALLET_KEYS } from './wallet';
 import {
   loadCharacterSkills,
@@ -22,6 +23,14 @@ export interface RosterEntry {
   wallet: CachedResult<number> | null;
   skills: CachedResult<CharacterSkills> | null;
   queue: CachedResult<SkillQueueEntry[]> | null;
+  /**
+   * total_sp corrected for queue entries /skills has not caught up to yet —
+   * null when there's no cached/fetched skills row at all. Applied here
+   * (not baked into `skills`) so both read paths below get it without either
+   * one calling the corrected-skills loader, which would refetch instead of
+   * reusing the wallet/skills/queue rows this function already gathered.
+   */
+  correctedTotalSp: number | null;
 }
 
 /** From the owners' exported `KEYS`, so the literal strings cannot drift. */
@@ -47,6 +56,7 @@ async function loadCacheOnly(characters: readonly CharacterRecord[]): Promise<Ro
     wallet: wallets.get(c.characterId) ?? null,
     skills: skills.get(c.characterId) ?? null,
     queue: queues.get(c.characterId) ?? null,
+    correctedTotalSp: null,
   }));
 }
 
@@ -64,6 +74,7 @@ async function loadLive(characters: readonly CharacterRecord[]): Promise<RosterE
     wallet: null,
     skills: null,
     queue: null,
+    correctedTotalSp: null,
   }));
 
   const requests = entries.flatMap((entry) => [
@@ -89,9 +100,35 @@ async function loadLive(characters: readonly CharacterRecord[]): Promise<RosterE
   return entries;
 }
 
-/** Cache-only by default (no live ESI call); `live: true` refreshes with capped concurrency. */
-export async function loadRosterSnapshot(opts?: { live?: boolean }): Promise<RosterEntry[]> {
+/**
+ * Corrects each entry's total_sp for completed-but-unapplied queue entries,
+ * given the wallet/skills/queue rows already gathered — a pure merge over
+ * data in hand, not a second fetch, so it applies equally to both read
+ * paths below (the cache-only path never calls the corrected-skills loader
+ * at all, and must not skip this).
+ */
+function withCorrectedTotalSp(entries: RosterEntry[], nowMs: number): RosterEntry[] {
+  return entries.map((entry) => {
+    if (!entry.skills?.data) return entry;
+    const gain = completedSpGain(
+      entry.skills.data.skills,
+      completedQueueLevels(entry.queue?.data ?? [], nowMs)
+    );
+    return { ...entry, correctedTotalSp: entry.skills.data.total_sp + gain };
+  });
+}
+
+/**
+ * Cache-only by default (no live ESI call); `live: true` refreshes with
+ * capped concurrency. `now` defaults to `Date.now()` — callers may inject it
+ * (as the corrected-skills loader's callers do) to keep this testable.
+ */
+export async function loadRosterSnapshot(opts?: {
+  live?: boolean;
+  now?: number;
+}): Promise<RosterEntry[]> {
   const characters = await db.characters.toArray();
   if (characters.length === 0) return [];
-  return opts?.live ? loadLive(characters) : loadCacheOnly(characters);
+  const entries = opts?.live ? await loadLive(characters) : await loadCacheOnly(characters);
+  return withCorrectedTotalSp(entries, opts?.now ?? Date.now());
 }

@@ -104,12 +104,15 @@ describe('loadRosterSnapshot (cache-only, default)', () => {
     });
     expect(a?.skills?.data).toEqual({ skills: [], total_sp: 500 });
     expect(a?.queue?.data).toEqual([{ skill_id: 1, queue_position: 0, finished_level: 3 }]);
+    // The queue entry above has no finish_date — paused, so it credits nothing.
+    expect(a?.correctedTotalSp).toBe(500);
 
     const b = roster.find((r) => r.characterId === CHAR_B);
     expect(b?.wallet?.data).toBe(2000);
     // B has no cached skills/queue row: null, not a fabricated empty value.
     expect(b?.skills).toBeNull();
     expect(b?.queue).toBeNull();
+    expect(b?.correctedTotalSp).toBeNull();
 
     bulkGetSpy.mockRestore();
   });
@@ -125,6 +128,7 @@ describe('loadRosterSnapshot (cache-only, default)', () => {
       wallet: null,
       skills: null,
       queue: null,
+      correctedTotalSp: null,
     });
   });
 
@@ -160,6 +164,107 @@ describe('loadRosterSnapshot (cache-only, default)', () => {
     // ...but roster must not serve it.
     const [entry] = await loadRosterSnapshot();
     expect(entry.wallet).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// issue #40: the roster's cache-only path is the surface that used to skip
+// the stale-skills correction entirely (it never called the per-character
+// loader, so nothing applied it). Both read paths must credit a finished
+// queue entry the same way.
+// ---------------------------------------------------------------------------
+describe('loadRosterSnapshot: correctedTotalSp', () => {
+  it('credits a queue entry finished in the past on the cache-only path', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedCache(CHAR_A, 'skills', {
+      skills: [{ skill_id: 3300, trained_skill_level: 3, skillpoints_in_skill: 8000 }],
+      total_sp: 264_000,
+    });
+    await seedCache(CHAR_A, 'skillqueue', [
+      {
+        skill_id: 3300,
+        queue_position: 0,
+        finished_level: 4,
+        finish_date: '2020-01-01T00:00:00Z',
+        level_end_sp: 45_255,
+      },
+    ]);
+
+    const [entry] = await loadRosterSnapshot();
+
+    expect(entry.correctedTotalSp).toBe(301_255); // 264,000 + (45,255 - 8,000)
+  });
+
+  it('credits a queue entry finished in the past on the live path', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    vi.mocked(loadWalletBalance).mockResolvedValue(null);
+    vi.mocked(loadCharacterSkills).mockResolvedValue({
+      data: {
+        skills: [
+          {
+            skill_id: 3300,
+            trained_skill_level: 3,
+            active_skill_level: 3,
+            skillpoints_in_skill: 8000,
+          },
+        ],
+        total_sp: 264_000,
+      },
+      fetchedAt: new Date(1),
+      fromCache: false,
+      truncated: false,
+    });
+    vi.mocked(loadCharacterSkillQueue).mockResolvedValue({
+      data: [
+        {
+          skill_id: 3300,
+          queue_position: 0,
+          finished_level: 4,
+          finish_date: '2020-01-01T00:00:00Z',
+          level_end_sp: 45_255,
+        },
+      ],
+      fetchedAt: new Date(1),
+      fromCache: false,
+      truncated: false,
+    });
+
+    const [entry] = await loadRosterSnapshot({ live: true });
+
+    expect(entry.correctedTotalSp).toBe(301_255);
+  });
+
+  it('does not credit a paused queue entry (no finish_date)', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedCache(CHAR_A, 'skills', { skills: [], total_sp: 500 });
+    await seedCache(CHAR_A, 'skillqueue', [{ skill_id: 1, queue_position: 0, finished_level: 5 }]);
+
+    const [entry] = await loadRosterSnapshot();
+
+    expect(entry.correctedTotalSp).toBe(500);
+  });
+
+  it('takes the current time as an injectable parameter, not read internally', async () => {
+    // Keeps this data-layer function clock-free (the same requirement the
+    // corrected-skills loader is built around): the caller decides "now",
+    // not a `Date.now()` buried inside roster.ts.
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedCache(CHAR_A, 'skills', { skills: [], total_sp: 500 });
+    await seedCache(CHAR_A, 'skillqueue', [
+      {
+        skill_id: 1,
+        queue_position: 0,
+        finished_level: 5,
+        finish_date: '2026-06-15T00:00:00Z',
+        level_end_sp: 900,
+      },
+    ]);
+
+    const before = await loadRosterSnapshot({ now: Date.parse('2026-06-01T00:00:00Z') });
+    expect(before[0].correctedTotalSp).toBe(500);
+
+    const after = await loadRosterSnapshot({ now: Date.parse('2026-07-01T00:00:00Z') });
+    expect(after[0].correctedTotalSp).toBe(1400);
   });
 });
 
