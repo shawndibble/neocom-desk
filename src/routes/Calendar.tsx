@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, ReauthBanner, Spinner, Tabs } from '@/components/ui';
+import type { TabItem } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
-import { loadCalendarEvents, loadCalendarEvent } from '@/features/character/calendar';
+import { loadCalendarEvents } from '@/features/character/calendar';
+import { EventDetailModal } from '@/features/character/EventDetailModal';
+import { CalendarMonthView } from '@/features/character/CalendarMonthView';
+import { CalendarWeekView } from '@/features/character/CalendarWeekView';
+import { CalendarAgendaView } from '@/features/character/CalendarAgendaView';
+import { useCalendarView, type CalendarViewMode } from '@/features/character/calendarViewPref';
+import { addMonths, addWeeks, formatMonthLabel, formatWeekLabel } from '@/lib/calendarGrid';
 import type { CachedResult } from '@/esi/cache';
-import type { CalendarEventDetail, CalendarEventSummary } from '@/esi/endpoints';
+import type { CalendarEventSummary } from '@/esi/endpoints';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
-import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { calendarCsvColumns } from '@/features/character/calendarCsv';
 
@@ -17,30 +23,28 @@ interface Snapshot {
   eventsNeedsReauth: boolean;
 }
 
-const RESPONSE_KEY: Record<CalendarEventSummary['event_response'], string> = {
-  accepted: 'calendar.responseAccepted',
-  declined: 'calendar.responseDeclined',
-  tentative: 'calendar.responseTentative',
-  not_responded: 'calendar.responseNotResponded',
-};
-
 async function loadCalendarSnapshot(characterId: number): Promise<Snapshot> {
   const { cached: eventsResult, needsReauth: eventsNeedsReauth } =
     await loadCalendarEvents(characterId);
   return { eventsResult, eventsNeedsReauth };
 }
 
-/** Calendar: upcoming event list + detail on click. Read-only (no respond), cached for offline. */
+/** Calendar: Month/Week/Agenda views + detail modal. Read-only (no respond), cached for offline. */
 export function Calendar() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadCalendarSnapshot);
 
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [detailSnapshot, setDetailSnapshot] = useState<{
-    selectedId: number;
-    result: CachedResult<CalendarEventDetail> | null;
-  } | null>(null);
+  const viewMode = useCalendarView((state) => state.value);
+  const setViewMode = useCalendarView((state) => state.setValue);
+  const hydrateViewMode = useCalendarView((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateViewMode();
+  }, [hydrateViewMode]);
+
+  const [monthAnchor, setMonthAnchor] = useState(() => new Date());
+  const [weekAnchor, setWeekAnchor] = useState(() => new Date());
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEventSummary | null>(null);
 
   const eventsResult = data?.eventsResult ?? null;
   const eventsNeedsReauth = data?.eventsNeedsReauth ?? false;
@@ -50,18 +54,22 @@ export function Calendar() {
     [eventsResult]
   );
 
-  useEffect(() => {
-    if (activeCharacterId === null || selectedId === null) return;
-    let cancelled = false;
-    void loadCalendarEvent(activeCharacterId, selectedId).then((result) => {
-      if (!cancelled) setDetailSnapshot({ selectedId, result });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCharacterId, selectedId]);
+  const tabs: TabItem[] = [
+    { id: 'month', label: t('calendar.viewMonth') },
+    { id: 'week', label: t('calendar.viewWeek') },
+    { id: 'agenda', label: t('calendar.viewAgenda') },
+  ];
 
-  const detail = detailSnapshot?.selectedId === selectedId ? detailSnapshot.result : undefined;
+  function goToday() {
+    const today = new Date();
+    setMonthAnchor(today);
+    setWeekAnchor(today);
+  }
+
+  function expandDay(date: Date) {
+    setWeekAnchor(date);
+    void setViewMode('week');
+  }
 
   if (!hydrated) {
     return (
@@ -73,7 +81,7 @@ export function Calendar() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('calendar.title')}</h1>
         <div className="flex items-center gap-2">
@@ -90,6 +98,45 @@ export function Calendar() {
           </Button>
         </div>
       </header>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs
+          tabs={tabs}
+          value={viewMode}
+          onChange={(id) => void setViewMode(id as CalendarViewMode)}
+          label={t('calendar.viewSwitcherLabel')}
+        />
+        {viewMode !== 'agenda' && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() =>
+                viewMode === 'month'
+                  ? setMonthAnchor((d) => addMonths(d, -1))
+                  : setWeekAnchor((d) => addWeeks(d, -1))
+              }
+            >
+              {viewMode === 'month' ? t('calendar.prevMonth') : t('calendar.prevWeek')}
+            </Button>
+            <Button size="sm" onClick={goToday}>
+              {t('calendar.today')}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() =>
+                viewMode === 'month'
+                  ? setMonthAnchor((d) => addMonths(d, 1))
+                  : setWeekAnchor((d) => addWeeks(d, 1))
+              }
+            >
+              {viewMode === 'month' ? t('calendar.nextMonth') : t('calendar.nextWeek')}
+            </Button>
+            <span className="text-xs font-semibold text-text-dim">
+              {viewMode === 'month' ? formatMonthLabel(monthAnchor) : formatWeekLabel(weekAnchor)}
+            </span>
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -111,52 +158,33 @@ export function Calendar() {
           {eventsResult.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
-          <Panel padded={false}>
-            <ul className="divide-y divide-line">
-              {events.map((event) => (
-                <li key={event.event_id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedId(event.event_id)}
-                    aria-current={selectedId === event.event_id}
-                    className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left text-xs transition-colors hover:bg-panel-2 ${
-                      selectedId === event.event_id ? 'bg-panel-2' : ''
-                    }`}
-                  >
-                    <span className="truncate font-semibold">{event.title}</span>
-                    <span className="truncate text-text-faint">
-                      {new Date(event.event_date).toLocaleString()} ·{' '}
-                      {t(RESPONSE_KEY[event.event_response])}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-
-          <Panel title={selectedId === null ? undefined : t('calendar.title')}>
-            {selectedId === null ? (
-              <p className="text-xs text-text-dim">{t('calendar.selectHint')}</p>
-            ) : detail === undefined ? (
-              <div className="flex justify-center py-4">
-                <Spinner size="sm" label={t('common.loading')} />
-              </div>
-            ) : detail === null ? (
-              <EmptyState title={t('calendar.emptyTitle')} className="py-4" />
-            ) : (
-              <div className="space-y-2 text-xs">
-                <p className="font-semibold">{detail.data.title}</p>
-                <p className="text-text-dim">
-                  {new Date(detail.data.date).toLocaleString()} ·{' '}
-                  {t('calendar.importance', { value: detail.data.importance })}
-                </p>
-                <p className="whitespace-pre-wrap text-text-dim">
-                  {stripEveMarkup(detail.data.text)}
-                </p>
-              </div>
-            )}
-          </Panel>
+          {viewMode === 'month' && (
+            <CalendarMonthView
+              monthAnchor={monthAnchor}
+              events={events}
+              onSelectEvent={setSelectedEvent}
+              onExpandDay={expandDay}
+            />
+          )}
+          {viewMode === 'week' && (
+            <CalendarWeekView
+              weekAnchor={weekAnchor}
+              events={events}
+              onSelectEvent={setSelectedEvent}
+            />
+          )}
+          {viewMode === 'agenda' && (
+            <CalendarAgendaView events={events} onSelectEvent={setSelectedEvent} />
+          )}
         </>
+      )}
+
+      {selectedEvent && activeCharacterId !== null && (
+        <EventDetailModal
+          characterId={activeCharacterId}
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+        />
       )}
     </div>
   );
