@@ -30,6 +30,7 @@ import {
   getCharacterIndustryJobs,
   getMarketsPrices,
   getIndustrySystemCostIndices,
+  getRoute,
 } from './endpoints';
 import type { CharacterSkills, SkillQueueEntry, CharacterAttributes } from './endpoints';
 
@@ -343,6 +344,26 @@ describe('public info endpoints', () => {
     const result = await getUniverseStation(60003760);
 
     expect(result.data?.name).toBe('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+  });
+
+  // ESI's /route/ endpoint 404s on the unversioned path once
+  // X-Compatibility-Date is set (every request here sends it) — confirmed
+  // live against esi.evetech.net: the same call against
+  // /latest/route/{origin}/{destination} succeeds. Every other endpoint
+  // tolerates the unversioned path fine, so this is scoped to getRoute
+  // rather than a global client change.
+  it('getRoute requests the versioned /latest/route/ path', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/latest/route/30003893/30000142`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json([30003893, 30000142]);
+      })
+    );
+
+    const result = await getRoute(30003893, 30000142, { flag: 'shortest' });
+
+    expect(result.data).toEqual([30003893, 30000142]);
   });
 });
 
