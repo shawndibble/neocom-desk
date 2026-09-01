@@ -20,6 +20,7 @@
     "calendar": "Calendar",
     "contracts": "Contracts",
     "contacts": "Contacts",
+    "loyalty": "Loyalty Points",
     "orders": "Orders",
     "settings": "Settings",
     "soon": "Soon",
@@ -643,6 +644,17 @@
     "filterBad": "Bad",
     "reauthTitle": "Log in again to see your contacts",
     "reauthHint": "Log in again to fetch this character's contacts.",
+    "reauthAction": "Log in again with EVE Online"
+  },
+  "loyalty": {
+    "title": "Loyalty Points",
+    "refresh": "Refresh",
+    "emptyTitle": "No loyalty points cached",
+    "emptyHint": "Reconnect to fetch this character's loyalty point balances.",
+    "corporation": "Corporation",
+    "points": "Loyalty Points",
+    "reauthTitle": "Log in again to see your loyalty points",
+    "reauthHint": "Log in again to fetch this character's loyalty point balances.",
     "reauthAction": "Log in again with EVE Online"
   },
   "orders": {
