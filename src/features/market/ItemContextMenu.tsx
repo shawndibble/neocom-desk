@@ -1,10 +1,10 @@
 /**
  * Right-click menu for an item — the tree, search results (same tree,
- * CONTEXT.md round 8) and the Quickbar.
+ * CONTEXT.md round 8), the Quickbar, and the Assets tree (issue #83).
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -12,6 +12,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
+import { parseMarketParams, buildMarketParams } from '@/engine/market/urlState';
 import { useCompareSet } from './compareSet';
 
 export interface ItemContextMenuProps {
@@ -27,7 +28,7 @@ export interface ItemContextMenuProps {
   children: ReactElement;
 }
 
-/** Item context menu: add to Quickbar, show info, add to Compare, copy name, jump to Build Plan. */
+/** Item context menu: add to Quickbar, show info, add to Compare, view in Market, copy name, jump to Build Plan. */
 export function ItemContextMenu({
   typeId,
   itemName,
@@ -40,6 +41,7 @@ export function ItemContextMenu({
 }: ItemContextMenuProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const addToCompare = useCompareSet((state) => state.add);
 
   const buildPlanLabel =
@@ -65,6 +67,28 @@ export function ItemContextMenu({
         </ContextMenuItem>
         <ContextMenuItem onSelect={() => addToCompare({ typeId, itemName })}>
           {t('market.contextMenu.addToCompare')}
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            // Preserves an existing region/hub param when already on
+            // /market (e.g. clicking this from another item's order book —
+            // region wins over hub, matching resolveMarketLocation's own
+            // precedence); a caller arriving from elsewhere (Assets) starts
+            // with neither, so this falls back to the device's Location
+            // Mode default, same as opening /market?type=… fresh.
+            const parsed = parseMarketParams((key) =>
+              new URLSearchParams(location.search).get(key)
+            );
+            const params =
+              parsed.regionId !== null
+                ? buildMarketParams(typeId, { mode: 'region', regionId: parsed.regionId })
+                : parsed.hubId !== null
+                  ? buildMarketParams(typeId, { mode: 'hub', hubId: parsed.hubId })
+                  : { type: String(typeId) };
+            navigate(`/market?${new URLSearchParams(params).toString()}`);
+          }}
+        >
+          {t('market.contextMenu.viewInMarket')}
         </ContextMenuItem>
         <ContextMenuItem onSelect={() => void writeToClipboard(itemName)}>
           {t('market.contextMenu.copyName')}
