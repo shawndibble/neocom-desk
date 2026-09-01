@@ -18,6 +18,8 @@ interface TooltipProps {
   content: string;
   /** Single focusable trigger element (button, etc.) — tooltip reveals on hover or focus. */
   children: ReactElement<{ 'aria-describedby'?: string }>;
+  /** Extra classes for the wrapping span, e.g. `w-full` so a full-width trigger stays full-width. */
+  className?: string;
 }
 
 /**
@@ -33,7 +35,7 @@ interface TooltipProps {
  * action — the long-press timer only starts the reveal, it never calls
  * `preventDefault`.
  */
-export function Tooltip({ content, children }: TooltipProps) {
+export function Tooltip({ content, children, className = '' }: TooltipProps) {
   const id = useId();
   const [touchOpen, setTouchOpen] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
@@ -83,7 +85,7 @@ export function Tooltip({ content, children }: TooltipProps) {
   return (
     <span
       ref={rootRef}
-      className="group relative inline-flex"
+      className={`group relative inline-flex ${className}`}
       onTouchStart={handleTouchStart}
       onTouchEnd={cancelLongPress}
       onTouchMove={cancelLongPress}

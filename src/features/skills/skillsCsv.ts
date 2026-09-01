@@ -4,7 +4,14 @@ import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 export interface SkillGroup {
   groupName: string;
   /** `sp` is null when ESI withheld it: a queue entry credited the level but carried no level_end_sp. */
-  skills: { skillTypeID: number; name: string; level: number; sp: number | null }[];
+  skills: {
+    skillTypeID: number;
+    name: string;
+    level: number;
+    sp: number | null;
+    /** Markup-stripped skill description, for the row's tooltip. Null/absent when the skill has none. */
+    description?: string | null;
+  }[];
 }
 
 export interface SkillCsvRow {

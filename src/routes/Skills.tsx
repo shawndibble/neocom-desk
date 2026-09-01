@@ -10,6 +10,7 @@ import {
   SkillBar,
   Spinner,
   StatChip,
+  Tooltip,
 } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
@@ -141,7 +142,13 @@ export function Skills() {
       const info = catalog.bySkillTypeID.get(skillTypeID);
       const groupName = info?.groupName ?? t('common.unknown');
       const list = byGroup.get(groupName) ?? [];
-      list.push({ skillTypeID, name: info?.name ?? `#${skillTypeID}`, level, sp });
+      list.push({
+        skillTypeID,
+        name: info?.name ?? `#${skillTypeID}`,
+        level,
+        sp,
+        description: info?.description ? stripEveMarkup(info.description) : null,
+      });
       byGroup.set(groupName, list);
     };
     for (const skill of skillsResult.data.skills) {
@@ -320,6 +327,7 @@ export function Skills() {
           {inspector && (
             <SkillInspector
               skillName={inspector.name}
+              description={inspector.description}
               prereqs={inspector.prereqs}
               unlocks={inspector.unlocks}
               onClose={() => setSelectedSkillTypeID(null)}
@@ -384,28 +392,37 @@ export function Skills() {
                       <ul className="divide-y divide-line">
                         {skillsToShow.map((skill) => {
                           const selected = selectedSkillTypeID === skill.skillTypeID;
+                          const row = (
+                            <button
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() =>
+                                setSelectedSkillTypeID((current) =>
+                                  current === skill.skillTypeID ? null : skill.skillTypeID
+                                )
+                              }
+                              className={`flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 ${
+                                selected ? 'bg-panel-2' : ''
+                              }`}
+                            >
+                              <span className="flex-1 truncate">{skill.name}</span>
+                              <SkillBar level={skill.level} />
+                              <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
+                                {skill.sp === null
+                                  ? t('common.unknown')
+                                  : t('skills.sp', { value: skill.sp.toLocaleString() })}
+                              </span>
+                            </button>
+                          );
                           return (
                             <li key={skill.skillTypeID}>
-                              <button
-                                type="button"
-                                aria-pressed={selected}
-                                onClick={() =>
-                                  setSelectedSkillTypeID((current) =>
-                                    current === skill.skillTypeID ? null : skill.skillTypeID
-                                  )
-                                }
-                                className={`flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 ${
-                                  selected ? 'bg-panel-2' : ''
-                                }`}
-                              >
-                                <span className="flex-1 truncate">{skill.name}</span>
-                                <SkillBar level={skill.level} />
-                                <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
-                                  {skill.sp === null
-                                    ? t('common.unknown')
-                                    : t('skills.sp', { value: skill.sp.toLocaleString() })}
-                                </span>
-                              </button>
+                              {skill.description ? (
+                                <Tooltip content={skill.description} className="w-full">
+                                  {row}
+                                </Tooltip>
+                              ) : (
+                                row
+                              )}
                             </li>
                           );
                         })}

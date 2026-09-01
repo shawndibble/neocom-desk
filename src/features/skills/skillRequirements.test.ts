@@ -87,4 +87,18 @@ describe('buildSkillRequirements', () => {
     const result = buildSkillRequirements(withGap, new Map(), 2);
     expect(result?.prereqs).toEqual([{ typeID: 1, name: '#1', level: 1, trained: false }]);
   });
+
+  it('strips EVE markup from the description', () => {
+    const withDescription = catalogOf(
+      [engineSkill({ typeID: 1 })],
+      [sdeSkill({ typeID: 1, name: 'Spaceship Command', description: 'Pilots a <b>ship</b>.' })]
+    );
+    const result = buildSkillRequirements(withDescription, new Map(), 1);
+    expect(result?.description).toBe('Pilots a ship.');
+  });
+
+  it('returns a null description for a skill with no description', () => {
+    const result = buildSkillRequirements(catalog, new Map(), 1);
+    expect(result?.description).toBeNull();
+  });
 });
