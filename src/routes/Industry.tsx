@@ -67,7 +67,7 @@ export function Industry() {
       const [cat, owned, corrected] = await Promise.all([
         loadBlueprintCatalog(),
         loadCharacterBlueprints(activeCharacterId),
-        loadCorrectedSkills(activeCharacterId, Date.now()),
+        loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true }),
       ]);
       if (cancelled) return;
       setCatalog(cat);

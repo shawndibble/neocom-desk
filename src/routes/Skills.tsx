@@ -70,7 +70,7 @@ async function loadSkillsSnapshot(
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
   const [corrected, attributesResult, implantsResult, catalog] = await Promise.all([
-    loadCorrectedSkills(characterId, Date.now()),
+    loadCorrectedSkills(characterId, Date.now(), { skipQueueWithoutScope: true }),
     loadCharacterAttributes(characterId),
     loadCharacterImplants(characterId),
     loadSkillCatalog(),
