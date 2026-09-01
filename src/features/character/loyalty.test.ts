@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCharacterLoyaltyPoints } from './loyalty';
+import { loadCharacterLoyaltyPoints, PARAGON_CORPORATION_ID, splitEverMarks } from './loyalty';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -61,5 +61,30 @@ describe('loadCharacterLoyaltyPoints', () => {
     const result = await loadCharacterLoyaltyPoints(CHAR_ID);
     expect(result.needsReauth).toBe(true);
     expect(result.cached).toBeNull();
+  });
+});
+
+describe('splitEverMarks', () => {
+  it('pulls the Paragon entry out as EverMarks, leaving the rest untouched', () => {
+    const result = splitEverMarks([
+      { corporation_id: 1000167, loyalty_points: 5000 },
+      { corporation_id: PARAGON_CORPORATION_ID, loyalty_points: 250 },
+      { corporation_id: 1000169, loyalty_points: 120 },
+    ]);
+    expect(result.everMarks).toBe(250);
+    expect(result.otherLoyalty).toEqual([
+      { corporation_id: 1000167, loyalty_points: 5000 },
+      { corporation_id: 1000169, loyalty_points: 120 },
+    ]);
+  });
+
+  it('reports zero EverMarks when the character has no Paragon LP', () => {
+    const result = splitEverMarks([{ corporation_id: 1000167, loyalty_points: 5000 }]);
+    expect(result.everMarks).toBe(0);
+    expect(result.otherLoyalty).toEqual([{ corporation_id: 1000167, loyalty_points: 5000 }]);
+  });
+
+  it('handles an empty list', () => {
+    expect(splitEverMarks([])).toEqual({ everMarks: 0, otherLoyalty: [] });
   });
 });

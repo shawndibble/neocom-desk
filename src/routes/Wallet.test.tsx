@@ -83,6 +83,11 @@ const transactions = [
   },
 ];
 
+const loyaltyPayload = [
+  { corporation_id: 1000167, loyalty_points: 5000 },
+  { corporation_id: 1000419, loyalty_points: 250 }, // Paragon — EverMarks
+];
+
 const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.json(4500)),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, ({ request }) => {
@@ -94,7 +99,13 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, ({ request }) => {
     const fromId = new URL(request.url).searchParams.get('from_id');
     return HttpResponse.json(fromId === null ? transactions : []);
-  })
+  }),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>
+    HttpResponse.json(loyaltyPayload)
+  ),
+  http.post('https://esi.evetech.net/universe/names', () =>
+    HttpResponse.json([{ id: 1000167, name: 'Caldari Navy', category: 'corporation' }])
+  )
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -114,7 +125,7 @@ beforeEach(async () => {
     accessToken: 'access-token',
     refreshToken: 'refresh',
     expiresAt: Date.now() + 3_600_000,
-    scopes: ['esi-wallet.read_character_wallet.v1'],
+    scopes: ['esi-wallet.read_character_wallet.v1', 'esi-characters.read_loyalty.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/wallet');
@@ -124,6 +135,39 @@ describe('Wallet', () => {
   it('shows the balance tab by default, from mocked ESI', async () => {
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+  });
+
+  it('shows EverMarks (Paragon LP) alongside ISK, and other loyalty points in a table below', async () => {
+    render(<App />);
+    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(screen.getByText('250')).toBeInTheDocument();
+    expect(screen.getByText('Caldari Navy')).toBeInTheDocument();
+    expect(screen.getByText('5,000')).toBeInTheDocument();
+    // The Paragon corp itself doesn't also show up as a loyalty-table row.
+    expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
+  });
+
+  it('shows the empty state under Loyalty Points when there is no non-EverMarks LP', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>
+        HttpResponse.json([{ corporation_id: 1000419, loyalty_points: 250 }])
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText('250')).toBeInTheDocument();
+    expect(screen.getByText(/no loyalty points cached/i)).toBeInTheDocument();
+  });
+
+  it('shows a re-login prompt under Loyalty Points (not the wallet reauth) when the loyalty scope was revoked', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    expect(screen.getByText('Log in again to see your loyalty points')).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your wallet')).not.toBeInTheDocument();
   });
 
   it('shows the journal, concatenating every page, newest first', async () => {

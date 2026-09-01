@@ -18,6 +18,8 @@ import {
   loadWalletJournal,
   loadWalletTransactions,
 } from '@/features/character/wallet';
+import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
+import { resolveNames } from '@/features/character/names';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
@@ -29,10 +31,15 @@ import {
   transactionTotal,
   walletTransactionsCsvColumns,
 } from '@/features/character/walletTransactionsCsv';
-import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
+import type {
+  CharacterLoyaltyPoints,
+  WalletJournalEntry,
+  WalletTransaction,
+} from '@/esi/endpoints';
 
 /** Stable identity, so the fallback doesn't invalidate the column memos every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
 interface Snapshot {
   balanceResult: CachedResult<number> | null;
@@ -45,25 +52,37 @@ interface Snapshot {
   /** The fetch stopped at the transactions page cap; older history is missing. */
   transactionsTruncated: boolean;
   typeNames: Map<number, string>;
+  loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
+  /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
+  loyaltyNeedsReauth: boolean;
+  corporationNames: Map<number, string>;
 }
 
 async function loadWalletSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [balanceStatus, journalResult, transactionsResult] = await Promise.all([
+  const [balanceStatus, journalResult, transactionsResult, loyaltyStatus] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
     loadWalletJournal(characterId),
     loadWalletTransactions(characterId),
+    loadCharacterLoyaltyPoints(characterId),
   ]);
   const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
+  const { cached: loyaltyResult, needsReauth: loyaltyNeedsReauth } = loyaltyStatus;
   const journalTruncated = journalResult?.truncated ?? false;
   const transactionsTruncated = transactionsResult?.truncated ?? false;
-  // Already superseded: skip the ESI name resolve, its result would be discarded.
+  // Already superseded: skip the ESI name resolves, their results would be discarded.
   const typeIds = signal.cancelled
     ? []
     : [...new Set((transactionsResult?.data ?? []).map((txn) => txn.type_id))];
-  const typeNames = await loadTypeNames(typeIds);
+  const corporationIds = signal.cancelled
+    ? []
+    : (loyaltyResult?.data ?? []).map((entry) => entry.corporation_id);
+  const [typeNames, corporationNames] = await Promise.all([
+    loadTypeNames(typeIds),
+    resolveNames(corporationIds),
+  ]);
   return {
     balanceResult,
     balanceNeedsReauth,
@@ -72,6 +91,9 @@ async function loadWalletSnapshot(
     transactionsResult,
     transactionsTruncated,
     typeNames,
+    loyaltyResult,
+    loyaltyNeedsReauth,
+    corporationNames,
   };
 }
 
@@ -94,6 +116,35 @@ export function Wallet() {
   const transactionsResult = data?.transactionsResult ?? null;
   const transactionsTruncated = data?.transactionsTruncated ?? false;
   const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
+  const loyaltyResult = data?.loyaltyResult ?? null;
+  const loyaltyNeedsReauth = data?.loyaltyNeedsReauth ?? false;
+  const corporationNames = data?.corporationNames ?? NO_NAMES;
+
+  const { everMarks, otherLoyalty } = useMemo(
+    () => splitEverMarks(loyaltyResult?.data ?? []),
+    [loyaltyResult]
+  );
+
+  const loyaltyColumns = useMemo<DataTableColumn<CharacterLoyaltyPoints>[]>(
+    () => [
+      {
+        id: 'corporation',
+        header: t('loyalty.corporation'),
+        render: (entry) => corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
+        sortValue: (entry) =>
+          corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
+      },
+      {
+        id: 'points',
+        header: t('loyalty.points'),
+        align: 'right',
+        className: 'tabular-nums font-semibold',
+        render: (entry) => entry.loyalty_points.toLocaleString(),
+        sortValue: (entry) => entry.loyalty_points,
+      },
+    ],
+    [t, corporationNames]
+  );
 
   const journalColumns = useMemo<DataTableColumn<WalletJournalEntry>[]>(
     () => [
@@ -224,30 +275,80 @@ export function Wallet() {
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : tab === 'balance' ? (
-        <Panel
-          title={t('wallet.balanceTab')}
-          actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
-        >
-          {balanceNeedsReauth ? (
-            <ReauthBanner
-              title={t('wallet.reauthTitle')}
-              hint={t('wallet.reauthHint')}
-              actionLabel={t('wallet.reauthAction')}
-              onLogin={() => void beginEveLogin()}
-            />
-          ) : balanceResult ? (
-            <>
-              <p className={`text-lg font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}>
-                {formatIsk(balanceResult.data, 2)} {t('wallet.isk')}
-              </p>
-              {balanceResult.fromCache && (
-                <p className="mt-1 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
-              )}
-            </>
-          ) : (
-            <EmptyState title={t('wallet.balanceEmpty')} className="py-4" />
-          )}
-        </Panel>
+        <div className="space-y-4">
+          <Panel
+            title={t('wallet.balanceTab')}
+            actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('wallet.isk')}
+                </p>
+                {balanceNeedsReauth ? (
+                  <ReauthBanner
+                    title={t('wallet.reauthTitle')}
+                    hint={t('wallet.reauthHint')}
+                    actionLabel={t('wallet.reauthAction')}
+                    onLogin={() => void beginEveLogin()}
+                  />
+                ) : balanceResult ? (
+                  <p
+                    className={`text-lg font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
+                  >
+                    {formatIsk(balanceResult.data, 2)}
+                  </p>
+                ) : (
+                  <EmptyState title={t('wallet.balanceEmpty')} className="py-4" />
+                )}
+              </div>
+              <div>
+                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('wallet.everMarks')}
+                </p>
+                <p className="text-lg font-medium tabular-nums">
+                  {loyaltyResult && !loyaltyNeedsReauth
+                    ? everMarks.toLocaleString()
+                    : t('common.unknown')}
+                </p>
+              </div>
+            </div>
+            {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
+              <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
+            )}
+          </Panel>
+
+          <Panel
+            padded={false}
+            title={t('loyalty.title')}
+            actions={loyaltyResult ? <DataAgeBadge date={loyaltyResult.fetchedAt} /> : undefined}
+          >
+            {loyaltyNeedsReauth ? (
+              <div className="p-3">
+                <ReauthBanner
+                  title={t('loyalty.reauthTitle')}
+                  hint={t('loyalty.reauthHint')}
+                  actionLabel={t('loyalty.reauthAction')}
+                  onLogin={() => void beginEveLogin()}
+                />
+              </div>
+            ) : !loyaltyResult || otherLoyalty.length === 0 ? (
+              <EmptyState
+                title={t('loyalty.emptyTitle')}
+                hint={t('loyalty.emptyHint')}
+                className="py-8"
+              />
+            ) : (
+              <DataTable
+                label={t('loyalty.title')}
+                columns={loyaltyColumns}
+                rows={otherLoyalty}
+                rowKey={(entry) => entry.corporation_id}
+                defaultSort={{ columnId: 'points', direction: 'desc' }}
+              />
+            )}
+          </Panel>
+        </div>
       ) : tab === 'journal' ? (
         <Panel
           padded={false}
