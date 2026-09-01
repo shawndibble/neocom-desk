@@ -325,3 +325,54 @@
   reads from the same slim SDE snapshot as everywhere else, so a type it
   doesn't cover (a market/asset-only type) shows as unknown rather than
   paying for a live ESI call per hover.
+
+## Scope decisions (round 17) — Skills pages rework
+
+- **Trained page**: skill groups start collapsed, one header toggle each,
+  plus an "Expand all" control; expand/collapse state does not persist across
+  visits. Search filters the group tree in place — the Market Browser's
+  pattern (hide non-matching branches, auto-expand matches, 3-char minimum) —
+  rather than becoming a flat result list. Every skill row carries a
+  hover/focus tooltip with the skill's description (EVE markup stripped, same
+  treatment `ImplantChip` already gives implant descriptions); the same text
+  also appears at the top of `SkillInspector` once a skill is selected.
+- **Skill Plan editing moves to its own route** (`/skills/plans/:planId`),
+  off the list page. "New plan" creates the record immediately (unchanged)
+  and redirects to it. The list page keeps the **Current skill queue** panel
+  (in-game data, character-wide, not plan-specific) plus plan CRUD with
+  icon-only row actions (edit/duplicate/delete) and an in-app `Modal`
+  replacing `window.confirm` on delete.
+- **No plan-switcher sidebar** on the editor page — a back link plus a
+  toolbar pinned above the entry list substitute for it. Import (from
+  in-game queue / from clipboard) and Export live in their own compact area,
+  separate from the pinned toolbar, which carries only reorder/optimize/
+  marker actions — the ones used while actively working the list.
+- **"Your entries" and "Computed queue" merge into one list**: one row per
+  plan entry (not exploded per individual level), draggable, with priority,
+  target level, and an icon-only remove button, plus per-level and cumulative
+  training time. Prerequisite skills the user did not add directly still
+  appear as their own dimmed, non-interactive rows, positioned where the
+  schedule actually trains them.
+- The merged list's optional columns (attribute-pair badge, priority,
+  per-level time, cumulative time) are individually toggleable via a
+  "Columns" control — a device-local view preference (not synced, not
+  per-plan; same category as the Market Browser's Location Mode), all on by
+  default. Narrow screens fold each row to two lines and show cumulative time
+  as a tooltip on the per-level time cell rather than its own column.
+- A grouping toggle switches the list between the existing priority-band
+  grouping and a new attribute-pair grouping. Visual only — drag-and-drop
+  still crosses group boundaries freely, same as priority bands today.
+- **"Suggest reorder"'s preview becomes a `Modal`** (accept/reject a proposed
+  mutation to the plan); "Optimize remaps" and "Optimize at markers" results
+  stay inline — read-only findings to consult, not a decision to commit.
+- Export (to clipboard / to CSV) collapses into one expandable "Export"
+  control instead of two always-visible buttons.
+- **"Optimize remaps" only evaluates the plan's current entry order** — it
+  does not reorder, by design (CONTEXT.md already rules that reorder never
+  applies silently). Its "no remap improves this plan" result, and the button
+  itself, get an explanatory tooltip pointing at "Suggest reorder" for plans
+  that aren't yet attribute-grouped. No change to the optimizer's math.
+- Tooltips (skill descriptions, icon-button labels) get long-press support on
+  touch, added once to the shared `Tooltip` component so every existing
+  usage benefits — CSS `:focus-within` alone is unreliable on touch (notably
+  iOS Safari does not reliably focus a plain `<button>` on tap).
