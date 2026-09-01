@@ -375,7 +375,7 @@ describe('Market Browser', () => {
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
-    await vi.waitFor(() => expect(hits.count).toBe(2));
+    await waitFor(() => expect(hits.count).toBe(2));
   });
 });
 
@@ -420,6 +420,10 @@ describe('Price History tab (issue #11)', () => {
     const historyHits = { count: 0 };
     server.use(
       ordersHandler({ count: 0 }),
+      // Tritanium's Related Items strip includes PLEX (same market group,
+      // fixtures above), whose order book lives at its own Global Market
+      // Region rather than Tritanium's.
+      plexOrdersHandler({ count: 0 }),
       historyHandler(historyHits, RIFTER_REGION_ID, {
         587: [
           {
@@ -529,11 +533,11 @@ describe('Related Items strip (issue #10)', () => {
     await user.click(await screen.findByText('Merlin'));
     await screen.findByRole('table', { name: 'Sell Orders' });
     await screen.findByRole('list', { name: 'Related Items' });
-    await vi.waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(1));
+    await waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(1));
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
-    await vi.waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(2));
+    await waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(2));
     expect(hits.get(MERLIN_TYPE_ID)).toBe(2);
   });
 
@@ -756,7 +760,11 @@ describe('Quickbar unavailable with no active character (issue #7)', () => {
     item.focus();
     fireEvent.contextMenu(item);
 
-    const menuItem = screen.getByRole('menuitem', { name: 'Add to Quickbar' });
+    // Radix's menu positions itself post-mount (Popper), a step that settles
+    // async — every other contextMenu test in this file awaits something
+    // afterward (a menu click, a findBy*) that gives it room; this one must
+    // too, or that settling lands outside `act`.
+    const menuItem = await screen.findByRole('menuitem', { name: 'Add to Quickbar' });
     expect(menuItem).toHaveAttribute('data-disabled');
     expect(menuItem).toHaveAttribute('title', 'Select a character to use the Quickbar');
   });
@@ -993,7 +1001,13 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
 
   it('a globally-traded item reads its Global Market Region regardless of Location Mode, with an explanatory note', async () => {
     const hits = { count: 0 };
-    server.use(plexOrdersHandler(hits));
+    server.use(
+      plexOrdersHandler(hits),
+      // PLEX's Related Items strip includes Tritanium (same market group,
+      // fixtures above), whose order book lives at the Forge region rather
+      // than PLEX's Global Market Region.
+      ordersHandler({ count: 0 })
+    );
     const user = userEvent.setup();
     render(<App />);
 
@@ -1082,7 +1096,13 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   });
 
   it('browser back and forward move through previous selections', async () => {
-    server.use(ordersHandler({ count: 0 }));
+    server.use(
+      ordersHandler({ count: 0 }),
+      // Tritanium's Related Items strip includes PLEX (same market group,
+      // fixtures above), whose order book lives at its own Global Market
+      // Region rather than Tritanium's.
+      plexOrdersHandler({ count: 0 })
+    );
     const user = userEvent.setup();
     render(<App />);
 

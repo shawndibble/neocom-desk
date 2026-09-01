@@ -6,7 +6,16 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist', 'dev-dist', 'coverage', 'playwright-report', 'test-results'] },
+  {
+    ignores: [
+      'dist',
+      'dev-dist',
+      'coverage',
+      'playwright-report',
+      'test-results',
+      '.claude/worktrees',
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended, prettier],
     files: ['**/*.{ts,tsx}'],
@@ -38,6 +47,21 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    // These wrapper files alias radix-ui root/trigger parts under new names
+    // (`export const Select = SelectPrimitive.Root`) per docs/adr/0004 — a
+    // deliberate re-export, not a component definition, so fast-refresh
+    // can't verify these files "only export components" and warns on
+    // every one. Scoped narrowly to the three affected wrappers.
+    files: [
+      'src/components/ui/ContextMenu.tsx',
+      'src/components/ui/DropdownMenu.tsx',
+      'src/components/ui/Select.tsx',
+    ],
+    rules: {
+      'react-refresh/only-export-components': 'off',
     },
   }
 );

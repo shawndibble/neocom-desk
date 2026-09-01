@@ -211,7 +211,11 @@ describe('Characters', () => {
 
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Pilot One'));
     await waitFor(() => expect(screen.queryByText('Pilot One')).not.toBeInTheDocument());
-    expect(await db.characters.get(91)).toBeUndefined();
+    // Folded into waitFor rather than a bare `await db.characters.get(91)`:
+    // a raw Dexie read after the DOM settles still leaves room for a
+    // trailing live-query update (e.g. another mounted component reacting to
+    // the same deletion) to land outside `act`.
+    await waitFor(async () => expect(await db.characters.get(91)).toBeUndefined());
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
   });
 
@@ -277,13 +281,15 @@ async function waitForSettingsValue(
   predicate: (value: unknown) => boolean,
   timeoutMs = 2000
 ): Promise<void> {
-  const start = Date.now();
-  for (;;) {
-    const record = await db.settings.get(key);
-    if (record && predicate(record.value)) return;
-    if (Date.now() - start > timeoutMs) {
-      throw new Error(`Timed out waiting for settings key "${key}" to match predicate`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
+  // A raw setTimeout poll here would race the component's own live-query
+  // subscription: the settings write lands, the component re-renders off
+  // it, and nothing wraps that update in act because this loop isn't part
+  // of React's test rendering. `waitFor` is — it wraps every retry.
+  await waitFor(
+    async () => {
+      const record = await db.settings.get(key);
+      expect(record && predicate(record.value)).toBe(true);
+    },
+    { timeout: timeoutMs }
+  );
 }
