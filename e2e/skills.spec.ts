@@ -18,6 +18,9 @@ test('renders trained skills grouped by SDE group, with SP totals', async ({ pag
   await expect(statChip(page, 'Total SP')).toContainText('264,000');
   await expect(statChip(page, 'Unallocated SP')).toContainText('500');
 
+  // Groups start collapsed; expand everything before asserting on skill rows.
+  await page.getByRole('button', { name: 'Expand all' }).click();
+
   await expect(page.getByRole('heading', { name: 'Spaceship Command' })).toBeVisible();
   await expect(page.getByText('Caldari Frigate')).toBeVisible();
   await expect(page.getByText('256,000 SP')).toBeVisible();

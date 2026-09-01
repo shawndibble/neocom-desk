@@ -27,6 +27,7 @@ import {
   loadUniverseType,
 } from '@/features/skills/data';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { filterSkillGroups } from '@/features/skills/skillGroupFilter';
 import type { CompletedLevel } from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
@@ -174,6 +175,36 @@ export function Skills() {
     return buildSkillRequirements(catalog, trainedSkillsMap, selectedSkillTypeID);
   }, [selectedSkillTypeID, catalog, trainedSkillsMap]);
 
+  // All groups start collapsed on every load (CONTEXT.md round 17); nothing
+  // seeds this set from a previous visit.
+  const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(() => new Set());
+  const [groupSearch, setGroupSearch] = useState('');
+  const filterResult = useMemo(() => filterSkillGroups(groups, groupSearch), [groups, groupSearch]);
+  // While searching, a surviving group is by construction a match — force it
+  // open so the result is visible without the user pre-expanding it. Toggling
+  // is a no-op during search so `expandedGroups` stays untouched underneath,
+  // and clearing the search restores the prior collapse state exactly (same
+  // approach as the Assets tree's search/expand interaction).
+  const searching = filterResult !== null;
+
+  function toggleGroup(groupName: string) {
+    if (searching) return;
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupName)) next.delete(groupName);
+      else next.add(groupName);
+      return next;
+    });
+  }
+  function expandAllGroups() {
+    if (searching) return;
+    setExpandedGroups(new Set(groups.map((group) => group.groupName)));
+  }
+  function collapseAllGroups() {
+    if (searching) return;
+    setExpandedGroups(new Set());
+  }
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -295,39 +326,96 @@ export function Skills() {
             />
           )}
 
-          {groups.map((group) => (
-            <Panel key={group.groupName} title={group.groupName}>
-              <ul className="divide-y divide-line">
-                {group.skills.map((skill) => {
-                  const selected = selectedSkillTypeID === skill.skillTypeID;
-                  return (
-                    <li key={skill.skillTypeID}>
-                      <button
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() =>
-                          setSelectedSkillTypeID((current) =>
-                            current === skill.skillTypeID ? null : skill.skillTypeID
-                          )
-                        }
-                        className={`flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 ${
-                          selected ? 'bg-panel-2' : ''
-                        }`}
-                      >
-                        <span className="flex-1 truncate">{skill.name}</span>
-                        <SkillBar level={skill.level} />
-                        <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
-                          {skill.sp === null
-                            ? t('common.unknown')
-                            : t('skills.sp', { value: skill.sp.toLocaleString() })}
+          {groups.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="search"
+                value={groupSearch}
+                onChange={(e) => setGroupSearch(e.target.value)}
+                placeholder={t('skills.searchPlaceholder')}
+                className="h-9 min-w-48 flex-1 rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
+              />
+              <Button size="sm" onClick={expandAllGroups} disabled={searching}>
+                {t('skills.expandAll')}
+              </Button>
+              <Button size="sm" onClick={collapseAllGroups} disabled={searching}>
+                {t('skills.collapseAll')}
+              </Button>
+            </div>
+          )}
+
+          {searching && filterResult.visibleGroupNames.size === 0 ? (
+            <EmptyState title={t('skills.noResults')} className="py-8" />
+          ) : (
+            groups.map((group) => {
+              if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;
+              const expanded = searching || expandedGroups.has(group.groupName);
+              const skillsToShow = searching
+                ? (filterResult.matchedSkillsByGroup.get(group.groupName) ?? [])
+                : group.skills;
+              return (
+                <section
+                  key={group.groupName}
+                  className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
+                >
+                  <h2>
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      disabled={searching}
+                      onClick={() => toggleGroup(group.groupName)}
+                      className={`flex min-h-8 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 disabled:hover:bg-transparent ${
+                        expanded ? 'border-b' : ''
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
+                          {expanded ? '▾' : '▸'}
                         </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Panel>
-          ))}
+                        {group.groupName}
+                      </span>
+                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-faint">
+                        {skillsToShow.length}
+                      </span>
+                    </button>
+                  </h2>
+                  {expanded && (
+                    <div className="p-3">
+                      <ul className="divide-y divide-line">
+                        {skillsToShow.map((skill) => {
+                          const selected = selectedSkillTypeID === skill.skillTypeID;
+                          return (
+                            <li key={skill.skillTypeID}>
+                              <button
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() =>
+                                  setSelectedSkillTypeID((current) =>
+                                    current === skill.skillTypeID ? null : skill.skillTypeID
+                                  )
+                                }
+                                className={`flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 ${
+                                  selected ? 'bg-panel-2' : ''
+                                }`}
+                              >
+                                <span className="flex-1 truncate">{skill.name}</span>
+                                <SkillBar level={skill.level} />
+                                <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
+                                  {skill.sp === null
+                                    ? t('common.unknown')
+                                    : t('skills.sp', { value: skill.sp.toLocaleString() })}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+                </section>
+              );
+            })
+          )}
         </>
       )}
     </div>

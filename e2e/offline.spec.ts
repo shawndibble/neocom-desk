@@ -18,6 +18,9 @@ test('shows cached character and skills after external hosts go unreachable', as
   await page.getByRole('link', { name: 'Skills' }).click();
   await page.waitForURL(/\/skills$/);
 
+  // Groups start collapsed; expand everything before asserting on skill rows.
+  await page.getByRole('button', { name: 'Expand all' }).click();
+
   // Live data first: no "showing cached data" banner yet.
   await expect(page.getByText('Caldari Frigate')).toBeVisible();
   await expect(page.getByText('Showing cached data')).toHaveCount(0);
@@ -27,6 +30,9 @@ test('shows cached character and skills after external hosts go unreachable', as
 
   // Active character persisted in Dexie settings/characters — no ESI call needed.
   await expect(page.getByRole('link', { name: 'Switch character' })).toContainText(CHARACTER_NAME);
+
+  // The reload resets React state, so groups are collapsed again.
+  await page.getByRole('button', { name: 'Expand all' }).click();
 
   // Skills data served from esiCache: cached rows + the "stale" banner + a data-age badge.
   await expect(page.getByText('Showing cached data')).toBeVisible();
