@@ -47,6 +47,9 @@ export const ROUTE_REQUIREMENTS = {
   // queue carries levels /skills has not caught up to — but a plan still
   // edits and still schedules without any of it.
   '/skills/plans': UNGATED,
+  // Reads each compared character's already-cached skills endpoint (same one
+  // /skills itself uses); no scope of its own to gate on.
+  '/skills/compare': UNGATED,
   // Device-local display preferences only — no ESI endpoint to gate on.
   '/settings': UNGATED,
 

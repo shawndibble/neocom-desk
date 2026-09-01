@@ -21,6 +21,9 @@ export function SkillsSubNav() {
       <NavLink to="/skills/plans" className={subNavClass}>
         {t('skills.plansTab')}
       </NavLink>
+      <NavLink to="/skills/compare" className={subNavClass}>
+        {t('skills.compareTab')}
+      </NavLink>
     </nav>
   );
 }

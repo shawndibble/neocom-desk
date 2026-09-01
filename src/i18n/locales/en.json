@@ -33,6 +33,7 @@
   "skills": {
     "trainedTab": "Trained",
     "plansTab": "Plans",
+    "compareTab": "Compare",
     "totalSp": "Total SP",
     "unallocatedSp": "Unallocated SP",
     "refresh": "Refresh",
@@ -195,6 +196,27 @@
     "headerNoFinish": "—",
     "headerSavingsLabel": "Remap savings",
     "headerSavingsNone": "None"
+  },
+  "skillCompare": {
+    "title": "Compare Skills",
+    "pickCharacters": "Characters to compare",
+    "noneSelectedTitle": "No characters selected",
+    "noneSelectedHint": "Select characters below to compare their trained skills.",
+    "loading": "Loading skills…",
+    "noDataTitle": "No skill data cached",
+    "noDataHint": "Reconnect to fetch trained skills for these characters.",
+    "refresh": "Refresh",
+    "skillColumn": "Skill",
+    "groupColumn": "Group",
+    "tableLabel": "Skill comparison",
+    "saveComparison": "Save comparison",
+    "untitledName": "Untitled comparison",
+    "savedTitle": "Saved comparisons",
+    "savedEmpty": "No saved comparisons yet.",
+    "rename": "Rename",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this saved comparison? This can't be undone.",
+    "someRemoved": "Some characters in this comparison have been removed and are no longer shown."
   },
   "industry": {
     "title": "Build Plans",
