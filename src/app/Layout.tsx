@@ -10,6 +10,7 @@ import { useSyncStatus } from './useSyncStatus';
 import { CharacterAvatar, LogoMark, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { useLockedRoutes } from './useGrantedScopes';
+import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import type { AppRoutePath } from './routeScopes';
 
 /**
@@ -169,6 +170,7 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
 /** App chrome: Neocom-style left rail on desktop, bottom tab bar on mobile. */
 export function Layout() {
   const { t } = useTranslation();
+  useKeyboardShortcuts();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const activeCharacter = useLiveQuery(
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),

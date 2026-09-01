@@ -437,6 +437,39 @@ export function getMarketsPrices(options: EndpointOptions = {}): Promise<EsiResu
   return esiFetch<MarketPrice[]>('/markets/prices', options);
 }
 
+// --- GET /markets/{region_id}/orders (public) ---
+
+export interface RegionOrder {
+  duration: number;
+  is_buy_order: boolean;
+  issued: string;
+  location_id: number;
+  min_volume: number;
+  order_id: number;
+  price: number;
+  range: string;
+  system_id: number;
+  type_id: number;
+  volume_remain: number;
+  volume_total: number;
+}
+
+/**
+ * Every buy/sell order for one item in one region (ADR 0003), paginated
+ * (X-Pages) though a single item rarely exceeds one page — Tritanium in The
+ * Forge, the busiest region, measured 158 orders / 1 page (verified 2026-08-30).
+ */
+export function getMarketOrders(
+  regionId: number,
+  typeId: number,
+  options: EndpointOptions = {}
+): Promise<TruncatableResult<RegionOrder>> {
+  return fetchAllPagesStatus<RegionOrder>(`/markets/${regionId}/orders`, {
+    ...options,
+    query: { order_type: 'all', type_id: typeId },
+  });
+}
+
 // --- GET /industry/systems (public) ---
 
 export interface SystemCostIndexEntry {

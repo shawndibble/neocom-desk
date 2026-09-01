@@ -150,6 +150,10 @@ export const ESI_REGISTRY = {
     route: '/markets/prices',
     scope: PUBLIC,
   },
+  getMarketOrders: {
+    route: '/markets/{region_id}/orders',
+    scope: PUBLIC,
+  },
   getIndustrySystemCostIndices: {
     route: '/industry/systems',
     scope: PUBLIC,
