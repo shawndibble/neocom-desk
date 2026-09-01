@@ -1,8 +1,24 @@
-import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  FilterChip,
+  Panel,
+  ReauthBanner,
+  Spinner,
+} from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
@@ -15,7 +31,11 @@ import { db, type QuickbarItem } from '@/db';
 import { cx } from '@/lib/cx';
 import { useHoverTooltip } from '@/lib/useHoverTooltip';
 import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
-import { loadCharacterAssets } from '@/features/character/assets';
+import {
+  loadCharacterAssets,
+  loadOtherCharactersAssets,
+  type OtherCharacterAssets,
+} from '@/features/character/assets';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';
@@ -23,6 +43,7 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import type { CharacterAsset } from '@/esi/endpoints';
 import { capItems } from '@/lib/cap';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
@@ -48,6 +69,8 @@ export const MAX_RENDERED_ASSETS = 1000;
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_PRICES: ReadonlyMap<number, number> = new Map();
 const NO_VOLUMES: ReadonlyMap<number, number> = new Map();
+const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
+const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
 
 interface Snapshot {
   assetsResult: CachedResult<CharacterAsset[]> | null;
@@ -90,6 +113,27 @@ function locationLabel(
   }
   // Exhaustiveness fallback: every current location_type is handled above.
   return t('assets.structureLabel', { id: locationId });
+}
+
+interface AssetMatch {
+  asset: CharacterAsset;
+  name: string;
+}
+
+/** Name-substring search over a flat asset list, shared by the CSV export path and the on-screen tree path. */
+function matchAssets(
+  assets: readonly CharacterAsset[],
+  typeNames: ReadonlyMap<number, string>,
+  query: string
+): AssetMatch[] {
+  const q = query.trim().toLowerCase();
+  const matches: AssetMatch[] = [];
+  for (const asset of assets) {
+    const name = typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
+    if (q && !name.toLowerCase().includes(q)) continue;
+    matches.push({ asset, name });
+  }
+  return matches;
 }
 
 /** Global average market prices, best-effort — a Fuzzwork/ESI outage degrades badges to 0 rather than the whole page. */
@@ -166,6 +210,69 @@ async function loadAssetsSnapshot(
     priceByTypeId,
     volumeByTypeId,
   };
+}
+
+/** Everything the cross-character search toggle (issue #85) merges into the active Character's own snapshot. */
+interface CrossCharacterData {
+  entries: OtherCharacterAssets[];
+  typeNames: Map<number, string>;
+  locationNames: Map<number, string>;
+  /** Owning Character per asset item_id — item ids are globally unique, so this is safe to merge flat across Characters. */
+  characterIdByItemId: Map<number, number>;
+  characterNameById: Map<number, string>;
+}
+
+/**
+ * Type/location names for every other Character's assets, mirroring
+ * `loadAssetsSnapshot`'s own resolution but per-Character for structures:
+ * `loadStructureName` is ACL-checked and cached per Character (structures.ts),
+ * so a structure must resolve under the Character whose asset actually sits
+ * in it, not the active Character running the search.
+ */
+async function loadCrossCharacterNames(
+  entries: readonly OtherCharacterAssets[]
+): Promise<{ typeNames: Map<number, string>; locationNames: Map<number, string> }> {
+  const allAssets = entries.flatMap((entry) => entry.assets);
+  const typeNames = await loadTypeNames(allAssets.map((a) => a.type_id));
+
+  const locationNames = new Map<number, string>();
+  const stationIds = [
+    ...new Set(allAssets.filter((a) => a.location_type === 'station').map((a) => a.location_id)),
+  ];
+  const resolvedStations = await Promise.all(stationIds.map((id) => loadStationName(id)));
+  stationIds.forEach((id, i) => {
+    const name = resolvedStations[i];
+    if (name) locationNames.set(id, name);
+  });
+
+  await mapWithConcurrencyLimit(entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
+    const structureIds = [
+      ...new Set(entry.assets.filter((a) => a.location_type === 'other').map((a) => a.location_id)),
+    ];
+    await Promise.all(
+      structureIds.map(async (id) => {
+        const name = await loadStructureName(entry.characterId, id);
+        if (name) locationNames.set(id, name);
+      })
+    );
+  });
+
+  return { typeNames, locationNames };
+}
+
+/** Fetches + resolves everything the cross-character search toggle needs, once per toggle-on. */
+async function loadCrossCharacterData(activeCharacterId: number): Promise<CrossCharacterData> {
+  const entries = await loadOtherCharactersAssets(activeCharacterId);
+  const { typeNames, locationNames } = await loadCrossCharacterNames(entries);
+
+  const characterIdByItemId = new Map<number, number>();
+  const characterNameById = new Map<number, string>();
+  for (const entry of entries) {
+    characterNameById.set(entry.characterId, entry.name);
+    for (const asset of entry.assets) characterIdByItemId.set(asset.item_id, entry.characterId);
+  }
+
+  return { entries, typeNames, locationNames, characterIdByItemId, characterNameById };
 }
 
 function nodeSegment(node: AssetTreeNode): string {
@@ -257,11 +364,24 @@ function collectExpandableKeys(nodes: readonly AssetTreeNode[], parentPath: stri
   return keys;
 }
 
+/**
+ * Cross-character search (issue #85): who owns which row, relative to the
+ * active Character — the three pieces always travel together, so they get
+ * one field on `RenderCtx` instead of three. `EMPTY_CHARACTER_BADGES` below
+ * is the off/inactive value: every row resolves to "no badge".
+ */
+interface CharacterBadgeContext {
+  activeCharacterId: number | null;
+  idByItemId: ReadonlyMap<number, number>;
+  nameById: ReadonlyMap<number, string>;
+}
+
 interface RenderCtx {
   expandedKeys: ReadonlySet<string>;
   onToggle: (key: string) => void;
   typeNames: ReadonlyMap<number, string>;
   t: Translate;
+  characterBadges: CharacterBadgeContext;
 }
 
 function formatBadge(totals: { itemCount: number; estimatedValue: number }, t: Translate): string {
@@ -269,6 +389,31 @@ function formatBadge(totals: { itemCount: number; estimatedValue: number }, t: T
     count: totals.itemCount,
     value: formatIsk(totals.estimatedValue),
   });
+}
+
+/** The owning Character's name, only when it isn't the active Character — null means "no badge". */
+function characterBadgeFor(itemId: number, ctx: RenderCtx): string | null {
+  const { activeCharacterId, idByItemId, nameById } = ctx.characterBadges;
+  const ownerId = idByItemId.get(itemId);
+  if (ownerId === undefined || ownerId === activeCharacterId) return null;
+  return nameById.get(ownerId) ?? null;
+}
+
+interface CharacterBadgeProps {
+  characterName: string;
+  t: Translate;
+}
+
+/** Small pill marking a tree row as belonging to a Character other than the active one. */
+function CharacterBadge({ characterName, t }: CharacterBadgeProps) {
+  return (
+    <span
+      className="ml-1.5 shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.625rem] text-text-dim"
+      title={t('assets.crossCharacterBadge', { character: characterName })}
+    >
+      {characterName}
+    </span>
+  );
 }
 
 interface StationPinButtonProps {
@@ -382,6 +527,7 @@ function AssetItemRow({ node, depth, ctx }: AssetItemRowProps) {
     actions.blueprintCatalog === null
       ? undefined
       : (actions.blueprintCatalog.byProductTypeID.get(asset.type_id)?.blueprintTypeID ?? null);
+  const characterBadge = characterBadgeFor(asset.item_id, ctx);
 
   return (
     <li style={{ paddingLeft: `${depth * 0.75 + 0.75}rem` }}>
@@ -406,7 +552,10 @@ function AssetItemRow({ node, depth, ctx }: AssetItemRowProps) {
             {...triggerHandlers}
             className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-accent"
           >
-            <span className="truncate">{name}</span>
+            <span className="flex min-w-0 items-center">
+              <span className="truncate">{name}</span>
+              {characterBadge && <CharacterBadge characterName={characterBadge} t={ctx.t} />}
+            </span>
             <span className="shrink-0 tabular-nums text-text-dim">
               {ctx.t('assets.quantity')} {asset.quantity.toLocaleString()}
             </span>
@@ -461,6 +610,7 @@ function renderAssetNode(
     node.kind === 'bay'
       ? ctx.t(`assets.bay.${node.bay}`)
       : (ctx.typeNames.get(node.asset.type_id) ?? `Type #${node.asset.type_id}`);
+  const characterBadge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, ctx);
 
   return (
     <li key={path}>
@@ -478,6 +628,7 @@ function renderAssetNode(
         ) : (
           <h3 className="truncate font-medium">{label}</h3>
         )}
+        {characterBadge && <CharacterBadge characterName={characterBadge} t={ctx.t} />}
         <span className="ml-auto shrink-0 tabular-nums text-[0.6875rem] text-text-faint">
           {formatBadge(node, ctx.t)}
         </span>
@@ -500,7 +651,39 @@ export function Assets() {
     useRouteSnapshot(loadAssetsSnapshot);
 
   const [search, setSearch] = useState('');
+  const searchActive = search.trim().length > 0;
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set());
+
+  // Cross-character search (issue #85): off by default, and device/session-local
+  // rather than a synced or persisted preference — flipping it on fetches every
+  // other authenticated Character's assets once, reused for the rest of this
+  // search session. A stale `crossCharacterData` left over from a previous
+  // toggle-on is harmless while the toggle is off: `activeCrossCharacterData`
+  // below only reads it when the toggle is on AND a search is active, so
+  // there is nothing to reset on toggle-off.
+  const [crossCharacterSearch, setCrossCharacterSearch] = useState(false);
+  const [crossCharacterData, setCrossCharacterData] = useState<CrossCharacterData | null>(null);
+  const [crossCharacterLoading, setCrossCharacterLoading] = useState(false);
+  useEffect(() => {
+    if (!crossCharacterSearch || activeCharacterId === null) return;
+    let cancelled = false;
+    void (async () => {
+      setCrossCharacterLoading(true);
+      try {
+        const result = await loadCrossCharacterData(activeCharacterId);
+        if (!cancelled) setCrossCharacterData(result);
+      } finally {
+        if (!cancelled) setCrossCharacterLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [crossCharacterSearch, activeCharacterId]);
+  // Only reaches beyond the active Character while an actual search is
+  // active — flipping the toggle on alone doesn't change browsing. Narrowed
+  // (not a plain boolean) so every memo below gets a non-null value for free.
+  const activeCrossCharacterData = crossCharacterSearch && searchActive ? crossCharacterData : null;
 
   // Quickbar (CONTEXT.md): the same Editable Data record the Market
   // Browser's item context menu writes to, keyed by the active character.
@@ -575,57 +758,85 @@ export function Assets() {
   const priceByTypeId = data?.priceByTypeId ?? NO_PRICES;
   const volumeByTypeId = data?.volumeByTypeId ?? NO_VOLUMES;
 
-  const assetsByItemId = useMemo(
+  // CSV export always stays scoped to the active Character's own assets,
+  // regardless of the cross-character toggle — exporting another Character's
+  // items without a character column would misattribute them.
+  const csvAssetsByItemId = useMemo(
     () => new Map((assetsResult?.data ?? []).map((asset) => [asset.item_id, asset])),
     [assetsResult]
   );
+  const csvGroups = useMemo(() => {
+    const matches = matchAssets(assetsResult?.data ?? [], typeNames, search);
 
-  const { csvGroups, shownCount, totalMatches, visibleItemIds } = useMemo(() => {
-    const items = assetsResult?.data ?? [];
-    const query = search.trim().toLowerCase();
-
-    const matches: { asset: CharacterAsset; name: string }[] = [];
-    for (const asset of items) {
-      const name = typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
-      if (query && !name.toLowerCase().includes(query)) continue;
-      matches.push({ asset, name });
+    const byLocation = new Map<number, AssetMatch[]>();
+    for (const entry of matches) {
+      const list = byLocation.get(entry.asset.location_id) ?? [];
+      list.push(entry);
+      byLocation.set(entry.asset.location_id, list);
     }
-    const capped = capItems(matches, MAX_RENDERED_ASSETS);
-
-    const groupEntries = (entries: readonly { asset: CharacterAsset; name: string }[]) => {
-      const byLocation = new Map<number, { asset: CharacterAsset; name: string }[]>();
-      for (const entry of entries) {
-        const list = byLocation.get(entry.asset.location_id) ?? [];
-        list.push(entry);
-        byLocation.set(entry.asset.location_id, list);
-      }
-      return [...byLocation.entries()]
-        .map(([locationId, locationEntries]) => ({
+    return [...byLocation.entries()]
+      .map(([locationId, locationEntries]) => ({
+        locationId,
+        label: locationLabel(
           locationId,
-          label: locationLabel(
-            locationId,
-            locationEntries[0].asset.location_type,
-            locationNames,
-            assetsByItemId,
-            typeNames,
-            t
-          ),
-          entries: locationEntries.sort((a, b) => a.name.localeCompare(b.name)),
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label));
-    };
+          locationEntries[0].asset.location_type,
+          locationNames,
+          csvAssetsByItemId,
+          typeNames,
+          t
+        ),
+        entries: locationEntries.sort((a, b) => a.name.localeCompare(b.name)),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
+  }, [assetsResult, typeNames, locationNames, csvAssetsByItemId, search]);
 
-    // Rendering caps at MAX_RENDERED_ASSETS for paint performance; CSV export
-    // uses the full matched set (still respecting `search`) — a UI cap must
-    // never silently drop rows from the exported file.
+  // Tree/on-screen matching: the active Character's own assets, plus every
+  // other Character's when the cross-character toggle is on and a search is
+  // active (see `crossCharacterActive` above) — merging is safe because
+  // asset item_ids are globally unique across the whole game, not scoped to
+  // one Character.
+  const mergedAssets = useMemo(() => {
+    const own = assetsResult?.data ?? [];
+    if (!activeCrossCharacterData) return own;
+    return [...own, ...activeCrossCharacterData.entries.flatMap((entry) => entry.assets)];
+  }, [assetsResult, activeCrossCharacterData]);
+  const mergedTypeNames = useMemo(() => {
+    if (!activeCrossCharacterData) return typeNames;
+    const merged = new Map(typeNames);
+    for (const [id, name] of activeCrossCharacterData.typeNames) {
+      if (!merged.has(id)) merged.set(id, name);
+    }
+    return merged;
+  }, [typeNames, activeCrossCharacterData]);
+  const mergedLocationNames = useMemo(() => {
+    if (!activeCrossCharacterData) return locationNames;
+    const merged = new Map(locationNames);
+    for (const [id, name] of activeCrossCharacterData.locationNames) {
+      if (!merged.has(id)) merged.set(id, name);
+    }
+    return merged;
+  }, [locationNames, activeCrossCharacterData]);
+  const characterBadges: CharacterBadgeContext = {
+    activeCharacterId,
+    idByItemId: activeCrossCharacterData?.characterIdByItemId ?? EMPTY_ITEM_OWNERS,
+    nameById: activeCrossCharacterData?.characterNameById ?? EMPTY_CHARACTER_NAMES,
+  };
+
+  const assetsByItemId = useMemo(
+    () => new Map(mergedAssets.map((asset) => [asset.item_id, asset])),
+    [mergedAssets]
+  );
+
+  const { shownCount, totalMatches, visibleItemIds } = useMemo(() => {
+    const matches = matchAssets(mergedAssets, mergedTypeNames, search);
+    const capped = capItems(matches, MAX_RENDERED_ASSETS);
     return {
-      csvGroups: groupEntries(matches),
       shownCount: capped.items.length,
       totalMatches: matches.length,
       visibleItemIds: new Set(capped.items.map((m) => m.asset.item_id)),
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
-  }, [assetsResult, typeNames, locationNames, assetsByItemId, search]);
+  }, [mergedAssets, mergedTypeNames, search]);
 
   const renderTruncated = shownCount < totalMatches;
 
@@ -633,8 +844,8 @@ export function Assets() {
   // list so a badge always reflects the character's true holdings — only the rendered
   // rows are capped/filtered, via pruning below.
   const tree = useMemo(
-    () => buildAssetTree(assetsResult?.data ?? [], priceByTypeId),
-    [assetsResult, priceByTypeId]
+    () => buildAssetTree(mergedAssets, priceByTypeId),
+    [mergedAssets, priceByTypeId]
   );
   const visibleTree = useMemo(() => pruneStations(tree, visibleItemIds), [tree, visibleItemIds]);
   const sortedTree = useMemo(
@@ -645,16 +856,16 @@ export function Assets() {
           locationLabel(
             station.locationId,
             station.locationType,
-            locationNames,
+            mergedLocationNames,
             assetsByItemId,
-            typeNames,
+            mergedTypeNames,
             t
           ),
-        typeNames,
+        mergedTypeNames,
         (station) => pinStateFor(station.locationId)
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
-    [visibleTree, locationNames, assetsByItemId, typeNames, t, pins, activeCharacterId]
+    [visibleTree, mergedLocationNames, assetsByItemId, mergedTypeNames, t, pins, activeCharacterId]
   );
 
   // Pinned stations start expanded on page load (issue #84) — the same effect
@@ -689,7 +900,6 @@ export function Assets() {
   // visible without the user pre-expanding the right path. Toggling/expand-all/collapse-all
   // are no-ops during search so the manual `expandedKeys` state underneath stays untouched,
   // and clearing the search restores the prior expand/collapse state exactly.
-  const searchActive = search.trim().length > 0;
   const autoExpandedKeys = useMemo(() => {
     if (!searchActive) return null;
     const keys = new Set<string>();
@@ -725,8 +935,9 @@ export function Assets() {
   const renderCtx: RenderCtx = {
     expandedKeys: autoExpandedKeys ?? expandedKeys,
     onToggle: toggleKey,
-    typeNames,
+    typeNames: mergedTypeNames,
     t,
+    characterBadges,
   };
   const itemActions: AssetItemActions = {
     priceByTypeId,
@@ -783,13 +994,23 @@ export function Assets() {
       </header>
 
       {!loading && assetsResult && !assetsNeedsReauth && (
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('assets.searchPlaceholder')}
-          className="h-9 w-full rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('assets.searchPlaceholder')}
+            className="h-9 min-w-48 flex-1 rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
+          />
+          <FilterChip
+            label={t('assets.crossCharacterToggle')}
+            selected={crossCharacterSearch}
+            onToggle={() => setCrossCharacterSearch((v) => !v)}
+          />
+          {crossCharacterSearch && crossCharacterLoading && (
+            <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
+          )}
+        </div>
       )}
 
       {loading ? (
@@ -832,9 +1053,9 @@ export function Assets() {
                 const label = locationLabel(
                   station.locationId,
                   station.locationType,
-                  locationNames,
+                  mergedLocationNames,
                   assetsByItemId,
-                  typeNames,
+                  mergedTypeNames,
                   t
                 );
                 const pinState = pinStateFor(station.locationId);

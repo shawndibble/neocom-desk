@@ -478,6 +478,9 @@
     "collapseAll": "Collapse all",
     "nodeBadge_one": "{{count}} item · {{value}} ISK",
     "nodeBadge_other": "{{count}} items · {{value}} ISK",
+    "crossCharacterToggle": "Search all characters",
+    "crossCharacterLoading": "Searching other characters…",
+    "crossCharacterBadge": "From {{character}}",
     "bay": {
       "cargoHold": "Cargo Hold",
       "droneBay": "Drone Bay",
