@@ -60,6 +60,14 @@ export function resolveOrderLocation(
   };
 }
 
+/** Trade Hub mode narrows a region's book to one station (CONTEXT.md: "filters the rows down to the hub's own station"). */
+export function filterOrdersByLocation<T extends { location_id: number }>(
+  orders: readonly T[],
+  locationId: number
+): T[] {
+  return orders.filter((o) => o.location_id === locationId);
+}
+
 /** An order's expiry: issued + duration (days). */
 export function orderExpiry(order: { issued: string; duration: number }): Date {
   const issued = new Date(order.issued);

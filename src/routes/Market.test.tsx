@@ -9,6 +9,7 @@ import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
+import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache } from '@/features/market/orderBook';
 import { ESI_BASE_URL } from '@/esi/client';
 import { App } from '@/app/App';
@@ -18,6 +19,8 @@ import type {
   MarketTypeEntry,
   NpcStationEntry,
   SolarSystemEntry,
+  MarketRegionEntry,
+  GlobalMarketEntry,
 } from '@/sde/marketTypes';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -28,6 +31,9 @@ vi.mock('virtual:pwa-register/react', () => ({
   }),
 }));
 
+const PLEX_TYPE_ID = 44992;
+const GPMR_REGION_ID = 19000001;
+
 const GROUPS: MarketGroupNode[] = [
   { id: 1, name: 'Ships', parentId: null, hasTypes: false },
   { id: 2, name: 'Frigates', parentId: 1, hasTypes: true },
@@ -36,6 +42,7 @@ const GROUPS: MarketGroupNode[] = [
 const TYPES: MarketTypeEntry[] = [
   { typeId: 587, name: 'Rifter', marketGroupId: 2 },
   { typeId: 34, name: 'Tritanium', marketGroupId: 3 },
+  { typeId: PLEX_TYPE_ID, name: 'PLEX', marketGroupId: 3 },
 ];
 const STATIONS: NpcStationEntry[] = [
   { id: 60003760, name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: 30000142 },
@@ -43,12 +50,21 @@ const STATIONS: NpcStationEntry[] = [
 const SYSTEMS: SolarSystemEntry[] = [
   { id: 30000142, name: 'Jita', security: 0.9459, regionId: 10000002 },
 ];
+const REGIONS: MarketRegionEntry[] = [
+  { id: 10000002, name: 'The Forge' },
+  { id: 10000043, name: 'Domain' },
+];
+const GLOBAL_MARKETS: GlobalMarketEntry[] = [
+  { typeId: PLEX_TYPE_ID, regionId: GPMR_REGION_ID, regionName: 'GPMR-01' },
+];
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketGroups: vi.fn(async () => GROUPS),
   loadMarketTypes: vi.fn(async () => TYPES),
   loadNpcStations: vi.fn(async () => STATIONS),
   loadSolarSystems: vi.fn(async () => SYSTEMS),
+  loadMarketRegions: vi.fn(async () => REGIONS),
+  loadGlobalMarkets: vi.fn(async () => GLOBAL_MARKETS),
 }));
 
 const RIFTER_REGION_ID = 10000002; // The Forge (Jita hub's region)
@@ -63,7 +79,7 @@ function ordersHandler(hits: { count: number }) {
           type_id: 587,
           is_buy_order: false,
           price: 1000000,
-          location_id: 60003760, // Jita 4-4, a known NPC station
+          location_id: 60003760, // Jita 4-4, the hub's own station
           system_id: 30000142,
           volume_remain: 5,
           volume_total: 10,
@@ -77,7 +93,7 @@ function ordersHandler(hits: { count: number }) {
           type_id: 587,
           is_buy_order: true,
           price: 500000,
-          location_id: 1035466617946, // player structure, not in STATIONS
+          location_id: 60003760, // Jita 4-4, the hub's own station
           system_id: 30000142,
           volume_remain: 3,
           volume_total: 3,
@@ -85,6 +101,45 @@ function ordersHandler(hits: { count: number }) {
           duration: 90,
           issued: '2026-08-01T00:00:00Z',
           range: '5',
+        },
+        {
+          order_id: 3,
+          type_id: 587,
+          is_buy_order: false,
+          price: 2000000,
+          location_id: 1035466617946, // player structure elsewhere in the region, not in STATIONS
+          system_id: 30000142,
+          volume_remain: 1,
+          volume_total: 1,
+          min_volume: 1,
+          duration: 90,
+          issued: '2026-08-01T00:00:00Z',
+          range: 'region',
+        },
+      ],
+      { headers: { 'X-Pages': '1' } }
+    );
+  });
+}
+
+function plexOrdersHandler(hits: { count: number }) {
+  return http.get(`${ESI_BASE_URL}/markets/${GPMR_REGION_ID}/orders`, () => {
+    hits.count += 1;
+    return HttpResponse.json(
+      [
+        {
+          order_id: 10,
+          type_id: PLEX_TYPE_ID,
+          is_buy_order: false,
+          price: 3000000,
+          location_id: 60003760, // PLEX orders still carry ordinary station ids
+          system_id: 30000142,
+          volume_remain: 267,
+          volume_total: 267,
+          min_volume: 1,
+          duration: 90,
+          issued: '2026-08-01T00:00:00Z',
+          range: 'region',
         },
       ],
       { headers: { 'X-Pages': '1' } }
@@ -106,6 +161,7 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useMarketHub.setState({ value: 'jita', hydrated: false });
+  useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
   clearOrderBookCache();
   window.history.pushState({}, '', '/market');
 });
@@ -149,9 +205,6 @@ describe('Market Browser', () => {
 
     const buyTable = await screen.findByRole('table', { name: 'Buy Orders' });
     expect(within(buyTable).getByText('500,000.00')).toBeInTheDocument();
-    // Player-structure order is never dropped — shown with an unknown-structure label.
-    expect(within(buyTable).getByText('Unknown Structure', { exact: false })).toBeInTheDocument();
-    expect(within(buyTable).getByText('Jita (0.9)', { exact: false })).toBeInTheDocument();
 
     expect(screen.getByText('just now')).toBeInTheDocument();
   });
@@ -170,6 +223,71 @@ describe('Market Browser', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
     await vi.waitFor(() => expect(hits.count).toBe(2));
+  });
+});
+
+describe('Location Mode and the Global Market Region (issue #3)', () => {
+  it("Trade Hub mode filters the order book down to the hub's own station", async () => {
+    const hits = { count: 0 };
+    server.use(ordersHandler(hits));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
+    expect(within(sellTable).queryByText('2,000,000.00')).not.toBeInTheDocument();
+  });
+
+  it('Region mode shows every station in the region, including ones Trade Hub mode hides', async () => {
+    const hits = { count: 0 };
+    server.use(ordersHandler(hits));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    await screen.findByRole('table', { name: 'Sell Orders' });
+
+    await user.click(screen.getByRole('button', { name: 'Region' }));
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('2,000,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('Unknown Structure', { exact: false })).toBeInTheDocument();
+    // Same region as Trade Hub mode was already fetched, so this is the cached result, not a refetch.
+    expect(hits.count).toBe(1);
+  });
+
+  it('the Region select offers only Market Regions', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Region' }));
+
+    const regionSelect = await screen.findByRole('combobox', { name: 'Region' });
+    expect(
+      within(regionSelect)
+        .getAllByRole('option')
+        .map((o) => o.textContent)
+    ).toEqual(['The Forge', 'Domain']);
+  });
+
+  it('a globally-traded item reads its Global Market Region regardless of Location Mode, with an explanatory note', async () => {
+    const hits = { count: 0 };
+    server.use(plexOrdersHandler(hits));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'plex');
+    await user.click(await screen.findByText('PLEX'));
+
+    expect(await screen.findByText(/GPMR-01/)).toBeInTheDocument();
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    // PLEX orders still carry ordinary station ids, so Trade Hub mode's Jita filter still applies.
+    expect(within(sellTable).getByText('3,000,000.00')).toBeInTheDocument();
+    expect(hits.count).toBe(1);
   });
 });
 
