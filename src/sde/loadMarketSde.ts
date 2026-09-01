@@ -12,6 +12,7 @@ import type {
   NpcStationEntry,
   MarketRegionEntry,
   GlobalMarketEntry,
+  AttributeDictionary,
 } from './marketTypes';
 
 async function fetchJson<T>(file: string): Promise<T> {
@@ -37,3 +38,4 @@ export const loadSolarSystems = cached<SolarSystemEntry[]>('systems.json');
 export const loadNpcStations = cached<NpcStationEntry[]>('stations.json');
 export const loadMarketRegions = cached<MarketRegionEntry[]>('regions.json');
 export const loadGlobalMarkets = cached<GlobalMarketEntry[]>('globalMarkets.json');
+export const loadAttributeDictionary = cached<AttributeDictionary>('attributes.json');

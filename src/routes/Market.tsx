@@ -45,6 +45,7 @@ import {
 import { formatVolume, formatOrderLocationText } from '@/features/market/format';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
+import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
 import { QuickbarList } from '@/features/market/QuickbarList';
@@ -126,6 +127,7 @@ interface MarketGroupTreeProps {
   onRequestBlueprintCatalog: () => void;
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 function MarketGroupTree({
@@ -140,6 +142,7 @@ function MarketGroupTree({
   onRequestBlueprintCatalog,
   onAddToQuickbar,
   quickbarAvailable,
+  onShowInfo,
 }: MarketGroupTreeProps) {
   const filtering = filterResult !== null;
 
@@ -186,6 +189,7 @@ function MarketGroupTree({
                     blueprintTypeID={blueprintTypeID}
                     onAddToQuickbar={onAddToQuickbar}
                     quickbarAvailable={quickbarAvailable}
+                    onShowInfo={onShowInfo}
                     onOpenChange={(open) => {
                       if (open) onRequestBlueprintCatalog();
                     }}
@@ -275,6 +279,16 @@ export function Market() {
   }
   function handleReorderQuickbar(activeTypeId: number, overTypeId: number) {
     void writeQuickbar(reorderQuickbarItems(quickbarItems, activeTypeId, overTypeId));
+  }
+
+  // Item Detail (CONTEXT.md round 6): opened from the item context menu
+  // (tree/search/Quickbar) or an order row's context menu, both of which
+  // only know the target item, not the whole selection state.
+  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
+    null
+  );
+  function handleShowInfo(typeId: number, itemName: string) {
+    setInfoModalItem({ typeId, itemName });
   }
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
@@ -713,6 +727,9 @@ export function Market() {
         npcStations={npcStationMap}
         solarSystems={solarSystemMap}
         onFilterToStation={setStationFilter}
+        typeId={selectedTypeId ?? 0}
+        itemName={selectedItem?.name ?? ''}
+        onShowInfo={handleShowInfo}
       />
     );
   }
@@ -975,6 +992,7 @@ export function Market() {
                 onRequestBlueprintCatalog={ensureBlueprintCatalog}
                 onAddToQuickbar={handleAddToQuickbar}
                 quickbarAvailable={activeCharacterId !== null}
+                onShowInfo={handleShowInfo}
               />
             </div>
           )}
@@ -1141,6 +1159,14 @@ export function Market() {
           locationMode={locationModeValue.mode}
           hubStationId={hub.stationId}
           refreshTick={refreshTick}
+        />
+      )}
+
+      {infoModalItem && (
+        <ItemDetailModal
+          typeId={infoModalItem.typeId}
+          itemName={infoModalItem.itemName}
+          onClose={() => setInfoModalItem(null)}
         />
       )}
     </div>

@@ -1,7 +1,6 @@
 /**
  * Right-click menu for an item — the tree, search results (same tree,
- * CONTEXT.md round 8) and the Quickbar. Show info has no target yet
- * (#6-detail-modal).
+ * CONTEXT.md round 8) and the Quickbar.
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +22,7 @@ export interface ItemContextMenuProps {
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   /** False with no active character — the Quickbar has nobody to save the item under. */
   quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }
@@ -34,6 +34,7 @@ export function ItemContextMenu({
   blueprintTypeID,
   onAddToQuickbar,
   quickbarAvailable,
+  onShowInfo,
   onOpenChange,
   children,
 }: ItemContextMenuProps) {
@@ -59,7 +60,7 @@ export function ItemContextMenu({
         >
           {t('market.contextMenu.addToQuickbar')}
         </ContextMenuItem>
-        <ContextMenuItem disabled title={t('market.contextMenu.unavailable')}>
+        <ContextMenuItem onSelect={() => onShowInfo(typeId, itemName)}>
           {t('market.contextMenu.showInfo')}
         </ContextMenuItem>
         <ContextMenuItem onSelect={() => addToCompare({ typeId, itemName })}>
