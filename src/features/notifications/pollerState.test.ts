@@ -4,6 +4,9 @@ import type {
   SkillQueueSnapshot,
   IndustryJobSnapshot,
   PlanetarySnapshot,
+  MailSnapshot,
+  CalendarSnapshot,
+  ContractSnapshot,
 } from '@/engine/notificationDiffs';
 import {
   useSkillQueuePollerState,
@@ -18,6 +21,18 @@ import {
   COLONY_POLLER_STATE_KEY,
   DEFAULT_COLONY_POLLER_STATE,
   withCharacterColonySnapshot,
+  useMailPollerState,
+  MAIL_POLLER_STATE_KEY,
+  DEFAULT_MAIL_POLLER_STATE,
+  withCharacterMailSnapshot,
+  useCalendarPollerState,
+  CALENDAR_POLLER_STATE_KEY,
+  DEFAULT_CALENDAR_POLLER_STATE,
+  withCharacterCalendarSnapshot,
+  useContractPollerState,
+  CONTRACT_POLLER_STATE_KEY,
+  DEFAULT_CONTRACT_POLLER_STATE,
+  withCharacterContractSnapshot,
 } from './pollerState';
 
 const SNAPSHOT: SkillQueueSnapshot = {
@@ -32,6 +47,21 @@ const JOB_SNAPSHOT: IndustryJobSnapshot = {
 
 const COLONY_SNAPSHOT: PlanetarySnapshot = {
   colonies: [{ planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: 12345 }] }],
+  nowMs: 999,
+};
+
+const MAIL_SNAPSHOT: MailSnapshot = {
+  entries: [{ mailId: 5 }],
+  nowMs: 999,
+};
+
+const CALENDAR_SNAPSHOT: CalendarSnapshot = {
+  entries: [{ calendarEventId: 1, startMs: 12345 }],
+  nowMs: 999,
+};
+
+const CONTRACT_SNAPSHOT: ContractSnapshot = {
+  entries: [{ contractId: 1, status: 'in_progress' }],
   nowMs: 999,
 };
 
@@ -160,5 +190,120 @@ describe('withCharacterColonySnapshot', () => {
   it('sets one character snapshot without disturbing others', () => {
     const next = withCharacterColonySnapshot({ 2: COLONY_SNAPSHOT }, 7, COLONY_SNAPSHOT);
     expect(next).toEqual({ 2: COLONY_SNAPSHOT, 7: COLONY_SNAPSHOT });
+  });
+});
+
+beforeEach(async () => {
+  useMailPollerState.setState({ value: DEFAULT_MAIL_POLLER_STATE, hydrated: false });
+  useCalendarPollerState.setState({ value: DEFAULT_CALENDAR_POLLER_STATE, hydrated: false });
+  useContractPollerState.setState({ value: DEFAULT_CONTRACT_POLLER_STATE, hydrated: false });
+});
+
+describe('useMailPollerState', () => {
+  it('defaults to no prior snapshots, unhydrated', () => {
+    expect(useMailPollerState.getState().value).toEqual(DEFAULT_MAIL_POLLER_STATE);
+    expect(useMailPollerState.getState().hydrated).toBe(false);
+  });
+
+  it('persists to Dexie under a non-syncing key', async () => {
+    expect(MAIL_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
+    await useMailPollerState.getState().setValue({ 7: MAIL_SNAPSHOT });
+    expect((await db.settings.get(MAIL_POLLER_STATE_KEY))?.value).toEqual({ 7: MAIL_SNAPSHOT });
+  });
+
+  it('hydrates a persisted value', async () => {
+    await db.settings.put({ key: MAIL_POLLER_STATE_KEY, value: { 7: MAIL_SNAPSHOT } });
+    await useMailPollerState.getState().hydrate();
+    expect(useMailPollerState.getState().value).toEqual({ 7: MAIL_SNAPSHOT });
+  });
+
+  it('falls back to the default when the stored value has the wrong shape', async () => {
+    await db.settings.put({ key: MAIL_POLLER_STATE_KEY, value: { 7: { entries: 'nope' } } });
+    await useMailPollerState.getState().hydrate();
+    expect(useMailPollerState.getState().value).toEqual(DEFAULT_MAIL_POLLER_STATE);
+  });
+});
+
+describe('withCharacterMailSnapshot', () => {
+  it('sets one character snapshot without disturbing others', () => {
+    const next = withCharacterMailSnapshot({ 2: MAIL_SNAPSHOT }, 7, MAIL_SNAPSHOT);
+    expect(next).toEqual({ 2: MAIL_SNAPSHOT, 7: MAIL_SNAPSHOT });
+  });
+});
+
+describe('useCalendarPollerState', () => {
+  it('defaults to no prior snapshots, unhydrated', () => {
+    expect(useCalendarPollerState.getState().value).toEqual(DEFAULT_CALENDAR_POLLER_STATE);
+    expect(useCalendarPollerState.getState().hydrated).toBe(false);
+  });
+
+  it('persists to Dexie under a non-syncing key', async () => {
+    expect(CALENDAR_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
+    await useCalendarPollerState.getState().setValue({ 7: CALENDAR_SNAPSHOT });
+    expect((await db.settings.get(CALENDAR_POLLER_STATE_KEY))?.value).toEqual({
+      7: CALENDAR_SNAPSHOT,
+    });
+  });
+
+  it('hydrates a persisted value', async () => {
+    await db.settings.put({ key: CALENDAR_POLLER_STATE_KEY, value: { 7: CALENDAR_SNAPSHOT } });
+    await useCalendarPollerState.getState().hydrate();
+    expect(useCalendarPollerState.getState().value).toEqual({ 7: CALENDAR_SNAPSHOT });
+  });
+
+  it('falls back to the default when the stored value has the wrong shape', async () => {
+    await db.settings.put({ key: CALENDAR_POLLER_STATE_KEY, value: { 7: { entries: 'nope' } } });
+    await useCalendarPollerState.getState().hydrate();
+    expect(useCalendarPollerState.getState().value).toEqual(DEFAULT_CALENDAR_POLLER_STATE);
+  });
+});
+
+describe('withCharacterCalendarSnapshot', () => {
+  it('sets one character snapshot without disturbing others', () => {
+    const next = withCharacterCalendarSnapshot({ 2: CALENDAR_SNAPSHOT }, 7, CALENDAR_SNAPSHOT);
+    expect(next).toEqual({ 2: CALENDAR_SNAPSHOT, 7: CALENDAR_SNAPSHOT });
+  });
+});
+
+describe('useContractPollerState', () => {
+  it('defaults to no prior snapshots, unhydrated', () => {
+    expect(useContractPollerState.getState().value).toEqual(DEFAULT_CONTRACT_POLLER_STATE);
+    expect(useContractPollerState.getState().hydrated).toBe(false);
+  });
+
+  it('persists to Dexie under a non-syncing key', async () => {
+    expect(CONTRACT_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
+    await useContractPollerState.getState().setValue({ 7: CONTRACT_SNAPSHOT });
+    expect((await db.settings.get(CONTRACT_POLLER_STATE_KEY))?.value).toEqual({
+      7: CONTRACT_SNAPSHOT,
+    });
+  });
+
+  it('hydrates a persisted value', async () => {
+    await db.settings.put({ key: CONTRACT_POLLER_STATE_KEY, value: { 7: CONTRACT_SNAPSHOT } });
+    await useContractPollerState.getState().hydrate();
+    expect(useContractPollerState.getState().value).toEqual({ 7: CONTRACT_SNAPSHOT });
+  });
+
+  it('falls back to the default when the stored value has the wrong shape', async () => {
+    await db.settings.put({ key: CONTRACT_POLLER_STATE_KEY, value: { 7: { entries: 'nope' } } });
+    await useContractPollerState.getState().hydrate();
+    expect(useContractPollerState.getState().value).toEqual(DEFAULT_CONTRACT_POLLER_STATE);
+  });
+
+  it('rejects an entry with an unrecognized status', async () => {
+    await db.settings.put({
+      key: CONTRACT_POLLER_STATE_KEY,
+      value: { 7: { entries: [{ contractId: 1, status: 'made_up' }], nowMs: 1 } },
+    });
+    await useContractPollerState.getState().hydrate();
+    expect(useContractPollerState.getState().value).toEqual(DEFAULT_CONTRACT_POLLER_STATE);
+  });
+});
+
+describe('withCharacterContractSnapshot', () => {
+  it('sets one character snapshot without disturbing others', () => {
+    const next = withCharacterContractSnapshot({ 2: CONTRACT_SNAPSHOT }, 7, CONTRACT_SNAPSHOT);
+    expect(next).toEqual({ 2: CONTRACT_SNAPSHOT, 7: CONTRACT_SNAPSHOT });
   });
 });

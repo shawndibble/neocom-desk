@@ -877,6 +877,22 @@
       "planetaryExtractionDone": {
         "title": "Extraction done",
         "body": "{{character}}'s extraction on {{planet}} has stopped."
+      },
+      "newMail": {
+        "title": "New mail",
+        "body": "{{character}} has new mail."
+      },
+      "newCalendarEvent": {
+        "title": "New calendar event",
+        "body": "{{character}} has a new calendar event."
+      },
+      "calendarEventStarting": {
+        "title": "Calendar event starting",
+        "body": "{{character}}'s calendar event is starting."
+      },
+      "contractAccepted": {
+        "title": "Contract accepted",
+        "body": "{{character}}'s contract was accepted."
       }
     }
   },
