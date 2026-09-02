@@ -5,10 +5,11 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  IconButton,
+  PageHeader,
   Panel,
   Spinner,
   type DataTableColumn,
-  IconButton,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -98,21 +99,21 @@ export function EmploymentHistory() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">
-          {t('employmentHistory.title')}
-        </h1>
-        <div className="flex items-center gap-2">
-          {historyResult && <DataAgeBadge date={historyResult.fetchedAt} />}
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('employmentHistory.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        </div>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('employmentHistory.title')}
+        meta={historyResult && <DataAgeBadge date={historyResult.fetchedAt} />}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('employmentHistory.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center py-16">

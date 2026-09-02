@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,11 +6,12 @@ import {
   DataAgeBadge,
   EmptyState,
   FilterChip,
+  IconButton,
+  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
   Tabs,
-  IconButton,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -129,6 +130,21 @@ export function Mail() {
     setLoadedNames(null);
     setHasMore(data?.headersHasMore ?? false);
   }
+  // Custom-label filters belong to a character, not a refresh: reset them
+  // only when the character itself changes, so a manual refresh of the same
+  // character keeps the filter the user picked.
+  const [labelFilterCharacterId, setLabelFilterCharacterId] = useState(activeCharacterId);
+  if (activeCharacterId !== labelFilterCharacterId) {
+    setLabelFilterCharacterId(activeCharacterId);
+    setSelectedLabelIds(new Set());
+  }
+  // Latest snapshot, readable from handleLoadMore's async closure after an
+  // await — a stale closure over `data` would never see the character
+  // switch or refresh that superseded the in-flight request.
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  });
 
   // Narrow screens show one column at a time (CONTEXT.md round 18); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
@@ -176,12 +192,21 @@ export function Mail() {
 
   async function handleLoadMore() {
     if (activeCharacterId === null || loadingMore) return;
+    const requestSnapshot = data;
     setLoadingMore(true);
-    const result = await loadMoreMailHeaders(activeCharacterId, headers);
-    setLoadedHeaders(result.headers);
-    setHasMore(result.hasMore);
-    setLoadedNames(await resolveNames(namePartyIds(result.headers)));
-    setLoadingMore(false);
+    try {
+      const result = await loadMoreMailHeaders(activeCharacterId, headers);
+      const names = await resolveNames(namePartyIds(result.headers));
+      // A character switch or refresh landed while this was in flight and
+      // already reset loadedHeaders/loadedNames for the new snapshot —
+      // applying this result now would overwrite it with stale mail.
+      if (dataRef.current !== requestSnapshot) return;
+      setLoadedHeaders(result.headers);
+      setHasMore(result.hasMore);
+      setLoadedNames(names);
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   useEffect(() => {
@@ -211,18 +236,20 @@ export function Mail() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('mail.title')}</h1>
-        <div className="flex items-center gap-2">
-          {headersResult && <DataAgeBadge date={headersResult.fetchedAt} />}
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('mail.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        </div>
-      </header>
+      <PageHeader
+        title={t('mail.title')}
+        meta={headersResult && <DataAgeBadge date={headersResult.fetchedAt} />}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('mail.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center py-16">

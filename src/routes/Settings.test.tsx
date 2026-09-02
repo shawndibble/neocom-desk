@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_KEY, DEFAULT_FONT_SCALE } from '@/lib/fontScale';
 import { useActivityLog } from '@/stores/activityLog';
+import { NOTIFICATION_EVENTS } from '@/features/notifications/events';
+import {
+  useNotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  NOTIFICATION_PREFS_SETTING_KEY,
+} from '@/features/notifications/preferences';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -30,8 +36,10 @@ const CHAR_ID = 91;
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
+  await db.tokens.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useFontScale.setState({ value: DEFAULT_FONT_SCALE, hydrated: false });
+  useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
   document.documentElement.style.fontSize = '';
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
@@ -99,8 +107,11 @@ describe('Settings', () => {
     expect(await screen.findByText('/characters/{character_id}/skills')).toBeInTheDocument();
     // The character name comes from a Dexie useLiveQuery, resolved async — wait for it
     // rather than asserting it's already there, or this races the query on a slow run.
-    expect(await screen.findByText('Pilot One')).toBeInTheDocument();
-    expect(screen.getByText('Succeeded')).toBeInTheDocument();
+    // Scoped to the Activity Log table: the Notifications section's collapsible
+    // headers also render the character's name.
+    const table = screen.getByRole('table', { name: /activity log/i });
+    expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
+    expect(within(table).getByText('Succeeded')).toBeInTheDocument();
   });
 
   it('labels a public call and an auth-failure outcome distinctly (issue #32)', async () => {
@@ -117,5 +128,141 @@ describe('Settings', () => {
 
     expect(await screen.findByText('Public')).toBeInTheDocument();
     expect(screen.getByText('Needs re-login')).toBeInTheDocument();
+  });
+});
+
+const ALL_NOTIFICATION_SCOPES = [...new Set(NOTIFICATION_EVENTS.map((event) => event.scope))];
+const CHAR_2_ID = 92;
+
+describe('Settings — Notifications (issue #170)', () => {
+  beforeEach(async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 1000 * 60 * 60,
+      scopes: ALL_NOTIFICATION_SCOPES,
+    });
+    await db.characters.put({
+      characterId: CHAR_2_ID,
+      name: 'Pilot Two',
+      ownerHash: 'oh2',
+      addedAt: 2,
+    });
+    await db.tokens.put({
+      characterId: CHAR_2_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 1000 * 60 * 60,
+      // Every scope except New Mail's — exercises the scope-gated disabled row.
+      scopes: ALL_NOTIFICATION_SCOPES.filter((scope) => scope !== 'esi-mail.read_mail.v1'),
+    });
+  });
+
+  it('lists one collapsible section per signed-in character, every event on by default', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const pilotOneButton = await screen.findByRole('button', { name: /pilot one/i });
+    expect(screen.getByRole('button', { name: /pilot two/i })).toBeInTheDocument();
+
+    await user.click(pilotOneButton);
+
+    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Wallet Balance Changed' })).toBeChecked();
+  });
+
+  it('flips a single event off, then back on, persisting to Dexie', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await user.click(await screen.findByRole('button', { name: /pilot one/i }));
+
+    const mailCheckbox = screen.getByRole('checkbox', { name: 'New Mail' });
+    await user.click(mailCheckbox);
+    expect(mailCheckbox).not.toBeChecked();
+    expect(
+      (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
+        ?.value as typeof DEFAULT_NOTIFICATION_PREFERENCES
+    ).toEqual({ masterEnabled: true, perCharacter: { [CHAR_ID]: { newMail: false } } });
+
+    await user.click(mailCheckbox);
+    expect(mailCheckbox).toBeChecked();
+  });
+
+  it("select-all/none checkbox toggles every togglable event for that character's section", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await user.click(await screen.findByRole('button', { name: /pilot one/i }));
+
+    await user.click(
+      screen.getByRole('checkbox', { name: /toggle all notifications for pilot one/i })
+    );
+
+    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Wallet Balance Changed' })).not.toBeChecked();
+
+    await user.click(
+      screen.getByRole('checkbox', { name: /toggle all notifications for pilot one/i })
+    );
+    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).toBeChecked();
+  });
+
+  it('the master switch persists independently of any per-character state', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(await screen.findByRole('checkbox', { name: /enable notifications/i }));
+
+    expect((await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))?.value).toMatchObject({
+      masterEnabled: false,
+    });
+  });
+
+  it("disables a row and shows a reauth hint for a character missing that event's ESI scope", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await user.click(await screen.findByRole('button', { name: /pilot two/i }));
+
+    const mailCheckbox = screen.getByRole('checkbox', { name: 'New Mail' });
+    expect(mailCheckbox).toBeDisabled();
+    expect(screen.getByText(/re-authorize the character/i)).toBeInTheDocument();
+
+    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).not.toBeDisabled();
+  });
+
+  it('search filters rows by event-type name across every character section', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.type(await screen.findByRole('searchbox'), 'mail');
+
+    // Two levels up: the button's immediate parent is just the header row
+    // (button + select-all checkbox); its parent is the whole section,
+    // including the event rows.
+    const pilotOneSection = screen
+      .getByRole('button', { name: /pilot one/i })
+      .closest('div')!.parentElement!;
+    expect(within(pilotOneSection).getByRole('checkbox', { name: 'New Mail' })).toBeInTheDocument();
+    expect(
+      within(pilotOneSection).queryByRole('checkbox', { name: 'Skill Level Complete' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('search filters sections by character name, showing every event for the matching character', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.type(await screen.findByRole('searchbox'), 'Two');
+
+    expect(screen.queryByRole('button', { name: /pilot one/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /pilot two/i })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).toBeInTheDocument();
   });
 });

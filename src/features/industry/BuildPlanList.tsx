@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, IconButton } from '@/components/ui';
+import { Button, EmptyState, IconButton, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import { BlueprintPicker } from './BlueprintPicker';
@@ -46,7 +46,8 @@ function PlanRow({
       }`}
     >
       {renaming ? (
-        <input
+        <TextInput
+          size="sm"
           autoFocus
           value={draftName}
           aria-label={t('industry.rename')}
@@ -59,7 +60,7 @@ function PlanRow({
               setRenaming(false);
             }
           }}
-          className="h-6 flex-1 rounded-xs border border-line bg-panel-2 px-1 text-text"
+          className="flex-1"
         />
       ) : (
         <button

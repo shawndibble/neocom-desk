@@ -88,7 +88,7 @@ describe('SkillPicker', () => {
       <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
     );
 
-    await user.type(screen.getByRole('textbox'), 'frigate');
+    await user.type(screen.getByRole('searchbox'), 'frigate');
 
     const items = screen.getAllByRole('listitem');
     expect(items.map((li) => li.textContent)).toEqual([
@@ -105,7 +105,7 @@ describe('SkillPicker', () => {
       <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
     );
 
-    await user.type(screen.getByRole('textbox'), 'spaceship command');
+    await user.type(screen.getByRole('searchbox'), 'spaceship command');
 
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
@@ -117,7 +117,7 @@ describe('SkillPicker', () => {
       <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={onAdd} />
     );
 
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole('searchbox');
     await user.type(input, 'frigate');
     const firstItem = screen.getAllByRole('listitem')[0];
     if (!firstItem) throw new Error('expected at least one result');
@@ -139,7 +139,7 @@ describe('SkillPicker', () => {
       />
     );
 
-    await user.type(screen.getByRole('textbox'), 'tracking');
+    await user.type(screen.getByRole('searchbox'), 'tracking');
 
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(items).toHaveLength(1);
@@ -157,7 +157,7 @@ describe('SkillPicker', () => {
       />
     );
 
-    await user.type(screen.getByRole('textbox'), 'turret');
+    await user.type(screen.getByRole('searchbox'), 'turret');
 
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(items[0]).toContain('Gunnery');
@@ -175,7 +175,7 @@ describe('SkillPicker', () => {
       />
     );
 
-    await user.type(screen.getByRole('textbox'), 'e');
+    await user.type(screen.getByRole('searchbox'), 'e');
     const names = () => screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(names().join()).toContain('Gunnery');
     expect(names().join()).toContain('Mining');
@@ -215,7 +215,7 @@ describe('SkillPicker', () => {
       />
     );
 
-    await user.type(screen.getByRole('textbox'), 'widget');
+    await user.type(screen.getByRole('searchbox'), 'widget');
     await user.click(screen.getByRole('button', { name: 'RareGroup' }));
 
     const names = screen.getAllByRole('listitem').map((li) => li.textContent);

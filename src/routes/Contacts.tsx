@@ -6,11 +6,12 @@ import {
   DataTable,
   EmptyState,
   FilterChip,
+  IconButton,
+  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
   type DataTableColumn,
-  IconButton,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -148,19 +149,21 @@ export function Contacts() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('contacts.title')}</h1>
-        <div className="flex items-center gap-2">
-          {contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />}
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('contacts.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        </div>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('contacts.title')}
+        meta={contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('contacts.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       {!loading && contactsResult && !contactsNeedsReauth && (
         <div role="group" aria-label={t('contacts.standing')} className="flex flex-wrap gap-2">

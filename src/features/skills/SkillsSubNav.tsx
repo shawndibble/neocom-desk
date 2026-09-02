@@ -1,20 +1,26 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-
-const LINK =
-  'inline-flex h-8 items-center border-b-2 px-3 text-xs font-semibold tracking-widest uppercase transition-colors';
-const ACTIVE = 'border-accent text-text';
-const IDLE = 'border-transparent text-text-dim hover:text-text';
+import { cx } from '@/lib/cx';
+import {
+  tabItemActiveClassName,
+  tabItemClassName,
+  tabItemIdleClassName,
+  tabListClassName,
+} from '@/components/ui/tabStyles';
 
 function subNavClass({ isActive }: { isActive: boolean }): string {
-  return `${LINK} ${isActive ? ACTIVE : IDLE}`;
+  return cx(tabItemClassName, isActive ? tabItemActiveClassName : tabItemIdleClassName);
 }
 
-/** Sub-navigation between the two Skills views. Real navigation (routes), not a Tabs widget. */
+/**
+ * Sub-navigation between the three Skills views. Real navigation (routes), not
+ * a `Tabs` widget — but it sits in the same slot and reads as the same control,
+ * so it borrows `Tabs`' own classes rather than approximating them.
+ */
 export function SkillsSubNav() {
   const { t } = useTranslation();
   return (
-    <nav aria-label={t('nav.skills')} className="flex gap-1 border-b border-line">
+    <nav aria-label={t('nav.skills')} className={tabListClassName}>
       <NavLink to="/skills" end className={subNavClass}>
         {t('skills.trainedTab')}
       </NavLink>

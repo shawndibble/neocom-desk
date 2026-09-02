@@ -60,7 +60,7 @@ export function SkillPlanEditor() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <SkillsSubNav />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">

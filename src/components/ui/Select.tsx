@@ -1,33 +1,44 @@
 import { Select as SelectPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
+import * as Icon from './icons';
+import { fieldBaseClassName, fieldSizeClassName, type ControlSize } from './controlStyles';
 
 /**
  * Listbox select. Wraps `radix-ui`'s Select — see docs/adr/0004 for why:
  * focus movement, typeahead, roving tabindex and screen-reader behaviour are
  * exactly the parts worth not hand-rolling.
+ *
+ * For a short, static option list inside a form, reach for `NativeSelect`
+ * instead — both draw from the same `controlStyles` tokens, so the choice is
+ * about behaviour, never about how it looks.
  */
 export const Select = SelectPrimitive.Root;
 export const SelectValue = SelectPrimitive.Value;
 
-export function SelectTrigger({
-  className,
-  children,
-  ...props
-}: ComponentProps<typeof SelectPrimitive.Trigger>) {
+interface SelectTriggerProps extends ComponentProps<typeof SelectPrimitive.Trigger> {
+  /** `md` (default) is the page/form size; `sm` matches `Button size="sm"` inside a dense row. */
+  size?: ControlSize;
+}
+
+export function SelectTrigger({ className, children, size = 'md', ...props }: SelectTriggerProps) {
   return (
     <SelectPrimitive.Trigger
       className={cx(
-        'flex h-9 items-center justify-between gap-2 rounded-xs border border-line bg-panel px-3 text-sm text-text outline-none focus-visible:outline-2 focus-visible:outline-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[placeholder]:text-text-dim',
+        fieldBaseClassName,
+        fieldSizeClassName[size],
+        'flex items-center justify-between gap-2 outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[placeholder]:text-text-dim',
         className
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <span aria-hidden="true" className="text-text-dim">
-          ▾
-        </span>
+        <Icon.Expanded
+          aria-hidden="true"
+          size={size === 'sm' ? Icon.ICON_SIZE.sm : Icon.ICON_SIZE.md}
+          className="shrink-0 text-text-dim"
+        />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );

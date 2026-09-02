@@ -3,10 +3,13 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  Caret,
   DataAgeBadge,
   EmptyState,
+  PageHeader,
   Panel,
   ReauthBanner,
+  SearchInput,
   SkillBar,
   Spinner,
   StatChip,
@@ -224,38 +227,42 @@ export function Skills() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('nav.skills')}
+        meta={fetchedAt && <DataAgeBadge date={fetchedAt} />}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Download />}
+              label={t('skills.exportCsv')}
+              disabled={groups.length === 0 || skillsNeedsReauth}
+              onClick={() => downloadCsv('skills', skillCsvRows(groups), skillCsvColumns(t))}
+            />
+            <IconButton icon={<Icon.Refresh />} label={t('skills.refresh')} onClick={refresh} />
+          </>
+        }
+      />
       <SkillsSubNav />
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <StatChip
-            label={t('skills.totalSp')}
-            value={
-              skillsResult?.data
-                ? (skillsResult.data.total_sp + completedSp).toLocaleString()
-                : t('common.unknown')
-            }
-          />
-          <StatChip
-            label={t('skills.unallocatedSp')}
-            value={
-              skillsResult?.data?.unallocated_sp !== undefined
-                ? skillsResult.data.unallocated_sp.toLocaleString()
-                : t('common.unknown')
-            }
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          {fetchedAt && <DataAgeBadge date={fetchedAt} />}
-          <IconButton
-            icon={<Icon.Download />}
-            label={t('skills.exportCsv')}
-            disabled={groups.length === 0 || skillsNeedsReauth}
-            onClick={() => downloadCsv('skills', skillCsvRows(groups), skillCsvColumns(t))}
-          />
-          <IconButton icon={<Icon.Refresh />} label={t('skills.refresh')} onClick={refresh} />
-        </div>
-      </header>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <StatChip
+          label={t('skills.totalSp')}
+          value={
+            skillsResult?.data
+              ? (skillsResult.data.total_sp + completedSp).toLocaleString()
+              : t('common.unknown')
+          }
+        />
+        <StatChip
+          label={t('skills.unallocatedSp')}
+          value={
+            skillsResult?.data?.unallocated_sp !== undefined
+              ? skillsResult.data.unallocated_sp.toLocaleString()
+              : t('common.unknown')
+          }
+        />
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -335,17 +342,18 @@ export function Skills() {
 
           {groups.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="search"
+              <SearchInput
                 value={groupSearch}
                 onChange={(e) => setGroupSearch(e.target.value)}
                 placeholder={t('skills.searchPlaceholder')}
-                className="h-9 min-w-48 flex-1 rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
+                className="min-w-48 flex-1"
               />
-              <Button size="sm" onClick={expandAllGroups} disabled={searching}>
+              {/* `md`, not `sm`: these sit on the search box's own line, and the
+                  shared control scale is what keeps the three the same height. */}
+              <Button onClick={expandAllGroups} disabled={searching}>
                 {t('skills.expandAll')}
               </Button>
-              <Button size="sm" onClick={collapseAllGroups} disabled={searching}>
+              <Button onClick={collapseAllGroups} disabled={searching}>
                 {t('skills.collapseAll')}
               </Button>
             </div>
@@ -376,9 +384,7 @@ export function Skills() {
                       }`}
                     >
                       <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-                          {expanded ? '▾' : '▸'}
-                        </span>
+                        <Caret expanded={expanded} />
                         {group.groupName}
                       </span>
                       <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-faint">

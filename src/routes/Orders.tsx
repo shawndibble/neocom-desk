@@ -6,6 +6,7 @@ import {
   DataTable,
   EmptyState,
   IconButton,
+  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
@@ -162,16 +163,20 @@ export function Orders() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('orders.title')}</h1>
-        <IconButton
-          icon={<Icon.Refresh />}
-          label={t('orders.refresh')}
-          onClick={refresh}
-          disabled={loading}
-        />
-      </header>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('orders.title')}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('orders.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       <Tabs
         label={t('orders.title')}

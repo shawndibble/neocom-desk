@@ -6,6 +6,7 @@ import {
   DataTable,
   EmptyState,
   IconButton,
+  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
@@ -255,16 +256,20 @@ export function Wallet() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('wallet.title')}</h1>
-        <IconButton
-          icon={<Icon.Refresh />}
-          label={t('wallet.refresh')}
-          onClick={refresh}
-          disabled={loading}
-        />
-      </header>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('wallet.title')}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('wallet.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       <Tabs
         label={t('wallet.title')}

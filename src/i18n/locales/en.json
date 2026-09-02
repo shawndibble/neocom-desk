@@ -221,7 +221,6 @@
     "headerSavingsNone": "None"
   },
   "skillCompare": {
-    "title": "Compare Skills",
     "pickCharacters": "Characters to compare",
     "noneSelectedTitle": "No characters selected",
     "noneSelectedHint": "Select characters below to compare their trained skills.",
@@ -990,7 +989,29 @@
     "fontScaleSmall": "Small",
     "fontScaleDefault": "Default",
     "fontScaleLarge": "Large",
-    "fontScaleExtraLarge": "Extra large"
+    "fontScaleExtraLarge": "Extra large",
+    "notificationsTitle": "Notifications",
+    "notifications": {
+      "hint": "Choose what you'd be notified about, per character. Stays on this device. No notifications are sent yet — this just sets your preferences for when that ships.",
+      "masterSwitchLabel": "Enable notifications",
+      "selectAllLabel": "Toggle all notifications for {{character}}",
+      "searchPlaceholder": "Search events or characters",
+      "noResults": "No matching events or characters",
+      "emptyTitle": "Add a character to configure notifications",
+      "reauthHint": "This character hasn't granted the permission this notification needs. Re-authorize the character to enable it.",
+      "event": {
+        "skillLevelComplete": "Skill Level Complete",
+        "characterNotTraining": "Character Not Training",
+        "industryJobComplete": "Industry Job Complete",
+        "newMail": "New Mail",
+        "planetaryExtractionDone": "Planetary Extraction Done",
+        "marketOrderFilled": "Market Order Filled",
+        "newCalendarEvent": "New Calendar Event",
+        "calendarEventStarting": "Calendar Event Starting",
+        "contractAccepted": "Contract Accepted",
+        "walletBalanceChanged": "Wallet Balance Changed"
+      }
+    }
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",
