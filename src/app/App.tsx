@@ -72,6 +72,7 @@ const ROUTE_ELEMENTS = {
   '/planetary-industry': <PlanetaryIndustry />,
   '/employment-history': <EmploymentHistory />,
   '/assets': <Assets />,
+  '/assets/*': <Assets />,
   '/mail': <Mail />,
   '/calendar': <Calendar />,
   '/contracts': <Contracts />,

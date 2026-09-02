@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -47,6 +47,8 @@ vi.mock('@/sde/loadMarketSde', () => ({
 }));
 
 const CHAR_ID = 91;
+const JITA = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
+const STRUCTURE = 'Structure #1000000000001';
 
 const assetPage1 = [
   {
@@ -81,7 +83,7 @@ const server = setupServer(
   http.get('https://esi.evetech.net/universe/stations/60003760', () =>
     HttpResponse.json({
       station_id: 60003760,
-      name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+      name: JITA,
       type_id: 1531,
       system_id: 30000142,
     })
@@ -139,42 +141,47 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/assets');
 });
 
-/**
- * Clicks the toolbar's single collapse/expand-all toggle (issue #148):
- * stations render collapsed by default now, so most tests that assert on a
- * station's direct-child content need one of these before that assertion.
- * Does not reveal nested bay/ship/container branches — those keep their own
- * independent expand state, unaffected by this toggle (see `toggleAllStations`
- * in Assets.tsx).
- */
-async function expandAllStations() {
-  fireEvent.click(await screen.findByRole('button', { name: /expand all/i }));
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Clicks the link into a location or container by its (partial) label. */
+async function openLocation(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string | RegExp
+): Promise<void> {
+  const matcher = typeof name === 'string' ? new RegExp(escapeRegExp(name)) : name;
+  await user.click(await screen.findByRole('link', { name: matcher }));
+}
+
+/** The single back control in the breadcrumb header — steps up exactly one level. */
+async function goBack(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(await screen.findByRole('button', { name: /back one level/i }));
+}
+
+/** Every top-level location label currently on screen, in DOM order. */
+function locationOrder(): string[] {
+  return screen
+    .getAllByText(new RegExp(`^(${JITA}|${STRUCTURE})$`))
+    .map((el) => el.textContent ?? '');
 }
 
 describe('Assets', () => {
-  it('renders stations collapsed by default, hiding their direct-child items until expanded (issue #148)', async () => {
+  it('lists locations at the root; drilling into one shows its contents', async () => {
+    const user = userEvent.setup();
     render(<App />);
-    expect(
-      await screen.findByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant')
-    ).toBeInTheDocument();
-    expect(screen.getByText('Structure #1000000000001')).toBeInTheDocument();
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    expect(screen.getByText(STRUCTURE)).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
 
-    await expandAllStations();
+    await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('Pyerite')).toBeInTheDocument();
-  });
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
 
-  it('groups items by location, resolving a station name and showing "Structure #id" for the rest', async () => {
-    render(<App />);
-    expect(
-      await screen.findByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant')
-    ).toBeInTheDocument();
-    expect(await screen.findByText('Structure #1000000000001')).toBeInTheDocument();
-    await expandAllStations();
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+    await goBack(user);
+    await openLocation(user, STRUCTURE);
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
   it('labels a container/ship parent with its resolved type name instead of a raw item id', async () => {
@@ -205,12 +212,13 @@ describe('Assets', () => {
         )
       )
     );
+    const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     expect(await screen.findByRole('heading', { name: 'Drake' })).toBeInTheDocument();
   });
 
-  it('falls back to the generic "Container" label when the parent item is unresolvable', async () => {
+  it('falls back to the generic "Container" label when the parent item is unresolvable, and files it under Location unresolved', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
         HttpResponse.json(
@@ -230,151 +238,36 @@ describe('Assets', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText('Container')).toBeInTheDocument();
+    expect(await screen.findByText(/Location unresolved/)).toBeInTheDocument();
+    expect(screen.getByText('Container')).toBeInTheDocument();
   });
 
-  it('filters items via the search box', async () => {
+  it('filters items via the search box, across every location at once', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('tree', { name: /character assets/i });
+    await screen.findByText(JITA);
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 
-  it('auto-expands ancestors of a search match, then collapses back to default once the search clears', async () => {
+  it('clearing the search returns to the root location list', async () => {
     const user = userEvent.setup();
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
-        HttpResponse.json(
-          [
-            {
-              item_id: 10,
-              type_id: 650,
-              quantity: 1,
-              location_id: 60003760,
-              location_type: 'station' as const,
-              location_flag: 'Hangar',
-              is_singleton: true,
-            },
-            {
-              item_id: 11,
-              type_id: 34,
-              quantity: 50,
-              location_id: 10,
-              location_type: 'item' as const,
-              location_flag: 'Cargo',
-              is_singleton: false,
-            },
-          ],
-          { headers: { 'X-Pages': '1' } }
-        )
-      )
-    );
     render(<App />);
-    await screen.findByRole('heading', { name: /Jita IV/ });
-    expect(screen.queryByRole('heading', { name: 'Drake' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
+    await screen.findByText(JITA);
 
     const search = screen.getByPlaceholderText(/search items/i);
+    const pinButton = new RegExp(`Pin toggle for ${escapeRegExp(JITA)}`);
     await user.type(search, 'tritanium');
-    expect(await screen.findByRole('heading', { name: 'Drake' })).toBeInTheDocument();
-    expect(screen.getByText('Cargo Hold')).toBeInTheDocument();
-    expect(screen.getByText('Tritanium')).toBeInTheDocument();
-
-    await user.clear(search);
-    expect(await screen.findByRole('heading', { name: /Jita IV/ })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Drake' })).not.toBeInTheDocument();
-    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
-  });
-
-  it('restores a manually-expanded branch after the search clears', async () => {
-    const user = userEvent.setup();
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
-        HttpResponse.json(
-          [
-            {
-              item_id: 10,
-              type_id: 650,
-              quantity: 1,
-              location_id: 60003760,
-              location_type: 'station' as const,
-              location_flag: 'Hangar',
-              is_singleton: true,
-            },
-            {
-              item_id: 11,
-              type_id: 34,
-              quantity: 50,
-              location_id: 10,
-              location_type: 'item' as const,
-              location_flag: 'Cargo',
-              is_singleton: false,
-            },
-          ],
-          { headers: { 'X-Pages': '1' } }
-        )
-      )
-    );
-    render(<App />);
-    await expandAllStations();
-    const shipHeading = await screen.findByRole('heading', { name: 'Drake' });
-    await user.click(shipHeading.closest('button')!);
-    await user.click(await screen.findByText('Cargo Hold'));
+    // A search result links to its location too, so its own text legitimately
+    // includes "Jita IV…" — the root list's pin button is what only the root
+    // list renders, so its absence is the real signal here.
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-
-    const search = screen.getByPlaceholderText(/search items/i);
-    await user.type(search, 'zzz-no-match');
-    expect(await screen.findByText(/no items match your search/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: pinButton })).not.toBeInTheDocument();
 
     await user.clear(search);
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-  });
-
-  it('ignores a click on an auto-expanded row during search, so it does not corrupt the state search restores to', async () => {
-    const user = userEvent.setup();
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
-        HttpResponse.json(
-          [
-            {
-              item_id: 10,
-              type_id: 650,
-              quantity: 1,
-              location_id: 60003760,
-              location_type: 'station' as const,
-              location_flag: 'Hangar',
-              is_singleton: true,
-            },
-            {
-              item_id: 11,
-              type_id: 34,
-              quantity: 50,
-              location_id: 10,
-              location_type: 'item' as const,
-              location_flag: 'Cargo',
-              is_singleton: false,
-            },
-          ],
-          { headers: { 'X-Pages': '1' } }
-        )
-      )
-    );
-    render(<App />);
-    await screen.findByRole('heading', { name: /Jita IV/ });
-    expect(screen.queryByRole('heading', { name: 'Drake' })).not.toBeInTheDocument();
-
-    const search = screen.getByPlaceholderText(/search items/i);
-    await user.type(search, 'tritanium');
-    const cargoHold = await screen.findByText('Cargo Hold');
-    // A user might reasonably try to collapse the auto-opened row while searching;
-    // that click must not mutate the hidden expand state search restores to on clear.
-    await user.click(cargoHold);
-
-    await user.clear(search);
-    expect(await screen.findByRole('heading', { name: /Jita IV/ })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Drake' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: pinButton })).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
   });
 
   it('falls back to cached data offline', async () => {
@@ -387,10 +280,11 @@ describe('Assets', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () => HttpResponse.error())
     );
+    const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
+    await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
 
   it('warns that the list is incomplete when a page fails mid-pagination (D4)', async () => {
@@ -402,15 +296,12 @@ describe('Assets', () => {
       })
     );
     render(<App />);
-    await expandAllStations();
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
+    expect(await screen.findByText(/incomplete data/i)).toBeInTheDocument();
   });
 
   it('shows no incomplete-data warning when every page came back', async () => {
     render(<App />);
-    await expandAllStations();
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    await screen.findByText(JITA);
     expect(screen.queryByText(/incomplete data/i)).not.toBeInTheDocument();
   });
 
@@ -461,14 +352,14 @@ describe('Assets', () => {
         HttpResponse.json(bigAssetList, { headers: { 'X-Pages': '1' } })
       )
     );
+    const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
-    // The jsdom scroll-container shim reports a fixed ~600px viewport at ~32px/row —
+    await openLocation(user, JITA);
+    // The jsdom scroll-container shim reports a fixed ~600px viewport at ~48px/row —
     // nowhere near the 2000 rows that exist, proving the virtualizer is windowing
     // rather than rendering everything.
     const rendered = await screen.findAllByText('Tritanium');
     expect(rendered.length).toBeLessThan(100);
-    expect(screen.queryByText(/^Showing \d+ of \d+ assets\.$/)).not.toBeInTheDocument();
   });
 
   it('shows the fetch-cap notice without a render-cap notice, now that rendering is virtualized', async () => {
@@ -488,7 +379,7 @@ describe('Assets', () => {
     expect(screen.queryByText(/^Showing \d+ of \d+ assets\.$/)).not.toBeInTheDocument();
   });
 
-  it('sorts sibling items alphabetically within a station, regardless of ESI response order', async () => {
+  it('sorts sibling items alphabetically within a location, regardless of ESI response order', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
         HttpResponse.json(
@@ -500,14 +391,15 @@ describe('Assets', () => {
         )
       )
     );
+    const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     await screen.findByText('Tritanium');
-    const names = screen.getAllByText(/Tritanium|Pyerite/).map((el) => el.textContent);
+    const names = screen.getAllByText(/^(Tritanium|Pyerite)$/).map((el) => el.textContent);
     expect(names).toEqual(['Pyerite', 'Tritanium']);
   });
 
-  it('shows the singular "item" form of the badge when a node holds exactly one', async () => {
+  it('shows the singular "item" form of a container badge when it holds exactly one', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
         HttpResponse.json(
@@ -535,22 +427,25 @@ describe('Assets', () => {
         )
       )
     );
+    const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     await screen.findByRole('heading', { name: 'Drake' });
     expect(screen.getByText('1 item · 0 ISK')).toBeInTheDocument();
   });
 
   it('still renders cached assets when global market prices are unreachable', async () => {
     server.use(http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.error()));
+    const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+    await goBack(user);
+    await openLocation(user, STRUCTURE);
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
-  it('nests a ship into named sub-bays, collapsed by default, with a nested-item badge', async () => {
-    const user = userEvent.setup();
+  it('nests a ship into named sub-bays, each a further level to drill into, with a nested-item badge', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
         HttpResponse.json(
@@ -578,297 +473,55 @@ describe('Assets', () => {
         )
       )
     );
+    const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
 
-    const shipHeading = await screen.findByRole('heading', { name: 'Drake' });
+    await screen.findByRole('heading', { name: 'Drake' });
     expect(screen.getByText('50 items · 0 ISK')).toBeInTheDocument();
     expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
 
-    await user.click(shipHeading.closest('button')!);
+    await openLocation(user, 'Drake');
     expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
 
-    await user.click(screen.getByText('Cargo Hold'));
+    await openLocation(user, 'Cargo Hold');
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-  });
 
-  it('the single toolbar toggle (issue #148) expands or collapses every station at once, leaving nested branch state untouched', async () => {
-    const user = userEvent.setup();
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
-        HttpResponse.json(
-          [
-            {
-              item_id: 10,
-              type_id: 650,
-              quantity: 1,
-              location_id: 60003760,
-              location_type: 'station' as const,
-              location_flag: 'Hangar',
-              is_singleton: true,
-            },
-            {
-              item_id: 11,
-              type_id: 34,
-              quantity: 50,
-              location_id: 10,
-              location_type: 'item' as const,
-              location_flag: 'Cargo',
-              is_singleton: false,
-            },
-          ],
-          { headers: { 'X-Pages': '1' } }
-        )
-      )
-    );
-    render(<App />);
-    await screen.findByRole('heading', { name: /Jita IV/ });
-    expect(screen.queryByRole('heading', { name: 'Drake' })).not.toBeInTheDocument();
+    // Back walks up exactly one level per press: Cargo Hold -> Drake -> the
+    // station's own contents -> the root list.
+    await goBack(user); // now at Drake: its row is Cargo Hold
+    expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /expand all/i }));
+    await goBack(user); // now at the station: its row is Drake
     expect(await screen.findByRole('heading', { name: 'Drake' })).toBeInTheDocument();
-    // The toggle only opens each station's own header — nested bays/ships/
-    // containers (Cargo Hold, here) keep their own independent expand state.
     expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /collapse all/i }));
-    expect(screen.queryByRole('heading', { name: 'Drake' })).not.toBeInTheDocument();
-  });
-});
-
-describe('keyboard tree navigation (issue #89)', () => {
-  it('exposes tree/treeitem roles, aria-level, aria-setsize/posinset, and roving tabindex', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    const tree = await screen.findByRole('tree', { name: /character assets/i });
-    await user.click(screen.getByRole('button', { name: /expand all/i }));
-    const items = await within(tree).findAllByRole('treeitem');
-    // Two stations, each with one top-level leaf item (assetPage1/assetPage2 from the shared fixture).
-    expect(items).toHaveLength(4);
-
-    const [station1, item1, station2, item2] = items;
-    expect(station1).toHaveAttribute('tabindex', '0');
-    for (const other of [item1, station2, item2]) expect(other).toHaveAttribute('tabindex', '-1');
-
-    expect(station1).toHaveAttribute('aria-level', '1');
-    expect(station1).toHaveAttribute('aria-posinset', '1');
-    expect(station1).toHaveAttribute('aria-setsize', '2');
-    expect(station1).toHaveAttribute('aria-expanded', 'true');
-    expect(station2).toHaveAttribute('aria-posinset', '2');
-
-    expect(item1).toHaveAttribute('aria-level', '2');
-    expect(item1).not.toHaveAttribute('aria-expanded');
+    await goBack(user); // now at the root list
+    expect(
+      await screen.findByRole('link', { name: new RegExp(escapeRegExp(JITA)) })
+    ).toBeInTheDocument();
   });
 
-  it('ArrowDown/ArrowUp move roving focus between visible rows', async () => {
+  it('reports an unresolved bookmark rather than silently landing on the root', async () => {
+    // A stale bookmark into a container that no longer has that item —
+    // navigated straight to, not reached via in-app links.
+    window.history.pushState({}, '', '/assets/60003760/i:999');
     const user = userEvent.setup();
     render(<App />);
-    const tree = await screen.findByRole('tree', { name: /character assets/i });
-    const [station1, item1] = within(tree).getAllByRole('treeitem');
-
-    station1.focus();
-    await user.keyboard('{ArrowDown}');
-    await waitFor(() => expect(document.activeElement).toBe(item1));
-    expect(item1).toHaveAttribute('tabindex', '0');
-    expect(station1).toHaveAttribute('tabindex', '-1');
-
-    await user.keyboard('{ArrowUp}');
-    await waitFor(() => expect(document.activeElement).toBe(station1));
-  });
-
-  it('Home/End jump focus to the first/last visible row', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    const tree = await screen.findByRole('tree', { name: /character assets/i });
-    const items = within(tree).getAllByRole('treeitem');
-    const last = items[items.length - 1];
-
-    items[0].focus();
-    await user.keyboard('{End}');
-    await waitFor(() => expect(document.activeElement).toBe(last));
-
-    await user.keyboard('{Home}');
-    await waitFor(() => expect(document.activeElement).toBe(items[0]));
-  });
-
-  it('type-ahead moves focus to the next row whose label starts with the typed letter', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    const tree = await screen.findByRole('tree', { name: /character assets/i });
-    await user.click(screen.getByRole('button', { name: /expand all/i }));
-    const items = await within(tree).findAllByRole('treeitem');
-    // Labels: "Jita IV…", "Tritanium", "Structure #…", "Pyerite" — 'p' has exactly one match.
-    const pyerite = items.find((el) => el.textContent?.includes('Pyerite'))!;
-
-    items[0].focus();
-    await user.keyboard('p');
-    await waitFor(() => expect(document.activeElement).toBe(pyerite));
-  });
-
-  it('ArrowRight expands a branch and then moves into its first child; ArrowLeft moves to parent, then collapses', async () => {
-    const user = userEvent.setup();
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
-        HttpResponse.json(
-          [
-            {
-              item_id: 10,
-              type_id: 650,
-              quantity: 1,
-              location_id: 60003760,
-              location_type: 'station' as const,
-              location_flag: 'Hangar',
-              is_singleton: true,
-            },
-            {
-              item_id: 11,
-              type_id: 34,
-              quantity: 50,
-              location_id: 10,
-              location_type: 'item' as const,
-              location_flag: 'Cargo',
-              is_singleton: false,
-            },
-          ],
-          { headers: { 'X-Pages': '1' } }
-        )
-      )
-    );
-    render(<App />);
-    await expandAllStations();
-
-    const shipHeading = await screen.findByRole('heading', { name: 'Drake' });
-    const shipRow = shipHeading.closest('[role="treeitem"]') as HTMLElement;
-    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
-
-    shipRow.focus();
-    await user.keyboard('{ArrowRight}');
-    expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
-    expect(shipRow).toHaveAttribute('aria-expanded', 'true');
-    expect(document.activeElement).toBe(shipRow);
-
-    const cargoHoldRow = screen.getByText('Cargo Hold').closest('[role="treeitem"]') as HTMLElement;
-    await user.keyboard('{ArrowRight}');
-    await waitFor(() => expect(document.activeElement).toBe(cargoHoldRow));
-
-    await user.keyboard('{ArrowLeft}');
-    await waitFor(() => expect(document.activeElement).toBe(shipRow));
-    expect(screen.getByText('Cargo Hold')).toBeInTheDocument();
-
-    await user.keyboard('{ArrowLeft}');
-    await waitFor(() => expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument());
-    expect(shipRow).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('Enter/Space toggles a focused branch row', async () => {
-    const user = userEvent.setup();
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
-        HttpResponse.json(
-          [
-            {
-              item_id: 10,
-              type_id: 650,
-              quantity: 1,
-              location_id: 60003760,
-              location_type: 'station' as const,
-              location_flag: 'Hangar',
-              is_singleton: true,
-            },
-            {
-              item_id: 11,
-              type_id: 34,
-              quantity: 50,
-              location_id: 10,
-              location_type: 'item' as const,
-              location_flag: 'Cargo',
-              is_singleton: false,
-            },
-          ],
-          { headers: { 'X-Pages': '1' } }
-        )
-      )
-    );
-    render(<App />);
-    await expandAllStations();
-
-    const shipHeading = await screen.findByRole('heading', { name: 'Drake' });
-    const shipRow = shipHeading.closest('[role="treeitem"]') as HTMLElement;
-    expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument();
-
-    shipRow.focus();
-    await user.keyboard('{Enter}');
-    expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
-
-    await user.keyboard(' ');
-    await waitFor(() => expect(screen.queryByText('Cargo Hold')).not.toBeInTheDocument());
-  });
-
-  it('Enter/Space on a focused leaf row opens its item detail', async () => {
-    const user = userEvent.setup();
-    server.use(
-      http.get('https://esi.evetech.net/universe/types/34', () =>
-        HttpResponse.json({
-          type_id: 34,
-          name: 'Tritanium',
-          description: '',
-          group_id: 18,
-          published: true,
-        })
-      )
-    );
-    render(<App />);
-    await expandAllStations();
-    const tree = await screen.findByRole('tree', { name: /character assets/i });
-    const itemRow = within(tree).getByRole('treeitem', { name: /Tritanium/ });
-
-    itemRow.focus();
-    await user.keyboard('{Enter}');
-    await waitFor(() =>
-      expect(screen.getByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument()
-    );
-  });
-
-  it('does not swallow Enter on a station header button that is not the roving-focus treeitem itself', async () => {
-    // The pin button (StationPinButton) is a real, independently-tabbable
-    // control nested inside the station's `role="treeitem"` row — same as
-    // the collapse-all toggle used to be before issue #148 moved that one
-    // out to the toolbar. Its own native Enter handling must not be
-    // swallowed by the tree's delegated keydown handler.
-    const user = userEvent.setup();
-    render(<App />);
-    const pinButton = await screen.findByRole('button', {
-      name: /Pin toggle for Jita IV/,
-    });
-
-    pinButton.focus();
-    await user.keyboard('{Enter}');
-    await waitFor(async () => {
-      expect(await db.stationPins.get(`${CHAR_ID}:60003760`)).toMatchObject({
-        characterId: CHAR_ID,
-        locationId: 60003760,
-        scope: 'character',
-      });
-    });
+    expect(await screen.findByText('This location is gone')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back to all locations' }));
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
   });
 });
 
 describe('station pins (issue #84)', () => {
-  const JITA = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
-  const STRUCTURE = 'Structure #1000000000001';
-
-  function stationOrder(): string[] {
-    return screen
-      .getAllByRole('heading', { name: new RegExp(`^(${JITA}|${STRUCTURE})$`) })
-      .map((h) => h.textContent);
-  }
-
-  it('cycles a station pin unpinned -> character -> account -> unpinned, persisting to Dexie', async () => {
+  it('cycles a location pin unpinned -> character -> account -> unpinned, persisting to Dexie', async () => {
     const user = userEvent.setup();
     render(<App />);
     const pinButton = await screen.findByRole('button', {
-      name: new RegExp(`Pin toggle for ${JITA}`),
+      name: new RegExp(`Pin toggle for ${escapeRegExp(JITA)}`),
     });
 
     await user.click(pinButton);
@@ -891,23 +544,23 @@ describe('station pins (issue #84)', () => {
     });
   });
 
-  it('sorts a pinned station to the top of the list, regardless of its label', async () => {
+  it('sorts a pinned location to the top of the list, regardless of its label', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('heading', { name: JITA });
-    expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+    await screen.findByText(JITA);
+    expect(locationOrder()).toEqual([JITA, STRUCTURE]);
 
     const pinButton = screen.getByRole('button', {
-      name: new RegExp(`Pin toggle for ${STRUCTURE}`),
+      name: new RegExp(`Pin toggle for ${escapeRegExp(STRUCTURE)}`),
     });
     await user.click(pinButton);
 
     await waitFor(() => {
-      expect(stationOrder()).toEqual([STRUCTURE, JITA]);
+      expect(locationOrder()).toEqual([STRUCTURE, JITA]);
     });
   });
 
-  it('a pin scoped to a different character does not elevate the station for the active one', async () => {
+  it('a pin scoped to a different character does not elevate the location for the active one', async () => {
     await db.stationPins.put({
       id: `999:1000000000001`,
       characterId: 999,
@@ -916,11 +569,11 @@ describe('station pins (issue #84)', () => {
       updatedAt: Date.now(),
     });
     render(<App />);
-    await screen.findByRole('heading', { name: JITA });
-    expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+    await screen.findByText(JITA);
+    expect(locationOrder()).toEqual([JITA, STRUCTURE]);
   });
 
-  it('an account-wide pin elevates the station for every character', async () => {
+  it('an account-wide pin elevates the location for every character', async () => {
     await db.stationPins.put({
       id: `999:1000000000001`,
       characterId: 999,
@@ -929,49 +582,10 @@ describe('station pins (issue #84)', () => {
       updatedAt: Date.now(),
     });
     render(<App />);
-    await screen.findByRole('heading', { name: JITA });
-    expect(stationOrder()).toEqual([STRUCTURE, JITA]);
-  });
-
-  it('a pinned station with nested nodes starts expanded on page load', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
-        HttpResponse.json(
-          [
-            {
-              item_id: 10,
-              type_id: 650,
-              quantity: 1,
-              location_id: 60003760,
-              location_type: 'station' as const,
-              location_flag: 'Hangar',
-              is_singleton: true,
-            },
-            {
-              item_id: 11,
-              type_id: 34,
-              quantity: 50,
-              location_id: 10,
-              location_type: 'item' as const,
-              location_flag: 'Cargo',
-              is_singleton: false,
-            },
-          ],
-          { headers: { 'X-Pages': '1' } }
-        )
-      )
-    );
-    await db.stationPins.put({
-      id: `${CHAR_ID}:60003760`,
-      characterId: CHAR_ID,
-      locationId: 60003760,
-      scope: 'character',
-      updatedAt: Date.now(),
+    await screen.findByText(JITA);
+    await waitFor(() => {
+      expect(locationOrder()).toEqual([STRUCTURE, JITA]);
     });
-
-    render(<App />);
-    await screen.findByRole('heading', { name: 'Drake' });
-    expect(await screen.findByText('Cargo Hold')).toBeInTheDocument();
   });
 });
 
@@ -1000,20 +614,23 @@ describe('item tooltip and context menu (issue #83)', () => {
     );
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
 
     const name = await screen.findByText('Drake');
     await user.hover(name);
 
-    const tooltip = await screen.findByRole('tooltip');
-    expect(within(tooltip).getByText('Drake')).toBeInTheDocument();
-    expect(within(tooltip).getByText(/Qty 1/)).toBeInTheDocument();
-    expect(within(tooltip).getByText('Value: 1,200,000 ISK')).toBeInTheDocument();
-    expect(within(tooltip).getByText('Volume: 92,150 m3')).toBeInTheDocument();
-    expect(tooltip.querySelector('img')?.getAttribute('src')).toContain('/types/650/icon');
+    // Every icon-only toolbar button also carries a `role="tooltip"` bubble
+    // (always mounted, CSS-hidden — jsdom applies no CSS, so it's a "hidden"
+    // element in name only). Locate the item tooltip by its own content
+    // instead of the ambiguous role.
+    expect(await screen.findByText(/Qty 1/)).toBeInTheDocument();
+    expect(screen.getByText('Value: 1,200,000 ISK')).toBeInTheDocument();
+    expect(screen.getByText('Volume: 92,150 m3')).toBeInTheDocument();
+    const img = screen.getByText(/Qty 1/).closest('[role="tooltip"]')?.querySelector('img');
+    expect(img?.getAttribute('src')).toContain('/types/650/icon');
 
     await user.unhover(name);
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Qty 1/)).not.toBeInTheDocument();
   });
 
   it('shows the volume as unknown for a type outside the slim SDE snapshot', async () => {
@@ -1040,19 +657,18 @@ describe('item tooltip and context menu (issue #83)', () => {
     );
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
 
     const name = await screen.findByText('Mystery Module');
     await user.hover(name);
 
-    const tooltip = await screen.findByRole('tooltip');
-    expect(within(tooltip).getByText('Volume: unknown')).toBeInTheDocument();
+    expect(await screen.findByText('Volume: unknown')).toBeInTheDocument();
   });
 
   it('opens the shared item context menu on right-click, with a View in Market action', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     const item = await screen.findByText('Tritanium');
     item.focus();
     fireEvent.contextMenu(item);
@@ -1072,7 +688,7 @@ describe('item tooltip and context menu (issue #83)', () => {
   it('adds an item to the Quickbar from the Assets context menu, persisting to Dexie', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     const item = await screen.findByText('Tritanium');
     item.focus();
     fireEvent.contextMenu(item);
@@ -1088,7 +704,7 @@ describe('item tooltip and context menu (issue #83)', () => {
   it('navigates to the Market Browser with the item preselected via View in Market', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     const item = await screen.findByText('Tritanium');
     item.focus();
     fireEvent.contextMenu(item);
@@ -1157,7 +773,7 @@ describe('cross-character search (issue #85)', () => {
   it('does not show another character’s items until the toggle is turned on', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('tree', { name: /character assets/i });
+    await screen.findByText(JITA);
 
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
     expect(await screen.findByText(/no items match your search/i)).toBeInTheDocument();
@@ -1167,7 +783,7 @@ describe('cross-character search (issue #85)', () => {
   it('reaches other characters once the toggle is on, tagging the match with a character badge', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('tree', { name: /character assets/i });
+    await screen.findByText(JITA);
 
     await user.click(screen.getByRole('button', { name: /search all characters/i }));
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
@@ -1179,7 +795,7 @@ describe('cross-character search (issue #85)', () => {
   it('returns to single-character search once the toggle is turned back off', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('tree', { name: /character assets/i });
+    await screen.findByText(JITA);
 
     const toggle = screen.getByRole('button', { name: /search all characters/i });
     await user.click(toggle);
@@ -1193,7 +809,7 @@ describe('cross-character search (issue #85)', () => {
 });
 
 describe('jumps-away distance (issue #87)', () => {
-  it('shows 0 jumps for a pinned station in the character’s own system, without a route call', async () => {
+  it('shows 0 jumps for a pinned location in the character’s own system, without a route call', async () => {
     const user = userEvent.setup();
     let routeCalled = false;
     server.use(
@@ -1204,7 +820,7 @@ describe('jumps-away distance (issue #87)', () => {
     );
     render(<App />);
     const pinButton = await screen.findByRole('button', {
-      name: /Pin toggle for Jita IV/,
+      name: new RegExp(`Pin toggle for ${escapeRegExp(JITA)}`),
     });
     await user.click(pinButton);
 
@@ -1266,7 +882,7 @@ describe('jumps-away distance (issue #87)', () => {
 
     render(<App />);
 
-    // Both visible stations degrade the same way — no pin needed for either.
+    // Both visible locations degrade the same way — no pin needed for either.
     const badges = await screen.findAllByTitle('Character location unavailable.');
     expect(badges.length).toBeGreaterThan(0);
     for (const badge of badges) expect(badge).toHaveTextContent('-');
@@ -1310,16 +926,7 @@ describe('jumps-away distance (issue #87)', () => {
   });
 });
 
-describe('station sort (issue #88)', () => {
-  const JITA = 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
-  const STRUCTURE = 'Structure #1000000000001';
-
-  function stationOrder(): string[] {
-    return screen
-      .getAllByRole('heading', { name: new RegExp(`^(${JITA}|${STRUCTURE})$`) })
-      .map((h) => h.textContent);
-  }
-
+describe('location sort (issue #88)', () => {
   // Default fixture: Jita holds 500 Tritanium (type 34), the structure holds
   // 10 Pyerite (type 35) — pricing Pyerite far above Tritanium makes the
   // structure's estimated value the larger one while its name still sorts
@@ -1336,29 +943,29 @@ describe('station sort (issue #88)', () => {
     );
   }
 
-  it('defaults to sorting stations by name', async () => {
+  it('defaults to sorting locations by name', async () => {
     render(<App />);
-    await screen.findByRole('heading', { name: JITA });
-    expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+    await screen.findByText(JITA);
+    expect(locationOrder()).toEqual([JITA, STRUCTURE]);
     expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveTextContent('Name');
   });
 
-  it('re-sorts the station list by estimated value when "Value" is selected', async () => {
+  it('re-sorts the location list by estimated value when "Value" is selected', async () => {
     const user = userEvent.setup();
     priceStructureAboveJita();
     render(<App />);
-    await screen.findByRole('heading', { name: JITA });
-    expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+    await screen.findByText(JITA);
+    expect(locationOrder()).toEqual([JITA, STRUCTURE]);
 
     await user.click(screen.getByRole('combobox', { name: 'Sort' }));
     await user.click(await screen.findByRole('option', { name: 'Value' }));
 
     await waitFor(() => {
-      expect(stationOrder()).toEqual([STRUCTURE, JITA]);
+      expect(locationOrder()).toEqual([STRUCTURE, JITA]);
     });
   });
 
-  it('keeps a pinned station on top even under a "Value" sort it would otherwise lose', async () => {
+  it('keeps a pinned location on top even under a "Value" sort it would otherwise lose', async () => {
     const user = userEvent.setup();
     priceStructureAboveJita();
     await db.stationPins.put({
@@ -1369,13 +976,13 @@ describe('station sort (issue #88)', () => {
       updatedAt: Date.now(),
     });
     render(<App />);
-    await screen.findByRole('heading', { name: JITA });
+    await screen.findByText(JITA);
 
     await user.click(screen.getByRole('combobox', { name: 'Sort' }));
     await user.click(await screen.findByRole('option', { name: 'Value' }));
 
     await waitFor(() => {
-      expect(stationOrder()).toEqual([JITA, STRUCTURE]);
+      expect(locationOrder()).toEqual([JITA, STRUCTURE]);
     });
   });
 
@@ -1383,19 +990,19 @@ describe('station sort (issue #88)', () => {
     const user = userEvent.setup();
     priceStructureAboveJita();
     const { unmount } = render(<App />);
-    await screen.findByRole('heading', { name: JITA });
+    await screen.findByText(JITA);
 
     await user.click(screen.getByRole('combobox', { name: 'Sort' }));
     await user.click(await screen.findByRole('option', { name: 'Value' }));
     await waitFor(() => {
-      expect(stationOrder()).toEqual([STRUCTURE, JITA]);
+      expect(locationOrder()).toEqual([STRUCTURE, JITA]);
     });
     unmount();
 
     render(<App />);
-    await screen.findByRole('heading', { name: JITA });
+    await screen.findByText(JITA);
     await waitFor(() => {
-      expect(stationOrder()).toEqual([STRUCTURE, JITA]);
+      expect(locationOrder()).toEqual([STRUCTURE, JITA]);
     });
     expect(screen.getByRole('combobox', { name: 'Sort' })).toHaveTextContent('Value');
   });
@@ -1407,7 +1014,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
   it('shows no checkboxes in browsing mode; toggling select mode reveals them', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('tree', { name: /character assets/i });
+    await screen.findByText(JITA);
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
 
     await user.click(screen.getByRole('button', { name: 'Select' }));
@@ -1445,7 +1052,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
     );
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     await screen.findByRole('heading', { name: 'Drake' });
 
     await user.click(screen.getByRole('button', { name: 'Select' }));
@@ -1457,7 +1064,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
   it('turning off select mode clears the current selection', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     await screen.findByText('Tritanium');
 
     await user.click(screen.getByRole('button', { name: 'Select' }));
@@ -1474,9 +1081,23 @@ describe('multi-select and bulk actions (issue #90)', () => {
   });
 
   it('adds every selected item to the Quickbar via the bulk action bar', async () => {
+    // Both items at one location so both are on screen together — the
+    // default fixture spreads them across two locations on purpose, to keep
+    // the location-scoping tests unambiguous.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            { ...assetPage1[0], item_id: 1, type_id: 34 },
+            { ...assetPage1[0], item_id: 2, type_id: 35 },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
 
@@ -1497,7 +1118,7 @@ describe('multi-select and bulk actions (issue #90)', () => {
   it('adds every selected item to the Compare set via the bulk action bar', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     await screen.findByText('Tritanium');
 
     await user.click(screen.getByRole('button', { name: 'Select' }));
@@ -1508,11 +1129,22 @@ describe('multi-select and bulk actions (issue #90)', () => {
   });
 
   it('copies every selected item’s name, newline-separated, to the clipboard', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            { ...assetPage1[0], item_id: 1, type_id: 34 },
+            { ...assetPage1[0], item_id: 2, type_id: 35 },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
     const writeText = vi.fn().mockResolvedValue(undefined);
     configureClipboard(writeText);
     const user = userEvent.setup();
     render(<App />);
-    await expandAllStations();
+    await openLocation(user, JITA);
     await screen.findByText('Tritanium');
     await screen.findByText('Pyerite');
 
@@ -1521,6 +1153,8 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select Pyerite' }));
     await user.click(screen.getByRole('button', { name: 'Copy names' }));
 
-    expect(writeText).toHaveBeenCalledWith('Tritanium\nPyerite');
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('Tritanium\nPyerite');
+    });
   });
 });

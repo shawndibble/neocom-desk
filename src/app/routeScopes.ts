@@ -91,6 +91,20 @@ export const ROUTE_REQUIREMENTS = {
     ],
     strings: 'assets',
   },
+  // The drill-down's deeper levels (issue #148 follow-up). "Where am I" lives
+  // in the URL so the back button steps up a level instead of leaving the
+  // page, which makes every level a real route — and every level renders the
+  // same component off the same endpoints, so it gates identically.
+  '/assets/*': {
+    endpoints: [
+      'getCharacterAssets',
+      'getUniverseStation',
+      'getUniverseSystem',
+      'postUniverseNames',
+      'getUniverseType',
+    ],
+    strings: 'assets',
+  },
   '/mail': {
     endpoints: ['getCharacterMailHeaders', 'getCharacterMail', 'postUniverseNames'],
     strings: 'mail',
