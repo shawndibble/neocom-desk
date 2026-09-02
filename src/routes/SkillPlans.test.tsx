@@ -1313,4 +1313,18 @@ describe('SkillPlans: current skill queue panel', () => {
       expect.stringContaining('Spaceship Command I'),
     ]);
   });
+
+  // #218: the plan list/editor is what a visitor came to this page to work
+  // with; the current queue is secondary reference info and must follow it,
+  // not precede it.
+  it('renders after the plan list/editor grid, not before it', async () => {
+    render(<App />);
+
+    const listPanel = (await screen.findByText('New plan')).closest('section')!;
+    const queuePanel = (await screen.findByText('Current skill queue')).closest('section')!;
+
+    expect(
+      listPanel.compareDocumentPosition(queuePanel) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
 });
