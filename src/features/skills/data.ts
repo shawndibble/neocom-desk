@@ -18,6 +18,7 @@ import {
   loadWithCache,
   loadWithCacheStatus,
   GLOBAL_CACHE_CHARACTER_ID,
+  STALE_AFTER,
   type CachedResult,
   type ExpiresCapture,
   type StatusResult,
@@ -129,7 +130,10 @@ export function loadUniverseType(typeId: number): Promise<CachedResult<UniverseT
   return loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     `type:${typeId}`,
-    async () => (await getUniverseType(typeId)).data
+    async () => (await getUniverseType(typeId)).data,
+    // An item type's name, description and dogma attributes change only when
+    // CCP patches them — not on the app's 10-minute cadence.
+    { staleAfterMs: STALE_AFTER.static }
   );
 }
 

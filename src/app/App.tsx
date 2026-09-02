@@ -9,6 +9,7 @@ import { registerPeriodicSync, liveBackgroundSyncEnv } from './backgroundSync';
 import { triggerSync } from '@/sync';
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
+import { prefetchCharacterData } from './prefetch';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import { Characters } from '@/routes/Characters';
@@ -130,6 +131,19 @@ export function App() {
   useEffect(() => {
     if (activeCharacterId === null || !isSyncConfigured()) return;
     void triggerSync(activeCharacterId).catch(() => {});
+  }, [activeCharacterId]);
+
+  // Same shape, for API-derived data: warm every granted surface into Dexie at
+  // boot so a later page opens from cache rather than the network. Cancelled on
+  // character switch so a slow run cannot keep spending requests for a
+  // character the user has already left.
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    const signal = { cancelled: false };
+    void prefetchCharacterData(activeCharacterId, signal);
+    return () => {
+      signal.cancelled = true;
+    };
   }, [activeCharacterId]);
 
   return (

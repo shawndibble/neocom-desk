@@ -3,6 +3,11 @@ import { db } from '@/db';
 import { EsiError } from './client';
 import {
   invalidateFreshness,
+  onCacheRevalidated,
+  resetRevalidationState,
+  REFRESH_BYPASS_MS,
+  STALE_AFTER,
+  STALE_GRACE_MS,
   loadPaginatedWithCache,
   loadPaginatedWithCacheStatus,
   loadWithCache,
@@ -19,7 +24,18 @@ const KEY = 'thing';
 
 beforeEach(async () => {
   await db.esiCache.clear();
+  // Module state, not Dexie state: without this one test's failed revalidation
+  // for [91, 'thing'] silently suppresses the next test's fetch for the same key.
+  resetRevalidationState();
 });
+
+/**
+ * Every assertion in this file below this point exercises the *fast* path: a
+ * live call that settles well inside `STALE_GRACE_MS` keeps the single-phase
+ * contract it always had, including `needsReauth` and `skipCacheOnAuthFailure`.
+ * That is the point of racing rather than serving stale unconditionally — see
+ * the "grace period" block at the end for the slow path.
+ */
 
 describe('GLOBAL_CACHE_CHARACTER_ID', () => {
   it('is the sentinel row 0', () => {
@@ -516,25 +532,118 @@ describe('freshness window', () => {
     const capture = { value: null as string | null };
     vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
     const fetchLive = vi.fn(async () => {
-      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      // An hour, so the Expires header rather than the TTL floor is what this
+      // test is stepping past.
+      capture.value = new Date(1_000_000 + 3_600_000).toUTCString();
       return 'live-value';
     });
 
     await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
 
-    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + 70_000); // past the 60s window
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + 3_700_000);
     await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
 
     expect(fetchLive).toHaveBeenCalledTimes(2);
   });
 
-  it('a call with no expiresCapture never gets a freshness window (safe default)', async () => {
+  it('a call with no expiresCapture still gets the default window', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
     const fetchLive = vi.fn(async () => 'live-value');
 
     await loadWithCache(CHAR_ID, KEY, fetchLive);
     await loadWithCache(CHAR_ID, KEY, fetchLive);
 
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('the default window expires after STALE_AFTER.default', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => 'live-value');
+
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + STALE_AFTER.default + 1);
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+
     expect(fetchLive).toHaveBeenCalledTimes(2);
+  });
+
+  it('staleAfterMs overrides the default, for immutable game data', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => 'live-value');
+    const options = { staleAfterMs: STALE_AFTER.static };
+
+    await loadWithCache(CHAR_ID, KEY, fetchLive, options);
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + STALE_AFTER.default + 1);
+    await loadWithCache(CHAR_ID, KEY, fetchLive, options);
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('a longer Expires header wins over the TTL, never shortens it', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const capture = { value: null as string | null };
+    const fetchLive = vi.fn(async () => {
+      // ESI declares an hour — longer than the 10-minute default floor.
+      capture.value = new Date(1_000_000 + 3_600_000).toUTCString();
+      return 'live-value';
+    });
+
+    await loadWithCache(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + STALE_AFTER.default + 1);
+    await loadWithCache(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('a shorter Expires header does not shorten the TTL floor', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const capture = { value: null as string | null };
+    const fetchLive = vi.fn(async () => {
+      // ESI's own 60s cache; the floor is what the user asked for instead.
+      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      return 'live-value';
+    });
+
+    await loadWithCache(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + 70_000);
+    await loadWithCache(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('a manual refresh bypasses the window only for the moments it is running', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => 'live-value');
+
+    // The refreshing route reloads its own key: bypassed, as intended.
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+    invalidateFreshness();
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+    expect(fetchLive).toHaveBeenCalledTimes(2);
+
+    // Another route's key, navigated to well after that refresh settled: its
+    // own window still holds. A global bypass would have refetched everything.
+    const other = vi.fn(async () => 'other-value');
+    await loadWithCache(CHAR_ID, 'other-key', other);
+    invalidateFreshness();
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + REFRESH_BYPASS_MS + 1);
+    await loadWithCache(CHAR_ID, 'other-key', other);
+
+    expect(other).toHaveBeenCalledTimes(1);
+  });
+
+  it('a manual refresh does not re-read game constants', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => 'Jita IV - Moon 4');
+    const options = { staleAfterMs: STALE_AFTER.static };
+
+    // Assets resolves one of these per distinct location; a Refresh click that
+    // refetched them all would turn one click into a fan-out over map data.
+    await loadWithCache(CHAR_ID, KEY, fetchLive, options);
+    invalidateFreshness();
+    await loadWithCache(CHAR_ID, KEY, fetchLive, options);
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
   });
 
   it('invalidateFreshness makes the very next call bypass an active window (manual refresh)', async () => {
@@ -589,5 +698,234 @@ describe('freshness window', () => {
     expect(fetchLive).toHaveBeenCalledTimes(1);
     expect(result.cached?.data).toEqual(['a', 'b']);
     expect(result.cached?.fromCache).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Grace period: past the window, a live call that dawdles does not hold the
+// view hostage — the stored row is shown and the call finishes behind it.
+// Ordering assertions, so `fetchLive` is driven off a promise the test settles
+// by hand; a mocked clock alone would pass an implementation that never
+// returned early at all.
+// ---------------------------------------------------------------------------
+
+describe('grace period past the freshness window', () => {
+  /** A `fetchLive` the test decides when, and whether, to settle. */
+  function deferredFetch<T>(value: T, failWith: unknown = new Error('offline')) {
+    let settle!: (ok: boolean) => void;
+    const gate = new Promise<void>((resolve, reject) => {
+      settle = (ok) => (ok ? resolve() : reject(failWith));
+    });
+    const fetchLive = vi.fn(async () => {
+      await gate;
+      return value;
+    });
+    return { fetchLive, settle };
+  }
+
+  /** Resolves the next time a late live call reports back. */
+  function nextRevalidation(): Promise<void> {
+    return new Promise((resolve) => {
+      const off = onCacheRevalidated(() => {
+        off();
+        resolve();
+      });
+    });
+  }
+
+  async function seedStaleRow(value: unknown): Promise<void> {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: KEY,
+      value,
+      fetchedAt: Date.now() - STALE_AFTER.default - 60_000,
+    });
+  }
+
+  /**
+   * Waits out the real grace timer.
+   *
+   * Deliberately not `vi.useFakeTimers()`: `fake-indexeddb` schedules its own
+   * work on the same timers, so faking them deadlocks every Dexie read in this
+   * block — including the one `loadPastWindow` makes *after* the grace expires.
+   * A real quarter second per test is the cheaper price.
+   */
+  async function expireGrace(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, STALE_GRACE_MS + 25));
+  }
+
+  beforeEach(async () => {
+    await clearCachePurgePending(CHAR_ID);
+    // `freshnessInvalidatedAt` is module state with a 30s reach, so the manual
+    // refresh test below would otherwise keep every later test's row from
+    // being substituted. Pinning it to 0 puts it far outside REFRESH_BYPASS_MS.
+    vi.spyOn(Date, 'now').mockReturnValue(0);
+    invalidateFreshness();
+    vi.restoreAllMocks();
+  });
+
+  it('shows the stored row once the grace period passes, without waiting for the call', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('fresh');
+
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await expireGrace();
+    const result = await pending;
+
+    // Resolved while fetchLive is still pending — the point of the whole thing.
+    expect(result.cached?.data).toBe('two-days-old');
+    // No bad news yet, so no view raises its offline banner.
+    expect(result.cached?.fromCache).toBe(false);
+    settle(true);
+  });
+
+  it('waits for a call that answers inside the grace period, and shows fresh data', async () => {
+    await seedStaleRow('two-days-old');
+
+    const result = await loadWithCacheStatus<string>(CHAR_ID, KEY, async () => 'fresh');
+
+    expect(result.cached?.data).toBe('fresh');
+    expect(result.cached?.fromCache).toBe(false);
+  });
+
+  it('writes the late result and signals, so a mounted view can silently re-read it', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('fresh');
+    const signalled = nextRevalidation();
+
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await expireGrace();
+    await pending;
+
+    settle(true);
+    await signalled;
+
+    const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    expect(reread.cached?.data).toBe('fresh');
+    expect(reread.cached?.fromCache).toBe(false);
+  });
+
+  it('a late failure signals too, and the re-read raises the offline banner', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('never-arrives');
+    const signalled = nextRevalidation();
+
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await expireGrace();
+    expect((await pending).cached?.fromCache).toBe(false);
+
+    settle(false);
+    await signalled;
+
+    // The bad news the optimistic read had none of.
+    const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    expect(reread.cached?.data).toBe('two-days-old');
+    expect(reread.cached?.fromCache).toBe(true);
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start another slow call after a late failure, so the signal cannot loop', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('never-arrives');
+    const signalled = nextRevalidation();
+
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await expireGrace();
+    await pending;
+    settle(false);
+    await signalled;
+
+    await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('still withholds the row from a caller that opted out of stale-on-auth-failure', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch(
+      'never-arrives',
+      new EsiError(403, 'missing scope')
+    );
+    const options = {
+      detectAuthFailure: (err: unknown) => err instanceof EsiError && err.status === 403,
+      skipCacheOnAuthFailure: true,
+    };
+    const signalled = nextRevalidation();
+
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive, options);
+    await expireGrace();
+    await pending;
+
+    settle(false);
+    await signalled;
+
+    // industry jobs / PI: a revoked scope must not leave a row on screen the
+    // character may no longer be entitled to.
+    const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive, options);
+    expect(reread.cached).toBeNull();
+  });
+
+  it('never substitutes a stored row for a manual refresh', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('fresh');
+    invalidateFreshness();
+
+    let resolved = false;
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive).then((r) => {
+      resolved = true;
+      return r;
+    });
+    await expireGrace();
+    // The user clicked Refresh and is watching the button: it must report what
+    // actually happened, not hand back the row it already had.
+    expect(resolved).toBe(false);
+
+    settle(true);
+    expect((await pending).cached?.data).toBe('fresh');
+  });
+
+  it('never substitutes a stored row for game constants', async () => {
+    const stationKey = 'station:60003760';
+    await db.esiCache.put({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: stationKey,
+      value: 'Jita IV - Moon 4',
+      fetchedAt: Date.now() - STALE_AFTER.static - 60_000,
+    });
+    const { fetchLive, settle } = deferredFetch('Jita IV - Moon 4');
+
+    let resolved = false;
+    const pending = loadWithCacheStatus<string>(GLOBAL_CACHE_CHARACTER_ID, stationKey, fetchLive, {
+      staleAfterMs: STALE_AFTER.static,
+    }).then((r) => {
+      resolved = true;
+      return r;
+    });
+    await expireGrace();
+    expect(resolved).toBe(false);
+
+    settle(true);
+    await pending;
+  });
+
+  it('applies to the paginated path too, not just the singular one', async () => {
+    await seedStaleRow(['a', 'b']);
+    let settle!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const fetchLive = vi.fn(async () => {
+      await gate;
+      return { items: ['a', 'b', 'c'], truncated: false };
+    });
+
+    const pending = loadPaginatedWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await expireGrace();
+    const result = await pending;
+
+    expect(result.cached?.data).toEqual(['a', 'b']);
+    expect(result.cached?.fromCache).toBe(false);
+    settle();
   });
 });

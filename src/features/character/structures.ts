@@ -15,7 +15,7 @@
 import { AuthError } from '@/auth/sso';
 import { getUniverseStructure, type UniverseStructure } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
-import { loadWithCache } from '@/esi/cache';
+import { loadWithCache, STALE_AFTER } from '@/esi/cache';
 
 function cacheKey(structureId: number): string {
   return `structure:${structureId}`;
@@ -32,6 +32,10 @@ async function loadStructure(
     {
       detectAuthFailure: (err) =>
         err instanceof AuthError || (err instanceof EsiError && err.status === 401),
+      // A structure can be renamed, but rarely, and the Assets tree resolves
+      // one per distinct location — refetching them on the 10-minute cadence
+      // would make every Assets visit a fan-out for names that did not move.
+      staleAfterMs: STALE_AFTER.static,
     }
   );
   return result?.data ?? null;

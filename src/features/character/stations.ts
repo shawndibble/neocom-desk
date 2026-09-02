@@ -5,7 +5,7 @@
  * scope-gated) — see `structures.ts`'s `loadStructureName`.
  */
 import { getUniverseStation, type UniverseStation } from '@/esi/endpoints';
-import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER } from '@/esi/cache';
 
 function cacheKey(stationId: number): string {
   return `station:${stationId}`;
@@ -15,7 +15,9 @@ async function loadStation(stationId: number): Promise<UniverseStation | null> {
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     cacheKey(stationId),
-    async () => (await getUniverseStation(stationId)).data
+    async () => (await getUniverseStation(stationId)).data,
+    // An NPC station's name and system do not change.
+    { staleAfterMs: STALE_AFTER.static }
   );
   return result?.data ?? null;
 }
