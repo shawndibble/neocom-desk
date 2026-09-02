@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, Disclosure, EmptyState, InfoTooltip, StatChip } from '@/components/ui';
+import { DataTable, Disclosure, EmptyState, FilterChip, InfoTooltip } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
 import { formatDuration } from '@/lib/duration';
@@ -14,8 +14,9 @@ interface CostRowProps {
   tooltip?: string;
   emphasized?: boolean;
   indented?: boolean;
-  /** `'negative'` renders the value in the `isk-neg` tone, for deductions like Sales Tax/Broker Fee. */
-  tone?: 'negative';
+  /** `'negative'`/`'positive'` render the value in the `isk-neg`/`isk-pos` tone, e.g. for
+   * deductions like Sales Tax/Broker Fee, or a Profit row that can go either way. */
+  tone?: 'negative' | 'positive';
 }
 
 /** One row of the Costs stack: label (+ optional tooltip) left, value right. */
@@ -28,6 +29,14 @@ function CostRow({
   tone,
 }: CostRowProps) {
   const { t } = useTranslation();
+  const toneClass =
+    tone === 'negative'
+      ? 'text-isk-neg'
+      : tone === 'positive'
+        ? 'text-isk-pos'
+        : emphasized
+          ? 'text-accent'
+          : 'text-text';
   return (
     <div
       className={`flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem] ${indented ? 'pl-7' : ''}`}
@@ -36,9 +45,7 @@ function CostRow({
         {label}
         {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
       </span>
-      <span
-        className={`font-medium tabular-nums ${emphasized ? 'text-sm text-accent' : tone === 'negative' ? 'text-isk-neg' : 'text-text'}`}
-      >
+      <span className={`font-medium tabular-nums ${emphasized ? 'text-sm' : ''} ${toneClass}`}>
         {value}
       </span>
     </div>
@@ -84,6 +91,7 @@ export function ResultsSummary({
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
+  const [profitView, setProfitView] = useState<'net' | 'gross'>('net');
 
   const revenueColumns = useMemo<DataTableColumn<RevenueRow>[]>(
     () => [
@@ -124,6 +132,9 @@ export function ResultsSummary({
   }
 
   const hasVerdict = result.recommendation !== 'unknown';
+  const displayProfit = profitView === 'gross' ? result.grossProfit : result.profit;
+  const displayMargin = profitView === 'gross' ? result.grossMargin : result.marginPct;
+  const displayIskPerHour = profitView === 'gross' ? result.grossIskPerHour : result.iskPerHour;
 
   return (
     <div className="space-y-3">
@@ -225,24 +236,39 @@ export function ResultsSummary({
         )}
 
       {(result.profit !== null || result.marginPct !== null || result.iskPerHour !== null) && (
-        <div className="flex flex-wrap gap-2">
-          {result.profit !== null && (
-            <StatChip
-              label={t('industry.profit')}
-              value={formatIsk(result.profit)}
-              tone={result.profit >= 0 ? 'success' : 'danger'}
+        <div className="space-y-2">
+          <div role="group" aria-label={t('industry.profitToggleLabel')} className="flex gap-1.5">
+            <FilterChip
+              label={t('industry.toggleNet')}
+              selected={profitView === 'net'}
+              onToggle={() => setProfitView('net')}
             />
-          )}
-          {result.marginPct !== null && (
-            <StatChip label={t('industry.margin')} value={formatPercent(result.marginPct)} />
-          )}
-          {result.iskPerHour !== null && (
-            <StatChip
-              label={t('industry.iskPerHour')}
-              value={formatIsk(result.iskPerHour)}
-              tooltip={t('industry.iskPerHourTooltip')}
+            <FilterChip
+              label={t('industry.toggleGross')}
+              selected={profitView === 'gross'}
+              onToggle={() => setProfitView('gross')}
             />
-          )}
+          </div>
+          <div className="divide-y divide-line rounded-xs border border-line">
+            {displayProfit !== null && (
+              <CostRow
+                label={t('industry.profit')}
+                value={formatIsk(displayProfit)}
+                emphasized
+                tone={displayProfit >= 0 ? 'positive' : 'negative'}
+              />
+            )}
+            {displayMargin !== null && (
+              <CostRow label={t('industry.margin')} value={formatPercent(displayMargin)} />
+            )}
+            {displayIskPerHour !== null && (
+              <CostRow
+                label={t('industry.iskPerHour')}
+                value={formatIsk(displayIskPerHour)}
+                tooltip={t('industry.iskPerHourTooltip')}
+              />
+            )}
+          </div>
         </div>
       )}
 

@@ -197,9 +197,14 @@ export interface BuildResult {
   netRevenue: number | null;
   /** revenue - salesTax - brokerFee - totalCost; null when unpriceable. */
   profit: number | null;
-  /** profit / totalCost x 100; null when unpriceable. */
+  /** profit / revenue x 100; null when unpriceable. */
   marginPct: number | null;
   iskPerHour: number | null;
+  /** revenue - totalCost (no selling fees); null when unpriceable. */
+  grossProfit: number | null;
+  /** grossProfit / revenue x 100; null when unpriceable. */
+  grossMargin: number | null;
+  grossIskPerHour: number | null;
   /** Material typeIDs with no hub price. */
   unpricedMaterials: number[];
   /** True when any material or the product lacks a hub price. */
