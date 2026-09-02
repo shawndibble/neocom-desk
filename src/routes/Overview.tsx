@@ -96,7 +96,6 @@ export function Overview() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <OverviewSubNav />
       <header className="flex flex-wrap items-center gap-3">
         <CharacterAvatar
           characterId={activeCharacterId}
@@ -134,6 +133,7 @@ export function Overview() {
           />
         </div>
       </header>
+      <OverviewSubNav />
 
       {loading ? (
         <div className="flex justify-center py-16">

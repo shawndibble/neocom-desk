@@ -2,17 +2,16 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
 import type { AppRoutePath } from '@/app/routeScopes';
-
-// The focus ring is spelled out rather than left to the UA default: there is
-// no global focus rule in the stylesheet, and DESIGN.md §7 asks for a visible
-// accent ring on every interactive element.
-const LINK =
-  'inline-flex h-8 items-center gap-1.5 border-b-2 px-3 text-xs font-semibold tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
-const ACTIVE = 'border-accent text-text';
-const IDLE = 'border-transparent text-text-dim hover:text-text';
+import { cx } from '@/lib/cx';
+import {
+  tabItemActiveClassName,
+  tabItemClassName,
+  tabItemIdleClassName,
+  tabListClassName,
+} from '@/components/ui/tabStyles';
 
 function subNavClass({ isActive }: { isActive: boolean }): string {
-  return `${LINK} ${isActive ? ACTIVE : IDLE}`;
+  return cx(tabItemClassName, 'gap-1.5', isActive ? tabItemActiveClassName : tabItemIdleClassName);
 }
 
 /**
@@ -37,7 +36,7 @@ export function OverviewSubNav() {
   const locked = useLockedRoutes(TAB_PATHS);
 
   return (
-    <nav aria-label={t('nav.overview')} className="flex gap-1 border-b border-line">
+    <nav aria-label={t('nav.overview')} className={tabListClassName}>
       <NavLink to="/overview" className={subNavClass}>
         {t('nav.overview')}
       </NavLink>
