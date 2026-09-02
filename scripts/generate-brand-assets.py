@@ -105,10 +105,16 @@ def main() -> None:
 
     for size in (192, 512):
         on_plate(mark, size, 0.78).save(ICONS / f"icon-{size}.png")
-    # Android crops icons to a mask that can bite ~10% off each edge, so the
-    # maskable variant is the same art pulled well inside the safe zone rather
-    # than a differently-cropped one.
-    on_plate(mark, 512, 0.60).save(ICONS / "icon-512-maskable.png")
+    # Android crops icons to a mask -- in the worst case a circle of 80% of the
+    # canvas -- so the maskable variant is the same art pulled inside that safe
+    # circle rather than a differently-cropped one. It sits at the same 0.78 as
+    # the plain icons and no lower: `contain` sizes the mark by its taller axis,
+    # so at 0.78 the *whole* bbox, glow included, is 399px on a 512 canvas and
+    # clears the 410px safe circle -- and the hexagon inside it is shorter still
+    # (the bbox carries ~30px of glow below the bottom vertex), which leaves the
+    # corners a further margin. Pulling it in to 0.60 as earlier drafts did was
+    # not safety, just a mark floating in a large empty circle on the launcher.
+    on_plate(mark, 512, 0.78).save(ICONS / "icon-512-maskable.png")
     on_plate(mark, 180, 0.78).save(ICONS / "apple-touch-icon-180.png")
 
     # Safari and other browsers that skip the SVG link land here (Chrome and
