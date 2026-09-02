@@ -25,6 +25,7 @@ describe('VariationsTable', () => {
         truncated={false}
         prices={new Map()}
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     expect(container).toBeEmptyDOMElement();
@@ -44,6 +45,7 @@ describe('VariationsTable', () => {
           ])
         }
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     const rowEls = screen.getAllByRole('row').slice(1); // drop header row
@@ -61,6 +63,7 @@ describe('VariationsTable', () => {
         truncated={false}
         prices={new Map()}
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     expect(screen.getByText('—')).toBeInTheDocument();
@@ -74,6 +77,7 @@ describe('VariationsTable', () => {
         truncated={false}
         prices={new Map()}
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     expect(screen.getAllByText('Loading').length).toBeGreaterThanOrEqual(1);
@@ -87,6 +91,7 @@ describe('VariationsTable', () => {
         truncated={false}
         prices={new Map([[588, summary(null, 90)]])}
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     expect(screen.getByText('No sell orders')).toBeInTheDocument();
@@ -101,6 +106,7 @@ describe('VariationsTable', () => {
         truncated={false}
         prices={new Map([[588, summary(null, null)]])}
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     expect(screen.getAllByText('No orders')).toHaveLength(2);
@@ -116,12 +122,30 @@ describe('VariationsTable', () => {
         truncated={false}
         prices={new Map()}
         onSelect={onSelect}
+        onCompare={vi.fn()}
       />
     );
     const rifterRow = screen.getByText('Rifter').closest('tr');
     if (!rifterRow) throw new Error('expected a Rifter row');
     await user.click(rifterRow);
     expect(onSelect).toHaveBeenCalledWith(587);
+  });
+
+  it('calls onCompare when the Compare button is clicked', async () => {
+    const user = userEvent.setup();
+    const onCompare = vi.fn();
+    render(
+      <VariationsTable
+        rows={ROWS}
+        totalCount={3}
+        truncated={false}
+        prices={new Map()}
+        onSelect={vi.fn()}
+        onCompare={onCompare}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Compare' }));
+    expect(onCompare).toHaveBeenCalledTimes(1);
   });
 
   it('shows the truncated warning with the shown/total counts', () => {
@@ -132,6 +156,7 @@ describe('VariationsTable', () => {
         truncated={true}
         prices={new Map()}
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     expect(screen.getByText('Showing 3 of 40')).toBeInTheDocument();
@@ -152,6 +177,7 @@ describe('VariationsTable', () => {
           ])
         }
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     await user.click(screen.getByRole('button', { name: /Sell/ }));
@@ -168,6 +194,7 @@ describe('VariationsTable', () => {
         truncated={false}
         prices={new Map()}
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     await user.click(screen.getByRole('button', { name: /Name/ }));
@@ -192,6 +219,7 @@ describe('VariationsTable', () => {
           ])
         }
         onSelect={vi.fn()}
+        onCompare={vi.fn()}
       />
     );
     await user.click(screen.getByRole('button', { name: /Buy/ }));
