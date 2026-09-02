@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { usePrefetch, isPrefetching } from '@/stores/prefetch';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
@@ -32,6 +33,26 @@ import type { AppRoutePath } from './routeScopes';
 function SyncStatusIndicator() {
   const { status, online } = useSyncStatus();
   return <SyncStatusDot status={status} online={online} />;
+}
+
+/**
+ * Present only while the boot warm-up (`app/prefetch.ts`) has work outstanding.
+ * Unlike the sync dot it has no resting state: a permanently-idle second dot
+ * beside the first says nothing, and warming is over in seconds.
+ */
+function PrefetchIndicator() {
+  const { t } = useTranslation();
+  const running = usePrefetch(isPrefetching);
+  if (!running) return null;
+  const label = t('prefetch.running');
+  return (
+    <span
+      role="status"
+      title={label}
+      aria-label={label}
+      className="inline-block size-2 shrink-0 animate-pulse rounded-full bg-accent"
+    />
+  );
 }
 
 const NAV_LINK =
@@ -386,6 +407,7 @@ export function Layout() {
           <span className="flex-1 text-xs font-semibold tracking-widest uppercase">
             {t('app.name')}
           </span>
+          <PrefetchIndicator />
           {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
         {/* `overflow-y-auto` is what makes the character menu below actually

@@ -79,6 +79,30 @@ const FUZZWORK_AGGREGATES = {
   },
 };
 
+/** Character endpoints the boot prefetch reads that every spec is happy to see empty. */
+const PREFETCHED_EMPTY = new Set(
+  [
+    'assets',
+    'blueprints',
+    'calendar',
+    'contacts',
+    'contracts',
+    'industry/jobs',
+    'mail',
+    'orders',
+    'orders/history',
+    'planets',
+    'wallet/journal',
+    'wallet/transactions',
+  ].map((suffix) => `/characters/${CHARACTER_ID}/${suffix}`)
+);
+
+/** `/mail/labels` answers an object, not a list. */
+const EMPTY_MAIL_LABELS = { labels: [], total_unread_count: 0 };
+
+/** `/clones` likewise. `home_location` is optional in ESI's schema, so it is omitted rather than nulled. */
+const EMPTY_CLONES = { jump_clones: [] };
+
 const TINY_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1"/></svg>';
 
@@ -98,6 +122,14 @@ export async function installEsiMock(page: Page): Promise<void> {
     if (path === `/alliances/${ALLIANCE_ID}`) return json(ALLIANCE_INFO);
     if (path === '/markets/prices') return json(MARKET_PRICES);
     if (path === '/industry/systems') return json(INDUSTRY_SYSTEMS);
+
+    // Warmed at boot by `app/prefetch.ts` for every scope the mocked JWT
+    // grants — which is all of them. No spec asserts on these surfaces yet, so
+    // they answer empty; a spec that needs real rows should override this
+    // route rather than filling the fixture in for everyone.
+    if (PREFETCHED_EMPTY.has(path)) return json([]);
+    if (path === `/characters/${CHARACTER_ID}/mail/labels`) return json(EMPTY_MAIL_LABELS);
+    if (path === `/characters/${CHARACTER_ID}/clones`) return json(EMPTY_CLONES);
 
     const typeMatch = /^\/universe\/types\/(\d+)$/.exec(path);
     if (typeMatch) {

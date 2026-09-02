@@ -1,5 +1,5 @@
 import { test, expect } from './support/testBase';
-import { goExternallyOffline, loginAndSelectCharacter } from './support/login';
+import { expireCachedEsiRows, goExternallyOffline, loginAndSelectCharacter } from './support/login';
 import { CHARACTER_NAME } from './support/fixtureData';
 
 /**
@@ -7,12 +7,33 @@ import { CHARACTER_NAME } from './support/fixtureData';
  * enabled), so `context.setOffline(true)` followed by a reload can't work
  * here — it also blocks the app's own localhost dev server, leaving nothing
  * to serve index.html. Offline support in this app instead lives in
- * src/features/skills/data.ts's `loadWithCache`: a failed ESI fetch falls
- * back to the `esiCache` Dexie table. This spec proves that path: load with
- * live data, cut off only the external hosts (ESI/fuzzwork/images/SSO), then
- * reload — IndexedDB survives the reload, the live fetch fails, and the
- * cached character + skills + data-age badge should still render.
+ * `esi/cache.ts`, and these two specs split it between them: inside the
+ * freshness window a page does not notice the network is gone at all, and
+ * past that window a failed ESI fetch still falls back to the `esiCache`
+ * Dexie table. Both cut off only the external hosts (ESI/fuzzwork/images/SSO)
+ * and reload, since IndexedDB survives a reload.
  */
+test('serves a fresh page with no offline banner when external hosts go unreachable', async ({
+  page,
+}) => {
+  await loginAndSelectCharacter(page);
+  // Skills opens on Plans, so the trained view is one sub-nav click away.
+  await page.getByRole('link', { name: 'Skills' }).click();
+  await page.getByRole('link', { name: 'Trained' }).click();
+  await page.waitForURL(/\/skills\/trained$/);
+  await page.getByRole('button', { name: 'Expand all' }).click();
+  await expect(page.getByText('Caldari Frigate', { exact: true })).toBeVisible();
+
+  await goExternallyOffline(page);
+  await page.reload();
+
+  // Inside the freshness window the loader never attempts ESI, so losing the
+  // network is invisible: the rows render as current, with no banner.
+  await page.getByRole('button', { name: 'Expand all' }).click();
+  await expect(page.getByText('Caldari Frigate', { exact: true })).toBeVisible();
+  await expect(page.getByText('Showing cached data')).toHaveCount(0);
+});
+
 test('shows cached character and skills after external hosts go unreachable', async ({ page }) => {
   await loginAndSelectCharacter(page);
   // Skills opens on Plans, so the trained view is one sub-nav click away.
@@ -28,6 +49,9 @@ test('shows cached character and skills after external hosts go unreachable', as
   await expect(page.getByText('Showing cached data')).toHaveCount(0);
 
   await goExternallyOffline(page);
+  // Age the rows out of the freshness window, so the reload actually attempts
+  // ESI and exercises the fallback rather than the window the spec above covers.
+  await expireCachedEsiRows(page);
   await page.reload();
 
   // Active character persisted in Dexie settings/characters — no ESI call

@@ -23,3 +23,40 @@ export async function goExternallyOffline(page: Page): Promise<void> {
   await page.route('https://images.evetech.net/**', disconnect);
   await page.route('https://login.eveonline.com/**', disconnect);
 }
+
+/**
+ * Backdates every `esiCache` row past its freshness window (`esi/cache.ts`),
+ * so the next read attempts ESI instead of serving the row as current.
+ *
+ * Without this a spec cannot reach the offline-fallback path at all: a row
+ * written seconds ago is inside the window, so the loader returns it without
+ * touching the network and no "showing cached data" banner appears — which is
+ * the caching promise working, not the fallback. Raw IndexedDB rather than
+ * Dexie because this runs in the page, before the app's own module graph is
+ * necessarily reachable from the test.
+ */
+export async function expireCachedEsiRows(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('neocom');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction('esiCache', 'readwrite');
+      const store = tx.objectStore('esiCache');
+      store.openCursor().onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result;
+        if (!cursor) return;
+        // Two days back clears both windows — the 10-minute default and the
+        // 24-hour one the static/game-data loaders use.
+        cursor.update({ ...cursor.value, fetchedAt: Date.now() - 2 * ONE_DAY_MS });
+        cursor.continue();
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    database.close();
+  });
+}
