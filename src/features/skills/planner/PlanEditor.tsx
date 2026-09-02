@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -7,6 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
   InfoTooltip,
   Modal,
   NativeSelect,
@@ -14,6 +15,9 @@ import {
   TextInput,
   Tooltip,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { normalizePlanWithBoundaries } from '@/engine/plan';
 import { effectivePriority } from '@/engine/planPriority';
 import { computeSchedule } from '@/engine/schedule';
@@ -157,6 +161,10 @@ export function PlanEditor({
   onUpdate,
 }: PlanEditorProps) {
   const { t } = useTranslation();
+  // Icon-only toolbar below `lg` (#224): same breakpoint/hook the route
+  // (SkillPlanEditor.tsx) already gates its two-column layout on, so the
+  // toolbar's own switch can never disagree with the layout around it.
+  const isDesktop = useIsDesktop();
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<PlaceRemapsResult | null>(null);
@@ -507,6 +515,39 @@ export function PlanEditor({
     setReorderPreview(null);
   }
 
+  // One toolbar action, two renderings (#224): a full-text `Button` at `lg`+
+  // (unchanged from before this ticket), an icon-only `IconButton` below it —
+  // same `aria-label`/action either way, so a test (or a screen reader) that
+  // looks up the control by its accessible name finds it regardless of which
+  // one rendered. `label` doubles as the IconButton's Tooltip content, so no
+  // separate tooltip copy to keep in sync.
+  function toolbarAction({
+    icon,
+    label,
+    onClick,
+    disabled,
+  }: {
+    icon: ReactNode;
+    label: string;
+    onClick?: () => void;
+    disabled?: boolean;
+  }): ReactElement<{ 'aria-describedby'?: string }> {
+    return isDesktop ? (
+      <Button size="sm" onClick={onClick} disabled={disabled}>
+        {label}
+      </Button>
+    ) : (
+      <IconButton icon={icon} label={label} onClick={onClick} disabled={disabled} />
+    );
+  }
+
+  const optimizeRemapsButton = toolbarAction({
+    icon: <Icon.OptimizeRemaps />,
+    label: t('plans.optimizeRemaps'),
+    onClick: handleOptimizeRemaps,
+    disabled: scheduled.length === 0,
+  });
+
   return (
     <div className="space-y-4">
       <PlanHeader
@@ -517,16 +558,32 @@ export function PlanEditor({
       />
 
       <Panel title={t('plans.importExport')}>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => void handleImport()}>
-            {t('plans.importQueue')}
-          </Button>
-          <Button size="sm" onClick={() => setImportOpen(true)}>
-            {t('plans.importClipboard')}
-          </Button>
+        {/* Below `lg` these become icon-only (#224): a horizontally scrollable
+            row rather than `flex-wrap`, since IconButtons are square and wrap
+            far less gracefully than the full-text Buttons `lg`+ keeps. */}
+        <div
+          className={cx(
+            'flex items-center gap-2',
+            isDesktop ? 'flex-wrap' : 'flex-nowrap overflow-x-auto'
+          )}
+        >
+          {toolbarAction({
+            icon: <Icon.ImportQueue />,
+            label: t('plans.importQueue'),
+            onClick: () => void handleImport(),
+          })}
+          {toolbarAction({
+            icon: <Icon.ImportClipboard />,
+            label: t('plans.importClipboard'),
+            onClick: () => setImportOpen(true),
+          })}
           <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
             <DropdownMenuTrigger asChild>
-              <Button size="sm">{t('plans.export')}</Button>
+              {isDesktop ? (
+                <Button size="sm">{t('plans.export')}</Button>
+              ) : (
+                <IconButton icon={<Icon.Export />} label={t('plans.export')} />
+              )}
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem
@@ -605,40 +662,53 @@ export function PlanEditor({
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Tooltip content={t('plans.optimizeRemapsTooltip')}>
-              <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
-                {t('plans.optimizeRemaps')}
-              </Button>
-            </Tooltip>
+          {/* Below `lg` these become icon-only (#224), same horizontally
+              scrollable row as the Import/Export panel above. The inline
+              confirmations stay text (never icon-only) — they're transient
+              status, not actions. */}
+          <div
+            className={cx(
+              'flex items-center gap-2',
+              isDesktop ? 'flex-wrap' : 'flex-nowrap overflow-x-auto'
+            )}
+          >
+            {isDesktop ? (
+              <Tooltip content={t('plans.optimizeRemapsTooltip')}>{optimizeRemapsButton}</Tooltip>
+            ) : (
+              optimizeRemapsButton
+            )}
             {optimizeConfirm && (
               <span role="status" aria-live="polite" className="text-xs text-success">
                 {optimizeConfirm}
               </span>
             )}
-            <Button size="sm" onClick={handleAddMarker}>
-              {t('plans.addMarker')}
-            </Button>
+            {toolbarAction({
+              icon: <Icon.AddMarker />,
+              label: t('plans.addMarker'),
+              onClick: handleAddMarker,
+            })}
             {markerConfirm && (
               <span role="status" aria-live="polite" className="text-xs text-success">
                 {t('plans.markerAdded')}
               </span>
             )}
-            <Button
-              size="sm"
-              onClick={handleOptimizeAtMarkers}
-              disabled={scheduled.length === 0 || (plan.markers?.length ?? 0) === 0}
-            >
-              {t('plans.optimizeAtMarkers')}
-            </Button>
+            {toolbarAction({
+              icon: <Icon.OptimizeAtMarkers />,
+              label: t('plans.optimizeAtMarkers'),
+              onClick: handleOptimizeAtMarkers,
+              disabled: scheduled.length === 0 || (plan.markers?.length ?? 0) === 0,
+            })}
             {markersOptimizeConfirm && (
               <span role="status" aria-live="polite" className="text-xs text-success">
                 {markersOptimizeConfirm}
               </span>
             )}
-            <Button size="sm" onClick={handleSuggestReorder} disabled={scheduled.length === 0}>
-              {t('plans.suggestReorder')}
-            </Button>
+            {toolbarAction({
+              icon: <Icon.SuggestReorder />,
+              label: t('plans.suggestReorder'),
+              onClick: handleSuggestReorder,
+              disabled: scheduled.length === 0,
+            })}
             {reorderConfirm && (
               <span role="status" aria-live="polite" className="text-xs text-success">
                 {t('plans.reorderSuggested')}

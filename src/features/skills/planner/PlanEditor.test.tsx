@@ -218,6 +218,96 @@ describe('PlanEditor toolbar reorganization', () => {
   });
 });
 
+describe('PlanEditor icon-only toolbar below desktop width (#224)', () => {
+  // jsdom's default `window.matchMedia` (vitest.setup.ts) never matches, so
+  // this already runs at a narrow (below-`lg`) viewport with no mock needed.
+  it('renders the toolbar actions as icon-only buttons, same accessible names as the text buttons, in a scrollable row', () => {
+    renderEditor();
+
+    const importExportSection = screen
+      .getByRole('heading', { name: 'Import / Export' })
+      .closest('section')!;
+    const toolbarSection = screen.getByRole('heading', { name: 'Toolbar' }).closest('section')!;
+
+    const actionNames = [
+      'Import from skill queue',
+      'Import from clipboard',
+      'Export',
+      'Optimize remaps',
+      'Add remap marker',
+      'Optimize at my markers',
+      'Suggest reorder',
+    ];
+    for (const name of actionNames) {
+      const button = screen.getByRole('button', { name });
+      // Icon-only: the accessible name comes from `aria-label`, not visible
+      // text — the glyph is the only rendered child, hidden from assistive
+      // tech (IconButton.test.tsx covers that contract directly).
+      expect(button).toHaveAttribute('aria-label', name);
+      expect(button.textContent).toBe('');
+    }
+
+    // `.closest` rather than `.parentElement`: every action here is wrapped
+    // in IconButton's own Tooltip span, one extra level between the button
+    // and the row div.
+    const importExportRow = screen
+      .getByRole('button', { name: 'Import from skill queue' })
+      .closest('div.flex.items-center.gap-2')!;
+    expect(importExportRow).toHaveClass('overflow-x-auto');
+    expect(importExportRow).not.toHaveClass('flex-wrap');
+    expect(within(importExportSection).getAllByRole('button')).toHaveLength(3);
+
+    const toolbarRow = screen
+      .getByRole('button', { name: 'Add remap marker' })
+      .closest('div.flex.items-center.gap-2')!;
+    expect(toolbarRow).toHaveClass('overflow-x-auto');
+    expect(toolbarRow).not.toHaveClass('flex-wrap');
+    // The 4 toolbar actions, plus the remap-count row's own "?" InfoTooltip
+    // button (unrelated to this ticket — not an action, not converted).
+    expect(within(toolbarSection).getAllByRole('button')).toHaveLength(5);
+  });
+
+  it('keeps full-text buttons at `lg`+, unchanged', () => {
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    try {
+      renderEditor();
+
+      const importExportRow = screen
+        .getByRole('button', { name: 'Import from skill queue' })
+        .closest('div.flex.items-center.gap-2')!;
+      expect(importExportRow).toHaveClass('flex-wrap');
+      expect(importExportRow).not.toHaveClass('overflow-x-auto');
+
+      for (const name of [
+        'Import from skill queue',
+        'Import from clipboard',
+        'Export',
+        'Optimize remaps',
+        'Add remap marker',
+        'Optimize at my markers',
+        'Suggest reorder',
+      ]) {
+        const button = screen.getByRole('button', { name });
+        expect(button).not.toHaveAttribute('aria-label');
+        expect(button.textContent).toBe(name);
+      }
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
+  });
+});
+
 describe('PlanEditor grouping toggle (#115)', () => {
   it('defaults to Priority band headers', () => {
     renderEditor();
