@@ -33,6 +33,7 @@ import {
   type SkillPlanRecord,
   type StationPinRecord,
 } from '@/db';
+import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import { retryPendingRemotePurge } from './characterPurge';
 import { getSyncFirestore } from './firebaseApp';
@@ -461,23 +462,29 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
   name: 'buildPlans',
   tombstoneKey: buildPlanTombstonesKey,
   loadLocal: (characterId) => db.buildPlans.where('characterId').equals(characterId).toArray(),
-  toRemoteDoc: (p, ownerHash) => ({
-    id: p.id,
-    characterId: p.characterId,
-    name: p.name,
-    blueprintTypeID: p.blueprintTypeID,
-    runs: p.runs,
-    me: p.me,
-    te: p.te,
-    facility: p.facility,
-    rigLevel: p.rigLevel,
-    security: p.security,
-    hubId: p.hubId,
-    ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
-    updatedAt: p.updatedAt,
-    ownerHash,
-    deleted: false,
-  }),
+  toRemoteDoc: (p, ownerHash) => {
+    // Firestore rejects undefined at any depth, so the map is normalized (empty
+    // and undefined-valued entries dropped) before it can reach a setDoc.
+    const materialSourcing = normalizeMaterialSourcingMap(p.materialSourcing);
+    return {
+      id: p.id,
+      characterId: p.characterId,
+      name: p.name,
+      blueprintTypeID: p.blueprintTypeID,
+      runs: p.runs,
+      me: p.me,
+      te: p.te,
+      facility: p.facility,
+      rigLevel: p.rigLevel,
+      security: p.security,
+      hubId: p.hubId,
+      ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
+      ...(materialSourcing !== undefined ? { materialSourcing } : {}),
+      updatedAt: p.updatedAt,
+      ownerHash,
+      deleted: false,
+    };
+  },
   toLocalRecord: (r) => ({
     id: r.id,
     characterId: r.characterId,
@@ -491,6 +498,7 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     security: r.security,
     hubId: r.hubId,
     ...(r.facilityTaxPct !== undefined ? { facilityTaxPct: r.facilityTaxPct } : {}),
+    ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
     updatedAt: r.updatedAt,
   }),
   bulkPutLocal: (records) => db.buildPlans.bulkPut(records),

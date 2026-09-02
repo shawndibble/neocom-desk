@@ -19,7 +19,14 @@ import type { BuildPlanRecord } from '@/db';
 export interface ComputeBuildPlanInput {
   plan: Pick<
     BuildPlanRecord,
-    'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'facilityTaxPct'
+    | 'runs'
+    | 'me'
+    | 'te'
+    | 'facility'
+    | 'rigLevel'
+    | 'security'
+    | 'facilityTaxPct'
+    | 'materialSourcing'
   >;
   blueprint: IndustryBlueprint;
   /** Manufacturing system cost index; pass 0 when unavailable (gate display on pricesReady instead). */
@@ -66,6 +73,7 @@ export function computeBuildPlan({
       systemCostIndex,
       adjustedPrices,
       hubPrices,
+      materialSourcing: plan.materialSourcing,
       skills,
     });
     return { result, error: null };

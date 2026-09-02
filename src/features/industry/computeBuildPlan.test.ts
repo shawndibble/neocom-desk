@@ -14,7 +14,14 @@ const BLUEPRINT: IndustryBlueprint = {
 
 const BASE_PLAN: Pick<
   BuildPlanRecord,
-  'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'facilityTaxPct'
+  | 'runs'
+  | 'me'
+  | 'te'
+  | 'facility'
+  | 'rigLevel'
+  | 'security'
+  | 'facilityTaxPct'
+  | 'materialSourcing'
 > = {
   runs: 10,
   me: 5,
@@ -53,6 +60,19 @@ describe('computeBuildPlan', () => {
 
     expect(error).toBeNull();
     expect(result).toEqual(expected);
+  });
+
+  it("passes the plan's material sourcing through to the engine", () => {
+    const { result, error } = computeBuildPlan({
+      plan: { ...BASE_PLAN, materialSourcing: { 34: { ownedQuantity: 20_000, overridePrice: 4 } } },
+      blueprint: BLUEPRINT,
+      ...MARKET,
+    });
+    expect(error).toBeNull();
+    const tritanium = result?.materials[0];
+    expect(tritanium?.ownedQuantity).toBe(20_000);
+    expect(tritanium?.unitPrice).toBe(4);
+    expect(result?.materialCost).toBeCloseTo((tritanium!.quantity - 20_000) * 4, 6);
   });
 
   it('clamps a cleared/invalid runs field to 1 instead of throwing', () => {

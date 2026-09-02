@@ -155,6 +155,8 @@ export interface IndustryInputs {
   systemCostIndex: number;
   adjustedPrices: AdjustedPrices;
   hubPrices: HubPrices;
+  /** Per-material owned quantity / price override; absent = buy it all at the hub. */
+  materialSourcing?: MaterialSourcingMap;
   skills: SkillLevels;
 }
 
@@ -176,14 +178,45 @@ export interface EffectiveMaterial {
   quantity: number;
 }
 
+/**
+ * Per-material sourcing overrides: how much of a material the player already
+ * owns (free — never bought) and, for whatever is left, a manually entered
+ * unit price for stock acquired outside the configured trade hub. Both fields
+ * are independently optional; an absent entry means "0 owned, use the hub
+ * price", which is the engine's original behaviour.
+ */
+export interface MaterialSourcing {
+  /** Units already in hand. Clamped into [0, required] — never an error. */
+  ownedQuantity?: number;
+  /** Unit price for the non-owned remainder, replacing the hub price. */
+  overridePrice?: number;
+}
+
+/** Sourcing overrides keyed by material typeID. Missing key = no overrides. */
+export type MaterialSourcingMap = Record<number, MaterialSourcing>;
+
+/** An effective material priced against its sourcing overrides + hub prices. */
+export interface MaterialCostLine extends EffectiveMaterial {
+  /** Free portion: min(sourcing.ownedQuantity, quantity). Costs nothing. */
+  ownedQuantity: number;
+  /** quantity - ownedQuantity: the portion that still has to be bought. */
+  remainingQuantity: number;
+  /** Override price if set, else the hub price; null when neither exists. */
+  unitPrice: number | null;
+  /** remainingQuantity x unitPrice; 0 when fully owned or unpriced. */
+  lineCost: number;
+  /** True when a non-zero remainder has neither an override nor a hub price. */
+  unpriced: boolean;
+}
+
 export type BuildRecommendation = 'build' | 'buy' | 'unknown';
 
 export interface BuildResult {
-  materials: EffectiveMaterial[];
+  materials: MaterialCostLine[];
   /** Job duration in seconds. */
   seconds: number;
   jobFee: JobFeeBreakdown;
-  /** Hub cost of priced materials (unpriced ones excluded and flagged). */
+  /** Sum of the material line costs: owned units are free, unpriced ones excluded and flagged. */
   materialCost: number;
   /** materialCost + jobFee.total. */
   totalCost: number;
@@ -212,9 +245,9 @@ export interface BuildResult {
    * Null only when the blueprint has no product (quantity <= 0).
    */
   breakEvenPrice: number | null;
-  /** Material typeIDs with no hub price. */
+  /** Material typeIDs whose non-owned remainder has no override and no hub price. */
   unpricedMaterials: number[];
-  /** True when any material or the product lacks a hub price. */
+  /** True when any material remainder is unpriced, or the product lacks a hub price. */
   unpriceable: boolean;
   recommendation: BuildRecommendation;
 }
