@@ -2,14 +2,15 @@ import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
   Panel,
   Spinner,
   type DataTableColumn,
+  IconButton,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import {
   deriveEmploymentHistoryRows,
   loadEmploymentHistory,
@@ -104,9 +105,12 @@ export function EmploymentHistory() {
         </h1>
         <div className="flex items-center gap-2">
           {historyResult && <DataAgeBadge date={historyResult.fetchedAt} />}
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            {t('employmentHistory.refresh')}
-          </Button>
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('employmentHistory.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
         </div>
       </header>
 

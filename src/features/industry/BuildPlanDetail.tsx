@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, InfoTooltip, Panel } from '@/components/ui';
+import { DataAgeBadge, EmptyState, IconButton, InfoTooltip, Panel } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { FacilityKind, RigLevel, SecurityBand, SkillLevels } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -292,18 +293,26 @@ export function BuildPlanDetail({
       <Panel
         title={t('industry.materials')}
         actions={
-          <span className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
+          // `flex-wrap` because this is the one converted toolbar that needs a
+          // saved build plan to reach, so it is the one I could not screenshot
+          // at 390px. Four items — badge, two controls, duration — beside the
+          // panel title; if they ever do run out of room, wrapping inside the
+          // (min-height, not fixed) header beats clipping.
+          <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-text-dim">
             {fetchedAt && <DataAgeBadge date={fetchedAt} />}
-            <Button
+            <IconButton
               size="sm"
+              icon={<Icon.Download />}
+              label={t('industry.exportCsvMaterials')}
               onClick={exportMaterialsCsv}
               disabled={!!error || !result || result.materials.length === 0}
-            >
-              {t('industry.exportCsvMaterials')}
-            </Button>
-            <Button size="sm" onClick={() => setRefreshTick((v) => v + 1)}>
-              {t('industry.refresh')}
-            </Button>
+            />
+            <IconButton
+              size="sm"
+              icon={<Icon.Refresh />}
+              label={t('industry.refresh')}
+              onClick={() => setRefreshTick((v) => v + 1)}
+            />
             {result && <span className="tabular-nums">{formatDuration(result.seconds)}</span>}
           </span>
         }

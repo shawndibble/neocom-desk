@@ -2,16 +2,17 @@ import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
+  IconButton,
   Panel,
   ReauthBanner,
   Spinner,
   Tabs,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import type { CachedResult } from '@/esi/cache';
@@ -164,9 +165,12 @@ export function Orders() {
     <div className="mx-auto max-w-5xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('orders.title')}</h1>
-        <Button size="sm" onClick={refresh} disabled={loading}>
-          {t('orders.refresh')}
-        </Button>
+        <IconButton
+          icon={<Icon.Refresh />}
+          label={t('orders.refresh')}
+          onClick={refresh}
+          disabled={loading}
+        />
       </header>
 
       <Tabs
@@ -191,13 +195,13 @@ export function Orders() {
           actions={
             ordersResult ? (
               <span className="flex items-center gap-2">
-                <Button
+                <IconButton
                   size="sm"
+                  icon={<Icon.Download />}
+                  label={t('orders.exportCsvOpen')}
                   disabled={orders.length === 0}
                   onClick={() => downloadCsv('orders-open', orders, ordersCsvColumns(t, nameFor))}
-                >
-                  {t('orders.exportCsvOpen')}
-                </Button>
+                />
                 <DataAgeBadge date={ordersResult.fetchedAt} />
               </span>
             ) : undefined
@@ -233,8 +237,10 @@ export function Orders() {
           actions={
             historyResult ? (
               <span className="flex items-center gap-2">
-                <Button
+                <IconButton
                   size="sm"
+                  icon={<Icon.Download />}
+                  label={t('orders.exportCsvHistory')}
                   disabled={history.length === 0}
                   onClick={() =>
                     downloadCsv(
@@ -245,9 +251,7 @@ export function Orders() {
                       historyTruncated
                     )
                   }
-                >
-                  {t('orders.exportCsvHistory')}
-                </Button>
+                />
                 <DataAgeBadge date={historyResult.fetchedAt} />
               </span>
             ) : undefined

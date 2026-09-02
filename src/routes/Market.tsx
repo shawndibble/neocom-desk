@@ -8,11 +8,13 @@ import {
   DataTable,
   EmptyState,
   FilterChip,
+  IconButton,
   Panel,
   Spinner,
   Tabs,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { db, type QuickbarItem } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
@@ -801,52 +803,15 @@ export function Market() {
     showBackControl || (itemTab === 'orders' && orderBookResult) ? (
       <>
         {showBackControl && (
-          <Button size="sm" onClick={handleBackToFinder}>
-            {t('market.backToFinder')}
-          </Button>
+          <IconButton
+            size="sm"
+            icon={<Icon.Back />}
+            label={t('market.backToFinder')}
+            onClick={handleBackToFinder}
+          />
         )}
         {itemTab === 'orders' && orderBookResult && (
-          <>
-            <Button
-              size="sm"
-              disabled={sortedSell.length === 0}
-              onClick={() =>
-                downloadCsv(
-                  'market-sell',
-                  sortedSell,
-                  orderBookCsvColumns(t, {
-                    npcStations: npcStationMap,
-                    solarSystems: solarSystemMap,
-                    isBuy: false,
-                  }),
-                  new Date(),
-                  orderBookResult.truncated
-                )
-              }
-            >
-              {t('market.exportCsvSell')}
-            </Button>
-            <Button
-              size="sm"
-              disabled={sortedBuy.length === 0}
-              onClick={() =>
-                downloadCsv(
-                  'market-buy',
-                  sortedBuy,
-                  orderBookCsvColumns(t, {
-                    npcStations: npcStationMap,
-                    solarSystems: solarSystemMap,
-                    isBuy: true,
-                  }),
-                  new Date(),
-                  orderBookResult.truncated
-                )
-              }
-            >
-              {t('market.exportCsvBuy')}
-            </Button>
-            <DataAgeBadge date={new Date(orderBookResult.fetchedAt)} />
-          </>
+          <DataAgeBadge date={new Date(orderBookResult.fetchedAt)} />
         )}
       </>
     ) : undefined;
@@ -991,13 +956,12 @@ export function Market() {
               </select>
             </label>
           )}
-          <Button
-            size="sm"
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('market.refresh')}
             onClick={handleRefresh}
             disabled={selectedTypeId === null || orderBookLoading}
-          >
-            {t('market.refresh')}
-          </Button>
+          />
         </div>
       </header>
 
@@ -1124,9 +1088,38 @@ export function Market() {
                     )}
 
                     <div className="pb-3">
-                      <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                        {t('market.sell')}
-                      </h2>
+                      {/*
+                        Each export sits with the table it exports. Both were
+                        in the panel header, where — once they became icons —
+                        they were two identical download glyphs telling a
+                        sighted user nothing apart; only their tooltips
+                        differed, and a touch user never sees those. Beside
+                        "Sell orders" the same glyph is unambiguous.
+                      */}
+                      <div className="flex items-center justify-between px-3 pt-3 pb-1">
+                        <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                          {t('market.sell')}
+                        </h2>
+                        <IconButton
+                          size="sm"
+                          icon={<Icon.Download />}
+                          label={t('market.exportCsvSell')}
+                          disabled={sortedSell.length === 0}
+                          onClick={() =>
+                            downloadCsv(
+                              'market-sell',
+                              sortedSell,
+                              orderBookCsvColumns(t, {
+                                npcStations: npcStationMap,
+                                solarSystems: solarSystemMap,
+                                isBuy: false,
+                              }),
+                              new Date(),
+                              orderBookResult?.truncated ?? false
+                            )
+                          }
+                        />
+                      </div>
                       {sortedSell.length === 0 ? (
                         <EmptyState
                           title={t('market.emptySellTitle')}
@@ -1159,9 +1152,30 @@ export function Market() {
                     </div>
 
                     <div className="pb-3">
-                      <h2 className="px-3 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                        {t('market.buy')}
-                      </h2>
+                      <div className="flex items-center justify-between px-3 pt-3 pb-1">
+                        <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                          {t('market.buy')}
+                        </h2>
+                        <IconButton
+                          size="sm"
+                          icon={<Icon.Download />}
+                          label={t('market.exportCsvBuy')}
+                          disabled={sortedBuy.length === 0}
+                          onClick={() =>
+                            downloadCsv(
+                              'market-buy',
+                              sortedBuy,
+                              orderBookCsvColumns(t, {
+                                npcStations: npcStationMap,
+                                solarSystems: solarSystemMap,
+                                isBuy: true,
+                              }),
+                              new Date(),
+                              orderBookResult?.truncated ?? false
+                            )
+                          }
+                        />
+                      </div>
                       {sortedBuy.length === 0 ? (
                         <EmptyState
                           title={t('market.emptyBuyTitle')}

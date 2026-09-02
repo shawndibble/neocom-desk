@@ -22,6 +22,16 @@ export interface DataTableColumn<T> {
    * being treated as zero.
    */
   sortValue?: (row: T) => string | number | undefined;
+  /**
+   * Names the row in the stacked (below-`sm`) layout: this cell becomes the
+   * card's title — hoisted to the top, unlabelled, semibold — while the rest
+   * stay label/value pairs. Defaults to the first column, which is usually
+   * right. Set it where reading order and identity disagree: a wallet journal
+   * leads with the date because a ledger should, but a card titled
+   * "9/1/2026, 9:34:21 PM" says nothing, so its `refType` claims this instead.
+   * At most one column per table; later ones are ignored.
+   */
+  primary?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -120,6 +130,13 @@ export function DataTable<T>({
     cx(headerPadding, 'font-semibold uppercase', column.align === 'right' && 'text-right')
   );
   const headerClass = columns.map((column, i) => cx(column.sortValue ? 'p-0' : headerTextClass[i]));
+  // Which cell titles the card once the rows stack. Marked on every row's
+  // cell rather than positionally, so `.dt-stack` can hoist it out of column
+  // order without the markup differing by width.
+  const primaryIndex = Math.max(
+    0,
+    columns.findIndex((column) => column.primary)
+  );
   const cellClass = columns.map((column) =>
     cx(cellPadding, column.align === 'right' && 'text-right', column.className)
   );
@@ -216,7 +233,11 @@ export function DataTable<T>({
                   // unconditionally: it costs one static attribute and keeps
                   // the markup width-independent.
                   data-label={column.header}
-                  className={cx(cellClass[i], column.cellClassName?.(row))}
+                  className={cx(
+                    cellClass[i],
+                    i === primaryIndex && 'dt-primary',
+                    column.cellClassName?.(row)
+                  )}
                 >
                   {column.render(row)}
                 </td>

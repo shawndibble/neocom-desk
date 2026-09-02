@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -11,7 +10,9 @@ import {
   ReauthBanner,
   Spinner,
   type DataTableColumn,
+  IconButton,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContacts } from '@/features/character/contacts';
 import type { CachedResult } from '@/esi/cache';
@@ -152,9 +153,12 @@ export function Contacts() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('contacts.title')}</h1>
         <div className="flex items-center gap-2">
           {contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />}
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            {t('contacts.refresh')}
-          </Button>
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('contacts.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
         </div>
       </header>
 

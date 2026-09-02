@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, ReauthBanner, Spinner, Tabs } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  IconButton,
+  ReauthBanner,
+  Spinner,
+  Tabs,
+} from '@/components/ui';
 import type { TabItem } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadCalendarEvents } from '@/features/character/calendar';
 import { EventDetailModal } from '@/features/character/EventDetailModal';
@@ -86,16 +95,18 @@ export function Calendar() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('calendar.title')}</h1>
         <div className="flex items-center gap-2">
           {eventsResult && <DataAgeBadge date={eventsResult.fetchedAt} />}
-          <Button
-            size="sm"
+          <IconButton
+            icon={<Icon.Download />}
+            label={t('calendar.exportCsv')}
             disabled={events.length === 0}
             onClick={() => downloadCsv('calendar', events, calendarCsvColumns(t))}
-          >
-            {t('calendar.exportCsv')}
-          </Button>
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            {t('calendar.refresh')}
-          </Button>
+          />
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('calendar.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
         </div>
       </header>
 
@@ -107,33 +118,38 @@ export function Calendar() {
           label={t('calendar.viewSwitcherLabel')}
         />
         {viewMode !== 'agenda' && (
+          // Period label first, then the controls. "Previous month"/"Next
+          // month" as text buttons wrapped onto two lines each at 390px and
+          // squeezed the label — which is the one thing here you actually
+          // read — down to a wrapped fragment. Chevrons don't wrap, and the
+          // label leads.
           <div className="flex items-center gap-2">
-            <Button
+            <span className="text-xs font-semibold text-text-dim">
+              {viewMode === 'month' ? formatMonthLabel(monthAnchor) : formatWeekLabel(weekAnchor)}
+            </span>
+            <IconButton
               size="sm"
+              icon={<Icon.Back />}
+              label={viewMode === 'month' ? t('calendar.prevMonth') : t('calendar.prevWeek')}
               onClick={() =>
                 viewMode === 'month'
                   ? setMonthAnchor((d) => addMonths(d, -1))
                   : setWeekAnchor((d) => addWeeks(d, -1))
               }
-            >
-              {viewMode === 'month' ? t('calendar.prevMonth') : t('calendar.prevWeek')}
-            </Button>
+            />
             <Button size="sm" onClick={goToday}>
               {t('calendar.today')}
             </Button>
-            <Button
+            <IconButton
               size="sm"
+              icon={<Icon.Descend />}
+              label={viewMode === 'month' ? t('calendar.nextMonth') : t('calendar.nextWeek')}
               onClick={() =>
                 viewMode === 'month'
                   ? setMonthAnchor((d) => addMonths(d, 1))
                   : setWeekAnchor((d) => addWeeks(d, 1))
               }
-            >
-              {viewMode === 'month' ? t('calendar.nextMonth') : t('calendar.nextWeek')}
-            </Button>
-            <span className="text-xs font-semibold text-text-dim">
-              {viewMode === 'month' ? formatMonthLabel(monthAnchor) : formatWeekLabel(weekAnchor)}
-            </span>
+            />
           </div>
         )}
       </div>

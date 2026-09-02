@@ -11,7 +11,9 @@ import {
   Spinner,
   StatChip,
   Tooltip,
+  IconButton,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { ImplantChip } from '@/features/skills/ImplantChip';
@@ -245,16 +247,13 @@ export function Skills() {
         </div>
         <div className="flex items-center gap-2">
           {fetchedAt && <DataAgeBadge date={fetchedAt} />}
-          <Button
-            size="sm"
+          <IconButton
+            icon={<Icon.Download />}
+            label={t('skills.exportCsv')}
             disabled={groups.length === 0 || skillsNeedsReauth}
             onClick={() => downloadCsv('skills', skillCsvRows(groups), skillCsvColumns(t))}
-          >
-            {t('skills.exportCsv')}
-          </Button>
-          <Button size="sm" onClick={refresh}>
-            {t('skills.refresh')}
-          </Button>
+          />
+          <IconButton icon={<Icon.Refresh />} label={t('skills.refresh')} onClick={refresh} />
         </div>
       </header>
 
