@@ -99,6 +99,13 @@ describe('materialCostLines', () => {
     expect(line.lineCost).toBe(4500);
   });
 
+  it('floors a fractional owned quantity — materials come in whole units', () => {
+    const [line] = materialCostLines([tritanium], hubPrices, { 34: { ownedQuantity: 400.7 } });
+    expect(line.ownedQuantity).toBe(400);
+    expect(line.remainingQuantity).toBe(500);
+    expect(line.lineCost).toBe(2500);
+  });
+
   it('ignores sourcing entries for materials the job does not use', () => {
     const lines = materialCostLines([tritanium], hubPrices, { 999: { ownedQuantity: 10 } });
     expect(lines).toHaveLength(1);

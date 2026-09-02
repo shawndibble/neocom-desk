@@ -30,12 +30,15 @@ function usable(value: number | undefined): number | undefined {
 }
 
 /** Resolve one material against its sourcing entry and the hub prices. */
-export function materialCostLine(
+function materialCostLine(
   material: EffectiveMaterial,
   hubPrices: HubPrices,
   sourcing?: MaterialSourcing
 ): MaterialCostLine {
-  const owned = Math.min(usable(sourcing?.ownedQuantity) ?? 0, material.quantity);
+  // Floored: materials are consumed in whole units everywhere else in the
+  // engine (effectiveMaterialQuantity ceils), so a fractional owned quantity
+  // must not leak a fractional remainder into the line cost.
+  const owned = Math.min(Math.floor(usable(sourcing?.ownedQuantity) ?? 0), material.quantity);
   const remainingQuantity = material.quantity - owned;
   const unitPrice = usable(sourcing?.overridePrice) ?? usable(hubPrices[material.typeID]) ?? null;
   return {
@@ -60,10 +63,10 @@ export function materialCostLines(
 }
 
 /**
- * Strip absent/unusable members so a sourcing map is safe to persist and sync:
- * Firestore rejects `undefined` at any depth, so `{ overridePrice: undefined }`
- * would throw on write. Entries left carrying nothing are dropped, and an
- * empty result collapses to `undefined` so the caller omits the key entirely.
+ * Canonical form of a sourcing map, for callers that persist one: every entry
+ * holds only members that carry a real value, entries left holding nothing are
+ * dropped, and an empty result collapses to `undefined` so the caller can omit
+ * the field entirely rather than store an empty object.
  */
 export function normalizeMaterialSourcingMap(
   sourcing: MaterialSourcingMap | undefined
