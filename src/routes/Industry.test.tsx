@@ -444,7 +444,9 @@ describe('Industry: results panel', () => {
     // value must differ, or the assertions below can't tell them apart.
     expect(expected.buyCost).not.toBe(100_000);
 
-    // Job fee breakdown, not just the total.
+    // Job fee breakdown, not just the total: expand the collapsed-by-default
+    // Job Fee row first (#116 — costs render as a stack, breakdown hidden until activated).
+    await user.click(screen.getByRole('button', { name: /job fee/i }));
     expect(screen.getByText(formatIsk(expected.jobFee.eiv))).toBeInTheDocument();
     expect(screen.getByText(formatIsk(expected.jobFee.grossCost))).toBeInTheDocument();
     expect(screen.getByText(formatIsk(expected.jobFee.sccSurcharge))).toBeInTheDocument();

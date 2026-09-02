@@ -1,9 +1,39 @@
+import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, StatChip } from '@/components/ui';
+import { Disclosure, EmptyState, InfoTooltip, StatChip } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent } from './format';
+
+interface CostRowProps {
+  label: string;
+  value: ReactNode;
+  tooltip?: string;
+  emphasized?: boolean;
+  indented?: boolean;
+}
+
+/** One row of the Costs stack: label (+ optional tooltip) left, value right. */
+function CostRow({ label, value, tooltip, emphasized = false, indented = false }: CostRowProps) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem] ${indented ? 'pl-7' : ''}`}
+    >
+      <span className="flex items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
+        {label}
+        {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
+      </span>
+      <span
+        className={`font-medium tabular-nums ${emphasized ? 'text-sm text-accent' : 'text-text'}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
 interface ResultsSummaryProps {
   result: BuildResult;
@@ -33,6 +63,7 @@ export function ResultsSummary({
   costIndexSystemName,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
+  const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
 
   if (!pricesReady) {
     return (
@@ -57,43 +88,44 @@ export function ResultsSummary({
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <StatChip
-          label={t('industry.eiv')}
-          value={formatIsk(result.jobFee.eiv)}
-          tooltip={t('industry.eivTooltip')}
-        />
-        <StatChip
-          label={t('industry.costIndexFee')}
-          value={formatIsk(result.jobFee.grossCost)}
-          tooltip={t('industry.costIndexFeeTooltip')}
-        />
-        <StatChip
-          label={t('industry.sccSurcharge')}
-          value={formatIsk(result.jobFee.sccSurcharge)}
-          tooltip={t('industry.sccSurchargeTooltip')}
-        />
-        <StatChip
-          label={t('industry.facilityTaxAmount')}
-          value={formatIsk(result.jobFee.facilityTax)}
-        />
-        <StatChip
-          label={t('industry.jobFee')}
-          value={formatIsk(result.jobFee.total)}
-          tone="accent"
-        />
-      </div>
+      <div className="divide-y divide-line rounded-xs border border-line">
+        <CostRow label={t('industry.materialCost')} value={formatIsk(result.materialCost)} />
 
-      <div className="flex flex-wrap gap-2">
-        <StatChip label={t('industry.materialCost')} value={formatIsk(result.materialCost)} />
-        <StatChip
-          label={t('industry.totalCost')}
-          value={formatIsk(result.totalCost)}
-          tone="accent"
-        />
-        <StatChip label={t('industry.time')} value={formatDuration(result.seconds)} />
+        <Disclosure
+          label={t('industry.jobFee')}
+          trailing={formatIsk(result.jobFee.total)}
+          expanded={jobFeeExpanded}
+          onToggle={() => setJobFeeExpanded((expanded) => !expanded)}
+        >
+          <CostRow
+            label={t('industry.eiv')}
+            value={formatIsk(result.jobFee.eiv)}
+            tooltip={t('industry.eivTooltip')}
+            indented
+          />
+          <CostRow
+            label={t('industry.costIndexFee')}
+            value={formatIsk(result.jobFee.grossCost)}
+            tooltip={t('industry.costIndexFeeTooltip')}
+            indented
+          />
+          <CostRow
+            label={t('industry.sccSurcharge')}
+            value={formatIsk(result.jobFee.sccSurcharge)}
+            tooltip={t('industry.sccSurchargeTooltip')}
+            indented
+          />
+          <CostRow
+            label={t('industry.facilityTaxAmount')}
+            value={formatIsk(result.jobFee.facilityTax)}
+            indented
+          />
+        </Disclosure>
+
+        <CostRow label={t('industry.totalCost')} value={formatIsk(result.totalCost)} emphasized />
+        <CostRow label={t('industry.time')} value={formatDuration(result.seconds)} />
         {systemCostIndex !== null && (
-          <StatChip
+          <CostRow
             label={t('industry.costIndexWithSystem', { system: costIndexSystemName })}
             value={formatCostIndex(systemCostIndex)}
             tooltip={t('industry.costIndexTooltip')}
