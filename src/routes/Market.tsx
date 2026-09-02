@@ -1220,6 +1220,11 @@ export function Market() {
                       prices={variationPrices}
                       onSelect={handleSelectItem}
                       onCompare={() => setCompareModalOpen(true)}
+                      blueprintCatalog={blueprintCatalog}
+                      onRequestBlueprintCatalog={ensureBlueprintCatalog}
+                      onAddToQuickbar={handleAddToQuickbar}
+                      quickbarAvailable={activeCharacterId !== null}
+                      onShowInfo={handleShowInfo}
                     />
                   )}
                 </>
