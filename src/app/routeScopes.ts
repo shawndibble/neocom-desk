@@ -47,6 +47,9 @@ export const ROUTE_REQUIREMENTS = {
   // queue carries levels /skills has not caught up to — but a plan still
   // edits and still schedules without any of it.
   '/skills/plans': UNGATED,
+  // Plan editor, its own route off the list (CONTEXT.md round 17). Same
+  // reasoning as the list above — nothing here needs a scope to function.
+  '/skills/plans/:planId': UNGATED,
   // Reads each compared character's already-cached skills endpoint (same one
   // /skills itself uses); no scope of its own to gate on.
   '/skills/compare': UNGATED,
