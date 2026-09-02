@@ -190,6 +190,165 @@ async function withDedupe<R>(characterId: number, key: string, run: () => Promis
   }
 }
 
+// ---------------------------------------------------------------------------
+// Stale-while-revalidate
+// ---------------------------------------------------------------------------
+
+/**
+ * Listeners notified after a background revalidation settles, so a mounted
+ * route can silently re-read what it already rendered. One signal for every
+ * key, carrying nothing: a listener's job is to re-run its own loader, not to
+ * work out which of its keys moved.
+ *
+ * Same one-way shape as `activityLog.ts` — `esi` publishes, the React layer
+ * (`lib/useRouteSnapshot.ts`) subscribes, and `esi` gains no dependency on it.
+ */
+type RevalidatedListener = () => void;
+const revalidatedListeners = new Set<RevalidatedListener>();
+
+export function onCacheRevalidated(listener: RevalidatedListener): () => void {
+  revalidatedListeners.add(listener);
+  return () => revalidatedListeners.delete(listener);
+}
+
+function emitCacheRevalidated(): void {
+  for (const listener of revalidatedListeners) listener();
+}
+
+/**
+ * How a key's background revalidation last failed, keyed exactly as
+ * `inFlightLoads` is (`dedupeKey`) so one character's failure cannot suppress
+ * another's retry.
+ *
+ * Serving a stale row instantly is only honest if a *failed* revalidation
+ * eventually says so. It does: the failure is recorded here, the signal fires
+ * anyway, the route re-reads, and this map is what makes that second read
+ * carry the bad news the optimistic first read had none of — the offline
+ * banner via `fromCache`, or the re-login one via `needsReauth`. Cleared on
+ * success, so a key that recovers stops carrying its old failure.
+ */
+interface RevalidationFailure {
+  at: number;
+  /** The live call answered 401/403 (or the refresh itself failed). */
+  needsReauth: boolean;
+}
+const revalidationFailures = new Map<string, RevalidationFailure>();
+
+/**
+ * A failed revalidation is not retried until the row would have gone stale
+ * again anyway. Reusing the window rather than inventing a second constant:
+ * retrying sooner cannot produce a fresher row than waiting would, and the
+ * user's way out of a persistent failure is Refresh, which bypasses all of
+ * this via `invalidateFreshness()`.
+ */
+function recentRevalidationFailure(dkey: string, now: number): RevalidationFailure | undefined {
+  const failure = revalidationFailures.get(dkey);
+  if (failure === undefined) return undefined;
+  return now - failure.at < STALE_AFTER.default ? failure : undefined;
+}
+
+/**
+ * Serves a lapsed row immediately and refreshes it in the background.
+ *
+ * Waiting for the network before showing data the device already holds is the
+ * one case the freshness window does not cover: offline fails fast, but a slow
+ * or hanging connection made every page past its window sit on a spinner over
+ * perfectly good local data. `null` here means "no stale row to serve, or not
+ * eligible" — the caller then awaits the live path as before.
+ *
+ * Deliberately does NOT apply to:
+ * - **A manual Refresh** (`isRefreshInvalidated`). The user asked for new data
+ *   and is watching the button; that one should await the network and report
+ *   what actually happened.
+ * - **`STALE_AFTER.static` keys.** A lapsed 24h row is a station name. Firing
+ *   a request and a route re-render per distinct location, for data that has
+ *   not changed, is all cost.
+ */
+async function serveStale<T>(
+  characterId: number,
+  key: string,
+  staleAfterMs: number,
+  options: LoadWithCacheStatusOptions,
+  revalidate: RevalidateRun
+): Promise<StatusResult<T> | null> {
+  if (staleAfterMs > STALE_AFTER.default) return null;
+  const row = await readCachedRow(characterId, key);
+  if (!row) return null;
+
+  const now = Date.now();
+  if (isRefreshInvalidated(row.fetchedAt, staleAfterMs, now)) return null;
+
+  const stale: CachedResult<T> = {
+    data: row.value as T,
+    fetchedAt: new Date(row.fetchedAt),
+    truncated: row.truncated === true,
+    // Mid-revalidation we have no bad news yet, so the row reads as current
+    // and no view raises its offline banner. The `failure` branch below is
+    // what corrects that once an attempt has actually failed.
+    fromCache: false,
+  };
+
+  const failure = recentRevalidationFailure(dedupeKey(characterId, key), now);
+  if (!failure) {
+    void revalidateInBackground(characterId, key, revalidate);
+    return { cached: stale, needsReauth: false };
+  }
+
+  // The previous attempt failed, so this row is genuinely unconfirmed. Report
+  // it the way the awaited path would have, including the two auth-failure
+  // behaviours the optimistic branch above cannot know about yet: a caller
+  // that opted out of stale-on-auth-failure (industry jobs, PI) must still get
+  // nothing rather than a row the character may no longer be entitled to.
+  if (failure.needsReauth && options.skipCacheOnAuthFailure) {
+    return { cached: null, needsReauth: true };
+  }
+  return { cached: { ...stale, fromCache: true }, needsReauth: failure.needsReauth };
+}
+
+/**
+ * The live path a revalidation runs — `loadWithCacheStatusLive` or its
+ * paginated twin. Both already swallow network errors and fall back to the
+ * cached row, so a rejection is not how failure arrives here: a `cached` that
+ * is null, or that came `fromCache`, means the live call did not land.
+ */
+type RevalidateRun = () => Promise<{
+  cached: { fromCache: boolean } | null;
+  needsReauth: boolean;
+}>;
+
+/** Fire-and-forget refresh behind a served stale row. Never rejects. */
+async function revalidateInBackground(
+  characterId: number,
+  key: string,
+  revalidate: RevalidateRun
+): Promise<void> {
+  const dkey = dedupeKey(characterId, key);
+  let succeeded = false;
+  let needsReauth = false;
+  try {
+    // `withDedupe` already collapses a concurrent identical read, so two routes
+    // rendering the same key revalidate once.
+    const result = await withDedupe(characterId, key, revalidate);
+    succeeded = result.cached !== null && !result.cached.fromCache;
+    needsReauth = result.needsReauth;
+  } catch {
+    // Defensive: the live paths catch their own failures, so reaching here
+    // means something unexpected threw. Treated as a failure either way.
+  }
+  if (succeeded) revalidationFailures.delete(dkey);
+  else revalidationFailures.set(dkey, { at: Date.now(), needsReauth });
+  emitCacheRevalidated();
+}
+
+/**
+ * Test seam: drops the failed-revalidation backoff so one test's offline key
+ * cannot suppress the next test's retry. Module state otherwise outlives a
+ * `beforeEach` that only clears Dexie.
+ */
+export function resetRevalidationState(): void {
+  revalidationFailures.clear();
+}
+
 /**
  * Like `loadWithCache`, but surfaces an auth failure (401 expired token, 403
  * missing scope, failed refresh) as `needsReauth` instead of silently falling
@@ -205,16 +364,16 @@ export async function loadWithCacheStatus<T>(
   fetchLive: () => Promise<T | null>,
   options: LoadWithCacheStatusOptions = {}
 ): Promise<StatusResult<T>> {
-  const fresh = await readFreshRow<T>(
-    characterId,
-    key,
-    options.staleAfterMs ?? STALE_AFTER.default
-  );
+  const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
+  const fresh = await readFreshRow<T>(characterId, key, staleAfterMs);
   if (fresh) return { cached: fresh, needsReauth: false };
 
-  return withDedupe(characterId, key, () =>
-    loadWithCacheStatusLive(characterId, key, fetchLive, options)
-  );
+  const runLive = () => loadWithCacheStatusLive(characterId, key, fetchLive, options);
+
+  const stale = await serveStale<T>(characterId, key, staleAfterMs, options, runLive);
+  if (stale) return stale;
+
+  return withDedupe(characterId, key, runLive);
 }
 
 async function loadWithCacheStatusLive<T>(
@@ -327,16 +486,16 @@ export async function loadPaginatedWithCacheStatus<T>(
   fetchLive: () => Promise<TruncatableResult<T>>,
   options: LoadWithCacheStatusOptions = {}
 ): Promise<StatusResult<T[]>> {
-  const fresh = await readFreshRow<T[]>(
-    characterId,
-    key,
-    options.staleAfterMs ?? STALE_AFTER.default
-  );
+  const staleAfterMs = options.staleAfterMs ?? STALE_AFTER.default;
+  const fresh = await readFreshRow<T[]>(characterId, key, staleAfterMs);
   if (fresh) return { cached: fresh, needsReauth: false };
 
-  return withDedupe(characterId, key, () =>
-    loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options)
-  );
+  const runLive = () => loadPaginatedWithCacheStatusLive(characterId, key, fetchLive, options);
+
+  const stale = await serveStale<T[]>(characterId, key, staleAfterMs, options, runLive);
+  if (stale) return stale;
+
+  return withDedupe(characterId, key, runLive);
 }
 
 async function loadPaginatedWithCacheStatusLive<T>(

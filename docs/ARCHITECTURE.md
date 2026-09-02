@@ -91,6 +91,21 @@ header only ever _extends_ the window, never shortens it below the floor.
 window for `REFRESH_BYPASS_MS`, so a manual refresh reaches ESI without
 sending every other route back to the network too.
 
+**Stale-while-revalidate.** Past the window a read is two-phase: `serveStale`
+returns the stored row immediately (`fromCache: false` — no bad news yet) and
+`revalidateInBackground` refreshes it, then fires `onCacheRevalidated`.
+`useRouteSnapshot` subscribes and re-runs its loader stamping the _unchanged_
+epoch, so the rendered snapshot stays `current` and `loading` never flips —
+the view updates in place instead of blinking back to a spinner. A signal
+arriving mid-load is held and flushed when that load settles, so a
+revalidation never cancels a load the user is waiting on and a burst across a
+page's several keys collapses into one re-run. A failed revalidation is
+recorded in `revalidationFailures` (keyed like `inFlightLoads`), which is what
+makes the re-read report `fromCache: true`/`needsReauth` — and what stops it
+starting another doomed fetch, so the signal cannot loop. Not applied to a
+manual refresh (it must report what actually happened) or to
+`STALE_AFTER.static` keys.
+
 **Boot prefetch.** `app/prefetch.ts` warms every granted surface into
 `esiCache` on app start and on each character switch, wired from the same
 `App.tsx` effect shape as `triggerSync`. It is a thin orchestrator over the

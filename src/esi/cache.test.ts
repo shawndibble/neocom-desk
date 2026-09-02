@@ -3,6 +3,8 @@ import { db } from '@/db';
 import { EsiError } from './client';
 import {
   invalidateFreshness,
+  onCacheRevalidated,
+  resetRevalidationState,
   REFRESH_BYPASS_MS,
   STALE_AFTER,
   loadPaginatedWithCache,
@@ -21,7 +23,33 @@ const KEY = 'thing';
 
 beforeEach(async () => {
   await db.esiCache.clear();
+  // Module state, not Dexie state: without this one test's failed revalidation
+  // for [91, 'thing'] silently suppresses the next test's fetch for the same key.
+  resetRevalidationState();
 });
+
+/**
+ * Runs `read`, then waits for the background revalidation it kicked off to
+ * settle, and returns the *second* read — the one carrying whatever the live
+ * call actually did.
+ *
+ * Past the freshness window a read is two-phase now (see
+ * "stale-while-revalidate" below): it answers instantly from the row on disk
+ * and only learns the network's verdict afterwards. Assertions about failure
+ * handling — the offline banner, `needsReauth`, `skipCacheOnAuthFailure` —
+ * belong to that second phase.
+ */
+async function afterRevalidation<R>(read: () => Promise<R>): Promise<R> {
+  const settled = new Promise<void>((resolve) => {
+    const off = onCacheRevalidated(() => {
+      off();
+      resolve();
+    });
+  });
+  await read();
+  await settled;
+  return read();
+}
 
 describe('GLOBAL_CACHE_CHARACTER_ID', () => {
   it('is the sentinel row 0', () => {
@@ -46,9 +74,11 @@ describe('loadWithCache', () => {
   it('falls back to the cache when the live call throws', async () => {
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1234 });
 
-    const result = await loadWithCache(CHAR_ID, KEY, async () => {
-      throw new Error('offline');
-    });
+    const result = await afterRevalidation(() =>
+      loadWithCache(CHAR_ID, KEY, async () => {
+        throw new Error('offline');
+      })
+    );
 
     expect(result).toEqual({
       data: 'stale',
@@ -67,7 +97,7 @@ describe('loadWithCache', () => {
 
   it('falls back to the cache when the live call resolves null (e.g. 304 with no prior fetch)', async () => {
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1 });
-    const result = await loadWithCache(CHAR_ID, KEY, async () => null);
+    const result = await afterRevalidation(() => loadWithCache(CHAR_ID, KEY, async () => null));
     expect(result?.fromCache).toBe(true);
   });
 });
@@ -76,9 +106,11 @@ describe('loadWithCacheStatus — default auth-failure detection', () => {
   it('reports needsReauth: true on a 401 EsiError, without discarding cached data', async () => {
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1234 });
 
-    const result = await loadWithCacheStatus(CHAR_ID, KEY, async () => {
-      throw new EsiError(401, 'token invalid');
-    });
+    const result = await afterRevalidation(() =>
+      loadWithCacheStatus(CHAR_ID, KEY, async () => {
+        throw new EsiError(401, 'token invalid');
+      })
+    );
 
     expect(result.needsReauth).toBe(true);
     expect(result.cached).toEqual({
@@ -101,9 +133,11 @@ describe('loadWithCacheStatus — default auth-failure detection', () => {
   it('still falls back to cache (needsReauth: false) for a non-auth failure', async () => {
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1234 });
 
-    const result = await loadWithCacheStatus(CHAR_ID, KEY, async () => {
-      throw new Error('offline');
-    });
+    const result = await afterRevalidation(() =>
+      loadWithCacheStatus(CHAR_ID, KEY, async () => {
+        throw new Error('offline');
+      })
+    );
 
     expect(result.needsReauth).toBe(false);
     expect(result.cached?.fromCache).toBe(true);
@@ -120,13 +154,15 @@ describe('loadWithCacheStatus — options', () => {
   it('detectAuthFailure overrides the default (industry/jobs.ts: only a 403 counts, not a 401)', async () => {
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1 });
 
-    const result = await loadWithCacheStatus(
-      CHAR_ID,
-      KEY,
-      async () => {
-        throw new EsiError(401, 'token invalid');
-      },
-      { detectAuthFailure: (err) => err instanceof EsiError && err.status === 403 }
+    const result = await afterRevalidation(() =>
+      loadWithCacheStatus(
+        CHAR_ID,
+        KEY,
+        async () => {
+          throw new EsiError(401, 'token invalid');
+        },
+        { detectAuthFailure: (err) => err instanceof EsiError && err.status === 403 }
+      )
     );
 
     // A 401 no longer counts as an auth failure under this override, so it's
@@ -138,16 +174,18 @@ describe('loadWithCacheStatus — options', () => {
   it('skipCacheOnAuthFailure returns cached: null on an auth failure even when a cache row exists', async () => {
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'stale', fetchedAt: 1 });
 
-    const result = await loadWithCacheStatus(
-      CHAR_ID,
-      KEY,
-      async () => {
-        throw new EsiError(403, 'missing scope');
-      },
-      {
-        detectAuthFailure: (err) => err instanceof EsiError && err.status === 403,
-        skipCacheOnAuthFailure: true,
-      }
+    const result = await afterRevalidation(() =>
+      loadWithCacheStatus(
+        CHAR_ID,
+        KEY,
+        async () => {
+          throw new EsiError(403, 'missing scope');
+        },
+        {
+          detectAuthFailure: (err) => err instanceof EsiError && err.status === 403,
+          skipCacheOnAuthFailure: true,
+        }
+      )
     );
 
     expect(result).toEqual({ cached: null, needsReauth: true });
@@ -234,9 +272,11 @@ describe('read path while a cache purge is pending', () => {
     await db.esiCache.put({ characterId: OTHER_CHAR_ID, key: KEY, value: 'mine', fetchedAt: 1 });
     await suppressViaFailedPurge(CHAR_ID);
 
-    const result = await loadWithCache(OTHER_CHAR_ID, KEY, async () => {
-      throw new Error('offline');
-    });
+    const result = await afterRevalidation(() =>
+      loadWithCache(OTHER_CHAR_ID, KEY, async () => {
+        throw new Error('offline');
+      })
+    );
 
     expect(result).toMatchObject({ data: 'mine', fromCache: true });
   });
@@ -253,9 +293,11 @@ describe('read path while a cache purge is pending', () => {
     await purgeCharacterCacheOrSuppress(CHAR_ID);
     await db.esiCache.put({ characterId: CHAR_ID, key: KEY, value: 'fresh', fetchedAt: 5 });
 
-    const result = await loadWithCache(CHAR_ID, KEY, async () => {
-      throw new Error('offline');
-    });
+    const result = await afterRevalidation(() =>
+      loadWithCache(CHAR_ID, KEY, async () => {
+        throw new Error('offline');
+      })
+    );
 
     expect(result).toMatchObject({ data: 'fresh', fromCache: true });
   });
@@ -358,9 +400,11 @@ describe('loadPaginatedWithCache', () => {
       truncated: true,
     });
 
-    const result = await loadPaginatedWithCache(7, 'k2', async () => {
-      throw new Error('offline');
-    });
+    const result = await afterRevalidation(() =>
+      loadPaginatedWithCache(7, 'k2', async () => {
+        throw new Error('offline');
+      })
+    );
 
     expect(result?.truncated).toBe(true);
     expect(result?.fromCache).toBe(true);
@@ -684,5 +728,187 @@ describe('freshness window', () => {
     expect(fetchLive).toHaveBeenCalledTimes(1);
     expect(result.cached?.data).toEqual(['a', 'b']);
     expect(result.cached?.fromCache).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stale-while-revalidate: past the window, a row the device already holds is
+// served without waiting on the network, and refreshed behind the view. These
+// are ordering assertions — a mocked clock would pass a broken implementation,
+// so each drives `fetchLive` off a promise the test settles by hand.
+// ---------------------------------------------------------------------------
+
+describe('stale-while-revalidate', () => {
+  /** A `fetchLive` the test decides when, and whether, to settle. */
+  function deferredFetch<T>(value: T) {
+    let settle!: (ok: boolean) => void;
+    const gate = new Promise<void>((resolve, reject) => {
+      settle = (ok) => (ok ? resolve() : reject(new Error('offline')));
+    });
+    const fetchLive = vi.fn(async () => {
+      await gate;
+      return value;
+    });
+    return { fetchLive, settle };
+  }
+
+  /** Resolves on the next `onCacheRevalidated` emission. */
+  function nextRevalidation(): Promise<void> {
+    return new Promise((resolve) => {
+      const off = onCacheRevalidated(() => {
+        off();
+        resolve();
+      });
+    });
+  }
+
+  async function seedStaleRow(value: unknown): Promise<void> {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: KEY,
+      value,
+      fetchedAt: Date.now() - STALE_AFTER.default - 60_000,
+    });
+  }
+
+  beforeEach(async () => {
+    resetRevalidationState();
+    await clearCachePurgePending(CHAR_ID);
+    // A prior test's invalidateFreshness() would otherwise force these rows
+    // live instead of letting the stale path serve them.
+    vi.spyOn(Date, 'now').mockReturnValue(0);
+    invalidateFreshness();
+    vi.restoreAllMocks();
+  });
+
+  it('returns the stale row before the live call has settled', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('fresh');
+
+    const result = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+
+    // The whole point: this resolved while fetchLive is still pending.
+    expect(result.cached?.data).toBe('two-days-old');
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+    settle(true);
+  });
+
+  it('reports a row served mid-revalidation as current, so no offline banner shows', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('fresh');
+
+    const result = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+
+    expect(result.cached?.fromCache).toBe(false);
+    settle(true);
+  });
+
+  it('writes the refreshed row and signals, so the view can silently re-read it', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('fresh');
+    const signalled = nextRevalidation();
+
+    await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    settle(true);
+    await signalled;
+
+    const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    expect(reread.cached?.data).toBe('fresh');
+    expect(reread.cached?.fromCache).toBe(false);
+  });
+
+  it('a failed revalidation still signals, and the re-read reports the row as cached', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('never-arrives');
+    const signalled = nextRevalidation();
+
+    const first = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    expect(first.cached?.fromCache).toBe(false); // no bad news yet
+
+    settle(false);
+    await signalled;
+
+    // This is what raises the offline banner the first read deliberately withheld.
+    const reread = await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    expect(reread.cached?.data).toBe('two-days-old');
+    expect(reread.cached?.fromCache).toBe(true);
+  });
+
+  it('does not retry after a failed revalidation, so a re-read cannot loop', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('never-arrives');
+    const signalled = nextRevalidation();
+
+    await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    settle(false);
+    await signalled;
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+
+    await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+    await loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+
+    // Still 1: the re-reads the signal provokes must not each start a new fetch.
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('awaits the network for a manual refresh instead of serving stale', async () => {
+    await seedStaleRow('two-days-old');
+    const { fetchLive, settle } = deferredFetch('fresh');
+    invalidateFreshness();
+
+    let resolved = false;
+    const pending = loadWithCacheStatus<string>(CHAR_ID, KEY, fetchLive).then((r) => {
+      resolved = true;
+      return r;
+    });
+    await Promise.resolve();
+    // The user clicked Refresh and is watching the button: it must report what
+    // actually happened, not hand back the row it already had.
+    expect(resolved).toBe(false);
+
+    settle(true);
+    expect((await pending).cached?.data).toBe('fresh');
+  });
+
+  it('never serves stale for game constants, which would fan out per location', async () => {
+    const stationKey = 'station:60003760';
+    await db.esiCache.put({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: stationKey,
+      value: 'Jita IV - Moon 4',
+      fetchedAt: Date.now() - STALE_AFTER.static - 60_000,
+    });
+    const { fetchLive, settle } = deferredFetch('Jita IV - Moon 4');
+
+    let resolved = false;
+    const pending = loadWithCacheStatus<string>(GLOBAL_CACHE_CHARACTER_ID, stationKey, fetchLive, {
+      staleAfterMs: STALE_AFTER.static,
+    }).then((r) => {
+      resolved = true;
+      return r;
+    });
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+
+    settle(true);
+    await pending;
+  });
+
+  it('serves stale from the paginated path too, not just the singular one', async () => {
+    await seedStaleRow(['a', 'b']);
+    let settle!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const fetchLive = vi.fn(async () => {
+      await gate;
+      return { items: ['a', 'b', 'c'], truncated: false };
+    });
+
+    const result = await loadPaginatedWithCacheStatus<string>(CHAR_ID, KEY, fetchLive);
+
+    expect(result.cached?.data).toEqual(['a', 'b']);
+    expect(result.cached?.fromCache).toBe(false);
+    settle();
   });
 });
