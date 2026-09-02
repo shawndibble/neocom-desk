@@ -482,8 +482,18 @@
     "reauthHint": "Log in again to fetch this character's assets.",
     "reauthAction": "Log in again with EVE Online",
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
+    "stationsToggle": {
+      "expand": "Expand all",
+      "collapse": "Collapse all"
+    },
+    "columnStation": "Station",
+    "columnQuantity": "Qty",
+    "columnVolume": "Volume",
+    "columnEstPrice": "Est. Price",
+    "unknownValue": "-",
+    "security": {
+      "ariaLabel": "Security status: {{value}}"
+    },
     "nodeBadge_one": "{{count}} item · {{value}} ISK",
     "nodeBadge_other": "{{count}} items · {{value}} ISK",
     "crossCharacterToggle": "Search all characters",
