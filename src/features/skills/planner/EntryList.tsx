@@ -147,7 +147,7 @@ function EntryRow({ row, name, boosted, timeline, onRemove, onSetPriority }: Ent
           size="sm"
           className={ICON_BUTTON}
           onClick={() => onRemove(entry.skillTypeID)}
-          aria-label={`${t('plans.remove')} ${name}`}
+          aria-label={t('plans.removeEntry', { name })}
         >
           <span aria-hidden="true">✕</span>
         </Button>
