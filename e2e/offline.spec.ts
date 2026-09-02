@@ -15,8 +15,10 @@ import { CHARACTER_NAME } from './support/fixtureData';
  */
 test('shows cached character and skills after external hosts go unreachable', async ({ page }) => {
   await loginAndSelectCharacter(page);
+  // Skills opens on Plans, so the trained view is one sub-nav click away.
   await page.getByRole('link', { name: 'Skills' }).click();
-  await page.waitForURL(/\/skills$/);
+  await page.getByRole('link', { name: 'Trained' }).click();
+  await page.waitForURL(/\/skills\/trained$/);
 
   // Groups start collapsed; expand everything before asserting on skill rows.
   await page.getByRole('button', { name: 'Expand all' }).click();

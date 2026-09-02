@@ -51,8 +51,11 @@ export const ROUTE_REQUIREMENTS = {
   // reasoning as the list above — nothing here needs a scope to function.
   '/skills/plans/:planId': UNGATED,
   // Reads each compared character's already-cached skills endpoint (same one
-  // /skills itself uses); no scope of its own to gate on.
+  // the trained view itself uses); no scope of its own to gate on.
   '/skills/compare': UNGATED,
+  // Section index: renders nothing of its own, it redirects to the plan list
+  // (App.tsx) — planning is what the Skills section opens on.
+  '/skills': UNGATED,
   // Device-local display preferences only — no ESI endpoint to gate on.
   '/settings': UNGATED,
 
@@ -61,7 +64,7 @@ export const ROUTE_REQUIREMENTS = {
   // blueprints and jobs; all three read the queue). These need panel-level
   // gating instead.
   '/overview': UNGATED,
-  '/skills': UNGATED,
+  '/skills/trained': UNGATED,
   '/industry': UNGATED,
   // Multi-scope, like Overview above: the Balance tab mixes wallet and
   // loyalty-point (EverMarks) reads, each panel already rendering its own

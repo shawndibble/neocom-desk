@@ -1,23 +1,29 @@
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
-import { EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
+import { PageHeader, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useSyncStatus } from '@/app/useSyncStatus';
 import { SyncErrorNote } from '@/app/SyncErrorNote';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
+import { AttributesPane } from '@/features/skills/planner/AttributesPane';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
 import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 
-/** Skill Plan list, beside the open plan's editor on wide screens (#158); editing a plan happens on its own route. */
+/**
+ * Skill Plan list — where the Skills section opens (`/skills` redirects here).
+ * On wide screens the pane beside it holds the character's current attributes
+ * until a plan is opened, at which point the editor takes it over from its own
+ * route (#158).
+ */
 export function SkillPlans() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const syncStatus = useSyncStatus();
-  const { catalog, remapInfo } = usePlanEditorData(activeCharacterId);
+  const { catalog, attributesResult, implants, remapInfo } = usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
 
   if (!hydrated) {
@@ -40,9 +46,15 @@ export function SkillPlans() {
           match a taller plan list, or vice versa. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
         <PlanListPane activeCharacterId={activeCharacterId} remapInfo={remapInfo} />
-        <Panel className={isDesktop ? '' : 'hidden'}>
-          <EmptyState title={t('plans.selectHint')} className="py-8" />
-        </Panel>
+        {/* Desktop-only, like the placeholder it replaces: below `lg` the
+            list owns the single column, and the editor takes it once a plan
+            is open. */}
+        <AttributesPane
+          result={attributesResult}
+          implantBonuses={implants}
+          remapInfo={remapInfo}
+          className={isDesktop ? '' : 'hidden'}
+        />
       </div>
 
       {catalog && <CurrentQueuePanel characterId={activeCharacterId} catalog={catalog} />}

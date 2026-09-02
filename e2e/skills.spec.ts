@@ -5,8 +5,10 @@ import { IMPLANT_NAMES } from './support/fixtureData';
 
 test.beforeEach(async ({ page }) => {
   await loginAndSelectCharacter(page);
+  // Skills opens on Plans, so the trained view is one sub-nav click away.
   await page.getByRole('link', { name: 'Skills' }).click();
-  await page.waitForURL(/\/skills$/);
+  await page.getByRole('link', { name: 'Trained' }).click();
+  await page.waitForURL(/\/skills\/trained$/);
 });
 
 /** The StatChip label and value are separate sibling <span>s; scope by the label's parent. */

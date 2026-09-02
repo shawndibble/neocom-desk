@@ -324,9 +324,10 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     render(<App />);
 
     const listPanel = (await screen.findByText('New plan')).closest('section');
-    const detailPanel = (await screen.findByText('Select a plan, or create one.')).closest(
-      'section'
-    );
+    // The detail pane shows the character's current attributes until a plan
+    // is opened (#158 follow-up: the old "select a plan" placeholder said
+    // nothing the list beside it didn't already say).
+    const detailPanel = (await screen.findByText('Attributes')).closest('section');
     expect(listPanel).not.toHaveClass('hidden');
     expect(detailPanel).toHaveClass('hidden');
     expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
@@ -343,7 +344,7 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
 
-    expect(await screen.findByText('Select a plan, or create one.')).toBeInTheDocument();
+    expect(await screen.findByText('Attributes')).toBeInTheDocument();
     const listPanelBack = screen.getByText('New plan').closest('section');
     expect(listPanelBack).not.toHaveClass('hidden');
   });
@@ -376,6 +377,91 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     } finally {
       window.matchMedia = original;
     }
+  });
+});
+
+describe('Skills opens on Plans', () => {
+  it('redirects /skills to the plan list, so the section lands on planning', async () => {
+    window.history.pushState({}, '', '/skills');
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
+    expect(await screen.findByText('Skill Plans')).toBeInTheDocument();
+  });
+
+  it('still reaches the trained-skills view from the sub-nav', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('link', { name: 'Trained' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/skills/trained'));
+  });
+});
+
+describe('SkillPlans: current attributes beside the plan list', () => {
+  const attributesPanel = async () => (await screen.findByText('Attributes')).closest('section')!;
+
+  it("shows the character's attributes from ESI, not the planner's placeholder defaults", async () => {
+    // Distinct from usePlanEditorData's DEFAULT_ATTRIBUTES (20/20/20/20/19),
+    // which the pane would otherwise present as the character's own sheet.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          charisma: 21,
+          intelligence: 24,
+          memory: 23,
+          perception: 22,
+          willpower: 25,
+        })
+      )
+    );
+    render(<App />);
+
+    const panel = await attributesPanel();
+    expect(await within(panel).findByText('24')).toBeInTheDocument();
+    expect(within(panel).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(panel).getByText('25')).toBeInTheDocument();
+    expect(within(panel).getByText('21')).toBeInTheDocument();
+  });
+
+  it('adds the implant bonus on top of the base attribute, as the trained view does', async () => {
+    server.use(
+      // Attribute-enhancer implant: ESI's attribute values already include it,
+      // so the chip reads base + bonus = effective.
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () =>
+        HttpResponse.json([9899])
+      ),
+      http.get('https://esi.evetech.net/universe/types/9899', () =>
+        HttpResponse.json({
+          type_id: 9899,
+          name: 'Ocular Filter - Basic',
+          description: '',
+          group_id: 300,
+          published: true,
+          dogma_attributes: [{ attribute_id: 178, value: 3 }], // +3 perception
+        })
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({ ...attributesPayload, perception: 23 })
+      )
+    );
+    render(<App />);
+
+    const panel = await attributesPanel();
+    expect(await within(panel).findByText('20 + 3 = 23')).toBeInTheDocument();
+  });
+
+  it('says the attributes are unknown when ESI fails, rather than inventing a sheet', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.error()
+      )
+    );
+    render(<App />);
+
+    const panel = await attributesPanel();
+    expect(await within(panel).findByText('—')).toBeInTheDocument();
+    expect(within(panel).queryByText('Intelligence')).not.toBeInTheDocument();
   });
 });
 

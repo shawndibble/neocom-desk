@@ -4,10 +4,15 @@ import {
   toEngineAttributes,
   type SkillCatalog,
 } from '@/features/skills/skillMap';
-import { loadCharacterAttributes, loadImplantBonuses } from '@/features/skills/data';
+import {
+  loadCharacterAttributes,
+  loadImplantBonuses,
+  type CachedResult,
+} from '@/features/skills/data';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { remapAvailability, type RemapAvailability } from './remapAvailability';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
+import type { CharacterAttributes } from '@/esi/endpoints';
 
 const DEFAULT_ATTRIBUTES: Attributes = {
   intelligence: 20,
@@ -20,7 +25,16 @@ const DEFAULT_ATTRIBUTES: Attributes = {
 export interface PlanEditorData {
   catalog: SkillCatalog | null;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  /** Base attributes (implant bonuses removed) — what the scheduler costs against. */
   attributes: Attributes;
+  /**
+   * ESI's own reading (with its `fetchedAt`, for a `DataAgeBadge`), or null
+   * when it could not be read. `attributes` above falls back to
+   * DEFAULT_ATTRIBUTES so the scheduler always has numbers to work with;
+   * anything *displaying* the character's sheet reads this instead, or it
+   * presents that fallback as fact.
+   */
+  attributesResult: CachedResult<CharacterAttributes> | null;
   implants: Implants;
   remapInfo: RemapAvailability | null;
 }
@@ -35,6 +49,8 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   const [catalog, setCatalog] = useState<SkillCatalog | null>(null);
   const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
   const [attributes, setAttributes] = useState<Attributes>(DEFAULT_ATTRIBUTES);
+  const [attributesResult, setAttributesResult] =
+    useState<CachedResult<CharacterAttributes> | null>(null);
   const [implants, setImplants] = useState<Implants>({});
   // Remaps Available (CONTEXT.md): ESI bonus remaps + the yearly remap when
   // off cooldown. Prefills new plans' remapCount; user-editable per plan.
@@ -57,6 +73,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
       // optimized against levels the character already trained past.
       setTrainedSkills(corrected.trained);
       if (attrs?.data) setAttributes(toEngineAttributes(attrs.data, implantBonuses));
+      setAttributesResult(attrs);
       setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
       setImplants(implantBonuses);
     })();
@@ -65,5 +82,5 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     };
   }, [characterId]);
 
-  return { catalog, trainedSkills, attributes, implants, remapInfo };
+  return { catalog, trainedSkills, attributes, attributesResult, implants, remapInfo };
 }

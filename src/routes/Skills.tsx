@@ -19,6 +19,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
+import { AttributeChips } from '@/features/skills/AttributeChips';
 import { ImplantChip } from '@/features/skills/ImplantChip';
 import { SkillInspector } from '@/features/skills/SkillInspector';
 import { buildSkillRequirements } from '@/features/skills/skillRequirements';
@@ -43,8 +44,6 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { downloadCsv } from '@/lib/downloadCsv';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
-
-const ATTRIBUTE_ORDER = ['intelligence', 'memory', 'perception', 'willpower', 'charisma'] as const;
 
 interface ImplantDetail {
   typeId: number;
@@ -286,28 +285,10 @@ export function Skills() {
           )}
 
           <Panel title={t('skills.attributes')}>
-            <div className="flex flex-wrap gap-4">
-              {attributesResult?.data ? (
-                ATTRIBUTE_ORDER.map((name) => {
-                  // ESI attribute values already include implant bonuses.
-                  const effective = attributesResult.data![name];
-                  const bonus = implantBonuses[name] ?? 0;
-                  const base = effective - bonus;
-                  return (
-                    <StatChip
-                      key={name}
-                      label={t(`skills.attr.${name}`)}
-                      value={
-                        bonus ? t('skills.attributeEffective', { base, bonus, effective }) : base
-                      }
-                      tone={bonus ? 'accent' : 'default'}
-                    />
-                  );
-                })
-              ) : (
-                <span className="text-xs text-text-dim">{t('common.unknown')}</span>
-              )}
-            </div>
+            <AttributeChips
+              attributes={attributesResult?.data ?? null}
+              implantBonuses={implantBonuses}
+            />
             <div className="mt-3">
               <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('skills.implants')}

@@ -68,7 +68,11 @@ const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 const ROUTE_ELEMENTS = {
   '/characters': <Characters />,
   '/overview': <Overview />,
-  '/skills': <Skills />,
+  // The Skills section opens on planning: /skills is an index that redirects,
+  // so the rail's own link (and any existing bookmark) lands on the plan list
+  // while the trained view keeps a URL of its own.
+  '/skills': <Navigate to="/skills/plans" replace />,
+  '/skills/trained': <Skills />,
   '/skills/plans': <SkillPlans />,
   '/skills/plans/:planId': <SkillPlanEditor />,
   '/skills/compare': <SkillCompare />,
