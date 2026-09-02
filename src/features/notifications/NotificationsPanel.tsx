@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Panel, EmptyState, Tooltip } from '@/components/ui';
+import { EmptyState, Panel, SearchInput, Tooltip } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { db } from '@/db';
 import {
@@ -112,13 +112,11 @@ export function NotificationsPanel() {
           <EmptyState title={t('settings.notifications.emptyTitle')} />
         ) : (
           <>
-            <input
-              type="search"
+            <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('settings.notifications.searchPlaceholder')}
               aria-label={t('settings.notifications.searchPlaceholder')}
-              className="h-9 w-full rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
             />
 
             {searching && filterResult.visibleCharacterIds.size === 0 ? (
