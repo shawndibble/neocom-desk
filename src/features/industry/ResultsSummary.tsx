@@ -272,23 +272,60 @@ export function ResultsSummary({
         </div>
       )}
 
-      {hasVerdict ? (
-        <p
-          className={`text-sm font-semibold ${
-            result.recommendation === 'build' ? 'text-success' : 'text-warning'
-          }`}
-        >
-          {result.recommendation === 'build'
-            ? t('industry.verdictBuild', {
-                amount: formatIsk((result.buyCost ?? 0) - result.totalCost),
-              })
-            : t('industry.verdictBuy', {
-                amount: formatIsk(result.totalCost - (result.buyCost ?? 0)),
-              })}
+      <div className="space-y-1">
+        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('industry.acquisitionVerdictLabel')}
         </p>
-      ) : (
-        <p className="text-xs text-text-dim">{t('industry.verdictUnknown')}</p>
-      )}
+        {hasVerdict ? (
+          <p
+            className={`text-sm font-semibold ${
+              result.recommendation === 'build' ? 'text-success' : 'text-warning'
+            }`}
+          >
+            {result.recommendation === 'build'
+              ? t('industry.verdictBuild', {
+                  amount: formatIsk((result.buyCost ?? 0) - result.totalCost),
+                })
+              : t('industry.verdictBuy', {
+                  amount: formatIsk(result.totalCost - (result.buyCost ?? 0)),
+                })}
+          </p>
+        ) : (
+          <p className="text-xs text-text-dim">{t('industry.verdictUnknown')}</p>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('industry.saleProfitabilityLabel')}
+        </p>
+        {displayProfit !== null ? (
+          <p
+            className={`text-sm font-semibold ${displayProfit >= 0 ? 'text-success' : 'text-warning'}`}
+          >
+            {displayProfit >= 0
+              ? t('industry.saleProfitabilityProfit', { amount: formatIsk(displayProfit) })
+              : t('industry.saleProfitabilityLoss', { amount: formatIsk(Math.abs(displayProfit)) })}
+          </p>
+        ) : (
+          <p className="text-xs text-text-dim">{t('industry.saleProfitabilityUnknown')}</p>
+        )}
+        {result.breakEvenPrice !== null && (
+          <div className="divide-y divide-line rounded-xs border border-line">
+            <CostRow
+              label={t('industry.breakEvenPrice')}
+              value={formatIsk(result.breakEvenPrice)}
+              tooltip={t('industry.breakEvenPriceTooltip')}
+            />
+            {productUnitPrice !== null && (
+              <CostRow
+                label={t('industry.currentMarketPrice')}
+                value={formatIsk(productUnitPrice)}
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

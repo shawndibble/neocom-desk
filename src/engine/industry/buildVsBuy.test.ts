@@ -73,6 +73,10 @@ describe('buildVsBuy', () => {
     expect(r.grossMargin).toBeCloseTo((grossProfit / 1_000_000) * 100, 6);
     expect(r.grossIskPerHour).toBeCloseTo(grossProfit / (13_787.136 / 3600), 4);
 
+    // totalCost 86_589 over 10 units, Accounting V (3.375%) + Broker Relations V (1.5%)
+    // revenue = 86_589 / (1 - 0.04875) = 91_026.5480...; price = revenue / 10
+    expect(r.breakEvenPrice).toBeCloseTo(86_589 / (1 - 0.04875) / 10, 6);
+
     expect(r.unpriceable).toBe(false);
     expect(r.unpricedMaterials).toEqual([]);
     expect(r.recommendation).toBe('build');
@@ -103,6 +107,8 @@ describe('buildVsBuy', () => {
     expect(r.grossMargin).toBeNull();
     expect(r.grossIskPerHour).toBeNull();
     expect(r.recommendation).toBe('unknown');
+    // break-even price only needs totalCost + quantity + skills, unaffected by unpriced materials
+    expect(r.breakEvenPrice).not.toBeNull();
   });
 
   it('flags a product with no hub price instead of throwing', () => {
@@ -118,6 +124,8 @@ describe('buildVsBuy', () => {
     expect(r.grossMargin).toBeNull();
     expect(r.grossIskPerHour).toBeNull();
     expect(r.recommendation).toBe('unknown');
+    // break-even price depends only on totalCost + quantity + skills, not the product's hub price
+    expect(r.breakEvenPrice).not.toBeNull();
     // build-side numbers still available
     expect(r.totalCost).toBeCloseTo(86_589, 6);
   });

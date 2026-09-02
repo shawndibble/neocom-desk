@@ -22,6 +22,7 @@ const RESULT: BuildResult = {
   grossProfit: 460,
   grossMargin: 82,
   grossIskPerHour: 460,
+  breakEvenPrice: 92.5,
   unpricedMaterials: [],
   unpriceable: false,
   recommendation: 'build',
@@ -158,13 +159,90 @@ describe('ResultsSummary: Costs stack (#116)', () => {
   });
 });
 
+describe('ResultsSummary: split Acquisition Verdict / Sale Profitability, break-even price (#119)', () => {
+  it('labels the Acquisition Verdict and Sale Profitability statements separately', () => {
+    renderSummary();
+    expect(screen.getByText('Acquisition Verdict')).toBeInTheDocument();
+    expect(screen.getByText('Sale Profitability')).toBeInTheDocument();
+  });
+
+  it('states Sale Profitability from the net profit by default, distinct from the Acquisition Verdict', () => {
+    renderSummary();
+    expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
+    expect(screen.getByText('Selling profits 435 ISK')).toBeInTheDocument();
+  });
+
+  it('flips Sale Profitability to a loss statement when the toggled figure is negative, independent of the Acquisition Verdict', async () => {
+    renderSummary({
+      result: { ...RESULT, profit: -50, grossProfit: 460 },
+    });
+    expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
+    expect(screen.getByText('Selling loses 50 ISK')).toBeInTheDocument();
+  });
+
+  it('tracks Sale Profitability to the Gross/Net toggle', async () => {
+    renderSummary({
+      result: { ...RESULT, profit: -50, grossProfit: 460 },
+    });
+    expect(screen.getByText('Selling loses 50 ISK')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Gross' }));
+    expect(screen.getByText('Selling profits 460 ISK')).toBeInTheDocument();
+  });
+
+  it('shows a net break-even price next to Sale Profitability, unaffected by the Gross/Net toggle', async () => {
+    renderSummary();
+    expect(screen.getByText('Break-even price').closest('div')).toHaveTextContent('93');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Gross' }));
+    expect(screen.getByText('Break-even price').closest('div')).toHaveTextContent('93');
+  });
+
+  it('shows the current market price alongside break-even price for comparison', () => {
+    renderSummary({ productUnitPrice: 100_000 });
+    expect(screen.getByText('Current market price').closest('div')).toHaveTextContent('100,000');
+  });
+
+  it('shows Sale Profitability and Acquisition Verdict unknown states independently when unpriced', () => {
+    renderSummary({
+      result: {
+        ...RESULT,
+        buyCost: null,
+        revenue: null,
+        salesTax: null,
+        brokerFee: null,
+        netRevenue: null,
+        profit: null,
+        marginPct: null,
+        iskPerHour: null,
+        grossProfit: null,
+        grossMargin: null,
+        grossIskPerHour: null,
+        breakEvenPrice: null,
+        unpriceable: true,
+        recommendation: 'unknown',
+      },
+      productUnitPrice: null,
+    });
+
+    expect(
+      screen.getByText('Not enough price data for a build-vs-buy verdict.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Not enough price data to judge sale profitability.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Break-even price')).not.toBeInTheDocument();
+  });
+});
+
 describe('ResultsSummary: Revenue block (#117)', () => {
   it('renders the product line as name, qty produced, unit price, and line total', () => {
     renderSummary();
 
     expect(screen.getByText('Rifter')).toBeInTheDocument();
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText('100,000')).toBeInTheDocument();
+    // also appears in the break-even section's "Current market price" comparison row
+    expect(screen.getAllByText('100,000').length).toBeGreaterThan(0);
     // line total = revenue (1000), not unitPrice x qty (1_000_000) — pulled from the engine, not recomputed
     expect(screen.getByText('1,000')).toBeInTheDocument();
   });
@@ -219,6 +297,7 @@ describe('ResultsSummary: Revenue block (#117)', () => {
         grossProfit: null,
         grossMargin: null,
         grossIskPerHour: null,
+        breakEvenPrice: 90,
         unpriceable: true,
         recommendation: 'unknown',
       },

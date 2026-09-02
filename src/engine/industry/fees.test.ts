@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { salesTaxPct, brokerFeePct, salesTax, brokerFee } from '@/engine/industry/fees';
+import {
+  salesTaxPct,
+  brokerFeePct,
+  salesTax,
+  brokerFee,
+  breakEvenPrice,
+} from '@/engine/industry/fees';
 
 describe('salesTaxPct', () => {
   it('is 7.5% base, reduced 11% per Accounting level', () => {
@@ -45,5 +51,26 @@ describe('brokerFee', () => {
   it('applies the 100 ISK minimum for a nonzero order', () => {
     expect(brokerFee(1_000, 5)).toBe(100); // 15 ISK raw -> min 100
     expect(brokerFee(0, 5)).toBe(0);
+  });
+});
+
+describe('breakEvenPrice', () => {
+  it('solves from the tax/broker rates when the percentage fee exceeds the 100 ISK minimum', () => {
+    // revenue 10_000: tax 7.5% (750) + broker 3% (300, above the 100 min) = totalCost 8_950
+    expect(breakEvenPrice(8_950, 100, 0, 0)).toBeCloseTo(100, 6);
+  });
+
+  it('re-solves against the 100 ISK broker-fee minimum when the percentage fee would bind below it', () => {
+    // revenue 1_000: tax 7.5% (75) + broker floored at 100 (raw 3% = 30) = totalCost 825
+    expect(breakEvenPrice(825, 10, 0, 0)).toBeCloseTo(100, 6);
+  });
+
+  it('returns 0 for a zero total cost instead of dividing by zero revenue', () => {
+    expect(breakEvenPrice(0, 10, 5, 5)).toBe(0);
+  });
+
+  it('returns null for a non-positive quantity', () => {
+    expect(breakEvenPrice(1_000, 0, 0, 0)).toBeNull();
+    expect(breakEvenPrice(1_000, -1, 0, 0)).toBeNull();
   });
 });

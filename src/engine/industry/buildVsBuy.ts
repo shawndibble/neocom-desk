@@ -9,7 +9,7 @@ import { SKILL_IDS } from '@/engine/industry/types';
 import { effectiveMaterials } from '@/engine/industry/materials';
 import { jobDurationSeconds } from '@/engine/industry/time';
 import { estimatedItemValue, jobFee } from '@/engine/industry/jobCost';
-import { brokerFee, salesTax } from '@/engine/industry/fees';
+import { brokerFee, breakEvenPrice, salesTax } from '@/engine/industry/fees';
 
 export function buildVsBuy(inputs: IndustryInputs): BuildResult {
   const { blueprint, runs, me, te, systemCostIndex, adjustedPrices, hubPrices, skills } = inputs;
@@ -66,6 +66,14 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     recommendation = totalCost <= revenue ? 'build' : 'buy';
   }
 
+  const productQuantity = product ? product.quantity * runs : 0;
+  const breakEven = breakEvenPrice(
+    totalCost,
+    productQuantity,
+    skills[SKILL_IDS.accounting] ?? 0,
+    skills[SKILL_IDS.brokerRelations] ?? 0
+  );
+
   return {
     materials,
     seconds,
@@ -83,6 +91,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     grossProfit,
     grossMargin,
     grossIskPerHour,
+    breakEvenPrice: breakEven,
     unpricedMaterials,
     unpriceable,
     recommendation,

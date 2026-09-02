@@ -205,6 +205,13 @@ export interface BuildResult {
   /** grossProfit / revenue x 100; null when unpriceable. */
   grossMargin: number | null;
   grossIskPerHour: number | null;
+  /**
+   * Net sell price per unit at which the job breaks even (profit = 0), after
+   * sales tax and broker fee. Independent of the product's hub price — only
+   * needs totalCost and quantity, so it's available even when unpriceable.
+   * Null only when the blueprint has no product (quantity <= 0).
+   */
+  breakEvenPrice: number | null;
   /** Material typeIDs with no hub price. */
   unpricedMaterials: number[];
   /** True when any material or the product lacks a hub price. */
