@@ -493,9 +493,11 @@ describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => 
     // The two panes are columns of one grid, each with its own scroller: the
     // list's is the row list alone, so the heading and create button stay
     // put; the detail's is `lg:`-gated so a phone doesn't nest a
-    // viewport-sized editor inside a 32rem scroll region.
-    expect(listPanel?.parentElement).toHaveClass('lg:grid-cols-[20rem_1fr]');
+    // viewport-sized editor inside a scroll region, and is capped against
+    // the live viewport height rather than a flat constant (#237-class fix).
+    expect(listPanel?.parentElement).toHaveClass('lg:grid-cols-[20rem_1fr]', 'lg:items-start');
     expect(screen.getByRole('list')).toHaveClass('max-h-[28rem]', 'overflow-y-auto');
-    expect(detailPane?.querySelector('div')).toHaveClass('lg:max-h-[32rem]', 'lg:overflow-y-auto');
+    expect(detailPane?.querySelector('div')).toHaveClass('lg:overflow-y-auto');
+    expect(detailPane?.querySelector('div')?.className).not.toMatch(/\bmax-h-/);
   });
 });

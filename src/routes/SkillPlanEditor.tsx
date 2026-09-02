@@ -11,6 +11,10 @@ import { PlanEditor } from '@/features/skills/planner/PlanEditor';
 import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import {
+  useViewportBoundedHeight,
+  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
+} from '@/lib/useViewportBoundedHeight';
 
 /** Skill Plan editor: the full editing surface for one plan, beside the plan list on wide screens (#158). */
 export function SkillPlanEditor() {
@@ -21,6 +25,7 @@ export function SkillPlanEditor() {
   const { catalog, trainedSkills, attributes, implants, remapInfo } =
     usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
+  const [scrollerRef, scrollerMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   // Wrapped so `undefined` (still loading) is distinguishable from a plan
   // genuinely not found: db.skillPlans.get() resolves to undefined either
@@ -63,7 +68,11 @@ export function SkillPlanEditor() {
     <div className="mx-auto max-w-6xl space-y-4">
       <SkillsSubNav />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
+      {/* `lg:items-start`: grid items stretch to the row's height by
+          default, so without this the list column (often just a couple of
+          short rows) gets pulled up to match the editor column's full
+          (capped) height, rendering as a tall, mostly-empty box. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
         <PlanListPane
           activeCharacterId={activeCharacterId}
           remapInfo={remapInfo}
@@ -76,12 +85,18 @@ export function SkillPlanEditor() {
             </Link>
           )}
           {/* The height cap exists to keep the plan list beside it in view on a
-              wide screen. Below `lg` the list is not rendered at all, so the
-              cap would only buy a 512px scroller inside an already-scrolling
-              phone page — two nested scroll regions and a viewport-sized
-              editor squeezed into two thirds of it. Keyed to `lg` to match the
-              grid above, not to a JS breakpoint that could drift from it. */}
-          <div className="lg:max-h-[32rem] lg:overflow-y-auto">
+              wide screen — measured live against the viewport instead of a
+              flat constant, so it uses whatever room is actually available.
+              Below `lg` the list is not rendered at all, so the cap is
+              skipped entirely — it would only buy a scroller inside an
+              already-scrolling phone page. */}
+          <div
+            ref={scrollerRef}
+            className="lg:overflow-y-auto"
+            style={
+              isDesktop && scrollerMaxHeight !== null ? { maxHeight: scrollerMaxHeight } : undefined
+            }
+          >
             {!catalog ? (
               <div className="flex justify-center py-16">
                 <Spinner label={t('common.loading')} />

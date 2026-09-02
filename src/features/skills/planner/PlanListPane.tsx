@@ -5,6 +5,10 @@ import { db, type SkillPlanRecord } from '@/db';
 import { Panel, Spinner } from '@/components/ui';
 import { markPlanDeleted, scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
+import {
+  useViewportBoundedHeight,
+  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
+} from '@/lib/useViewportBoundedHeight';
 import { PlanList } from './PlanList';
 import type { RemapAvailability } from './remapAvailability';
 
@@ -42,6 +46,8 @@ export function PlanListPane({ activeCharacterId, remapInfo, className }: PlanLi
     async () => db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
     [activeCharacterId]
   );
+
+  const [scrollerRef, scrollerMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   function syncAfterEdit() {
     if (isSyncConfigured()) scheduleSync(activeCharacterId);
@@ -81,7 +87,11 @@ export function PlanListPane({ activeCharacterId, remapInfo, className }: PlanLi
 
   return (
     <Panel className={className}>
-      <div className="max-h-[32rem] overflow-y-auto">
+      <div
+        ref={scrollerRef}
+        className="overflow-y-auto"
+        style={scrollerMaxHeight !== null ? { maxHeight: scrollerMaxHeight } : undefined}
+      >
         {!plans ? (
           <div className="flex justify-center py-8">
             <Spinner label={t('common.loading')} />

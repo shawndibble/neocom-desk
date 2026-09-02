@@ -8,6 +8,10 @@ import { Button, EmptyState, PageHeader, Panel, ReauthBanner, Spinner } from '@/
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import {
+  useViewportBoundedHeight,
+  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
+} from '@/lib/useViewportBoundedHeight';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -176,6 +180,7 @@ export function Industry() {
   const isDesktop = useIsDesktop();
   const detailVisible = isDesktop || selectedId !== null;
   const showBackControl = !isDesktop && selectedId !== null;
+  const [scrollerRef, scrollerMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   if (!hydrated) {
     return (
@@ -248,7 +253,11 @@ export function Industry() {
           <Spinner label={t('common.loading')} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
+        // `lg:items-start`: grid items stretch to the row's height by
+        // default, so without this the list column (often just a couple of
+        // short rows) gets pulled up to match the detail column's full
+        // height, rendering as a tall, mostly-empty box.
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
           <Panel className={isDesktop || selectedId === null ? '' : 'hidden'}>
             <BuildPlanList
               plans={plans}
@@ -275,7 +284,15 @@ export function Industry() {
                 {t('industry.backToList')}
               </Button>
             )}
-            <div className="space-y-4 lg:max-h-[32rem] lg:overflow-y-auto">
+            <div
+              ref={scrollerRef}
+              className="space-y-4 lg:overflow-y-auto"
+              style={
+                isDesktop && scrollerMaxHeight !== null
+                  ? { maxHeight: scrollerMaxHeight }
+                  : undefined
+              }
+            >
               {!detailVisible ? null : selectedPlan ? (
                 <BuildPlanDetail
                   key={selectedPlan.id}

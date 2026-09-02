@@ -25,6 +25,10 @@ import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import {
+  useViewportBoundedHeight,
+  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
+} from '@/lib/useViewportBoundedHeight';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import {
   buildCustomLabelList,
@@ -150,6 +154,7 @@ export function Mail() {
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width.
   const isDesktop = useIsDesktop();
+  const [bodyScrollerRef, bodyMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   const headersResult = data?.headersResult ?? null;
   const needsReauth = data?.needsReauth ?? false;
@@ -313,11 +318,14 @@ export function Mail() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
             <Panel padded={false} className={isDesktop || selectedId === null ? '' : 'hidden'}>
               {visibleHeaders.length === 0 ? (
                 <p className="p-3 text-xs text-text-dim">{t('mail.emptyTitle')}</p>
               ) : (
+                // Flat cap, not viewport-relative: the "load more" button
+                // renders below this list in the same column, so sizing the
+                // list to all remaining viewport height would push it off-screen.
                 <ul className="max-h-[32rem] divide-y divide-line overflow-y-auto">
                   {visibleHeaders.map((header) => {
                     const tab = resolveMailTab(header.labels, labelTabById);
@@ -390,7 +398,11 @@ export function Mail() {
               ) : body === null ? (
                 <EmptyState title={t('mail.emptyTitle')} className="py-4" />
               ) : (
-                <div className="max-h-[32rem] space-y-2 overflow-y-auto text-xs">
+                <div
+                  ref={bodyScrollerRef}
+                  className="space-y-2 overflow-y-auto text-xs"
+                  style={bodyMaxHeight !== null ? { maxHeight: bodyMaxHeight } : undefined}
+                >
                   <p className="font-semibold">{body.data.subject || t('mail.noSubject')}</p>
                   {recipients.length > 0 && (
                     <p className="text-text-dim">

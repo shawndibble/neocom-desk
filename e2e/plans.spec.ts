@@ -67,7 +67,8 @@ test('sticky plan summary and toolbar stack without overlap once the entries que
   // the moment the summary strip's rendered height changed, so the toolbar
   // overlapped it once actually scrolled — invisible at rest, only visible
   // once the entries queue genuinely overflows its box. Needs enough
-  // entries to overflow SkillPlanEditor's `lg:max-h-[32rem]` (512px) box.
+  // entries to overflow SkillPlanEditor's scroller, which is capped against
+  // the live viewport height (#237), not a flat constant.
   await addCaldariCruiserToNewPlan(page);
   await page.getByRole('button', { name: 'Import from clipboard' }).click();
   const dialog = page.getByRole('dialog', { name: 'Import from clipboard' });
@@ -109,14 +110,14 @@ test('sticky plan summary and toolbar stack without overlap once the entries que
     .locator('xpath=ancestor::section[1]');
 
   // Confirm the setup actually overflows the box this bug depends on
-  // (SkillPlanEditor.tsx's `lg:max-h-[32rem]`, 512px) — otherwise the wheel
+  // (SkillPlanEditor.tsx's viewport-bounded scroller) — otherwise the wheel
   // scroll below has nothing to do and this test would pass vacuously
-  // regardless of the bug. `lg:` is load-bearing in the match: an unrelated
-  // element elsewhere on the page carries the un-prefixed `max-h-[32rem]`.
+  // regardless of the bug. Exact class match: several other elements on the
+  // page carry `overflow-y-auto` combined with other utility classes.
   await expect(async () => {
     const overflowed = await page.evaluate(() => {
-      const el = Array.from(document.querySelectorAll<HTMLElement>('div')).find((d) =>
-        d.className.includes('lg:max-h-[32rem]')
+      const el = Array.from(document.querySelectorAll<HTMLElement>('div')).find(
+        (d) => d.className.trim() === 'lg:overflow-y-auto'
       );
       return !!el && el.scrollHeight > el.clientHeight + 50;
     });
