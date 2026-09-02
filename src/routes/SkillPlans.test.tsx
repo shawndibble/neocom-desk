@@ -337,37 +337,55 @@ describe('SkillPlans editor: add-skill picker', () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
-    render(<App />);
+    // Column headers (checked below) only render at desktop widths (#114) —
+    // jsdom's matchMedia never matches by default, so mock it to desktop.
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    try {
+      render(<App />);
 
-    const search = await screen.findByRole('textbox', { name: 'Add skill' });
-    await user.type(search, 'Small Hybrid Turret');
-    await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
-    await user.click(await screen.findByRole('button', { name: 'Level I' }));
+      const search = await screen.findByRole('textbox', { name: 'Add skill' });
+      await user.type(search, 'Small Hybrid Turret');
+      await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
+      await user.click(await screen.findByRole('button', { name: 'Level I' }));
 
-    const panel = screen.getByText('Your entries').closest('section')!;
-    const items = await within(panel).findAllByRole('listitem');
-    // A priority-band divider ("Normal priority") precedes the whole entry
-    // block (#27) — including its leading dimmed prereq rows, not just the
-    // entry row itself, so the group reads as one visual unit.
-    expect(items.map((li) => li.textContent)).toEqual([
-      expect.stringContaining('Normal priority'),
-      expect.stringContaining('Gunnery I'),
-      expect.stringContaining('Gunnery II'),
-      expect.stringContaining('Gunnery III'),
-      expect.stringContaining('Small Hybrid Turret I'),
-    ]);
-    // The three Gunnery levels are prereqs the user didn't add directly —
-    // dimmed and tagged, positioned ahead of the one row for the entry
-    // they were needed by (#112: entry rows are one-per-entry, not
-    // one-per-level, so Small Hybrid Turret I is a single row here).
-    expect(items[1].textContent).toMatch(/prereq/i);
-    expect(items[2].textContent).toMatch(/prereq/i);
-    expect(items[3].textContent).toMatch(/prereq/i);
-    expect(items[4].textContent).not.toMatch(/prereq/i);
+      const panel = screen.getByText('Your entries').closest('section')!;
+      const items = await within(panel).findAllByRole('listitem');
+      // A priority-band divider ("Normal priority") precedes the whole entry
+      // block (#27) — including its leading dimmed prereq rows, not just the
+      // entry row itself, so the group reads as one visual unit.
+      expect(items.map((li) => li.textContent)).toEqual([
+        expect.stringContaining('Normal priority'),
+        expect.stringContaining('Gunnery I'),
+        expect.stringContaining('Gunnery II'),
+        expect.stringContaining('Gunnery III'),
+        expect.stringContaining('Small Hybrid Turret I'),
+      ]);
+      // The three Gunnery levels are prereqs the user didn't add directly —
+      // dimmed and tagged, positioned ahead of the one row for the entry
+      // they were needed by (#112: entry rows are one-per-entry, not
+      // one-per-level, so Small Hybrid Turret I is a single row here).
+      expect(items[1].textContent).toMatch(/prereq/i);
+      expect(items[2].textContent).toMatch(/prereq/i);
+      expect(items[3].textContent).toMatch(/prereq/i);
+      expect(items[4].textContent).not.toMatch(/prereq/i);
 
-    // Column headers label the two time columns (UX-REVIEW #9).
-    expect(within(panel).getByText('Per-level')).toBeInTheDocument();
-    expect(within(panel).getByText('Cumulative')).toBeInTheDocument();
+      // Column headers label the two time columns (UX-REVIEW #9).
+      expect(within(panel).getByText('Per-level')).toBeInTheDocument();
+      expect(within(panel).getByText('Cumulative')).toBeInTheDocument();
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
 
     const stored = await db.skillPlans.get('plan-1');
     expect(stored?.entries).toEqual([{ skillTypeID: 2, targetLevel: 1 }]);

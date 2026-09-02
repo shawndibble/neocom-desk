@@ -34,6 +34,21 @@ export function DropdownMenuItem({
   return <DropdownMenuPrimitive.Item className={cx(menuItemClassName, className)} {...props} />;
 }
 
+export function DropdownMenuCheckboxItem({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.CheckboxItem>) {
+  return (
+    <DropdownMenuPrimitive.CheckboxItem className={cx(menuItemClassName, className)} {...props}>
+      <span aria-hidden="true" className="inline-block w-3 text-center">
+        <DropdownMenuPrimitive.ItemIndicator>✓</DropdownMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </DropdownMenuPrimitive.CheckboxItem>
+  );
+}
+
 export function DropdownMenuSeparator({
   className,
   ...props
