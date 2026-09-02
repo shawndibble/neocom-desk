@@ -165,6 +165,14 @@ export function PlanEditor({
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  // Inline, beside-the-button confirmations (#222) — same pattern as
+  // copyConfirm/importConfirm above: small text next to the triggering
+  // button, cleared after a couple of seconds. Additive to the full
+  // Panel/Modal results those same actions already produce below.
+  const [optimizeConfirm, setOptimizeConfirm] = useState<string | null>(null);
+  const [markerConfirm, setMarkerConfirm] = useState(false);
+  const [markersOptimizeConfirm, setMarkersOptimizeConfirm] = useState<string | null>(null);
+  const [reorderConfirm, setReorderConfirm] = useState(false);
 
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
@@ -265,6 +273,8 @@ export function PlanEditor({
     setOptimizeResult(null);
     setMarkersResult(null);
     setReorderPreview(null);
+    setOptimizeConfirm(null);
+    setMarkersOptimizeConfirm(null);
   }
 
   const userSkillTypeIDs = useMemo(
@@ -408,32 +418,46 @@ export function PlanEditor({
     downloadCsv('skill-queue', scheduled, queueCsvColumns(t, nameFor, userSkillTypeIDs));
   }
 
+  // Same beside-the-button confirmation for both remap-optimizing actions:
+  // the savings figure when meaningful, a short "no gain" note otherwise.
+  function confirmRemapOutcome(result: PlaceRemapsResult): string {
+    return result.savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS
+      ? t('plans.optimizeConfirmSaves', { duration: formatDuration(result.savingsSeconds) })
+      : t('plans.optimizeConfirmNoGain');
+  }
+
   function handleOptimizeRemaps() {
     if (scheduled.length === 0) return;
-    setOptimizeResult(
-      placeRemaps(scheduled, catalog.engineSkills, {
-        remapCount,
-        currentAttributes: attributes,
-        implants: effectiveImplants,
-        // The same Boosters the computed queue schedules with, so the savings
-        // figure and the queue total cannot disagree.
-        booster:
-          activeBoosters.length > 0
-            ? { boosters: activeBoosters, startDate: new Date() }
-            : undefined,
-      })
-    );
+    const result = placeRemaps(scheduled, catalog.engineSkills, {
+      remapCount,
+      currentAttributes: attributes,
+      implants: effectiveImplants,
+      // The same Boosters the computed queue schedules with, so the savings
+      // figure and the queue total cannot disagree.
+      booster:
+        activeBoosters.length > 0 ? { boosters: activeBoosters, startDate: new Date() } : undefined,
+    });
+    setOptimizeResult(result);
+    setOptimizeConfirm(confirmRemapOutcome(result));
+    setTimeout(() => setOptimizeConfirm(null), 2000);
   }
 
   function handleOptimizeAtMarkers() {
     if (scheduled.length === 0) return;
-    setMarkersResult(
-      optimizeAtMarkers(scheduled, catalog.engineSkills, {
-        markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
-        currentAttributes: attributes,
-        implants: effectiveImplants,
-      })
-    );
+    const result = optimizeAtMarkers(scheduled, catalog.engineSkills, {
+      markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
+      currentAttributes: attributes,
+      implants: effectiveImplants,
+    });
+    setMarkersResult(result);
+    setMarkersOptimizeConfirm(confirmRemapOutcome(result));
+    setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
+  }
+
+  function handleAddMarker() {
+    onUpdate({ markers: addMarker(plan.markers, plan.entries.length) });
+    setMarkerConfirm(true);
+    setTimeout(() => setMarkerConfirm(false), 2000);
   }
 
   // Shared per-segment rendering for both optimize modes: a remapped segment
@@ -473,6 +497,8 @@ export function PlanEditor({
   function handleSuggestReorder() {
     if (scheduled.length === 0) return;
     setReorderPreview(suggestReorder(scheduled, catalog.engineSkills, priorityMap));
+    setReorderConfirm(true);
+    setTimeout(() => setReorderConfirm(false), 2000);
   }
 
   function acceptReorder() {
@@ -575,12 +601,19 @@ export function PlanEditor({
                 {t('plans.optimizeRemaps')}
               </Button>
             </Tooltip>
-            <Button
-              size="sm"
-              onClick={() => onUpdate({ markers: addMarker(plan.markers, plan.entries.length) })}
-            >
+            {optimizeConfirm && (
+              <span role="status" aria-live="polite" className="text-xs text-success">
+                {optimizeConfirm}
+              </span>
+            )}
+            <Button size="sm" onClick={handleAddMarker}>
               {t('plans.addMarker')}
             </Button>
+            {markerConfirm && (
+              <span role="status" aria-live="polite" className="text-xs text-success">
+                {t('plans.markerAdded')}
+              </span>
+            )}
             <Button
               size="sm"
               onClick={handleOptimizeAtMarkers}
@@ -588,9 +621,19 @@ export function PlanEditor({
             >
               {t('plans.optimizeAtMarkers')}
             </Button>
+            {markersOptimizeConfirm && (
+              <span role="status" aria-live="polite" className="text-xs text-success">
+                {markersOptimizeConfirm}
+              </span>
+            )}
             <Button size="sm" onClick={handleSuggestReorder} disabled={scheduled.length === 0}>
               {t('plans.suggestReorder')}
             </Button>
+            {reorderConfirm && (
+              <span role="status" aria-live="polite" className="text-xs text-success">
+                {t('plans.reorderSuggested')}
+              </span>
+            )}
           </div>
         </div>
       </Panel>

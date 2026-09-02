@@ -658,7 +658,9 @@ describe('SkillPlans editor: import / export', () => {
     const entriesPanel = screen.getByText('Your entries').closest('section')!;
     // The entry row's name and level render as separate text nodes ("Gunnery"
     // " " "III"), so match by regex rather than the exact string "Gunnery".
-    expect(await within(entriesPanel).findByText(/Gunnery/)).toBeInTheDocument();
+    // Anchored: an unanchored /Gunnery/ also matches the below-desktop "Move
+    // Gunnery up/down" reorder-control tooltip text elsewhere in the row (#223).
+    expect(await within(entriesPanel).findByText(/^Gunnery\b/)).toBeInTheDocument();
     const stored = await db.skillPlans.get('plan-1');
     expect(stored?.entries).toEqual([
       { skillTypeID: 1, targetLevel: 3 },
@@ -812,6 +814,29 @@ describe('SkillPlans editor: optimize remaps', () => {
     // The rest of the app must still be usable — no crash boundary tripped.
     expect(await screen.findByText('Your entries')).toBeInTheDocument();
   });
+
+  it('shows an inline confirmation beside the Optimize remaps button (#222)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount: 1,
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Optimize remaps' }).closest('section')!;
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+
+    // Additive: the full panel result (asserted elsewhere above) still
+    // renders — this only checks the new beside-the-button confirmation.
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent(/^Saves \d+[dhm]/);
+  });
 });
 
 describe('SkillPlans editor: remap markers', () => {
@@ -840,6 +865,19 @@ describe('SkillPlans editor: remap markers', () => {
     await user.click(screen.getByRole('button', { name: 'Remove marker' }));
     await waitFor(() => expect(screen.queryByText('Remap marker')).not.toBeInTheDocument());
     expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([]);
+  });
+
+  it('shows an inline confirmation beside the Add marker button (#222)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
+    render(<App />);
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Add remap marker' }).closest('section')!;
+    await user.click(screen.getByRole('button', { name: 'Add remap marker' }));
+
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent('Marker added');
   });
 
   it('optimize at my markers reports the current-attributes segment and a best spread per marker segment', async () => {
@@ -874,6 +912,29 @@ describe('SkillPlans editor: remap markers', () => {
     expect(
       screen.getByText(/Before Spaceship Command I, remap to INT 27 \/ MEM 21 \//)
     ).toBeInTheDocument();
+  });
+
+  it('shows an inline confirmation beside the Optimize at my markers button (#222)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 5 },
+          { skillTypeID: 3, targetLevel: 3 },
+        ],
+        markers: [1],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+
+    await screen.findByText('Your entries');
+    const toolbar = screen
+      .getByRole('button', { name: 'Optimize at my markers' })
+      .closest('section')!;
+    await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
+
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent(/^Saves \d+[dhm]/);
   });
 
   it('disables "Optimize at my markers" when the plan has no markers', async () => {
@@ -1079,6 +1140,29 @@ describe('SkillPlans editor: suggest reorder', () => {
       { skillTypeID: 4, targetLevel: 1 },
       { skillTypeID: 3, targetLevel: 1 },
     ]);
+  });
+
+  it('shows an inline confirmation beside the Suggest reorder button (#222)', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+          { skillTypeID: 4, targetLevel: 1 },
+        ],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Suggest reorder' }).closest('section')!;
+    await user.click(screen.getByRole('button', { name: 'Suggest reorder' }));
+
+    // Additive: the reorder-preview modal (asserted elsewhere above) still
+    // opens — this only checks the new beside-the-button confirmation.
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent('Reorder suggested');
   });
 });
 
