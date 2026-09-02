@@ -158,6 +158,20 @@ describe('Settings', () => {
 const ALL_NOTIFICATION_SCOPES = [...new Set(NOTIFICATION_EVENTS.map((event) => event.scope))];
 const CHAR_2_ID = 92;
 
+/**
+ * The shell's rail renders a character-menu button named after the active
+ * pilot, so a bare `getByRole('button', { name: /pilot one/i })` matches twice
+ * once Settings is reached through `<App />`. Same ambiguity the Activity Log
+ * assertion resolves by naming its table: scope per-character queries to the
+ * Notifications panel rather than the whole document.
+ */
+async function notificationsPanel(): Promise<HTMLElement> {
+  const heading = await screen.findByRole('heading', { name: /^notifications$/i });
+  const section = heading.closest('section');
+  if (!section) throw new Error('Notifications panel has no section wrapper');
+  return section as HTMLElement;
+}
+
 describe('Settings — Notifications (issue #170)', () => {
   beforeEach(async () => {
     await db.tokens.put({
@@ -188,8 +202,9 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    const pilotOneButton = await screen.findByRole('button', { name: /pilot one/i });
-    expect(screen.getByRole('button', { name: /pilot two/i })).toBeInTheDocument();
+    const panel = await notificationsPanel();
+    const pilotOneButton = await within(panel).findByRole('button', { name: /pilot one/i });
+    expect(within(panel).getByRole('button', { name: /pilot two/i })).toBeInTheDocument();
 
     await user.click(pilotOneButton);
 
@@ -201,7 +216,9 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
-    await user.click(await screen.findByRole('button', { name: /pilot one/i }));
+    await user.click(
+      await within(await notificationsPanel()).findByRole('button', { name: /pilot one/i })
+    );
 
     const mailCheckbox = screen.getByRole('checkbox', { name: 'New Mail' });
     await user.click(mailCheckbox);
@@ -219,7 +236,9 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
-    await user.click(await screen.findByRole('button', { name: /pilot one/i }));
+    await user.click(
+      await within(await notificationsPanel()).findByRole('button', { name: /pilot one/i })
+    );
 
     await user.click(
       screen.getByRole('checkbox', { name: /toggle all notifications for pilot one/i })
@@ -255,7 +274,9 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(
       screen.queryByRole('checkbox', { name: /enable notifications/i })
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /pilot one/i })).not.toBeInTheDocument();
+    expect(
+      within(await notificationsPanel()).queryByRole('button', { name: /pilot one/i })
+    ).not.toBeInTheDocument();
   });
 
   it('offers an Enable button that makes the browser request, and no request without it', async () => {
@@ -286,7 +307,9 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
-    await user.click(await screen.findByRole('button', { name: /pilot one/i }));
+    await user.click(
+      await within(await notificationsPanel()).findByRole('button', { name: /pilot one/i })
+    );
 
     expect(screen.getByRole('checkbox', { name: 'New Mail' })).toBeInTheDocument();
     expect(screen.queryByText(/notifications are blocked/i)).not.toBeInTheDocument();
@@ -300,7 +323,9 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
-    await user.click(await screen.findByRole('button', { name: /pilot two/i }));
+    await user.click(
+      await within(await notificationsPanel()).findByRole('button', { name: /pilot two/i })
+    );
 
     const mailCheckbox = screen.getByRole('checkbox', { name: 'New Mail' });
     expect(mailCheckbox).toBeDisabled();
@@ -319,7 +344,7 @@ describe('Settings — Notifications (issue #170)', () => {
     // Two levels up: the button's immediate parent is just the header row
     // (button + select-all checkbox); its parent is the whole section,
     // including the event rows.
-    const pilotOneSection = screen
+    const pilotOneSection = within(await notificationsPanel())
       .getByRole('button', { name: /pilot one/i })
       .closest('div')!.parentElement!;
     expect(within(pilotOneSection).getByRole('checkbox', { name: 'New Mail' })).toBeInTheDocument();
@@ -335,8 +360,12 @@ describe('Settings — Notifications (issue #170)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'Two');
 
-    expect(screen.queryByRole('button', { name: /pilot one/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /pilot two/i })).toBeInTheDocument();
+    expect(
+      within(await notificationsPanel()).queryByRole('button', { name: /pilot one/i })
+    ).not.toBeInTheDocument();
+    expect(
+      within(await notificationsPanel()).getByRole('button', { name: /pilot two/i })
+    ).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).toBeInTheDocument();
   });
 });
