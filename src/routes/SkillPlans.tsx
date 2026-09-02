@@ -35,14 +35,14 @@ export function SkillPlans() {
       <SkillsSubNav />
       {isSyncConfigured() && <SyncErrorNote {...syncStatus} />}
 
-      {catalog && <CurrentQueuePanel characterId={activeCharacterId} catalog={catalog} />}
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
         <PlanListPane activeCharacterId={activeCharacterId} remapInfo={remapInfo} />
         <Panel className={isDesktop ? '' : 'hidden'}>
           <EmptyState title={t('plans.selectHint')} className="py-8" />
         </Panel>
       </div>
+
+      {catalog && <CurrentQueuePanel characterId={activeCharacterId} catalog={catalog} />}
     </div>
   );
 }
