@@ -15,6 +15,7 @@
  * than flooding the notification the first time an already-stalled or
  * already-finished queue is observed.
  */
+import { colonyStatus } from './pi/colonyStatus';
 
 export interface SkillQueueEntrySnapshot {
   skillId: number;
@@ -112,6 +113,116 @@ export function diffCharacterNotTraining(
   if (headStatus(next) !== 'notTraining') return [];
   if (headStatus(prev) === 'notTraining') return [];
   return [{ eventId: 'characterNotTraining', characterId, skillId: null, level: null }];
+}
+
+export interface IndustryJobEntrySnapshot {
+  jobId: number;
+  /** Epoch ms this job finishes (ESI's `end_date`, fixed once the job is started). */
+  endMs: number;
+  blueprintTypeId: number;
+  productTypeId: number | null;
+  activityId: number;
+}
+
+export interface IndustryJobSnapshot {
+  entries: readonly IndustryJobEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface IndustryJobNotificationFire {
+  eventId: 'industryJobComplete';
+  characterId: number;
+  jobId: number;
+  blueprintTypeId: number;
+  productTypeId: number | null;
+  activityId: number;
+}
+
+/**
+ * Fires per job whose `endMs` is newly in the past — edge-triggered the same
+ * way as `diffSkillLevelComplete`, comparing the job's own fixed finish
+ * instant against `prev.nowMs` rather than matching job identity against
+ * `prev.entries`. `loadCharacterIndustryJobs` only returns non-completed jobs
+ * (CONTEXT.md/ADR: ESI keeps a finished-but-undelivered job at status `ready`
+ * in that list until collected), so a job can sit in `next.entries` for many
+ * polls after completing — the `endMs <= prev.nowMs` check is what stops a
+ * re-fire on every one of those polls.
+ */
+export function diffIndustryJobComplete(
+  characterId: number,
+  prev: IndustryJobSnapshot | undefined,
+  next: IndustryJobSnapshot
+): IndustryJobNotificationFire[] {
+  if (!prev) return [];
+  const fires: IndustryJobNotificationFire[] = [];
+  for (const entry of next.entries) {
+    if (entry.endMs > next.nowMs) continue;
+    if (entry.endMs <= prev.nowMs) continue;
+    fires.push({
+      eventId: 'industryJobComplete',
+      characterId,
+      jobId: entry.jobId,
+      blueprintTypeId: entry.blueprintTypeId,
+      productTypeId: entry.productTypeId,
+      activityId: entry.activityId,
+    });
+  }
+  return fires;
+}
+
+export interface ColonyExtractorSnapshot {
+  pinId: number;
+  expiryTimeMs: number;
+}
+
+export interface ColonySnapshotEntry {
+  planetId: number;
+  extractors: readonly ColonyExtractorSnapshot[];
+}
+
+export interface PlanetarySnapshot {
+  colonies: readonly ColonySnapshotEntry[];
+  nowMs: number;
+}
+
+export interface PlanetaryNotificationFire {
+  eventId: 'planetaryExtractionDone';
+  characterId: number;
+  planetId: number;
+}
+
+function colonyIdle(entry: ColonySnapshotEntry, nowMs: number): boolean {
+  return colonyStatus(
+    entry.extractors.map((e) => ({ pinId: e.pinId, expiryTimeMs: e.expiryTimeMs })),
+    nowMs
+  ).idle;
+}
+
+/**
+ * Fires per colony whose extractor programs newly read idle (ADR 0005:
+ * `engine/pi/colonyStatus.ts`'s `expiry_time`-only idle read, never
+ * `contents[].amount`/`last_cycle_start`). Edge-triggered on the transition
+ * into idle, evaluating both snapshots at their own `nowMs` the same way
+ * `diffCharacterNotTraining` compares `headStatus(prev)` against
+ * `headStatus(next)` — a colony missing from `prev.colonies` (first time
+ * this character's poll has seen it) is treated as not-previously-idle, so a
+ * colony discovered already idle still fires once.
+ */
+export function diffPlanetaryExtractionDone(
+  characterId: number,
+  prev: PlanetarySnapshot | undefined,
+  next: PlanetarySnapshot
+): PlanetaryNotificationFire[] {
+  if (!prev) return [];
+  const prevByPlanet = new Map(prev.colonies.map((c) => [c.planetId, c]));
+  const fires: PlanetaryNotificationFire[] = [];
+  for (const colony of next.colonies) {
+    if (!colonyIdle(colony, next.nowMs)) continue;
+    const prevColony = prevByPlanet.get(colony.planetId);
+    if (prevColony && colonyIdle(prevColony, prev.nowMs)) continue;
+    fires.push({ eventId: 'planetaryExtractionDone', characterId, planetId: colony.planetId });
+  }
+  return fires;
 }
 
 export const SKILL_QUEUE_NOTIFICATION_DIFFS: Record<

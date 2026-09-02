@@ -873,6 +873,14 @@
       "characterNotTraining": {
         "title": "Not training",
         "body": "{{character}} has no skill in training."
+      },
+      "industryJobComplete": {
+        "title": "Industry job complete",
+        "body": "{{character}}'s industry job for {{item}} is complete."
+      },
+      "planetaryExtractionDone": {
+        "title": "Extraction done",
+        "body": "{{character}}'s extraction on {{planet}} has stopped."
       }
     }
   },
