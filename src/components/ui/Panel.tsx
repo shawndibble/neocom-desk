@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { forwardRef, type CSSProperties, type ReactNode } from 'react';
 
 interface PanelProps {
   title?: string;
@@ -17,6 +17,8 @@ interface PanelProps {
    */
   fill?: boolean;
   className?: string;
+  /** Passthrough for values Tailwind can't express statically, e.g. a `top` offset measured at runtime for a `sticky` panel. */
+  style?: CSSProperties;
 }
 
 /**
@@ -29,20 +31,26 @@ interface PanelProps {
  * list had already discovered this and hand-rolled the strip locally. Its
  * minimum height is the `md` control tier, because what sits in `actions` is
  * usually an `IconButton` at exactly that height.
+ *
+ * Forwards its ref to the root `<section>` — needed by, e.g., a `sticky`
+ * Panel whose stacking offset is measured at runtime (see PlanEditor.tsx).
+ * Wrapping a Panel in a plain `<div>` to get a ref instead doesn't work: it
+ * silently breaks that Panel's own `position: sticky` (confirmed — a
+ * wrapper div, even with no styling of its own, defeats it).
  */
-export function Panel({
-  title,
-  actions,
-  children,
-  padded = true,
-  fill = false,
-  className = '',
-}: PanelProps) {
+export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
+  { title, actions, children, padded = true, fill = false, className = '', style },
+  ref
+) {
   const contentClassName = [padded ? 'p-3' : '', fill ? 'flex min-h-0 flex-1 flex-col' : '']
     .filter(Boolean)
     .join(' ');
   return (
-    <section className={`rounded-xs border border-line bg-panel/85 backdrop-blur-sm ${className}`}>
+    <section
+      ref={ref}
+      className={`rounded-xs border border-line bg-panel/85 backdrop-blur-sm ${className}`}
+      style={style}
+    >
       {(title || actions) && (
         <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
           {title && (
@@ -56,4 +64,4 @@ export function Panel({
       <div className={contentClassName}>{children}</div>
     </section>
   );
-}
+});

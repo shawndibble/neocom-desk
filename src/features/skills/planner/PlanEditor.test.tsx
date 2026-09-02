@@ -147,10 +147,17 @@ describe('PlanEditor toolbar reorganization', () => {
     if (!summarySection) throw new Error('expected summary section');
 
     expect(summarySection).toHaveClass('lg:sticky', 'lg:top-0');
-    // Distinct, non-zero offset so the toolbar stacks below the summary
-    // strip instead of both claiming `top-0` and overlapping.
-    expect(toolbarSection).toHaveClass('lg:sticky', 'lg:top-[4.625rem]');
-    expect(toolbarSection.className).not.toMatch(/\blg:top-0\b/);
+    // The offset that stacks the toolbar below the summary strip is
+    // measured live off the summary Panel's rendered height (see
+    // PlanEditor.tsx's `headerRef`/`toolbarTop`), not a fixed Tailwind
+    // class — a hand-derived constant here previously went stale and the
+    // two panels visibly overlapped (PR #229, fixed in a follow-up). Assert
+    // the mechanism is wired up (sticky, no baked-in top-* class, an inline
+    // `top` supplied) rather than a specific pixel value, which jsdom can't
+    // render anyway.
+    expect(toolbarSection).toHaveClass('lg:sticky');
+    expect(toolbarSection.className).not.toMatch(/\blg:top-/);
+    expect((toolbarSection as HTMLElement).style.top).not.toBe('');
   });
 
   it('collapses Export into one control that reveals "to clipboard" / "to CSV" only after being opened', async () => {

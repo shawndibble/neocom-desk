@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -181,6 +181,39 @@ export function PlanEditor({
   const [markerConfirm, setMarkerConfirm] = useState(false);
   const [markersOptimizeConfirm, setMarkersOptimizeConfirm] = useState<string | null>(null);
   const [reorderConfirm, setReorderConfirm] = useState(false);
+
+  // Toolbar's sticky `top` (#221) has to sit exactly at PlanHeader's rendered
+  // height so the two stack flush instead of overlapping. A hand-derived
+  // constant here goes stale the moment PlanHeader's content changes height
+  // (a chip's text wraps differently, a font metric shifts, a translation
+  // runs longer) — happened for real: PR #229 shipped `4.625rem` and it
+  // already didn't match. Measuring live with ResizeObserver makes this
+  // self-correcting instead of something to remember to re-derive.
+  //
+  // The ref goes straight onto PlanHeader's own forwarded Panel ref, not a
+  // wrapping `<div>` — confirmed by hand that a wrapper div, even styleless,
+  // silently breaks that Panel's `position: sticky` (it stopped sticking at
+  // all rather than sticking in the wrong place, which is a worse bug than
+  // the offset drift this measurement fixes).
+  const headerRef = useRef<HTMLElement>(null);
+  const [toolbarTop, setToolbarTop] = useState<number | null>(null);
+  useEffect(() => {
+    const headerEl = headerRef.current;
+    if (!headerEl) return;
+    // Verified against a real browser, not just reasoned about: the Toolbar
+    // Panel's own `space-y-4` top margin does NOT get added on top of this
+    // `top` value once it's stuck — a sticky element's offset positions its
+    // border box directly, ignoring its own margin. (This is exactly what
+    // PR #229's hardcoded `4.625rem` got wrong: it subtracted 1rem for a
+    // margin contribution that was never actually there, landing 1rem short
+    // and overlapping the strip above. An e2e regression test pins this —
+    // see plans.spec.ts's "#221 regression" test.)
+    const measure = () => setToolbarTop(headerEl.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(headerEl);
+    return () => observer.disconnect();
+  }, []);
 
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
@@ -551,6 +584,7 @@ export function PlanEditor({
   return (
     <div className="space-y-4">
       <PlanHeader
+        ref={headerRef}
         totalSeconds={totalSeconds}
         skillCount={scheduledSkillCount}
         projectedFinish={planFinish}
@@ -618,16 +652,17 @@ export function PlanEditor({
           a three-row toolbar there would hold a fifth of the viewport
           permanently against the content it acts on.
 
-          `lg:top-[4.625rem]` (not `top-0`) stacks this below the also-sticky
-          PlanHeader summary strip above: the strip's own rendered height at
-          `lg`+ is one fixed chip row (`lg:flex-nowrap` on its chip row) plus
-          its Panel chrome, ~5.625rem (90px) border-box, and this Panel picks
-          up a 1rem `space-y-4` top margin from its parent that sticky
-          offsets count against the stuck position, so the offset that lands
-          this Panel flush under the strip is 5.625rem - 1rem = 4.625rem. If
-          PlanHeader's header content changes height, re-derive this value
-          rather than leaving it stale. */}
-      <Panel title={t('plans.toolbar')} className="lg:sticky lg:top-[4.625rem] lg:z-10">
+          `top` is measured live (see `toolbarTop` above) rather than a fixed
+          Tailwind offset — a hand-derived constant here previously went
+          stale the moment PlanHeader's rendered height changed and the two
+          panels visibly overlapped. `lg:sticky` still gates *whether* it
+          sticks; the inline style only supplies *where*, and has no effect
+          below `lg` since `position` isn't sticky there. */}
+      <Panel
+        title={t('plans.toolbar')}
+        className="lg:sticky lg:z-10"
+        style={toolbarTop === null ? undefined : { top: `${toolbarTop}px` }}
+      >
         <div className="space-y-2">
           {/* Remaps-available is a control with a value and an explanatory
               hint, not header adornment. In the header slot the hint wrapped
