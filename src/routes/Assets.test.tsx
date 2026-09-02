@@ -266,11 +266,50 @@ describe('Assets', () => {
           ],
           { headers: { 'X-Pages': '1' } }
         )
+      ),
+      // The missing parent isn't a real structure either — the best-effort
+      // structure lookup 403s, same as any other structure the character
+      // can't see into, and the group stays a genuine orphan.
+      http.get('https://esi.evetech.net/universe/structures/999999999', () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
       )
     );
     render(<App />);
     expect(await screen.findByText(/Location unresolved/)).toBeInTheDocument();
     expect(screen.getByText('Container')).toBeInTheDocument();
+  });
+
+  it('resolves a missing parent to its real name when it turns out to be a structure ESI can still look up (e.g. a personal-hangar division ESI never returns its own asset row for)', async () => {
+    const HANGAR_STRUCTURE = 'Badivefi - Tycho Brahe 18 HQ';
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 21,
+              type_id: 653,
+              quantity: 1,
+              location_id: 1053725032929,
+              location_type: 'item' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      ),
+      http.get('https://esi.evetech.net/universe/structures/1053725032929', () =>
+        HttpResponse.json({
+          name: HANGAR_STRUCTURE,
+          owner_id: 1,
+          solar_system_id: 30000144,
+        })
+      )
+    );
+    render(<App />);
+    expect(await screen.findByText(HANGAR_STRUCTURE)).toBeInTheDocument();
+    expect(screen.queryByText(/Location unresolved/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Container')).not.toBeInTheDocument();
   });
 
   it('filters items via the search box, across every location at once', async () => {
@@ -801,6 +840,44 @@ describe('jumps-away distance (issue #87)', () => {
       id: `${CHAR_ID}:1000000000001`,
       characterId: CHAR_ID,
       locationId: 1000000000001,
+      scope: 'character',
+      updatedAt: Date.now(),
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('2 jumps')).toBeInTheDocument();
+  });
+
+  it('resolves jumps-away for an "in space" location from its own location id, instead of always showing 0', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            {
+              item_id: 30,
+              type_id: 650,
+              quantity: 1,
+              location_id: 30002187,
+              location_type: 'solar_system' as const,
+              location_flag: 'AutoFit',
+              is_singleton: true,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      ),
+      http.get('https://esi.evetech.net/universe/systems/30002187', () =>
+        HttpResponse.json({ system_id: 30002187, name: 'Amamake', security_status: 0.3 })
+      ),
+      http.get('https://esi.evetech.net/latest/route/30000142/30002187', () =>
+        HttpResponse.json([30000142, 30002053, 30002187])
+      )
+    );
+    await db.stationPins.put({
+      id: `${CHAR_ID}:30002187`,
+      characterId: CHAR_ID,
+      locationId: 30002187,
       scope: 'character',
       updatedAt: Date.now(),
     });
