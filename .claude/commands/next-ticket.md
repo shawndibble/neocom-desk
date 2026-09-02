@@ -102,27 +102,50 @@ cleanly per the procedure above instead of looping unboundedly.
 
 ### Sync-with-main / conflict resolution procedure
 
-Referenced by steps 6 and 8 whenever the branch is behind `main` or a PR
+Referenced by steps 6, 7a, and 8 whenever the branch is behind `main` or a PR
 reports `mergeStateStatus: CONFLICTING`/`DIRTY`. Up to **3 attempts**:
 
 1. `node scripts/next-ticket/sync-main.mjs` — fetches and merges
    `origin/main`. Prints `{"status":"already-up-to-date"}`,
    `{"status":"merged"}`, or `{"status":"conflict","files":[...]}`.
-2. On `already-up-to-date` or `merged`: skip to step 4.
+2. On `already-up-to-date`: nothing changed — skip to step 5, no gate run.
 3. On `conflict`: invoke the `resolving-merge-conflicts` skill to resolve
    the listed files in place — it resolves and commits; never
-   `git merge --abort`.
-4. Re-run the gate (`node scripts/next-ticket/gate.mjs --build`) against the
-   merged tree. If it fails, follow the local gate failure procedure below.
+   `git merge --abort`. Then continue to step 4.
+4. The tree changed (`merged`, or a conflict was just resolved) — it needs
+   validating. **If this procedure is running as part of step 6** (the one
+   pre-PR gate, before the PR exists), re-run the gate
+   (`node scripts/next-ticket/gate.mjs --build`) against the merged tree; if
+   it fails, follow the local gate failure procedure below. **If running as
+   part of step 7a or step 8** (the PR is already open), skip the gate here
+   — commit and push, and let CI re-validate instead; see "One local gate,
+   then CI" below.
 5. If the merge left anything uncommitted, commit it.
 
 If a 3rd attempt still leaves conflicts (main moving faster than this run can
 converge — very unlikely), abandon and report that `main` would not settle.
 
+### One local gate, then CI
+
+The full gate (format:check/lint/typecheck/`test:run`/build) runs locally
+**at most once** per ticket, in step 6, right before the PR opens — this is
+what satisfies CLAUDE.md's "validate before commit" rule (skipped entirely
+if step 6's sync found nothing new to validate, per step 4 above). After the
+PR is open, the full suite and the full gate don't run locally again:
+GitHub Actions (`validate` + `e2e`) is the only place they run for the rest
+of the loop — every round of step 8's CI-failure-fix loop, and any conflict
+resolution once the PR is open (step 7a, step 8), ends in a commit-and-push,
+never a local gate re-run. A single test *file* is still fine to run locally
+to confirm a targeted fix (e.g. `npx vitest run <path>`, as in step 8) —
+it's the full suite and the full gate that move to CI-only. This keeps
+concurrent `/next-ticket` runs from piling up repeated full test/build runs
+on the local machine.
+
 ### Local gate failure procedure
 
-Referenced by step 6, and by step 8 whenever a post-merge re-check is needed.
-Up to **5 rounds**:
+Referenced by step 6 only — the single pre-PR local gate. Once the PR is
+open, GitHub Actions is the sole place these checks run (see "One local
+gate, then CI" above and step 8 below). Up to **5 rounds**:
 
 1. Read the failing command's output directly from the gate script's JSON
    (`output.<check-name>`) — it's local, not a CI log, so no sub-agent is
@@ -235,19 +258,24 @@ run them inline.
 
 `main` may have moved since step 3 (another `/next-ticket` run or a human
 merge) — catch that now rather than at PR-merge time. Run the sync-with-main
-procedure above once, unconditionally, before the gate.
+procedure above once, unconditionally. This is the one pre-PR call site
+(per the procedure's step 4), so if the sync actually changed the tree
+(`merged`, or a conflict was resolved), it already runs
+`node scripts/next-ticket/gate.mjs --build` for you as part of that
+procedure and follows the local gate failure procedure on failure — nothing
+further to do here beyond that. (If sync reported `already-up-to-date`, the
+gate didn't run — `/implement`'s own validation in step 5 already covers
+this exact tree, so re-running it here would be pure waste; see "One local
+gate, then CI".)
 
-Then run `node scripts/next-ticket/gate.mjs --build`. It runs
-`format:check`, `lint`, `typecheck`, and `test:run` concurrently (they're
-independent — this is faster than the old sequential `&&` chain, and one
-Bash call either way), then `build` if the rest passed. It prints
-`{"status":"pass"}` or
+`gate.mjs --build` runs `format:check`, `lint`, `typecheck`, and `test:run`
+concurrently (they're independent — this is faster than the old sequential
+`&&` chain, and one Bash call either way), then `build` if the rest passed.
+It prints `{"status":"pass"}` or
 `{"status":"fail","failed":["lint", ...],"output":{"lint":"...tail...", ...}}`
 (each failed check's output, truncated to its last ~4000 characters — read
 `output.<check-name>` directly rather than re-running the check yourself).
-
-If it fails, follow the local gate failure procedure above (bounded to 5
-rounds) rather than looping freely. `npm run format` auto-fixes formatting.
+`npm run format` auto-fixes formatting.
 
 Do **not** run `npm run test:e2e` locally — one spec
 (`e2e/plans.spec.ts` clipboard export) fails only on Windows due to a clipboard
@@ -272,6 +300,17 @@ export/clipboard behaviour, reason about e2e impact from the spec instead.
   abandon procedures as appropriate to the failure. If `autoMergeArmed` is
   `false`, note it and continue — step 9 still merges directly as a fallback.
 
+## 7a. Immediate conflict check
+
+Right after `open-pr.mjs` succeeds, before waiting on any CI run: check
+locally whether `main` moved in the gap between step 6's sync and this push
+(a race, not the common case — but worth a cheap local check before
+spending a full CI run on a PR that couldn't have merged anyway). Run the
+sync-with-main / conflict resolution procedure above once, unconditionally.
+`already-up-to-date` or `merged`: proceed to step 8. A real conflict:
+resolve, commit, and push (no local gate re-run — see "One local gate, then
+CI"), then proceed to step 8.
+
 ## 8. Drive to a mergeable, green PR
 
 Loop up to **5 rounds** (this budget is shared across both triggers below —
@@ -282,8 +321,8 @@ it is not 5 conflict rounds plus 5 CI rounds):
   (this is the CI runtime itself, not overhead — nothing to speed up here).
   Prints one of:
   - `{"status":"conflict"}` — follow the sync-with-main / conflict resolution
-    procedure above (it includes the gate re-run and commit), push, and
-    restart this round.
+    procedure above (no local gate re-run at this point — see "One local
+    gate, then CI"), push, and restart this round.
   - `{"status":"green","mergeable":true}` — proceed to step 9.
   - `{"status":"checks-failed","failedRunIds":[<run-id>, ...]}` — for each
     id, within the same round budget:
@@ -298,9 +337,13 @@ playwright-report`), then report back: the failing job and test, the
        previous rounds already tried — each sub-agent starts fresh and will
        otherwise re-propose a fix you have already ruled out.
     2. Fix it on the branch from that report (code or test, whichever is
-       actually wrong — do not delete a failing test to make it pass).
-    3. Re-run the gate (`node scripts/next-ticket/gate.mjs --build`), commit,
-       `git push`.
+       actually wrong — do not delete a failing test to make it pass). If
+       the failure was a unit test, you may run that one file locally to
+       confirm the fix (`npx vitest run <path>`) — but do not re-run the full
+       gate or the full suite (`gate.mjs`, `npm run test:run`, `npm run
+       build`); the PR is already open, so CI is what validates the whole
+       tree now (see "One local gate, then CI").
+    3. Commit and `git push`.
     4. Restart this round (`drive-ci.mjs` again against the new commit).
 - If still not both mergeable and green after 5 rounds: comment on the PR
   **and** the issue with a precise summary of the remaining failure, leave the
