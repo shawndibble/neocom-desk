@@ -458,7 +458,15 @@ export function PlanEditor({
               <Button size="sm">{t('plans.export')}</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onSelect={() => void handleExport()}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  // Deferred to a fresh macrotask: writeText() called during
+                  // Radix's own menu-close/focus-restore transition can throw
+                  // "Document is not focused" (NotAllowedError) if it races
+                  // that transition — this runs after it's settled.
+                  setTimeout(() => void handleExport(), 0);
+                }}
+              >
                 {t('plans.exportClipboard')}
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={handleExportCsv} disabled={scheduled.length === 0}>
