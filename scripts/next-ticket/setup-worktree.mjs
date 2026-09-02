@@ -58,7 +58,11 @@ if (!ci.ok) {
 const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const husky = tryRun(npxCmd, ['husky'], { cwd: worktreePath, shell: process.platform === 'win32' });
 if (!husky.ok) {
-  printResult({ status: 'error', step: 'husky-install', message: husky.stderr.trim().slice(-4000) });
+  printResult({
+    status: 'error',
+    step: 'husky-install',
+    message: husky.stderr.trim().slice(-4000),
+  });
   process.exit(1);
 }
 
