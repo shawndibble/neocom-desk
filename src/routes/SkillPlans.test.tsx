@@ -546,7 +546,8 @@ describe('SkillPlans editor: import / export', () => {
       { skillTypeID: 3, targetLevel: 1 },
     ]);
 
-    await user.click(screen.getByRole('button', { name: 'Export to clipboard' }));
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Export to clipboard' }));
     expect(await screen.findByText('Copied to clipboard')).toBeInTheDocument();
     expect(clipboardWriteText).toHaveBeenCalledWith(
       'Gunnery I\nGunnery II\nGunnery III\nSpaceship Command I'

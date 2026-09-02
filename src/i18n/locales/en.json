@@ -111,6 +111,8 @@
     "computeError": "Couldn't compute this plan: {{message}}",
     "remove": "Remove",
     "toolbar": "Toolbar",
+    "importExport": "Import / Export",
+    "export": "Export",
     "addSkill": "Add skill",
     "searchPlaceholder": "Search skills…",
     "filterByGroup": "Filter by skill group",

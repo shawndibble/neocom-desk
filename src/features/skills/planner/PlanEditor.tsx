@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, Panel, Tooltip } from '@/components/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  InfoTooltip,
+  Modal,
+  Panel,
+  Tooltip,
+} from '@/components/ui';
 import { normalizePlan } from '@/engine/plan';
 import { effectivePriority } from '@/engine/planPriority';
 import { computeSchedule } from '@/engine/schedule';
@@ -409,6 +419,94 @@ export function PlanEditor({
         badge={headerBadge}
       />
 
+      <Panel title={t('plans.importExport')}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => void handleImport()}>
+            {t('plans.importQueue')}
+          </Button>
+          <Button size="sm" onClick={() => setImportOpen(true)}>
+            {t('plans.importClipboard')}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm">{t('plans.export')}</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onSelect={() => void handleExport()}>
+                {t('plans.exportClipboard')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={handleExportCsv} disabled={scheduled.length === 0}>
+                {t('plans.exportCsvQueue')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {copyConfirm && (
+            <span role="status" aria-live="polite" className="text-xs text-success">
+              {t('plans.exportCopied')}
+            </span>
+          )}
+        </div>
+      </Panel>
+
+      <Panel
+        title={t('plans.toolbar')}
+        className="sticky top-0 z-10"
+        actions={
+          <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
+            <label htmlFor="plan-remap-count">{t('plans.remapCount')}</label>
+            <InfoTooltip
+              label={t('plans.remapCountTooltipLabel')}
+              content={t('plans.remapCountTooltip')}
+            />
+            <input
+              id="plan-remap-count"
+              type="number"
+              min={0}
+              max={5}
+              value={plan.remapCount}
+              onChange={(e) =>
+                onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
+              }
+              className="h-6 w-12 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
+            />
+            {remapInfo && (
+              <span className="text-text-faint">
+                {remapInfo.yearlyReady
+                  ? t('plans.remapFromEveReady', { bonus: remapInfo.bonus })
+                  : t('plans.remapFromEveCooldown', {
+                      bonus: remapInfo.bonus,
+                      date: remapInfo.cooldownUntil ? formatDate(remapInfo.cooldownUntil) : '',
+                    })}
+              </span>
+            )}
+          </span>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <Tooltip content={t('plans.optimizeRemapsTooltip')}>
+            <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
+              {t('plans.optimizeRemaps')}
+            </Button>
+          </Tooltip>
+          <Button
+            size="sm"
+            onClick={() => onUpdate({ markers: addMarker(plan.markers, plan.entries.length) })}
+          >
+            {t('plans.addMarker')}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleOptimizeAtMarkers}
+            disabled={scheduled.length === 0 || (plan.markers?.length ?? 0) === 0}
+          >
+            {t('plans.optimizeAtMarkers')}
+          </Button>
+          <Button size="sm" onClick={handleSuggestReorder} disabled={scheduled.length === 0}>
+            {t('plans.suggestReorder')}
+          </Button>
+        </div>
+      </Panel>
+
       <Panel title={t('plans.yourEntries')}>
         <div className="space-y-3">
           <SkillPicker
@@ -447,76 +545,6 @@ export function PlanEditor({
               update(setEntryPriority(plan.entries, skillTypeID, priority))
             }
           />
-        </div>
-      </Panel>
-
-      <Panel
-        title={t('plans.toolbar')}
-        actions={
-          <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
-            <label htmlFor="plan-remap-count">{t('plans.remapCount')}</label>
-            <InfoTooltip
-              label={t('plans.remapCountTooltipLabel')}
-              content={t('plans.remapCountTooltip')}
-            />
-            <input
-              id="plan-remap-count"
-              type="number"
-              min={0}
-              max={5}
-              value={plan.remapCount}
-              onChange={(e) =>
-                onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
-              }
-              className="h-6 w-12 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
-            />
-            {remapInfo && (
-              <span className="text-text-faint">
-                {remapInfo.yearlyReady
-                  ? t('plans.remapFromEveReady', { bonus: remapInfo.bonus })
-                  : t('plans.remapFromEveCooldown', {
-                      bonus: remapInfo.bonus,
-                      date: remapInfo.cooldownUntil ? formatDate(remapInfo.cooldownUntil) : '',
-                    })}
-              </span>
-            )}
-          </span>
-        }
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => void handleImport()}>
-            {t('plans.importQueue')}
-          </Button>
-          <Button size="sm" onClick={() => setImportOpen(true)}>
-            {t('plans.importClipboard')}
-          </Button>
-          <Button size="sm" onClick={() => void handleExport()}>
-            {copyConfirm ? t('plans.exportCopied') : t('plans.exportClipboard')}
-          </Button>
-          <Button size="sm" onClick={handleExportCsv} disabled={scheduled.length === 0}>
-            {t('plans.exportCsvQueue')}
-          </Button>
-          <Tooltip content={t('plans.optimizeRemapsTooltip')}>
-            <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
-              {t('plans.optimizeRemaps')}
-            </Button>
-          </Tooltip>
-          <Button
-            size="sm"
-            onClick={() => onUpdate({ markers: addMarker(plan.markers, plan.entries.length) })}
-          >
-            {t('plans.addMarker')}
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleOptimizeAtMarkers}
-            disabled={scheduled.length === 0 || (plan.markers?.length ?? 0) === 0}
-          >
-            {t('plans.optimizeAtMarkers')}
-          </Button>
-          <Button size="sm" onClick={handleSuggestReorder} disabled={scheduled.length === 0}>
-            {t('plans.suggestReorder')}
-          </Button>
         </div>
       </Panel>
 
@@ -653,28 +681,30 @@ export function PlanEditor({
         </Panel>
       )}
 
-      {reorderPreview && (
-        <Panel title={t('plans.reorderPreviewTitle')}>
-          <ul className="max-h-56 overflow-y-auto text-xs">
-            {reorderPreview.map((step, i) => (
-              <li
-                key={`${step.skillTypeID}-${step.level}-${i}`}
-                className="border-b border-line py-1 last:border-b-0"
-              >
-                {nameFor(step.skillTypeID)} {ROMAN[step.level - 1]}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-2 flex gap-2">
-            <Button variant="primary" size="sm" onClick={acceptReorder}>
-              {t('plans.reorderAccept')}
-            </Button>
-            <Button size="sm" onClick={() => setReorderPreview(null)}>
-              {t('plans.reorderReject')}
-            </Button>
-          </div>
-        </Panel>
-      )}
+      <Modal
+        open={reorderPreview !== null}
+        onClose={() => setReorderPreview(null)}
+        title={t('plans.reorderPreviewTitle')}
+      >
+        <ul className="max-h-56 overflow-y-auto text-xs">
+          {reorderPreview?.map((step, i) => (
+            <li
+              key={`${step.skillTypeID}-${step.level}-${i}`}
+              className="border-b border-line py-1 last:border-b-0"
+            >
+              {nameFor(step.skillTypeID)} {ROMAN[step.level - 1]}
+            </li>
+          ))}
+        </ul>
+        <div className="mt-2 flex gap-2">
+          <Button variant="primary" size="sm" onClick={acceptReorder}>
+            {t('plans.reorderAccept')}
+          </Button>
+          <Button size="sm" onClick={() => setReorderPreview(null)}>
+            {t('plans.reorderReject')}
+          </Button>
+        </div>
+      </Modal>
 
       <Panel
         title={t('plans.computedQueue')}
