@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildResult } from '@/engine/industry/types';
@@ -49,10 +49,12 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
     await userEvent.click(screen.getByRole('button', { name: /job fee/i }));
 
     const eivButton = screen.getByRole('button', { name: /about eiv/i });
+    fireEvent.focus(eivButton);
     const eivTooltipId = eivButton.getAttribute('aria-describedby')!;
     expect(document.getElementById(eivTooltipId)?.textContent).not.toBe('');
 
     const sccButton = screen.getByRole('button', { name: /about scc surcharge/i });
+    fireEvent.focus(sccButton);
     const sccTooltipId = sccButton.getAttribute('aria-describedby')!;
     expect(document.getElementById(sccTooltipId)?.textContent).not.toBe('');
   });
@@ -60,6 +62,7 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
   it('gives the ISK/hour chip an accessible tooltip explaining its basis (UX-REVIEW #13)', () => {
     renderSummary();
     const iskPerHourButton = screen.getByRole('button', { name: /about isk\/hour/i });
+    fireEvent.focus(iskPerHourButton);
     const tooltipId = iskPerHourButton.getAttribute('aria-describedby')!;
     expect(document.getElementById(tooltipId)?.textContent).not.toBe('');
   });

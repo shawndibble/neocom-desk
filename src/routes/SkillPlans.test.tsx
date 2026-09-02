@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -772,6 +772,7 @@ describe('SkillPlans editor: optimize remaps', () => {
 
     await screen.findByText('Your entries');
     const button = screen.getByRole('button', { name: 'Optimize remaps' });
+    fireEvent.focus(button);
     const tooltipId = button.getAttribute('aria-describedby');
     const tooltip = document.getElementById(tooltipId!);
 

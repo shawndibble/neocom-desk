@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { IconButton } from './IconButton';
 
@@ -18,11 +18,10 @@ describe('IconButton', () => {
 
   it('exposes the same text as a tooltip, so pointer users get the name too', () => {
     render(<IconButton icon={glyph} label="Export CSV" />);
+    const button = screen.getByRole('button');
+    fireEvent.focus(button);
     expect(screen.getByRole('tooltip')).toHaveTextContent('Export CSV');
-    expect(screen.getByRole('button')).toHaveAttribute(
-      'aria-describedby',
-      screen.getByRole('tooltip').id
-    );
+    expect(button).toHaveAttribute('aria-describedby', screen.getByRole('tooltip').id);
   });
 
   it('is a toggle only when `pressed` is given', () => {

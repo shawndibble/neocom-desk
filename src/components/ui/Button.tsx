@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react';
+import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { controlHeightClassName, type ControlSize } from './controlStyles';
 
 export type ButtonVariant = 'primary' | 'ghost' | 'danger';
@@ -20,18 +20,17 @@ const SIZE: Record<ButtonSize, string> = {
   md: `${controlHeightClassName.md} px-4 text-xs`,
 };
 
-export function Button({
-  variant = 'ghost',
-  size = 'md',
-  type = 'button',
-  className = '',
-  ...rest
-}: ButtonProps) {
+/** Forwards its ref so it can be a Radix or Tooltip trigger directly, e.g. `<Tooltip><Button/></Tooltip>`. */
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = 'ghost', size = 'md', type = 'button', className = '', ...rest },
+  ref
+) {
   return (
     <button
+      ref={ref}
       type={type}
       className={`inline-flex items-center justify-center gap-1.5 rounded-xs border font-semibold tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40 ${VARIANT[variant]} ${SIZE[size]} ${className}`}
       {...rest}
     />
   );
-}
+});

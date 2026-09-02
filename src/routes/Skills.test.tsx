@@ -131,12 +131,15 @@ describe('Skills', () => {
     expect(screen.getByText('8,000 SP')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Level 5 of 5' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
-    expect(await screen.findByText('Ocular Filter - Basic')).toBeInTheDocument();
-    // Tooltip content is in the DOM (CSS-revealed on hover/focus), markup stripped.
-    // Two tooltips exist now: the implant chip's, and the Frigate skill row's.
-    const tooltipTexts = screen.getAllByRole('tooltip').map((el) => el.textContent);
-    expect(tooltipTexts).toContain('A basic ocular filter implant.');
-    expect(tooltipTexts).toContain('Pilots a Frigate-class starship.');
+    const implantTrigger = (await screen.findByText('Ocular Filter - Basic')).closest('button')!;
+    const frigateTrigger = screen.getByText('Frigate').closest('button')!;
+    // Tooltip content only mounts once its trigger is focused/hovered, and
+    // Radix closes any other open tooltip document-wide when a new one opens
+    // — so check each one right after focusing it, not both at once.
+    fireEvent.focus(implantTrigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('A basic ocular filter implant.');
+    fireEvent.focus(frigateTrigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Pilots a Frigate-class starship.');
 
     // ESI perception 22 already includes the +3 implant: base 19 + 3 = 22.
     expect(await screen.findByText('19 + 3 = 22')).toBeInTheDocument();
