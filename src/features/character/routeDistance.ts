@@ -6,7 +6,7 @@
  * station-name cache.
  */
 import { getRoute } from '@/esi/endpoints';
-import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER } from '@/esi/cache';
 import { jumpsAwayFromRoute, type JumpsAwayResult } from '@/engine/jumpsAway';
 import type { RoutePreference } from './routePreference';
 
@@ -33,7 +33,11 @@ export async function loadJumpsAway(
     GLOBAL_CACHE_CHARACTER_ID,
     cacheKey(originSystemId, destinationSystemId, preference),
     async () =>
-      (await getRoute(originSystemId, destinationSystemId, { flag: routeFlagFor(preference) })).data
+      (await getRoute(originSystemId, destinationSystemId, { flag: routeFlagFor(preference) }))
+        .data,
+    // The jump graph is map data; a route between two fixed systems under a
+    // fixed preference is stable across a session and well beyond it.
+    { staleAfterMs: STALE_AFTER.static }
   );
   return jumpsAwayFromRoute(result?.data ?? null);
 }

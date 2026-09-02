@@ -51,6 +51,42 @@ export interface ExpiresCapture {
   value: string | null;
 }
 
+/**
+ * How long a cached row is served without a live call. The window is a floor,
+ * not a ceiling: `readFreshRow` takes whichever is later, this or ESI's own
+ * `Expires` (issue #221 / CONTEXT.md round 25) — so an endpoint ESI caches for
+ * an hour keeps that hour, while one it caches for 60s still holds for the
+ * full 10 minutes the app promises.
+ */
+export const STALE_AFTER = {
+  /**
+   * A Character's own mutable data — skills, wallet, assets, orders, jobs,
+   * mail, colonies. Ten minutes is the app-wide promise: page-to-page
+   * navigation inside it never touches the network.
+   */
+  default: 10 * 60_000,
+  /**
+   * Data that does not meaningfully change: universe types, stations, systems,
+   * routes, PI schematics and planet names, a delivered mail's body, an issued
+   * contract's item list. Refetching these on a 10-minute cadence would spend
+   * most of the prefetch budget re-learning constants.
+   */
+  static: 24 * 60 * 60_000,
+} as const;
+
+/**
+ * How long after `invalidateFreshness()` a stale-at-that-instant row stays
+ * ineligible for a freshness hit.
+ *
+ * The invalidation signal is global (one module-level timestamp), which was
+ * harmless when exactly one key had a window. Now that every key does, an
+ * unbounded signal would mean one Refresh click on Wallet sends the next visit
+ * to Assets, Mail, Contracts and Orders all back to the network — defeating
+ * the caching this exists to provide. Bounding it confines the bypass to the
+ * reload the user actually asked for, which runs immediately after the click.
+ */
+export const REFRESH_BYPASS_MS = 30_000;
+
 export interface LoadWithCacheStatusOptions {
   /**
    * Defaults to `isAuthFailure` (401/403 EsiError, or a failed refresh).
@@ -65,28 +101,55 @@ export interface LoadWithCacheStatusOptions {
    * to.
    */
   skipCacheOnAuthFailure?: boolean;
-  /** See `ExpiresCapture`. Omitted means this key never gets a freshness window. */
+  /** See `ExpiresCapture`. Optional — the window no longer depends on it. */
   expiresCapture?: ExpiresCapture;
+  /** Freshness window for this key; see `STALE_AFTER`. Defaults to `STALE_AFTER.default`. */
+  staleAfterMs?: number;
 }
 
 /**
  * Epoch ms of the last `invalidateFreshness()` call. A row is only eligible
- * for a freshness-window skip if it was fetched at or after this instant —
- * so a manual refresh (which calls `invalidateFreshness()` first) always
- * forces a live call for whatever it's about to reload, without threading a
- * "force" flag through every loader and route.
+ * for a freshness-window skip if it was fetched at or after this instant, and
+ * only for `REFRESH_BYPASS_MS` afterwards — so a manual refresh (which calls
+ * `invalidateFreshness()` first) always forces a live call for whatever it's
+ * about to reload, without threading a "force" flag through every loader and
+ * route, and without sending every *other* route back to the network too.
  */
 let freshnessInvalidatedAt = 0;
 
 /**
  * Call before a manual refresh re-runs its loader(s), so the freshness window
- * added in issue #41 never holds back a user-requested reload. Global and
- * coarse on purpose: over-invalidating costs a few extra live calls; a
- * per-key flag threaded through every route would cost a lot more surface
- * area for the same guarantee.
+ * never holds back a user-requested reload. Global and coarse on purpose: a
+ * per-key flag threaded through every route would cost a lot more surface area
+ * for the same guarantee. `REFRESH_BYPASS_MS` is what keeps that coarseness
+ * affordable now that every key has a window.
  */
 export function invalidateFreshness(): void {
   freshnessInvalidatedAt = Date.now();
+}
+
+/**
+ * Whether a manual refresh should force this row live rather than serve it.
+ *
+ * Two bounds on what one Refresh click reaches, both because the invalidation
+ * signal is a single global timestamp:
+ *
+ * - **In time.** Only for `REFRESH_BYPASS_MS`, so the click does not also send
+ *   the next visit to every unrelated route back to the network.
+ * - **In kind.** Only keys on the default window. A Refresh means "re-read my
+ *   data", not "re-read the star map": Assets alone resolves a station,
+ *   structure or system name per distinct location, and refetching those would
+ *   turn one click into a fan-out over data that cannot have changed. The
+ *   `STALE_AFTER.static` loaders are exactly the ones that hold game
+ *   constants, so the window length is already the right discriminator — no
+ *   second flag to keep in step with it.
+ */
+function isRefreshInvalidated(fetchedAt: number, staleAfterMs: number, now: number): boolean {
+  if (staleAfterMs > STALE_AFTER.default) return false;
+  // <=, not <: a manual refresh calling invalidateFreshness() right after a
+  // fetch that landed in the same millisecond must still force the next call
+  // live, not read the row it just invalidated as still-fresh.
+  return fetchedAt <= freshnessInvalidatedAt && now - freshnessInvalidatedAt <= REFRESH_BYPASS_MS;
 }
 
 function parseExpiresHeader(expires: string | null | undefined): number | undefined {
@@ -142,7 +205,11 @@ export async function loadWithCacheStatus<T>(
   fetchLive: () => Promise<T | null>,
   options: LoadWithCacheStatusOptions = {}
 ): Promise<StatusResult<T>> {
-  const fresh = await readFreshRow<T>(characterId, key);
+  const fresh = await readFreshRow<T>(
+    characterId,
+    key,
+    options.staleAfterMs ?? STALE_AFTER.default
+  );
   if (fresh) return { cached: fresh, needsReauth: false };
 
   return withDedupe(characterId, key, () =>
@@ -200,21 +267,27 @@ async function loadWithCacheStatusLive<T>(
 }
 
 /**
- * A row still inside the freshness window ESI's own `Expires` header (via
- * `expiresCapture`) declared for it — served without a live call. `fromCache`
- * is `false` here: this is a successful, on-time read, not the degraded
- * "live call failed, fell back to a stale row" case that flag otherwise
- * means, and views use it to decide whether to show an offline banner.
+ * A row still inside its freshness window — served without a live call.
+ *
+ * The window is `max(the row's own Expires, fetchedAt + staleAfterMs)`: the
+ * TTL is a floor every key gets, and ESI's header only ever extends it. Before
+ * issue #221 the header was the whole mechanism, so a key whose loader did not
+ * opt into `expiresCapture` had no window at all.
+ *
+ * `fromCache` is `false` here: this is a successful, on-time read, not the
+ * degraded "live call failed, fell back to a stale row" case that flag
+ * otherwise means, and views use it to decide whether to show an offline banner.
  */
-async function readFreshRow<T>(characterId: number, key: string): Promise<CachedResult<T> | null> {
+async function readFreshRow<T>(
+  characterId: number,
+  key: string,
+  staleAfterMs: number
+): Promise<CachedResult<T> | null> {
   const row = await readCachedRow(characterId, key);
-  if (!row || row.expiresAt === undefined) return null;
+  if (!row) return null;
   const now = Date.now();
-  if (row.expiresAt <= now) return null;
-  // <=, not <: a manual refresh calling invalidateFreshness() right after a
-  // fetch that landed in the same millisecond must still force the next call
-  // live, not read the row it just invalidated as still-fresh.
-  if (row.fetchedAt <= freshnessInvalidatedAt) return null;
+  if (Math.max(row.expiresAt ?? 0, row.fetchedAt + staleAfterMs) <= now) return null;
+  if (isRefreshInvalidated(row.fetchedAt, staleAfterMs, now)) return null;
   return {
     data: row.value as T,
     fetchedAt: new Date(row.fetchedAt),
@@ -254,7 +327,11 @@ export async function loadPaginatedWithCacheStatus<T>(
   fetchLive: () => Promise<TruncatableResult<T>>,
   options: LoadWithCacheStatusOptions = {}
 ): Promise<StatusResult<T[]>> {
-  const fresh = await readFreshRow<T[]>(characterId, key);
+  const fresh = await readFreshRow<T[]>(
+    characterId,
+    key,
+    options.staleAfterMs ?? STALE_AFTER.default
+  );
   if (fresh) return { cached: fresh, needsReauth: false };
 
   return withDedupe(characterId, key, () =>
@@ -326,9 +403,10 @@ async function loadPaginatedWithCacheStatusLive<T>(
 export async function loadPaginatedWithCache<T>(
   characterId: number,
   key: string,
-  fetchLive: () => Promise<TruncatableResult<T>>
+  fetchLive: () => Promise<TruncatableResult<T>>,
+  options: LoadWithCacheStatusOptions = {}
 ): Promise<CachedResult<T[]> | null> {
-  return (await loadPaginatedWithCacheStatus(characterId, key, fetchLive)).cached;
+  return (await loadPaginatedWithCacheStatus(characterId, key, fetchLive, options)).cached;
 }
 
 /**

@@ -3,6 +3,8 @@ import { db } from '@/db';
 import { EsiError } from './client';
 import {
   invalidateFreshness,
+  REFRESH_BYPASS_MS,
+  STALE_AFTER,
   loadPaginatedWithCache,
   loadPaginatedWithCacheStatus,
   loadWithCache,
@@ -516,25 +518,118 @@ describe('freshness window', () => {
     const capture = { value: null as string | null };
     vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
     const fetchLive = vi.fn(async () => {
-      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      // An hour, so the Expires header rather than the TTL floor is what this
+      // test is stepping past.
+      capture.value = new Date(1_000_000 + 3_600_000).toUTCString();
       return 'live-value';
     });
 
     await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
 
-    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + 70_000); // past the 60s window
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + 3_700_000);
     await loadWithCacheStatus(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
 
     expect(fetchLive).toHaveBeenCalledTimes(2);
   });
 
-  it('a call with no expiresCapture never gets a freshness window (safe default)', async () => {
+  it('a call with no expiresCapture still gets the default window', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
     const fetchLive = vi.fn(async () => 'live-value');
 
     await loadWithCache(CHAR_ID, KEY, fetchLive);
     await loadWithCache(CHAR_ID, KEY, fetchLive);
 
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('the default window expires after STALE_AFTER.default', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => 'live-value');
+
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + STALE_AFTER.default + 1);
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+
     expect(fetchLive).toHaveBeenCalledTimes(2);
+  });
+
+  it('staleAfterMs overrides the default, for immutable game data', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => 'live-value');
+    const options = { staleAfterMs: STALE_AFTER.static };
+
+    await loadWithCache(CHAR_ID, KEY, fetchLive, options);
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + STALE_AFTER.default + 1);
+    await loadWithCache(CHAR_ID, KEY, fetchLive, options);
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('a longer Expires header wins over the TTL, never shortens it', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const capture = { value: null as string | null };
+    const fetchLive = vi.fn(async () => {
+      // ESI declares an hour — longer than the 10-minute default floor.
+      capture.value = new Date(1_000_000 + 3_600_000).toUTCString();
+      return 'live-value';
+    });
+
+    await loadWithCache(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + STALE_AFTER.default + 1);
+    await loadWithCache(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('a shorter Expires header does not shorten the TTL floor', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const capture = { value: null as string | null };
+    const fetchLive = vi.fn(async () => {
+      // ESI's own 60s cache; the floor is what the user asked for instead.
+      capture.value = new Date(1_000_000 + 60_000).toUTCString();
+      return 'live-value';
+    });
+
+    await loadWithCache(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + 70_000);
+    await loadWithCache(CHAR_ID, KEY, fetchLive, { expiresCapture: capture });
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('a manual refresh bypasses the window only for the moments it is running', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => 'live-value');
+
+    // The refreshing route reloads its own key: bypassed, as intended.
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+    invalidateFreshness();
+    await loadWithCache(CHAR_ID, KEY, fetchLive);
+    expect(fetchLive).toHaveBeenCalledTimes(2);
+
+    // Another route's key, navigated to well after that refresh settled: its
+    // own window still holds. A global bypass would have refetched everything.
+    const other = vi.fn(async () => 'other-value');
+    await loadWithCache(CHAR_ID, 'other-key', other);
+    invalidateFreshness();
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000 + REFRESH_BYPASS_MS + 1);
+    await loadWithCache(CHAR_ID, 'other-key', other);
+
+    expect(other).toHaveBeenCalledTimes(1);
+  });
+
+  it('a manual refresh does not re-read game constants', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    const fetchLive = vi.fn(async () => 'Jita IV - Moon 4');
+    const options = { staleAfterMs: STALE_AFTER.static };
+
+    // Assets resolves one of these per distinct location; a Refresh click that
+    // refetched them all would turn one click into a fan-out over map data.
+    await loadWithCache(CHAR_ID, KEY, fetchLive, options);
+    invalidateFreshness();
+    await loadWithCache(CHAR_ID, KEY, fetchLive, options);
+
+    expect(fetchLive).toHaveBeenCalledTimes(1);
   });
 
   it('invalidateFreshness makes the very next call bypass an active window (manual refresh)', async () => {
