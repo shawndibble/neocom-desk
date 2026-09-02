@@ -1,12 +1,15 @@
 /**
- * Build-vs-buy comparison: total build cost (materials at hub sell prices +
- * job fee) against buying the product outright at the hub's lowest sell.
- * Missing hub prices flag the result as unpriceable instead of throwing.
+ * Build-vs-buy comparison: total build cost (materials at their sourced prices
+ * + job fee) against buying the product outright at the hub's lowest sell.
+ * Material prices come from src/engine/industry/sourcing — owned units are
+ * free, the rest is priced at an override or the hub. Missing prices flag the
+ * result as unpriceable instead of throwing.
  */
 
 import type { BuildResult, FacilityContext, IndustryInputs } from '@/engine/industry/types';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { effectiveMaterials } from '@/engine/industry/materials';
+import { materialCostLines } from '@/engine/industry/sourcing';
 import { jobDurationSeconds } from '@/engine/industry/time';
 import { estimatedItemValue, jobFee } from '@/engine/industry/jobCost';
 import { brokerFee, breakEvenPrice, salesTax } from '@/engine/industry/fees';
@@ -19,7 +22,11 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     security: inputs.security,
   };
 
-  const materials = effectiveMaterials(blueprint, runs, me, ctx);
+  const materials = materialCostLines(
+    effectiveMaterials(blueprint, runs, me, ctx),
+    hubPrices,
+    inputs.materialSourcing
+  );
   const seconds = jobDurationSeconds(blueprint.time, runs, te, skills, ctx);
   const fee = jobFee(
     estimatedItemValue(blueprint, runs, adjustedPrices),
@@ -28,13 +35,8 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     inputs.facilityTaxPct
   );
 
-  const unpricedMaterials = materials
-    .filter(({ typeID }) => hubPrices[typeID] === undefined)
-    .map(({ typeID }) => typeID);
-  const materialCost = materials.reduce(
-    (sum, { typeID, quantity }) => sum + quantity * (hubPrices[typeID] ?? 0),
-    0
-  );
+  const unpricedMaterials = materials.filter((m) => m.unpriced).map(({ typeID }) => typeID);
+  const materialCost = materials.reduce((sum, { lineCost }) => sum + lineCost, 0);
   const totalCost = materialCost + fee.total;
 
   const product = blueprint.products[0];

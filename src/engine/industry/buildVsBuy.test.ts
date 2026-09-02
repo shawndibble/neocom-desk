@@ -39,8 +39,26 @@ describe('buildVsBuy', () => {
 
     // modifier 0.9 * 0.99 * 0.98 = 0.87318, per-job over 10 runs
     expect(r.materials).toEqual([
-      { typeID: 34, baseQuantity: 10_000, quantity: 8732 },
-      { typeID: 35, baseQuantity: 340, quantity: 297 },
+      {
+        typeID: 34,
+        baseQuantity: 10_000,
+        quantity: 8732,
+        ownedQuantity: 0,
+        remainingQuantity: 8732,
+        unitPrice: 5,
+        lineCost: 8732 * 5,
+        unpriced: false,
+      },
+      {
+        typeID: 35,
+        baseQuantity: 340,
+        quantity: 297,
+        ownedQuantity: 0,
+        remainingQuantity: 297,
+        unitPrice: 120,
+        lineCost: 297 * 120,
+        unpriced: false,
+      },
     ]);
     expect(r.materialCost).toBeCloseTo(8732 * 5 + 297 * 120, 6); // 79_300
 
@@ -111,6 +129,73 @@ describe('buildVsBuy', () => {
     expect(r.breakEvenPrice).not.toBeNull();
   });
 
+  it('prices a fully owned material at zero and stops it blocking the plan', () => {
+    // No hub listing for 35 at all — owning every unit must still price the plan.
+    const r = buildVsBuy({
+      ...baseInputs,
+      hubPrices: { 34: 5, 999: 100_000 },
+      materialSourcing: { 35: { ownedQuantity: 297 } },
+    });
+    expect(r.unpriceable).toBe(false);
+    expect(r.unpricedMaterials).toEqual([]);
+    expect(r.materialCost).toBeCloseTo(8732 * 5, 6);
+    // Job fee is EIV-based (ME0 quantities x adjusted prices) — owning material
+    // does not make the job cheaper to install.
+    expect(r.jobFee.total).toBeCloseTo(7_289, 6);
+    expect(r.totalCost).toBeCloseTo(8732 * 5 + 7_289, 6);
+    expect(r.recommendation).toBe('build');
+  });
+
+  it('prices only the remainder of a partially owned material, at its override price', () => {
+    const r = buildVsBuy({
+      ...baseInputs,
+      materialSourcing: { 34: { ownedQuantity: 4000, overridePrice: 6 } },
+    });
+    const [tritanium] = r.materials;
+    expect(tritanium.ownedQuantity).toBe(4000);
+    expect(tritanium.remainingQuantity).toBe(4732);
+    expect(tritanium.unitPrice).toBe(6);
+    expect(r.materialCost).toBeCloseTo(4732 * 6 + 297 * 120, 6);
+  });
+
+  it('applies an override price with nothing owned', () => {
+    const r = buildVsBuy({ ...baseInputs, materialSourcing: { 34: { overridePrice: 7 } } });
+    expect(r.materials[0].ownedQuantity).toBe(0);
+    expect(r.materialCost).toBeCloseTo(8732 * 7 + 297 * 120, 6);
+  });
+
+  it('clamps an owned quantity larger than the job needs instead of crediting it', () => {
+    const r = buildVsBuy({ ...baseInputs, materialSourcing: { 34: { ownedQuantity: 1_000_000 } } });
+    expect(r.materials[0].ownedQuantity).toBe(8732);
+    expect(r.materials[0].remainingQuantity).toBe(0);
+    expect(r.materialCost).toBeCloseTo(297 * 120, 6);
+  });
+
+  it('leaves an empty sourcing map byte-identical to no sourcing at all', () => {
+    expect(buildVsBuy({ ...baseInputs, materialSourcing: {} })).toEqual(buildVsBuy(baseInputs));
+  });
+
+  it('still blocks pricing when a partially owned material has no price for the rest', () => {
+    const r = buildVsBuy({
+      ...baseInputs,
+      hubPrices: { 34: 5, 999: 100_000 },
+      materialSourcing: { 35: { ownedQuantity: 296 } },
+    });
+    expect(r.unpriceable).toBe(true);
+    expect(r.unpricedMaterials).toEqual([35]);
+  });
+
+  it('owned material does not rescue a plan whose product is unpriced', () => {
+    const r = buildVsBuy({
+      ...baseInputs,
+      hubPrices: { 34: 5, 35: 120 },
+      materialSourcing: { 34: { ownedQuantity: 8732 }, 35: { ownedQuantity: 297 } },
+    });
+    expect(r.unpriceable).toBe(true);
+    expect(r.materialCost).toBe(0);
+    expect(r.revenue).toBeNull();
+  });
+
   it('flags a product with no hub price instead of throwing', () => {
     const r = buildVsBuy({ ...baseInputs, hubPrices: { 34: 5, 35: 120 } });
     expect(r.unpriceable).toBe(true);
@@ -142,8 +227,26 @@ describe('buildVsBuy', () => {
       skills: {},
     });
     expect(r.materials).toEqual([
-      { typeID: 34, baseQuantity: 1000, quantity: 1000 },
-      { typeID: 35, baseQuantity: 34, quantity: 34 },
+      {
+        typeID: 34,
+        baseQuantity: 1000,
+        quantity: 1000,
+        ownedQuantity: 0,
+        remainingQuantity: 1000,
+        unitPrice: 5,
+        lineCost: 5000,
+        unpriced: false,
+      },
+      {
+        typeID: 35,
+        baseQuantity: 34,
+        quantity: 34,
+        ownedQuantity: 0,
+        remainingQuantity: 34,
+        unitPrice: 120,
+        lineCost: 4080,
+        unpriced: false,
+      },
     ]);
     expect(r.seconds).toBe(3600);
     // EIV 7_400: gross 370, scc 296, tax 0.25% = 18.5 -> 684.5
