@@ -182,12 +182,12 @@ describe('Industry: Build Plan CRUD', () => {
     expect(await screen.findByRole('button', { name: 'Rifter run' })).toBeInTheDocument();
 
     const row = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
-    await user.click(within(row).getByRole('button', { name: 'Duplicate' }));
+    await user.click(within(row).getByRole('button', { name: 'Duplicate Rifter run' }));
     expect(await screen.findByRole('button', { name: 'Rifter run (copy)' })).toBeInTheDocument();
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
 
     const originalRow = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
-    await user.click(within(originalRow).getByRole('button', { name: 'Delete' }));
+    await user.click(within(originalRow).getByRole('button', { name: 'Delete Rifter run' }));
     // handleDelete is fire-and-forget from the click handler (Industry.tsx),
     // so wait for the live-query-driven UI to drop the row before reading
     // Dexie directly — otherwise the read can race the still-in-flight

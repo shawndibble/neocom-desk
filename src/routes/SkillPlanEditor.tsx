@@ -75,7 +75,13 @@ export function SkillPlanEditor() {
               {t('plans.backToList')}
             </Link>
           )}
-          <div className="max-h-[32rem] overflow-y-auto">
+          {/* The height cap exists to keep the plan list beside it in view on a
+              wide screen. Below `lg` the list is not rendered at all, so the
+              cap would only buy a 512px scroller inside an already-scrolling
+              phone page — two nested scroll regions and a viewport-sized
+              editor squeezed into two thirds of it. Keyed to `lg` to match the
+              grid above, not to a JS breakpoint that could drift from it. */}
+          <div className="lg:max-h-[32rem] lg:overflow-y-auto">
             {!catalog ? (
               <div className="flex justify-center py-16">
                 <Spinner label={t('common.loading')} />

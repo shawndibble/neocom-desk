@@ -22,10 +22,12 @@ import {
   CaretRight,
   CaretUpDown,
   Check,
+  Copy,
   DotsThreeVertical,
   DownloadSimple,
   MagnifyingGlass,
   Package,
+  PencilSimple,
   Star,
   UsersThree,
   Warning,
@@ -89,5 +91,9 @@ export const Route = withWeight(ArrowsLeftRight);
 export const Warn = withWeight(Warning);
 /** Clear a field, dismiss a panel. */
 export const Close = withWeight(X);
+/** Edit a name in place — the rename affordance on a saved-plan row. */
+export const Rename = withWeight(PencilSimple);
+/** Copy a saved plan to a new one. */
+export const Duplicate = withWeight(Copy);
 /** Overflow menu. */
 export const More = withWeight(DotsThreeVertical);

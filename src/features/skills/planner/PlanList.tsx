@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Modal } from '@/components/ui';
+import { Button, EmptyState, IconButton, Modal } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { SkillPlanRecord } from '@/db';
 
 interface PlanListProps {
@@ -11,8 +12,6 @@ interface PlanListProps {
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
 }
-
-const ICON_BUTTON = 'w-7 justify-center';
 
 function PlanRow({
   plan,
@@ -58,31 +57,29 @@ function PlanRow({
           {plan.name}
         </button>
       )}
-      <Button
+      {/* Same three controls as the Industry Build Plan list, from the same
+          icon set — the two plan lists are the same object in two features and
+          should not read as two different designs. The unicode glyphs these
+          replace sat in a 28px box, under the touch tier (DESIGN.md §3). */}
+      <IconButton
         size="sm"
-        className={ICON_BUTTON}
+        icon={<Icon.Rename />}
+        label={`${t('plans.rename')} ${plan.name}`}
         onClick={() => setRenaming(true)}
-        aria-label={`${t('plans.rename')} ${plan.name}`}
-      >
-        <span aria-hidden="true">✎</span>
-      </Button>
-      <Button
+      />
+      <IconButton
         size="sm"
-        className={ICON_BUTTON}
+        icon={<Icon.Duplicate />}
+        label={`${t('plans.duplicate')} ${plan.name}`}
         onClick={() => onDuplicate(plan.id)}
-        aria-label={`${t('plans.duplicate')} ${plan.name}`}
-      >
-        <span aria-hidden="true">⧉</span>
-      </Button>
-      <Button
-        variant="danger"
+      />
+      <IconButton
         size="sm"
-        className={ICON_BUTTON}
+        icon={<Icon.Close />}
+        label={`${t('plans.delete')} ${plan.name}`}
+        tone="danger"
         onClick={() => onRequestDelete(plan.id)}
-        aria-label={`${t('plans.delete')} ${plan.name}`}
-      >
-        <span aria-hidden="true">✕</span>
-      </Button>
+      />
     </li>
   );
 }

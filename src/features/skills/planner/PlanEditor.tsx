@@ -527,11 +527,18 @@ export function PlanEditor({
         </div>
       </Panel>
 
-      <Panel
-        title={t('plans.toolbar')}
-        className="sticky top-0 z-10"
-        actions={
-          <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
+      {/* Sticky from `lg` up only: that is where SkillPlanEditor caps the
+          editor in its own scroll box and a pinned toolbar has a short list to
+          stay above. On a phone the editor scrolls with the page, and pinning
+          a three-row toolbar there would hold a fifth of the viewport
+          permanently against the content it acts on. */}
+      <Panel title={t('plans.toolbar')} className="lg:sticky lg:top-0 lg:z-10">
+        <div className="space-y-2">
+          {/* Remaps-available is a control with a value and an explanatory
+              hint, not header adornment. In the header slot the hint wrapped
+              across three lines and squeezed the panel title to nothing on a
+              phone; in the body it gets the full width it needs. */}
+          <div className="flex flex-wrap items-center gap-1 text-[0.6875rem] text-text-dim">
             <label htmlFor="plan-remap-count">{t('plans.remapCount')}</label>
             <InfoTooltip
               label={t('plans.remapCountTooltipLabel')}
@@ -558,42 +565,51 @@ export function PlanEditor({
                     })}
               </span>
             )}
-          </span>
-        }
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <Tooltip content={t('plans.optimizeRemapsTooltip')}>
-            <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
-              {t('plans.optimizeRemaps')}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Tooltip content={t('plans.optimizeRemapsTooltip')}>
+              <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
+                {t('plans.optimizeRemaps')}
+              </Button>
+            </Tooltip>
+            <Button
+              size="sm"
+              onClick={() => onUpdate({ markers: addMarker(plan.markers, plan.entries.length) })}
+            >
+              {t('plans.addMarker')}
             </Button>
-          </Tooltip>
-          <Button
-            size="sm"
-            onClick={() => onUpdate({ markers: addMarker(plan.markers, plan.entries.length) })}
-          >
-            {t('plans.addMarker')}
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleOptimizeAtMarkers}
-            disabled={scheduled.length === 0 || (plan.markers?.length ?? 0) === 0}
-          >
-            {t('plans.optimizeAtMarkers')}
-          </Button>
-          <Button size="sm" onClick={handleSuggestReorder} disabled={scheduled.length === 0}>
-            {t('plans.suggestReorder')}
-          </Button>
+            <Button
+              size="sm"
+              onClick={handleOptimizeAtMarkers}
+              disabled={scheduled.length === 0 || (plan.markers?.length ?? 0) === 0}
+            >
+              {t('plans.optimizeAtMarkers')}
+            </Button>
+            <Button size="sm" onClick={handleSuggestReorder} disabled={scheduled.length === 0}>
+              {t('plans.suggestReorder')}
+            </Button>
+          </div>
         </div>
       </Panel>
 
       <Panel
         title={t('plans.yourEntries')}
         actions={
-          <div className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
-            <span>{formatDuration(totalSeconds)}</span>
+          <div className="flex items-center gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
+            <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
             {planFinish && (
               <span>{t('plans.projectedFinish', { date: formatDate(planFinish) })}</span>
             )}
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          {/* Group-by and Columns are view controls for the list below, and
+              they were the two widest things in the header. Sat there with the
+              two stats, the row could not fit a phone and every part of it
+              wrapped. Here they get their own line and the header keeps only
+              what it can hold. */}
+          <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] text-text-dim">
             <label className="flex items-center gap-1">
               {t('plans.groupBy')}
               <select
@@ -638,9 +654,6 @@ export function PlanEditor({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        }
-      >
-        <div className="space-y-3">
           <SkillPicker
             skills={pickerSkills}
             catalog={catalog}
