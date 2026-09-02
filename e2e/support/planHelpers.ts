@@ -18,7 +18,9 @@ export async function addCaldariCruiserToNewPlan(page: Page): Promise<void> {
   await page.getByRole('button', { name: /Caldari Cruiser/ }).click();
   await page.getByRole('button', { name: 'Level I', exact: true }).click();
 
-  // Exact: the computed queue below also renders a "Caldari Cruiser I" row,
-  // which contains this string too.
-  await expect(page.getByText('Caldari Cruiser', { exact: true })).toBeVisible();
+  // The merged entry row renders "{name} {level}" as sibling text nodes in
+  // one <span> (no element exposes the bare skill name), so wait on the
+  // row's icon-only remove button instead — its accessible name is
+  // "Remove {name}", unambiguous and immune to that text-node splitting.
+  await expect(page.getByRole('button', { name: 'Remove Caldari Cruiser' })).toBeVisible();
 }

@@ -18,11 +18,12 @@ import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState } from '@/components/ui';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
-import type { PlanEntry, PlanPriority } from '@/engine/types';
-import { bandStarts } from './bands';
-import { buildRows } from './markers';
+import type { PlanPriority } from '@/engine/types';
+import { formatDate, formatDuration, stepTimeline } from '@/lib/duration';
+import type { MergedRow } from './queueRows';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
+const ICON_BUTTON = 'w-7 justify-center';
 
 /** i18n key for a priority's display label, e.g. 'high' -> 'plans.priorityHigh'. */
 function priorityLabelKey(priority: PlanPriority): string {
@@ -64,51 +65,123 @@ function useRowSortable(id: string): SortableRowChrome {
   };
 }
 
+/** A row's booster mark: shared by entry and prereq rows. */
+function BoosterMark() {
+  const { t } = useTranslation();
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-label={t('plans.boosterAffects')}
+      role="img"
+      className="ml-1 inline-block size-3 align-[-0.125em] text-accent"
+    >
+      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function TimelineLine({ start, finish }: { start: Date; finish: Date }) {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-0.5 text-[0.625rem] tabular-nums text-text-dim">
+      {t('plans.stepTimeline', { start: formatDate(start), finish: formatDate(finish) })}
+    </div>
+  );
+}
+
 interface EntryRowProps {
-  id: string;
-  entry: PlanEntry;
+  row: Extract<MergedRow, { kind: 'entry' }>;
   name: string;
+  boosted: boolean;
+  timeline: { start: Date; finish: Date } | null;
   onRemove: (skillTypeID: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
 }
 
-function EntryRow({ id, entry, name, onRemove, onSetPriority }: EntryRowProps) {
+function EntryRow({ row, name, boosted, timeline, onRemove, onSetPriority }: EntryRowProps) {
   const { t } = useTranslation();
-  const { setNodeRef, style, handleProps, isDragging } = useRowSortable(id);
+  const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
+  const { entry } = row;
 
   return (
     <li
       ref={setNodeRef}
       style={style}
-      className={`flex items-center justify-between gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${
+      className={`border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${
         isDragging ? 'bg-panel-2' : ''
       }`}
     >
-      <button
-        type="button"
-        {...handleProps}
-        aria-label={t('plans.reorderEntry', { name })}
-        className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        ⠿
-      </button>
-      <span className="flex-1 truncate">{name}</span>
-      <span className="text-text-dim">{ROMAN[entry.targetLevel - 1]}</span>
-      <select
-        aria-label={t('plans.priorityLabel', { name })}
-        value={entry.priority ?? 'normal'}
-        onChange={(e) => onSetPriority(entry.skillTypeID, e.target.value as PlanPriority)}
-        className="h-6 rounded-xs border border-line bg-panel-2 px-1 text-text"
-      >
-        {PRIORITY_ORDER.map((priority) => (
-          <option key={priority} value={priority}>
-            {t(priorityLabelKey(priority))}
-          </option>
-        ))}
-      </select>
-      <Button variant="danger" size="sm" onClick={() => onRemove(entry.skillTypeID)}>
-        {t('plans.remove')}
-      </Button>
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          {...handleProps}
+          aria-label={t('plans.reorderEntry', { name })}
+          className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          ⠿
+        </button>
+        <span className="flex-1 truncate">
+          {name} {ROMAN[entry.targetLevel - 1]}
+          {boosted && <BoosterMark />}
+        </span>
+        <select
+          aria-label={t('plans.priorityLabel', { name })}
+          value={entry.priority ?? 'normal'}
+          onChange={(e) => onSetPriority(entry.skillTypeID, e.target.value as PlanPriority)}
+          className="h-6 rounded-xs border border-line bg-panel-2 px-1 text-text"
+        >
+          {PRIORITY_ORDER.map((priority) => (
+            <option key={priority} value={priority}>
+              {t(priorityLabelKey(priority))}
+            </option>
+          ))}
+        </select>
+        <span className="w-16 text-right tabular-nums text-text-dim">
+          {formatDuration(row.seconds)}
+        </span>
+        <span className="w-16 text-right tabular-nums">
+          {formatDuration(row.cumulativeSeconds)}
+        </span>
+        <Button
+          variant="danger"
+          size="sm"
+          className={ICON_BUTTON}
+          onClick={() => onRemove(entry.skillTypeID)}
+          aria-label={`${t('plans.remove')} ${name}`}
+        >
+          <span aria-hidden="true">✕</span>
+        </Button>
+      </div>
+      {timeline && <TimelineLine start={timeline.start} finish={timeline.finish} />}
+    </li>
+  );
+}
+
+interface PrereqRowProps {
+  row: Extract<MergedRow, { kind: 'prereq' }>;
+  name: string;
+  boosted: boolean;
+  timeline: { start: Date; finish: Date } | null;
+}
+
+/** Prereq-inserted step the user didn't add directly: dimmed, non-interactive, not draggable. */
+function PrereqRow({ row, name, boosted, timeline }: PrereqRowProps) {
+  const { t } = useTranslation();
+  return (
+    <li className="border-b border-line px-2 py-1.5 text-xs text-text-faint italic last:border-b-0">
+      <div className="flex items-center justify-between gap-2">
+        <span className="w-6" aria-hidden="true" />
+        <span className="flex-1 truncate">
+          {name} {ROMAN[row.step.level - 1]}
+          <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
+          {boosted && <BoosterMark />}
+        </span>
+        <span className="w-16 text-right tabular-nums">{formatDuration(row.step.seconds)}</span>
+        <span className="w-16 text-right tabular-nums">
+          {formatDuration(row.step.cumulativeSeconds)}
+        </span>
+      </div>
+      {timeline && <TimelineLine start={timeline.start} finish={timeline.finish} />}
     </li>
   );
 }
@@ -146,34 +219,44 @@ function MarkerRow({ id, markerIndex, onRemove }: MarkerRowProps) {
       <Button
         variant="danger"
         size="sm"
+        className={ICON_BUTTON}
         aria-label={t('plans.removeMarker')}
         onClick={() => onRemove(markerIndex)}
       >
-        {t('plans.remove')}
+        <span aria-hidden="true">✕</span>
       </Button>
     </li>
   );
 }
 
 interface EntryListProps {
-  entries: readonly PlanEntry[];
-  /** Remap Marker positions (see markers.ts). */
-  markers: readonly number[] | undefined;
-  /** Effective priority per skill typeID (inherited from dependents, #27). */
-  priorityFor: ReadonlyMap<number, PlanPriority>;
+  /** Pre-merged entry + marker + prereq rows (see queueRows.ts), in schedule order. */
+  rows: readonly MergedRow[];
+  /** Row ids that start a new priority band (#27), from placeBandHeaders — may key a prereq row's id when that entry has leading prereq rows. */
+  bandsAt: ReadonlyMap<string, PlanPriority>;
   nameFor: (skillTypeID: number) => string;
+  /** Step indices (into the underlying scheduled queue) a live Booster speeds up. */
+  boostedSteps?: ReadonlySet<number>;
+  /** When training begins, for each row's start/finish line (#20). Omitted when there's no wall-clock basis to offer. */
+  startDate?: Date;
   onReorder: (activeId: string, overId: string) => void;
   onRemove: (skillTypeID: number) => void;
   onRemoveMarker: (markerIndex: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
 }
 
-/** Drag-and-drop (keyboard-accessible) list of user Skill Plan entries + Remap Markers. */
+/**
+ * Drag-and-drop (keyboard-accessible) list merging plan entries, Remap
+ * Markers, and their computed queue (#112): one row per entry with its own
+ * per-level/cumulative time, dimmed non-interactive rows for any
+ * prereq-inserted steps positioned just ahead of it.
+ */
 export function EntryList({
-  entries,
-  markers,
-  priorityFor,
+  rows,
+  bandsAt,
   nameFor,
+  boostedSteps,
+  startDate,
   onReorder,
   onRemove,
   onRemoveMarker,
@@ -190,37 +273,64 @@ export function EntryList({
     if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
   }
 
-  const rows = buildRows(entries, markers);
-  const bandsAt = bandStarts(rows, priorityFor);
-
   if (rows.length === 0) {
     return <EmptyState title={t('plans.yourEntriesEmpty')} className="py-4" />;
   }
 
+  const sortableIds = rows.filter((r) => r.kind !== 'prereq').map((r) => r.id);
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-        <ul className="rounded-xs border border-line">
-          {rows.map((row) => {
-            const band = bandsAt.get(row.id);
-            return (
-              <Fragment key={row.id}>
-                {band && <BandHeader priority={band} />}
-                {row.kind === 'entry' ? (
-                  <EntryRow
-                    id={row.id}
-                    entry={row.entry}
-                    name={nameFor(row.entry.skillTypeID)}
-                    onRemove={onRemove}
-                    onSetPriority={onSetPriority}
-                  />
-                ) : (
-                  <MarkerRow id={row.id} markerIndex={row.markerIndex} onRemove={onRemoveMarker} />
-                )}
-              </Fragment>
-            );
-          })}
-        </ul>
+      <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+        <div className="rounded-xs border border-line">
+          <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+            <span className="flex-1" />
+            <span className="w-16 text-right">{t('plans.columnPerLevel')}</span>
+            <span className="w-16 text-right">{t('plans.columnCumulative')}</span>
+          </div>
+          <ul>
+            {rows.map((row) => {
+              const band = bandsAt.get(row.id);
+              return (
+                <Fragment key={row.id}>
+                  {band && <BandHeader priority={band} />}
+                  {row.kind === 'entry' && (
+                    <EntryRow
+                      row={row}
+                      name={nameFor(row.entry.skillTypeID)}
+                      boosted={row.stepIndices.some((i) => boostedSteps?.has(i) ?? false)}
+                      timeline={
+                        startDate && row.stepIndices.length > 0
+                          ? stepTimeline(
+                              { seconds: row.seconds, cumulativeSeconds: row.cumulativeSeconds },
+                              startDate
+                            )
+                          : null
+                      }
+                      onRemove={onRemove}
+                      onSetPriority={onSetPriority}
+                    />
+                  )}
+                  {row.kind === 'prereq' && (
+                    <PrereqRow
+                      row={row}
+                      name={nameFor(row.step.skillTypeID)}
+                      boosted={boostedSteps?.has(row.stepIndex) ?? false}
+                      timeline={startDate ? stepTimeline(row.step, startDate) : null}
+                    />
+                  )}
+                  {row.kind === 'marker' && (
+                    <MarkerRow
+                      id={row.id}
+                      markerIndex={row.markerIndex}
+                      onRemove={onRemoveMarker}
+                    />
+                  )}
+                </Fragment>
+              );
+            })}
+          </ul>
+        </div>
       </SortableContext>
     </DndContext>
   );
