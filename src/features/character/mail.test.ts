@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadMailHeaders, loadMailBody } from './mail';
+import { loadMailHeaders, loadMailBody, loadMailLabels } from './mail';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -65,6 +65,33 @@ describe('loadMailHeaders', () => {
       )
     );
     const result = await loadMailHeaders(CHAR_ID);
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
+  });
+});
+
+describe('loadMailLabels', () => {
+  it('fetches labels and caches them', async () => {
+    const labels = {
+      labels: [{ label_id: 1, name: 'Inbox', unread_count: 3, color: '#ffffff' }],
+      total_unread_count: 3,
+    };
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/labels`, () => HttpResponse.json(labels))
+    );
+    const result = await loadMailLabels(CHAR_ID);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual(labels);
+    expect((await db.esiCache.get([CHAR_ID, 'mail:labels']))?.value).toEqual(labels);
+  });
+
+  it('reports needsReauth when the mail scope was revoked (403) and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/labels`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const result = await loadMailLabels(CHAR_ID);
     expect(result.needsReauth).toBe(true);
     expect(result.cached).toBeNull();
   });

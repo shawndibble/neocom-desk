@@ -32,7 +32,8 @@ const headers = [
     subject: 'Fleet up!',
     timestamp: '2026-08-02T00:00:00Z',
     is_read: false,
-    labels: [],
+    labels: [3],
+    recipients: [{ recipient_id: 90000003, recipient_type: 'character' }],
   },
   {
     mail_id: 2,
@@ -44,12 +45,26 @@ const headers = [
   },
 ];
 
+const mailLabels = {
+  labels: [
+    { label_id: 1, name: 'Inbox', unread_count: 1 },
+    { label_id: 2, name: 'Sent', unread_count: 0 },
+    { label_id: 3, name: 'Corp', unread_count: 2 },
+    { label_id: 4, name: 'Alliance', unread_count: 0 },
+  ],
+  total_unread_count: 3,
+};
+
 const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.json(headers)),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
+    HttpResponse.json(mailLabels)
+  ),
   http.post('https://esi.evetech.net/universe/names', () =>
     HttpResponse.json([
       { id: 90000001, name: 'Fleet Commander', category: 'character' },
       { id: 90000002, name: 'Market Bot', category: 'character' },
+      { id: 90000003, name: 'Corp Recruiter', category: 'character' },
     ])
   ),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1`, () =>
@@ -58,6 +73,7 @@ const server = setupServer(
       subject: 'Fleet up!',
       body: 'Undock <b>now</b>.',
       read: false,
+      recipients: [{ recipient_id: 90000003, recipient_type: 'character' }],
     })
   )
 );
@@ -149,5 +165,66 @@ describe('Mail', () => {
     render(<App />);
     expect(await screen.findByText('Log in again to see your mail')).toBeInTheDocument();
     expect(screen.queryByText(/no mail cached/i)).not.toBeInTheDocument();
+  });
+
+  it('shows an All/Inbox/Corp/Alliance/Sent tab bar with unread badges from /mail/labels', async () => {
+    render(<App />);
+    const tablist = await screen.findByRole('tablist', { name: 'Mail folders' });
+    expect(tablist).toBeInTheDocument();
+    const allTab = tablist.querySelector('[data-tab-id="all"]') as HTMLElement;
+    expect(allTab).toHaveTextContent('3'); // total_unread_count
+    const corpTab = tablist.querySelector('[data-tab-id="corp"]') as HTMLElement;
+    expect(corpTab).toHaveTextContent('2');
+    const sentTab = tablist.querySelector('[data-tab-id="sent"]') as HTMLElement;
+    expect(sentTab).not.toHaveTextContent(/\d/);
+  });
+
+  it('filters the list to the selected tab, folding an uncategorized header into Inbox', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.getByText('Market report')).toBeInTheDocument();
+
+    const tablist = screen.getByRole('tablist', { name: 'Mail folders' });
+    await user.click(tablist.querySelector('[data-tab-id="corp"]') as HTMLElement);
+    expect(screen.getByText('Fleet up!')).toBeInTheDocument();
+    expect(screen.queryByText('Market report')).not.toBeInTheDocument();
+
+    await user.click(tablist.querySelector('[data-tab-id="inbox"]') as HTMLElement);
+    expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
+    expect(screen.getByText('Market report')).toBeInTheDocument();
+  });
+
+  it('shows a resolved "To:" line in the reading pane', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet up!'));
+    expect(await screen.findByText(/Corp Recruiter/)).toBeInTheDocument();
+  });
+
+  it('does not render an Export CSV button', async () => {
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.queryByRole('button', { name: /export csv/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the list pane bounded and independently scrollable with many cached headers', async () => {
+    const manyHeaders = Array.from({ length: 35 }, (_, i) => ({
+      mail_id: 100 + i,
+      from: 90000001,
+      subject: `Mail ${i}`,
+      timestamp: `2026-08-${String((i % 28) + 1).padStart(2, '0')}T00:00:00Z`,
+      is_read: true,
+      labels: [],
+    }));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json(manyHeaders)
+      )
+    );
+    render(<App />);
+    await screen.findByText('Mail 0');
+    const list = screen.getByText('Mail 0').closest('ul');
+    expect(list).toHaveClass('max-h-[32rem]', 'overflow-y-auto');
   });
 });
