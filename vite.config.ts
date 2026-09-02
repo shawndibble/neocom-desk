@@ -22,6 +22,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      // Hand-written src/sw.ts (ADR 0007, issue #176) — only strategy that
+      // supports a custom `periodicsync` handler; generateSW's output has no
+      // room for one.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'prompt',
       manifest: {
         name: 'NeoCom Desk',
@@ -43,7 +49,9 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
+      // navigateFallback/navigateFallbackDenylist are generateSW-only — the
+      // equivalent SPA-fallback routing is hand-written in src/sw.ts.
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json}'],
         // The Market Browser's catalogue (~1.2 MB: market groups, market
         // types, solar systems, NPC stations, market regions) is fetched
@@ -51,8 +59,6 @@ export default defineConfig({
         // open it, so an install should not pay for it up front (CONTEXT.md).
         globIgnores: ['**/data/market/**'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],
