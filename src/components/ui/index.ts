@@ -1,4 +1,5 @@
 export { Panel } from './Panel';
+export { PageHeader } from './PageHeader';
 export { Button } from './Button';
 export type { ButtonVariant, ButtonSize } from './Button';
 export { StatChip } from './StatChip';
@@ -20,7 +21,7 @@ export type { DataTableColumn } from './DataTable';
 export { CharacterAvatar } from './CharacterAvatar';
 export type { CharacterAvatarSize } from './CharacterAvatar';
 export { FilterChip } from './FilterChip';
-export { Disclosure } from './Disclosure';
+export { Disclosure, Caret } from './Disclosure';
 export { LogoMark } from './LogoMark';
 export {
   ContextMenu,
@@ -48,3 +49,7 @@ export {
   SelectItem,
   SelectSeparator,
 } from './Select';
+export { NativeSelect } from './NativeSelect';
+export { TextInput } from './TextInput';
+export { SearchInput } from './SearchInput';
+export type { ControlSize } from './controlStyles';

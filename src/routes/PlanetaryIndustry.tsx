@@ -5,13 +5,14 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  IconButton,
   InfoTooltip,
+  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
   StatChip,
   type DataTableColumn,
-  IconButton,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -340,19 +341,21 @@ export function PlanetaryIndustry() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('pi.title')}</h1>
-        <div className="flex items-center gap-2">
-          {planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('pi.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        </div>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('pi.title')}
+        meta={planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('pi.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center py-16">

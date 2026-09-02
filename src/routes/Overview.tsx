@@ -94,7 +94,7 @@ export function Overview() {
       : null;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <header className="flex flex-wrap items-center gap-3">
         <CharacterAvatar
           characterId={activeCharacterId}

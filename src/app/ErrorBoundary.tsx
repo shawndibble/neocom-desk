@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui';
 
 interface Props {
   children: ReactNode;
@@ -27,13 +28,9 @@ function ErrorScreen() {
             'Reloading usually fixes this. Your Skill Plans and Build Plans are stored locally and are not affected.',
         })}
       </p>
-      <button
-        type="button"
-        onClick={() => window.location.reload()}
-        className="h-7 rounded-xs border border-line bg-panel-2 px-3 text-[0.6875rem] font-semibold tracking-widest text-text uppercase hover:border-line-bright"
-      >
+      <Button size="sm" onClick={() => window.location.reload()}>
         {t('error.reload', { defaultValue: 'Reload' })}
-      </button>
+      </Button>
     </main>
   );
 }

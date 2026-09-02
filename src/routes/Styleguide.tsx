@@ -19,8 +19,12 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   FilterChip,
+  IconButton,
   LogoMark,
+  NativeSelect,
+  PageHeader,
   Panel,
+  SearchInput,
   Select,
   SelectContent,
   SelectItem,
@@ -30,7 +34,9 @@ import {
   Spinner,
   StatChip,
   Tabs,
+  TextInput,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 
 const COLOR_TOKENS: { name: string; className: string; note?: string }[] = [
   { name: 'bg', className: 'bg-bg' },
@@ -153,12 +159,12 @@ export function Styleguide() {
 
   return (
     <div className="min-h-screen space-y-10 bg-bg p-6 text-text">
-      <header className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">NeoCom Desk Styleguide</h1>
+      <div className="space-y-1">
+        <PageHeader title="NeoCom Desk Styleguide" />
         <p className="text-sm text-text-dim">
           Design tokens and base components. Source of truth: docs/DESIGN.md.
         </p>
-      </header>
+      </div>
 
       <Section title="Color tokens">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
@@ -408,18 +414,55 @@ export function Styleguide() {
         </DropdownMenu>
       </Section>
 
-      <Section title="Select">
-        <Select value={region} onValueChange={setRegion}>
-          <SelectTrigger aria-label="Region">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="the-forge">The Forge</SelectItem>
-            <SelectItem value="domain">Domain</SelectItem>
-            <SelectSeparator />
-            <SelectItem value="heimatar">Heimatar</SelectItem>
-          </SelectContent>
-        </Select>
+      <Section title="Fields — one scale, two sizes">
+        {/* Both rows exist to be *compared*: every control on a row is the same
+            height because they all read `controlStyles`, and that is the whole
+            claim DESIGN.md §3 makes. If a row ever looks ragged here, the scale
+            has been bypassed somewhere. */}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <TextInput size="sm" placeholder="TextInput sm" className="w-40" />
+            <NativeSelect size="sm" aria-label="NativeSelect sm" className="w-40">
+              <option>NativeSelect sm</option>
+            </NativeSelect>
+            <Select value={region} onValueChange={setRegion}>
+              <SelectTrigger size="sm" aria-label="Region (sm)" className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="the-forge">The Forge</SelectItem>
+                <SelectItem value="domain">Domain</SelectItem>
+                <SelectSeparator />
+                <SelectItem value="heimatar">Heimatar</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm">Button sm</Button>
+            <IconButton size="sm" icon={<Icon.Refresh />} label="IconButton sm" />
+            <FilterChip label="FilterChip" selected={false} onToggle={() => {}} />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <TextInput placeholder="TextInput md" className="w-40" />
+            <NativeSelect aria-label="NativeSelect md" className="w-40">
+              <option>NativeSelect md</option>
+            </NativeSelect>
+            <Select value={region} onValueChange={setRegion}>
+              <SelectTrigger aria-label="Region (md)" className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="the-forge">The Forge</SelectItem>
+                <SelectItem value="domain">Domain</SelectItem>
+                <SelectSeparator />
+                <SelectItem value="heimatar">Heimatar</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button>Button md</Button>
+            <IconButton icon={<Icon.Refresh />} label="IconButton md" />
+          </div>
+
+          <SearchInput placeholder="SearchInput — always md, always with the magnifier" />
+        </div>
       </Section>
     </div>
   );

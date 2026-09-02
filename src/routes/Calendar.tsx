@@ -6,6 +6,7 @@ import {
   DataAgeBadge,
   EmptyState,
   IconButton,
+  PageHeader,
   ReauthBanner,
   Spinner,
   Tabs,
@@ -90,25 +91,27 @@ export function Calendar() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('calendar.title')}</h1>
-        <div className="flex items-center gap-2">
-          {eventsResult && <DataAgeBadge date={eventsResult.fetchedAt} />}
-          <IconButton
-            icon={<Icon.Download />}
-            label={t('calendar.exportCsv')}
-            disabled={events.length === 0}
-            onClick={() => downloadCsv('calendar', events, calendarCsvColumns(t))}
-          />
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('calendar.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        </div>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('calendar.title')}
+        meta={eventsResult && <DataAgeBadge date={eventsResult.fetchedAt} />}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Download />}
+              label={t('calendar.exportCsv')}
+              disabled={events.length === 0}
+              onClick={() => downloadCsv('calendar', events, calendarCsvColumns(t))}
+            />
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('calendar.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Tabs
