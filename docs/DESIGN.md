@@ -110,8 +110,15 @@ Sources live in `assets/brand/` (not shipped). Everything under
 - `public/brand/lockup.png` is the full mark-plus-wordmark artwork, login page
   only. It is the one place the wordmark appears as art rather than as text,
   which is why the rule above still holds: no font is bundled.
-- App icons carry an opaque `--color-bg` plate. The maskable variant sits at
-  60% of the canvas so Android's mask cannot bite the hexagon corners.
+- App icons carry an opaque `--color-bg` plate, the mark at 78% of the canvas.
+  All of them centre on the hexagon, never on the artwork's bounding box: the
+  glow pools under the bottom vertex, so the box reaches further down than the
+  mark does and centring it sits the hexagon high and right.
+- The maskable variant is sized against the mask's safe circle (80% of the
+  canvas) rather than the square edge, at 98% of its radius — the constraint a
+  launcher actually applies is radial, and fitting the hexagon's circumradius
+  to it fills the cropped icon under any mask shape without a corner being
+  bitten. Only the glow spills past, which is what a glow does anyway.
 
 ## 3. Spacing & radius
 
