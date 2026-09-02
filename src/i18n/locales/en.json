@@ -96,6 +96,7 @@
     "rename": "Rename",
     "emptyTitle": "No skill plans yet",
     "emptyHint": "Create a plan to start training toward a goal.",
+    "selectHint": "Select a plan, or create one.",
     "backToList": "Back to plans",
     "yourEntries": "Your entries",
     "yourEntriesEmpty": "No entries yet. Add a skill below.",

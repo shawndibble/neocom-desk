@@ -8,9 +8,11 @@ import { scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { PlanEditor } from '@/features/skills/planner/PlanEditor';
+import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 
-/** Skill Plan editor: the full editing surface for one plan, reached from the plan list. */
+/** Skill Plan editor: the full editing surface for one plan, beside the plan list on wide screens (#158). */
 export function SkillPlanEditor() {
   const { t } = useTranslation();
   const { planId } = useParams<{ planId: string }>();
@@ -18,6 +20,7 @@ export function SkillPlanEditor() {
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const { catalog, trainedSkills, attributes, implants, remapInfo } =
     usePlanEditorData(activeCharacterId);
+  const isDesktop = useIsDesktop();
 
   // Wrapped so `undefined` (still loading) is distinguishable from a plan
   // genuinely not found: db.skillPlans.get() resolves to undefined either
@@ -57,28 +60,41 @@ export function SkillPlanEditor() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <SkillsSubNav />
-      <Link to="/skills/plans" className="text-xs text-accent hover:underline">
-        {t('plans.backToList')}
-      </Link>
 
-      {!catalog ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : (
-        <PlanEditor
-          characterId={activeCharacterId}
-          plan={plan}
-          catalog={catalog}
-          trainedSkills={trainedSkills}
-          attributes={attributes}
-          implants={implants}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
+        <PlanListPane
+          activeCharacterId={activeCharacterId}
           remapInfo={remapInfo}
-          onUpdate={(patch) => void handleUpdate(patch)}
+          className={isDesktop ? '' : 'hidden'}
         />
-      )}
+        <div className="space-y-2">
+          {!isDesktop && (
+            <Link to="/skills/plans" className="inline-block text-xs text-accent hover:underline">
+              {t('plans.backToList')}
+            </Link>
+          )}
+          <div className="max-h-[32rem] overflow-y-auto">
+            {!catalog ? (
+              <div className="flex justify-center py-16">
+                <Spinner label={t('common.loading')} />
+              </div>
+            ) : (
+              <PlanEditor
+                characterId={activeCharacterId}
+                plan={plan}
+                catalog={catalog}
+                trainedSkills={trainedSkills}
+                attributes={attributes}
+                implants={implants}
+                remapInfo={remapInfo}
+                onUpdate={(patch) => void handleUpdate(patch)}
+              />
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

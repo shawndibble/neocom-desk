@@ -456,12 +456,12 @@
   fallback, so uncapped width with unbounded per-character columns would
   either force the whole page to scroll sideways or produce absurdly wide
   rows on a large monitor, once enough characters are selected.
-- **Calendar, SkillPlans and Industry stay vertically-stacked
-  master-detail** (list Panel above detail Panel/editor) — they are
-  Mail-shaped (Industry's materials table already needed its own
-  `overflow-x-auto` at 768px, the clearest evidence of the three), but
-  converting them to a real side-by-side pane is deferred as its own
-  follow-up per page, not bundled into a width pass.
+- **Calendar and Industry stay vertically-stacked master-detail** (list
+  Panel above detail Panel/editor) — they are Mail-shaped (Industry's
+  materials table already needed its own `overflow-x-auto` at 768px, the
+  clearest evidence), but converting them to a real side-by-side pane is
+  deferred as its own follow-up per page, not bundled into a width pass.
+  SkillPlans got its own follow-up in round 21.
 - **Assets** gets the `max-w-5xl` tier now (less name truncation, more room
   per tree-depth indent); replacing its hover-tooltip detail with a real
   detail pane (a tree+detail split, the same shape as the deferred
@@ -529,3 +529,30 @@
   issue #108), each with a select-all/none checkbox for that character's
   event toggles, plus a text search that filters event types in place across
   all sections (Market Browser/Trained-skills search pattern).
+
+## Scope decisions (round 21) — Skill Plans side-by-side layout
+
+- SkillPlans is the first of round 19's three deferred pages (Calendar,
+  SkillPlans, Industry) to convert from vertically-stacked master-detail to
+  a real side-by-side pane, mirroring Mail's shipped two-pane shape
+  (round 18): list left, detail right, each with its own independent
+  scroll, `useIsDesktop`-driven `hidden`-class toggling on narrow screens,
+  and a back control shown only when narrow. Calendar and Industry remain
+  deferred.
+- **The list/editor route split (round 17) is unchanged.** `/skills/plans`
+  and `/skills/plans/:planId` stay separate routes — this round is purely
+  about how the two are presented together, not about merging them. Both
+  routes render the same `PlanListPane` (data + create/duplicate/delete/
+  rename) in the left column; the right column is either a "select a plan"
+  placeholder (list route) or the full `PlanEditor` (editor route).
+  Navigating between the two routes still unmounts/remounts that pane like
+  any other route change; only switching which plan is open _within_ the
+  editor route (`:planId` changing on the same route element) keeps it
+  mounted.
+- `SkillPlanEditor` widens from `max-w-3xl` to `max-w-5xl`, matching
+  `SkillPlans`' round 19 tier — the two need one shared width now that they
+  render as columns of the same page shape.
+- The desktop-breakpoint media-query hook (`DESKTOP_QUERY` + the
+  `isDesktop` state/effect pair) was identical in `Mail.tsx` and
+  `Market.tsx` already; adding a third copy for SkillPlans was the trigger
+  to extract it to `src/lib/useIsDesktop.ts` instead, adopted by all three.

@@ -15,12 +15,10 @@ import { loadMailHeaders, loadMailBody, loadMailLabels } from '@/features/charac
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildLabelTabMap, resolveMailTab, unreadCountsByTab, type MailTab } from '@/engine/mail';
 import type { MailBody, MailHeader, MailLabel, MailLabels } from '@/esi/endpoints';
-
-/** Matches the `lg:` breakpoint the two-column grid switches on below (same precedent as Market). */
-const DESKTOP_QUERY = '(min-width: 64rem)';
 
 type ActiveTab = 'all' | MailTab;
 
@@ -90,15 +88,7 @@ export function Mail() {
   // Narrow screens show one column at a time (CONTEXT.md round 18); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width.
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_QUERY).matches
-  );
-  useEffect(() => {
-    const desktop = window.matchMedia(DESKTOP_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    desktop.addEventListener('change', onChange);
-    return () => desktop.removeEventListener('change', onChange);
-  }, []);
+  const isDesktop = useIsDesktop();
 
   const headersResult = data?.headersResult ?? null;
   const needsReauth = data?.needsReauth ?? false;
