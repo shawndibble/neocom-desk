@@ -122,7 +122,12 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
                       {t(badgeKey)}
                     </span>
                   )}
-                  <span className="w-24 shrink-0 text-right tabular-nums text-text-dim">
+                  {/* min-w, not w: "112d 12h 26m left" is 17 characters and
+                      overran a fixed 6rem box, breaking "left" onto its own
+                      line under every long-running skill. Short values still
+                      line up at 6rem; a long one grows leftwards into the
+                      name, which truncates rather than wrapping. */}
+                  <span className="min-w-24 shrink-0 text-right tabular-nums whitespace-nowrap text-text-dim">
                     {secondsRemaining === null
                       ? ''
                       : t('plans.queueRemaining', {

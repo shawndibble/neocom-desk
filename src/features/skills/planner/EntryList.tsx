@@ -30,6 +30,14 @@ export type BandInfo =
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const ICON_BUTTON = 'w-7 justify-center';
+/**
+ * Every training-time cell and its desktop column header, so the two cannot
+ * drift apart and leave the numbers unaligned. 6rem holds the widest duration
+ * formatDuration produces ("9999d 23h 59m"); the previous 4rem ran out around
+ * "99d 23h 59m", so any plan longer than a few months broke its own times
+ * across two lines mid-value ("123d 18h" / "58m").
+ */
+const TIME_CELL = 'w-24 shrink-0 whitespace-nowrap text-right';
 /** Matches Layout.tsx's phone/desktop line (#114). */
 const DESKTOP_QUERY = '(min-width: 48rem)';
 
@@ -91,7 +99,7 @@ function PerLevelTimeCell({
   const { t } = useTranslation();
   const cell = (
     <span
-      className={`w-16 text-right tabular-nums ${dim ? 'text-text-dim' : ''}`}
+      className={`${TIME_CELL} tabular-nums ${dim ? 'text-text-dim' : ''}`}
       // Tooltip.tsx requires a focusable trigger to reveal on keyboard focus,
       // not just hover/touch (docs/DESIGN.md §6) — only needed when this
       // cell actually carries the tooltip.
@@ -243,7 +251,7 @@ function EntryRow({
   ) : null;
 
   const cumulativeTimeCell = columns.cumulativeTime ? (
-    <span className="w-16 text-right tabular-nums">{formatDuration(row.cumulativeSeconds)}</span>
+    <span className={`${TIME_CELL} tabular-nums`}>{formatDuration(row.cumulativeSeconds)}</span>
   ) : null;
 
   const removeButton = (
@@ -350,7 +358,7 @@ function PrereqRow({
     ) : null;
 
   const cumulativeTimeCell = columns.cumulativeTime ? (
-    <span className="w-16 text-right tabular-nums">
+    <span className={`${TIME_CELL} tabular-nums`}>
       {formatDuration(row.step.cumulativeSeconds)}
     </span>
   ) : null;
@@ -512,10 +520,10 @@ export function EntryList({
             <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
               <span className="flex-1" />
               {columns.perLevelTime && (
-                <span className="w-16 text-right">{t('plans.columnPerLevel')}</span>
+                <span className={TIME_CELL}>{t('plans.columnPerLevel')}</span>
               )}
               {columns.cumulativeTime && (
-                <span className="w-16 text-right">{t('plans.columnCumulative')}</span>
+                <span className={TIME_CELL}>{t('plans.columnCumulative')}</span>
               )}
             </div>
           )}

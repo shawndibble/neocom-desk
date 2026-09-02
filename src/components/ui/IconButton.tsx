@@ -24,6 +24,14 @@ interface IconButtonProps extends Omit<
    * around every line of a list.
    */
   variant?: 'ghost' | 'plain';
+  /**
+   * `danger` is the destructive treatment, matching `Button variant="danger"`.
+   * It lives here rather than as a caller `className` because the base classes
+   * already set a text colour: two colour utilities on one element resolve by
+   * stylesheet order, not by the order they appear in the attribute, so an
+   * override passed in from outside is not reliably an override.
+   */
+  tone?: 'default' | 'danger';
   /** `md` (default) is the toolbar size; `sm` is for controls nested inside a dense row. */
   size?: 'md' | 'sm';
   className?: string;
@@ -53,6 +61,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     pressed,
     disabled = false,
     variant = 'ghost',
+    tone = 'default',
     size = 'md',
     className = '',
     ...rest
@@ -74,15 +83,28 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
           'disabled:cursor-not-allowed disabled:opacity-40',
           size === 'md' ? 'size-11 md:size-9' : 'size-9 md:size-7',
-          variant === 'ghost' && 'border border-line',
+          // `border` alone here: each state below names its own border colour,
+          // so no two border-colour utilities ever land on the element at once.
+          // Tailwind resolves same-property utilities by stylesheet order, not
+          // by their order in this attribute, so "a later class overrides an
+          // earlier one" is not something to rely on.
+          variant === 'ghost' && 'border',
           pressed === true
-            ? 'bg-accent/12 text-accent' + (variant === 'ghost' ? ' border-accent' : '')
-            : cx(
-                'text-text-dim',
-                !disabled && 'hover:text-text',
-                variant === 'ghost' && 'bg-panel-2',
-                variant === 'ghost' && !disabled && 'hover:border-line-bright'
-              ),
+            ? cx('bg-accent/12 text-accent', variant === 'ghost' && 'border-accent')
+            : tone === 'danger'
+              ? cx(
+                  'text-danger',
+                  variant === 'ghost' && 'border-danger/60',
+                  !disabled && 'hover:bg-danger/10',
+                  variant === 'ghost' && !disabled && 'hover:border-danger'
+                )
+              : cx(
+                  'text-text-dim',
+                  variant === 'ghost' && 'border-line',
+                  !disabled && 'hover:text-text',
+                  variant === 'ghost' && 'bg-panel-2',
+                  variant === 'ghost' && !disabled && 'hover:border-line-bright'
+                ),
           className
         )}
       >

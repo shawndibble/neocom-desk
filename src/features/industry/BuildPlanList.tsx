@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState } from '@/components/ui';
+import { Button, EmptyState, IconButton } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import { BlueprintPicker } from './BlueprintPicker';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
@@ -70,25 +71,31 @@ function PlanRow({
           {plan.name}
         </button>
       )}
-      <Button
+      {/* Three labelled buttons left the plan name ~90px on a phone ("Raven
+          Nav…"). The name is the row — the actions are the adornment — so the
+          actions become icons and give the width back. Each label names the
+          plan too, so a screen reader hears which row it is on. */}
+      <IconButton
         size="sm"
+        icon={<Icon.Rename />}
+        label={`${t('industry.rename')} ${plan.name}`}
         onClick={() => setRenaming(true)}
-        aria-label={`${t('industry.rename')} ${plan.name}`}
-      >
-        {t('industry.rename')}
-      </Button>
-      <Button size="sm" onClick={() => onDuplicate(plan.id)}>
-        {t('industry.duplicate')}
-      </Button>
-      <Button
-        variant="danger"
+      />
+      <IconButton
         size="sm"
+        icon={<Icon.Duplicate />}
+        label={`${t('industry.duplicate')} ${plan.name}`}
+        onClick={() => onDuplicate(plan.id)}
+      />
+      <IconButton
+        size="sm"
+        icon={<Icon.Close />}
+        label={`${t('industry.delete')} ${plan.name}`}
+        tone="danger"
         onClick={() => {
           if (window.confirm(t('industry.deleteConfirm'))) onDelete(plan.id);
         }}
-      >
-        {t('industry.delete')}
-      </Button>
+      />
     </li>
   );
 }
