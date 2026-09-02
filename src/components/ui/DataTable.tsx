@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import * as Icon from './icons';
 
 export interface DataTableSort {
   columnId: string;
@@ -173,6 +174,13 @@ export function DataTable<T>({
             }
             const active = sort?.columnId === column.id;
             const direction = active ? sort.direction : undefined;
+            // Unsorted columns get the neutral up/down glyph, so a sortable
+            // column advertises itself before anyone clicks it.
+            const SortGlyph = !active
+              ? Icon.Sort
+              : direction === 'asc'
+                ? Icon.Ascending
+                : Icon.Descending;
             return (
               <th
                 key={column.id}
@@ -191,9 +199,11 @@ export function DataTable<T>({
                   )}
                 >
                   {column.header}
-                  <span aria-hidden="true" className="text-[0.6875rem]">
-                    {active ? (direction === 'asc' ? '▲' : '▼') : '⇅'}
-                  </span>
+                  <SortGlyph
+                    aria-hidden="true"
+                    size={Icon.ICON_SIZE.sm}
+                    className={cx('shrink-0', active ? 'text-accent' : 'text-text-faint')}
+                  />
                 </button>
               </th>
             );

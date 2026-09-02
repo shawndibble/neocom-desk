@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  Caret,
   DataAgeBadge,
   EmptyState,
   PageHeader,
@@ -347,10 +348,12 @@ export function Skills() {
                 placeholder={t('skills.searchPlaceholder')}
                 className="min-w-48 flex-1"
               />
-              <Button size="sm" onClick={expandAllGroups} disabled={searching}>
+              {/* `md`, not `sm`: these sit on the search box's own line, and the
+                  shared control scale is what keeps the three the same height. */}
+              <Button onClick={expandAllGroups} disabled={searching}>
                 {t('skills.expandAll')}
               </Button>
-              <Button size="sm" onClick={collapseAllGroups} disabled={searching}>
+              <Button onClick={collapseAllGroups} disabled={searching}>
                 {t('skills.collapseAll')}
               </Button>
             </div>
@@ -381,9 +384,7 @@ export function Skills() {
                       }`}
                     >
                       <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-                          {expanded ? '▾' : '▸'}
-                        </span>
+                        <Caret expanded={expanded} />
                         {group.groupName}
                       </span>
                       <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-faint">

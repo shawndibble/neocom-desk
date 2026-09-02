@@ -4,6 +4,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
+  Caret,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -188,11 +189,7 @@ function MarketGroupTree({
           style={{ paddingLeft: `${depth * 0.75}rem` }}
           className="flex w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text"
         >
-          {expandable && (
-            <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-              {expanded ? '▾' : '▸'}
-            </span>
-          )}
+          {expandable && <Caret expanded={expanded} />}
           <span className={expandable ? '' : 'pl-3'}>{group.name}</span>
         </button>
         {expanded && (children.length > 0 || items.length > 0) && (
