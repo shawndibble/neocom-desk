@@ -297,4 +297,35 @@ describe('DataTable', () => {
       expect(firstRow).not.toHaveAttribute('tabindex');
     });
   });
+
+  // The collapse itself is CSS (`.dt-stack`, src/styles/index.css) and jsdom
+  // loads no stylesheet, so these cover the markup that CSS depends on: where
+  // the labels come from, the opt-out hook, and the roles `display: block`
+  // would otherwise strip in a real browser.
+  describe('responsive collapse', () => {
+    it('carries each column header on its cells, for the stacked layout to print', () => {
+      renderTable();
+      const [itemCell, amountCell] = screen.getAllByRole('cell');
+      expect(itemCell).toHaveAttribute('data-label', 'Item');
+      expect(amountCell).toHaveAttribute('data-label', 'Amount');
+    });
+
+    it('stacks by default and opts out on request', () => {
+      const { unmount } = renderTable();
+      expect(screen.getByRole('table')).toHaveClass('dt-stack');
+
+      unmount();
+      renderTable({ responsive: 'table' });
+      expect(screen.getByRole('table')).not.toHaveClass('dt-stack');
+    });
+
+    it('states its table roles explicitly, since the stacked layout drops the implicit ones', () => {
+      renderTable();
+      expect(screen.getByRole('table')).toHaveAttribute('role', 'table');
+      expect(screen.getAllByRole('row')[0]).toHaveAttribute('role', 'row');
+      expect(screen.getAllByRole('columnheader')[0]).toHaveAttribute('role', 'columnheader');
+      expect(screen.getAllByRole('cell')[0]).toHaveAttribute('role', 'cell');
+      expect(screen.getAllByRole('rowgroup')).toHaveLength(2);
+    });
+  });
 });

@@ -340,6 +340,14 @@ export function SkillCompare() {
               {t('skillCompare.refresh')}
             </Button>
           </div>
+          {/*
+            The one table that keeps its columns on a phone. Comparing is the
+            page: a stacked card per skill would put each character's level on
+            its own line, which reads fine for one skill and makes scanning
+            "who is ahead" across skills impossible. A matrix earns its
+            sideways scroll, so this opts out of the responsive collapse and
+            keeps the wrapper below.
+          */}
           <div className="overflow-x-auto">
             <DataTable
               columns={columns}
@@ -347,6 +355,7 @@ export function SkillCompare() {
               rowKey={(row) => row.skillTypeID}
               label={t('skillCompare.tableLabel')}
               defaultSort={{ columnId: 'skill', direction: 'asc' }}
+              responsive="table"
             />
           </div>
         </>

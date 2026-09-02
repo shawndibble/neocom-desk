@@ -101,7 +101,14 @@ export function Overview() {
           size="lg"
           alt={t('characters.portraitAlt', { name: character?.name ?? '' })}
         />
-        <div className="min-w-0 flex-1">
+        {/*
+          `basis-48` is what makes the header actually wrap on a phone. With a
+          bare `flex-1` (basis 0) this block is infinitely shrinkable, so the
+          chips below stayed on line one and truncated the character name down
+          to a single letter instead. Given a real basis, the chips wrap to
+          their own line and the name gets the full width.
+        */}
+        <div className="min-w-0 flex-1 basis-48">
           <h1 className="truncate text-xl font-semibold tracking-widest uppercase">
             {character?.name ?? t('common.unknown')}
           </h1>

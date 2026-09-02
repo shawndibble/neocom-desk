@@ -51,6 +51,13 @@ interface DataTableProps<T> {
    * `rowContextMenu`.
    */
   onRowClick?: (row: T) => void;
+  /**
+   * How the table behaves below `sm`. `'stack'` (the default) collapses each
+   * row into a labelled card — see `.dt-stack` in `src/styles/index.css`.
+   * `'table'` keeps real columns, and is only right for a table narrow enough
+   * to fit a 390px screen unaided — roughly two short columns.
+   */
+  responsive?: 'stack' | 'table';
 }
 
 function compareValues(a: string | number, b: string | number): number {
@@ -83,6 +90,11 @@ function sortRows<T>(
  * here. No empty branch — callers show `EmptyState` instead (docs/DESIGN.md
  * §4, "Never show a bare empty table"). Sorting is opt-in per column via
  * `sortValue`: a table that declares none behaves exactly as before.
+ *
+ * Below `sm` the rows collapse into labelled cards (`responsive`), which is
+ * pure CSS — the markup below is what every width renders. Because that CSS
+ * makes the elements `display: block`, which strips their implicit ARIA
+ * roles, each one states its table role explicitly.
  */
 export function DataTable<T>({
   columns,
@@ -95,6 +107,7 @@ export function DataTable<T>({
   density = 'default',
   rowContextMenu,
   onRowClick,
+  responsive = 'stack',
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
 
@@ -126,13 +139,17 @@ export function DataTable<T>({
   }
 
   return (
-    <table aria-label={label} className={cx('w-full text-xs', className)}>
-      <thead>
-        <tr className="border-b border-line text-left text-text-dim">
+    <table
+      role="table"
+      aria-label={label}
+      className={cx('w-full text-xs', responsive === 'stack' && 'dt-stack', className)}
+    >
+      <thead role="rowgroup">
+        <tr role="row" className="border-b border-line text-left text-text-dim">
           {columns.map((column, i) => {
             if (!column.sortValue) {
               return (
-                <th key={column.id} scope="col" className={headerClass[i]}>
+                <th key={column.id} role="columnheader" scope="col" className={headerClass[i]}>
                   {column.header}
                 </th>
               );
@@ -142,6 +159,7 @@ export function DataTable<T>({
             return (
               <th
                 key={column.id}
+                role="columnheader"
                 scope="col"
                 className={headerClass[i]}
                 aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
@@ -165,11 +183,12 @@ export function DataTable<T>({
           })}
         </tr>
       </thead>
-      <tbody className="divide-y divide-line">
+      <tbody role="rowgroup" className="divide-y divide-line">
         {sortedRows.map((row) => {
           const focusable = Boolean(rowContextMenu) || Boolean(onRowClick);
           const tr = (
             <tr
+              role="row"
               className={cx(
                 'hover:bg-panel-2',
                 onRowClick && 'cursor-pointer',
@@ -190,7 +209,15 @@ export function DataTable<T>({
               }
             >
               {columns.map((column, i) => (
-                <td key={column.id} className={cx(cellClass[i], column.cellClassName?.(row))}>
+                <td
+                  key={column.id}
+                  role="cell"
+                  // Printed as the cell's label in the stacked layout. Set
+                  // unconditionally: it costs one static attribute and keeps
+                  // the markup width-independent.
+                  data-label={column.header}
+                  className={cx(cellClass[i], column.cellClassName?.(row))}
+                >
                   {column.render(row)}
                 </td>
               ))}

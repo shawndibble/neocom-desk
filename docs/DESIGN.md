@@ -148,12 +148,45 @@ Built in `src/components/ui/` (✓) or planned (○):
 | `Spinner`         | ✓      | Accent arc, sizes sm/md/lg. Inline or centered while loading; prefer skeleton-free simple spinner + DataAgeBadge of last cached data.                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `Tooltip`         | ✓      | Accessible hover/focus tooltip (`role="tooltip"` + `aria-describedby`) around a single focusable trigger. `InfoTooltip` variant renders a small "?" button for labeling jargon (ME/TE, EIV, SCC, cost index, Remaps available, StatChip's `tooltip` prop).                                                                                                                                                                                                                                                                                                                             |
 | `Modal`           | ✓      | Native `<dialog>` + `showModal()`. Platform-supplied focus trap, inert background, Escape-to-close and `::backdrop` — never hand-roll a focus trap. `placement="center"` (default) or `"sheet"` (bottom-anchored, mobile nav). Escape and backdrop click both close.                                                                                                                                                                                                                                                                                                                   |
-| `DataTable`       | ✓      | Dense table: hairline-underlined uppercase header row (no fill — matches every shipped table), hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`. No empty branch — callers branch to `EmptyState` themselves. Sorting is opt-in per column via `sortValue`: a column that declares one gets a clickable header (`aria-sort`, ascending/descending toggle, missing values sink to the end); a table that declares none behaves exactly as before.                                                                                                      |
+| `DataTable`       | ✓      | Dense table: hairline-underlined uppercase header row (no fill — matches every shipped table), hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`. No empty branch — callers branch to `EmptyState` themselves. Sorting is opt-in per column via `sortValue`: a column that declares one gets a clickable header (`aria-sort`, ascending/descending toggle, missing values sink to the end); a table that declares none behaves exactly as before. Below `sm` each row collapses into a labelled card — see §4a.                                        |
 | `CharacterAvatar` | ✓      | ESI portrait, `rounded-xs` (house radius, §3), 1px `line` ring; sizes `sm`/`md`/`lg`; accent ring when selected. Decorative by default — pass `alt` only for standalone use.                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `FilterChip`      | ✓      | Toggleable filter pill. `StatChip`'s dimensions, but interactive: a real `<button>` with `aria-pressed`, accent when on, optional trailing count.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `SkillBar`        | ✓      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `LogoMark`        | ✓      | The app mark, inline SVG. Decorative (`aria-hidden`) — every placement sits beside the app name. Size it with `size-*`; corner brackets follow `currentColor`, defaulting to accent. Simplified from the artwork, see §2b.                                                                                                                                                                                                                                                                                                                                                             |
 | `IconButton`      | ✓      | Icon-only control with a real accessible name: `label` sets both `aria-label` and the `Tooltip` text, so the two can't drift. `pressed` makes it a toggle (`aria-pressed`). `variant`: `ghost` (default, hairline box) / `plain` (no box, for a control nested inside a row). `size`: `md` (default, the `h-11 md:h-9` touch tier, §3) / `sm` (`h-9 md:h-7`, nested-in-a-row). Forwards its ref and spreads unknown props onto the `<button>` — pass it to a Radix `Trigger`'s `asChild` and it works. Prefer this over a bare icon `<Button>` whenever there's no visible label text. |
+
+## 4a. Tables on a phone
+
+A dense table cannot stay a table on a 390px screen. Measured before the fix:
+a six-column row rendered 505px wide, which scrolled the whole page sideways
+**and** squeezed the name column to 74px, breaking one item name over five
+lines. Both failures at once — so neither "let it scroll" nor "let it squash"
+was an option.
+
+`DataTable` therefore collapses below `sm` (`responsive="stack"`, the
+default): the header row hides, each row becomes a card, the **first column is
+the card's title**, and every other cell prints its column header into a left
+gutter. Order columns accordingly — whatever names the row goes first.
+
+Three rules hold this together:
+
+- **One DOM at every width.** The collapse is pure CSS (`.dt-stack` in
+  `src/styles/index.css`) — no `sm:hidden`/`hidden sm:flex` pair, nothing
+  rendered twice, same rule the Assets page follows. Labels come from
+  `data-label`, so they can't drift from the headers, and they add no i18n
+  strings.
+- **It lives in the `utilities` layer.** A cascade layer beats every earlier
+  layer regardless of specificity, so from `components` these rules would lose
+  to the `px-3`/`text-right`/`whitespace-nowrap` utilities on the very cells
+  they re-lay-out.
+- **Roles are explicit.** `display: block` strips the implicit ARIA table
+  roles in real browsers, so `DataTable` writes `role="table"`/`rowgroup`/
+  `row`/`columnheader`/`cell` itself.
+
+Opt out with `responsive="table"` only when the columns _are_ the content.
+`SkillCompare` is the one case in the app: it's a character-by-skill matrix,
+where a card per skill would make "who is ahead" unscannable. A matrix earns
+its sideways scroll; a list of records does not.
 
 ## 5. Icons
 
