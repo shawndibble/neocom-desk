@@ -135,7 +135,7 @@ PR is open, the full suite and the full gate don't run locally again:
 GitHub Actions (`validate` + `e2e`) is the only place they run for the rest
 of the loop — every round of step 8's CI-failure-fix loop, and any conflict
 resolution once the PR is open (step 7a, step 8), ends in a commit-and-push,
-never a local gate re-run. A single test *file* is still fine to run locally
+never a local gate re-run. A single test _file_ is still fine to run locally
 to confirm a targeted fix (e.g. `npx vitest run <path>`, as in step 8) —
 it's the full suite and the full gate that move to CI-only. This keeps
 concurrent `/next-ticket` runs from piling up repeated full test/build runs
@@ -339,10 +339,10 @@ playwright-report`), then report back: the failing job and test, the
     2. Fix it on the branch from that report (code or test, whichever is
        actually wrong — do not delete a failing test to make it pass). If
        the failure was a unit test, you may run that one file locally to
-       confirm the fix (`npx vitest run <path>`) — but do not re-run the full
-       gate or the full suite (`gate.mjs`, `npm run test:run`, `npm run
-       build`); the PR is already open, so CI is what validates the whole
-       tree now (see "One local gate, then CI").
+       confirm the fix (`npx vitest run <path>`) — but do not re-run the
+       full gate or the full suite (`gate.mjs`, `npm run test:run`,
+       `npm run build`); the PR is already open, so CI is what validates
+       the whole tree now (see "One local gate, then CI").
     3. Commit and `git push`.
     4. Restart this round (`drive-ci.mjs` again against the new commit).
 - If still not both mergeable and green after 5 rounds: comment on the PR
