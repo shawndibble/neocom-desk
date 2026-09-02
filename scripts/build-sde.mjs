@@ -30,6 +30,8 @@ const FILES = [
   'industryActivityProducts.csv',
   'industryActivitySkills.csv',
   'invMarketGroups.csv',
+  'invMetaTypes.csv',
+  'invMetaGroups.csv',
   'mapRegions.csv',
   'mapSolarSystems.csv',
   'staStations.csv',
@@ -480,6 +482,41 @@ async function main() {
   }
   marketTypes.sort((a, b) => a.typeId - b.typeId);
 
+  // --- market/variations.json: invMetaTypes + invMetaGroups -> Tech/Meta/
+  // Faction variation relation (the EVE client's "Variations" tab). Every
+  // classified type has an invMetaTypes row; a group's root has an empty
+  // parentTypeID, and every other member's parentTypeID points at that root
+  // (metaGroupID alone does not identify the root — some non-root rows are
+  // also metaGroupID 1/Tech I). Filtered to published types so every id the
+  // app resolves is guaranteed renderable, same discipline as marketTypes
+  // above.
+  const metaGroupNames = {};
+  {
+    const rows = raw['invMetaGroups.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      metaGroupNames[Number(r[h.metaGroupID])] = r[h.metaGroupName];
+    }
+  }
+  const variationTypes = {};
+  {
+    const rows = raw['invMetaTypes.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const typeID = Number(r[h.typeID]);
+      const t = types.get(typeID);
+      if (!t || !t.published) continue;
+      const parentRaw = r[h.parentTypeID];
+      variationTypes[typeID] = {
+        parentTypeId: parentRaw === '' ? null : Number(parentRaw),
+        metaGroupId: Number(r[h.metaGroupID]),
+      };
+    }
+  }
+  const variations = { types: variationTypes, metaGroups: metaGroupNames };
+
   // --- market/systems.json: mapSolarSystems -> SolarSystemEntry[] ---
   // Also tracks, per region, whether every one of its systems sits at a
   // synthetic (near-origin) position — see SYNTHETIC_POSITION_MAX_M.
@@ -631,6 +668,7 @@ async function main() {
     ['regions.json', marketRegions],
     ['globalMarkets.json', globalMarkets],
     ['attributes.json', attributeDictionary],
+    ['variations.json', variations],
   ];
   for (const [name, data] of marketOutputs) {
     const json = JSON.stringify(data);
@@ -668,13 +706,17 @@ async function main() {
   );
   console.log(`  globally-traded items: ${globalMarkets.length}`);
   console.log(`  attribute dictionary entries: ${Object.keys(attributeDictionary).length}`);
+  console.log(`  variation-classified types: ${Object.keys(variationTypes).length}`);
+  console.log(`  meta groups: ${Object.keys(metaGroupNames).length}`);
   if (
     marketGroups.length === 0 ||
     marketTypes.length === 0 ||
     solarSystems.length === 0 ||
     npcStations.length === 0 ||
     marketRegions.length === 0 ||
-    Object.keys(attributeDictionary).length === 0
+    Object.keys(attributeDictionary).length === 0 ||
+    Object.keys(variationTypes).length === 0 ||
+    Object.keys(metaGroupNames).length === 0
   ) {
     console.error('  FAIL: a market payload came out empty');
     process.exitCode = 1;

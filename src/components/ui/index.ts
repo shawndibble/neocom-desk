@@ -19,6 +19,7 @@ export type { DataTableColumn } from './DataTable';
 export { CharacterAvatar } from './CharacterAvatar';
 export type { CharacterAvatarSize } from './CharacterAvatar';
 export { FilterChip } from './FilterChip';
+export { Disclosure } from './Disclosure';
 export { LogoMark } from './LogoMark';
 export {
   ContextMenu,
