@@ -1,17 +1,25 @@
 import type { EngineSkill, PlanEntry, PlanStep, TrainedSkill } from '@/engine/types';
 
+export interface NormalizedPlan {
+  steps: PlanStep[];
+  /**
+   * entryBoundaries[i] = steps.length after processing entries[0..i]
+   * inclusive, so steps.slice(entryBoundaries[i-1] ?? 0, entryBoundaries[i])
+   * is exactly the sub-range entry i contributed (its own levels, plus any
+   * prereq levels not already covered by an earlier entry).
+   */
+  entryBoundaries: number[];
+}
+
 /**
- * Expand plan entries into per-level steps:
- * - each entry becomes the missing levels I..target,
- * - prerequisites are inserted recursively before dependents,
- * - already-trained and already-planned levels are skipped,
- * - user order is preserved where prerequisites allow.
+ * Expand plan entries into per-level steps, and record which sub-range of
+ * `steps` each entry contributed. See normalizePlan for the expansion rules.
  */
-export function normalizePlan(
+export function normalizePlanWithBoundaries(
   entries: readonly PlanEntry[],
   skills: ReadonlyMap<number, EngineSkill>,
   trainedSkills: ReadonlyMap<number, TrainedSkill> = new Map()
-): PlanStep[] {
+): NormalizedPlan {
   const steps: PlanStep[] = [];
   const planned = new Map<number, number>(); // typeID -> highest level already in steps
   const visiting = new Set<number>(); // cycle guard for current prereq path
@@ -35,6 +43,25 @@ export function normalizePlan(
     }
   };
 
-  for (const entry of entries) add(entry.skillTypeID, entry.targetLevel);
-  return steps;
+  const entryBoundaries: number[] = [];
+  for (const entry of entries) {
+    add(entry.skillTypeID, entry.targetLevel);
+    entryBoundaries.push(steps.length);
+  }
+  return { steps, entryBoundaries };
+}
+
+/**
+ * Expand plan entries into per-level steps:
+ * - each entry becomes the missing levels I..target,
+ * - prerequisites are inserted recursively before dependents,
+ * - already-trained and already-planned levels are skipped,
+ * - user order is preserved where prerequisites allow.
+ */
+export function normalizePlan(
+  entries: readonly PlanEntry[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  trainedSkills: ReadonlyMap<number, TrainedSkill> = new Map()
+): PlanStep[] {
+  return normalizePlanWithBoundaries(entries, skills, trainedSkills).steps;
 }

@@ -11,7 +11,7 @@ import {
   Panel,
   Tooltip,
 } from '@/components/ui';
-import { normalizePlan } from '@/engine/plan';
+import { normalizePlanWithBoundaries } from '@/engine/plan';
 import { effectivePriority } from '@/engine/planPriority';
 import { computeSchedule } from '@/engine/schedule';
 import { parseSkillQueue } from '@/engine/queueImport';
@@ -39,7 +39,6 @@ import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
-import { ComputedQueue } from './ComputedQueue';
 import { PlanHeader } from './PlanHeader';
 import {
   evaluateOptimizationBadge,
@@ -59,11 +58,14 @@ import {
 } from './reorder';
 import {
   addMarker,
+  buildRows,
   markerStepIndices,
   markersAfterEntryRemoval,
   removeMarker,
   reorderRows,
 } from './markers';
+import { bandStarts } from './bands';
+import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
 import type { RemapAvailability } from './remapAvailability';
 import { whatIfImplants, WHAT_IF_IMPLANT_MODES, type WhatIfImplantMode } from './whatIfImplants';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
@@ -92,9 +94,9 @@ interface PlanEditorProps {
 
 interface ComputeResult {
   scheduled: ScheduledStep[];
+  /** entryBoundaries[i] = scheduled.length after processing validEntries[0..i] (see normalizePlanWithBoundaries). */
+  entryBoundaries: number[];
   error: string | null;
-  /** At least one entry refers to a skill the current catalog knows about (UX-REVIEW #9's empty-state discriminator). */
-  hasValidEntries: boolean;
   /**
    * "Now" at compute time — the single wall-clock origin fed to
    * computeSchedule's booster-expiry math AND used to derive the plan
@@ -113,21 +115,24 @@ function computeQueue(
 ): ComputeResult {
   // Guard against unknown typeIDs (stale plan, imported skill not in the current SDE snapshot).
   const validEntries = entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
-  const hasValidEntries = validEntries.length > 0;
   const startDate = new Date();
   try {
-    const steps = normalizePlan(validEntries, catalog.engineSkills, trainedSkills);
+    const { steps, entryBoundaries } = normalizePlanWithBoundaries(
+      validEntries,
+      catalog.engineSkills,
+      trainedSkills
+    );
     const scheduled = computeSchedule(
       steps,
       { attributes, implants, boosters, startDate },
       catalog.engineSkills
     );
-    return { scheduled, error: null, hasValidEntries, startDate };
+    return { scheduled, entryBoundaries, error: null, startDate };
   } catch (err) {
     return {
       scheduled: [],
+      entryBoundaries: [],
       error: err instanceof Error ? err.message : String(err),
-      hasValidEntries,
       startDate,
     };
   }
@@ -195,7 +200,7 @@ export function PlanEditor({
     [catalog]
   );
 
-  const { scheduled, error, hasValidEntries, startDate } = useMemo(
+  const { scheduled, entryBoundaries, error, startDate } = useMemo(
     () =>
       computeQueue(
         plan.entries,
@@ -259,6 +264,27 @@ export function PlanEditor({
         : new Set<number>(),
     [scheduled, catalog, activeBoosters, startDate]
   );
+
+  // #112: merge "Your entries" and the computed queue into one row list —
+  // one row per entry (own aggregated per-level/cumulative time) plus dimmed
+  // prereq rows positioned just ahead of the entry that needed them.
+  const entryQueue = useMemo(
+    () =>
+      summarizeEntryQueue(plan.entries, entryBoundaries, scheduled, (skillTypeID) =>
+        catalog.engineSkills.has(skillTypeID)
+      ),
+    [plan.entries, entryBoundaries, scheduled, catalog]
+  );
+  const mergedRows = useMemo(
+    () => buildMergedRows(plan.entries, plan.markers, entryQueue),
+    [plan.entries, plan.markers, entryQueue]
+  );
+  const bandsAt = useMemo(
+    () =>
+      placeBandHeaders(mergedRows, bandStarts(buildRows(plan.entries, plan.markers), priorityMap)),
+    [mergedRows, plan.entries, plan.markers, priorityMap]
+  );
+
   const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0;
   // No steps means no plan finish to project — never invent one for an
   // empty (or all-trained) queue (#20).
@@ -507,7 +533,17 @@ export function PlanEditor({
         </div>
       </Panel>
 
-      <Panel title={t('plans.yourEntries')}>
+      <Panel
+        title={t('plans.yourEntries')}
+        actions={
+          <div className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
+            <span>{formatDuration(totalSeconds)}</span>
+            {planFinish && (
+              <span>{t('plans.projectedFinish', { date: formatDate(planFinish) })}</span>
+            )}
+          </div>
+        }
+      >
         <div className="space-y-3">
           <SkillPicker
             skills={pickerSkills}
@@ -515,36 +551,41 @@ export function PlanEditor({
             trainedSkills={trainedSkills}
             onAdd={(entry) => update(upsertEntry(plan.entries, entry))}
           />
-          <EntryList
-            entries={plan.entries}
-            markers={plan.markers}
-            priorityFor={priorityMap}
-            nameFor={nameFor}
-            onReorder={(activeId, overId) =>
-              onUpdate(reorderRows(plan.entries, plan.markers, activeId, overId))
-            }
-            onRemove={(skillTypeID) => {
-              const entryIndex = plan.entries.findIndex((e) => e.skillTypeID === skillTypeID);
-              onUpdate({
-                entries: removeEntry(plan.entries, skillTypeID),
-                ...(plan.markers
-                  ? {
-                      markers: markersAfterEntryRemoval(
-                        plan.markers,
-                        entryIndex,
-                        plan.entries.length
-                      ),
-                    }
-                  : {}),
-              });
-            }}
-            onRemoveMarker={(markerIndex) =>
-              onUpdate({ markers: removeMarker(plan.markers, markerIndex, plan.entries.length) })
-            }
-            onSetPriority={(skillTypeID, priority) =>
-              update(setEntryPriority(plan.entries, skillTypeID, priority))
-            }
-          />
+          {error ? (
+            <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
+          ) : (
+            <EntryList
+              rows={mergedRows}
+              bandsAt={bandsAt}
+              nameFor={nameFor}
+              boostedSteps={boostedSteps}
+              startDate={startDate}
+              onReorder={(activeId, overId) =>
+                onUpdate(reorderRows(plan.entries, plan.markers, activeId, overId))
+              }
+              onRemove={(skillTypeID) => {
+                const entryIndex = plan.entries.findIndex((e) => e.skillTypeID === skillTypeID);
+                onUpdate({
+                  entries: removeEntry(plan.entries, skillTypeID),
+                  ...(plan.markers
+                    ? {
+                        markers: markersAfterEntryRemoval(
+                          plan.markers,
+                          entryIndex,
+                          plan.entries.length
+                        ),
+                      }
+                    : {}),
+                });
+              }}
+              onRemoveMarker={(markerIndex) =>
+                onUpdate({ markers: removeMarker(plan.markers, markerIndex, plan.entries.length) })
+              }
+              onSetPriority={(skillTypeID, priority) =>
+                update(setEntryPriority(plan.entries, skillTypeID, priority))
+              }
+            />
+          )}
         </div>
       </Panel>
 
@@ -705,31 +746,6 @@ export function PlanEditor({
           </Button>
         </div>
       </Modal>
-
-      <Panel
-        title={t('plans.computedQueue')}
-        actions={
-          <div className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
-            <span>{formatDuration(totalSeconds)}</span>
-            {planFinish && (
-              <span>{t('plans.projectedFinish', { date: formatDate(planFinish) })}</span>
-            )}
-          </div>
-        }
-      >
-        {error ? (
-          <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
-        ) : (
-          <ComputedQueue
-            steps={scheduled}
-            nameFor={nameFor}
-            userSkillTypeIDs={userSkillTypeIDs}
-            boostedSteps={boostedSteps}
-            hasValidEntries={hasValidEntries}
-            startDate={startDate}
-          />
-        )}
-      </Panel>
     </div>
   );
 }
