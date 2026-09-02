@@ -266,7 +266,7 @@ export function SkillCompare() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="mx-auto max-w-7xl space-y-4">
       <SkillsSubNav />
       <header className="flex items-center justify-between">
         <h1 className="text-sm font-semibold tracking-widest text-text uppercase">
@@ -340,13 +340,15 @@ export function SkillCompare() {
               {t('skillCompare.refresh')}
             </Button>
           </div>
-          <DataTable
-            columns={columns}
-            rows={rows}
-            rowKey={(row) => row.skillTypeID}
-            label={t('skillCompare.tableLabel')}
-            defaultSort={{ columnId: 'skill', direction: 'asc' }}
-          />
+          <div className="overflow-x-auto">
+            <DataTable
+              columns={columns}
+              rows={rows}
+              rowKey={(row) => row.skillTypeID}
+              label={t('skillCompare.tableLabel')}
+              defaultSort={{ columnId: 'skill', direction: 'asc' }}
+            />
+          </div>
         </>
       )}
 

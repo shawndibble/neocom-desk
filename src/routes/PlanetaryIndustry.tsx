@@ -339,7 +339,7 @@ export function PlanetaryIndustry() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('pi.title')}</h1>
         <div className="flex items-center gap-2">

@@ -147,7 +147,7 @@ export function Contacts() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('contacts.title')}</h1>
         <div className="flex items-center gap-2">
