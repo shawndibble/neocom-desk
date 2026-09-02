@@ -250,6 +250,7 @@
     "emptyTitle": "No build plans yet",
     "emptyHint": "Create a plan to price out a manufacturing job.",
     "selectHint": "Select a build plan, or create one.",
+    "backToList": "Back to build plans",
     "addPlan": "Add build plan",
     "searchPlaceholder": "Search by product name…",
     "blueprintMissing": "This plan's blueprint isn't in the current SDE snapshot.",
