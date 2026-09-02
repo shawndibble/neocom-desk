@@ -770,16 +770,36 @@ describe('SkillPlans editor: optimize remaps', () => {
       })
     );
     goToPlanEditor();
-    render(<App />);
+    // This explanatory tooltip only wraps the `lg`+ full-text button (#224):
+    // below `lg` the icon-only button carries its own Tooltip (just the
+    // button's name, via IconButton) instead \u2014 jsdom's matchMedia never
+    // matches by default, so mock it to desktop.
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    try {
+      render(<App />);
 
-    await screen.findByText('Your entries');
-    const button = screen.getByRole('button', { name: 'Optimize remaps' });
-    const tooltipId = button.getAttribute('aria-describedby');
-    const tooltip = document.getElementById(tooltipId!);
+      await screen.findByText('Your entries');
+      const button = screen.getByRole('button', { name: 'Optimize remaps' });
+      const tooltipId = button.getAttribute('aria-describedby');
+      const tooltip = document.getElementById(tooltipId!);
 
-    expect(tooltip).toHaveTextContent(
-      'Evaluates the plan\'s entries in their current order \u2014 it never reorders them. Grouping similar skills together first (e.g. with "Suggest reorder") tends to produce bigger savings.'
-    );
+      expect(tooltip).toHaveTextContent(
+        'Evaluates the plan\'s entries in their current order \u2014 it never reorders them. Grouping similar skills together first (e.g. with "Suggest reorder") tends to produce bigger savings.'
+      );
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
   });
 
   it('clears the stale optimize result when an entry is removed, instead of crashing on an out-of-range segment index (BUG #1)', async () => {
