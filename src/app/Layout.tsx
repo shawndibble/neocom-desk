@@ -9,6 +9,7 @@ import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
 import {
   CharacterAvatar,
+  characterAvatarBoxClassName,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -145,10 +146,12 @@ function CharacterTriggerFace({
   size?: 'sm';
 }) {
   if (!activeCharacter) {
+    // Borrows the portrait's own box so the placeholder doesn't change shape
+    // when the real one arrives.
     return (
       <span
         aria-hidden="true"
-        className={`${size === 'sm' ? 'size-7' : 'size-8'} shrink-0 rounded-full bg-panel-2`}
+        className={`${characterAvatarBoxClassName(size)} border-line bg-panel-2`}
       />
     );
   }
@@ -172,6 +175,17 @@ function characterTriggerLabel(
   return activeCharacter ? undefined : t('nav.switchCharacter');
 }
 
+/**
+ * What the character menu opens onto, in one place: the rail renders these as
+ * `DropdownMenuItem`s and the sheet as `NavItem`s, and only the mechanism
+ * differs between them. Both are UNGATED (routeScopes.ts), so neither
+ * rendering carries a missing-scope marker.
+ */
+const CHARACTER_MENU_DESTINATIONS = [
+  { to: '/characters', labelKey: 'nav.characters' },
+  { to: '/settings', labelKey: 'nav.settings' },
+] as const satisfies readonly { to: AppRoutePath; labelKey: string }[];
+
 const CHARACTER_TRIGGER =
   'flex w-full items-center gap-2 p-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
 
@@ -194,12 +208,13 @@ function RailCharacterMenu({ activeCharacter }: { activeCharacter: ActiveCharact
       </DropdownMenuTrigger>
       {/* Anchored upward: the trigger is pinned to the bottom of the viewport. */}
       <DropdownMenuContent side="top" align="start" className="w-44">
-        <DropdownMenuItem asChild>
-          <Link to="/characters">{t('nav.characters')}</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/settings">{t('nav.settings')}</Link>
-        </DropdownMenuItem>
+        {CHARACTER_MENU_DESTINATIONS.map(({ to, labelKey }) => (
+          // `asChild` so each item stays a real anchor — middle-click and
+          // "open in new tab" keep working.
+          <DropdownMenuItem key={to} asChild>
+            <Link to={to}>{t(labelKey)}</Link>
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -239,13 +254,9 @@ function SheetCharacterMenu({
       </button>
       {expanded && (
         <div className="ml-3 space-y-1 border-l border-line pl-2">
-          <NavItem
-            to="/characters"
-            label={t('nav.characters')}
-            locked={false}
-            onClick={onNavigate}
-          />
-          <NavItem to="/settings" label={t('nav.settings')} locked={false} onClick={onNavigate} />
+          {CHARACTER_MENU_DESTINATIONS.map(({ to, labelKey }) => (
+            <NavItem key={to} to={to} label={t(labelKey)} locked={false} onClick={onNavigate} />
+          ))}
         </div>
       )}
     </div>
@@ -412,7 +423,7 @@ export function Layout() {
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar: 4 primary destinations + More. Fixed-width
+      {/* Mobile bottom tab bar: 3 primary destinations + More. Fixed-width
           items (see MOBILE_NAV_ITEM) so the bar never overflows the
           viewport; `env(safe-area-inset-bottom)` keeps it clear of the
           home-indicator gesture area on notched phones. */}

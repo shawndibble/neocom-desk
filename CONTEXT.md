@@ -590,7 +590,8 @@
 
 - The desktop rail's Character block moves from above the nav groups to a
   **pinned footer**, and stops being a link to `/characters`: it is a menu
-  now (ADR 0004's `DropdownMenu`, the app's first call site) holding
+  now (ADR 0004's `DropdownMenu`, as the plan editor's export menu already
+  does) holding
   **Characters** and **Settings**, both of which leave the rail proper. Its
   accessible name is the pilot's own name — Radix supplies
   `aria-haspopup="menu"`, so a wrapper label would only make the name less

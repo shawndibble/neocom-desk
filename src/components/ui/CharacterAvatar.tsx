@@ -1,7 +1,10 @@
 import { characterPortraitUrl } from '@/lib/eveImages';
 import { cx } from '@/lib/cx';
-
-export type CharacterAvatarSize = 'sm' | 'md' | 'lg';
+import {
+  CHARACTER_AVATAR_SIZE,
+  characterAvatarBoxClassName,
+  type CharacterAvatarSize,
+} from './characterAvatarBox';
 
 interface CharacterAvatarProps {
   characterId: number;
@@ -18,13 +21,6 @@ interface CharacterAvatarProps {
   className?: string;
 }
 
-/** Rendered box size, and the portrait the image server should return for it. */
-const SIZE: Record<CharacterAvatarSize, { className: string; px: number; source: 64 | 128 }> = {
-  sm: { className: 'size-7', px: 28, source: 64 },
-  md: { className: 'size-8', px: 32, source: 64 },
-  lg: { className: 'size-16', px: 64, source: 128 },
-};
-
 /**
  * ESI portrait. Decorative by default: the nav sites sit beside a text label
  * that already names the Character, so `alt` would repeat it — pass one only
@@ -38,7 +34,7 @@ export function CharacterAvatar({
   loading = 'eager',
   className = '',
 }: CharacterAvatarProps) {
-  const { className: box, px, source } = SIZE[size];
+  const { px, source } = CHARACTER_AVATAR_SIZE[size];
   return (
     <img
       src={characterPortraitUrl(characterId, source)}
@@ -49,9 +45,8 @@ export function CharacterAvatar({
       loading={loading}
       decoding="async"
       className={cx(
-        'shrink-0 rounded-xs border',
+        characterAvatarBoxClassName(size),
         selected ? 'border-accent' : 'border-line',
-        box,
         className
       )}
     />
