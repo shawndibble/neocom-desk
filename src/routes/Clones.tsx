@@ -139,7 +139,6 @@ export function Clones() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <OverviewSubNav />
       <PageHeader
         title={t('clones.title')}
         meta={clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
@@ -154,6 +153,7 @@ export function Clones() {
           </>
         }
       />
+      <OverviewSubNav />
 
       {loading ? (
         <div className="flex justify-center py-16">

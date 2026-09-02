@@ -132,6 +132,13 @@ function locationLabel(
       : t('assets.inSpaceLabel', { id: locationId });
   }
   if (locationType === 'item') {
+    // A missing parent is often actually a structure id ESI never returned as
+    // its own asset row (a personal-hangar division inside a player-owned
+    // structure, for instance) — `loadAssetsSnapshot` best-effort resolves
+    // these via the structures endpoint, so a hit here beats every fallback
+    // below.
+    const resolvedName = locationNames.get(locationId);
+    if (resolvedName) return resolvedName;
     // The parent is another asset (container or ship) in this same list; label
     // the group with ITS resolved type name instead of a raw item id.
     const parent = assetsByItemId.get(locationId);
@@ -232,11 +239,30 @@ async function loadAssetsSnapshot(
           assets.filter((a) => a.location_type === 'solar_system').map((a) => a.location_id)
         ),
       ];
-  const [resolvedStations, resolvedStructures, resolvedSystems] = await Promise.all([
-    Promise.all(stationIds.map((id) => loadStationName(id))),
-    Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
-    Promise.all(systemIds.map((id) => loadSystemName(id))),
-  ]);
+  // A `location_type: "item"` asset whose location_id matches no item_id in
+  // this same fetch has a parent ESI never returned a row for — most often a
+  // personal-hangar division inside a player-owned structure, which the
+  // structures endpoint still resolves even though it never appears as its
+  // own asset row. Cheap to try (only ever hit once per distinct missing
+  // parent) and harmless to miss: an unresolvable id just 403/404s, same as
+  // today's silent fallback.
+  const itemIds = signal.cancelled ? new Set<number>() : new Set(assets.map((a) => a.item_id));
+  const orphanParentIds = signal.cancelled
+    ? []
+    : [
+        ...new Set(
+          assets
+            .filter((a) => a.location_type === 'item' && !itemIds.has(a.location_id))
+            .map((a) => a.location_id)
+        ),
+      ];
+  const [resolvedStations, resolvedStructures, resolvedSystems, resolvedOrphanParents] =
+    await Promise.all([
+      Promise.all(stationIds.map((id) => loadStationName(id))),
+      Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
+      Promise.all(systemIds.map((id) => loadSystemName(id))),
+      Promise.all(orphanParentIds.map((id) => loadStructureName(characterId, id))),
+    ]);
   const locationNames = new Map<number, string>();
   stationIds.forEach((id, i) => {
     const name = resolvedStations[i];
@@ -248,6 +274,10 @@ async function loadAssetsSnapshot(
   });
   systemIds.forEach((id, i) => {
     const name = resolvedSystems[i];
+    if (name) locationNames.set(id, name);
+  });
+  orphanParentIds.forEach((id, i) => {
+    const name = resolvedOrphanParents[i];
     if (name) locationNames.set(id, name);
   });
 
@@ -312,6 +342,24 @@ async function loadCrossCharacterNames(
     ];
     await Promise.all(
       structureIds.map(async (id) => {
+        const name = await loadStructureName(entry.characterId, id);
+        if (name) locationNames.set(id, name);
+      })
+    );
+
+    // Same best-effort orphan-parent resolution as `loadAssetsSnapshot` — see
+    // its comment. Scoped per-entry since a missing parent is ACL-checked
+    // under the Character whose asset actually sits there.
+    const itemIds = new Set(entry.assets.map((a) => a.item_id));
+    const orphanParentIds = [
+      ...new Set(
+        entry.assets
+          .filter((a) => a.location_type === 'item' && !itemIds.has(a.location_id))
+          .map((a) => a.location_id)
+      ),
+    ];
+    await Promise.all(
+      orphanParentIds.map(async (id) => {
         const name = await loadStructureName(entry.characterId, id);
         if (name) locationNames.set(id, name);
       })
@@ -452,12 +500,18 @@ function estimateRowHeight(row: BrowseRow): number {
 /**
  * An orphan group: `buildAssetTree` promotes an asset whose parent wasn't in
  * the fetched page to its own top-level group, which is why a bare "Container"
- * or a ship name can appear beside real stations. They are real assets and
- * must stay reachable, but they are not locations, so they get their own
- * section rather than being sorted in among stations.
+ * or a ship name can appear beside real stations. Most such parents really are
+ * unresolvable (a cycle, or a page never fetched), but some are structure ids
+ * ESI just never returns an asset row for (a personal-hangar division inside a
+ * player-owned structure) — `loadAssetsSnapshot` best-effort resolves those via
+ * the structures endpoint, and a hit there means this is a real, named
+ * location after all, not an orphan.
  */
-function isUnresolvedParent(station: AssetTreeStation): boolean {
-  return station.locationType === 'item';
+function isUnresolvedParent(
+  station: AssetTreeStation,
+  locationNames: ReadonlyMap<number, string>
+): boolean {
+  return station.locationType === 'item' && !locationNames.has(station.locationId);
 }
 
 /** Character assets, browsed one level at a time. Read-only, cached for offline. */
@@ -819,7 +873,7 @@ export function Assets() {
         key: `l:${station.locationId}`,
         station,
       };
-      if (isUnresolvedParent(station)) orphans.push(row);
+      if (isUnresolvedParent(station, mergedLocationNames)) orphans.push(row);
       else if (pinStateFor(station.locationId) !== 'unpinned') pinned.push(row);
       else rest.push(row);
     }
@@ -864,6 +918,7 @@ export function Assets() {
     sortedTree,
     pins,
     activeCharacterId,
+    mergedLocationNames,
     t,
   ]);
 
@@ -932,13 +987,20 @@ export function Assets() {
   // every station a character owns.
   const jumpsAwayScopedStations = useMemo(() => {
     return sortedTree.filter((station) => {
-      if (isUnresolvedParent(station)) return false;
+      if (isUnresolvedParent(station, mergedLocationNames)) return false;
       if (pinStateFor(station.locationId) !== 'unpinned') return true;
       if (visibleStationLocationIds.has(station.locationId)) return true;
       return station.locationId === pathStationId;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
-  }, [sortedTree, visibleStationLocationIds, pathStationId, pins, activeCharacterId]);
+  }, [
+    sortedTree,
+    visibleStationLocationIds,
+    pathStationId,
+    pins,
+    activeCharacterId,
+    mergedLocationNames,
+  ]);
 
   // Each station's own solar system id (resolved once, then reused across a
   // preference switch) and the resulting jumps-away result per (station,
@@ -1007,14 +1069,22 @@ export function Assets() {
       const systemId =
         station.locationType === 'station'
           ? await loadStationSystemId(station.locationId)
-          : station.locationType === 'other'
+          : station.locationType === 'other' ||
+              // A resolved orphan (see isUnresolvedParent) is a structure id in
+              // every case seen so far, so its system comes from the same call
+              // that already resolved its name.
+              (station.locationType === 'item' && mergedLocationNames.has(station.locationId))
             ? await loadStructureSystemId(activeCharacterId, station.locationId)
-            : null;
+            : // `location_type: "solar_system"` already *is* the system id —
+              // nothing to fetch.
+              station.locationType === 'solar_system'
+              ? station.locationId
+              : null;
       if (activeCharacterIdRef.current === requestedForCharacterId) {
         setStationSystemIds((prev) => new Map(prev).set(station.locationId, systemId));
       }
     });
-  }, [activeCharacterId, jumpsAwayScopedStations, stationSystemIds]);
+  }, [activeCharacterId, jumpsAwayScopedStations, stationSystemIds, mergedLocationNames]);
 
   useEffect(() => {
     if (activeCharacterId === null || !characterLocationResolved) return;
@@ -1322,20 +1392,21 @@ export function Assets() {
                       </span>
                     )}
                   </div>
-                  {resolved.station && !isUnresolvedParent(resolved.station) && (
-                    <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-faint sm:flex">
-                      <SecurityValue
-                        security={securityForStation(resolved.station.locationId)}
-                        t={t}
-                      />
-                      <JumpsAwayText
-                        result={jumpsAwayByKey.get(
-                          `${resolved.station.locationId}:${routePreference}`
-                        )}
-                        t={t}
-                      />
-                    </span>
-                  )}
+                  {resolved.station &&
+                    !isUnresolvedParent(resolved.station, mergedLocationNames) && (
+                      <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-faint sm:flex">
+                        <SecurityValue
+                          security={securityForStation(resolved.station.locationId)}
+                          t={t}
+                        />
+                        <JumpsAwayText
+                          result={jumpsAwayByKey.get(
+                            `${resolved.station.locationId}:${routePreference}`
+                          )}
+                          t={t}
+                        />
+                      </span>
+                    )}
                   {currentTotals && (
                     <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
                       <span className="hidden sm:inline">
@@ -1446,6 +1517,7 @@ export function Assets() {
                             onToggleSelection={toggleNodeSelection}
                             stationLabelFor={stationLabelFor}
                             nodeLabel={nodeLabel}
+                            locationNames={mergedLocationNames}
                             securityForStation={securityForStation}
                             jumpsAwayFor={(locationId) =>
                               jumpsAwayByKey.get(`${locationId}:${routePreference}`)
@@ -1489,6 +1561,7 @@ interface BrowseRowViewProps {
   onToggleSelection: (ids: readonly number[]) => void;
   stationLabelFor: (station: AssetTreeStation) => string;
   nodeLabel: (node: AssetTreeNode) => string;
+  locationNames: ReadonlyMap<number, string>;
   securityForStation: (locationId: number) => number | null | undefined;
   jumpsAwayFor: (locationId: number) => JumpsAwayResult | undefined;
   pinStateFor: (locationId: number) => PinState;
@@ -1509,7 +1582,7 @@ function BrowseRowView(props: BrowseRowViewProps) {
 
   if (row.kind === 'location') {
     const { station } = row;
-    const orphan = isUnresolvedParent(station);
+    const orphan = isUnresolvedParent(station, props.locationNames);
     return (
       <LocationRow
         href={assetPathHref(station.locationId, [])}
