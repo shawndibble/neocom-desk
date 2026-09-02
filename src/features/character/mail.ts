@@ -2,8 +2,10 @@
 import {
   getCharacterMailHeaders,
   getCharacterMail,
+  getCharacterMailLabels,
   type MailHeader,
   type MailBody,
+  type MailLabels,
 } from '@/esi/endpoints';
 import {
   loadWithCache,
@@ -14,6 +16,7 @@ import {
 
 const KEYS = {
   headers: 'mail:headers',
+  labels: 'mail:labels',
   body: (mailId: number) => `mail:${mailId}`,
 } as const;
 
@@ -27,6 +30,15 @@ export function loadMailHeaders(characterId: number): Promise<StatusResult<MailH
     characterId,
     KEYS.headers,
     async () => (await getCharacterMailHeaders(characterId)).data
+  );
+}
+
+/** System + Custom Labels with unread counts, for the tab bar (CONTEXT.md round 18). ESI or cache. */
+export function loadMailLabels(characterId: number): Promise<StatusResult<MailLabels>> {
+  return loadWithCacheStatus(
+    characterId,
+    KEYS.labels,
+    async () => (await getCharacterMailLabels(characterId)).data
   );
 }
 

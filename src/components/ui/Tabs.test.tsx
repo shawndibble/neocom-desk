@@ -23,6 +23,22 @@ describe('Tabs', () => {
     expect(onChange).toHaveBeenCalledWith('history');
   });
 
+  it('renders a badge next to a tab label when one is given', () => {
+    render(
+      <Tabs
+        tabs={[
+          { id: 'open', label: 'Open', badge: 3 },
+          { id: 'history', label: 'History' },
+        ]}
+        value="open"
+        onChange={() => undefined}
+      />
+    );
+    const openTab = screen.getByRole('tab', { name: /Open/ });
+    expect(openTab).toHaveTextContent('3');
+    expect(screen.getByRole('tab', { name: 'History' })).not.toHaveTextContent(/\d/);
+  });
+
   it('moves selection with arrow keys, wrapping', async () => {
     const onChange = vi.fn();
     render(<Tabs tabs={tabs} value="open" onChange={onChange} />);

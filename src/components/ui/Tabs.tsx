@@ -3,6 +3,8 @@ import { useRef } from 'react';
 export interface TabItem {
   id: string;
   label: string;
+  /** Rendered next to the label, e.g. an unread count. Omit for no badge. */
+  badge?: number;
 }
 
 interface TabsProps {
@@ -54,6 +56,11 @@ export function Tabs({ tabs, value, onChange, label, className = '' }: TabsProps
             }`}
           >
             {tab.label}
+            {tab.badge !== undefined && tab.badge > 0 && (
+              <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[0.625rem] font-semibold text-panel tabular-nums">
+                {tab.badge}
+              </span>
+            )}
           </button>
         );
       })}

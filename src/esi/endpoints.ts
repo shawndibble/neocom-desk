@@ -470,6 +470,32 @@ export function getCharacterMail(
   });
 }
 
+// --- GET /characters/{character_id}/mail/labels (esi-mail.read_mail.v1) ---
+
+/** One of the character's mail labels — the four built-in System Labels plus any Custom Labels (out of scope for v1, see engine/mail.ts). */
+export interface MailLabel {
+  label_id: number;
+  name?: string;
+  unread_count?: number;
+  color?: string;
+}
+
+export interface MailLabels {
+  labels?: MailLabel[];
+  total_unread_count?: number;
+}
+
+export function getCharacterMailLabels(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<MailLabels>> {
+  return esiFetch<MailLabels>(`/characters/${characterId}/mail/labels`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterMailLabels',
+  });
+}
+
 // --- GET /markets/prices (public) ---
 
 export interface MarketPrice {

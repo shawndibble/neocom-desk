@@ -97,6 +97,10 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/mail/{mail_id}',
     scope: 'esi-mail.read_mail.v1',
   },
+  getCharacterMailLabels: {
+    route: '/characters/{character_id}/mail/labels',
+    scope: 'esi-mail.read_mail.v1',
+  },
   getCharacterCalendar: {
     route: '/characters/{character_id}/calendar',
     scope: 'esi-calendar.read_calendar_events.v1',
