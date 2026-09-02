@@ -23,10 +23,9 @@ Implement the work described in the spec or ticket you were given. Do not reopen
    the iterative core of the phase and stays inline — each cycle depends on
    the real result of the last one, so splitting it across sub-agent calls
    would pay a fresh sub-agent-startup cost per cycle instead of once.
-3. Typecheck often (`npm run typecheck`); run single test files as you go (`npx vitest run <path>`).
-4. Run the full validation once, at the end: `node scripts/next-ticket/gate.mjs --build` (runs format:check/lint/typecheck/test:run concurrently, then build). `npm run format` auto-fixes formatting.
-5. Run `/code-review` against the merge-base with `main` — its two axes run as parallel sub-agents, never inline. Address hard Standards violations and missing/wrong Spec findings.
-6. Commit to the current branch. Conventional Commit subject; body ends with `Closes #<n>`.
+3. Typecheck often (`npm run typecheck`); run single test files as you go (`npx vitest run <path>`). Never run the full suite (`npm run test:run`) or `npm run build` locally — CI runs those on the PR.
+4. Run `/code-review` against the merge-base with `main` — its two axes run as parallel sub-agents, never inline. Address hard Standards violations and missing/wrong Spec findings.
+5. Commit to the current branch. Conventional Commit subject; body ends with `Closes #<n>`. A pre-commit hook (`lint-staged`: eslint --fix + prettier --write on staged files, then `npm run typecheck`) runs automatically — if it rejects the commit, fix the reported issue and re-commit.
 
 ## Keeping the context small
 
@@ -37,8 +36,9 @@ this reason (measured: sub-agent turns run at roughly half the per-turn cost
 of a main-thread turn at this point in a run). What's left inline is the
 TDD loop itself, which can't be delegated the same way — so within it: gather
 all the changes you intend to make to a file and apply them in a single edit
-rather than a stream of small ones, and run the validation gate as one script
-call (beat 4), not a manual chain.
+rather than a stream of small ones. There's no full-suite gate to run here
+any more — the pre-commit hook covers lint/format/typecheck at beat 5's
+commit, and CI covers the rest.
 
 ## This repo
 
