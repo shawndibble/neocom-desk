@@ -213,3 +213,33 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
     }
   });
 });
+
+describe('EntryList band headers (#115)', () => {
+  it('renders a priority band header', () => {
+    const rows = [entryRow(1, [0])];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map([[rows[0].id, { kind: 'priority', priority: 'high' }]])}
+        {...defaultProps}
+      />
+    );
+    expect(screen.getByText('High priority')).toBeInTheDocument();
+  });
+
+  it('renders an attribute-pair band header', () => {
+    const rows = [entryRow(1, [0])];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={
+          new Map([
+            [rows[0].id, { kind: 'attributePair', primary: 'perception', secondary: 'willpower' }],
+          ])
+        }
+        {...defaultProps}
+      />
+    );
+    expect(screen.getByText('PER/WIL attributes')).toBeInTheDocument();
+  });
+});

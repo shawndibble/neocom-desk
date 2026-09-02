@@ -23,6 +23,11 @@ import { formatDate, formatDuration, stepTimeline } from '@/lib/duration';
 import type { ColumnVisibility } from './columnPreference';
 import type { MergedRow } from './queueRows';
 
+/** A band header's grouping (#115): either mode carries enough to render its label. */
+export type BandInfo =
+  | { kind: 'priority'; priority: PlanPriority }
+  | { kind: 'attributePair'; primary: AttributeName; secondary: AttributeName };
+
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const ICON_BUTTON = 'w-7 justify-center';
 /** Matches Layout.tsx's phone/desktop line (#114). */
@@ -112,16 +117,21 @@ function PerLevelTimeCell({
 }
 
 interface BandHeaderProps {
-  priority: PlanPriority;
+  band: BandInfo;
 }
 
-/** Divider marking where a run of same-priority entries begins (#27). */
-function BandHeader({ priority }: BandHeaderProps) {
+/** Divider marking where a run of same-priority (#27) or same-attribute-pair (#115) entries begins. */
+function BandHeader({ band }: BandHeaderProps) {
   const { t } = useTranslation();
-  const label = t(priorityLabelKey(priority));
+  const text =
+    band.kind === 'priority'
+      ? t('plans.priorityBand', { label: t(priorityLabelKey(band.priority)) })
+      : t('plans.attributePairBand', {
+          pair: attributePairLabel(band.primary, band.secondary),
+        });
   return (
     <li className="border-b border-line bg-panel-2 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-text-dim">
-      {t('plans.priorityBand', { label })}
+      {text}
     </li>
   );
 }
@@ -440,8 +450,8 @@ function MarkerRow({ id, markerIndex, onRemove }: MarkerRowProps) {
 interface EntryListProps {
   /** Pre-merged entry + marker + prereq rows (see queueRows.ts), in schedule order. */
   rows: readonly MergedRow[];
-  /** Row ids that start a new priority band (#27), from placeBandHeaders — may key a prereq row's id when that entry has leading prereq rows. */
-  bandsAt: ReadonlyMap<string, PlanPriority>;
+  /** Row ids that start a new band (#27, #115), from placeBandHeaders — may key a prereq row's id when that entry has leading prereq rows. */
+  bandsAt: ReadonlyMap<string, BandInfo>;
   nameFor: (skillTypeID: number) => string;
   /** A skill's primary/secondary attribute pair, when known (#114). */
   attributesFor: (
@@ -519,7 +529,7 @@ export function EntryList({
               const band = bandsAt.get(row.id);
               return (
                 <Fragment key={row.id}>
-                  {band && <BandHeader priority={band} />}
+                  {band && <BandHeader band={band} />}
                   {row.kind === 'entry' && (
                     <EntryRow
                       row={row}

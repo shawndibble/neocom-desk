@@ -208,3 +208,23 @@ describe('PlanEditor toolbar reorganization', () => {
     expect(screen.getByRole('heading', { name: 'Optimize remaps' })).toBeInTheDocument();
   });
 });
+
+describe('PlanEditor grouping toggle (#115)', () => {
+  it('defaults to Priority band headers', () => {
+    renderEditor();
+
+    expect(screen.getByText('High priority')).toBeInTheDocument();
+  });
+
+  it('switching to Attribute pair regroups the entry list without updating the plan', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+
+    await user.selectOptions(screen.getByLabelText('Group by'), 'Attribute pair');
+
+    expect(screen.queryByText('High priority')).not.toBeInTheDocument();
+    expect(screen.getByText('PER/WIL attributes')).toBeInTheDocument();
+    expect(screen.getByText('INT/MEM attributes')).toBeInTheDocument();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+});
