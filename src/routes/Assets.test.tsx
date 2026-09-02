@@ -184,6 +184,37 @@ describe('Assets', () => {
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
+  it('resolves a solar-system location to its name instead of a raw system id', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        if (page === '2') return HttpResponse.json(assetPage2, { headers: { 'X-Pages': '2' } });
+        return HttpResponse.json(
+          [
+            ...assetPage1,
+            {
+              item_id: 3,
+              type_id: 650,
+              quantity: 1,
+              location_id: 30003889,
+              location_type: 'solar_system' as const,
+              location_flag: 'Hangar',
+              is_singleton: true,
+            },
+          ],
+          { headers: { 'X-Pages': '2' } }
+        );
+      }),
+      http.get('https://esi.evetech.net/universe/systems/30003889', () =>
+        HttpResponse.json({ system_id: 30003889, name: 'Amamake', security_status: 0.3 })
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('In space (Amamake)')).toBeInTheDocument();
+  });
+
   it('labels a container/ship parent with its resolved type name instead of a raw item id', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
