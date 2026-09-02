@@ -39,7 +39,7 @@ import {
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
-import { loadSystemSecurity } from '@/features/character/systemSecurity';
+import { loadSystemSecurity, loadSystemName } from '@/features/character/systemSecurity';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadJumpsAway } from '@/features/character/routeDistance';
@@ -125,7 +125,12 @@ function locationLabel(
     return locationNames.get(locationId) ?? t('assets.stationLabel', { id: locationId });
   if (locationType === 'other')
     return locationNames.get(locationId) ?? t('assets.structureLabel', { id: locationId });
-  if (locationType === 'solar_system') return t('assets.inSpaceLabel', { id: locationId });
+  if (locationType === 'solar_system') {
+    const name = locationNames.get(locationId);
+    return name
+      ? t('assets.inSpaceNamedLabel', { name })
+      : t('assets.inSpaceLabel', { id: locationId });
+  }
   if (locationType === 'item') {
     // The parent is another asset (container or ship) in this same list; label
     // the group with ITS resolved type name instead of a raw item id.
@@ -220,9 +225,17 @@ async function loadAssetsSnapshot(
   const structureIds = signal.cancelled
     ? []
     : [...new Set(assets.filter((a) => a.location_type === 'other').map((a) => a.location_id))];
-  const [resolvedStations, resolvedStructures] = await Promise.all([
+  const systemIds = signal.cancelled
+    ? []
+    : [
+        ...new Set(
+          assets.filter((a) => a.location_type === 'solar_system').map((a) => a.location_id)
+        ),
+      ];
+  const [resolvedStations, resolvedStructures, resolvedSystems] = await Promise.all([
     Promise.all(stationIds.map((id) => loadStationName(id))),
     Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
+    Promise.all(systemIds.map((id) => loadSystemName(id))),
   ]);
   const locationNames = new Map<number, string>();
   stationIds.forEach((id, i) => {
@@ -231,6 +244,10 @@ async function loadAssetsSnapshot(
   });
   structureIds.forEach((id, i) => {
     const name = resolvedStructures[i];
+    if (name) locationNames.set(id, name);
+  });
+  systemIds.forEach((id, i) => {
+    const name = resolvedSystems[i];
     if (name) locationNames.set(id, name);
   });
 
@@ -275,6 +292,17 @@ async function loadCrossCharacterNames(
   const resolvedStations = await Promise.all(stationIds.map((id) => loadStationName(id)));
   stationIds.forEach((id, i) => {
     const name = resolvedStations[i];
+    if (name) locationNames.set(id, name);
+  });
+
+  const systemIds = [
+    ...new Set(
+      allAssets.filter((a) => a.location_type === 'solar_system').map((a) => a.location_id)
+    ),
+  ];
+  const resolvedSystems = await Promise.all(systemIds.map((id) => loadSystemName(id)));
+  systemIds.forEach((id, i) => {
+    const name = resolvedSystems[i];
     if (name) locationNames.set(id, name);
   });
 

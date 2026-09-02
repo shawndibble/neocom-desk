@@ -503,6 +503,7 @@
     "stationLabel": "Station #{{id}}",
     "structureLabel": "Structure #{{id}}",
     "inSpaceLabel": "In space (system #{{id}})",
+    "inSpaceNamedLabel": "In space ({{name}})",
     "containerLabel": "Container",
     "exportCsv": "Export CSV",
     "csvLocation": "Location",
