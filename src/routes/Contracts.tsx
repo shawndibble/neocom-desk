@@ -5,11 +5,12 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  IconButton,
+  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
   type DataTableColumn,
-  IconButton,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -153,33 +154,35 @@ export function Contracts() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('contracts.title')}</h1>
-        <div className="flex items-center gap-2">
-          {contractsResult && <DataAgeBadge date={contractsResult.fetchedAt} />}
-          <IconButton
-            icon={<Icon.Download />}
-            label={t('contracts.exportCsv')}
-            disabled={contracts.length === 0}
-            onClick={() =>
-              downloadCsv(
-                'contracts',
-                contracts,
-                contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`),
-                new Date(),
-                contractsTruncated
-              )
-            }
-          />
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('contracts.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        </div>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('contracts.title')}
+        meta={contractsResult && <DataAgeBadge date={contractsResult.fetchedAt} />}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Download />}
+              label={t('contracts.exportCsv')}
+              disabled={contracts.length === 0}
+              onClick={() =>
+                downloadCsv(
+                  'contracts',
+                  contracts,
+                  contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`),
+                  new Date(),
+                  contractsTruncated
+                )
+              }
+            />
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('contracts.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center py-16">

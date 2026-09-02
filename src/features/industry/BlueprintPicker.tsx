@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { SearchInput } from '@/components/ui';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { searchByProductName } from './blueprintCatalog';
 
@@ -23,13 +24,11 @@ export function BlueprintPicker({ catalog, onPick, className = '' }: BlueprintPi
 
   return (
     <div className={className}>
-      <input
-        type="text"
+      <SearchInput
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t('industry.searchPlaceholder')}
         aria-label={t('industry.addPlan')}
-        className="h-8 w-full rounded-xs border border-line bg-panel-2 px-2 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
       />
       {results.length > 0 && (
         <ul className="mt-1 max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">

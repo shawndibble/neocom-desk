@@ -8,8 +8,10 @@ import {
   DataAgeBadge,
   EmptyState,
   IconButton,
+  PageHeader,
   Panel,
   ReauthBanner,
+  SearchInput,
   Select,
   SelectContent,
   SelectItem,
@@ -1176,54 +1178,50 @@ export function Assets() {
         'h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)]'
       )}
     >
-      <header className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('assets.title')}</h1>
-        {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
-        <div className="ml-auto flex items-center gap-1.5">
-          {crossCharacterSearch && crossCharacterLoading && (
-            <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
-          )}
-          <IconButton
-            icon={<Icon.AllCharacters />}
-            label={t('assets.crossCharacterToggle')}
-            pressed={crossCharacterSearch}
-            onClick={() => setCrossCharacterSearch((v) => !v)}
-          />
-          <IconButton
-            icon={<Icon.Select />}
-            label={t('assets.select.toggle')}
-            pressed={selectMode}
-            onClick={toggleSelectMode}
-          />
-          <IconButton
-            icon={<Icon.Download />}
-            label={t('assets.exportCsv')}
-            disabled={csvGroups.length === 0}
-            onClick={handleExportCsv}
-          />
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('assets.refresh')}
-            disabled={loading}
-            onClick={refresh}
-          />
-        </div>
-      </header>
+      <PageHeader
+        title={t('assets.title')}
+        meta={assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+        actions={
+          <>
+            <div className="ml-auto flex items-center gap-1.5">
+              {crossCharacterSearch && crossCharacterLoading && (
+                <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
+              )}
+              <IconButton
+                icon={<Icon.AllCharacters />}
+                label={t('assets.crossCharacterToggle')}
+                pressed={crossCharacterSearch}
+                onClick={() => setCrossCharacterSearch((v) => !v)}
+              />
+              <IconButton
+                icon={<Icon.Select />}
+                label={t('assets.select.toggle')}
+                pressed={selectMode}
+                onClick={toggleSelectMode}
+              />
+              <IconButton
+                icon={<Icon.Download />}
+                label={t('assets.exportCsv')}
+                disabled={csvGroups.length === 0}
+                onClick={handleExportCsv}
+              />
+              <IconButton
+                icon={<Icon.Refresh />}
+                label={t('assets.refresh')}
+                disabled={loading}
+                onClick={refresh}
+              />
+            </div>
+          </>
+        }
+      />
 
       {!loading && assetsResult && !assetsNeedsReauth && (
-        <div className="relative">
-          <Icon.Search
-            size={Icon.ICON_SIZE.md}
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-faint"
-          />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('assets.searchPlaceholder')}
-            className="h-11 w-full rounded-xs border border-line bg-panel-2 pr-3 pl-10 text-sm text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent md:h-9"
-          />
-        </div>
+        <SearchInput
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('assets.searchPlaceholder')}
+        />
       )}
 
       {selectMode && selectedIds.size > 0 && (

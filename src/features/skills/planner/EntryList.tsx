@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Tooltip } from '@/components/ui';
+import { Button, EmptyState, NativeSelect, Tooltip } from '@/components/ui';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { AttributeName, PlanPriority } from '@/engine/types';
 import { formatDate, formatDuration, stepTimeline } from '@/lib/duration';
@@ -236,18 +236,18 @@ function EntryRow({
     ) : null;
 
   const priorityControl = columns.priority ? (
-    <select
+    <NativeSelect
+      size="sm"
       aria-label={t('plans.priorityLabel', { name })}
       value={entry.priority ?? 'normal'}
       onChange={(e) => onSetPriority(entry.skillTypeID, e.target.value as PlanPriority)}
-      className="h-6 rounded-xs border border-line bg-panel-2 px-1 text-text"
     >
       {PRIORITY_ORDER.map((priority) => (
         <option key={priority} value={priority}>
           {t(priorityLabelKey(priority))}
         </option>
       ))}
-    </select>
+    </NativeSelect>
   ) : null;
 
   const cumulativeTimeCell = columns.cumulativeTime ? (

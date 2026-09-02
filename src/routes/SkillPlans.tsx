@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
-import { EmptyState, Panel, Spinner } from '@/components/ui';
+import { EmptyState, PageHeader, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useSyncStatus } from '@/app/useSyncStatus';
@@ -30,7 +30,8 @@ export function SkillPlans() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader title={t('nav.skills')} />
       <SkillsSubNav />
       {isSyncConfigured() && <SyncErrorNote {...syncStatus} />}
 

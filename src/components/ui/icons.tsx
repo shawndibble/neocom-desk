@@ -16,6 +16,8 @@
 
 import {
   ArrowClockwise,
+  ArrowDown,
+  ArrowUp,
   ArrowsLeftRight,
   CaretDown,
   CaretLeft,
@@ -69,8 +71,12 @@ export const Back = withWeight(CaretLeft);
 export const Descend = withWeight(CaretRight);
 /** A disclosure that is currently open. */
 export const Expanded = withWeight(CaretDown);
-/** Sort control. */
+/** A column that can be sorted but currently isn't. */
 export const Sort = withWeight(CaretUpDown);
+/** Ascending: a sorted-ascending column, or "move this row up". */
+export const Ascending = withWeight(ArrowUp);
+/** Descending: a sorted-descending column, or "move this row down". */
+export const Descending = withWeight(ArrowDown);
 /** Re-fetch from ESI. */
 export const Refresh = withWeight(ArrowClockwise);
 /** Download the current view as CSV. */

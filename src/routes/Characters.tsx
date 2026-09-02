@@ -9,6 +9,8 @@ import {
   DataAgeBadge,
   EmptyState,
   FilterChip,
+  IconButton,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -16,8 +18,10 @@ import {
   SelectValue,
   Spinner,
   StatChip,
+  TextInput,
   type StatChipTone,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
@@ -132,6 +136,7 @@ function CharacterCard({
           }
         >
           <SelectTrigger
+            size="sm"
             aria-label={t('characters.groupFor', { name: character.name })}
             className="w-32 shrink-0"
           >
@@ -190,8 +195,9 @@ function GroupSectionHeader({
   return (
     <div className="flex items-center gap-2">
       {renaming ? (
-        <input
+        <TextInput
           autoFocus
+          size="sm"
           value={draftName}
           aria-label={t('characters.renameGroup')}
           onChange={(e) => setDraftName(e.target.value)}
@@ -203,7 +209,7 @@ function GroupSectionHeader({
               setRenaming(false);
             }
           }}
-          className="h-7 flex-1 rounded-xs border border-line bg-panel-2 px-1.5 text-sm text-text"
+          className="flex-1"
         />
       ) : (
         <h2
@@ -213,38 +219,40 @@ function GroupSectionHeader({
           {group.name}
         </h2>
       )}
-      <Button
+      {/* Icon actions, like every other editable-row header in the app (the
+          Skill Plan and Build Plan lists): the group name is the row, the
+          actions are the adornment, and four labelled buttons left the name
+          nothing on a phone. Each label names the group so a screen reader
+          hears which one it is on. */}
+      <IconButton
         size="sm"
+        icon={<Icon.Ascending />}
+        label={t('characters.moveGroupUp', { name: group.name })}
         onClick={() => onMove(index, -1)}
         disabled={index === 0}
-        aria-label={t('characters.moveGroupUp', { name: group.name })}
-      >
-        ▲
-      </Button>
-      <Button
+      />
+      <IconButton
         size="sm"
+        icon={<Icon.Descending />}
+        label={t('characters.moveGroupDown', { name: group.name })}
         onClick={() => onMove(index, 1)}
         disabled={index === groupCount - 1}
-        aria-label={t('characters.moveGroupDown', { name: group.name })}
-      >
-        ▼
-      </Button>
-      <Button
+      />
+      <IconButton
         size="sm"
+        icon={<Icon.Rename />}
+        label={`${t('characters.renameGroup')} ${group.name}`}
         onClick={() => setRenaming(true)}
-        aria-label={`${t('characters.renameGroup')} ${group.name}`}
-      >
-        {t('characters.renameGroup')}
-      </Button>
-      <Button
-        variant="danger"
+      />
+      <IconButton
         size="sm"
+        icon={<Icon.Close />}
+        tone="danger"
+        label={`${t('characters.deleteGroup')} ${group.name}`}
         onClick={() => {
           if (window.confirm(t('characters.deleteGroupConfirm'))) onRemove(group.id);
         }}
-      >
-        {t('characters.deleteGroup')}
-      </Button>
+      />
     </div>
   );
 }
@@ -439,13 +447,17 @@ export function Characters() {
   const ungroupedIds = ungroupedCharacterIds(groupsValue.groups, allIds);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <header className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('characters.title')}</h1>
-        <Button variant="primary" size="sm" onClick={() => void beginEveLogin()}>
-          {t('characters.add')}
-        </Button>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('characters.title')}
+        actions={
+          <>
+            <Button variant="primary" size="sm" onClick={() => void beginEveLogin()}>
+              {t('characters.add')}
+            </Button>
+          </>
+        }
+      />
 
       {characters.length === 0 ? (
         <EmptyState title={t('characters.emptyTitle')} hint={t('characters.emptyHint')} />
@@ -457,7 +469,7 @@ export function Characters() {
                 value={sortKey}
                 onValueChange={(value) => setSortKey(value as CharacterSortKey)}
               >
-                <SelectTrigger aria-label={t('characters.sortBy')} className="w-40">
+                <SelectTrigger size="sm" aria-label={t('characters.sortBy')} className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -468,16 +480,16 @@ export function Characters() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button
+              <IconButton
                 size="sm"
-                aria-label={t('characters.sortDirection')}
+                icon={sortDirection === 'asc' ? <Icon.Ascending /> : <Icon.Descending />}
+                label={t('characters.sortDirection')}
                 onClick={() => setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))}
-              >
-                {sortDirection === 'asc' ? '↑' : '↓'}
-              </Button>
+              />
               {addingGroup ? (
-                <input
+                <TextInput
                   autoFocus
+                  size="sm"
                   value={newGroupName}
                   aria-label={t('characters.newGroupName')}
                   onChange={(e) => setNewGroupName(e.target.value)}
@@ -489,7 +501,7 @@ export function Characters() {
                     }
                   }}
                   onBlur={() => void handleCreateGroup()}
-                  className="h-7 w-40 rounded-xs border border-line bg-panel-2 px-1.5 text-sm text-text"
+                  className="w-40"
                 />
               ) : (
                 <Button size="sm" onClick={() => setAddingGroup(true)}>

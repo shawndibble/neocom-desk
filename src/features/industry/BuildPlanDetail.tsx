@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, EmptyState, IconButton, InfoTooltip, Panel } from '@/components/ui';
+import {
+  DataAgeBadge,
+  EmptyState,
+  IconButton,
+  InfoTooltip,
+  NativeSelect,
+  Panel,
+  TextInput,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { FacilityKind, RigLevel, SecurityBand, SkillLevels } from '@/engine/industry/types';
@@ -133,14 +141,13 @@ export function BuildPlanDetail({
             <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="flex flex-col gap-1 text-xs">
                 {t('industry.runs')}
-                <input
+                <TextInput
                   type="number"
                   min={1}
                   value={plan.runs}
                   onChange={(e) =>
                     update({ runs: Math.max(1, Math.round(Number(e.target.value) || 1)) })
                   }
-                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
                 />
               </label>
 
@@ -152,14 +159,13 @@ export function BuildPlanDetail({
                     content={t('industry.meTooltip')}
                   />
                 </span>
-                <input
+                <TextInput
                   id="build-plan-me"
                   type="number"
                   min={0}
                   max={10}
                   value={plan.me}
                   onChange={(e) => update({ me: clampInt(Number(e.target.value), 0, 10) })}
-                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
                 />
                 {ownedMatch && (
                   <span className="text-[0.6875rem] text-text-dim">
@@ -179,14 +185,13 @@ export function BuildPlanDetail({
                     content={t('industry.teTooltip')}
                   />
                 </span>
-                <input
+                <TextInput
                   id="build-plan-te"
                   type="number"
                   min={0}
                   max={20}
                   value={plan.te}
                   onChange={(e) => update({ te: clampInt(Number(e.target.value), 0, 20) })}
-                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
                 />
               </div>
             </div>
@@ -199,7 +204,7 @@ export function BuildPlanDetail({
             <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="flex flex-col gap-1 text-xs">
                 {t('industry.facility')}
-                <select
+                <NativeSelect
                   value={plan.facility}
                   onChange={(e) => {
                     const facility = e.target.value as FacilityKind;
@@ -210,56 +215,52 @@ export function BuildPlanDetail({
                         : { facility, rigLevel: 'none', facilityTaxPct: undefined }
                     );
                   }}
-                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
                 >
                   {Object.values(FACILITY_PRESETS).map((f) => (
                     <option key={f.kind} value={f.kind}>
                       {f.name}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </label>
 
               <label className="flex flex-col gap-1 text-xs">
                 {t('industry.rigLevel')}
-                <select
+                <NativeSelect
                   value={plan.rigLevel}
                   disabled={!facilityPreset.structure}
                   onChange={(e) => update({ rigLevel: e.target.value as RigLevel })}
-                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text disabled:opacity-40"
                 >
                   <option value="none">{t('industry.rigNone')}</option>
                   <option value="t1">{t('industry.rigT1')}</option>
                   <option value="t2">{t('industry.rigT2')}</option>
-                </select>
+                </NativeSelect>
               </label>
 
               <label className="flex flex-col gap-1 text-xs">
                 {t('industry.security')}
-                <select
+                <NativeSelect
                   value={plan.security}
                   onChange={(e) => update({ security: e.target.value as SecurityBand })}
-                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
                 >
                   <option value="highsec">{t('industry.highsec')}</option>
                   <option value="lowsec">{t('industry.lowsec')}</option>
                   <option value="nullsec">{t('industry.nullsec')}</option>
-                </select>
+                </NativeSelect>
               </label>
 
               <label className="flex flex-col gap-1 text-xs">
                 {t('industry.tradeHub')}
-                <select
+                <NativeSelect
                   value={plan.hubId}
                   onChange={(e) => update({ hubId: e.target.value as BuildPlanRecord['hubId'] })}
-                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
                 >
                   {TRADE_HUBS.map((h) => (
                     <option key={h.id} value={h.id}>
                       {h.name}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </label>
 
               {facilityPreset.structure && (
@@ -271,7 +272,7 @@ export function BuildPlanDetail({
                       content={t('industry.facilityTaxTooltip')}
                     />
                   </span>
-                  <input
+                  <TextInput
                     id="build-plan-facility-tax"
                     type="number"
                     min={0}
@@ -281,7 +282,6 @@ export function BuildPlanDetail({
                     onChange={(e) =>
                       update({ facilityTaxPct: Math.max(0, Number(e.target.value) || 0) })
                     }
-                    className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
                   />
                 </div>
               )}

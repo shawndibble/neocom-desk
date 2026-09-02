@@ -9,7 +9,9 @@ import {
   DropdownMenuTrigger,
   InfoTooltip,
   Modal,
+  NativeSelect,
   Panel,
+  TextInput,
   Tooltip,
 } from '@/components/ui';
 import { normalizePlanWithBoundaries } from '@/engine/plan';
@@ -544,8 +546,9 @@ export function PlanEditor({
               label={t('plans.remapCountTooltipLabel')}
               content={t('plans.remapCountTooltip')}
             />
-            <input
+            <TextInput
               id="plan-remap-count"
+              size="sm"
               type="number"
               min={0}
               max={5}
@@ -553,7 +556,7 @@ export function PlanEditor({
               onChange={(e) =>
                 onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
               }
-              className="h-6 w-12 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
+              className="w-14 text-center"
             />
             {remapInfo && (
               <span className="text-text-faint">
@@ -612,11 +615,11 @@ export function PlanEditor({
           <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] text-text-dim">
             <label className="flex items-center gap-1">
               {t('plans.groupBy')}
-              <select
+              <NativeSelect
+                size="sm"
                 aria-label={t('plans.groupBy')}
                 value={groupingMode}
                 onChange={(e) => void setGroupingMode(e.target.value as GroupingMode)}
-                className="h-6 rounded-xs border border-line bg-panel-2 px-1 text-text"
               >
                 {GROUPING_MODES.map((mode) => (
                   <option key={mode} value={mode}>
@@ -625,7 +628,7 @@ export function PlanEditor({
                       : t('plans.groupByAttributePair')}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -739,10 +742,10 @@ export function PlanEditor({
         <div className="flex flex-wrap items-start gap-6">
           <label className="flex items-center gap-2 text-xs">
             {t('plans.whatIfImplants')}
-            <select
+            <NativeSelect
+              size="sm"
               value={whatIfMode}
               onChange={(e) => setWhatIfMode(e.target.value as WhatIfImplantMode)}
-              className="h-7 rounded-xs border border-line bg-panel-2 px-1 text-text"
             >
               {WHAT_IF_IMPLANT_MODES.map((mode) => (
                 <option key={mode} value={mode}>
@@ -753,7 +756,7 @@ export function PlanEditor({
                       : mode}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -769,22 +772,23 @@ export function PlanEditor({
               <>
                 <label className="flex items-center gap-1">
                   {t('plans.boosterBonus')}
-                  <input
+                  <TextInput
+                    size="sm"
                     type="number"
                     min={1}
                     max={9}
                     value={boosterBonus}
                     onChange={(e) => setBoosterBonus(Number(e.target.value) || 0)}
-                    className="h-7 w-14 rounded-xs border border-line bg-panel-2 px-1 text-center text-text"
+                    className="w-16 text-center"
                   />
                 </label>
                 <label className="flex items-center gap-1">
                   {t('plans.boosterExpiresAt')}
-                  <input
+                  <TextInput
+                    size="sm"
                     type="datetime-local"
                     value={boosterExpiresAt}
                     onChange={(e) => setBoosterExpiresAt(e.target.value)}
-                    className="h-7 rounded-xs border border-line bg-panel-2 px-1 text-text"
                   />
                 </label>
                 {boosterExpired && (

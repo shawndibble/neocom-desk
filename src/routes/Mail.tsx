@@ -5,11 +5,12 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
+  IconButton,
+  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
   Tabs,
-  IconButton,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -144,18 +145,20 @@ export function Mail() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('mail.title')}</h1>
-        <div className="flex items-center gap-2">
-          {headersResult && <DataAgeBadge date={headersResult.fetchedAt} />}
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('mail.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        </div>
-      </header>
+      <PageHeader
+        title={t('mail.title')}
+        meta={headersResult && <DataAgeBadge date={headersResult.fetchedAt} />}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('mail.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center py-16">

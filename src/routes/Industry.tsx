@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
 import { markBuildPlanDeleted, scheduleSync } from '@/sync';
-import { EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
+import { EmptyState, PageHeader, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -217,7 +217,8 @@ export function Industry() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader title={t('nav.industry')} />
       <ActiveJobsPanel characterId={activeCharacterId} />
 
       {blueprintsNeedsReauth && (

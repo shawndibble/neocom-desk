@@ -1,7 +1,14 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Panel, FilterChip, DataTable, EmptyState, type DataTableColumn } from '@/components/ui';
+import {
+  DataTable,
+  EmptyState,
+  FilterChip,
+  PageHeader,
+  Panel,
+  type DataTableColumn,
+} from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
@@ -98,8 +105,8 @@ export function Settings() {
   const setScale = useFontScale((state) => state.setValue);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className="text-xl font-semibold tracking-widest uppercase">{t('settings.title')}</h1>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader title={t('settings.title')} />
       <Panel title={t('settings.displayTitle')}>
         <div className="space-y-2">
           <p className="text-xs text-text-dim">{t('settings.fontScaleHint')}</p>
@@ -120,7 +127,12 @@ export function Settings() {
         </div>
       </Panel>
       <Panel title={t('shortcuts.title')}>
-        <dl className="divide-y divide-line text-xs">
+        {/* `max-w-md` inside the full-width page frame: a description and its
+            key are a pair, and at the page's own width `justify-between` threw
+            them a thousand pixels apart with nothing in between. The page
+            keeps one container width app-wide (§3); content that a wide row
+            would make unreadable constrains itself, here. */}
+        <dl className="max-w-md divide-y divide-line text-xs">
           {SHORTCUTS.map((shortcut) => (
             <div key={shortcut.id} className="flex items-center justify-between gap-4 py-2">
               <dt className="text-text-dim">{t(shortcut.descriptionKey)}</dt>

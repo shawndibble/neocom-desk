@@ -9,7 +9,9 @@ import {
   DataTable,
   EmptyState,
   IconButton,
+  PageHeader,
   Spinner,
+  TextInput,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -84,7 +86,8 @@ function SavedComparisonRow({ comparison, onLoad, onDelete, onRename }: SavedCom
   return (
     <li className="flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0">
       {renaming ? (
-        <input
+        <TextInput
+          size="sm"
           autoFocus
           value={draftName}
           aria-label={t('skillCompare.rename')}
@@ -97,7 +100,7 @@ function SavedComparisonRow({ comparison, onLoad, onDelete, onRename }: SavedCom
               setRenaming(false);
             }
           }}
-          className={`h-6 flex-1 rounded-xs border border-line bg-panel-2 px-1 text-text ${FOCUS_RING}`}
+          className="flex-1"
         />
       ) : (
         <button
@@ -268,21 +271,21 @@ export function SkillCompare() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('nav.skills')}
+        actions={
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={selectedIds.length === 0}
+            onClick={handleSave}
+          >
+            {t('skillCompare.saveComparison')}
+          </Button>
+        }
+      />
       <SkillsSubNav />
-      <header className="flex items-center justify-between">
-        <h1 className="text-sm font-semibold tracking-widest text-text uppercase">
-          {t('skillCompare.title')}
-        </h1>
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={selectedIds.length === 0}
-          onClick={handleSave}
-        >
-          {t('skillCompare.saveComparison')}
-        </Button>
-      </header>
 
       <div>
         <h2 className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

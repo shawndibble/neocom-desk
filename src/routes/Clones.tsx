@@ -5,11 +5,12 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  IconButton,
+  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
   type DataTableColumn,
-  IconButton,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -136,19 +137,21 @@ export function Clones() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('clones.title')}</h1>
-        <div className="flex items-center gap-2">
-          {clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('clones.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        </div>
-      </header>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title={t('clones.title')}
+        meta={clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
+        actions={
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('clones.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center py-16">
