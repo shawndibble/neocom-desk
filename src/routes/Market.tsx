@@ -24,6 +24,7 @@ import {
   loadSolarSystems,
   loadMarketRegions,
   loadGlobalMarkets,
+  loadVariations,
 } from '@/sde/loadMarketSde';
 import type {
   MarketGroupNode,
@@ -32,7 +33,9 @@ import type {
   SolarSystemEntry,
   MarketRegionEntry,
   GlobalMarketEntry,
+  VariationData,
 } from '@/sde/marketTypes';
+import { buildVariationIndex } from '@/engine/market/variations';
 import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
@@ -50,8 +53,8 @@ import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
 import { QuickbarList } from '@/features/market/QuickbarList';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
-import { getRelatedItems } from '@/features/market/relatedItems';
-import { RelatedItemsStrip } from '@/features/market/RelatedItemsStrip';
+import { getVariationRows } from '@/features/market/variations';
+import { VariationsTable } from '@/features/market/VariationsTable';
 import {
   addQuickbarItem,
   removeQuickbarItem,
@@ -303,6 +306,7 @@ export function Market() {
   const [solarSystems, setSolarSystems] = useState<SolarSystemEntry[] | null>(null);
   const [marketRegions, setMarketRegions] = useState<MarketRegionEntry[] | null>(null);
   const [globalMarkets, setGlobalMarkets] = useState<GlobalMarketEntry[] | null>(null);
+  const [variationData, setVariationData] = useState<VariationData | null>(null);
   const [catalogueError, setCatalogueError] = useState(false);
 
   // Blueprint catalog for the item context menu's Build Plan action, loaded
@@ -480,8 +484,9 @@ export function Market() {
       loadSolarSystems(),
       loadMarketRegions(),
       loadGlobalMarkets(),
+      loadVariations(),
     ])
-      .then(([g, ty, stations, systems, regions, global]) => {
+      .then(([g, ty, stations, systems, regions, global, variations]) => {
         if (cancelled) return;
         setGroups(g);
         setTypes(ty);
@@ -489,6 +494,7 @@ export function Market() {
         setSolarSystems(systems);
         setMarketRegions(regions);
         setGlobalMarkets(global);
+        setVariationData(variations);
       })
       .catch(() => {
         if (!cancelled) setCatalogueError(true);
@@ -562,6 +568,19 @@ export function Market() {
     for (const list of map.values()) list.sort((a, b) => a.name.localeCompare(b.name));
     return map;
   }, [types]);
+
+  const typesById = useMemo(
+    () => new Map((types ?? []).map((type) => [type.typeId, type])),
+    [types]
+  );
+
+  // Built once per SDE load, not per selection — getVariations is then
+  // O(group size) per call instead of re-scanning the whole types map.
+  const variationIndex = useMemo(
+    () =>
+      variationData ? buildVariationIndex(variationData.types, variationData.metaGroups) : null,
+    [variationData]
+  );
 
   const filterResult = useMemo(
     () => (groups && types ? filterMarketTree(groups, types, query) : null),
@@ -748,7 +767,13 @@ export function Market() {
 
   const catalogueLoading =
     !catalogueError &&
-    (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
+    (!groups ||
+      !types ||
+      !npcStations ||
+      !solarSystems ||
+      !marketRegions ||
+      !globalMarkets ||
+      !variationData);
   const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
   const showBackControl = !isDesktop && selectedTypeId !== null;
   // The Data Age badge reflects the order book, so it only belongs on the
@@ -808,42 +833,46 @@ export function Market() {
       </>
     ) : undefined;
 
-  // Related Items (CONTEXT.md round 6): the selected item's Market Group
-  // siblings, re-anchored whenever selectedItem changes — including a click
-  // on a sibling itself, which just becomes the new selectedItem.
-  const relatedResult = useMemo(
-    () => (selectedItem ? getRelatedItems(typesByGroup, selectedItem) : null),
-    [typesByGroup, selectedItem]
+  // Variations (CONTEXT.md round 6): the selected item's Tech/Meta/Faction
+  // variation group, falling back to Market Group siblings, re-anchored
+  // whenever selectedItem changes — including a click on a row itself, which
+  // just becomes the new selectedItem.
+  const variationsResult = useMemo(
+    () =>
+      selectedItem && variationIndex
+        ? getVariationRows(variationIndex, typesByGroup, typesById, selectedItem)
+        : null,
+    [variationIndex, typesByGroup, typesById, selectedItem]
   );
 
-  const [relatedPrices, setRelatedPrices] = useState<
+  const [variationPrices, setVariationPrices] = useState<
     ReadonlyMap<number, OrderBookSummary | undefined>
   >(new Map());
   // Same "adjusting state when a prop changes" pattern as resetKey above:
-  // clears stale sibling prices the instant the sibling set or the location
-  // changes, in the same render — an Effect would let the old item's prices
-  // flash under the new strip. stationFilter is included so the strip stays
-  // in step with the order-row "filter to this station" action (CONTEXT.md
+  // clears stale row prices the instant the row set or the location changes,
+  // in the same render — an Effect would let the old item's prices flash
+  // under the new table. stationFilter is included so the table stays in
+  // step with the order-row "filter to this station" action (CONTEXT.md
   // round 10) the same way the on-screen tables do; refreshTick deliberately
   // isn't, so a manual refresh updates prices in place instead of blanking
-  // the strip back to a loading state.
-  const relatedResetKey = relatedResult
-    ? `${relatedResult.siblings.map((sibling) => sibling.typeId).join(',')}:${chosenRegionId}:${locationModeValue.mode}:${hub.stationId}:${stationFilter ?? 'none'}`
+  // the table back to a loading state.
+  const variationResetKey = variationsResult
+    ? `${variationsResult.rows.map((row) => row.typeId).join(',')}:${chosenRegionId}:${locationModeValue.mode}:${hub.stationId}:${stationFilter ?? 'none'}`
     : 'none';
-  const [relatedResetForKey, setRelatedResetForKey] = useState<string | null>(null);
-  if (relatedResetKey !== relatedResetForKey) {
-    setRelatedResetForKey(relatedResetKey);
-    setRelatedPrices(new Map());
+  const [variationResetForKey, setVariationResetForKey] = useState<string | null>(null);
+  if (variationResetKey !== variationResetForKey) {
+    setVariationResetForKey(variationResetKey);
+    setVariationPrices(new Map());
   }
 
-  // Fetched independently of the main order book, so a slow sibling price
+  // Fetched independently of the main order book, so a slow row's price
   // never delays the order book's own render (acceptance criteria). Also
   // reruns on refreshTick so a manual Refresh — which clears getOrderBook's
-  // cache — refetches sibling prices too, not just the on-screen tables.
+  // cache — refetches row prices too, not just the on-screen tables.
   useEffect(() => {
     if (
-      !relatedResult ||
-      relatedResult.siblings.length === 0 ||
+      !variationsResult ||
+      variationsResult.rows.length === 0 ||
       !hubHydrated ||
       !locationModeHydrated
     ) {
@@ -851,24 +880,24 @@ export function Market() {
     }
     let cancelled = false;
     void Promise.all(
-      relatedResult.siblings.map(async (sibling) => {
-        const region = resolveOrderBookRegion(sibling.typeId, chosenRegionId, globalMarketsMap);
+      variationsResult.rows.map(async (row) => {
+        const region = resolveOrderBookRegion(row.typeId, chosenRegionId, globalMarketsMap);
         try {
-          const result = await getOrderBook(region.regionId, sibling.typeId);
+          const result = await getOrderBook(region.regionId, row.typeId);
           if (cancelled) return;
           const locationFiltered =
             locationModeValue.mode === 'hub'
               ? filterOrdersByLocation(result.orders, hub.stationId)
               : result.orders;
           const orders = filterOrdersByLocation(locationFiltered, stationFilter);
-          setRelatedPrices((prev) => new Map(prev).set(sibling.typeId, summarizeOrderBook(orders)));
+          setVariationPrices((prev) => new Map(prev).set(row.typeId, summarizeOrderBook(orders)));
         } catch {
-          // A sibling's own price is a nice-to-have next to the order book
-          // that did load; one failed fetch reads as "no orders" rather than
-          // stalling the strip on a spinner forever.
+          // A row's own price is a nice-to-have next to the order book that
+          // did load; one failed fetch reads as "no orders" rather than
+          // stalling the table on a spinner forever.
           if (!cancelled) {
-            setRelatedPrices((prev) =>
-              new Map(prev).set(sibling.typeId, {
+            setVariationPrices((prev) =>
+              new Map(prev).set(row.typeId, {
                 bestSell: null,
                 bestBuy: null,
                 spread: null,
@@ -883,7 +912,7 @@ export function Market() {
       cancelled = true;
     };
   }, [
-    relatedResult,
+    variationsResult,
     chosenRegionId,
     globalMarketsMap,
     locationModeValue.mode,
@@ -1149,12 +1178,12 @@ export function Market() {
                     </div>
                   </div>
 
-                  {relatedResult && (
-                    <RelatedItemsStrip
-                      siblings={relatedResult.siblings}
-                      totalCount={relatedResult.totalCount}
-                      truncated={relatedResult.truncated}
-                      prices={relatedPrices}
+                  {variationsResult && (
+                    <VariationsTable
+                      rows={variationsResult.rows}
+                      totalCount={variationsResult.totalCount}
+                      truncated={variationsResult.truncated}
+                      prices={variationPrices}
                       onSelect={handleSelectItem}
                     />
                   )}
