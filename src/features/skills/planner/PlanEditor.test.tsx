@@ -140,8 +140,17 @@ describe('PlanEditor toolbar reorganization', () => {
       within(toolbarSection).queryByRole('button', { name: 'Import from skill queue' })
     ).toBeNull();
 
-    // Pinned near the top of the entries list, not scrolling away with it.
-    expect(toolbarSection.className).toContain('sticky');
+    // Pinned near the top of the entries list, not scrolling away with it,
+    // stacked below the also-pinned summary strip at a distinct offset so
+    // neither hides the other.
+    const summarySection = screen.getByRole('heading', { name: 'Plan summary' }).closest('section');
+    if (!summarySection) throw new Error('expected summary section');
+
+    expect(summarySection).toHaveClass('lg:sticky', 'lg:top-0');
+    // Distinct, non-zero offset so the toolbar stacks below the summary
+    // strip instead of both claiming `top-0` and overlapping.
+    expect(toolbarSection).toHaveClass('lg:sticky', 'lg:top-[4.625rem]');
+    expect(toolbarSection.className).not.toMatch(/\blg:top-0\b/);
   });
 
   it('collapses Export into one control that reveals "to clipboard" / "to CSV" only after being opened', async () => {

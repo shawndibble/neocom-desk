@@ -575,7 +575,7 @@
     "unresolved": {
       "heading_one": "Location unresolved · {{count}}",
       "heading_other": "Location unresolved · {{count}}",
-      "rowHint": "Parent wasn't in this fetch"
+      "rowHint": "Not among this character's own assets — likely inside a container you don't own (e.g. a corp hangar)"
     },
     "search": {
       "resultCount_one": "{{count}} match",
@@ -591,19 +591,7 @@
       "action": "Back to all locations"
     },
     "nodeBadge_one": "{{count}} item · {{value}} ISK",
-    "nodeBadge_other": "{{count}} items · {{value}} ISK",
-    "detail": {
-      "selectHint": "Select an item to see its details.",
-      "back": "Back to list",
-      "quantity": "Quantity",
-      "volume": "Volume",
-      "volumeUnknown": "Unknown",
-      "volumeValue": "{{volume}} m3",
-      "location": "Location",
-      "jumpsAway": "Jumps away",
-      "value": "Value",
-      "valueAmount": "{{value}} ISK"
-    }
+    "nodeBadge_other": "{{count}} items · {{value}} ISK"
   },
   "mail": {
     "title": "Mail",

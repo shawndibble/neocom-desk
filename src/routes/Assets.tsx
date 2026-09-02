@@ -30,7 +30,6 @@ import {
 } from '@/sync';
 import { db, type QuickbarItem } from '@/db';
 import { cx } from '@/lib/cx';
-import { useIsDesktop } from '@/lib/useIsDesktop';
 import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
 import {
   loadCharacterAssets,
@@ -76,7 +75,6 @@ import {
   toggleSelection,
 } from '@/features/character/assetSelection';
 import {
-  AssetDetailPane,
   ContainerRow,
   ItemRow,
   JumpsAwayText,
@@ -453,12 +451,6 @@ export function Assets() {
   const [search, setSearch] = useState('');
   const searchActive = search.trim().length > 0;
 
-  // Detail pane (issue #160): selecting a leaf item shows its detail beside
-  // the list instead of the old hover/focus tooltip. Narrow screens show one
-  // column at a time, same breakpoint and pattern as Mail/Market/SkillPlans.
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
-  const isDesktop = useIsDesktop();
-
   // Multi-select and bulk actions (issue #90): select mode is off by default and
   // browsing (select mode off) renders exactly as it did before this ticket.
   // Turning select mode off clears the selection rather than merely hiding it.
@@ -768,13 +760,6 @@ export function Assets() {
     return current.location_id;
   }
 
-  // Detail pane (issue #160): the selected leaf asset, if any is still
-  // resolvable — a stale id (e.g. the item left the fetch on refresh) just
-  // falls back to the pane's empty-selection state rather than erroring.
-  const selectedAsset =
-    selectedItemId === null ? null : (assetsByItemId.get(selectedItemId) ?? null);
-  const selectedAssetRootStationId = selectedAsset ? rootStationIdFor(selectedAsset) : null;
-
   const searchMatches = useMemo(
     () => (searchActive ? matchAssets(mergedAssets, mergedTypeNames, search) : []),
     [searchActive, mergedAssets, mergedTypeNames, search]
@@ -874,7 +859,6 @@ export function Assets() {
   // extra API surface.
   useEffect(() => {
     if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
-    setSelectedItemId(null);
   }, [wildcard, searchActive]);
 
   // Jumps-away distances (issue #87): the active character's current solar
@@ -1268,247 +1252,191 @@ export function Assets() {
             </p>
           )}
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-1 gap-3 lg:grid-cols-[1fr_20rem]">
-            <AssetItemActionsContext.Provider value={itemActions}>
-              <Panel
-                padded={false}
-                className={cx(
-                  'flex h-full min-h-0 flex-col',
-                  isDesktop || selectedItemId === null ? '' : 'hidden'
-                )}
-              >
-                {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
-                {searchActive ? (
-                  <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
-                    <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('assets.search.resultCount', { count: searchMatches.length })}
+          <AssetItemActionsContext.Provider value={itemActions}>
+            <Panel padded={false} fill className="flex min-h-0 flex-1 flex-col">
+              {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
+              {searchActive ? (
+                <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
+                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('assets.search.resultCount', { count: searchMatches.length })}
+                  </span>
+                  <IconButton
+                    icon={<Icon.Close />}
+                    label={t('assets.search.clear')}
+                    variant="plain"
+                    size="sm"
+                    className="ml-auto"
+                    onClick={() => setSearch('')}
+                  />
+                </div>
+              ) : pathStationId !== null ? (
+                <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
+                  <IconButton
+                    icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
+                    label={t('assets.breadcrumb.back')}
+                    variant="plain"
+                    onClick={() => void navigate(parentHref)}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-sm font-semibold">
+                      {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
                     </span>
-                    <IconButton
-                      icon={<Icon.Close />}
-                      label={t('assets.search.clear')}
-                      variant="plain"
-                      size="sm"
-                      className="ml-auto"
-                      onClick={() => setSearch('')}
-                    />
-                  </div>
-                ) : pathStationId !== null ? (
-                  <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
-                    <IconButton
-                      icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
-                      label={t('assets.breadcrumb.back')}
-                      variant="plain"
-                      onClick={() => void navigate(parentHref)}
-                    />
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="truncate text-sm font-semibold">
-                        {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
-                      </span>
-                      {crumbs.length > 1 && (
-                        <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-faint">
-                          {crumbs.slice(0, -1).map((crumb, index) => (
-                            <span key={crumb.href} className="flex min-w-0 items-center gap-1">
-                              {index > 0 && <span aria-hidden="true">›</span>}
-                              <Link to={crumb.href} className="truncate hover:text-accent">
-                                {crumb.label}
-                              </Link>
-                            </span>
-                          ))}
-                        </span>
-                      )}
-                    </div>
-                    {resolved.station && !isUnresolvedParent(resolved.station) && (
-                      <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-faint sm:flex">
-                        <SecurityValue
-                          security={securityForStation(resolved.station.locationId)}
-                          t={t}
-                        />
-                        <JumpsAwayText
-                          result={jumpsAwayByKey.get(
-                            `${resolved.station.locationId}:${routePreference}`
-                          )}
-                          t={t}
-                        />
-                      </span>
-                    )}
-                    {currentTotals && (
-                      <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
-                        <span className="hidden sm:inline">
-                          {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
-                        </span>
-                        <span className="text-isk-pos">
-                          {formatIsk(currentTotals.estimatedValue)}
-                        </span>
+                    {crumbs.length > 1 && (
+                      <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-faint">
+                        {crumbs.slice(0, -1).map((crumb, index) => (
+                          <span key={crumb.href} className="flex min-w-0 items-center gap-1">
+                            {index > 0 && <span aria-hidden="true">›</span>}
+                            <Link to={crumb.href} className="truncate hover:text-accent">
+                              {crumb.label}
+                            </Link>
+                          </span>
+                        ))}
                       </span>
                     )}
                   </div>
-                ) : (
-                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
-                    <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('assets.section.locationCount', { count: sortedTree.length })}
+                  {resolved.station && !isUnresolvedParent(resolved.station) && (
+                    <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-faint sm:flex">
+                      <SecurityValue
+                        security={securityForStation(resolved.station.locationId)}
+                        t={t}
+                      />
+                      <JumpsAwayText
+                        result={jumpsAwayByKey.get(
+                          `${resolved.station.locationId}:${routePreference}`
+                        )}
+                        t={t}
+                      />
                     </span>
-                    <div className="ml-auto flex items-center gap-2">
-                      <Select
-                        value={stationSortField}
-                        onValueChange={(value) =>
-                          void setStationSortField(value as StationSortField)
-                        }
-                      >
-                        <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
-                          <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
-                          <SelectItem value="itemCount">
-                            {t('assets.stationSort.itemCount')}
-                          </SelectItem>
-                          <SelectItem value="jumpsAway">
-                            {t('assets.stationSort.jumpsAway')}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={routePreference}
-                        onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
-                      >
-                        <SelectTrigger
-                          aria-label={t('assets.jumpsAway.routePreference.label')}
-                          className="w-28"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="shortest">
-                            {t('assets.jumpsAway.routePreference.shortest')}
-                          </SelectItem>
-                          <SelectItem value="safest">
-                            {t('assets.jumpsAway.routePreference.safest')}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-
-                {/* --- the list --- */}
-                {resolved.unresolved.length > 0 ? (
-                  <EmptyState
-                    title={t('assets.staleLink.title')}
-                    hint={t('assets.staleLink.hint')}
-                    className="py-8"
-                    action={
-                      <Button size="sm" onClick={() => void navigate(assetPathHref(null, []))}>
-                        {t('assets.staleLink.action')}
-                      </Button>
-                    }
-                  />
-                ) : rows.length === 0 ? (
-                  <EmptyState
-                    title={searchActive ? t('assets.noResults') : t('assets.emptyLocation')}
-                    className="py-8"
-                  />
-                ) : (
-                  <div
-                    ref={scrollParentRef}
-                    data-virtual-scroll-root
-                    aria-label={t('assets.treeLabel')}
-                    className="min-h-0 flex-1 overflow-y-auto"
-                  >
-                    <div
-                      role="presentation"
-                      style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
+                  )}
+                  {currentTotals && (
+                    <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
+                      <span className="hidden sm:inline">
+                        {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
+                      </span>
+                      <span className="text-isk-pos">
+                        {formatIsk(currentTotals.estimatedValue)}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
+                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('assets.section.locationCount', { count: sortedTree.length })}
+                  </span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Select
+                      value={stationSortField}
+                      onValueChange={(value) => void setStationSortField(value as StationSortField)}
                     >
-                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                        const row = rows[virtualRow.index];
-                        return (
-                          <div
-                            key={virtualRow.key}
-                            data-index={virtualRow.index}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              transform: `translateY(${virtualRow.start}px)`,
-                            }}
-                          >
-                            <BrowseRowView
-                              row={row}
-                              t={t}
-                              typeNames={mergedTypeNames}
-                              characterBadges={characterBadges}
-                              selectMode={selectMode}
-                              selectedIds={selectedIds}
-                              onToggleSelection={toggleNodeSelection}
-                              stationLabelFor={stationLabelFor}
-                              nodeLabel={nodeLabel}
-                              securityForStation={securityForStation}
-                              jumpsAwayFor={(locationId) =>
-                                jumpsAwayByKey.get(`${locationId}:${routePreference}`)
-                              }
-                              pinStateFor={pinStateFor}
-                              onTogglePin={(locationId) => void handleTogglePin(locationId)}
-                              pathStationId={pathStationId}
-                              pathSegments={pathSegments}
-                              trailFor={trailFor}
-                              rootStationIdFor={rootStationIdFor}
-                              selectedItemId={selectedItemId}
-                              onSelectItem={setSelectedItemId}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
+                      <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
+                        <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
+                        <SelectItem value="itemCount">
+                          {t('assets.stationSort.itemCount')}
+                        </SelectItem>
+                        <SelectItem value="jumpsAway">
+                          {t('assets.stationSort.jumpsAway')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={routePreference}
+                      onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
+                    >
+                      <SelectTrigger
+                        aria-label={t('assets.jumpsAway.routePreference.label')}
+                        className="w-28"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="shortest">
+                          {t('assets.jumpsAway.routePreference.shortest')}
+                        </SelectItem>
+                        <SelectItem value="safest">
+                          {t('assets.jumpsAway.routePreference.safest')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </Panel>
-            </AssetItemActionsContext.Provider>
-
-            <Panel
-              padded={false}
-              className={cx(
-                'flex h-full min-h-0 flex-col',
-                isDesktop || selectedItemId !== null ? '' : 'hidden'
+                </div>
               )}
-              actions={
-                !isDesktop && selectedItemId !== null ? (
-                  <Button size="sm" onClick={() => setSelectedItemId(null)}>
-                    {t('assets.detail.back')}
-                  </Button>
-                ) : undefined
-              }
-            >
-              <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                {selectedAsset ? (
-                  <AssetDetailPane
-                    typeId={selectedAsset.type_id}
-                    name={
-                      mergedTypeNames.get(selectedAsset.type_id) ?? `Type #${selectedAsset.type_id}`
-                    }
-                    quantity={selectedAsset.quantity}
-                    unitVolume={volumeByTypeId.get(selectedAsset.type_id)}
-                    estimatedValue={estimatedValueFor(selectedAsset, priceByTypeId)}
-                    characterBadge={characterBadgeFor(selectedAsset.item_id, characterBadges)}
-                    locationLabel={trailFor(selectedAsset).join(' › ')}
-                    security={
-                      selectedAssetRootStationId === null
-                        ? undefined
-                        : securityForStation(selectedAssetRootStationId)
-                    }
-                    jumpsAway={
-                      selectedAssetRootStationId === null
-                        ? undefined
-                        : jumpsAwayByKey.get(`${selectedAssetRootStationId}:${routePreference}`)
-                    }
-                    t={t}
-                  />
-                ) : (
-                  <p className="text-text-dim">{t('assets.detail.selectHint')}</p>
-                )}
-              </div>
+
+              {/* --- the list --- */}
+              {resolved.unresolved.length > 0 ? (
+                <EmptyState
+                  title={t('assets.staleLink.title')}
+                  hint={t('assets.staleLink.hint')}
+                  className="py-8"
+                  action={
+                    <Button size="sm" onClick={() => void navigate(assetPathHref(null, []))}>
+                      {t('assets.staleLink.action')}
+                    </Button>
+                  }
+                />
+              ) : rows.length === 0 ? (
+                <EmptyState
+                  title={searchActive ? t('assets.noResults') : t('assets.emptyLocation')}
+                  className="py-8"
+                />
+              ) : (
+                <div
+                  ref={scrollParentRef}
+                  data-virtual-scroll-root
+                  aria-label={t('assets.treeLabel')}
+                  className="min-h-0 flex-1 overflow-y-auto"
+                >
+                  <div
+                    role="presentation"
+                    style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
+                  >
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const row = rows[virtualRow.index];
+                      return (
+                        <div
+                          key={virtualRow.key}
+                          data-index={virtualRow.index}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          <BrowseRowView
+                            row={row}
+                            t={t}
+                            typeNames={mergedTypeNames}
+                            characterBadges={characterBadges}
+                            selectMode={selectMode}
+                            selectedIds={selectedIds}
+                            onToggleSelection={toggleNodeSelection}
+                            stationLabelFor={stationLabelFor}
+                            nodeLabel={nodeLabel}
+                            securityForStation={securityForStation}
+                            jumpsAwayFor={(locationId) =>
+                              jumpsAwayByKey.get(`${locationId}:${routePreference}`)
+                            }
+                            pinStateFor={pinStateFor}
+                            onTogglePin={(locationId) => void handleTogglePin(locationId)}
+                            pathStationId={pathStationId}
+                            pathSegments={pathSegments}
+                            trailFor={trailFor}
+                            rootStationIdFor={rootStationIdFor}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </Panel>
-          </div>
+          </AssetItemActionsContext.Provider>
         </div>
       )}
 
@@ -1541,9 +1469,6 @@ interface BrowseRowViewProps {
   pathSegments: readonly string[];
   trailFor: (asset: CharacterAsset) => string[];
   rootStationIdFor: (asset: CharacterAsset) => number | null;
-  /** The leaf asset currently shown in the detail pane (issue #160), null when none is selected. */
-  selectedItemId: number | null;
-  onSelectItem: (itemId: number) => void;
 }
 
 /** Dispatches one virtualized row to the right presentation component. */
@@ -1620,8 +1545,6 @@ function NodeRowView({
   characterBadges,
   pathStationId,
   pathSegments,
-  selectedItemId,
-  onSelectItem,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const actions = useAssetItemActions();
   const label = nodeLabel(node);
@@ -1658,8 +1581,6 @@ function NodeRowView({
       unitVolume={actions.volumeByTypeId.get(asset.type_id)}
       estimatedValue={estimatedValue}
       characterBadge={badge}
-      onSelect={() => onSelectItem(asset.item_id)}
-      selected={selectedItemId === asset.item_id}
       selectMode={selectMode}
       selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
       onToggleSelection={() => onToggleSelection([asset.item_id])}
