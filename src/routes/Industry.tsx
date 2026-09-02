@@ -4,9 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
 import { markBuildPlanDeleted, scheduleSync } from '@/sync';
-import { EmptyState, PageHeader, Panel, ReauthBanner, Spinner } from '@/components/ui';
+import { Button, EmptyState, PageHeader, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -166,6 +167,16 @@ export function Industry() {
     [plans, effectiveSelectedId]
   );
 
+  // Narrow screens show one column at a time (CONTEXT.md round 25); matches
+  // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
+  // layout switch at the same width. Gated on the explicit `selectedId`, not
+  // `effectiveSelectedId`'s first-plan fallback, so a narrow-screen visitor
+  // lands on the list first, same as Mail/SkillPlans, rather than jumping
+  // straight to whichever plan the fallback picked.
+  const isDesktop = useIsDesktop();
+  const detailVisible = isDesktop || selectedId !== null;
+  const showBackControl = !isDesktop && selectedId !== null;
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -237,12 +248,15 @@ export function Industry() {
           <Spinner label={t('common.loading')} />
         </div>
       ) : (
-        <>
-          <Panel>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
+          <Panel className={isDesktop || selectedId === null ? '' : 'hidden'}>
             <BuildPlanList
               plans={plans}
               catalog={catalog}
-              selectedId={effectiveSelectedId}
+              // Only mark a row selected when its detail is actually on
+              // screen: the first-plan fallback would otherwise leave a row
+              // highlighted on a narrow screen with nothing open.
+              selectedId={detailVisible ? effectiveSelectedId : null}
               onSelect={setSelectedId}
               onCreate={(entry) =>
                 void createPlan(entry).then((id) => {
@@ -255,23 +269,32 @@ export function Industry() {
             />
           </Panel>
 
-          {selectedPlan ? (
-            <BuildPlanDetail
-              key={selectedPlan.id}
-              plan={selectedPlan}
-              catalog={catalog}
-              ownedBlueprints={ownedBlueprints}
-              skills={skills}
-              onUpdate={(patch) => void handleUpdate(patch)}
-            />
-          ) : plans.length > 0 ? (
-            <div className="flex justify-center py-8">
-              <Spinner label={t('common.loading')} />
+          <article className={`space-y-2 ${detailVisible ? '' : 'hidden'}`}>
+            {showBackControl && (
+              <Button size="sm" onClick={() => setSelectedId(null)}>
+                {t('industry.backToList')}
+              </Button>
+            )}
+            <div className="space-y-4 lg:max-h-[32rem] lg:overflow-y-auto">
+              {!detailVisible ? null : selectedPlan ? (
+                <BuildPlanDetail
+                  key={selectedPlan.id}
+                  plan={selectedPlan}
+                  catalog={catalog}
+                  ownedBlueprints={ownedBlueprints}
+                  skills={skills}
+                  onUpdate={(patch) => void handleUpdate(patch)}
+                />
+              ) : plans.length > 0 ? (
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              ) : (
+                <EmptyState title={t('industry.selectHint')} />
+              )}
             </div>
-          ) : (
-            <EmptyState title={t('industry.selectHint')} />
-          )}
-        </>
+          </article>
+        </div>
       )}
     </div>
   );

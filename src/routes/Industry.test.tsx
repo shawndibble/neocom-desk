@@ -121,12 +121,38 @@ function seedPlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
+
+/**
+ * Industry renders one column at a time below `lg`, so most of this file —
+ * which is about the plan detail — needs a viewport wide enough for the
+ * detail pane to exist at all. jsdom's stub never matches, i.e. it is a
+ * narrow screen; `beforeEach` widens it and the narrow-screen tests opt back
+ * out with `useNarrowViewport()`.
+ */
+const realMatchMedia = window.matchMedia;
+function useViewport(matches: boolean) {
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+}
+const useNarrowViewport = () => useViewport(false);
+
 afterEach(() => {
   server.resetHandlers();
   clearMarketPriceCache();
   clearCostIndexCache();
+  window.matchMedia = realMatchMedia;
 });
 beforeEach(async () => {
+  useViewport(true);
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -408,5 +434,68 @@ describe('Industry: results panel', () => {
 
     expect(screen.getByText('Price data unavailable')).toBeInTheDocument();
     expect(screen.queryByText('Not enough price data for a build-vs-buy verdict.')).toBeNull();
+  });
+});
+
+describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => {
+  it('shows one column at a time on narrow screens, with a back control that returns to the list', async () => {
+    useNarrowViewport();
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    const listPanel = (await screen.findByRole('button', { name: 'New plan' })).closest('section');
+    expect(listPanel).not.toHaveClass('hidden');
+    // The detail isn't merely hidden while collapsed away — it isn't mounted,
+    // so it can't spend a narrow-screen visitor's bandwidth fetching prices
+    // for a plan they never opened.
+    expect(screen.queryByRole('heading', { name: 'Rifter' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back to build plans' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Rifter run' }));
+
+    expect(listPanel).toHaveClass('hidden');
+    expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Back to build plans' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Back to build plans' }));
+
+    expect(listPanel).not.toHaveClass('hidden');
+    expect(screen.queryByRole('heading', { name: 'Rifter' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back to build plans' })).not.toBeInTheDocument();
+  });
+
+  it('does not mark a row selected on a narrow screen while no plan is open', async () => {
+    useNarrowViewport();
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    const row = await screen.findByRole('button', { name: 'Rifter run' });
+    // The first-plan fallback drives the desktop detail pane; it must not
+    // leave a row looking selected when nothing is on screen beside it.
+    expect(row.closest('li')).not.toHaveClass('bg-panel-2');
+
+    await user.click(row);
+    expect(row.closest('li')).toHaveClass('bg-panel-2');
+  });
+
+  it('keeps both panes visible on desktop, with no back control', async () => {
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    const listPanel = (await screen.findByRole('button', { name: 'New plan' })).closest('section');
+    const detailPane = (await screen.findByRole('heading', { name: 'Rifter' })).closest('article');
+    expect(listPanel).not.toHaveClass('hidden');
+    expect(detailPane).not.toHaveClass('hidden');
+    expect(screen.queryByRole('button', { name: 'Back to build plans' })).not.toBeInTheDocument();
+
+    // The two panes are columns of one grid, each with its own scroller: the
+    // list's is the row list alone, so the heading and create button stay
+    // put; the detail's is `lg:`-gated so a phone doesn't nest a
+    // viewport-sized editor inside a 32rem scroll region.
+    expect(listPanel?.parentElement).toHaveClass('lg:grid-cols-[20rem_1fr]');
+    expect(screen.getByRole('list')).toHaveClass('max-h-[28rem]', 'overflow-y-auto');
+    expect(detailPane?.querySelector('div')).toHaveClass('lg:max-h-[32rem]', 'lg:overflow-y-auto');
   });
 });
