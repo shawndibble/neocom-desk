@@ -405,7 +405,7 @@ export function Characters() {
   function renderCharacterList(characterIds: readonly number[]) {
     const sortedIds = sortCharacterIds(characterIds, stats, sortKey, sortDirection);
     return (
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {sortedIds.map((characterId) => {
           const character = charactersById.get(characterId);
           if (!character) return null;
@@ -439,7 +439,7 @@ export function Characters() {
   const ungroupedIds = ungroupedCharacterIds(groupsValue.groups, allIds);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="mx-auto max-w-5xl space-y-4">
       <header className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('characters.title')}</h1>
         <Button variant="primary" size="sm" onClick={() => void beginEveLogin()}>
