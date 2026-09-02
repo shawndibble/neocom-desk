@@ -18,7 +18,6 @@ import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatVolume } from '@/features/market/format';
-import { typeIconUrl } from '@/lib/eveImages';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
@@ -261,10 +260,6 @@ interface ItemRowProps {
   characterBadge: string | null;
   /** Wraps the row in the shared item context menu — supplied by the route. */
   wrap: (children: ReactElement) => ReactNode;
-  /** Selects this asset into the detail pane beside the list (issue #160). */
-  onSelect: () => void;
-  /** Whether this row's asset is the one currently shown in the detail pane. */
-  selected: boolean;
   selectMode: boolean;
   selectionState: SelectionState;
   onToggleSelection: () => void;
@@ -277,9 +272,8 @@ interface ItemRowProps {
  * old `w-14`/`w-16`/`w-20` trio) is exactly what made the row unreadable
  * below ~500px — this reflows instead of clipping or scrolling sideways.
  *
- * Selecting a row shows its full detail in the pane beside the list
- * (`AssetDetailPane`, issue #160) — replaces the previous hover/focus
- * tooltip, which couldn't be reached on a touch device at all.
+ * Full item detail (icon, volume, location, jumps-away) lives behind the
+ * right-click context menu's "Show info" action, not on the row itself.
  */
 export function ItemRow({
   name,
@@ -288,8 +282,6 @@ export function ItemRow({
   estimatedValue,
   characterBadge,
   wrap,
-  onSelect,
-  selected,
   selectMode,
   selectionState,
   onToggleSelection,
@@ -306,15 +298,7 @@ export function ItemRow({
         />
       )}
       {wrap(
-        <button
-          type="button"
-          onClick={onSelect}
-          aria-current={selected}
-          className={cx(
-            'flex min-h-12 w-full min-w-0 items-center gap-2.5 py-1.5 pr-3 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent',
-            selected ? 'bg-panel-2' : ''
-          )}
-        >
+        <div className="flex min-h-12 w-full min-w-0 items-center gap-2.5 py-1.5 pr-3">
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex min-w-0 items-center">
               <span className="truncate text-sm">{name}</span>
@@ -328,89 +312,8 @@ export function ItemRow({
               <span className="text-isk-pos">{formatIsk(estimatedValue)}</span>
             </span>
           </span>
-        </button>
+        </div>
       )}
-    </div>
-  );
-}
-
-/* ---------------------------------------------------------- detail pane */
-
-export interface AssetDetailPaneProps {
-  typeId: number;
-  name: string;
-  quantity: number;
-  unitVolume: number | undefined;
-  estimatedValue: number;
-  characterBadge: string | null;
-  /** Where this asset lives, outermost first, joined the same way `SearchResultRow`'s trail is. */
-  locationLabel: string;
-  security: number | null | undefined;
-  jumpsAway: JumpsAwayResult | undefined;
-  t: Translate;
-}
-
-/**
- * One selected asset's full detail, replacing the old hover/focus tooltip
- * (issue #160): icon, name, quantity, estimated value, volume, and the
- * location it lives in — security/jumps-away reuse whatever the route has
- * already resolved for that station rather than fetching fresh per
- * selection (CONTEXT.md round 14).
- */
-export function AssetDetailPane({
-  typeId,
-  name,
-  quantity,
-  unitVolume,
-  estimatedValue,
-  characterBadge,
-  locationLabel,
-  security,
-  jumpsAway,
-  t,
-}: AssetDetailPaneProps) {
-  return (
-    <div className="space-y-3 text-xs">
-      <div className="flex items-center gap-2">
-        <img
-          src={typeIconUrl(typeId, 64)}
-          alt=""
-          width={48}
-          height={48}
-          className="shrink-0 rounded-xs border border-line"
-        />
-        <span className="flex min-w-0 flex-1 items-center">
-          <h2 className="truncate text-sm font-semibold">{name}</h2>
-          {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
-        </span>
-      </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-        <dt className="text-text-dim uppercase">{t('assets.detail.quantity')}</dt>
-        <dd className="tabular-nums">{quantity.toLocaleString()}</dd>
-
-        <dt className="text-text-dim uppercase">{t('assets.detail.volume')}</dt>
-        <dd className="tabular-nums">
-          {unitVolume === undefined
-            ? t('assets.detail.volumeUnknown')
-            : t('assets.detail.volumeValue', { volume: formatVolume(unitVolume) })}
-        </dd>
-
-        <dt className="text-text-dim uppercase">{t('assets.detail.location')}</dt>
-        <dd className="flex min-w-0 items-center gap-1.5">
-          <SecurityValue security={security} t={t} />
-          <span className="min-w-0 truncate">{locationLabel}</span>
-        </dd>
-
-        <dt className="text-text-dim uppercase">{t('assets.detail.jumpsAway')}</dt>
-        <dd>
-          <JumpsAwayText result={jumpsAway} t={t} />
-        </dd>
-
-        <dt className="text-text-dim uppercase">{t('assets.detail.value')}</dt>
-        <dd className="tabular-nums font-semibold text-isk-pos">
-          {t('assets.detail.valueAmount', { value: formatIsk(estimatedValue) })}
-        </dd>
-      </dl>
     </div>
   );
 }
