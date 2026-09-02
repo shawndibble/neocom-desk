@@ -607,6 +607,87 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.keyboard('{Escape}');
   });
 
+  it('right-clicks a Variations row to open its item context menu, including Compare Variations (issue #147)', async () => {
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    const table = await screen.findByRole('table', { name: 'Variations' });
+
+    const kestrelRow = within(table).getByText('Kestrel').closest('tr');
+    if (!kestrelRow) throw new Error('expected a Kestrel row');
+    kestrelRow.focus();
+    fireEvent.contextMenu(kestrelRow);
+
+    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Compare Variations' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+  });
+
+  it("opens the compare modal from a row's Compare Variations action, same as the header button (issue #147)", async () => {
+    const dogma = (typeId: number, hp: number) =>
+      http.get(`${ESI_BASE_URL}/universe/types/${typeId}`, () =>
+        HttpResponse.json({
+          type_id: typeId,
+          name: `Type ${typeId}`,
+          description: 'A ship.',
+          group_id: 25,
+          published: true,
+          dogma_attributes: [{ attribute_id: STRUCTURE_HITPOINTS_ATTR_ID, value: hp }],
+        })
+      );
+    server.use(
+      destroyerOrdersHandler(new Map()),
+      dogma(KESTREL_TYPE_ID, 1200),
+      dogma(CORAX_TYPE_ID, 1400),
+      dogma(CORMORANT_TYPE_ID, 1600)
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    const table = await screen.findByRole('table', { name: 'Variations' });
+
+    const kestrelRow = within(table).getByText('Kestrel').closest('tr');
+    if (!kestrelRow) throw new Error('expected a Kestrel row');
+    fireEvent.contextMenu(kestrelRow);
+    await user.click(screen.getByRole('menuitem', { name: 'Compare Variations' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Compare Variations' });
+    expect(within(dialog).getByText('Kestrel')).toBeInTheDocument();
+    expect(within(dialog).getByText('Corax')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Merlin')).not.toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+  });
+
+  it('right-clicking a Variations row opens the menu without also re-anchoring on it (left/right-click non-interference, issue #147)', async () => {
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    const table = await screen.findByRole('table', { name: 'Variations' });
+
+    const kestrelRow = within(table).getByText('Kestrel').closest('tr');
+    if (!kestrelRow) throw new Error('expected a Kestrel row');
+    fireEvent.contextMenu(kestrelRow);
+
+    await screen.findByRole('menuitem', { name: 'Show info' });
+    // Menu open: Radix marks the rest of the page aria-hidden, so the
+    // heading check below has to wait until Escape closes it again.
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('heading', { name: 'Merlin', level: 2 })).toBeInTheDocument();
+  });
+
   it('a failed variations.json fetch degrades only the Variations table to its sibling fallback, not the whole Market route', async () => {
     vi.mocked(loadVariations).mockRejectedValueOnce(new Error('network error'));
     server.use(destroyerOrdersHandler(new Map()));

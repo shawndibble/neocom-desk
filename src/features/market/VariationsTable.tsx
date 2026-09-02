@@ -5,11 +5,14 @@
  * leads. Clicking a row selects it, which re-anchors this table as a side
  * effect of the route's own selection state.
  */
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { formatIsk } from '@/lib/isk';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
+import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { ItemContextMenu } from './ItemContextMenu';
 import type { VariationRow } from './variations';
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
@@ -22,8 +25,14 @@ export interface VariationsTableProps {
   /** Absent key = not yet requested; undefined value = still loading. */
   prices: ReadonlyMap<number, OrderBookSummary | undefined>;
   onSelect: (typeId: number) => void;
-  /** Opens the attribute-compare modal for every row currently shown here. */
+  /** Opens the attribute-compare modal for every row currently shown here — both the header button and each row's "Compare Variations" menu action. */
   onCompare: () => void;
+  /** Same per-item context menu as the tree (issue #147): null until requested, then per-typeId lookups. */
+  blueprintCatalog: BlueprintCatalog | null;
+  onRequestBlueprintCatalog: () => void;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 /** Loading, then this row's own side, then the other side's presence (matches the order-book tables' empty-state pair), then neither. */
@@ -47,10 +56,38 @@ export function VariationsTable({
   prices,
   onSelect,
   onCompare,
+  blueprintCatalog,
+  onRequestBlueprintCatalog,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
 }: VariationsTableProps) {
   const { t } = useTranslation();
 
   if (rows.length === 0) return null;
+
+  function rowContextMenu(row: VariationRow, tr: ReactElement) {
+    const blueprintTypeID =
+      blueprintCatalog === null
+        ? undefined
+        : (blueprintCatalog.byProductTypeID.get(row.typeId)?.blueprintTypeID ?? null);
+    return (
+      <ItemContextMenu
+        typeId={row.typeId}
+        itemName={row.name}
+        blueprintTypeID={blueprintTypeID}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable={quickbarAvailable}
+        onShowInfo={onShowInfo}
+        onCompareVariations={onCompare}
+        onOpenChange={(open) => {
+          if (open) onRequestBlueprintCatalog();
+        }}
+      >
+        {tr}
+      </ItemContextMenu>
+    );
+  }
 
   const columns: DataTableColumn<VariationRow>[] = [
     {
@@ -114,6 +151,7 @@ export function VariationsTable({
         defaultSort={{ columnId: 'sell', direction: 'asc' }}
         density="compact"
         onRowClick={(row) => onSelect(row.typeId)}
+        rowContextMenu={rowContextMenu}
       />
     </div>
   );

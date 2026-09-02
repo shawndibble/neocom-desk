@@ -24,6 +24,8 @@ export interface ItemContextMenuProps {
   /** False with no active character — the Quickbar has nobody to save the item under. */
   quickbarAvailable: boolean;
   onShowInfo: (typeId: number, itemName: string) => void;
+  /** Variations-table rows only (issue #147): opens the attribute-compare modal for the row's variation group. Omitted elsewhere. */
+  onCompareVariations?: () => void;
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }
@@ -36,6 +38,7 @@ export function ItemContextMenu({
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
+  onCompareVariations,
   onOpenChange,
   children,
 }: ItemContextMenuProps) {
@@ -68,6 +71,11 @@ export function ItemContextMenu({
         <ContextMenuItem onSelect={() => addToCompare({ typeId, itemName })}>
           {t('market.contextMenu.addToCompare')}
         </ContextMenuItem>
+        {onCompareVariations && (
+          <ContextMenuItem onSelect={onCompareVariations}>
+            {t('market.contextMenu.compareVariations')}
+          </ContextMenuItem>
+        )}
         <ContextMenuItem
           onSelect={() => {
             // Preserves an existing region/hub param when already on
