@@ -1,20 +1,30 @@
 /**
- * Settings' Notifications section (issue #170): persistence + UI shell only
- * — no live browser permission request and no real notifications fire yet
- * (CONTEXT.md round 20). One master switch exists above every per-Character
- * section; wiring it to gate the OS permission request and every poller is a
- * later ticket's job (issue #170's own acceptance criteria). Each section
- * lists every Notification Event, on by default, with a select-all/none
- * checkbox; a row the Character lacks the ESI scope for renders disabled
- * with a reauth tooltip instead of a working toggle (the same "compare the
- * grant, don't wait for a 403" reasoning as `ScopeGate.tsx`, applied per row
- * instead of per route). Search filters rows by event-type or Character name
- * (Trained Skills precedent, issue #108).
- */
-import { useEffect, useMemo, useState } from 'react';
+ * Settings' Notifications section. Persistence + UI shell landed with issue
+ * #170; issue #171 added the browser grant on top, so this section now renders
+ * three ways off the *live* `Notification.permission` (never off the stored
+ * outcome — the user can flip it in site settings without telling the page):
+ *
+ * - **denied** — the blocked notice stands in for the whole toggle UI. JS
+ *   cannot re-request a denied grant, so offering toggles here would be a
+ *   button that does nothing.
+ * - **default** — the toggles stay, with an Enable button above them: the
+ *   second chance for someone who dismissed the one-time explainer
+ *   (`NotificationPermissionPrompt`). That tap is the only thing in this file
+ *   that reaches the browser prompt; nothing requests permission on mount.
+ * - **granted** (and browsers with no Notification API at all) — unchanged.
+ *
+ * Below that: each Character gets a collapsible section listing every
+ * Notification Event, on by default, with a select-all/none checkbox; a row
+ * the Character lacks the ESI scope for renders disabled with a reauth tooltip
+ * instead of a working toggle (the same "compare the grant, don't wait for a
+ * 403" reasoning as `ScopeGate.tsx`, applied per row instead of per route).
+ * Search filters rows by event-type or Character name (Trained Skills
+ * precedent, issue #108). No notification actually fires yet — the pollers
+ * that would send them are a later ticket (CONTEXT.md round 20).
+ */ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Panel, EmptyState, Tooltip } from '@/components/ui';
+import { Button, Panel, EmptyState, Tooltip } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { db } from '@/db';
 import {
@@ -32,6 +42,11 @@ import {
 } from './preferences';
 import { isEventEnabled, selectionStateForEvents } from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
+import {
+  useNotificationPermission,
+  requestNotificationPermission,
+  notificationsBlocked,
+} from './permission';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
 
@@ -53,6 +68,13 @@ export function NotificationsPanel() {
   useEffect(() => {
     void hydratePrefs();
   }, [hydratePrefs]);
+
+  const { permission, refresh: refreshPermission } = useNotificationPermission();
+
+  async function enableNotifications() {
+    await requestNotificationPermission();
+    refreshPermission();
+  }
 
   const [search, setSearch] = useState('');
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
@@ -96,131 +118,156 @@ export function NotificationsPanel() {
     <Panel title={t('settings.notificationsTitle')}>
       <div className="space-y-3">
         <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
-        <label className="flex items-center gap-2 text-xs font-medium text-text">
-          <input
-            type="checkbox"
-            checked={prefsValue.masterEnabled}
-            onChange={() =>
-              void setPrefsValue(withMasterEnabled(prefsValue, !prefsValue.masterEnabled))
-            }
-            className="size-4 shrink-0 cursor-pointer accent-accent"
-          />
-          {t('settings.notifications.masterSwitchLabel')}
-        </label>
-
-        {characterList.length === 0 ? (
-          <EmptyState title={t('settings.notifications.emptyTitle')} />
+        {notificationsBlocked(permission) ? (
+          <p
+            role="note"
+            className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-text"
+          >
+            {t('settings.notifications.blockedNotice')}
+          </p>
         ) : (
           <>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('settings.notifications.searchPlaceholder')}
-              aria-label={t('settings.notifications.searchPlaceholder')}
-              className="h-9 w-full rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
-            />
-
-            {searching && filterResult.visibleCharacterIds.size === 0 ? (
-              <EmptyState title={t('settings.notifications.noResults')} className="py-8" />
-            ) : (
-              characterList.map((character) => {
-                if (searching && !filterResult.visibleCharacterIds.has(character.characterId)) {
-                  return null;
+            {permission === 'default' && (
+              <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+                <p className="min-w-0 flex-1 text-xs text-text-dim">
+                  {t('settings.notifications.enableHint')}
+                </p>
+                <Button size="sm" variant="primary" onClick={() => void enableNotifications()}>
+                  {t('settings.notifications.enableButton')}
+                </Button>
+              </div>
+            )}
+            <label className="flex items-center gap-2 text-xs font-medium text-text">
+              <input
+                type="checkbox"
+                checked={prefsValue.masterEnabled}
+                onChange={() =>
+                  void setPrefsValue(withMasterEnabled(prefsValue, !prefsValue.masterEnabled))
                 }
-                const expanded = searching || expandedCharacterIds.has(character.characterId);
-                const visibleEventIds: readonly NotificationEventId[] = searching
-                  ? [...(filterResult.visibleEventIdsByCharacter.get(character.characterId) ?? [])]
-                  : NOTIFICATION_EVENT_IDS;
-                const grantedScopes = scopesByCharacterId.get(character.characterId) ?? new Set();
-                const togglableEventIds = visibleEventIds.filter((eventId) =>
-                  grantedScopes.has(eventDef(eventId).scope)
-                );
-                const prefs = characterEventPrefs(prefsValue, character.characterId);
-                const selectionState = selectionStateForEvents(togglableEventIds, prefs);
+                className="size-4 shrink-0 cursor-pointer accent-accent"
+              />
+              {t('settings.notifications.masterSwitchLabel')}
+            </label>
 
-                return (
-                  <div
-                    key={character.characterId}
-                    className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
-                  >
-                    {/* Select-all is a sibling of the expand toggle, not nested inside its
-                        <button> — an interactive control inside a <button> is invalid HTML
-                        and would fold both accessible names together for screen readers. */}
-                    <div
-                      className={`flex min-h-8 items-center gap-2 px-2.5 py-1.5 ${expanded ? 'border-b border-line' : ''}`}
-                    >
-                      <button
-                        type="button"
-                        aria-expanded={expanded}
-                        onClick={() => toggleExpanded(character.characterId)}
-                        className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+            {characterList.length === 0 ? (
+              <EmptyState title={t('settings.notifications.emptyTitle')} />
+            ) : (
+              <>
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t('settings.notifications.searchPlaceholder')}
+                  aria-label={t('settings.notifications.searchPlaceholder')}
+                  className="h-9 w-full rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
+                />
+
+                {searching && filterResult.visibleCharacterIds.size === 0 ? (
+                  <EmptyState title={t('settings.notifications.noResults')} className="py-8" />
+                ) : (
+                  characterList.map((character) => {
+                    if (searching && !filterResult.visibleCharacterIds.has(character.characterId)) {
+                      return null;
+                    }
+                    const expanded = searching || expandedCharacterIds.has(character.characterId);
+                    const visibleEventIds: readonly NotificationEventId[] = searching
+                      ? [
+                          ...(filterResult.visibleEventIdsByCharacter.get(character.characterId) ??
+                            []),
+                        ]
+                      : NOTIFICATION_EVENT_IDS;
+                    const grantedScopes =
+                      scopesByCharacterId.get(character.characterId) ?? new Set();
+                    const togglableEventIds = visibleEventIds.filter((eventId) =>
+                      grantedScopes.has(eventDef(eventId).scope)
+                    );
+                    const prefs = characterEventPrefs(prefsValue, character.characterId);
+                    const selectionState = selectionStateForEvents(togglableEventIds, prefs);
+
+                    return (
+                      <div
+                        key={character.characterId}
+                        className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
                       >
-                        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-                          {expanded ? '▾' : '▸'}
-                        </span>
-                        <span className="min-w-0 truncate normal-case">{character.name}</span>
-                      </button>
-                      <SelectionCheckbox
-                        state={selectionState}
-                        onToggle={() =>
-                          void setPrefsValue(
-                            withAllEventsToggledForCharacter(
-                              prefsValue,
-                              character.characterId,
-                              togglableEventIds
-                            )
-                          )
-                        }
-                        label={t('settings.notifications.selectAllLabel', {
-                          character: character.name,
-                        })}
-                      />
-                    </div>
-                    {expanded && (
-                      <ul className="divide-y divide-line bg-panel-2">
-                        {visibleEventIds.map((eventId) => {
-                          const def = eventDef(eventId);
-                          const hasScope = grantedScopes.has(def.scope);
-                          const enabled = isEventEnabled(prefs, eventId);
-                          const eventLabel = t(def.labelKey);
-                          const checkbox = (
-                            <input
-                              type="checkbox"
-                              checked={hasScope && enabled}
-                              disabled={!hasScope}
-                              onChange={() =>
-                                void setPrefsValue(
-                                  withEventToggled(prefsValue, character.characterId, eventId)
+                        {/* Select-all is a sibling of the expand toggle, not nested inside its
+                          <button> — an interactive control inside a <button> is invalid HTML
+                          and would fold both accessible names together for screen readers. */}
+                        <div
+                          className={`flex min-h-8 items-center gap-2 px-2.5 py-1.5 ${expanded ? 'border-b border-line' : ''}`}
+                        >
+                          <button
+                            type="button"
+                            aria-expanded={expanded}
+                            onClick={() => toggleExpanded(character.characterId)}
+                            className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                          >
+                            <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
+                              {expanded ? '▾' : '▸'}
+                            </span>
+                            <span className="min-w-0 truncate normal-case">{character.name}</span>
+                          </button>
+                          <SelectionCheckbox
+                            state={selectionState}
+                            onToggle={() =>
+                              void setPrefsValue(
+                                withAllEventsToggledForCharacter(
+                                  prefsValue,
+                                  character.characterId,
+                                  togglableEventIds
                                 )
-                              }
-                              aria-label={eventLabel}
-                              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            />
-                          );
-                          return (
-                            <li
-                              key={eventId}
-                              className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
-                            >
-                              <span className={hasScope ? 'text-text' : 'text-text-faint'}>
-                                {eventLabel}
-                              </span>
-                              {hasScope ? (
-                                checkbox
-                              ) : (
-                                <Tooltip content={t('settings.notifications.reauthHint')}>
-                                  {checkbox}
-                                </Tooltip>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                );
-              })
+                              )
+                            }
+                            label={t('settings.notifications.selectAllLabel', {
+                              character: character.name,
+                            })}
+                          />
+                        </div>
+                        {expanded && (
+                          <ul className="divide-y divide-line bg-panel-2">
+                            {visibleEventIds.map((eventId) => {
+                              const def = eventDef(eventId);
+                              const hasScope = grantedScopes.has(def.scope);
+                              const enabled = isEventEnabled(prefs, eventId);
+                              const eventLabel = t(def.labelKey);
+                              const checkbox = (
+                                <input
+                                  type="checkbox"
+                                  checked={hasScope && enabled}
+                                  disabled={!hasScope}
+                                  onChange={() =>
+                                    void setPrefsValue(
+                                      withEventToggled(prefsValue, character.characterId, eventId)
+                                    )
+                                  }
+                                  aria-label={eventLabel}
+                                  className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                              );
+                              return (
+                                <li
+                                  key={eventId}
+                                  className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                                >
+                                  <span className={hasScope ? 'text-text' : 'text-text-faint'}>
+                                    {eventLabel}
+                                  </span>
+                                  {hasScope ? (
+                                    checkbox
+                                  ) : (
+                                    <Tooltip content={t('settings.notifications.reauthHint')}>
+                                      {checkbox}
+                                    </Tooltip>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </>
             )}
           </>
         )}

@@ -11,6 +11,7 @@ import { CharacterAvatar, LogoMark, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { useLockedRoutes } from './useGrantedScopes';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import type { AppRoutePath } from './routeScopes';
 
 /**
@@ -341,6 +342,8 @@ export function Layout() {
           <span className="truncate">{t('nav.more')}</span>
         </button>
       </nav>
+
+      <NotificationPermissionPrompt />
 
       {!isDesktop && (
         <MobileMoreSheet

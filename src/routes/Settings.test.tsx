@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -12,6 +12,10 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   NOTIFICATION_PREFS_SETTING_KEY,
 } from '@/features/notifications/preferences';
+import {
+  useNotificationPromptState,
+  DEFAULT_NOTIFICATION_PROMPT_STATE,
+} from '@/features/notifications/permission';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -30,6 +34,17 @@ vi.mock('@/sde/loadSde', () => ({
 
 const CHAR_ID = 91;
 
+/**
+ * jsdom has no Notification API, so every test above renders the panel's
+ * unsupported path (toggle UI, no notice) — the permission-specific tests
+ * opt into a grant state explicitly.
+ */
+function stubNotification(permission: NotificationPermission) {
+  const requestPermission = vi.fn(async () => permission);
+  vi.stubGlobal('Notification', { permission, requestPermission });
+  return requestPermission;
+}
+
 // Rendered through <App /> rather than in isolation: /settings has a nav
 // entry now, so routing to it through the shell is part of what's asserted.
 // Settings makes no requests, hence no msw server.
@@ -40,12 +55,20 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useFontScale.setState({ value: DEFAULT_FONT_SCALE, hydrated: false });
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
+  useNotificationPromptState.setState({
+    value: { ...DEFAULT_NOTIFICATION_PROMPT_STATE, seen: true },
+    hydrated: true,
+  });
   document.documentElement.style.fontSize = '';
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   useActivityLog.setState({ entries: [] });
   window.history.pushState({}, '', '/settings');
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('Settings', () => {
@@ -220,6 +243,51 @@ describe('Settings — Notifications (issue #170)', () => {
     expect((await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))?.value).toMatchObject({
       masterEnabled: false,
     });
+  });
+
+  it('replaces the toggle UI with a persistent blocked notice while permission is denied', async () => {
+    stubNotification('denied');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: /enable notifications/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pilot one/i })).not.toBeInTheDocument();
+  });
+
+  it('offers an Enable button that makes the browser request, and no request without it', async () => {
+    const requestPermission = stubNotification('default');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const enable = await screen.findByRole('button', { name: /turn on browser notifications/i });
+    expect(requestPermission).not.toHaveBeenCalled();
+    // The toggle UI stays put at 'default' — only a denial replaces it.
+    expect(screen.getByRole('checkbox', { name: /enable notifications/i })).toBeInTheDocument();
+
+    await user.click(enable);
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByRole('checkbox', { name: /toggle all notifications for pilot one/i })
+    ).toBeInTheDocument();
+  });
+
+  it('never requests permission on its own when the grant is already settled', async () => {
+    const requestPermission = stubNotification('granted');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await user.click(await screen.findByRole('button', { name: /pilot one/i }));
+
+    expect(screen.getByRole('checkbox', { name: 'New Mail' })).toBeInTheDocument();
+    expect(screen.queryByText(/notifications are blocked/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /turn on browser notifications/i })
+    ).not.toBeInTheDocument();
+    expect(requestPermission).not.toHaveBeenCalled();
   });
 
   it("disables a row and shows a reauth hint for a character missing that event's ESI scope", async () => {
