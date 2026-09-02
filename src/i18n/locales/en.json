@@ -868,6 +868,16 @@
       "body": "NeoCom can notify you about skill training, mail, industry jobs, and more. You choose exactly what, per character, in Settings.",
       "enable": "Enable",
       "dismiss": "Not now"
+    },
+    "fired": {
+      "skillLevelComplete": {
+        "title": "Skill training complete",
+        "body": "{{character}} finished training {{skill}} {{level}}."
+      },
+      "characterNotTraining": {
+        "title": "Not training",
+        "body": "{{character}} has no skill in training."
+      }
     }
   },
   "pwa": {
