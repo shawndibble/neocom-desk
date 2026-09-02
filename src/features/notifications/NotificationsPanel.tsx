@@ -19,8 +19,10 @@
  * instead of a working toggle (the same "compare the grant, don't wait for a
  * 403" reasoning as `ScopeGate.tsx`, applied per row instead of per route).
  * Search filters rows by event-type or Character name (Trained Skills
- * precedent, issue #108). No notification actually fires yet — the pollers
- * that would send them are a later ticket (CONTEXT.md round 20).
+ * precedent, issue #108). The Foreground Poller
+ * (`features/notifications/ForegroundNotificationPoller.tsx`, issue #172)
+ * reads these same toggles to decide what to fire; further Notification
+ * Events land here as later tickets add their pollers (CONTEXT.md round 20).
  */ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';

@@ -133,6 +133,9 @@
     "suggestReorder": "Suggest reorder",
     "remapSaves": "Remapping saves {{duration}}",
     "remapNoGain": "No remap improves this plan in its current order — keeping current attributes. Try \"Suggest reorder\" to group similar skills first, then optimize again.",
+    "optimizeConfirmSaves": "Saves {{duration}}",
+    "optimizeConfirmNoGain": "No meaningful savings",
+    "reorderSuggested": "Reorder suggested",
     "segment": "Segment {{index}}",
     "segmentRemap": "Before {{skill}}, remap to {{attributes}}",
     "reorderPreviewTitle": "Suggested reorder",
@@ -181,6 +184,7 @@
     "removeEntry": "Remove {{name}}",
     "importError": "Couldn't import the skill queue: {{message}}",
     "addMarker": "Add remap marker",
+    "markerAdded": "Marker added",
     "optimizeAtMarkers": "Optimize at my markers",
     "markerRow": "Remap marker",
     "removeMarker": "Remove marker",
@@ -868,6 +872,16 @@
       "body": "NeoCom can notify you about skill training, mail, industry jobs, and more. You choose exactly what, per character, in Settings.",
       "enable": "Enable",
       "dismiss": "Not now"
+    },
+    "fired": {
+      "skillLevelComplete": {
+        "title": "Skill training complete",
+        "body": "{{character}} finished training {{skill}} {{level}}."
+      },
+      "characterNotTraining": {
+        "title": "Not training",
+        "body": "{{character}} has no skill in training."
+      }
     }
   },
   "pwa": {
