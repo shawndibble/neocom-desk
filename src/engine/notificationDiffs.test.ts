@@ -10,6 +10,8 @@ import {
   diffNewCalendarEvent,
   diffCalendarEventStarting,
   diffContractAccepted,
+  diffWalletBalanceChanged,
+  diffMarketOrderFilled,
   type SkillQueueEntrySnapshot,
   type SkillQueueSnapshot,
   type IndustryJobEntrySnapshot,
@@ -22,6 +24,10 @@ import {
   type CalendarSnapshot,
   type ContractEntrySnapshot,
   type ContractSnapshot,
+  type WalletJournalEntrySnapshot,
+  type WalletSnapshot,
+  type MarketOrderEntrySnapshot,
+  type MarketOrderSnapshot,
 } from './notificationDiffs';
 
 function entry(
@@ -529,5 +535,106 @@ describe('diffContractAccepted', () => {
     const prev = contractSnapshot([contractEntry(1, 'outstanding')], T0);
     const next = contractSnapshot([contractEntry(1, 'finished')], T0 + 2000);
     expect(diffContractAccepted(7, prev, next)).toEqual([]);
+  });
+});
+
+function walletEntry(id: number, amount: number | null = 100): WalletJournalEntrySnapshot {
+  return { id, amount };
+}
+
+function walletSnapshot(
+  entries: readonly WalletJournalEntrySnapshot[],
+  nowMs: number
+): WalletSnapshot {
+  return { entries, nowMs };
+}
+
+describe('diffWalletBalanceChanged', () => {
+  it('fires nothing on the first-ever poll', () => {
+    const next = walletSnapshot([walletEntry(5)], T0);
+    expect(diffWalletBalanceChanged(1, undefined, next)).toEqual([]);
+  });
+
+  it('fires when a journal entry id above the previous high-water mark appears', () => {
+    const prev = walletSnapshot([walletEntry(5), walletEntry(3)], T0);
+    const next = walletSnapshot([walletEntry(6, 250), walletEntry(5), walletEntry(3)], T0 + 2000);
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
+      { eventId: 'walletBalanceChanged', characterId: 7, amount: 250 },
+    ]);
+  });
+
+  it('does not fire for an id already seen', () => {
+    const prev = walletSnapshot([walletEntry(5)], T0);
+    const next = walletSnapshot([walletEntry(5)], T0 + 2000);
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([]);
+  });
+
+  it('does not fire while the balance merely differs from a baseline across many polls with no new entry', () => {
+    const prev = walletSnapshot([walletEntry(5)], T0);
+    const next = walletSnapshot([walletEntry(5)], T0 + FIVE_MIN * 10);
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([]);
+  });
+
+  it('fires once per new journal entry when multiple arrive in the same poll', () => {
+    const prev = walletSnapshot([walletEntry(5)], T0);
+    const next = walletSnapshot([walletEntry(7), walletEntry(6), walletEntry(5)], T0 + 2000);
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
+      { eventId: 'walletBalanceChanged', characterId: 7, amount: 100 },
+      { eventId: 'walletBalanceChanged', characterId: 7, amount: 100 },
+    ]);
+  });
+});
+
+function orderEntry(orderId: number, filled: boolean): MarketOrderEntrySnapshot {
+  return { orderId, filled };
+}
+
+function orderSnapshot(
+  entries: readonly MarketOrderEntrySnapshot[],
+  nowMs: number
+): MarketOrderSnapshot {
+  return { entries, nowMs };
+}
+
+describe('diffMarketOrderFilled', () => {
+  it('fires nothing on the first-ever poll', () => {
+    const next = orderSnapshot([orderEntry(1, true)], T0);
+    expect(diffMarketOrderFilled(1, undefined, next)).toEqual([]);
+  });
+
+  it('fires when a sell order newly transitions to filled', () => {
+    const prev = orderSnapshot([orderEntry(1, false)], T0);
+    const next = orderSnapshot([orderEntry(1, true)], T0 + 2000);
+    expect(diffMarketOrderFilled(7, prev, next)).toEqual([
+      { eventId: 'marketOrderFilled', characterId: 7, orderId: 1 },
+    ]);
+  });
+
+  it('fires the same event type when a buy order newly transitions to filled', () => {
+    const prev = orderSnapshot([orderEntry(2, false)], T0);
+    const next = orderSnapshot([orderEntry(2, true)], T0 + 2000);
+    expect(diffMarketOrderFilled(7, prev, next)).toEqual([
+      { eventId: 'marketOrderFilled', characterId: 7, orderId: 2 },
+    ]);
+  });
+
+  it('does not fire while an order stays unfilled', () => {
+    const prev = orderSnapshot([orderEntry(1, false)], T0);
+    const next = orderSnapshot([orderEntry(1, false)], T0 + 2000);
+    expect(diffMarketOrderFilled(7, prev, next)).toEqual([]);
+  });
+
+  it('does not re-fire for an order already filled as of the previous poll', () => {
+    const prev = orderSnapshot([orderEntry(1, true)], T0);
+    const next = orderSnapshot([orderEntry(1, true)], T0 + FIVE_MIN);
+    expect(diffMarketOrderFilled(7, prev, next)).toEqual([]);
+  });
+
+  it('fires for an order that only appears once already filled (never seen open before)', () => {
+    const prev = orderSnapshot([orderEntry(2, false)], T0);
+    const next = orderSnapshot([orderEntry(1, true), orderEntry(2, false)], T0 + 2000);
+    expect(diffMarketOrderFilled(7, prev, next)).toEqual([
+      { eventId: 'marketOrderFilled', characterId: 7, orderId: 1 },
+    ]);
   });
 });

@@ -5,8 +5,16 @@ import type {
   MailHeader,
   CalendarEventSummary,
   Contract,
+  WalletJournalEntry,
+  MarketOrder,
+  MarketOrderHistory,
 } from '@/esi/endpoints';
-import { runForegroundPoll, type PollDependencies, type CharacterRef } from './foregroundPoller';
+import {
+  runForegroundPoll,
+  deriveMarketOrderEntries,
+  type PollDependencies,
+  type CharacterRef,
+} from './foregroundPoller';
 import type {
   SkillQueuePollerState,
   IndustryJobPollerState,
@@ -14,6 +22,8 @@ import type {
   MailPollerState,
   CalendarPollerState,
   ContractPollerState,
+  WalletPollerState,
+  MarketOrderPollerState,
 } from './pollerState';
 
 const CHAR: CharacterRef = { characterId: 1, name: 'Test Pilot' };
@@ -23,6 +33,8 @@ const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
 const MAIL_SCOPE = 'esi-mail.read_mail.v1';
 const CALENDAR_SCOPE = 'esi-calendar.read_calendar_events.v1';
 const CONTRACTS_SCOPE = 'esi-contracts.read_character_contracts.v1';
+const WALLET_SCOPE = 'esi-wallet.read_character_wallet.v1';
+const MARKET_ORDERS_SCOPE = 'esi-markets.read_character_orders.v1';
 
 function queueEntry(overrides: Partial<SkillQueueEntry> = {}): SkillQueueEntry {
   return {
@@ -63,6 +75,16 @@ function calendarEvent(overrides: Partial<CalendarEventSummary> = {}): CalendarE
   };
 }
 
+function walletJournalEntry(overrides: Partial<WalletJournalEntry> = {}): WalletJournalEntry {
+  return {
+    id: 1,
+    date: '2026-01-01T00:00:00Z',
+    ref_type: 'bounty',
+    description: '',
+    ...overrides,
+  };
+}
+
 function contract(overrides: Partial<Contract> = {}): Contract {
   return {
     contract_id: 1,
@@ -87,6 +109,8 @@ function baseDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
   let savedMail: MailPollerState = {};
   let savedCalendar: CalendarPollerState = {};
   let savedContracts: ContractPollerState = {};
+  let savedWallet: WalletPollerState = {};
+  let savedMarketOrders: MarketOrderPollerState = {};
   return {
     now: () => 1_000_000,
     characters: async () => [CHAR],
@@ -97,6 +121,8 @@ function baseDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
     loadMail: async () => [],
     loadCalendarEvents: async () => [],
     loadContracts: async () => [],
+    loadWalletJournal: async () => [],
+    loadMarketOrders: async () => [],
     masterEnabled: async () => true,
     eventPrefsFor: async () => ({}),
     permission: () => 'granted',
@@ -124,10 +150,84 @@ function baseDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
     saveContractState: async (state) => {
       savedContracts = state;
     },
+    prevWalletState: async () => savedWallet,
+    saveWalletState: async (state) => {
+      savedWallet = state;
+    },
+    prevMarketOrderState: async () => savedMarketOrders,
+    saveMarketOrderState: async (state) => {
+      savedMarketOrders = state;
+    },
     notify: vi.fn(async () => {}),
     ...overrides,
   };
 }
+
+function marketOrder(overrides: Partial<MarketOrder> = {}): MarketOrder {
+  return {
+    order_id: 1,
+    type_id: 34,
+    region_id: 10000002,
+    location_id: 60003760,
+    is_corporation: false,
+    price: 100,
+    volume_remain: 5,
+    volume_total: 10,
+    issued: '2026-01-01T00:00:00Z',
+    duration: 90,
+    range: 'region',
+    ...overrides,
+  };
+}
+
+function marketOrderHistoryEntry(overrides: Partial<MarketOrderHistory> = {}): MarketOrderHistory {
+  return { ...marketOrder(), state: 'expired', ...overrides };
+}
+
+describe('deriveMarketOrderEntries', () => {
+  it('marks every still-open order as not filled', () => {
+    const entries = deriveMarketOrderEntries([marketOrder({ order_id: 1 })], []);
+    expect(entries).toEqual([{ orderId: 1, filled: false }]);
+  });
+
+  it('marks a history order gone from the open list as filled once volume_remain is 0', () => {
+    const entries = deriveMarketOrderEntries(
+      [],
+      [marketOrderHistoryEntry({ order_id: 2, volume_remain: 0 })]
+    );
+    expect(entries).toEqual([{ orderId: 2, filled: true }]);
+  });
+
+  it('does not mark a history order with remaining volume as filled (cancelled/expired unfilled)', () => {
+    const entries = deriveMarketOrderEntries(
+      [],
+      [marketOrderHistoryEntry({ order_id: 3, volume_remain: 4 })]
+    );
+    expect(entries).toEqual([{ orderId: 3, filled: false }]);
+  });
+
+  it('prefers the open-list entry over a stale history row for the same order id', () => {
+    const entries = deriveMarketOrderEntries(
+      [marketOrder({ order_id: 4 })],
+      [marketOrderHistoryEntry({ order_id: 4, volume_remain: 0 })]
+    );
+    expect(entries).toEqual([{ orderId: 4, filled: false }]);
+  });
+
+  it('derives the same shape for a filled buy order as a filled sell order', () => {
+    const entries = deriveMarketOrderEntries(
+      [],
+      [
+        marketOrderHistoryEntry({ order_id: 5, is_buy_order: true, volume_remain: 0 }),
+        marketOrderHistoryEntry({ order_id: 6, is_buy_order: false, volume_remain: 0 }),
+      ]
+    );
+    expect(entries).toEqual([
+      { orderId: 5, filled: true },
+      { orderId: 6, filled: true },
+    ]);
+  });
+});
 
 describe('runForegroundPoll', () => {
   it('does nothing when the master switch is off', async () => {
@@ -631,5 +731,144 @@ describe('runForegroundPoll', () => {
       contractId: 1,
     });
     expect(character).toEqual(CHAR);
+  });
+
+  it('skips the wallet journal for a character with no granted scope', async () => {
+    const loadWalletJournal = vi.fn(async () => []);
+    const deps = baseDeps({ loadWalletJournal });
+    await runForegroundPoll(deps);
+    expect(loadWalletJournal).not.toHaveBeenCalled();
+  });
+
+  it('skips the wallet journal for a character who toggled the event off despite having the scope', async () => {
+    const loadWalletJournal = vi.fn(async () => []);
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+      eventPrefsFor: async () => ({ walletBalanceChanged: false }),
+      loadWalletJournal,
+    });
+    await runForegroundPoll(deps);
+    expect(loadWalletJournal).not.toHaveBeenCalled();
+  });
+
+  it('persists a wallet snapshot on the first poll but fires nothing (no baseline yet)', async () => {
+    let savedWallet: WalletPollerState | null = null;
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+      loadWalletJournal: async () => [walletJournalEntry({ id: 5, amount: 100 })],
+      saveWalletState: async (state) => {
+        savedWallet = state;
+      },
+    });
+    await runForegroundPoll(deps);
+    expect(deps.notify).not.toHaveBeenCalled();
+    expect(savedWallet).not.toBeNull();
+    expect(savedWallet![CHAR.characterId].entries).toEqual([{ id: 5, amount: 100 }]);
+  });
+
+  it('fires walletBalanceChanged when a journal entry id above the previous high-water mark appears', async () => {
+    let savedWallet: WalletPollerState = {
+      [CHAR.characterId]: { entries: [{ id: 5, amount: 100 }], nowMs: 1000 },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+      prevWalletState: async () => savedWallet,
+      saveWalletState: async (state) => {
+        savedWallet = state;
+      },
+      loadWalletJournal: async () => [
+        walletJournalEntry({ id: 6, amount: 250 }),
+        walletJournalEntry({ id: 5, amount: 100 }),
+      ],
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [fire, character] = notify.mock.calls[0];
+    expect(fire).toEqual({
+      eventId: 'walletBalanceChanged',
+      characterId: CHAR.characterId,
+      amount: 250,
+    });
+    expect(character).toEqual(CHAR);
+  });
+
+  it('skips market orders for a character with no granted scope', async () => {
+    const loadMarketOrders = vi.fn(async () => []);
+    const deps = baseDeps({ loadMarketOrders });
+    await runForegroundPoll(deps);
+    expect(loadMarketOrders).not.toHaveBeenCalled();
+  });
+
+  it('skips market orders for a character who toggled the event off despite having the scope', async () => {
+    const loadMarketOrders = vi.fn(async () => []);
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({ marketOrderFilled: false }),
+      loadMarketOrders,
+    });
+    await runForegroundPoll(deps);
+    expect(loadMarketOrders).not.toHaveBeenCalled();
+  });
+
+  it('persists a market-order snapshot on the first poll but fires nothing (no baseline yet)', async () => {
+    let savedMarketOrders: MarketOrderPollerState | null = null;
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      loadMarketOrders: async () => [{ orderId: 1, filled: false }],
+      saveMarketOrderState: async (state) => {
+        savedMarketOrders = state;
+      },
+    });
+    await runForegroundPoll(deps);
+    expect(deps.notify).not.toHaveBeenCalled();
+    expect(savedMarketOrders).not.toBeNull();
+    expect(savedMarketOrders![CHAR.characterId].entries).toEqual([{ orderId: 1, filled: false }]);
+  });
+
+  it('fires marketOrderFilled when an order newly transitions to filled', async () => {
+    let savedMarketOrders: MarketOrderPollerState = {
+      [CHAR.characterId]: { entries: [{ orderId: 1, filled: false }], nowMs: 1000 },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      prevMarketOrderState: async () => savedMarketOrders,
+      saveMarketOrderState: async (state) => {
+        savedMarketOrders = state;
+      },
+      loadMarketOrders: async () => [{ orderId: 1, filled: true }],
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [fire, character] = notify.mock.calls[0];
+    expect(fire).toEqual({
+      eventId: 'marketOrderFilled',
+      characterId: CHAR.characterId,
+      orderId: 1,
+    });
+    expect(character).toEqual(CHAR);
+  });
+
+  it('fires marketOrderFilled the same way for a buy order as a sell order', async () => {
+    let savedMarketOrders: MarketOrderPollerState = {
+      [CHAR.characterId]: { entries: [{ orderId: 2, filled: false }], nowMs: 1000 },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      prevMarketOrderState: async () => savedMarketOrders,
+      saveMarketOrderState: async (state) => {
+        savedMarketOrders = state;
+      },
+      loadMarketOrders: async () => [{ orderId: 2, filled: true }],
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [fire] = notify.mock.calls[0];
+    expect(fire.eventId).toBe('marketOrderFilled');
   });
 });

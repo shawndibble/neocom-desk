@@ -21,6 +21,10 @@ import type {
   ContractEntrySnapshot,
   ContractSnapshot,
   ContractStatus,
+  WalletJournalEntrySnapshot,
+  WalletSnapshot,
+  MarketOrderEntrySnapshot,
+  MarketOrderSnapshot,
 } from '@/engine/notificationDiffs';
 
 export const SKILL_QUEUE_POLLER_STATE_KEY = 'notifications.pollerState.skillQueue';
@@ -310,5 +314,91 @@ export function withCharacterContractSnapshot(
   characterId: number,
   snapshot: ContractSnapshot
 ): ContractPollerState {
+  return { ...state, [characterId]: snapshot };
+}
+
+export const WALLET_POLLER_STATE_KEY = 'notifications.pollerState.wallet';
+
+export type WalletPollerState = Record<number, WalletSnapshot>;
+
+export const DEFAULT_WALLET_POLLER_STATE: WalletPollerState = {};
+
+function isWalletJournalEntrySnapshot(raw: unknown): raw is WalletJournalEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return typeof r.id === 'number' && (r.amount === null || typeof r.amount === 'number');
+}
+
+function isWalletSnapshot(raw: unknown): raw is WalletSnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.nowMs === 'number' &&
+    Array.isArray(r.entries) &&
+    r.entries.every(isWalletJournalEntrySnapshot)
+  );
+}
+
+function isWalletPollerState(raw: unknown): raw is WalletPollerState {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) => !Number.isNaN(Number(key)) && isWalletSnapshot(value)
+  );
+}
+
+export const useWalletPollerState = createLocalSetting<WalletPollerState>({
+  key: WALLET_POLLER_STATE_KEY,
+  defaultValue: DEFAULT_WALLET_POLLER_STATE,
+  parse: (raw) => (isWalletPollerState(raw) ? raw : null),
+});
+
+export function withCharacterWalletSnapshot(
+  state: WalletPollerState,
+  characterId: number,
+  snapshot: WalletSnapshot
+): WalletPollerState {
+  return { ...state, [characterId]: snapshot };
+}
+
+export const MARKET_ORDER_POLLER_STATE_KEY = 'notifications.pollerState.marketOrders';
+
+export type MarketOrderPollerState = Record<number, MarketOrderSnapshot>;
+
+export const DEFAULT_MARKET_ORDER_POLLER_STATE: MarketOrderPollerState = {};
+
+function isMarketOrderEntrySnapshot(raw: unknown): raw is MarketOrderEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return typeof r.orderId === 'number' && typeof r.filled === 'boolean';
+}
+
+function isMarketOrderSnapshot(raw: unknown): raw is MarketOrderSnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.nowMs === 'number' &&
+    Array.isArray(r.entries) &&
+    r.entries.every(isMarketOrderEntrySnapshot)
+  );
+}
+
+function isMarketOrderPollerState(raw: unknown): raw is MarketOrderPollerState {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) => !Number.isNaN(Number(key)) && isMarketOrderSnapshot(value)
+  );
+}
+
+export const useMarketOrderPollerState = createLocalSetting<MarketOrderPollerState>({
+  key: MARKET_ORDER_POLLER_STATE_KEY,
+  defaultValue: DEFAULT_MARKET_ORDER_POLLER_STATE,
+  parse: (raw) => (isMarketOrderPollerState(raw) ? raw : null),
+});
+
+export function withCharacterMarketOrderSnapshot(
+  state: MarketOrderPollerState,
+  characterId: number,
+  snapshot: MarketOrderSnapshot
+): MarketOrderPollerState {
   return { ...state, [characterId]: snapshot };
 }
