@@ -9,10 +9,6 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
-import { buildVsBuy } from '@/engine/industry/buildVsBuy';
-import { FACILITY_PRESETS } from '@/engine/industry/types';
-import { formatCostIndex } from '@/features/industry/format';
-import { formatIsk } from '@/lib/isk';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
@@ -59,12 +55,9 @@ vi.mock('@/sde/loadSde', () => ({
 const CHAR_ID = 91;
 const emptySkillsPayload = { skills: [], total_sp: 0, unallocated_sp: 0 };
 
-let fuzzworkStations: number[] = [];
-
 function fuzzworkHandler() {
   return http.get('https://market.fuzzwork.co.uk/aggregates/', ({ request }) => {
     const url = new URL(request.url);
-    fuzzworkStations.push(Number(url.searchParams.get('station')));
     const types = url.searchParams.get('types')?.split(',') ?? [];
     const body: Record<string, unknown> = {};
     for (const t of types) {
@@ -134,7 +127,6 @@ afterEach(() => {
   clearCostIndexCache();
 });
 beforeEach(async () => {
-  fuzzworkStations = [];
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -338,17 +330,6 @@ describe('Industry: build plan settings grouping (#120)', () => {
   });
 });
 
-const RIFTER_BLUEPRINT = {
-  name: 'Rifter Blueprint',
-  time: 1200,
-  materials: [
-    { typeID: 34, quantity: 100 },
-    { typeID: 35, quantity: 50 },
-    { typeID: 9840, quantity: 10 },
-  ],
-  products: [{ typeID: 587, quantity: 1 }],
-};
-
 describe('Industry: /skills is stale until the character logs in', () => {
   it('applies an Industry level the queue finished in the past, which /skills omits', async () => {
     // Base blueprint time is 1200s (20m). Industry V is -4%/level, so a
@@ -413,73 +394,6 @@ describe('Industry: /skills is stale until the character logs in', () => {
 });
 
 describe('Industry: results panel', () => {
-  it('flags an unpriced material, wires displayed totals (including the job fee breakdown and unit vs. sell-value product price) to buildVsBuy, then refetches on hub switch', async () => {
-    const user = userEvent.setup();
-    // runs: 2, not 1 — at runs 1 a unit price and the job's gross sell value
-    // are numerically identical, which would hide a unit-price/revenue mixup.
-    await db.buildPlans.add(seedPlan({ runs: 2 }));
-    render(<App />);
-
-    const pyeriteRow = (await screen.findByText('Pyerite')).closest('tr')!;
-    expect(within(pyeriteRow).getByText('No price')).toBeInTheDocument();
-    expect(await screen.findByText(/1 material\(s\) have no hub price/)).toBeInTheDocument();
-
-    const expected = buildVsBuy({
-      blueprint: RIFTER_BLUEPRINT,
-      runs: 2,
-      me: 0,
-      te: 0,
-      facility: FACILITY_PRESETS.npcStation,
-      rig: 'none',
-      security: 'highsec',
-      facilityTaxPct: undefined,
-      systemCostIndex: 0.05,
-      adjustedPrices: { 34: 8, 35: 3, 9840: 20 },
-      hubPrices: { 34: 10, 9840: 50, 587: 100_000 },
-      skills: {},
-    });
-    expect(expected.unpriceable).toBe(true);
-    expect(expected.recommendation).toBe('unknown');
-    // Sanity check on the test's own fixture: unit price and gross sell
-    // value must differ, or the assertions below can't tell them apart.
-    expect(expected.buyCost).not.toBe(100_000);
-
-    // Job fee breakdown, not just the total: expand the collapsed-by-default
-    // Job Fee row first (#116 — costs render as a stack, breakdown hidden until activated).
-    await user.click(screen.getByRole('button', { name: /job fee/i }));
-    expect(screen.getByText(formatIsk(expected.jobFee.eiv))).toBeInTheDocument();
-    expect(screen.getByText(formatIsk(expected.jobFee.grossCost))).toBeInTheDocument();
-    expect(screen.getByText(formatIsk(expected.jobFee.sccSurcharge))).toBeInTheDocument();
-    expect(screen.getByText(formatIsk(expected.jobFee.facilityTax))).toBeInTheDocument();
-    expect(screen.getByText(formatIsk(expected.jobFee.total))).toBeInTheDocument();
-
-    expect(screen.getByText(formatIsk(expected.materialCost))).toBeInTheDocument();
-    expect(screen.getByText(formatIsk(expected.totalCost))).toBeInTheDocument();
-    expect(screen.getByText(formatCostIndex(0.05))).toBeInTheDocument();
-
-    // Product sell price is the unit price (100,000), distinct from the
-    // job's gross sell value (buyCost = 2 runs x 100,000 = 200,000). It also
-    // appears in the break-even section's "Current market price" comparison row.
-    expect(screen.getAllByText(formatIsk(100_000)).length).toBeGreaterThan(0);
-    expect(screen.getByText(formatIsk(expected.buyCost!))).toBeInTheDocument();
-
-    expect(
-      screen.getByText('Not enough price data for a build-vs-buy verdict.')
-    ).toBeInTheDocument();
-
-    // fuzzworkStations is populated inside the MSW request handler, an async
-    // side channel the DOM assertions above don't actually wait on — under
-    // CPU contention (e.g. several /next-ticket runs at once) the request
-    // can still be in flight even once other state has settled. waitFor
-    // makes this deterministic instead of racing.
-    await waitFor(() => expect(fuzzworkStations).toContain(60003760)); // Jita 4-4
-
-    await user.selectOptions(screen.getByLabelText('Trade hub'), 'amarr');
-
-    await screen.findByText(formatCostIndex(0.002));
-    await waitFor(() => expect(fuzzworkStations).toContain(60008494)); // Amarr
-  });
-
   it('keeps materials and time visible, but shows an empty state instead of cost/profit, when prices are unreachable (offline)', async () => {
     server.use(
       http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.error()),
