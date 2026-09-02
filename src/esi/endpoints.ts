@@ -415,6 +415,24 @@ export function getUniverseStation(
   });
 }
 
+// --- GET /universe/systems/{system_id} (public) ---
+
+export interface UniverseSystem {
+  system_id: number;
+  name: string;
+  security_status: number;
+}
+
+export function getUniverseSystem(
+  systemId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<UniverseSystem>> {
+  return esiFetch<UniverseSystem>(`/universe/systems/${systemId}`, {
+    ...options,
+    endpointId: 'getUniverseSystem',
+  });
+}
+
 // --- GET /characters/{character_id}/mail (esi-mail.read_mail.v1) ---
 
 /** One entry in a recipients list (mail header or body). */

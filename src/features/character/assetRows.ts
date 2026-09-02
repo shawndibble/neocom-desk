@@ -62,10 +62,12 @@ export function flattenAssetRows(
       posinset: index + 1,
       setsize,
     });
-    pushNodeRows(rows, station.children, stationKey, 0, {
-      stationLocationId: station.locationId,
-      expandedKeys,
-    });
+    if (expandedKeys.has(stationKey)) {
+      pushNodeRows(rows, station.children, stationKey, 0, {
+        stationLocationId: station.locationId,
+        expandedKeys,
+      });
+    }
   });
   return rows;
 }
