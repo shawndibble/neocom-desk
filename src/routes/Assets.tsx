@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
   DataAgeBadge,
   EmptyState,
-  FilterChip,
+  IconButton,
   Panel,
   ReauthBanner,
   Select,
@@ -17,6 +17,7 @@ import {
   SelectValue,
   Spinner,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
@@ -27,7 +28,6 @@ import {
 } from '@/sync';
 import { db, type QuickbarItem } from '@/db';
 import { cx } from '@/lib/cx';
-import { useHoverTooltip } from '@/lib/useHoverTooltip';
 import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
 import {
   loadCharacterAssets,
@@ -38,7 +38,6 @@ import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
 import { loadSystemSecurity } from '@/features/character/systemSecurity';
-import { securityStatusColor } from '@/engine/securityStatus';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadJumpsAway } from '@/features/character/routeDistance';
@@ -51,40 +50,37 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
 import { formatIsk } from '@/lib/isk';
-import { formatVolume } from '@/features/market/format';
-import { typeIconUrl } from '@/lib/eveImages';
 import { loadTypes } from '@/sde/loadSde';
 import {
   buildAssetTree,
   compareStations,
   collectItemIds,
   collectStationItemIds,
-  type AssetTreeBayNode,
-  type AssetTreeContainerNode,
-  type AssetTreeItemNode,
   type AssetTreeNode,
   type AssetTreeStation,
   type StationSortField,
 } from '@/engine/assetTree';
+import {
+  assetNodeSegment,
+  assetPathHref,
+  parseAssetPath,
+  resolveAssetPath,
+} from '@/engine/assetPath';
 import { useStationSort } from '@/features/character/stationSortPreference';
-import {
-  flattenAssetRows,
-  nodeSegment,
-  stationRowKey,
-  type AssetRow,
-} from '@/features/character/assetRows';
-import {
-  arrowLeft,
-  arrowRight,
-  typeAheadIndex,
-  type NavRow,
-} from '@/features/character/assetTreeNav';
 import {
   namesForSelection,
   selectionStateForIds,
   toggleSelection,
-  type SelectionState,
 } from '@/features/character/assetSelection';
+import {
+  ContainerRow,
+  ItemRow,
+  JumpsAwayText,
+  LocationRow,
+  SearchResultRow,
+  SectionHeading,
+  SecurityValue,
+} from '@/features/character/assetBrowserRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { addQuickbarItem } from '@/features/market/quickbar';
@@ -147,7 +143,7 @@ interface AssetMatch {
   name: string;
 }
 
-/** Name-substring search over a flat asset list, shared by the CSV export path and the on-screen tree path. */
+/** Name-substring search over a flat asset list, shared by the CSV export path and the on-screen results path. */
 function matchAssets(
   assets: readonly CharacterAsset[],
   typeNames: ReadonlyMap<number, string>,
@@ -302,40 +298,6 @@ async function loadCrossCharacterData(activeCharacterId: number): Promise<CrossC
   return { entries, typeNames, locationNames, characterIdByItemId, characterNameById };
 }
 
-/**
- * A leaf survives if its own name matches; a container/ship survives if its own name
- * matches OR at least one descendant does (so a non-matching ship isn't dropped out from
- * under a matching item inside it). Ancestor auto-expand for the surviving tree is handled
- * separately, in the `autoExpandedKeys` computation below.
- */
-function pruneNode(node: AssetTreeNode, visibleItemIds: ReadonlySet<number>): AssetTreeNode | null {
-  if (node.kind === 'item') return visibleItemIds.has(node.asset.item_id) ? node : null;
-
-  const children = node.children
-    .map((child) => pruneNode(child, visibleItemIds))
-    .filter((child): child is AssetTreeNode => child !== null);
-
-  if (node.kind === 'bay') return children.length > 0 ? { ...node, children } : null;
-
-  const ownMatch = visibleItemIds.has(node.asset.item_id);
-  if (!ownMatch && children.length === 0) return null;
-  return { ...node, children };
-}
-
-function pruneStations(
-  stations: readonly AssetTreeStation[],
-  visibleItemIds: ReadonlySet<number>
-): AssetTreeStation[] {
-  const result: AssetTreeStation[] = [];
-  for (const station of stations) {
-    const children = station.children
-      .map((child) => pruneNode(child, visibleItemIds))
-      .filter((child): child is AssetTreeNode => child !== null);
-    if (children.length > 0) result.push({ ...station, children });
-  }
-  return result;
-}
-
 function nameForNode(node: AssetTreeNode, typeNames: ReadonlyMap<number, string>): string {
   if (node.kind === 'bay') return '';
   return typeNames.get(node.asset.type_id) ?? `Type #${node.asset.type_id}`;
@@ -380,21 +342,10 @@ function sortStations(
     );
 }
 
-function collectExpandableKeys(nodes: readonly AssetTreeNode[], parentPath: string): string[] {
-  const keys: string[] = [];
-  for (const node of nodes) {
-    if (node.kind === 'item') continue;
-    const path = `${parentPath}/${nodeSegment(node)}`;
-    keys.push(path, ...collectExpandableKeys(node.children, path));
-  }
-  return keys;
-}
-
 /**
  * Cross-character search (issue #85): who owns which row, relative to the
  * active Character — the three pieces always travel together, so they get
- * one field on `RenderCtx` instead of three. `EMPTY_CHARACTER_BADGES` below
- * is the off/inactive value: every row resolves to "no badge".
+ * one value instead of three.
  */
 interface CharacterBadgeContext {
   activeCharacterId: number | null;
@@ -402,184 +353,20 @@ interface CharacterBadgeContext {
   nameById: ReadonlyMap<number, string>;
 }
 
-interface RenderCtx {
-  expandedKeys: ReadonlySet<string>;
-  onToggle: (key: string) => void;
-  typeNames: ReadonlyMap<number, string>;
-  t: Translate;
-  characterBadges: CharacterBadgeContext;
-  /** Roving-tabindex bookkeeping (issue #89): tells this row's `role="treeitem"` it now has DOM focus. */
-  onRowFocus: (key: string) => void;
-  /** Select mode (issue #90): browsing mode (off) renders exactly as before this ticket. */
-  selectMode: boolean;
-  selectedIds: ReadonlySet<number>;
-  /** Cascades the checkbox's node/station ids into the selection set — see `toggleSelection`. */
-  onToggleSelection: (ids: readonly number[]) => void;
-}
-
-/** `aria-level`/`aria-posinset`/`aria-setsize` plus roving-tabindex state for one row — see `assetRows.ts` for how the first three are computed. */
-interface TreeRowA11y {
-  level: number;
-  posinset: number;
-  setsize: number;
-  focused: boolean;
-}
-
-function formatBadge(totals: { itemCount: number; estimatedValue: number }, t: Translate): string {
-  return t('assets.nodeBadge', {
-    count: totals.itemCount,
-    value: formatIsk(totals.estimatedValue),
-  });
-}
-
 /** The owning Character's name, only when it isn't the active Character — null means "no badge". */
-function characterBadgeFor(itemId: number, ctx: RenderCtx): string | null {
-  const { activeCharacterId, idByItemId, nameById } = ctx.characterBadges;
-  const ownerId = idByItemId.get(itemId);
-  if (ownerId === undefined || ownerId === activeCharacterId) return null;
-  return nameById.get(ownerId) ?? null;
-}
-
-interface CharacterBadgeProps {
-  characterName: string;
-  t: Translate;
-}
-
-/** Small pill marking a tree row as belonging to a Character other than the active one. */
-function CharacterBadge({ characterName, t }: CharacterBadgeProps) {
-  return (
-    <span
-      className="ml-1.5 shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.625rem] text-text-dim"
-      title={t('assets.crossCharacterBadge', { character: characterName })}
-    >
-      {characterName}
-    </span>
-  );
-}
-
-interface StationPinButtonProps {
-  label: string;
-  pinState: PinState;
-  onToggle: () => void;
-  t: Translate;
-}
-
-/**
- * Station pin toggle (issue #84): cycles unpinned -> pinned-for-this-character
- * -> pinned-account-wide -> unpinned. Both pinned states use the `accent`
- * family (a stronger, filled treatment for account-wide, since it's the more
- * far-reaching of the two) rather than `warning` — DESIGN.md reserves that
- * token for caution states (stale data, low skill), and an account-wide pin
- * is a deliberate elevated choice, not a caution. `aria-pressed` follows the
- * `FilterChip` toggle-button precedent (DESIGN.md); the finer character-vs-
- * account distinction is carried by the label/tooltip text, not by
- * `aria-pressed` itself (only true/false/mixed, none of which map cleanly to
- * "which of two pinned states").
- */
-function StationPinButton({ label, pinState, onToggle, t }: StationPinButtonProps) {
-  const { tooltipOpen, tooltipId, triggerHandlers } = useHoverTooltip();
-  const tooltipText = t(`assets.pin.${pinState}`);
-  const glyph = pinState === 'unpinned' ? '☆' : pinState === 'character' ? '★' : '✦';
-
-  return (
-    <span className="relative inline-flex">
-      <button
-        type="button"
-        aria-pressed={pinState !== 'unpinned'}
-        aria-label={t('assets.pin.ariaLabel', { station: label, state: tooltipText })}
-        onClick={onToggle}
-        {...triggerHandlers}
-        className={cx(
-          'flex size-7 shrink-0 items-center justify-center rounded-xs border text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-          pinState === 'account'
-            ? 'border-accent bg-accent text-accent-contrast'
-            : pinState === 'character'
-              ? 'border-accent-dim bg-accent/15 text-accent'
-              : 'border-line bg-panel-2 text-text-dim hover:border-line-bright hover:text-text'
-        )}
-      >
-        <span aria-hidden="true">{glyph}</span>
-      </button>
-      {tooltipOpen && (
-        <span
-          id={tooltipId}
-          role="tooltip"
-          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 w-max max-w-56 -translate-x-1/2 rounded-xs border border-line bg-panel px-2 py-1 text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
-        >
-          {tooltipText}
-        </span>
-      )}
-    </span>
-  );
-}
-
-interface JumpsAwayBadgeProps {
-  result: JumpsAwayResult | undefined;
-  t: Translate;
-}
-
-/**
- * Jumps-away distance for a station row (issue #87). Renders nothing while
- * still resolving (undefined) rather than a placeholder — the badge is a
- * progressive enhancement that pops in once its route call settles, never a
- * load-blocking part of the row. `title` (not the hover-tooltip pattern used
- * elsewhere on this page) mirrors `CharacterBadge`'s own plain-annotation
- * treatment just above — this is the same kind of small supplementary label.
- */
-interface SecurityBadgeProps {
-  /** Undefined while still resolving/out of scope, null if unresolvable — see `JumpsAwayBadge`. */
-  security: number | null | undefined;
-  t: Translate;
-}
-
-/**
- * A solar system's security status (issue #148), colored on the game's own
- * scale (`securityStatusColor` — blue-green through highsec, amber/red
- * through lowsec and nullsec). Renders nothing while unresolved, same
- * progressive-enhancement treatment as `JumpsAwayBadge` just above.
- */
-function SecurityBadge({ security, t }: SecurityBadgeProps) {
-  if (security === null || security === undefined) return null;
-  const value = security.toFixed(1);
-  return (
-    <span
-      className="shrink-0 text-[0.6875rem] font-semibold tabular-nums"
-      style={{ color: securityStatusColor(security) }}
-      title={t('assets.security.ariaLabel', { value })}
-    >
-      {value}
-    </span>
-  );
-}
-
-function JumpsAwayBadge({ result, t }: JumpsAwayBadgeProps) {
-  if (!result) return null;
-  if (result.kind === 'known') {
-    return (
-      <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
-        {t('assets.jumpsAway.value', { count: result.jumps })}
-      </span>
-    );
-  }
-  return (
-    <span
-      className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums"
-      title={t(`assets.jumpsAway.unknownReason.${result.reason}`)}
-    >
-      {t('assets.jumpsAway.unknown')}
-    </span>
-  );
+function characterBadgeFor(itemId: number, ctx: CharacterBadgeContext): string | null {
+  const ownerId = ctx.idByItemId.get(itemId);
+  if (ownerId === undefined || ownerId === ctx.activeCharacterId) return null;
+  return ctx.nameById.get(ownerId) ?? null;
 }
 
 /**
  * The item context menu's actions and their supporting data (Quickbar,
- * blueprint catalog, tooltip pricing/volume) — everything an `AssetItemRow`
- * needs but a plain-recursion-threaded `RenderCtx` cannot carry. Reaching
- * these through `useContext` rather than another `ctx` field matters beyond
- * style: the React Compiler's purity/refs checks can verify a value read via
- * Context is deferred to event time, but lose that guarantee for a closure
- * (over a ref, or over an impure call like `Date.now()`) that merely rides
- * along inside a plain object passed through ordinary function calls.
+ * blueprint catalog, pricing/volume) — everything an item row needs but a
+ * prop-threaded context cannot carry cheaply. Reaching these through
+ * `useContext` rather than props matters beyond style: the React Compiler's
+ * purity/refs checks can verify a value read via Context is deferred to event
+ * time, but lose that guarantee for a closure passed through ordinary props.
  */
 interface AssetItemActions {
   priceByTypeId: ReadonlyMap<number, number>;
@@ -595,327 +382,64 @@ const AssetItemActionsContext = createContext<AssetItemActions | null>(null);
 
 function useAssetItemActions(): AssetItemActions {
   const actions = useContext(AssetItemActionsContext);
-  if (!actions) throw new Error('AssetItemRow rendered outside its actions provider');
+  if (!actions) throw new Error('Asset row rendered outside its actions provider');
   return actions;
 }
 
-interface SelectionCheckboxProps {
-  state: SelectionState;
-  onToggle: () => void;
-  label: string;
-}
+/**
+ * One row of whatever list is currently on screen. Three list shapes share a
+ * single virtualizer and a single row union rather than three parallel
+ * implementations: the location list, one level of a location's contents, and
+ * flat search results.
+ */
+type BrowseRow =
+  | { kind: 'heading'; key: string; label: string; tone: 'default' | 'warning' }
+  | { kind: 'location'; key: string; station: AssetTreeStation }
+  | { kind: 'node'; key: string; node: AssetTreeNode }
+  | { kind: 'match'; key: string; match: AssetMatch };
 
-/** Tri-state checkbox for select mode (issue #90) — indeterminate can only be set imperatively, not via a JSX prop. */
-function SelectionCheckbox({ state, onToggle, label }: SelectionCheckboxProps) {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (ref.current) ref.current.indeterminate = state === 'indeterminate';
-  }, [state]);
-
-  return (
-    <input
-      ref={ref}
-      type="checkbox"
-      checked={state === 'checked'}
-      onChange={onToggle}
-      onClick={(e) => e.stopPropagation()}
-      aria-label={label}
-      className="size-3.5 shrink-0 cursor-pointer accent-accent"
-    />
-  );
-}
-
-interface AssetItemRowProps {
-  node: AssetTreeItemNode;
-  depth: number;
-  ctx: RenderCtx;
-  rowKey: string;
-  a11y: TreeRowA11y;
+/** Estimated heights — the virtualizer windows on these, same fixed-estimate approach as the tree view it replaces. */
+function estimateRowHeight(row: BrowseRow): number {
+  switch (row.kind) {
+    case 'heading':
+      return 33;
+    case 'location':
+    case 'match':
+      return 64;
+    case 'node':
+      return 48;
+  }
 }
 
 /**
- * A leaf asset row: hover/focus reveals a tooltip (name, icon, quantity,
- * estimated value, volume) and right-click opens the shared item context
- * menu (`ItemContextMenu`, also used by the Market Browser — issue #83). The
- * tooltip bubble only mounts while active rather than always-rendered-but-
- * hidden (the pattern `Tooltip` uses elsewhere): an unvirtualized tree can
- * hold thousands of these rows, and paying render cost for a bubble nobody is
- * looking at doesn't scale the way it does for the handful of static tooltips
- * that component serves.
+ * An orphan group: `buildAssetTree` promotes an asset whose parent wasn't in
+ * the fetched page to its own top-level group, which is why a bare "Container"
+ * or a ship name can appear beside real stations. They are real assets and
+ * must stay reachable, but they are not locations, so they get their own
+ * section rather than being sorted in among stations.
  */
-function AssetItemRow({ node, depth, ctx, rowKey, a11y }: AssetItemRowProps) {
-  const { tooltipOpen, tooltipId, triggerHandlers } = useHoverTooltip();
-  const actions = useAssetItemActions();
-  const { asset } = node;
-  const name = ctx.typeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
-  const unitVolume = actions.volumeByTypeId.get(asset.type_id);
-  const estimatedValue = asset.quantity * (actions.priceByTypeId.get(asset.type_id) ?? 0);
-  const blueprintTypeID =
-    actions.blueprintCatalog === null
-      ? undefined
-      : (actions.blueprintCatalog.byProductTypeID.get(asset.type_id)?.blueprintTypeID ?? null);
-  const characterBadge = characterBadgeFor(asset.item_id, ctx);
-
-  return (
-    <div style={{ paddingLeft: `${depth * 0.75 + 0.75}rem` }} className="flex items-center gap-1.5">
-      {ctx.selectMode && (
-        <SelectionCheckbox
-          state={ctx.selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
-          onToggle={() => ctx.onToggleSelection([asset.item_id])}
-          label={ctx.t('assets.select.itemAriaLabel', { name })}
-        />
-      )}
-      <ItemContextMenu
-        typeId={asset.type_id}
-        itemName={name}
-        blueprintTypeID={blueprintTypeID}
-        onAddToQuickbar={actions.onAddToQuickbar}
-        quickbarAvailable={actions.quickbarAvailable}
-        onShowInfo={actions.onShowInfo}
-        onOpenChange={(open) => {
-          if (open) actions.onRequestBlueprintCatalog();
-        }}
-      >
-        {/* The tooltip bubble is a sibling of the button, not a descendant —
-            nested inside, its text would fold into the button's accessible
-            name (computed from its content, since it has no aria-label of
-            its own) whenever the tooltip is open. */}
-        <span className="group relative block min-w-0 flex-1">
-          <button
-            type="button"
-            role="treeitem"
-            aria-level={a11y.level}
-            aria-posinset={a11y.posinset}
-            aria-setsize={a11y.setsize}
-            tabIndex={a11y.focused ? 0 : -1}
-            data-row-key={rowKey}
-            {...triggerHandlers}
-            onFocus={() => {
-              triggerHandlers.onFocus();
-              ctx.onRowFocus(rowKey);
-            }}
-            className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-accent"
-          >
-            <span className="flex min-w-0 items-center">
-              <span className="truncate">{name}</span>
-              {characterBadge && <CharacterBadge characterName={characterBadge} t={ctx.t} />}
-            </span>
-            <span className="flex shrink-0 items-center gap-4 tabular-nums text-text-dim">
-              <span className="w-14 text-right">{asset.quantity.toLocaleString()}</span>
-              <span className="w-16 text-right">
-                {unitVolume === undefined ? ctx.t('assets.unknownValue') : formatVolume(unitVolume)}
-              </span>
-              <span className="w-20 text-right">{formatIsk(estimatedValue)}</span>
-            </span>
-          </button>
-          {tooltipOpen && (
-            <span
-              id={tooltipId}
-              role="tooltip"
-              className="pointer-events-none absolute bottom-full left-0 z-10 mb-1 w-64 rounded-xs border border-line bg-panel p-2 text-left text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
-            >
-              <span className="flex items-center gap-2">
-                <img
-                  src={typeIconUrl(asset.type_id, 32)}
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="shrink-0 rounded-xs border border-line"
-                />
-                <span className="truncate font-medium text-text">{name}</span>
-              </span>
-              <span className="mt-1 block">
-                {ctx.t('assets.quantity')} {asset.quantity.toLocaleString()}
-              </span>
-              <span className="block">
-                {ctx.t('assets.tooltip.value', { value: formatIsk(estimatedValue) })}
-              </span>
-              <span className="block">
-                {unitVolume === undefined
-                  ? ctx.t('assets.tooltip.volumeUnknown')
-                  : ctx.t('assets.tooltip.volume', { volume: formatVolume(unitVolume) })}
-              </span>
-            </span>
-          )}
-        </span>
-      </ItemContextMenu>
-    </div>
-  );
+function isUnresolvedParent(station: AssetTreeStation): boolean {
+  return station.locationType === 'item';
 }
 
-interface AssetBranchRowProps {
-  node: AssetTreeBayNode | AssetTreeContainerNode;
-  path: string;
-  depth: number;
-  ctx: RenderCtx;
-  a11y: TreeRowA11y;
-  /** From the shared `rowLabels` array (Assets()) — the one place this is computed, so it never drifts from what type-ahead searches against. */
-  label: string;
-}
-
-/** A bay/container/ship row: toggles its own children's presence in the flattened row list. */
-function AssetBranchRow({ node, path, depth, ctx, a11y, label }: AssetBranchRowProps) {
-  const expanded = ctx.expandedKeys.has(path);
-  const characterBadge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, ctx);
-
-  return (
-    <div style={{ paddingLeft: `${depth * 0.75}rem` }} className="flex items-center gap-1.5 pr-3">
-      {ctx.selectMode && (
-        <SelectionCheckbox
-          state={selectionStateForIds(collectItemIds(node), ctx.selectedIds)}
-          onToggle={() => ctx.onToggleSelection(collectItemIds(node))}
-          label={ctx.t('assets.select.branchAriaLabel', { name: label })}
-        />
-      )}
-      <button
-        type="button"
-        role="treeitem"
-        aria-expanded={expanded}
-        aria-level={a11y.level}
-        aria-posinset={a11y.posinset}
-        aria-setsize={a11y.setsize}
-        tabIndex={a11y.focused ? 0 : -1}
-        data-row-key={path}
-        onFocus={() => ctx.onRowFocus(path)}
-        onClick={() => ctx.onToggle(path)}
-        className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left text-xs text-text hover:text-accent"
-      >
-        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-          {expanded ? '▾' : '▸'}
-        </span>
-        {node.kind === 'bay' ? (
-          <span className="truncate text-text-dim">{label}</span>
-        ) : (
-          <h3 className="truncate font-medium">{label}</h3>
-        )}
-        {characterBadge && <CharacterBadge characterName={characterBadge} t={ctx.t} />}
-        <span className="ml-auto shrink-0 tabular-nums text-[0.6875rem] text-text-faint">
-          {formatBadge(node, ctx.t)}
-        </span>
-      </button>
-    </div>
-  );
-}
-
-interface StationHeaderRowProps {
-  station: AssetTreeStation;
-  label: string;
-  pinState: PinState;
-  /** Undefined while still resolving/out of scope (issue #87) — see `JumpsAwayBadge`. */
-  jumpsAway: JumpsAwayResult | undefined;
-  /** Undefined while still resolving/out of scope, null if unresolvable — see `SecurityBadge`. */
-  security: number | null | undefined;
-  expanded: boolean;
-  onToggle: () => void;
-  onTogglePin: () => void;
-  onFocusRow: (key: string) => void;
-  t: Translate;
-  a11y: TreeRowA11y;
-  selectMode: boolean;
-  selectionState: SelectionState;
-  onToggleSelection: () => void;
-}
-
-/**
- * Replaces the old per-station `Panel` header now that every station shares
- * one virtualizer: a boxed `Panel` per station can't wrap only its own rows
- * when all rows are absolutely-positioned siblings in one scroll container,
- * so this renders inline as just another row, styled to still read as a
- * section boundary (border-top, panel background) rather than a full box.
- *
- * Collapsed by default (issue #148): a station is now a toggleable branch
- * like a bay/container/ship, not an always-open root. The row's DOM focus
- * target is the outer `role="treeitem"` div (so Enter/Space/ArrowRight
- * toggle it via the shared tree keydown handler), but the click affordance
- * is a nested `<button>` around just the chevron/label — `StationPinButton`
- * is a real, independently-tabbable sibling control, and nesting it inside
- * a row-wide button would be invalid HTML, the same constraint
- * `AssetBranchRow` doesn't have to solve since it has no sibling controls.
- */
-function StationHeaderRow({
-  station,
-  label,
-  pinState,
-  jumpsAway,
-  security,
-  expanded,
-  onToggle,
-  onTogglePin,
-  onFocusRow,
-  t,
-  a11y,
-  selectMode,
-  selectionState,
-  onToggleSelection,
-}: StationHeaderRowProps) {
-  const rowKey = stationRowKey(station.locationId);
-  const labelId = `${rowKey}-label`;
-  return (
-    <div
-      role="treeitem"
-      aria-expanded={expanded}
-      aria-level={a11y.level}
-      aria-posinset={a11y.posinset}
-      aria-setsize={a11y.setsize}
-      aria-labelledby={labelId}
-      tabIndex={a11y.focused ? 0 : -1}
-      data-row-key={rowKey}
-      onFocus={() => onFocusRow(rowKey)}
-      className="flex min-h-10 items-center justify-between gap-2 border-t border-line bg-panel/85 px-3 py-1 backdrop-blur-sm"
-    >
-      <div className="flex min-w-0 items-center gap-1.5">
-        {selectMode && (
-          <SelectionCheckbox
-            state={selectionState}
-            onToggle={onToggleSelection}
-            label={t('assets.select.stationAriaLabel', { station: label })}
-          />
-        )}
-        <button
-          type="button"
-          onClick={onToggle}
-          className="flex min-w-0 items-center gap-1.5 hover:text-accent"
-        >
-          <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-            {expanded ? '▾' : '▸'}
-          </span>
-          <h2
-            id={labelId}
-            className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-          >
-            {label}
-          </h2>
-        </button>
-      </div>
-      <div className="flex items-center gap-2">
-        <StationPinButton label={label} pinState={pinState} onToggle={onTogglePin} t={t} />
-        <SecurityBadge security={security} t={t} />
-        <JumpsAwayBadge result={jumpsAway} t={t} />
-        <span className="text-[0.6875rem] text-text-faint tabular-nums">
-          {formatBadge(station, t)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-/** Station header rows read taller (title + pin/badge/expand/collapse controls); every bay/container/ship/item row shares one `py-1.5 text-xs` row button, so one height covers all three. */
-const STATION_ROW_HEIGHT = 41;
-const TREE_ROW_HEIGHT = 32;
-
-function estimateRowHeight(row: AssetRow): number {
-  return row.type === 'station' ? STATION_ROW_HEIGHT : TREE_ROW_HEIGHT;
-}
-
-/** Character assets as a nested Station -> Ship/Container -> ... tree, with a name search filter. Read-only, cached for offline. */
+/** Character assets, browsed one level at a time. Read-only, cached for offline. */
 export function Assets() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadAssetsSnapshot);
 
+  // "Where am I" lives in the URL (`/assets/:stationId/*`), not in state, so
+  // the browser/Android back button steps up one level instead of leaving the
+  // page — the single most important thing about drill-down on a phone.
+  const wildcard = useParams()['*'] ?? '';
+  const { stationId: pathStationId, segments: pathSegments } = useMemo(
+    () => parseAssetPath(wildcard),
+    [wildcard]
+  );
+
   const [search, setSearch] = useState('');
   const searchActive = search.trim().length > 0;
-  const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(new Set());
 
   // Multi-select and bulk actions (issue #90): select mode is off by default and
   // browsing (select mode off) renders exactly as it did before this ticket.
@@ -1069,11 +593,11 @@ export function Assets() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
   }, [assetsResult, typeNames, locationNames, csvAssetsByItemId, search]);
 
-  // Tree/on-screen matching: the active Character's own assets, plus every
-  // other Character's when the cross-character toggle is on and a search is
-  // active (see `crossCharacterActive` above) — merging is safe because
-  // asset item_ids are globally unique across the whole game, not scoped to
-  // one Character.
+  // On-screen matching: the active Character's own assets, plus every other
+  // Character's when the cross-character toggle is on and a search is active
+  // (see `activeCrossCharacterData` above) — merging is safe because asset
+  // item_ids are globally unique across the whole game, not scoped to one
+  // Character.
   const mergedAssets = useMemo(() => {
     const own = assetsResult?.data ?? [];
     if (!activeCrossCharacterData) return own;
@@ -1106,21 +630,6 @@ export function Assets() {
     [mergedAssets]
   );
 
-  // Every search match is rendered — the tree is virtualized (issue #86), so
-  // there is no longer a render-cost reason to cap what's shown separately
-  // from what ESI actually fetched (`assetsTruncated`, upstream, is unrelated
-  // and stays as-is).
-  const visibleItemIds = useMemo(() => {
-    const matches = matchAssets(mergedAssets, mergedTypeNames, search);
-    return new Set(matches.map((m) => m.asset.item_id));
-  }, [mergedAssets, mergedTypeNames, search]);
-
-  // Declared here (ahead of their other, non-sort-related usages further down)
-  // because `sortedTree` below needs both to resolve jumps-away sort order:
-  // the lookup key is `${locationId}:${routePreference}`, and the values
-  // themselves live in `jumpsAwayByKey`, populated asynchronously by the
-  // ESI-fetching effects further down once `sortedTree` tells them which
-  // stations are in view.
   const routePreference = useRoutePreference((state) => state.value);
   const hydrateRoutePreference = useRoutePreference((state) => state.hydrate);
   const setRoutePreference = useRoutePreference((state) => state.setValue);
@@ -1139,31 +648,31 @@ export function Assets() {
     new Map()
   );
 
-  // Sorting by "jumps away" (issue #88) can only reflect distances already
-  // fetched — CONTEXT.md round 14 bounds that fetch to pinned, visible, and
-  // expanded stations (issue #87), deliberately, to cap ESI fan-out. A
-  // station outside that scope has no entry in `jumpsAwayByKey` yet and
-  // sorts last (see `compareStations`'s unknown-last rule) until it's
-  // pinned or scrolled into view, rather than this memo widening the fetch
-  // scope to "everything" just because this field is selected.
+  // The tree is built from every asset, unpruned: search no longer filters it
+  // (results are a separate flat list), so browsing always sees the whole
+  // structure and clearing a search never has to rebuild it.
   const tree = useMemo(
     () => buildAssetTree(mergedAssets, priceByTypeId),
     [mergedAssets, priceByTypeId]
   );
-  const visibleTree = useMemo(() => pruneStations(tree, visibleItemIds), [tree, visibleItemIds]);
+  const stationLabelFor = useMemo(
+    () => (station: AssetTreeStation) =>
+      locationLabel(
+        station.locationId,
+        station.locationType,
+        mergedLocationNames,
+        assetsByItemId,
+        mergedTypeNames,
+        t
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
+    [mergedLocationNames, assetsByItemId, mergedTypeNames]
+  );
   const sortedTree = useMemo(
     () =>
       sortStations(
-        visibleTree,
-        (station) =>
-          locationLabel(
-            station.locationId,
-            station.locationType,
-            mergedLocationNames,
-            assetsByItemId,
-            mergedTypeNames,
-            t
-          ),
+        tree,
+        stationLabelFor,
         mergedTypeNames,
         (station) => pinStateFor(station.locationId),
         stationSortField,
@@ -1171,11 +680,9 @@ export function Assets() {
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
     [
-      visibleTree,
-      mergedLocationNames,
-      assetsByItemId,
+      tree,
+      stationLabelFor,
       mergedTypeNames,
-      t,
       pins,
       activeCharacterId,
       stationSortField,
@@ -1184,247 +691,165 @@ export function Assets() {
     ]
   );
 
-  // Pinned stations start expanded on page load (issue #84) — the same effect
-  // as clicking "Expand All" on each pinned station, seeded once pins and the
-  // tree are both available so a later manual collapse isn't fought on every
-  // render. Re-arms itself if the active character changes (a fresh page
-  // context, in effect). Seeded during render (React's "adjusting state on a
-  // change" pattern: https://react.dev/learn/you-might-not-need-an-effect),
-  // not a useEffect — the guard below makes it run at most once per character
-  // before the extra render settles, and an effect would only add a redundant
-  // commit-then-setState round trip for a plain derived seed.
-  const [pinnedSeededForCharacter, setPinnedSeededForCharacter] = useState<number | null>(null);
-  if (
-    activeCharacterId !== null &&
-    pinsQuery !== undefined &&
-    sortedTree.length > 0 &&
-    pinnedSeededForCharacter !== activeCharacterId
-  ) {
-    setPinnedSeededForCharacter(activeCharacterId);
-    const pinnedKeys = sortedTree
-      .filter((station) => pinStateFor(station.locationId) !== 'unpinned')
-      .flatMap((station) => {
-        const stationKey = stationRowKey(station.locationId);
-        return [stationKey, ...collectExpandableKeys(station.children, stationKey)];
-      });
-    if (pinnedKeys.length > 0) {
-      setExpandedKeys((prev) => new Set([...prev, ...pinnedKeys]));
-    }
+  const resolved = useMemo(
+    () => resolveAssetPath(sortedTree, pathStationId, pathSegments),
+    [sortedTree, pathStationId, pathSegments]
+  );
+
+  function nodeLabel(node: AssetTreeNode): string {
+    return node.kind === 'bay'
+      ? t(`assets.bay.${node.bay}`)
+      : (mergedTypeNames.get(node.asset.type_id) ?? `Type #${node.asset.type_id}`);
   }
 
-  // While searching, every surviving branch is by construction an ancestor of a match
-  // (pruneStations already dropped anything that isn't) — force it open so the match is
-  // visible without the user pre-expanding the right path. Toggling/expand-all/collapse-all
-  // are no-ops during search so the manual `expandedKeys` state underneath stays untouched,
-  // and clearing the search restores the prior expand/collapse state exactly.
-  const autoExpandedKeys = useMemo(() => {
-    if (!searchActive) return null;
-    const keys = new Set<string>();
-    for (const station of sortedTree) {
-      const stationKey = stationRowKey(station.locationId);
-      keys.add(stationKey);
-      for (const key of collectExpandableKeys(station.children, stationKey)) keys.add(key);
+  /** Ancestor labels for a search hit, outermost first — where this item actually lives. */
+  function trailFor(asset: CharacterAsset): string[] {
+    const labels: string[] = [];
+    let current = asset;
+    const seen = new Set<number>([asset.item_id]);
+    while (current.location_type === 'item') {
+      const parent = assetsByItemId.get(current.location_id);
+      if (!parent || seen.has(parent.item_id)) break;
+      seen.add(parent.item_id);
+      labels.unshift(mergedTypeNames.get(parent.type_id) ?? `Type #${parent.type_id}`);
+      current = parent;
     }
-    return keys;
-  }, [searchActive, sortedTree]);
+    labels.unshift(
+      locationLabel(
+        current.location_id,
+        current.location_type,
+        mergedLocationNames,
+        assetsByItemId,
+        mergedTypeNames,
+        t
+      )
+    );
+    return labels;
+  }
 
-  // One flat row list — station headers and tree nodes interleaved in visual
-  // order — feeds the single virtualizer below (issue #86). Search re-prunes
-  // `sortedTree` above, which re-flattens here; there is no separate
-  // search-specific row path. Computed here (rather than down by the render,
-  // where the old pre-virtualization layout had it) because the jumps-away
-  // scoping below needs the virtualizer's visible range.
-  const effectiveExpandedKeys = autoExpandedKeys ?? expandedKeys;
-  const flattenedRows = useMemo(
-    () => flattenAssetRows(sortedTree, effectiveExpandedKeys),
-    [sortedTree, effectiveExpandedKeys]
+  /** The station a search hit belongs to, for the link back into the drill-down. */
+  function rootStationIdFor(asset: CharacterAsset): number | null {
+    let current = asset;
+    const seen = new Set<number>([asset.item_id]);
+    while (current.location_type === 'item') {
+      const parent = assetsByItemId.get(current.location_id);
+      if (!parent) break;
+      if (seen.has(parent.item_id)) {
+        // A cycle in the asset chain — `current.location_id` points at a node
+        // `buildAssetTree`'s cycle guard already absorbed, so no orphan
+        // station carries this id. Report unresolved rather than link to a
+        // station that doesn't exist.
+        return null;
+      }
+      seen.add(parent.item_id);
+      current = parent;
+    }
+    // We reached a real location, or the chain broke on a missing parent —
+    // in which case `buildAssetTree` made that same location_id an orphan
+    // group, so it addresses the right row either way.
+    return current.location_id;
+  }
+
+  const searchMatches = useMemo(
+    () => (searchActive ? matchAssets(mergedAssets, mergedTypeNames, search) : []),
+    [searchActive, mergedAssets, mergedTypeNames, search]
   );
+
+  // The three list shapes, reduced to one row array for one virtualizer.
+  const rows = useMemo<BrowseRow[]>(() => {
+    if (searchActive) {
+      return searchMatches.map((match) => ({
+        kind: 'match' as const,
+        key: `m:${match.asset.item_id}`,
+        match,
+      }));
+    }
+    if (pathStationId !== null) {
+      return resolved.children.map((node) => ({
+        kind: 'node' as const,
+        key: assetNodeSegment(node),
+        node,
+      }));
+    }
+
+    const pinned: BrowseRow[] = [];
+    const rest: BrowseRow[] = [];
+    const orphans: BrowseRow[] = [];
+    for (const station of sortedTree) {
+      const row: BrowseRow = {
+        kind: 'location',
+        key: `l:${station.locationId}`,
+        station,
+      };
+      if (isUnresolvedParent(station)) orphans.push(row);
+      else if (pinStateFor(station.locationId) !== 'unpinned') pinned.push(row);
+      else rest.push(row);
+    }
+
+    const out: BrowseRow[] = [];
+    if (pinned.length > 0) {
+      out.push({
+        kind: 'heading',
+        key: 'h:pinned',
+        label: t('assets.section.pinned'),
+        tone: 'default',
+      });
+      out.push(...pinned);
+    }
+    if (rest.length > 0) {
+      if (pinned.length > 0) {
+        out.push({
+          kind: 'heading',
+          key: 'h:all',
+          label: t('assets.section.allLocations', { count: rest.length }),
+          tone: 'default',
+        });
+      }
+      out.push(...rest);
+    }
+    if (orphans.length > 0) {
+      out.push({
+        kind: 'heading',
+        key: 'h:unresolved',
+        label: t('assets.unresolved.heading', { count: orphans.length }),
+        tone: 'warning',
+      });
+      out.push(...orphans);
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly; t is stable
+  }, [
+    searchActive,
+    searchMatches,
+    pathStationId,
+    resolved,
+    sortedTree,
+    pins,
+    activeCharacterId,
+    t,
+  ]);
+
   const scrollParentRef = useRef<HTMLDivElement>(null);
   // React Compiler isn't enabled in this build (no babel plugin configured);
   // this is eslint-plugin-react-hooks flagging TanStack Virtual's returned
   // functions as unsafe to memoize *if* the compiler is ever turned on.
   // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
-    count: flattenedRows.length,
+    count: rows.length,
     getScrollElement: () => scrollParentRef.current,
-    estimateSize: (index) => estimateRowHeight(flattenedRows[index]),
-    getItemKey: (index) => flattenedRows[index].key,
-    overscan: 12,
+    estimateSize: (index) => estimateRowHeight(rows[index]),
+    getItemKey: (index) => rows[index].key,
+    overscan: 10,
   });
 
-  // Per-row display label, aligned index-for-index with `flattenedRows` — the
-  // one place a bay's translated name or a station's resolved location name
-  // is computed, so both the rendered row text and keyboard type-ahead below
-  // read the same value instead of duplicating this logic.
-  const rowLabels = useMemo(
-    () =>
-      flattenedRows.map((row) =>
-        row.type === 'station'
-          ? locationLabel(
-              row.station.locationId,
-              row.station.locationType,
-              mergedLocationNames,
-              assetsByItemId,
-              mergedTypeNames,
-              t
-            )
-          : row.node.kind === 'bay'
-            ? t(`assets.bay.${row.node.bay}`)
-            : (mergedTypeNames.get(row.node.asset.type_id) ?? `Type #${row.node.asset.type_id}`)
-      ),
-    [flattenedRows, mergedLocationNames, assetsByItemId, mergedTypeNames, t]
-  );
-
-  // `flattenedRows` reduced to what `assetTreeNav.ts`'s pure keyboard-nav
-  // functions need — decoupled on purpose from the asset tree's own types. A
-  // station is a toggleable branch like a bay/ship/container (issue #148):
-  // collapsed by default, its direct children gated behind `expandedKeys`
-  // the same way `pushNodeRows` already gates every other branch.
-  const navRows = useMemo<NavRow[]>(
-    () =>
-      flattenedRows.map((row, index) => {
-        if (row.type === 'station') {
-          return {
-            key: row.key,
-            level: row.level,
-            hasChildren: true,
-            isOpen: effectiveExpandedKeys.has(row.key),
-            canToggle: !searchActive,
-            label: rowLabels[index],
-          };
-        }
-        const hasChildren = row.node.kind !== 'item';
-        return {
-          key: row.key,
-          level: row.level,
-          hasChildren,
-          isOpen: hasChildren && effectiveExpandedKeys.has(row.key),
-          canToggle: hasChildren && !searchActive,
-          label: rowLabels[index],
-        };
-      }),
-    [flattenedRows, rowLabels, effectiveExpandedKeys, searchActive]
-  );
-
-  // Roving tabindex (issue #89): `focusedRowKey` is the logical focus
-  // target, kept in React state rather than read off the DOM because the
-  // virtualizer may not have that row mounted. `pendingFocusRowKey` bridges
-  // a target that was just scrolled into view but isn't mounted yet — the
-  // effect below has no dependency array (retries every render) rather than
-  // depending on `focusedRowKey`, which wouldn't change again if a render
-  // lands with the row still unmounted.
-  const [focusedRowKey, setFocusedRowKey] = useState<string | null>(null);
-  const pendingFocusRowKey = useRef<string | null>(null);
-  const effectiveFocusedRowKey =
-    focusedRowKey !== null && flattenedRows.some((row) => row.key === focusedRowKey)
-      ? focusedRowKey
-      : (flattenedRows[0]?.key ?? null);
-
+  // Every level change is a different list; keep the new one at the top
+  // rather than inheriting the previous level's scroll offset. Plain
+  // `scrollTop` rather than `scrollTo()` — jsdom's test shim implements the
+  // former, not the latter, and there's no smooth-scroll case here worth the
+  // extra API surface.
   useEffect(() => {
-    const key = pendingFocusRowKey.current;
-    if (key === null) return;
-    const node = scrollParentRef.current?.querySelector<HTMLElement>(`[data-row-key="${key}"]`);
-    if (node) {
-      node.focus();
-      pendingFocusRowKey.current = null;
-    }
-  });
-
-  function focusRowAtIndex(index: number) {
-    const row = flattenedRows[index];
-    if (!row) return;
-    setFocusedRowKey(row.key);
-    pendingFocusRowKey.current = row.key;
-    rowVirtualizer.scrollToIndex(index, { align: 'auto' });
-  }
-
-  function handleRowFocus(key: string) {
-    setFocusedRowKey(key);
-  }
-
-  function activateFocusedRow(index: number) {
-    const row = flattenedRows[index];
-    if (!row) return;
-    if (row.type === 'station') {
-      toggleKey(row.key);
-    } else if (row.node.kind === 'item') {
-      handleShowInfo(row.node.asset.type_id, rowLabels[index]);
-    } else {
-      toggleKey(row.key);
-    }
-  }
-
-  function handleTreeKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    // Only the tree rows themselves (`role="treeitem"`) drive roving nav — a
-    // station header also hosts a real, independently-tabbable pin button;
-    // its own native Enter/Space/click handling must not be swallowed by
-    // this delegated handler.
-    if ((event.target as HTMLElement).getAttribute('role') !== 'treeitem') return;
-    if (flattenedRows.length === 0) return;
-    const currentIndex = Math.max(
-      0,
-      flattenedRows.findIndex((row) => row.key === effectiveFocusedRowKey)
-    );
-    switch (event.key) {
-      case 'ArrowDown':
-        event.preventDefault();
-        focusRowAtIndex(Math.min(currentIndex + 1, flattenedRows.length - 1));
-        return;
-      case 'ArrowUp':
-        event.preventDefault();
-        focusRowAtIndex(Math.max(currentIndex - 1, 0));
-        return;
-      case 'Home':
-        event.preventDefault();
-        focusRowAtIndex(0);
-        return;
-      case 'End':
-        event.preventDefault();
-        focusRowAtIndex(flattenedRows.length - 1);
-        return;
-      case 'ArrowRight': {
-        const action = arrowRight(navRows, currentIndex);
-        if (action.kind === 'toggle') {
-          event.preventDefault();
-          toggleKey(action.key);
-        } else if (action.kind === 'moveTo') {
-          event.preventDefault();
-          focusRowAtIndex(action.index);
-        }
-        return;
-      }
-      case 'ArrowLeft': {
-        const action = arrowLeft(navRows, currentIndex);
-        if (action.kind === 'toggle') {
-          event.preventDefault();
-          toggleKey(action.key);
-        } else if (action.kind === 'moveTo') {
-          event.preventDefault();
-          focusRowAtIndex(action.index);
-        }
-        return;
-      }
-      case 'Enter':
-      case ' ':
-        event.preventDefault();
-        activateFocusedRow(currentIndex);
-        return;
-      default:
-        if (
-          event.key.length === 1 &&
-          event.key.trim().length > 0 &&
-          !event.altKey &&
-          !event.ctrlKey &&
-          !event.metaKey
-        ) {
-          const nextIndex = typeAheadIndex(navRows, currentIndex, event.key);
-          if (nextIndex !== null) {
-            event.preventDefault();
-            focusRowAtIndex(nextIndex);
-          }
-        }
-    }
-  }
+    if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
+  }, [wildcard, searchActive]);
 
   // Jumps-away distances (issue #87): the active character's current solar
   // system, fetched once per page load (not polled) via ESI's location
@@ -1445,42 +870,37 @@ export function Assets() {
     };
   }, [activeCharacterId]);
 
-  // Stations with at least one row (their own header, or a descendant) in
-  // the virtualizer's current visible range — the "currently visible"
-  // half of CONTEXT.md round 14's "only for pinned and currently
-  // visible/expanded stations". Keyed on the range's indices, not
+  // Locations with a row in the virtualizer's current visible range — the
+  // "currently visible" half of CONTEXT.md round 14's "only for pinned and
+  // currently visible/expanded stations". Keyed on the range's indices, not
   // `getVirtualItems()`'s array (a fresh reference every render), so this
   // only recomputes when the visible window actually moves.
   const rangeStart = rowVirtualizer.range?.startIndex ?? null;
   const rangeEnd = rowVirtualizer.range?.endIndex ?? null;
   const visibleStationLocationIds = useMemo(() => {
-    if (rangeStart === null || rangeEnd === null) return new Set<number>();
     const ids = new Set<number>();
+    if (rangeStart === null || rangeEnd === null) return ids;
     for (let i = rangeStart; i <= rangeEnd; i += 1) {
-      const row = flattenedRows[i];
-      if (!row) continue;
-      ids.add(row.type === 'station' ? row.station.locationId : row.stationLocationId);
+      const row = rows[i];
+      if (row?.kind === 'location') ids.add(row.station.locationId);
     }
     return ids;
-  }, [rangeStart, rangeEnd, flattenedRows]);
+  }, [rangeStart, rangeEnd, rows]);
 
-  // Lazy, scoped to pinned stations, stations in the virtualizer's visible
-  // range, and stations the user has actually drilled into (CONTEXT.md round
-  // 14: "only for pinned and currently visible/expanded stations") — bounds
-  // the route-call fan-out to what's pinned or actually on screen, rather
-  // than every station a character owns.
+  // Lazy, scoped to pinned locations, locations in the virtualizer's visible
+  // range, and the location currently drilled into (CONTEXT.md round 14:
+  // "only for pinned and currently visible/expanded stations") — bounds the
+  // route-call fan-out to what's pinned or actually on screen, rather than
+  // every station a character owns.
   const jumpsAwayScopedStations = useMemo(() => {
     return sortedTree.filter((station) => {
+      if (isUnresolvedParent(station)) return false;
       if (pinStateFor(station.locationId) !== 'unpinned') return true;
       if (visibleStationLocationIds.has(station.locationId)) return true;
-      const prefix = `${stationRowKey(station.locationId)}/`;
-      for (const key of effectiveExpandedKeys) {
-        if (key.startsWith(prefix)) return true;
-      }
-      return false;
+      return station.locationId === pathStationId;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
-  }, [sortedTree, effectiveExpandedKeys, visibleStationLocationIds, pins, activeCharacterId]);
+  }, [sortedTree, visibleStationLocationIds, pathStationId, pins, activeCharacterId]);
 
   // Each station's own solar system id (resolved once, then reused across a
   // preference switch) and the resulting jumps-away result per (station,
@@ -1628,36 +1048,6 @@ export function Assets() {
     return securityBySystemId.get(systemId);
   }
 
-  function toggleKey(key: string) {
-    if (searchActive) return;
-    setExpandedKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  // Single toolbar toggle (issue #148), replacing the old per-station
-  // `Expand all`/`Collapse all` button pair: flips every station's own
-  // header key at once, leaving each station's internal bay/ship/container
-  // expand state untouched — matches the game client's single collapse-all
-  // control, which only ever collapses/expands the top-level list.
-  const allStationsExpanded =
-    sortedTree.length > 0 &&
-    sortedTree.every((station) => effectiveExpandedKeys.has(stationRowKey(station.locationId)));
-
-  function toggleAllStations() {
-    if (searchActive) return;
-    const stationKeys = sortedTree.map((station) => stationRowKey(station.locationId));
-    if (allStationsExpanded) {
-      const toRemove = new Set(stationKeys);
-      setExpandedKeys((prev) => new Set([...prev].filter((k) => !toRemove.has(k))));
-    } else {
-      setExpandedKeys((prev) => new Set([...prev, ...stationKeys]));
-    }
-  }
-
   // Bulk actions (issue #90): the three actions the item context menu already
   // offers per row, applied to every selected item_id at once. Quickbar and
   // Compare have different lifetimes (CONTEXT.md) — bulk-adding to Quickbar
@@ -1688,17 +1078,24 @@ export function Assets() {
     void writeToClipboard(names.join('\n'));
   }
 
-  const renderCtx: RenderCtx = {
-    expandedKeys: effectiveExpandedKeys,
-    onToggle: toggleKey,
-    typeNames: mergedTypeNames,
-    t,
-    characterBadges,
-    onRowFocus: handleRowFocus,
-    selectMode,
-    selectedIds,
-    onToggleSelection: toggleNodeSelection,
-  };
+  function handleExportCsv() {
+    downloadCsv(
+      'assets',
+      assetCsvRows(
+        csvGroups.map((group) => ({
+          label: group.label,
+          entries: group.entries.map((entry) => ({
+            name: entry.name,
+            quantity: entry.asset.quantity,
+          })),
+        }))
+      ),
+      assetsCsvColumns(t),
+      new Date(),
+      assetsTruncated
+    );
+  }
+
   const itemActions: AssetItemActions = {
     priceByTypeId,
     volumeByTypeId,
@@ -1718,106 +1115,89 @@ export function Assets() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  // Breadcrumb: the station, then every node walked through. The last entry is
+  // where we are; the ones before it are links back up.
+  const crumbs =
+    resolved.station === null
+      ? []
+      : [
+          { label: stationLabelFor(resolved.station), href: assetPathHref(pathStationId, []) },
+          ...resolved.trail.map((node, index) => ({
+            label: nodeLabel(node),
+            href: assetPathHref(
+              pathStationId,
+              resolved.trail.slice(0, index + 1).map(assetNodeSegment)
+            ),
+          })),
+        ];
+  const parentHref = crumbs.length > 1 ? crumbs[crumbs.length - 2].href : assetPathHref(null, []);
+  // A leaf item carries no aggregate of its own — there is nothing below it to
+  // total — so the header simply drops the counts at that depth.
+  const deepest = resolved.trail[resolved.trail.length - 1] ?? resolved.station;
+  const currentTotals =
+    deepest && (!('kind' in deepest) || deepest.kind !== 'item') ? deepest : null;
+
   return (
     <div
       className={cx(
-        'mx-auto flex max-w-5xl flex-col gap-4',
+        'mx-auto flex w-full max-w-6xl flex-col gap-3',
         // Fills the remaining viewport height (issue #148) rather than
         // growing with content: bounds the height against `<main>`'s own
         // chrome (Layout.tsx's `p-4`, plus the mobile bottom nav's
         // `calc(5rem+safe-area)` reservation below `md`, mirrored here since
-        // that reservation isn't itself exposed as a token) so the tree
+        // that reservation isn't itself exposed as a token) so the list
         // Panel below — the only `flex-1` child — has real remaining space
         // to fill instead of a `flex-1` that's inert with no bounded
         // ancestor.
         'h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)]'
       )}
     >
-      <header className="flex flex-wrap items-center justify-between gap-2">
+      <header className="flex items-center gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('assets.title')}</h1>
-        <div className="flex items-center gap-2">
-          {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
-          <Select
-            value={stationSortField}
-            onValueChange={(value) => void setStationSortField(value as StationSortField)}
-          >
-            <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
-              <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
-              <SelectItem value="itemCount">{t('assets.stationSort.itemCount')}</SelectItem>
-              <SelectItem value="jumpsAway">{t('assets.stationSort.jumpsAway')}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={routePreference}
-            onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
-          >
-            <SelectTrigger
-              aria-label={t('assets.jumpsAway.routePreference.label')}
-              className="w-28"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="shortest">
-                {t('assets.jumpsAway.routePreference.shortest')}
-              </SelectItem>
-              <SelectItem value="safest">{t('assets.jumpsAway.routePreference.safest')}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
+        {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+        <div className="ml-auto flex items-center gap-1.5">
+          {crossCharacterSearch && crossCharacterLoading && (
+            <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
+          )}
+          <IconButton
+            icon={<Icon.AllCharacters />}
+            label={t('assets.crossCharacterToggle')}
+            pressed={crossCharacterSearch}
+            onClick={() => setCrossCharacterSearch((v) => !v)}
+          />
+          <IconButton
+            icon={<Icon.Select />}
+            label={t('assets.select.toggle')}
+            pressed={selectMode}
+            onClick={toggleSelectMode}
+          />
+          <IconButton
+            icon={<Icon.Download />}
+            label={t('assets.exportCsv')}
             disabled={csvGroups.length === 0}
-            onClick={() =>
-              downloadCsv(
-                'assets',
-                assetCsvRows(
-                  csvGroups.map((group) => ({
-                    label: group.label,
-                    entries: group.entries.map((entry) => ({
-                      name: entry.name,
-                      quantity: entry.asset.quantity,
-                    })),
-                  }))
-                ),
-                assetsCsvColumns(t),
-                new Date(),
-                assetsTruncated
-              )
-            }
-          >
-            {t('assets.exportCsv')}
-          </Button>
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            {t('assets.refresh')}
-          </Button>
+            onClick={handleExportCsv}
+          />
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('assets.refresh')}
+            disabled={loading}
+            onClick={refresh}
+          />
         </div>
       </header>
 
       {!loading && assetsResult && !assetsNeedsReauth && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Icon.Search
+            size={Icon.ICON_SIZE.md}
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-faint"
+          />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('assets.searchPlaceholder')}
-            className="h-9 min-w-48 flex-1 rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
-          />
-          <FilterChip
-            label={t('assets.crossCharacterToggle')}
-            selected={crossCharacterSearch}
-            onToggle={() => setCrossCharacterSearch((v) => !v)}
-          />
-          {crossCharacterSearch && crossCharacterLoading && (
-            <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
-          )}
-          <FilterChip
-            label={t('assets.select.toggle')}
-            selected={selectMode}
-            onToggle={toggleSelectMode}
+            className="h-11 w-full rounded-xs border border-line bg-panel-2 pr-3 pl-10 text-sm text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent md:h-9"
           />
         </div>
       )}
@@ -1855,7 +1235,7 @@ export function Assets() {
       ) : !assetsResult ? (
         <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
           {assetsResult.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
@@ -1865,52 +1245,155 @@ export function Assets() {
               {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
             </p>
           )}
-          {sortedTree.length === 0 ? (
-            <EmptyState title={t('assets.noResults')} className="py-8" />
-          ) : (
-            <AssetItemActionsContext.Provider value={itemActions}>
-              <Panel padded={false} className="relative min-h-0 flex-1">
-                <div className="flex h-9 items-center gap-2 border-b border-line bg-panel-2 px-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  <FilterChip
-                    label={
-                      allStationsExpanded
-                        ? t('assets.stationsToggle.collapse')
-                        : t('assets.stationsToggle.expand')
-                    }
-                    selected={allStationsExpanded}
-                    onToggle={toggleAllStations}
-                  />
-                  <span>{t('assets.columnStation')}</span>
-                  <span className="ml-auto flex items-center gap-4 normal-case">
-                    <span className="w-14 text-right">{t('assets.columnQuantity')}</span>
-                    <span className="w-16 text-right">{t('assets.columnVolume')}</span>
-                    <span className="w-20 text-right">{t('assets.columnEstPrice')}</span>
+
+          <AssetItemActionsContext.Provider value={itemActions}>
+            <Panel padded={false} className="flex min-h-0 flex-1 flex-col">
+              {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
+              {searchActive ? (
+                <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
+                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('assets.search.resultCount', { count: searchMatches.length })}
                   </span>
+                  <IconButton
+                    icon={<Icon.Close />}
+                    label={t('assets.search.clear')}
+                    variant="plain"
+                    size="sm"
+                    className="ml-auto"
+                    onClick={() => setSearch('')}
+                  />
                 </div>
+              ) : pathStationId !== null ? (
+                <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
+                  <IconButton
+                    icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
+                    label={t('assets.breadcrumb.back')}
+                    variant="plain"
+                    onClick={() => void navigate(parentHref)}
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-sm font-semibold">
+                      {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
+                    </span>
+                    {crumbs.length > 1 && (
+                      <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-faint">
+                        {crumbs.slice(0, -1).map((crumb, index) => (
+                          <span key={crumb.href} className="flex min-w-0 items-center gap-1">
+                            {index > 0 && <span aria-hidden="true">›</span>}
+                            <Link to={crumb.href} className="truncate hover:text-accent">
+                              {crumb.label}
+                            </Link>
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                  {resolved.station && !isUnresolvedParent(resolved.station) && (
+                    <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-faint sm:flex">
+                      <SecurityValue
+                        security={securityForStation(resolved.station.locationId)}
+                        t={t}
+                      />
+                      <JumpsAwayText
+                        result={jumpsAwayByKey.get(
+                          `${resolved.station.locationId}:${routePreference}`
+                        )}
+                        t={t}
+                      />
+                    </span>
+                  )}
+                  {currentTotals && (
+                    <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
+                      <span className="hidden sm:inline">
+                        {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
+                      </span>
+                      <span className="text-isk-pos">
+                        {formatIsk(currentTotals.estimatedValue)}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
+                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('assets.section.locationCount', { count: sortedTree.length })}
+                  </span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Select
+                      value={stationSortField}
+                      onValueChange={(value) => void setStationSortField(value as StationSortField)}
+                    >
+                      <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
+                        <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
+                        <SelectItem value="itemCount">
+                          {t('assets.stationSort.itemCount')}
+                        </SelectItem>
+                        <SelectItem value="jumpsAway">
+                          {t('assets.stationSort.jumpsAway')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={routePreference}
+                      onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
+                    >
+                      <SelectTrigger
+                        aria-label={t('assets.jumpsAway.routePreference.label')}
+                        className="w-28"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="shortest">
+                          {t('assets.jumpsAway.routePreference.shortest')}
+                        </SelectItem>
+                        <SelectItem value="safest">
+                          {t('assets.jumpsAway.routePreference.safest')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              {/* --- the list --- */}
+              {resolved.unresolved.length > 0 ? (
+                <EmptyState
+                  title={t('assets.staleLink.title')}
+                  hint={t('assets.staleLink.hint')}
+                  className="py-8"
+                  action={
+                    <Button size="sm" onClick={() => void navigate(assetPathHref(null, []))}>
+                      {t('assets.staleLink.action')}
+                    </Button>
+                  }
+                />
+              ) : rows.length === 0 ? (
+                <EmptyState
+                  title={searchActive ? t('assets.noResults') : t('assets.emptyLocation')}
+                  className="py-8"
+                />
+              ) : (
                 <div
                   ref={scrollParentRef}
                   data-virtual-scroll-root
-                  role="tree"
                   aria-label={t('assets.treeLabel')}
-                  onKeyDown={handleTreeKeyDown}
-                  className="absolute inset-x-0 bottom-0 top-9 overflow-y-auto"
+                  className="min-h-0 flex-1 overflow-y-auto"
                 >
                   <div
                     role="presentation"
                     style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
                   >
                     {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                      const row = flattenedRows[virtualRow.index];
-                      const a11y: TreeRowA11y = {
-                        level: row.level,
-                        posinset: row.posinset,
-                        setsize: row.setsize,
-                        focused: row.key === effectiveFocusedRowKey,
-                      };
+                      const row = rows[virtualRow.index];
                       return (
                         <div
                           key={virtualRow.key}
-                          role="presentation"
+                          data-index={virtualRow.index}
                           style={{
                             position: 'absolute',
                             top: 0,
@@ -1919,56 +1402,35 @@ export function Assets() {
                             transform: `translateY(${virtualRow.start}px)`,
                           }}
                         >
-                          {row.type === 'station' ? (
-                            <StationHeaderRow
-                              station={row.station}
-                              label={rowLabels[virtualRow.index]}
-                              pinState={pinStateFor(row.station.locationId)}
-                              jumpsAway={jumpsAwayByKey.get(
-                                `${row.station.locationId}:${routePreference}`
-                              )}
-                              security={securityForStation(row.station.locationId)}
-                              expanded={effectiveExpandedKeys.has(row.key)}
-                              onToggle={() => toggleKey(row.key)}
-                              onTogglePin={() => void handleTogglePin(row.station.locationId)}
-                              onFocusRow={handleRowFocus}
-                              t={t}
-                              a11y={a11y}
-                              selectMode={selectMode}
-                              selectionState={selectionStateForIds(
-                                collectStationItemIds(row.station),
-                                selectedIds
-                              )}
-                              onToggleSelection={() =>
-                                toggleNodeSelection(collectStationItemIds(row.station))
-                              }
-                            />
-                          ) : row.node.kind === 'item' ? (
-                            <AssetItemRow
-                              node={row.node}
-                              depth={row.depth}
-                              ctx={renderCtx}
-                              rowKey={row.key}
-                              a11y={a11y}
-                            />
-                          ) : (
-                            <AssetBranchRow
-                              node={row.node}
-                              path={row.key}
-                              depth={row.depth}
-                              ctx={renderCtx}
-                              a11y={a11y}
-                              label={rowLabels[virtualRow.index]}
-                            />
-                          )}
+                          <BrowseRowView
+                            row={row}
+                            t={t}
+                            typeNames={mergedTypeNames}
+                            characterBadges={characterBadges}
+                            selectMode={selectMode}
+                            selectedIds={selectedIds}
+                            onToggleSelection={toggleNodeSelection}
+                            stationLabelFor={stationLabelFor}
+                            nodeLabel={nodeLabel}
+                            securityForStation={securityForStation}
+                            jumpsAwayFor={(locationId) =>
+                              jumpsAwayByKey.get(`${locationId}:${routePreference}`)
+                            }
+                            pinStateFor={pinStateFor}
+                            onTogglePin={(locationId) => void handleTogglePin(locationId)}
+                            pathStationId={pathStationId}
+                            pathSegments={pathSegments}
+                            trailFor={trailFor}
+                            rootStationIdFor={rootStationIdFor}
+                          />
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              </Panel>
-            </AssetItemActionsContext.Provider>
-          )}
+              )}
+            </Panel>
+          </AssetItemActionsContext.Provider>
         </div>
       )}
 
@@ -1980,5 +1442,160 @@ export function Assets() {
         />
       )}
     </div>
+  );
+}
+
+interface BrowseRowViewProps {
+  row: BrowseRow;
+  t: Translate;
+  typeNames: ReadonlyMap<number, string>;
+  characterBadges: CharacterBadgeContext;
+  selectMode: boolean;
+  selectedIds: ReadonlySet<number>;
+  onToggleSelection: (ids: readonly number[]) => void;
+  stationLabelFor: (station: AssetTreeStation) => string;
+  nodeLabel: (node: AssetTreeNode) => string;
+  securityForStation: (locationId: number) => number | null | undefined;
+  jumpsAwayFor: (locationId: number) => JumpsAwayResult | undefined;
+  pinStateFor: (locationId: number) => PinState;
+  onTogglePin: (locationId: number) => void;
+  pathStationId: number | null;
+  pathSegments: readonly string[];
+  trailFor: (asset: CharacterAsset) => string[];
+  rootStationIdFor: (asset: CharacterAsset) => number | null;
+}
+
+/** Dispatches one virtualized row to the right presentation component. */
+function BrowseRowView(props: BrowseRowViewProps) {
+  const { row, t } = props;
+
+  if (row.kind === 'heading') {
+    return <SectionHeading tone={row.tone}>{row.label}</SectionHeading>;
+  }
+
+  if (row.kind === 'location') {
+    const { station } = row;
+    const orphan = isUnresolvedParent(station);
+    return (
+      <LocationRow
+        href={assetPathHref(station.locationId, [])}
+        label={props.stationLabelFor(station)}
+        security={orphan ? undefined : props.securityForStation(station.locationId)}
+        jumpsAway={orphan ? undefined : props.jumpsAwayFor(station.locationId)}
+        itemCount={station.itemCount}
+        estimatedValue={station.estimatedValue}
+        pinState={props.pinStateFor(station.locationId)}
+        onTogglePin={() => props.onTogglePin(station.locationId)}
+        unresolvedParent={orphan}
+        selectMode={props.selectMode}
+        selectionState={selectionStateForIds(collectStationItemIds(station), props.selectedIds)}
+        onToggleSelection={() => props.onToggleSelection(collectStationItemIds(station))}
+        t={t}
+      />
+    );
+  }
+
+  if (row.kind === 'node') {
+    return <NodeRowView {...props} node={row.node} />;
+  }
+
+  return <SearchMatchRow {...props} match={row.match} />;
+}
+
+/** Split out so it can call `useAssetItemActions` — a heading/location row does not. */
+function SearchMatchRow({
+  match,
+  t,
+  characterBadges,
+  securityForStation,
+  trailFor,
+  rootStationIdFor,
+}: BrowseRowViewProps & { match: AssetMatch }) {
+  const actions = useAssetItemActions();
+  const { asset, name } = match;
+  const rootStationId = rootStationIdFor(asset);
+  return (
+    <SearchResultRow
+      name={name}
+      quantity={asset.quantity}
+      estimatedValue={asset.quantity * (actions.priceByTypeId.get(asset.type_id) ?? 0)}
+      trail={trailFor(asset)}
+      security={rootStationId === null ? undefined : securityForStation(rootStationId)}
+      href={assetPathHref(rootStationId, [])}
+      characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
+      t={t}
+    />
+  );
+}
+
+/** Split out so it can call `useAssetItemActions` — a leaf needs pricing/menu wiring a heading does not. */
+function NodeRowView({
+  node,
+  t,
+  selectMode,
+  selectedIds,
+  onToggleSelection,
+  nodeLabel,
+  characterBadges,
+  pathStationId,
+  pathSegments,
+}: BrowseRowViewProps & { node: AssetTreeNode }) {
+  const actions = useAssetItemActions();
+  const label = nodeLabel(node);
+  const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
+
+  if (node.kind !== 'item') {
+    return (
+      <ContainerRow
+        href={assetPathHref(pathStationId, [...pathSegments, assetNodeSegment(node)])}
+        label={label}
+        itemCount={node.itemCount}
+        estimatedValue={node.estimatedValue}
+        characterBadge={badge}
+        named={node.kind !== 'bay'}
+        selectMode={selectMode}
+        selectionState={selectionStateForIds(collectItemIds(node), selectedIds)}
+        onToggleSelection={() => onToggleSelection(collectItemIds(node))}
+        t={t}
+      />
+    );
+  }
+
+  const { asset } = node;
+  const estimatedValue = asset.quantity * (actions.priceByTypeId.get(asset.type_id) ?? 0);
+  const blueprintTypeID =
+    actions.blueprintCatalog === null
+      ? undefined
+      : (actions.blueprintCatalog.byProductTypeID.get(asset.type_id)?.blueprintTypeID ?? null);
+
+  return (
+    <ItemRow
+      typeId={asset.type_id}
+      name={label}
+      quantity={asset.quantity}
+      unitVolume={actions.volumeByTypeId.get(asset.type_id)}
+      estimatedValue={estimatedValue}
+      characterBadge={badge}
+      onShowInfo={() => actions.onShowInfo(asset.type_id, label)}
+      selectMode={selectMode}
+      selectionState={selectedIds.has(asset.item_id) ? 'checked' : 'unchecked'}
+      onToggleSelection={() => onToggleSelection([asset.item_id])}
+      t={t}
+      wrap={(children) => (
+        <ItemContextMenu
+          typeId={asset.type_id}
+          itemName={label}
+          blueprintTypeID={blueprintTypeID}
+          onAddToQuickbar={actions.onAddToQuickbar}
+          quickbarAvailable={actions.quickbarAvailable}
+          onShowInfo={actions.onShowInfo}
+          onOpenChange={(open) => {
+            if (open) actions.onRequestBlueprintCatalog();
+          }}
+        >
+          {children}
+        </ItemContextMenu>
+      )}
+    />
   );
 }

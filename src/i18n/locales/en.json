@@ -477,7 +477,6 @@
     "emptyTitle": "No assets cached",
     "emptyHint": "Reconnect to fetch this character's assets.",
     "noResults": "No items match your search.",
-    "quantity": "Qty",
     "stationLabel": "Station #{{id}}",
     "structureLabel": "Structure #{{id}}",
     "inSpaceLabel": "In space (system #{{id}})",
@@ -490,20 +489,10 @@
     "reauthHint": "Log in again to fetch this character's assets.",
     "reauthAction": "Log in again with EVE Online",
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
-    "stationsToggle": {
-      "expand": "Expand all",
-      "collapse": "Collapse all"
-    },
-    "columnStation": "Station",
-    "columnQuantity": "Qty",
-    "columnVolume": "Volume",
-    "columnEstPrice": "Est. Price",
     "unknownValue": "-",
     "security": {
       "ariaLabel": "Security status: {{value}}"
     },
-    "nodeBadge_one": "{{count}} item · {{value}} ISK",
-    "nodeBadge_other": "{{count}} items · {{value}} ISK",
     "crossCharacterToggle": "Search all characters",
     "crossCharacterLoading": "Searching other characters…",
     "crossCharacterBadge": "From {{character}}",
@@ -517,11 +506,6 @@
       "character": "Pinned for this character",
       "account": "Pinned for all characters",
       "ariaLabel": "Pin toggle for {{station}}: {{state}}"
-    },
-    "tooltip": {
-      "value": "Value: {{value}} ISK",
-      "volume": "Volume: {{volume}} m3",
-      "volumeUnknown": "Volume: unknown"
     },
     "jumpsAway": {
       "value_one": "{{count}} jump",
@@ -554,6 +538,42 @@
       "addToQuickbar": "Add to Quickbar",
       "addToCompare": "Add to Compare",
       "copyNames": "Copy names"
+    },
+    "itemCount_one": "{{count}} item",
+    "itemCount_other": "{{count}} items",
+    "emptyLocation": "Nothing stored here.",
+    "section": {
+      "pinned": "Pinned",
+      "allLocations_one": "All locations · {{count}}",
+      "allLocations_other": "All locations · {{count}}",
+      "locationCount_one": "{{count}} location",
+      "locationCount_other": "{{count}} locations"
+    },
+    "unresolved": {
+      "heading_one": "Location unresolved · {{count}}",
+      "heading_other": "Location unresolved · {{count}}",
+      "rowHint": "Parent wasn't in this fetch"
+    },
+    "search": {
+      "resultCount_one": "{{count}} match",
+      "resultCount_other": "{{count}} matches",
+      "clear": "Clear search"
+    },
+    "breadcrumb": {
+      "back": "Back one level"
+    },
+    "staleLink": {
+      "title": "This location is gone",
+      "hint": "It was in your assets when this link was made, but it is not any more.",
+      "action": "Back to all locations"
+    },
+    "nodeBadge_one": "{{count}} item · {{value}} ISK",
+    "nodeBadge_other": "{{count}} items · {{value}} ISK",
+    "quantity": "Qty",
+    "tooltip": {
+      "value": "Value: {{value}} ISK",
+      "volume": "Volume: {{volume}} m3",
+      "volumeUnknown": "Volume: unknown"
     }
   },
   "mail": {

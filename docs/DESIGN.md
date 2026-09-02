@@ -8,6 +8,13 @@ condensed uppercase micro-headings. Density over whitespace — this is a data t
 Tokens live in `src/styles/index.css` (`@theme`, Tailwind v4 CSS-first config).
 Live reference: hidden `/styleguide` route (`src/routes/Styleguide.tsx`).
 
+Interactive primitives (menus, selects, dialogs) are built on
+[`radix-ui`](https://www.radix-ui.com/)'s unstyled components, styled to this
+system's tokens rather than a component library's own defaults — `Select`,
+`DropdownMenu`, `ContextMenu` (`src/components/ui/`) wrap them. Reach for a
+Radix primitive before hand-rolling focus/keyboard/portal behavior for a new
+composite control; icons (§5) are built to compose with it directly.
+
 ## 1. Color tokens
 
 ### Background layers (darkest → lightest)
@@ -53,6 +60,18 @@ Live reference: hidden `/styleguide` route (`src/routes/Styleguide.tsx`).
 
 Distinct from `success`/`danger` so status badges and money never read as the same
 signal in one table. Always pair sign or +/− prefix with color (color-blind safety).
+
+### Security status
+
+`securityStatusColor(security)` (`src/engine/securityStatus.ts`) colors a solar
+system's security status on the game's own scale: blue-green across highsec
+(`success` at 0.5 blending to `accent` at 1.0), amber toward red across lowsec
+and nullsec (`warning` approaching 0.5 from below, blending to `danger` at
+-1.0 and beyond). The step at exactly 0.5 is deliberate — it mirrors the
+game client's own highsec/lowsec boundary, not an interpolation artifact.
+Computed, not a fixed token set: call the function rather than hand-picking a
+color, and always render the numeric value (`0.9`, `-0.3`, …) alongside the
+color — colour is never the only signal (§7).
 
 ## 2. Typography
 
@@ -104,6 +123,12 @@ Sources live in `assets/brand/` (not shipped). Everything under
   `h-9` (36px, default). `DataTable`'s `density="compact"` option tightens
   both to `px-2 py-1`, for tables embedded in already-dense surfaces (e.g.
   the build-plan materials table inside a `Panel`).
+- Touch tier: `h-11` (44px) for an icon-only control on a touch viewport —
+  `h-7`/`h-9` are mouse-pointer sizes (WCAG 2.2's 24px floor with room to
+  spare, not a thumb target) and reusing them for icon-only buttons on a
+  phone is what made early drafts of the Assets page hard to tap. `IconButton`
+  defaults to `size-11 md:size-9` for exactly this reason — pointer users
+  never get the 44px box, touch users never get the 36px one.
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
 - Borders: always 1px (`border`), never 2px.
@@ -112,24 +137,62 @@ Sources live in `assets/brand/` (not shipped). Everything under
 
 Built in `src/components/ui/` (✓) or planned (○):
 
-| Component         | Status | Purpose / usage                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Panel`           | ✓      | Base surface. Optional uppercase title header + actions slot. Everything lives in a Panel; don't nest Panels — use `panel-2` fills inside.                                                                                                                                                                                                                                                                                                                                        |
-| `Button`          | ✓      | `primary` (accent fill — max one per view), `ghost` (default; hairline border), `danger` (destructive; outline red, never filled). Sizes `sm`/`md`.                                                                                                                                                                                                                                                                                                                               |
-| `StatChip`        | ✓      | Tiny label+value pair (ISK balance, SP, data counts). Tones: default/accent/success/warning/danger. Rows of chips form a stat strip under a page title.                                                                                                                                                                                                                                                                                                                           |
-| `DataAgeBadge`    | ✓      | Relative age of API-derived data ("12m ago"). Required on every ESI-backed view. Auto-tones: <1h dim, 1–24h warning, >24h danger.                                                                                                                                                                                                                                                                                                                                                 |
-| `EmptyState`      | ✓      | Centered title+hint+optional action for empty lists / not-yet-fetched views. Never show a bare empty table.                                                                                                                                                                                                                                                                                                                                                                       |
-| `Tabs`            | ✓      | Controlled horizontal tab bar, accent underline on active. For peer views within a page (e.g. Orders: Open / History). Not for navigation — that's the router.                                                                                                                                                                                                                                                                                                                    |
-| `Spinner`         | ✓      | Accent arc, sizes sm/md/lg. Inline or centered while loading; prefer skeleton-free simple spinner + DataAgeBadge of last cached data.                                                                                                                                                                                                                                                                                                                                             |
-| `Tooltip`         | ✓      | Accessible hover/focus tooltip (`role="tooltip"` + `aria-describedby`) around a single focusable trigger. `InfoTooltip` variant renders a small "?" button for labeling jargon (ME/TE, EIV, SCC, cost index, Remaps available, StatChip's `tooltip` prop).                                                                                                                                                                                                                        |
-| `Modal`           | ✓      | Native `<dialog>` + `showModal()`. Platform-supplied focus trap, inert background, Escape-to-close and `::backdrop` — never hand-roll a focus trap. `placement="center"` (default) or `"sheet"` (bottom-anchored, mobile nav). Escape and backdrop click both close.                                                                                                                                                                                                              |
-| `DataTable`       | ✓      | Dense table: hairline-underlined uppercase header row (no fill — matches every shipped table), hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`. No empty branch — callers branch to `EmptyState` themselves. Sorting is opt-in per column via `sortValue`: a column that declares one gets a clickable header (`aria-sort`, ascending/descending toggle, missing values sink to the end); a table that declares none behaves exactly as before. |
-| `CharacterAvatar` | ✓      | ESI portrait, `rounded-xs` (house radius, §3), 1px `line` ring; sizes `sm`/`md`/`lg`; accent ring when selected. Decorative by default — pass `alt` only for standalone use.                                                                                                                                                                                                                                                                                                      |
-| `FilterChip`      | ✓      | Toggleable filter pill. `StatChip`'s dimensions, but interactive: a real `<button>` with `aria-pressed`, accent when on, optional trailing count.                                                                                                                                                                                                                                                                                                                                 |
-| `SkillBar`        | ✓      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                                                                                                                                                                                                                                                      |
-| `LogoMark`        | ✓      | The app mark, inline SVG. Decorative (`aria-hidden`) — every placement sits beside the app name. Size it with `size-*`; corner brackets follow `currentColor`, defaulting to accent. Simplified from the artwork, see §2b.                                                                                                                                                                                                                                                        |
+| Component         | Status | Purpose / usage                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Panel`           | ✓      | Base surface. Optional uppercase title header + actions slot. Everything lives in a Panel; don't nest Panels — use `panel-2` fills inside.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `Button`          | ✓      | `primary` (accent fill — max one per view), `ghost` (default; hairline border), `danger` (destructive; outline red, never filled). Sizes `sm`/`md`.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `StatChip`        | ✓      | Tiny label+value pair (ISK balance, SP, data counts). Tones: default/accent/success/warning/danger. Rows of chips form a stat strip under a page title.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `DataAgeBadge`    | ✓      | Relative age of API-derived data ("12m ago"). Required on every ESI-backed view. Auto-tones: <1h dim, 1–24h warning, >24h danger.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `EmptyState`      | ✓      | Centered title+hint+optional action for empty lists / not-yet-fetched views. Never show a bare empty table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `Tabs`            | ✓      | Controlled horizontal tab bar, accent underline on active. For peer views within a page (e.g. Orders: Open / History). Not for navigation — that's the router.                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `Spinner`         | ✓      | Accent arc, sizes sm/md/lg. Inline or centered while loading; prefer skeleton-free simple spinner + DataAgeBadge of last cached data.                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `Tooltip`         | ✓      | Accessible hover/focus tooltip (`role="tooltip"` + `aria-describedby`) around a single focusable trigger. `InfoTooltip` variant renders a small "?" button for labeling jargon (ME/TE, EIV, SCC, cost index, Remaps available, StatChip's `tooltip` prop).                                                                                                                                                                                                                                                                                                                             |
+| `Modal`           | ✓      | Native `<dialog>` + `showModal()`. Platform-supplied focus trap, inert background, Escape-to-close and `::backdrop` — never hand-roll a focus trap. `placement="center"` (default) or `"sheet"` (bottom-anchored, mobile nav). Escape and backdrop click both close.                                                                                                                                                                                                                                                                                                                   |
+| `DataTable`       | ✓      | Dense table: hairline-underlined uppercase header row (no fill — matches every shipped table), hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`. No empty branch — callers branch to `EmptyState` themselves. Sorting is opt-in per column via `sortValue`: a column that declares one gets a clickable header (`aria-sort`, ascending/descending toggle, missing values sink to the end); a table that declares none behaves exactly as before.                                                                                                      |
+| `CharacterAvatar` | ✓      | ESI portrait, `rounded-xs` (house radius, §3), 1px `line` ring; sizes `sm`/`md`/`lg`; accent ring when selected. Decorative by default — pass `alt` only for standalone use.                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `FilterChip`      | ✓      | Toggleable filter pill. `StatChip`'s dimensions, but interactive: a real `<button>` with `aria-pressed`, accent when on, optional trailing count.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `SkillBar`        | ✓      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `LogoMark`        | ✓      | The app mark, inline SVG. Decorative (`aria-hidden`) — every placement sits beside the app name. Size it with `size-*`; corner brackets follow `currentColor`, defaulting to accent. Simplified from the artwork, see §2b.                                                                                                                                                                                                                                                                                                                                                             |
+| `IconButton`      | ✓      | Icon-only control with a real accessible name: `label` sets both `aria-label` and the `Tooltip` text, so the two can't drift. `pressed` makes it a toggle (`aria-pressed`). `variant`: `ghost` (default, hairline box) / `plain` (no box, for a control nested inside a row). `size`: `md` (default, the `h-11 md:h-9` touch tier, §3) / `sm` (`h-9 md:h-7`, nested-in-a-row). Forwards its ref and spreads unknown props onto the `<button>` — pass it to a Radix `Trigger`'s `asChild` and it works. Prefer this over a bare icon `<Button>` whenever there's no visible label text. |
 
-## 5. Usage rules
+## 5. Icons
+
+Pack: [Phosphor](https://phosphoricons.com) (`@phosphor-icons/react`), weight
+`light` throughout. Import from `src/components/ui/icons.tsx` — never
+`@phosphor-icons/react` directly in a feature file; that module is what pins
+the weight and the `rem`-based sizing (`Icon.ICON_SIZE.sm/md/lg`) so every
+glyph in the app matches, and it's the one place to touch if the pack ever
+changes. Add a re-export there for a glyph the app doesn't have yet, rather
+than reaching for a one-off import.
+
+Why Phosphor `light` over the alternatives: it's the only shortlisted pack
+(Phosphor, Lucide, Tabler, Radix Icons) with a genuinely 1px-native stroke
+face rather than a thinned-down 2px default, which is what this system's
+hairline-everywhere rule (§3, "Borders: always 1px, never 2px") needs — a
+default-weight icon next to a 1px border reads heavier than everything around
+it. MIT-licensed, tree-shakes per icon under Vite, and every icon takes
+`size`/`weight`/`color` as plain props (`currentColor` by default, so
+`--color-accent` drives it the same way `LogoMark` does).
+
+Radix compatibility: this app's menus, selects and dialogs (`Select`,
+`DropdownMenu`, `ContextMenu`) are built on `radix-ui`'s primitives. A
+Phosphor icon is a plain SVG component with no opinion about its parent, so
+it drops into a Radix `Trigger`/`Item`/`Content` exactly like any other
+child — no wrapper needed. `IconButton` (§4) is the one place that _does_
+need to compose with Radix directly (an icon-only `DropdownMenuTrigger`,
+say): it forwards its ref and spreads unprimary props, so
+`<DropdownMenuTrigger asChild><IconButton icon={...} label="..." /></DropdownMenuTrigger>`
+works and Radix's cloned `aria-expanded`/`data-state` land on the real button.
+
+Rules:
+
+- Icon-only control → `IconButton`, never a bare `<button>` wrapping a glyph.
+- Icon beside its own visible text label (a menu item, a nav link) → the icon
+  is decorative, `aria-hidden="true"`, no separate label needed.
+- Never emoji or dingbat characters as icons — SVG only, matching the rest of
+  this system's illustration style (DESIGN.md's brand assets, §2b).
+
+## 6. Usage rules
 
 - **Dark only.** No light theme. `color-scheme: dark` is set globally.
 - Layering: `bg` → `panel` → `panel-2`. Depth via background steps + hairlines,
@@ -141,7 +204,7 @@ Built in `src/components/ui/` (✓) or planned (○):
 - Density: tables are the norm; avoid card grids for data lists.
 - Every API-derived view shows a `DataAgeBadge`.
 
-## 6. Accessibility
+## 7. Accessibility
 
 - Contrast (WCAG AA ≥ 4.5:1 for text) — measured ratios:
 
