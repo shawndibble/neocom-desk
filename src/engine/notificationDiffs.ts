@@ -225,6 +225,178 @@ export function diffPlanetaryExtractionDone(
   return fires;
 }
 
+export interface MailHeaderSnapshot {
+  mailId: number;
+}
+
+export interface MailSnapshot {
+  entries: readonly MailHeaderSnapshot[];
+  nowMs: number;
+}
+
+export interface MailNotificationFire {
+  eventId: 'newMail';
+  characterId: number;
+  mailId: number;
+}
+
+/**
+ * Fires per mail id newly above the highest id seen in `prev` (issue #174).
+ * ESI's mail list is capped at the 50 most recent (`getCharacterMailHeaders`),
+ * and "load more" (`loadMoreMailHeaders`, features/character/mail.ts) can
+ * write a longer merged list back to the same cache key this poller reads —
+ * so a plain set-difference against `prev.entries` would treat every older
+ * id newly paged in as "new mail" and flood on the next poll. `mail_id` is
+ * monotonically increasing (it's what makes `last_mail_id` pagination work),
+ * so gating on the high-water mark instead is immune to the window sliding
+ * in either direction.
+ */
+export function diffNewMail(
+  characterId: number,
+  prev: MailSnapshot | undefined,
+  next: MailSnapshot
+): MailNotificationFire[] {
+  if (!prev) return [];
+  const maxPrevId = prev.entries.reduce((max, entry) => Math.max(max, entry.mailId), 0);
+  const fires: MailNotificationFire[] = [];
+  for (const entry of next.entries) {
+    if (entry.mailId <= maxPrevId) continue;
+    fires.push({ eventId: 'newMail', characterId, mailId: entry.mailId });
+  }
+  return fires;
+}
+
+export interface CalendarEventEntrySnapshot {
+  calendarEventId: number;
+  /** Epoch ms this event starts (ESI's `event_date`). */
+  startMs: number;
+}
+
+export interface CalendarSnapshot {
+  entries: readonly CalendarEventEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface NewCalendarEventFire {
+  eventId: 'newCalendarEvent';
+  characterId: number;
+  calendarEventId: number;
+}
+
+export interface CalendarEventStartingFire {
+  eventId: 'calendarEventStarting';
+  characterId: number;
+  calendarEventId: number;
+}
+
+/**
+ * Fires per calendar event id newly above the highest id seen in `prev`
+ * (issue #174) — same high-water-mark reasoning as `diffNewMail`:
+ * `getCharacterCalendar` returns only up to 50 events from now, so as events
+ * pass and the window slides, an older event newly entering the list must
+ * not be reported as new.
+ */
+export function diffNewCalendarEvent(
+  characterId: number,
+  prev: CalendarSnapshot | undefined,
+  next: CalendarSnapshot
+): NewCalendarEventFire[] {
+  if (!prev) return [];
+  const maxPrevId = prev.entries.reduce((max, entry) => Math.max(max, entry.calendarEventId), 0);
+  const fires: NewCalendarEventFire[] = [];
+  for (const entry of next.entries) {
+    if (entry.calendarEventId <= maxPrevId) continue;
+    fires.push({
+      eventId: 'newCalendarEvent',
+      characterId,
+      calendarEventId: entry.calendarEventId,
+    });
+  }
+  return fires;
+}
+
+/**
+ * Fires per event whose `startMs` is newly in the past — edge-triggered the
+ * same way as `diffIndustryJobComplete`, comparing the event's own fixed
+ * start instant against `prev.nowMs` rather than matching identity against
+ * `prev.entries` (issue #174). Fires up to one poll interval after the
+ * event's actual start, not before or on every later poll.
+ */
+export function diffCalendarEventStarting(
+  characterId: number,
+  prev: CalendarSnapshot | undefined,
+  next: CalendarSnapshot
+): CalendarEventStartingFire[] {
+  if (!prev) return [];
+  const fires: CalendarEventStartingFire[] = [];
+  for (const entry of next.entries) {
+    if (entry.startMs > next.nowMs) continue;
+    if (entry.startMs <= prev.nowMs) continue;
+    fires.push({
+      eventId: 'calendarEventStarting',
+      characterId,
+      calendarEventId: entry.calendarEventId,
+    });
+  }
+  return fires;
+}
+
+/** Engine-native mirror of ESI's `Contract.status` (ARCHITECTURE.md: callers adapt ESI shapes at the boundary). */
+export type ContractStatus =
+  | 'outstanding'
+  | 'in_progress'
+  | 'finished_issuer'
+  | 'finished_contractor'
+  | 'finished'
+  | 'cancelled'
+  | 'rejected'
+  | 'failed'
+  | 'deleted'
+  | 'reversed';
+
+export interface ContractEntrySnapshot {
+  contractId: number;
+  status: ContractStatus;
+}
+
+export interface ContractSnapshot {
+  entries: readonly ContractEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface ContractNotificationFire {
+  eventId: 'contractAccepted';
+  characterId: number;
+  contractId: number;
+}
+
+/**
+ * Fires per contract whose status is newly `in_progress` (issue #174) — ESI
+ * has no `accepted` status literal; `in_progress` is what a contract becomes
+ * once accepted. Edge-triggered on the transition, keyed by contract id: a
+ * contract missing from `prev.entries` (first time this poll has seen it) is
+ * treated as not-previously-in-progress, so a contract discovered already
+ * in progress still fires once — same discovered-already-true shape as
+ * `diffPlanetaryExtractionDone`. `getCharacterContracts` returns every page
+ * (not windowed like mail/calendar), so no high-water-mark guard is needed
+ * here.
+ */
+export function diffContractAccepted(
+  characterId: number,
+  prev: ContractSnapshot | undefined,
+  next: ContractSnapshot
+): ContractNotificationFire[] {
+  if (!prev) return [];
+  const prevStatusById = new Map(prev.entries.map((entry) => [entry.contractId, entry.status]));
+  const fires: ContractNotificationFire[] = [];
+  for (const entry of next.entries) {
+    if (entry.status !== 'in_progress') continue;
+    if (prevStatusById.get(entry.contractId) === 'in_progress') continue;
+    fires.push({ eventId: 'contractAccepted', characterId, contractId: entry.contractId });
+  }
+  return fires;
+}
+
 export const SKILL_QUEUE_NOTIFICATION_DIFFS: Record<
   SkillQueueNotificationEventId,
   (

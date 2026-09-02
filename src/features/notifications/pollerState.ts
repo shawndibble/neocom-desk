@@ -14,6 +14,13 @@ import type {
   ColonyExtractorSnapshot,
   ColonySnapshotEntry,
   PlanetarySnapshot,
+  MailHeaderSnapshot,
+  MailSnapshot,
+  CalendarEventEntrySnapshot,
+  CalendarSnapshot,
+  ContractEntrySnapshot,
+  ContractSnapshot,
+  ContractStatus,
 } from '@/engine/notificationDiffs';
 
 export const SKILL_QUEUE_POLLER_STATE_KEY = 'notifications.pollerState.skillQueue';
@@ -159,5 +166,149 @@ export function withCharacterColonySnapshot(
   characterId: number,
   snapshot: PlanetarySnapshot
 ): ColonyPollerState {
+  return { ...state, [characterId]: snapshot };
+}
+
+export const MAIL_POLLER_STATE_KEY = 'notifications.pollerState.mail';
+
+export type MailPollerState = Record<number, MailSnapshot>;
+
+export const DEFAULT_MAIL_POLLER_STATE: MailPollerState = {};
+
+function isMailHeaderSnapshot(raw: unknown): raw is MailHeaderSnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return typeof r.mailId === 'number';
+}
+
+function isMailSnapshot(raw: unknown): raw is MailSnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.nowMs === 'number' && Array.isArray(r.entries) && r.entries.every(isMailHeaderSnapshot)
+  );
+}
+
+function isMailPollerState(raw: unknown): raw is MailPollerState {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) => !Number.isNaN(Number(key)) && isMailSnapshot(value)
+  );
+}
+
+export const useMailPollerState = createLocalSetting<MailPollerState>({
+  key: MAIL_POLLER_STATE_KEY,
+  defaultValue: DEFAULT_MAIL_POLLER_STATE,
+  parse: (raw) => (isMailPollerState(raw) ? raw : null),
+});
+
+export function withCharacterMailSnapshot(
+  state: MailPollerState,
+  characterId: number,
+  snapshot: MailSnapshot
+): MailPollerState {
+  return { ...state, [characterId]: snapshot };
+}
+
+export const CALENDAR_POLLER_STATE_KEY = 'notifications.pollerState.calendar';
+
+export type CalendarPollerState = Record<number, CalendarSnapshot>;
+
+export const DEFAULT_CALENDAR_POLLER_STATE: CalendarPollerState = {};
+
+function isCalendarEventEntrySnapshot(raw: unknown): raw is CalendarEventEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return typeof r.calendarEventId === 'number' && typeof r.startMs === 'number';
+}
+
+function isCalendarSnapshot(raw: unknown): raw is CalendarSnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.nowMs === 'number' &&
+    Array.isArray(r.entries) &&
+    r.entries.every(isCalendarEventEntrySnapshot)
+  );
+}
+
+function isCalendarPollerState(raw: unknown): raw is CalendarPollerState {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) => !Number.isNaN(Number(key)) && isCalendarSnapshot(value)
+  );
+}
+
+export const useCalendarPollerState = createLocalSetting<CalendarPollerState>({
+  key: CALENDAR_POLLER_STATE_KEY,
+  defaultValue: DEFAULT_CALENDAR_POLLER_STATE,
+  parse: (raw) => (isCalendarPollerState(raw) ? raw : null),
+});
+
+export function withCharacterCalendarSnapshot(
+  state: CalendarPollerState,
+  characterId: number,
+  snapshot: CalendarSnapshot
+): CalendarPollerState {
+  return { ...state, [characterId]: snapshot };
+}
+
+export const CONTRACT_POLLER_STATE_KEY = 'notifications.pollerState.contracts';
+
+export type ContractPollerState = Record<number, ContractSnapshot>;
+
+export const DEFAULT_CONTRACT_POLLER_STATE: ContractPollerState = {};
+
+const CONTRACT_STATUSES: readonly ContractStatus[] = [
+  'outstanding',
+  'in_progress',
+  'finished_issuer',
+  'finished_contractor',
+  'finished',
+  'cancelled',
+  'rejected',
+  'failed',
+  'deleted',
+  'reversed',
+];
+
+function isContractStatus(raw: unknown): raw is ContractStatus {
+  return typeof raw === 'string' && (CONTRACT_STATUSES as readonly string[]).includes(raw);
+}
+
+function isContractEntrySnapshot(raw: unknown): raw is ContractEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return typeof r.contractId === 'number' && isContractStatus(r.status);
+}
+
+function isContractSnapshot(raw: unknown): raw is ContractSnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.nowMs === 'number' &&
+    Array.isArray(r.entries) &&
+    r.entries.every(isContractEntrySnapshot)
+  );
+}
+
+function isContractPollerState(raw: unknown): raw is ContractPollerState {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) => !Number.isNaN(Number(key)) && isContractSnapshot(value)
+  );
+}
+
+export const useContractPollerState = createLocalSetting<ContractPollerState>({
+  key: CONTRACT_POLLER_STATE_KEY,
+  defaultValue: DEFAULT_CONTRACT_POLLER_STATE,
+  parse: (raw) => (isContractPollerState(raw) ? raw : null),
+});
+
+export function withCharacterContractSnapshot(
+  state: ContractPollerState,
+  characterId: number,
+  snapshot: ContractSnapshot
+): ContractPollerState {
   return { ...state, [characterId]: snapshot };
 }

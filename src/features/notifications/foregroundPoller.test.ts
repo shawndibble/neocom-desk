@@ -1,16 +1,28 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { SkillQueueEntry, IndustryJob } from '@/esi/endpoints';
+import type {
+  SkillQueueEntry,
+  IndustryJob,
+  MailHeader,
+  CalendarEventSummary,
+  Contract,
+} from '@/esi/endpoints';
 import { runForegroundPoll, type PollDependencies, type CharacterRef } from './foregroundPoller';
 import type {
   SkillQueuePollerState,
   IndustryJobPollerState,
   ColonyPollerState,
+  MailPollerState,
+  CalendarPollerState,
+  ContractPollerState,
 } from './pollerState';
 
 const CHAR: CharacterRef = { characterId: 1, name: 'Test Pilot' };
 const SKILLQUEUE_SCOPE = 'esi-skills.read_skillqueue.v1';
 const INDUSTRY_JOBS_SCOPE = 'esi-industry.read_character_jobs.v1';
 const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
+const MAIL_SCOPE = 'esi-mail.read_mail.v1';
+const CALENDAR_SCOPE = 'esi-calendar.read_calendar_events.v1';
+const CONTRACTS_SCOPE = 'esi-contracts.read_character_contracts.v1';
 
 function queueEntry(overrides: Partial<SkillQueueEntry> = {}): SkillQueueEntry {
   return {
@@ -36,10 +48,45 @@ function industryJob(overrides: Partial<IndustryJob> = {}): IndustryJob {
   };
 }
 
+function mailHeader(overrides: Partial<MailHeader> = {}): MailHeader {
+  return { mail_id: 1, ...overrides };
+}
+
+function calendarEvent(overrides: Partial<CalendarEventSummary> = {}): CalendarEventSummary {
+  return {
+    event_id: 1,
+    event_date: '2026-01-01T01:00:00Z',
+    title: 'Ops',
+    importance: 0,
+    event_response: 'not_responded',
+    ...overrides,
+  };
+}
+
+function contract(overrides: Partial<Contract> = {}): Contract {
+  return {
+    contract_id: 1,
+    issuer_id: 1,
+    issuer_corporation_id: 1,
+    assignee_id: 1,
+    acceptor_id: 0,
+    type: 'courier',
+    status: 'outstanding',
+    for_corporation: false,
+    availability: 'personal',
+    date_issued: '2026-01-01T00:00:00Z',
+    date_expired: '2026-02-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
 function baseDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
   let saved: SkillQueuePollerState = {};
   let savedJobs: IndustryJobPollerState = {};
   let savedColonies: ColonyPollerState = {};
+  let savedMail: MailPollerState = {};
+  let savedCalendar: CalendarPollerState = {};
+  let savedContracts: ContractPollerState = {};
   return {
     now: () => 1_000_000,
     characters: async () => [CHAR],
@@ -47,6 +94,9 @@ function baseDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
     loadSkillQueue: async () => [],
     loadIndustryJobs: async () => [],
     loadColonyExtractors: async () => [],
+    loadMail: async () => [],
+    loadCalendarEvents: async () => [],
+    loadContracts: async () => [],
     masterEnabled: async () => true,
     eventPrefsFor: async () => ({}),
     permission: () => 'granted',
@@ -61,6 +111,18 @@ function baseDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
     prevColonyState: async () => savedColonies,
     saveColonyState: async (state) => {
       savedColonies = state;
+    },
+    prevMailState: async () => savedMail,
+    saveMailState: async (state) => {
+      savedMail = state;
+    },
+    prevCalendarState: async () => savedCalendar,
+    saveCalendarState: async (state) => {
+      savedCalendar = state;
+    },
+    prevContractState: async () => savedContracts,
+    saveContractState: async (state) => {
+      savedContracts = state;
     },
     notify: vi.fn(async () => {}),
     ...overrides,
@@ -347,6 +409,226 @@ describe('runForegroundPoll', () => {
       eventId: 'planetaryExtractionDone',
       characterId: CHAR.characterId,
       planetId: 40000001,
+    });
+    expect(character).toEqual(CHAR);
+  });
+
+  it('skips mail for a character with no granted scope', async () => {
+    const loadMail = vi.fn(async () => []);
+    const deps = baseDeps({ loadMail });
+    await runForegroundPoll(deps);
+    expect(loadMail).not.toHaveBeenCalled();
+  });
+
+  it('skips mail for a character who toggled the event off despite having the scope', async () => {
+    const loadMail = vi.fn(async () => []);
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MAIL_SCOPE]),
+      eventPrefsFor: async () => ({ newMail: false }),
+      loadMail,
+    });
+    await runForegroundPoll(deps);
+    expect(loadMail).not.toHaveBeenCalled();
+  });
+
+  it('persists a mail snapshot on the first poll but fires nothing (no baseline yet)', async () => {
+    let savedMail: MailPollerState | null = null;
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MAIL_SCOPE]),
+      loadMail: async () => [mailHeader({ mail_id: 5 })],
+      saveMailState: async (state) => {
+        savedMail = state;
+      },
+    });
+    await runForegroundPoll(deps);
+    expect(deps.notify).not.toHaveBeenCalled();
+    expect(savedMail).not.toBeNull();
+    expect(savedMail![CHAR.characterId].entries).toEqual([{ mailId: 5 }]);
+  });
+
+  it('fires newMail when a mail id above the previous high-water mark appears', async () => {
+    let savedMail: MailPollerState = {
+      [CHAR.characterId]: { entries: [{ mailId: 5 }], nowMs: 1000 },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MAIL_SCOPE]),
+      prevMailState: async () => savedMail,
+      saveMailState: async (state) => {
+        savedMail = state;
+      },
+      loadMail: async () => [mailHeader({ mail_id: 6 }), mailHeader({ mail_id: 5 })],
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [fire, character] = notify.mock.calls[0];
+    expect(fire).toEqual({ eventId: 'newMail', characterId: CHAR.characterId, mailId: 6 });
+    expect(character).toEqual(CHAR);
+  });
+
+  it('skips calendar events for a character with no granted scope', async () => {
+    const loadCalendarEvents = vi.fn(async () => []);
+    const deps = baseDeps({ loadCalendarEvents });
+    await runForegroundPoll(deps);
+    expect(loadCalendarEvents).not.toHaveBeenCalled();
+  });
+
+  it('skips calendar events for a character who toggled both calendar events off despite having the scope', async () => {
+    const loadCalendarEvents = vi.fn(async () => []);
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CALENDAR_SCOPE]),
+      eventPrefsFor: async () => ({ newCalendarEvent: false, calendarEventStarting: false }),
+      loadCalendarEvents,
+    });
+    await runForegroundPoll(deps);
+    expect(loadCalendarEvents).not.toHaveBeenCalled();
+  });
+
+  it('persists a calendar snapshot on the first poll but fires nothing (no baseline yet)', async () => {
+    let savedCalendar: CalendarPollerState | null = null;
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CALENDAR_SCOPE]),
+      loadCalendarEvents: async () => [
+        calendarEvent({ event_id: 9, event_date: '2026-01-01T02:00:00Z' }),
+      ],
+      saveCalendarState: async (state) => {
+        savedCalendar = state;
+      },
+    });
+    await runForegroundPoll(deps);
+    expect(deps.notify).not.toHaveBeenCalled();
+    expect(savedCalendar).not.toBeNull();
+    expect(savedCalendar![CHAR.characterId].entries).toEqual([
+      { calendarEventId: 9, startMs: Date.parse('2026-01-01T02:00:00Z') },
+    ]);
+  });
+
+  it('fires newCalendarEvent when an event id above the previous high-water mark appears', async () => {
+    let savedCalendar: CalendarPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ calendarEventId: 5, startMs: Date.parse('2026-01-05T00:00:00Z') }],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CALENDAR_SCOPE]),
+      eventPrefsFor: async () => ({ newCalendarEvent: true, calendarEventStarting: false }),
+      prevCalendarState: async () => savedCalendar,
+      saveCalendarState: async (state) => {
+        savedCalendar = state;
+      },
+      loadCalendarEvents: async () => [
+        calendarEvent({ event_id: 6, event_date: '2026-01-06T00:00:00Z' }),
+        calendarEvent({ event_id: 5, event_date: '2026-01-05T00:00:00Z' }),
+      ],
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [fire, character] = notify.mock.calls[0];
+    expect(fire).toEqual({
+      eventId: 'newCalendarEvent',
+      characterId: CHAR.characterId,
+      calendarEventId: 6,
+    });
+    expect(character).toEqual(CHAR);
+  });
+
+  it('fires calendarEventStarting when an event newly starts between two polls', async () => {
+    let now = Date.parse('2026-01-01T00:30:00Z');
+    let savedCalendar: CalendarPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ calendarEventId: 1, startMs: Date.parse('2026-01-01T01:00:00Z') }],
+        nowMs: now,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      now: () => now,
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CALENDAR_SCOPE]),
+      eventPrefsFor: async () => ({ newCalendarEvent: false, calendarEventStarting: true }),
+      prevCalendarState: async () => savedCalendar,
+      saveCalendarState: async (state) => {
+        savedCalendar = state;
+      },
+      loadCalendarEvents: async () => [
+        calendarEvent({ event_id: 1, event_date: '2026-01-01T01:00:00Z' }),
+      ],
+      notify,
+    });
+    now = Date.parse('2026-01-01T01:30:00Z');
+    await runForegroundPoll(deps);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [fire, character] = notify.mock.calls[0];
+    expect(fire).toEqual({
+      eventId: 'calendarEventStarting',
+      characterId: CHAR.characterId,
+      calendarEventId: 1,
+    });
+    expect(character).toEqual(CHAR);
+  });
+
+  it('skips contracts for a character with no granted scope', async () => {
+    const loadContracts = vi.fn(async () => []);
+    const deps = baseDeps({ loadContracts });
+    await runForegroundPoll(deps);
+    expect(loadContracts).not.toHaveBeenCalled();
+  });
+
+  it('skips contracts for a character who toggled the event off despite having the scope', async () => {
+    const loadContracts = vi.fn(async () => []);
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE]),
+      eventPrefsFor: async () => ({ contractAccepted: false }),
+      loadContracts,
+    });
+    await runForegroundPoll(deps);
+    expect(loadContracts).not.toHaveBeenCalled();
+  });
+
+  it('persists a contract snapshot on the first poll but fires nothing (no baseline yet)', async () => {
+    let savedContracts: ContractPollerState | null = null;
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE]),
+      loadContracts: async () => [contract({ contract_id: 1, status: 'outstanding' })],
+      saveContractState: async (state) => {
+        savedContracts = state;
+      },
+    });
+    await runForegroundPoll(deps);
+    expect(deps.notify).not.toHaveBeenCalled();
+    expect(savedContracts).not.toBeNull();
+    expect(savedContracts![CHAR.characterId].entries).toEqual([
+      { contractId: 1, status: 'outstanding' },
+    ]);
+  });
+
+  it('fires contractAccepted when a contract newly transitions to in_progress', async () => {
+    let savedContracts: ContractPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ contractId: 1, status: 'outstanding' }],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE]),
+      prevContractState: async () => savedContracts,
+      saveContractState: async (state) => {
+        savedContracts = state;
+      },
+      loadContracts: async () => [contract({ contract_id: 1, status: 'in_progress' })],
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [fire, character] = notify.mock.calls[0];
+    expect(fire).toEqual({
+      eventId: 'contractAccepted',
+      characterId: CHAR.characterId,
+      contractId: 1,
     });
     expect(character).toEqual(CHAR);
   });

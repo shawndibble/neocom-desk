@@ -6,12 +6,22 @@ import {
   SKILL_QUEUE_NOTIFICATION_DIFFS,
   diffIndustryJobComplete,
   diffPlanetaryExtractionDone,
+  diffNewMail,
+  diffNewCalendarEvent,
+  diffCalendarEventStarting,
+  diffContractAccepted,
   type SkillQueueEntrySnapshot,
   type SkillQueueSnapshot,
   type IndustryJobEntrySnapshot,
   type IndustryJobSnapshot,
   type ColonySnapshotEntry,
   type PlanetarySnapshot,
+  type MailHeaderSnapshot,
+  type MailSnapshot,
+  type CalendarEventEntrySnapshot,
+  type CalendarSnapshot,
+  type ContractEntrySnapshot,
+  type ContractSnapshot,
 } from './notificationDiffs';
 
 function entry(
@@ -346,5 +356,178 @@ describe('diffPlanetaryExtractionDone', () => {
       { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1 },
       { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 2 },
     ]);
+  });
+});
+
+function mailEntry(mailId: number): MailHeaderSnapshot {
+  return { mailId };
+}
+
+function mailSnapshot(entries: readonly MailHeaderSnapshot[], nowMs: number): MailSnapshot {
+  return { entries, nowMs };
+}
+
+describe('diffNewMail', () => {
+  it('fires nothing on the first-ever poll', () => {
+    const next = mailSnapshot([mailEntry(5)], T0);
+    expect(diffNewMail(1, undefined, next)).toEqual([]);
+  });
+
+  it('fires when a mail id above the previous high-water mark appears', () => {
+    const prev = mailSnapshot([mailEntry(5), mailEntry(3)], T0);
+    const next = mailSnapshot([mailEntry(6), mailEntry(5), mailEntry(3)], T0 + 2000);
+    expect(diffNewMail(7, prev, next)).toEqual([{ eventId: 'newMail', characterId: 7, mailId: 6 }]);
+  });
+
+  it('does not fire for an id already seen', () => {
+    const prev = mailSnapshot([mailEntry(5)], T0);
+    const next = mailSnapshot([mailEntry(5)], T0 + 2000);
+    expect(diffNewMail(7, prev, next)).toEqual([]);
+  });
+
+  it('does not fire for an older id newly paged in below the high-water mark ("load more")', () => {
+    const prev = mailSnapshot([mailEntry(10)], T0);
+    const next = mailSnapshot([mailEntry(10), mailEntry(9), mailEntry(1)], T0 + 2000);
+    expect(diffNewMail(7, prev, next)).toEqual([]);
+  });
+
+  it('fires once per new mail id when multiple arrive in the same poll', () => {
+    const prev = mailSnapshot([mailEntry(5)], T0);
+    const next = mailSnapshot([mailEntry(7), mailEntry(6), mailEntry(5)], T0 + 2000);
+    expect(diffNewMail(7, prev, next)).toEqual([
+      { eventId: 'newMail', characterId: 7, mailId: 7 },
+      { eventId: 'newMail', characterId: 7, mailId: 6 },
+    ]);
+  });
+});
+
+function calendarEntry(calendarEventId: number, startMs: number): CalendarEventEntrySnapshot {
+  return { calendarEventId, startMs };
+}
+
+function calendarSnapshot(
+  entries: readonly CalendarEventEntrySnapshot[],
+  nowMs: number
+): CalendarSnapshot {
+  return { entries, nowMs };
+}
+
+describe('diffNewCalendarEvent', () => {
+  it('fires nothing on the first-ever poll', () => {
+    const next = calendarSnapshot([calendarEntry(5, T0 + 1000)], T0);
+    expect(diffNewCalendarEvent(1, undefined, next)).toEqual([]);
+  });
+
+  it('fires when an event id above the previous high-water mark appears', () => {
+    const prev = calendarSnapshot([calendarEntry(5, T0 + 1000)], T0);
+    const next = calendarSnapshot(
+      [calendarEntry(6, T0 + 5000), calendarEntry(5, T0 + 1000)],
+      T0 + 2000
+    );
+    expect(diffNewCalendarEvent(7, prev, next)).toEqual([
+      { eventId: 'newCalendarEvent', characterId: 7, calendarEventId: 6 },
+    ]);
+  });
+
+  it('does not fire for an older event newly entering the 50-event window', () => {
+    const prev = calendarSnapshot([calendarEntry(10, T0 + 1000)], T0);
+    const next = calendarSnapshot(
+      [calendarEntry(10, T0 + 1000), calendarEntry(2, T0 + 500)],
+      T0 + 2000
+    );
+    expect(diffNewCalendarEvent(7, prev, next)).toEqual([]);
+  });
+});
+
+describe('diffCalendarEventStarting', () => {
+  it('fires nothing on the first-ever poll', () => {
+    const next = calendarSnapshot([calendarEntry(1, T0 - 1000)], T0);
+    expect(diffCalendarEventStarting(1, undefined, next)).toEqual([]);
+  });
+
+  it('fires when an event newly starts', () => {
+    const prev = calendarSnapshot([calendarEntry(1, T0 + 1000)], T0);
+    const next = calendarSnapshot([calendarEntry(1, T0 + 1000)], T0 + 2000);
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([
+      { eventId: 'calendarEventStarting', characterId: 7, calendarEventId: 1 },
+    ]);
+  });
+
+  it('does not fire before the event starts', () => {
+    const prev = calendarSnapshot([calendarEntry(1, T0 + 5000)], T0);
+    const next = calendarSnapshot([calendarEntry(1, T0 + 5000)], T0 + 1000);
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([]);
+  });
+
+  it('does not re-fire for an event that already started as of the previous poll', () => {
+    const prev = calendarSnapshot([calendarEntry(1, T0 - 5000)], T0);
+    const next = calendarSnapshot([calendarEntry(1, T0 - 5000)], T0 + FIVE_MIN);
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([]);
+  });
+
+  it('fires for an event that only appears once already started (never seen upcoming before)', () => {
+    const prev = calendarSnapshot([], T0);
+    const next = calendarSnapshot([calendarEntry(1, T0 + 1000)], T0 + 2000);
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([
+      { eventId: 'calendarEventStarting', characterId: 7, calendarEventId: 1 },
+    ]);
+  });
+});
+
+function contractEntry(
+  contractId: number,
+  status: ContractEntrySnapshot['status']
+): ContractEntrySnapshot {
+  return { contractId, status };
+}
+
+function contractSnapshot(
+  entries: readonly ContractEntrySnapshot[],
+  nowMs: number
+): ContractSnapshot {
+  return { entries, nowMs };
+}
+
+describe('diffContractAccepted', () => {
+  it('fires nothing on the first-ever poll', () => {
+    const next = contractSnapshot([contractEntry(1, 'in_progress')], T0);
+    expect(diffContractAccepted(1, undefined, next)).toEqual([]);
+  });
+
+  it('fires when a contract newly transitions to in_progress', () => {
+    const prev = contractSnapshot([contractEntry(1, 'outstanding')], T0);
+    const next = contractSnapshot([contractEntry(1, 'in_progress')], T0 + 2000);
+    expect(diffContractAccepted(7, prev, next)).toEqual([
+      { eventId: 'contractAccepted', characterId: 7, contractId: 1 },
+    ]);
+  });
+
+  it('does not fire while the contract stays outstanding', () => {
+    const prev = contractSnapshot([contractEntry(1, 'outstanding')], T0);
+    const next = contractSnapshot([contractEntry(1, 'outstanding')], T0 + 2000);
+    expect(diffContractAccepted(7, prev, next)).toEqual([]);
+  });
+
+  it('does not re-fire for a contract already in_progress as of the previous poll', () => {
+    const prev = contractSnapshot([contractEntry(1, 'in_progress')], T0);
+    const next = contractSnapshot([contractEntry(1, 'in_progress')], T0 + FIVE_MIN);
+    expect(diffContractAccepted(7, prev, next)).toEqual([]);
+  });
+
+  it('fires for a contract that only appears once already in_progress (never seen outstanding before)', () => {
+    const prev = contractSnapshot([contractEntry(2, 'outstanding')], T0);
+    const next = contractSnapshot(
+      [contractEntry(1, 'in_progress'), contractEntry(2, 'outstanding')],
+      T0 + 2000
+    );
+    expect(diffContractAccepted(7, prev, next)).toEqual([
+      { eventId: 'contractAccepted', characterId: 7, contractId: 1 },
+    ]);
+  });
+
+  it('does not fire when a contract finishes without ever being in_progress', () => {
+    const prev = contractSnapshot([contractEntry(1, 'outstanding')], T0);
+    const next = contractSnapshot([contractEntry(1, 'finished')], T0 + 2000);
+    expect(diffContractAccepted(7, prev, next)).toEqual([]);
   });
 });
