@@ -7,6 +7,7 @@ import {
   useNotificationPromptState,
   useNotificationPermission,
   requestNotificationPermission,
+  promptStateAfterAsk,
   shouldShowPermissionExplainer,
 } from './permission';
 
@@ -41,14 +42,12 @@ export function NotificationPermissionPrompt() {
   if (!visible) return null;
 
   const enable = async () => {
-    const outcome = await requestNotificationPermission();
-    await setValue({ seen: true, outcome: outcome === 'unsupported' ? null : outcome });
+    await setValue(promptStateAfterAsk(await requestNotificationPermission()));
   };
 
   return (
     <div
       role="alert"
-      aria-label={t('notifications.prompt.title')}
       // Sits above InstallPrompt's own fixed banner rather than on top of it —
       // a first login can plausibly surface both at once.
       className="fixed inset-x-4 bottom-28 z-50 space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-16 md:left-auto md:max-w-sm"

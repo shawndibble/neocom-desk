@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -15,6 +15,7 @@ import {
 import {
   useNotificationPromptState,
   DEFAULT_NOTIFICATION_PROMPT_STATE,
+  NOTIFICATION_PERMISSION_PROMPT_KEY,
 } from '@/features/notifications/permission';
 import { App } from '@/app/App';
 
@@ -270,9 +271,14 @@ describe('Settings — Notifications (issue #170)', () => {
 
     await user.click(enable);
     expect(requestPermission).toHaveBeenCalledTimes(1);
-    expect(
-      await screen.findByRole('checkbox', { name: /toggle all notifications for pilot one/i })
-    ).toBeInTheDocument();
+    // The ask is recorded, so the one-time explainer never returns for someone
+    // who came to Settings instead of using it.
+    await waitFor(async () => {
+      expect((await db.settings.get(NOTIFICATION_PERMISSION_PROMPT_KEY))?.value).toEqual({
+        seen: true,
+        outcome: 'default',
+      });
+    });
   });
 
   it('never requests permission on its own when the grant is already settled', async () => {

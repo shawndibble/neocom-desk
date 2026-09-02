@@ -44,7 +44,9 @@ import { isEventEnabled, selectionStateForEvents } from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
 import {
   useNotificationPermission,
+  useNotificationPromptState,
   requestNotificationPermission,
+  promptStateAfterAsk,
   notificationsBlocked,
 } from './permission';
 
@@ -70,9 +72,13 @@ export function NotificationsPanel() {
   }, [hydratePrefs]);
 
   const { permission, refresh: refreshPermission } = useNotificationPermission();
+  const setPromptState = useNotificationPromptState((state) => state.setValue);
 
+  // Records the ask here too, so someone who ignored the one-time explainer and
+  // came to Settings instead is not offered it again on the next load.
   async function enableNotifications() {
-    await requestNotificationPermission();
+    const outcome = await requestNotificationPermission();
+    await setPromptState(promptStateAfterAsk(outcome));
     refreshPermission();
   }
 
@@ -114,160 +120,164 @@ export function NotificationsPanel() {
   // same as "no characters yet" rather than blanking the whole section.
   const characterList = characters ?? [];
 
-  return (
-    <Panel title={t('settings.notificationsTitle')}>
-      <div className="space-y-3">
-        <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
-        {notificationsBlocked(permission) ? (
+  // JS cannot re-request a denied grant, so the toggle UI would be a set of
+  // controls that can never take effect — the notice stands in for all of it
+  // until the user unblocks the site (issue #171).
+  if (notificationsBlocked(permission)) {
+    return (
+      <Panel title={t('settings.notificationsTitle')}>
+        <div className="space-y-3">
+          <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
           <p
-            role="note"
+            role="status"
             className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-text"
           >
             {t('settings.notifications.blockedNotice')}
           </p>
+        </div>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel title={t('settings.notificationsTitle')}>
+      <div className="space-y-3">
+        <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
+        {permission === 'default' && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+            <p className="min-w-0 flex-1 text-xs text-text-dim">
+              {t('settings.notifications.enableHint')}
+            </p>
+            <Button size="sm" variant="primary" onClick={() => void enableNotifications()}>
+              {t('settings.notifications.enableButton')}
+            </Button>
+          </div>
+        )}
+        <label className="flex items-center gap-2 text-xs font-medium text-text">
+          <input
+            type="checkbox"
+            checked={prefsValue.masterEnabled}
+            onChange={() =>
+              void setPrefsValue(withMasterEnabled(prefsValue, !prefsValue.masterEnabled))
+            }
+            className="size-4 shrink-0 cursor-pointer accent-accent"
+          />
+          {t('settings.notifications.masterSwitchLabel')}
+        </label>
+
+        {characterList.length === 0 ? (
+          <EmptyState title={t('settings.notifications.emptyTitle')} />
         ) : (
           <>
-            {permission === 'default' && (
-              <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
-                <p className="min-w-0 flex-1 text-xs text-text-dim">
-                  {t('settings.notifications.enableHint')}
-                </p>
-                <Button size="sm" variant="primary" onClick={() => void enableNotifications()}>
-                  {t('settings.notifications.enableButton')}
-                </Button>
-              </div>
-            )}
-            <label className="flex items-center gap-2 text-xs font-medium text-text">
-              <input
-                type="checkbox"
-                checked={prefsValue.masterEnabled}
-                onChange={() =>
-                  void setPrefsValue(withMasterEnabled(prefsValue, !prefsValue.masterEnabled))
-                }
-                className="size-4 shrink-0 cursor-pointer accent-accent"
-              />
-              {t('settings.notifications.masterSwitchLabel')}
-            </label>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('settings.notifications.searchPlaceholder')}
+              aria-label={t('settings.notifications.searchPlaceholder')}
+              className="h-9 w-full rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
+            />
 
-            {characterList.length === 0 ? (
-              <EmptyState title={t('settings.notifications.emptyTitle')} />
+            {searching && filterResult.visibleCharacterIds.size === 0 ? (
+              <EmptyState title={t('settings.notifications.noResults')} className="py-8" />
             ) : (
-              <>
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={t('settings.notifications.searchPlaceholder')}
-                  aria-label={t('settings.notifications.searchPlaceholder')}
-                  className="h-9 w-full rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
-                />
+              characterList.map((character) => {
+                if (searching && !filterResult.visibleCharacterIds.has(character.characterId)) {
+                  return null;
+                }
+                const expanded = searching || expandedCharacterIds.has(character.characterId);
+                const visibleEventIds: readonly NotificationEventId[] = searching
+                  ? [...(filterResult.visibleEventIdsByCharacter.get(character.characterId) ?? [])]
+                  : NOTIFICATION_EVENT_IDS;
+                const grantedScopes = scopesByCharacterId.get(character.characterId) ?? new Set();
+                const togglableEventIds = visibleEventIds.filter((eventId) =>
+                  grantedScopes.has(eventDef(eventId).scope)
+                );
+                const prefs = characterEventPrefs(prefsValue, character.characterId);
+                const selectionState = selectionStateForEvents(togglableEventIds, prefs);
 
-                {searching && filterResult.visibleCharacterIds.size === 0 ? (
-                  <EmptyState title={t('settings.notifications.noResults')} className="py-8" />
-                ) : (
-                  characterList.map((character) => {
-                    if (searching && !filterResult.visibleCharacterIds.has(character.characterId)) {
-                      return null;
-                    }
-                    const expanded = searching || expandedCharacterIds.has(character.characterId);
-                    const visibleEventIds: readonly NotificationEventId[] = searching
-                      ? [
-                          ...(filterResult.visibleEventIdsByCharacter.get(character.characterId) ??
-                            []),
-                        ]
-                      : NOTIFICATION_EVENT_IDS;
-                    const grantedScopes =
-                      scopesByCharacterId.get(character.characterId) ?? new Set();
-                    const togglableEventIds = visibleEventIds.filter((eventId) =>
-                      grantedScopes.has(eventDef(eventId).scope)
-                    );
-                    const prefs = characterEventPrefs(prefsValue, character.characterId);
-                    const selectionState = selectionStateForEvents(togglableEventIds, prefs);
-
-                    return (
-                      <div
-                        key={character.characterId}
-                        className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
+                return (
+                  <div
+                    key={character.characterId}
+                    className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
+                  >
+                    {/* Select-all is a sibling of the expand toggle, not nested inside its
+                        <button> — an interactive control inside a <button> is invalid HTML
+                        and would fold both accessible names together for screen readers. */}
+                    <div
+                      className={`flex min-h-8 items-center gap-2 px-2.5 py-1.5 ${expanded ? 'border-b border-line' : ''}`}
+                    >
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        onClick={() => toggleExpanded(character.characterId)}
+                        className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                       >
-                        {/* Select-all is a sibling of the expand toggle, not nested inside its
-                          <button> — an interactive control inside a <button> is invalid HTML
-                          and would fold both accessible names together for screen readers. */}
-                        <div
-                          className={`flex min-h-8 items-center gap-2 px-2.5 py-1.5 ${expanded ? 'border-b border-line' : ''}`}
-                        >
-                          <button
-                            type="button"
-                            aria-expanded={expanded}
-                            onClick={() => toggleExpanded(character.characterId)}
-                            className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-                          >
-                            <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-                              {expanded ? '▾' : '▸'}
-                            </span>
-                            <span className="min-w-0 truncate normal-case">{character.name}</span>
-                          </button>
-                          <SelectionCheckbox
-                            state={selectionState}
-                            onToggle={() =>
-                              void setPrefsValue(
-                                withAllEventsToggledForCharacter(
-                                  prefsValue,
-                                  character.characterId,
-                                  togglableEventIds
+                        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
+                          {expanded ? '▾' : '▸'}
+                        </span>
+                        <span className="min-w-0 truncate normal-case">{character.name}</span>
+                      </button>
+                      <SelectionCheckbox
+                        state={selectionState}
+                        onToggle={() =>
+                          void setPrefsValue(
+                            withAllEventsToggledForCharacter(
+                              prefsValue,
+                              character.characterId,
+                              togglableEventIds
+                            )
+                          )
+                        }
+                        label={t('settings.notifications.selectAllLabel', {
+                          character: character.name,
+                        })}
+                      />
+                    </div>
+                    {expanded && (
+                      <ul className="divide-y divide-line bg-panel-2">
+                        {visibleEventIds.map((eventId) => {
+                          const def = eventDef(eventId);
+                          const hasScope = grantedScopes.has(def.scope);
+                          const enabled = isEventEnabled(prefs, eventId);
+                          const eventLabel = t(def.labelKey);
+                          const checkbox = (
+                            <input
+                              type="checkbox"
+                              checked={hasScope && enabled}
+                              disabled={!hasScope}
+                              onChange={() =>
+                                void setPrefsValue(
+                                  withEventToggled(prefsValue, character.characterId, eventId)
                                 )
-                              )
-                            }
-                            label={t('settings.notifications.selectAllLabel', {
-                              character: character.name,
-                            })}
-                          />
-                        </div>
-                        {expanded && (
-                          <ul className="divide-y divide-line bg-panel-2">
-                            {visibleEventIds.map((eventId) => {
-                              const def = eventDef(eventId);
-                              const hasScope = grantedScopes.has(def.scope);
-                              const enabled = isEventEnabled(prefs, eventId);
-                              const eventLabel = t(def.labelKey);
-                              const checkbox = (
-                                <input
-                                  type="checkbox"
-                                  checked={hasScope && enabled}
-                                  disabled={!hasScope}
-                                  onChange={() =>
-                                    void setPrefsValue(
-                                      withEventToggled(prefsValue, character.characterId, eventId)
-                                    )
-                                  }
-                                  aria-label={eventLabel}
-                                  className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
-                                />
-                              );
-                              return (
-                                <li
-                                  key={eventId}
-                                  className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
-                                >
-                                  <span className={hasScope ? 'text-text' : 'text-text-faint'}>
-                                    {eventLabel}
-                                  </span>
-                                  {hasScope ? (
-                                    checkbox
-                                  ) : (
-                                    <Tooltip content={t('settings.notifications.reauthHint')}>
-                                      {checkbox}
-                                    </Tooltip>
-                                  )}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </>
+                              }
+                              aria-label={eventLabel}
+                              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                          );
+                          return (
+                            <li
+                              key={eventId}
+                              className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                            >
+                              <span className={hasScope ? 'text-text' : 'text-text-faint'}>
+                                {eventLabel}
+                              </span>
+                              {hasScope ? (
+                                checkbox
+                              ) : (
+                                <Tooltip content={t('settings.notifications.reauthHint')}>
+                                  {checkbox}
+                                </Tooltip>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })
             )}
           </>
         )}

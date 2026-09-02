@@ -6,6 +6,7 @@ import {
   useNotificationPromptState,
   readNotificationPermission,
   requestNotificationPermission,
+  promptStateAfterAsk,
   shouldShowPermissionExplainer,
   notificationsBlocked,
 } from './permission';
@@ -53,6 +54,21 @@ describe('requestNotificationPermission', () => {
   it('falls back to the current permission when the request rejects', async () => {
     stubNotification('denied', () => Promise.reject(new Error('nope')));
     await expect(requestNotificationPermission()).resolves.toBe('denied');
+  });
+});
+
+describe('promptStateAfterAsk', () => {
+  it('marks the device offered and records what the browser answered', () => {
+    expect(promptStateAfterAsk('granted')).toEqual({ seen: true, outcome: 'granted' });
+    expect(promptStateAfterAsk('denied')).toEqual({ seen: true, outcome: 'denied' });
+  });
+
+  it('counts a dismissed browser prompt as offered, still with no grant', () => {
+    expect(promptStateAfterAsk('default')).toEqual({ seen: true, outcome: 'default' });
+  });
+
+  it('records no outcome where no browser could answer', () => {
+    expect(promptStateAfterAsk('unsupported')).toEqual({ seen: true, outcome: null });
   });
 });
 

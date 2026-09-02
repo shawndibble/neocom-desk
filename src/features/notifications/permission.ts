@@ -75,6 +75,16 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   }
 }
 
+/**
+ * The prompt row to persist once an ask has completed, wherever it was made
+ * from. `seen` is set even on 'default' (the user dismissed the browser's own
+ * prompt) — they have been offered it, which is what the flag records; and
+ * 'unsupported' stores no outcome because no browser ever answered.
+ */
+export function promptStateAfterAsk(outcome: NotificationPermissionState): NotificationPromptState {
+  return { seen: true, outcome: outcome === 'unsupported' ? null : outcome };
+}
+
 export function shouldShowPermissionExplainer(state: {
   hydrated: boolean;
   seen: boolean;
