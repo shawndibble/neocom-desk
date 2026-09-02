@@ -930,6 +930,7 @@ export function Market() {
             {effectiveLocation.mode === 'hub' ? (
               <NativeSelect
                 size="sm"
+                className="w-32 sm:w-44"
                 aria-label={t('market.tradeHub')}
                 value={effectiveHub.id}
                 onChange={(e) => handleHubChange(e.target.value as TradeHub['id'])}
@@ -943,6 +944,7 @@ export function Market() {
             ) : (
               <NativeSelect
                 size="sm"
+                className="w-32 sm:w-44"
                 aria-label={t('market.region')}
                 value={chosenRegionId}
                 onChange={(e) => handleRegionChange(Number(e.target.value))}

@@ -127,7 +127,12 @@ export function Settings() {
         </div>
       </Panel>
       <Panel title={t('shortcuts.title')}>
-        <dl className="divide-y divide-line text-xs">
+        {/* `max-w-md` inside the full-width page frame: a description and its
+            key are a pair, and at the page's own width `justify-between` threw
+            them a thousand pixels apart with nothing in between. The page
+            keeps one container width app-wide (§3); content that a wide row
+            would make unreadable constrains itself, here. */}
+        <dl className="max-w-md divide-y divide-line text-xs">
           {SHORTCUTS.map((shortcut) => (
             <div key={shortcut.id} className="flex items-center justify-between gap-4 py-2">
               <dt className="text-text-dim">{t(shortcut.descriptionKey)}</dt>

@@ -221,7 +221,6 @@
     "headerSavingsNone": "None"
   },
   "skillCompare": {
-    "title": "Compare Skills",
     "pickCharacters": "Characters to compare",
     "noneSelectedTitle": "No characters selected",
     "noneSelectedHint": "Select characters below to compare their trained skills.",

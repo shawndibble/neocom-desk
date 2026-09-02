@@ -24,7 +24,7 @@ export function FilterChip({ label, selected, onToggle, count, className = '' }:
       aria-pressed={selected}
       onClick={onToggle}
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
         controlHeightClassName.sm,
         selected
           ? 'border-accent-dim bg-accent/15 text-accent'
