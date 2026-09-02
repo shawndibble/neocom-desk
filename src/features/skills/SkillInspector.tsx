@@ -5,13 +5,20 @@ import type { PrereqRow, UnlockRow } from './skillRequirements';
 
 interface SkillInspectorProps {
   skillName: string;
+  description?: string | null;
   prereqs: readonly PrereqRow[];
   unlocks: readonly UnlockRow[];
   onClose: () => void;
 }
 
-/** Shows a selected skill's prerequisites (trained vs. still needed) and what it unlocks. */
-export function SkillInspector({ skillName, prereqs, unlocks, onClose }: SkillInspectorProps) {
+/** Shows a selected skill's description, prerequisites (trained vs. still needed), and what it unlocks. */
+export function SkillInspector({
+  skillName,
+  description,
+  prereqs,
+  unlocks,
+  onClose,
+}: SkillInspectorProps) {
   const { t } = useTranslation();
   return (
     <Panel
@@ -22,6 +29,7 @@ export function SkillInspector({ skillName, prereqs, unlocks, onClose }: SkillIn
         </Button>
       }
     >
+      {description && <p className="mb-3 text-xs text-text-dim">{description}</p>}
       <SkillRequirementsList prereqs={prereqs} unlocks={unlocks} />
     </Panel>
   );

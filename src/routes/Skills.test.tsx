@@ -34,7 +34,7 @@ const FIXTURE_SKILLS: SkillType[] = [
   {
     typeID: 2,
     name: 'Frigate',
-    description: '',
+    description: 'Pilots a <b>Frigate</b>-class starship.',
     groupID: 20,
     groupName: 'Spaceship Command',
     rank: 1,
@@ -133,7 +133,10 @@ describe('Skills', () => {
     expect(screen.getByRole('img', { name: 'Level 3 of 5' })).toBeInTheDocument();
     expect(await screen.findByText('Ocular Filter - Basic')).toBeInTheDocument();
     // Tooltip content is in the DOM (CSS-revealed on hover/focus), markup stripped.
-    expect(screen.getByRole('tooltip')).toHaveTextContent('A basic ocular filter implant.');
+    // Two tooltips exist now: the implant chip's, and the Frigate skill row's.
+    const tooltipTexts = screen.getAllByRole('tooltip').map((el) => el.textContent);
+    expect(tooltipTexts).toContain('A basic ocular filter implant.');
+    expect(tooltipTexts).toContain('Pilots a Frigate-class starship.');
 
     // ESI perception 22 already includes the +3 implant: base 19 + 3 = 22.
     expect(await screen.findByText('19 + 3 = 22')).toBeInTheDocument();
@@ -344,6 +347,28 @@ describe('Skills', () => {
     const unlocksSection = unlocksHeading.closest('section')!;
     expect(within(unlocksSection).getByText('Frigate')).toBeInTheDocument();
     expect(within(unlocksSection).getByText('Level 3')).toBeInTheDocument();
+  });
+
+  it('does not render a tooltip bubble for a skill row with no description', async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Gunnery/ }));
+    const turretRow = await screen.findByRole('button', { name: /Small Hybrid Turret/ });
+    expect(turretRow.closest('li')?.querySelector('[role="tooltip"]')).toBeNull();
+  });
+
+  it("shows the selected skill's description above its prerequisites", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Frigate/ }));
+
+    const prereqsHeading = await screen.findByText('Prerequisites');
+    const panel = screen.getByRole('button', { name: /close/i }).closest('section')!;
+    const description = within(panel).getByText('Pilots a Frigate-class starship.');
+    expect(
+      description.compareDocumentPosition(prereqsHeading) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('deselects a skill (closing the inspector) on a second click', async () => {

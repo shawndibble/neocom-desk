@@ -60,4 +60,29 @@ describe('SkillInspector', () => {
     screen.getByRole('button', { name: /close/i }).click();
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("shows the skill's description above the prerequisites section", () => {
+    render(
+      <SkillInspector
+        skillName="Frigate"
+        description="A small, fast starship."
+        prereqs={[]}
+        unlocks={[]}
+        onClose={vi.fn()}
+      />
+    );
+
+    const description = screen.getByText('A small, fast starship.');
+    const prereqsHeading = screen.getByText('Prerequisites');
+    expect(
+      description.compareDocumentPosition(prereqsHeading) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('renders no description text when the skill has none', () => {
+    render(<SkillInspector skillName="Frigate" prereqs={[]} unlocks={[]} onClose={vi.fn()} />);
+
+    expect(screen.getByText('Frigate')).toBeInTheDocument();
+    expect(screen.queryByText(/starship/)).not.toBeInTheDocument();
+  });
 });

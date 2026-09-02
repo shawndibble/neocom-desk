@@ -14,6 +14,17 @@ describe('Tooltip', () => {
     expect(tooltip).toHaveTextContent('One-line explanation.');
     expect(trigger.getAttribute('aria-describedby')).toBe(tooltip.id);
   });
+
+  it('applies a caller-supplied className to the wrapping span alongside its own', () => {
+    render(
+      <Tooltip content="One-line explanation." className="w-full">
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+    expect(trigger.parentElement?.className).toContain('w-full');
+    expect(trigger.parentElement?.className).toContain('inline-flex');
+  });
 });
 
 describe('Tooltip touch support', () => {

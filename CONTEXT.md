@@ -139,8 +139,10 @@
   name, and jump to a Build Plan. A sixth candidate action, re-anchoring the
   Related Items strip on a chosen item, is dropped: clicking a related item
   already replaces the selection, which re-anchors the strip as a side effect.
-- **Related Items are Market Group siblings.** Meta/tech variants need a
-  relation the SDE build does not emit yet; they are a later step.
+- **Related Items are Market Group siblings.** Meta/tech variants are a
+  separate relation, resolved by `src/engine/market/variations.ts` from
+  `public/data/market/variations.json`; surfacing them in the UI is a later
+  step.
 - Compare ships with four fixed columns, but user-chosen columns are the
   expected direction, so the column set is modelled as a list, not as fixed
   table markup.
@@ -464,3 +466,63 @@
 - **Characters' card grid gains a `lg:grid-cols-3` breakpoint** at the wider
   width (a real third column, not wider padding on two); PlanetaryIndustry's
   repeated colony panels get the same treatment where applicable.
+
+## Glossary (round 20 additions)
+
+- **Install Prompt**: A one-time, in-app call-to-action to install NeoCom
+  Desk as a home-screen/desktop app, layered on top of the browser's own
+  passive PWA affordance (already present via `vite-plugin-pwa`). Platform-
+  appropriate: captures the native `beforeinstallprompt` event on Chrome/Edge
+  desktop and Chrome Android; on iOS Safari, where `beforeinstallprompt`
+  never fires, it's a static "tap Share → Add to Home Screen" instructional
+  banner instead. Shown once ever per device — accepting or dismissing either
+  one permanently suppresses it, no snooze or re-ask.
+- **Notification Event**: One of a fixed catalog of character-state changes a
+  user can be notified about — Skill Level Complete, Character Not Training,
+  Industry Job Complete, New Mail, Planetary Extraction Done, Market Order
+  Filled, New Calendar Event, Calendar Event Starting, Contract Accepted,
+  Wallet Balance Changed. Each is independently toggleable per Character.
+- **Character Not Training**: Fires when a Character's skill queue shows no
+  active training (the head entry has no live `finish_date`) — whether from
+  an empty queue or a stalled/alpha-incapable queue head. ESI exposes no
+  Omega/Alpha or subscription field at all (confirmed on CCP's own forums —
+  deliberately excluded so characters can't be correlated to one account), so
+  the _cause_ can never be distinguished; only this one unified symptom is
+  detectable. Distinct from **Skill Level Complete**, which fires per
+  finished queue entry while training continues.
+- **Market Order Filled**: Fires when any of a Character's market orders
+  completes — a sell order being bought out, or a buy order being delivered.
+  Both directions count as one event type, not two.
+- **Foreground Poller**: Client-side interval (5 minutes) that checks each
+  enabled Notification Event's underlying ESI data while the app is open and
+  the tab/window is visible; paused via the Page Visibility API when
+  backgrounded, with an immediate catch-up check on regaining visibility.
+- **Background Sync Poller**: A hand-written service worker (`injectManifest`
+  Workbox strategy, replacing the current auto-generated `generateSW` one)
+  registered for the Periodic Background Sync API, so notifications can still
+  fire when the app isn't open. Chrome/Edge desktop + Android only (no
+  Safari/Firefox), requires the PWA installed, and runs on a browser-decided
+  schedule with no fixed interval — a best-effort supplement to the
+  Foreground Poller, never a replacement for it.
+
+## Scope decisions (round 20) — Install prompt & notifications
+
+- **No true server push.** Doing so would mean sending EVE refresh tokens
+  off-device or standing up a real polling backend, reversing ADR 0001.
+  Out of scope for this work.
+- Event-detection logic (the "did X change" diff per Notification Event)
+  lives in `src/engine` as pure, TDD'd code shared by both pollers; only the
+  scheduling/permission/orchestration shell is service-worker-only and not
+  unit-testable the way the rest of the app is.
+- Notification preferences are **device-local** (`useLocalSetting`
+  precedent), not synced Editable Data — browser permission is inherently
+  per-device, so syncing "what I want to hear about" across devices would be
+  misleading when each device's actual permission grant is independent.
+- Preferences scope: one master, app-wide, device-level kill switch gates
+  both the real OS `Notification` permission and every per-Character toggle
+  beneath it; below that, every Notification Event is independently
+  toggleable per Character, on by default.
+- Settings UI: per-character collapsible sections (Trained-skills precedent,
+  issue #108), each with a select-all/none checkbox for that character's
+  event toggles, plus a text search that filters event types in place across
+  all sections (Market Browser/Trained-skills search pattern).

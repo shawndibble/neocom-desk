@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -13,6 +13,8 @@ import {
 } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContracts } from '@/features/character/contracts';
+import { ContractDetailModal } from '@/features/character/ContractDetailModal';
+import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -46,8 +48,17 @@ const STATUS_TONE: Record<Contract['status'], string> = {
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
-function isExpired(contract: Contract): boolean {
-  return new Date(contract.date_expired).getTime() < Date.now();
+/**
+ * Lapsed and unclaimed — still `outstanding` past its accept-by deadline.
+ * `date_expired` is only ever "the deadline to act", not "when this row
+ * stopped mattering": a finished/cancelled/etc. contract's deadline is
+ * naturally in the past for anything old, so dimming on date alone (the
+ * previous behavior) faded almost every completed contract in the list.
+ */
+function isStale(contract: Contract): boolean {
+  return (
+    contract.status === 'outstanding' && new Date(contract.date_expired).getTime() < Date.now()
+  );
 }
 
 async function loadContractsSnapshot(
@@ -63,7 +74,7 @@ async function loadContractsSnapshot(
   return { contractsResult, contractsNeedsReauth, contractsTruncated, issuerNames };
 }
 
-/** Contracts: table with status chips, expired dimmed. Read-only, cached for offline. */
+/** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } =
@@ -74,19 +85,29 @@ export function Contracts() {
   const contractsTruncated = data?.contractsTruncated ?? false;
   const issuerNames = data?.issuerNames ?? NO_NAMES;
 
+  const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+
   const columns = useMemo<DataTableColumn<Contract>[]>(
     () => [
       {
         id: 'type',
         header: t('contracts.type'),
-        render: (contract) => contract.title || contract.type,
+        render: (contract) => (
+          <button
+            type="button"
+            onClick={() => setSelectedContract(contract)}
+            className="text-left font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {contract.title || t(CONTRACT_TYPE_KEY[contract.type])}
+          </button>
+        ),
       },
       {
         id: 'status',
         header: t('contracts.status'),
         className: 'font-semibold',
         cellClassName: (contract) => STATUS_TONE[contract.status],
-        render: (contract) => contract.status,
+        render: (contract) => t(CONTRACT_STATUS_KEY[contract.status]),
       },
       {
         id: 'issuer',
@@ -189,9 +210,20 @@ export function Contracts() {
             columns={columns}
             rows={contracts}
             rowKey={(contract) => contract.contract_id}
-            rowClassName={(contract) => (isExpired(contract) ? 'opacity-50' : undefined)}
+            rowClassName={(contract) => (isStale(contract) ? 'opacity-50' : undefined)}
           />
         </Panel>
+      )}
+
+      {selectedContract && activeCharacterId !== null && (
+        <ContractDetailModal
+          characterId={activeCharacterId}
+          contract={selectedContract}
+          issuerName={
+            issuerNames.get(selectedContract.issuer_id) ?? `#${selectedContract.issuer_id}`
+          }
+          onClose={() => setSelectedContract(null)}
+        />
       )}
     </div>
   );

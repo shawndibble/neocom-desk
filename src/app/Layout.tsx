@@ -31,6 +31,22 @@ function navClass({ isActive }: { isActive: boolean }): string {
   return `${NAV_LINK} ${isActive ? NAV_ACTIVE : NAV_IDLE}`;
 }
 
+// Distinct from NAV_LINK (used by the desktop rail and the More sheet, both
+// of which scroll and have room to spare): the bottom tab bar is a fixed
+// five-way split of a viewport that can be as narrow as ~320px. `flex-1
+// min-w-0` forces every tab — including "More" — to always get an equal,
+// bounded share of the width, so a long label truncates instead of pushing
+// later tabs off-screen. `min-h-11` (44px) meets the mobile touch-target
+// minimum regardless of how little padding the text needs.
+const MOBILE_NAV_ITEM =
+  'flex min-h-11 min-w-0 flex-1 items-center justify-center border-t-2 border-transparent px-1 py-2 text-[0.625rem] font-semibold uppercase transition-colors';
+const MOBILE_NAV_ACTIVE = 'border-accent bg-panel-2 text-accent';
+const MOBILE_NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text';
+
+function mobileNavClass({ isActive }: { isActive: boolean }): string {
+  return `${MOBILE_NAV_ITEM} ${isActive ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`;
+}
+
 /** Nav-reachable routes, so `useLockedRoutes` answers for all of them at once. */
 const NAV_PATHS = [
   '/characters',
@@ -80,6 +96,15 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
         <span aria-hidden="true" className="ml-auto size-1.5 shrink-0 rounded-full bg-warning" />
       )}
     </NavLink>
+  );
+}
+
+/** Small heading introducing a group of NavItems in the desktop rail. */
+function NavGroupLabel({ children }: { children: string }) {
+  return (
+    <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+      {children}
+    </p>
   );
 }
 
@@ -233,72 +258,76 @@ export function Layout() {
           </span>
           {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
-        <nav className="flex flex-1 flex-col gap-1 p-2">
-          <NavItem
-            to="/characters"
-            label={t('nav.characters')}
-            locked={locked.has('/characters')}
-          />
-          <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
-          <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
-          <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
-          <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
-          <NavItem to="/settings" label={t('nav.settings')} locked={locked.has('/settings')} />
-          <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
-            {t('nav.characterSection')}
-          </p>
-          <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
-          <NavItem to="/clones" label={t('nav.clones')} locked={locked.has('/clones')} />
-          <NavItem
-            to="/planetary-industry"
-            label={t('nav.pi')}
-            locked={locked.has('/planetary-industry')}
-          />
-          <NavItem
-            to="/employment-history"
-            label={t('nav.employmentHistory')}
-            locked={locked.has('/employment-history')}
-          />
-          <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
-          <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} />
-          <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
-          <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
-          <NavItem to="/contacts" label={t('nav.contacts')} locked={locked.has('/contacts')} />
-          <NavItem to="/orders" label={t('nav.orders')} locked={locked.has('/orders')} />
-        </nav>
         {activeCharacter && (
           <Link
             to="/characters"
             aria-label={t('nav.switchCharacter')}
-            className="flex items-center gap-2 border-t border-line p-2 transition-colors hover:bg-panel-2"
+            className="flex items-center gap-2 border-b border-line p-2 transition-colors hover:bg-panel-2"
           >
             <CharacterAvatar characterId={activeCharacter.characterId} />
             <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
           </Link>
         )}
+        <nav className="flex flex-1 flex-col gap-1 p-2">
+          <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
+          <NavGroupLabel>{t('nav.groups.general')}</NavGroupLabel>
+          <NavItem
+            to="/characters"
+            label={t('nav.characters')}
+            locked={locked.has('/characters')}
+          />
+          <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
+          <NavItem to="/settings" label={t('nav.settings')} locked={locked.has('/settings')} />
+          <NavGroupLabel>{t('nav.groups.progression')}</NavGroupLabel>
+          <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
+          <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
+          <NavItem
+            to="/planetary-industry"
+            label={t('nav.pi')}
+            locked={locked.has('/planetary-industry')}
+          />
+          <NavItem to="/clones" label={t('nav.clones')} locked={locked.has('/clones')} />
+          <NavItem
+            to="/employment-history"
+            label={t('nav.employmentHistory')}
+            locked={locked.has('/employment-history')}
+          />
+          <NavGroupLabel>{t('nav.groups.economy')}</NavGroupLabel>
+          <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
+          <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
+          <NavItem to="/orders" label={t('nav.orders')} locked={locked.has('/orders')} />
+          <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
+          <NavGroupLabel>{t('nav.groups.social')}</NavGroupLabel>
+          <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} />
+          <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
+          <NavItem to="/contacts" label={t('nav.contacts')} locked={locked.has('/contacts')} />
+        </nav>
       </aside>
 
-      <main className="min-w-0 flex-1 p-4 pb-20 md:pb-4">
+      <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
         <AuthFailureNotice />
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar: 4 primary destinations + More. */}
+      {/* Mobile bottom tab bar: 4 primary destinations + More. Fixed-width
+          items (see MOBILE_NAV_ITEM) so the bar never overflows the
+          viewport; `env(safe-area-inset-bottom)` keeps it clear of the
+          home-indicator gesture area on notched phones. */}
       <nav
         aria-label={t('nav.mobileLabel')}
-        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-line bg-panel/95 backdrop-blur-sm md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
       >
-        <NavLink to="/characters" className={navClass}>
-          {t('nav.characters')}
+        <NavLink to="/characters" className={mobileNavClass}>
+          <span className="truncate">{t('nav.characters')}</span>
         </NavLink>
-        <NavLink to="/overview" className={navClass}>
-          {t('nav.overview')}
+        <NavLink to="/overview" className={mobileNavClass}>
+          <span className="truncate">{t('nav.overview')}</span>
         </NavLink>
-        <NavLink to="/skills" className={navClass}>
-          {t('nav.skills')}
+        <NavLink to="/skills" className={mobileNavClass}>
+          <span className="truncate">{t('nav.skills')}</span>
         </NavLink>
-        <NavLink to="/industry" className={navClass}>
-          {t('nav.industry')}
+        <NavLink to="/industry" className={mobileNavClass}>
+          <span className="truncate">{t('nav.industry')}</span>
         </NavLink>
         <button
           type="button"
@@ -307,9 +336,9 @@ export function Layout() {
           aria-expanded={moreOpen}
           aria-controls={MORE_SHEET_ID}
           onClick={() => setMoreOpen((open) => !open)}
-          className={`${NAV_LINK} ${moreOpen ? NAV_ACTIVE : NAV_IDLE}`}
+          className={`${MOBILE_NAV_ITEM} ${moreOpen ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
         >
-          {t('nav.more')}
+          <span className="truncate">{t('nav.more')}</span>
         </button>
       </nav>
 
