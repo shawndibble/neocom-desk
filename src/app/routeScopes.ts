@@ -79,7 +79,13 @@ export const ROUTE_REQUIREMENTS = {
   // with a tooltip (Assets.tsx / features/character/location.ts) instead of
   // gating the whole tab on a grant most existing users don't have yet.
   '/assets': {
-    endpoints: ['getCharacterAssets', 'getUniverseStation', 'postUniverseNames', 'getUniverseType'],
+    endpoints: [
+      'getCharacterAssets',
+      'getUniverseStation',
+      'getUniverseSystem',
+      'postUniverseNames',
+      'getUniverseType',
+    ],
     strings: 'assets',
   },
   '/mail': {

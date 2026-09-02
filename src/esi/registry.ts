@@ -190,6 +190,10 @@ export const ESI_REGISTRY = {
     route: '/universe/stations/{station_id}',
     scope: PUBLIC,
   },
+  getUniverseSystem: {
+    route: '/universe/systems/{system_id}',
+    scope: PUBLIC,
+  },
   postUniverseNames: {
     route: '/universe/names',
     scope: PUBLIC,

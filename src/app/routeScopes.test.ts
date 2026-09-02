@@ -29,8 +29,9 @@ describe('scope derivation', () => {
   });
 
   it('drops PUBLIC endpoints, so a route reading only public data needs nothing', () => {
-    // /assets also calls getUniverseStation, postUniverseNames and
-    // getUniverseType — all PUBLIC, so exactly one scope survives.
+    // /assets also calls getUniverseStation, getUniverseSystem,
+    // postUniverseNames and getUniverseType — all PUBLIC, so exactly one
+    // scope survives.
     expect(requiredScopesForRoute('/assets')).toHaveLength(1);
   });
 
