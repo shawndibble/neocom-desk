@@ -315,6 +315,70 @@ describe('SkillPlans CRUD', () => {
   });
 });
 
+describe('SkillPlans layout: side by side list + editor (#158)', () => {
+  it('shows one column at a time on narrow screens, with a back control that returns to the list', async () => {
+    // jsdom's default `window.matchMedia` (vitest.setup.ts) never matches,
+    // so this already runs as a narrow viewport.
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    const listPanel = (await screen.findByText('New plan')).closest('section');
+    const detailPanel = (await screen.findByText('Select a plan, or create one.')).closest(
+      'section'
+    );
+    expect(listPanel).not.toHaveClass('hidden');
+    expect(detailPanel).toHaveClass('hidden');
+    expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
+
+    await user.click(await screen.findByText('Test plan'));
+    await screen.findByText('Your entries');
+
+    // The list pane stays mounted (not unmounted) behind the editor — its
+    // own state (e.g. scroll position) survives being hidden, matching
+    // Market's narrow-screen precedent.
+    const listPanelOnEditor = screen.getByText('Test plan').closest('section');
+    expect(listPanelOnEditor).toHaveClass('hidden');
+    expect(await screen.findByRole('link', { name: 'Back to plans' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Back to plans' }));
+
+    expect(await screen.findByText('Select a plan, or create one.')).toBeInTheDocument();
+    const listPanelBack = screen.getByText('New plan').closest('section');
+    expect(listPanelBack).not.toHaveClass('hidden');
+  });
+
+  it('keeps both panes visible on desktop, with no back control', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+
+    try {
+      const user = userEvent.setup();
+      await db.skillPlans.add(seedPlan());
+      render(<App />);
+
+      await user.click(await screen.findByText('Test plan'));
+      await screen.findByText('Your entries');
+
+      const listPanel = screen.getByText('Test plan').closest('section');
+      expect(listPanel).not.toHaveClass('hidden');
+      expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+});
+
 describe('SkillPlans: sync error visibility (UX-REVIEW #10)', () => {
   it('shows a visible "Sync error" note (not tooltip-only) when sync is in the error state', async () => {
     subscribeSyncStatusMock.mockImplementation((listener: (s: unknown) => void) => {

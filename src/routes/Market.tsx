@@ -46,6 +46,7 @@ import {
   type OrderBookResult,
 } from '@/features/market/orderBook';
 import { formatVolume, formatOrderLocationText } from '@/features/market/format';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
@@ -90,9 +91,6 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
-
-/** Matches the `lg:` breakpoint the two-column grid switches on below. */
-const DESKTOP_QUERY = '(min-width: 64rem)';
 
 /**
  * Stands in for variationIndex before variations.json resolves (or if it
@@ -347,15 +345,7 @@ export function Market() {
   // Narrow screens show one column at a time (CONTEXT.md round 8); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width.
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_QUERY).matches
-  );
-  useEffect(() => {
-    const desktop = window.matchMedia(DESKTOP_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    desktop.addEventListener('change', onChange);
-    return () => desktop.removeEventListener('change', onChange);
-  }, []);
+  const isDesktop = useIsDesktop();
 
   // The selected item and the current location are read from the URL
   // (CONTEXT.md round 7, issue #4), not held in component state: the query
