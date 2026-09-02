@@ -332,6 +332,9 @@ export function BuildPlanDetail({
                 ? (snapshot?.hubPrices[entry.productTypeID] ?? null)
                 : null
             }
+            productQuantity={
+              blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null
+            }
             costIndexSystemName={hub.systemName}
           />
         </Panel>

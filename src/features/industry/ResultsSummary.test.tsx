@@ -15,6 +15,7 @@ const RESULT: BuildResult = {
   revenue: 1000,
   salesTax: 10,
   brokerFee: 5,
+  netRevenue: 985,
   profit: 435,
   marginPct: 77,
   iskPerHour: 435,
@@ -31,6 +32,7 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
       systemCostIndex={0.023}
       productName="Rifter"
       productUnitPrice={100000}
+      productQuantity={10}
       costIndexSystemName="Jita"
       {...overrides}
     />
@@ -146,10 +148,79 @@ describe('ResultsSummary: Costs stack (#116)', () => {
     expect(jobFeeButton).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('leaves the Revenue and Verdict rows unchanged from current behavior', () => {
+  it('leaves the Profit and Verdict rows unchanged from current behavior', () => {
     renderSummary();
-    expect(screen.getByText('Product sell price')).toBeInTheDocument();
     expect(screen.getByText('Profit')).toBeInTheDocument();
     expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
+  });
+});
+
+describe('ResultsSummary: Revenue block (#117)', () => {
+  it('renders the product line as name, qty produced, unit price, and line total', () => {
+    renderSummary();
+
+    expect(screen.getByText('Rifter')).toBeInTheDocument();
+    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.getByText('100,000')).toBeInTheDocument();
+    // line total = revenue (1000), not unitPrice x qty (1_000_000) — pulled from the engine, not recomputed
+    expect(screen.getByText('1,000')).toBeInTheDocument();
+  });
+
+  it('shows Sales Tax and Broker Fee as negative deductions, then an emphasized Net Revenue total', () => {
+    renderSummary();
+
+    const salesTaxRow = screen.getByText('Sales tax').closest('div')!;
+    expect(salesTaxRow).toHaveTextContent('-10');
+    expect(salesTaxRow.querySelector('.text-isk-neg')).not.toBeNull();
+
+    const brokerFeeRow = screen.getByText('Broker fee').closest('div')!;
+    expect(brokerFeeRow).toHaveTextContent('-5');
+    expect(brokerFeeRow.querySelector('.text-isk-neg')).not.toBeNull();
+
+    const netRevenueRow = screen.getByText('Net revenue').closest('div')!;
+    expect(netRevenueRow).toHaveTextContent('985');
+  });
+
+  it('orders Revenue rows: product line, Sales Tax, Broker Fee, Net Revenue', () => {
+    const { container } = renderSummary();
+    const text = container.textContent ?? '';
+    const productIdx = text.indexOf('Rifter');
+    const salesTaxIdx = text.indexOf('Sales tax');
+    const brokerFeeIdx = text.indexOf('Broker fee');
+    const netRevenueIdx = text.indexOf('Net revenue');
+
+    expect(productIdx).toBeGreaterThanOrEqual(0);
+    expect(productIdx).toBeLessThan(salesTaxIdx);
+    expect(salesTaxIdx).toBeLessThan(brokerFeeIdx);
+    expect(brokerFeeIdx).toBeLessThan(netRevenueIdx);
+  });
+
+  it('removes the old Product sell price / Sell value chips', () => {
+    renderSummary();
+    expect(screen.queryByText('Product sell price')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sell value')).not.toBeInTheDocument();
+  });
+
+  it('hides the Revenue block entirely when the product is unpriced, rather than showing fabricated numbers', () => {
+    renderSummary({
+      result: {
+        ...RESULT,
+        buyCost: null,
+        revenue: null,
+        salesTax: null,
+        brokerFee: null,
+        netRevenue: null,
+        profit: null,
+        marginPct: null,
+        iskPerHour: null,
+        unpriceable: true,
+        recommendation: 'unknown',
+      },
+      productUnitPrice: null,
+    });
+
+    expect(screen.queryByText('Sales tax')).not.toBeInTheDocument();
+    expect(screen.queryByText('Broker fee')).not.toBeInTheDocument();
+    expect(screen.queryByText('Net revenue')).not.toBeInTheDocument();
   });
 });
