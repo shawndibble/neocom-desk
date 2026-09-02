@@ -139,8 +139,10 @@
   name, and jump to a Build Plan. A sixth candidate action, re-anchoring the
   Related Items strip on a chosen item, is dropped: clicking a related item
   already replaces the selection, which re-anchors the strip as a side effect.
-- **Related Items are Market Group siblings.** Meta/tech variants need a
-  relation the SDE build does not emit yet; they are a later step.
+- **Related Items are Market Group siblings.** Meta/tech variants are a
+  separate relation, resolved by `src/engine/market/variations.ts` from
+  `public/data/market/variations.json`; surfacing them in the UI is a later
+  step.
 - Compare ships with four fixed columns, but user-chosen columns are the
   expected direction, so the column set is modelled as a list, not as fixed
   table markup.
