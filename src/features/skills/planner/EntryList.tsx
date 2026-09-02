@@ -20,13 +20,13 @@ import { Button, EmptyState, Tooltip } from '@/components/ui';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { AttributeName, PlanPriority } from '@/engine/types';
 import { formatDate, formatDuration, stepTimeline } from '@/lib/duration';
+import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
 import type { MergedRow } from './queueRows';
 
 /** A band header's grouping (#115): either mode carries enough to render its label. */
 export type BandInfo =
-  | { kind: 'priority'; priority: PlanPriority }
-  | { kind: 'attributePair'; primary: AttributeName; secondary: AttributeName };
+  { kind: 'priority'; priority: PlanPriority } | ({ kind: 'attributePair' } & AttributePair);
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const ICON_BUTTON = 'w-7 justify-center';
@@ -57,10 +57,7 @@ function attributePairLabel(primary: AttributeName, secondary: AttributeName): s
   return `${primary.slice(0, 3).toUpperCase()}/${secondary.slice(0, 3).toUpperCase()}`;
 }
 
-interface AttributePairBadgeProps {
-  primary: AttributeName;
-  secondary: AttributeName;
-}
+type AttributePairBadgeProps = AttributePair;
 
 /** A skill's primary/secondary attribute pair, toggleable via the "Columns" control (#114). */
 function AttributePairBadge({ primary, secondary }: AttributePairBadgeProps) {
@@ -183,7 +180,7 @@ function TimelineLine({ start, finish }: { start: Date; finish: Date }) {
 interface EntryRowProps {
   row: Extract<MergedRow, { kind: 'entry' }>;
   name: string;
-  attributes: { primary: AttributeName; secondary: AttributeName } | undefined;
+  attributes: AttributePair | undefined;
   boosted: boolean;
   timeline: { start: Date; finish: Date } | null;
   columns: ColumnVisibility;
@@ -320,7 +317,7 @@ function EntryRow({
 interface PrereqRowProps {
   row: Extract<MergedRow, { kind: 'prereq' }>;
   name: string;
-  attributes: { primary: AttributeName; secondary: AttributeName } | undefined;
+  attributes: AttributePair | undefined;
   boosted: boolean;
   timeline: { start: Date; finish: Date } | null;
   columns: ColumnVisibility;
@@ -454,9 +451,7 @@ interface EntryListProps {
   bandsAt: ReadonlyMap<string, BandInfo>;
   nameFor: (skillTypeID: number) => string;
   /** A skill's primary/secondary attribute pair, when known (#114). */
-  attributesFor: (
-    skillTypeID: number
-  ) => { primary: AttributeName; secondary: AttributeName } | undefined;
+  attributesFor: (skillTypeID: number) => AttributePair | undefined;
   /** Which optional row parts are enabled — the "Columns" control's device-local preference (#114). */
   columns: ColumnVisibility;
   /** Step indices (into the underlying scheduled queue) a live Booster speeds up. */
