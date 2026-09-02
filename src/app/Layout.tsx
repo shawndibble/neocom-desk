@@ -99,6 +99,15 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
   );
 }
 
+/** Small heading introducing a group of NavItems in the desktop rail. */
+function NavGroupLabel({ children }: { children: string }) {
+  return (
+    <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+      {children}
+    </p>
+  );
+}
+
 const MORE_SHEET_ID = 'mobile-more-sheet';
 
 interface MobileMoreSheetProps {
@@ -249,49 +258,50 @@ export function Layout() {
           </span>
           {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
-        <nav className="flex flex-1 flex-col gap-1 p-2">
-          <NavItem
-            to="/characters"
-            label={t('nav.characters')}
-            locked={locked.has('/characters')}
-          />
-          <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
-          <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
-          <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
-          <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
-          <NavItem to="/settings" label={t('nav.settings')} locked={locked.has('/settings')} />
-          <p className="mt-3 px-3 text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
-            {t('nav.characterSection')}
-          </p>
-          <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
-          <NavItem to="/clones" label={t('nav.clones')} locked={locked.has('/clones')} />
-          <NavItem
-            to="/planetary-industry"
-            label={t('nav.pi')}
-            locked={locked.has('/planetary-industry')}
-          />
-          <NavItem
-            to="/employment-history"
-            label={t('nav.employmentHistory')}
-            locked={locked.has('/employment-history')}
-          />
-          <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
-          <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} />
-          <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
-          <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
-          <NavItem to="/contacts" label={t('nav.contacts')} locked={locked.has('/contacts')} />
-          <NavItem to="/orders" label={t('nav.orders')} locked={locked.has('/orders')} />
-        </nav>
         {activeCharacter && (
           <Link
             to="/characters"
             aria-label={t('nav.switchCharacter')}
-            className="flex items-center gap-2 border-t border-line p-2 transition-colors hover:bg-panel-2"
+            className="flex items-center gap-2 border-b border-line p-2 transition-colors hover:bg-panel-2"
           >
             <CharacterAvatar characterId={activeCharacter.characterId} />
             <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
           </Link>
         )}
+        <nav className="flex flex-1 flex-col gap-1 p-2">
+          <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
+          <NavGroupLabel>{t('nav.groups.general')}</NavGroupLabel>
+          <NavItem
+            to="/characters"
+            label={t('nav.characters')}
+            locked={locked.has('/characters')}
+          />
+          <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
+          <NavItem to="/settings" label={t('nav.settings')} locked={locked.has('/settings')} />
+          <NavGroupLabel>{t('nav.groups.progression')}</NavGroupLabel>
+          <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
+          <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
+          <NavItem
+            to="/planetary-industry"
+            label={t('nav.pi')}
+            locked={locked.has('/planetary-industry')}
+          />
+          <NavItem to="/clones" label={t('nav.clones')} locked={locked.has('/clones')} />
+          <NavItem
+            to="/employment-history"
+            label={t('nav.employmentHistory')}
+            locked={locked.has('/employment-history')}
+          />
+          <NavGroupLabel>{t('nav.groups.economy')}</NavGroupLabel>
+          <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
+          <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
+          <NavItem to="/orders" label={t('nav.orders')} locked={locked.has('/orders')} />
+          <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
+          <NavGroupLabel>{t('nav.groups.social')}</NavGroupLabel>
+          <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} />
+          <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
+          <NavItem to="/contacts" label={t('nav.contacts')} locked={locked.has('/contacts')} />
+        </nav>
       </aside>
 
       <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
