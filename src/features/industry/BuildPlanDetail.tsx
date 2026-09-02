@@ -293,7 +293,12 @@ export function BuildPlanDetail({
       <Panel
         title={t('industry.materials')}
         actions={
-          <span className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
+          // `flex-wrap` because this is the one converted toolbar that needs a
+          // saved build plan to reach, so it is the one I could not screenshot
+          // at 390px. Four items — badge, two controls, duration — beside the
+          // panel title; if they ever do run out of room, wrapping inside the
+          // (min-height, not fixed) header beats clipping.
+          <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-text-dim">
             {fetchedAt && <DataAgeBadge date={fetchedAt} />}
             <IconButton
               size="sm"
