@@ -143,7 +143,10 @@ export function BuildPlanList({
           className="py-6"
         />
       ) : (
-        <ul className="rounded-xs border border-line">
+        // The scroller is the row list alone, not the whole pane: the heading,
+        // the create button and the blueprint picker stay put while a long
+        // plan list scrolls under them, same as Mail's list.
+        <ul className="max-h-[28rem] overflow-y-auto rounded-xs border border-line">
           {plans.map((plan) => (
             <PlanRow
               key={plan.id}
