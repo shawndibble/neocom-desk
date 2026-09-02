@@ -11,6 +11,8 @@ Run: python3 scripts/generate-brand-assets.py
 """
 
 from pathlib import Path
+import math
+
 from PIL import Image, ImageFilter, ImageOps
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,6 +28,10 @@ PLATE = (10, 14, 20)
 # glow ramps. HI is deliberately well under 255 so the silver body stays fully
 # opaque instead of picking up a haze of its own anti-aliasing.
 ALPHA_LO, ALPHA_HI = 8, 90
+
+# A maskable icon is guaranteed only its centre circle of this diameter; the
+# launcher's mask may take the rest. https://w3c.github.io/manifest/#icon-masks
+SAFE_ZONE = 0.8
 
 
 def with_alpha(path: Path) -> Image.Image:
@@ -49,17 +55,75 @@ def trim(im: Image.Image) -> Image.Image:
     return im.crop(solid.getbbox())
 
 
-def on_plate(mark: Image.Image, size: int, coverage: float) -> Image.Image:
-    """Square icon: the mark centred on an opaque plate at `coverage` of the edge."""
+def body(im: Image.Image) -> Image.Image:
+    """The solid artwork as a mask, with the glow thresholded away.
+
+    with_alpha() ramps the glow across a wide band on purpose, so alpha alone
+    cannot say where the hexagon ends and its bloom begins. Everything that has
+    to reason about the mark's *shape* -- where its centre is, how much room it
+    needs -- measures this instead.
+    """
+    return im.getchannel("A").point(lambda v: 255 if v > 140 else 0)
+
+
+def body_centre(im: Image.Image) -> tuple[float, float]:
+    """Centre of the solid artwork, which is not the centre of its bounding box.
+
+    The glow is not symmetric: it pools under the bottom vertex and is thinner
+    at the top right, so the full bbox reaches further down and left than the
+    hexagon does. Centring the bbox therefore pushes the hexagon itself up and
+    to the right -- invisible on a square icon with room to spare, obvious once
+    a launcher crops the plate away to a circle and the mark is all that is
+    left. Every placement below centres on this point.
+    """
+    left, top, right, bottom = body(im).getbbox()
+    return (left + right) / 2, (top + bottom) / 2
+
+
+def body_radius(im: Image.Image) -> float:
+    """Distance from body_centre() to the furthest solid pixel.
+
+    Measured rather than derived from the bbox: the bbox's own half-diagonal
+    would fit the hexagon's empty *corners* inside the safe circle and shrink
+    the mark for nothing.
+    """
+    cx, cy = body_centre(im)
+    px = body(im).load()
+    w, h = im.size
+    return max(
+        math.hypot(x - cx, y - cy) for y in range(h) for x in range(w) if px[x, y]
+    )
+
+
+def place(mark: Image.Image, size: int, scale: float) -> Image.Image:
+    """The mark resized by `scale` and set body-centre on an opaque plate."""
     canvas = Image.new("RGBA", (size, size), (*PLATE, 255))
-    # contain(), not thumbnail(): thumbnail only ever shrinks, so a source at
-    # or below the target size would silently land under `coverage`.
-    limit = int(size * coverage)
-    scaled = ImageOps.contain(mark, (limit, limit), Image.LANCZOS)
-    x = (size - scaled.width) // 2
-    y = (size - scaled.height) // 2
-    canvas.alpha_composite(scaled, (x, y))
+    scaled = mark.resize(
+        (max(1, round(mark.width * scale)), max(1, round(mark.height * scale))),
+        Image.LANCZOS,
+    )
+    cx, cy = body_centre(scaled)
+    canvas.alpha_composite(scaled, (round(size / 2 - cx), round(size / 2 - cy)))
     return canvas.convert("RGB")
+
+
+def on_plate(mark: Image.Image, size: int, coverage: float) -> Image.Image:
+    """Square icon: the mark on an opaque plate, its long axis `coverage` of the edge."""
+    return place(mark, size, size * coverage / max(mark.size))
+
+
+def on_safe_circle(mark: Image.Image, size: int, fill: float) -> Image.Image:
+    """Maskable icon: the mark sized to `fill` of the mask's safe circle.
+
+    A maskable icon is only guaranteed its centre 80%-diameter circle; the
+    launcher may crop everything outside it, and a circle is the tightest of
+    the shapes it may crop to. So the constraint is not a share of the square
+    edge -- it is the radius: fit the hexagon's own circumradius inside that
+    circle and it fills the launcher icon, at any mask shape, without a corner
+    ever being bitten. Only the glow can spill past, and glow fading out under
+    the mask edge is what it looks like anyway.
+    """
+    return place(mark, size, size * SAFE_ZONE / 2 * fill / body_radius(mark))
 
 
 def on_keyline(mark: Image.Image, size: int, coverage: float, halo: int) -> Image.Image:
@@ -105,16 +169,10 @@ def main() -> None:
 
     for size in (192, 512):
         on_plate(mark, size, 0.78).save(ICONS / f"icon-{size}.png")
-    # Android crops icons to a mask -- in the worst case a circle of 80% of the
-    # canvas -- so the maskable variant is the same art pulled inside that safe
-    # circle rather than a differently-cropped one. It sits at the same 0.78 as
-    # the plain icons and no lower: `contain` sizes the mark by its taller axis,
-    # so at 0.78 the *whole* bbox, glow included, is 399px on a 512 canvas and
-    # clears the 410px safe circle -- and the hexagon inside it is shorter still
-    # (the bbox carries ~30px of glow below the bottom vertex), which leaves the
-    # corners a further margin. Pulling it in to 0.60 as earlier drafts did was
-    # not safety, just a mark floating in a large empty circle on the launcher.
-    on_plate(mark, 512, 0.78).save(ICONS / "icon-512-maskable.png")
+    # Android crops this one to a mask, so it is sized against the safe circle
+    # rather than the square edge. 0.98 of it, not 1.0: the hexagon's vertices
+    # land a couple of pixels inside the boundary instead of on it.
+    on_safe_circle(mark, 512, 0.98).save(ICONS / "icon-512-maskable.png")
     on_plate(mark, 180, 0.78).save(ICONS / "apple-touch-icon-180.png")
 
     # Safari and other browsers that skip the SVG link land here (Chrome and
