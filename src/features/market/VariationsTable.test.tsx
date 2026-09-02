@@ -106,7 +106,7 @@ describe('VariationsTable', () => {
     expect(screen.getAllByText('No orders')).toHaveLength(2);
   });
 
-  it('re-anchors on the clicked row via onSelect', async () => {
+  it('re-anchors on the clicked row via onSelect, anywhere in the row', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     render(
@@ -118,7 +118,9 @@ describe('VariationsTable', () => {
         onSelect={onSelect}
       />
     );
-    await user.click(screen.getByRole('button', { name: 'Rifter' }));
+    const rifterRow = screen.getByText('Rifter').closest('tr');
+    if (!rifterRow) throw new Error('expected a Rifter row');
+    await user.click(rifterRow);
     expect(onSelect).toHaveBeenCalledWith(587);
   });
 
@@ -155,5 +157,45 @@ describe('VariationsTable', () => {
     await user.click(screen.getByRole('button', { name: /Sell/ }));
     const rowEls = screen.getAllByRole('row').slice(1);
     expect(within(rowEls[0]).getByText("Vherokior's Slasher")).toBeInTheDocument();
+  });
+
+  it('sorts by Name on header click', async () => {
+    const user = userEvent.setup();
+    render(
+      <VariationsTable
+        rows={ROWS}
+        totalCount={3}
+        truncated={false}
+        prices={new Map()}
+        onSelect={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /Name/ }));
+    const rowEls = screen.getAllByRole('row').slice(1);
+    expect(within(rowEls[0]).getByText('Republic Fleet Rifter')).toBeInTheDocument();
+    expect(within(rowEls[1]).getByText('Rifter')).toBeInTheDocument();
+    expect(within(rowEls[2]).getByText("Vherokior's Slasher")).toBeInTheDocument();
+  });
+
+  it('sorts by Buy on header click', async () => {
+    const user = userEvent.setup();
+    render(
+      <VariationsTable
+        rows={ROWS}
+        totalCount={3}
+        truncated={false}
+        prices={
+          new Map([
+            [588, summary(200, 190)],
+            [587, summary(100, 90)],
+            [589, summary(300, 290)],
+          ])
+        }
+        onSelect={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /Buy/ }));
+    const rowEls = screen.getAllByRole('row').slice(1);
+    expect(within(rowEls[0]).getByText('Rifter')).toBeInTheDocument();
   });
 });

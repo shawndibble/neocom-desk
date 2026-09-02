@@ -567,6 +567,24 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     expect(within(table).queryByText('Cormorant')).not.toBeInTheDocument();
   });
 
+  it('a failed variations.json fetch degrades only the Variations table to its sibling fallback, not the whole Market route', async () => {
+    vi.mocked(loadVariations).mockRejectedValueOnce(new Error('network error'));
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+
+    // The order book — unrelated to variations.json — still renders fine.
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('900,000.00')).toBeInTheDocument();
+    // The Variations table degrades to the sibling fallback rather than
+    // going empty or taking the whole route down with it.
+    const table = await screen.findByRole('table', { name: 'Variations' });
+    expect(within(table).getByText('Kestrel')).toBeInTheDocument();
+  });
+
   it('clicking a row selects it, reloading the order book and re-anchoring the table on it', async () => {
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup();
@@ -584,6 +602,24 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     // (the tree still shows its own "Merlin" match for the lingering search).
     const table = await screen.findByRole('table', { name: 'Variations' });
     expect(within(table).getByText('Merlin')).toBeInTheDocument();
+  });
+
+  it('re-anchors on a click anywhere in the row, not just the item name — identical to the old card click', async () => {
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    const table = await screen.findByRole('table', { name: 'Variations' });
+
+    // Click the Tier cell, not the Name cell.
+    const kestrelRow = within(table).getByText('Kestrel').closest('tr');
+    if (!kestrelRow) throw new Error('expected a Kestrel row');
+    await user.click(within(kestrelRow).getByText('—'));
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('1,500,000.00')).toBeInTheDocument();
   });
 
   it('a manual Refresh also refetches row prices, not just the on-screen order book', async () => {

@@ -9,7 +9,7 @@ import { getVariations, type VariationIndex } from '@/engine/market/variations';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 
 /** Bounds the table so a large variation group or Market Group cannot grow it unusably long. */
-export const RELATED_ITEMS_LIMIT = 20;
+export const VARIATIONS_LIMIT = 20;
 
 export interface VariationRow {
   typeId: number;
@@ -19,7 +19,7 @@ export interface VariationRow {
 }
 
 export interface VariationsResult {
-  /** Rows to render, capped at RELATED_ITEMS_LIMIT. */
+  /** Rows to render, capped at VARIATIONS_LIMIT. */
   rows: readonly VariationRow[];
   /** True row count before the cap. */
   totalCount: number;
@@ -41,9 +41,9 @@ export function tierLabel(metaGroupName: string): string {
 }
 
 function cap(rows: readonly VariationRow[]): VariationsResult {
-  const truncated = rows.length > RELATED_ITEMS_LIMIT;
+  const truncated = rows.length > VARIATIONS_LIMIT;
   return {
-    rows: truncated ? rows.slice(0, RELATED_ITEMS_LIMIT) : rows,
+    rows: truncated ? rows.slice(0, VARIATIONS_LIMIT) : rows,
     totalCount: rows.length,
     truncated,
   };

@@ -94,6 +94,16 @@ const ROW_CAP = 15;
 /** Matches the `lg:` breakpoint the two-column grid switches on below. */
 const DESKTOP_QUERY = '(min-width: 64rem)';
 
+/**
+ * Stands in for variationIndex before variations.json resolves (or if it
+ * fails to load) — every lookup against it comes back empty, which
+ * getVariationRows already treats the same as "this item has no variation
+ * data" and degrades to the Market Group sibling fallback. Keeps the
+ * Variations panel's own data source independent of the page's primary
+ * catalogue load.
+ */
+const EMPTY_VARIATION_INDEX = buildVariationIndex({}, {});
+
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -484,9 +494,8 @@ export function Market() {
       loadSolarSystems(),
       loadMarketRegions(),
       loadGlobalMarkets(),
-      loadVariations(),
     ])
-      .then(([g, ty, stations, systems, regions, global, variations]) => {
+      .then(([g, ty, stations, systems, regions, global]) => {
         if (cancelled) return;
         setGroups(g);
         setTypes(ty);
@@ -494,10 +503,28 @@ export function Market() {
         setSolarSystems(systems);
         setMarketRegions(regions);
         setGlobalMarkets(global);
-        setVariationData(variations);
       })
       .catch(() => {
         if (!cancelled) setCatalogueError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Fetched independently of the catalogue load above: variations.json is
+  // Variations-panel-only data, so a slow or failed fetch degrades that one
+  // panel to its Market-Group-sibling fallback (see variationsResult below)
+  // rather than blocking or erroring the whole Market route.
+  useEffect(() => {
+    let cancelled = false;
+    void loadVariations()
+      .then((variations) => {
+        if (!cancelled) setVariationData(variations);
+      })
+      .catch(() => {
+        // Leaves variationData null — variationsResult below already treats
+        // that the same as "no variation data for this item".
       });
     return () => {
       cancelled = true;
@@ -576,9 +603,13 @@ export function Market() {
 
   // Built once per SDE load, not per selection — getVariations is then
   // O(group size) per call instead of re-scanning the whole types map.
+  // Defaults to EMPTY_VARIATION_INDEX before variations.json resolves, so
+  // the Variations panel falls back to siblings rather than going blank.
   const variationIndex = useMemo(
     () =>
-      variationData ? buildVariationIndex(variationData.types, variationData.metaGroups) : null,
+      variationData
+        ? buildVariationIndex(variationData.types, variationData.metaGroups)
+        : EMPTY_VARIATION_INDEX,
     [variationData]
   );
 
@@ -765,15 +796,12 @@ export function Market() {
     );
   }
 
+  // variationData isn't included here — it's fetched by its own effect,
+  // independent of the primary catalogue load, so a slow or failed
+  // variations.json never blocks or errors the rest of the page.
   const catalogueLoading =
     !catalogueError &&
-    (!groups ||
-      !types ||
-      !npcStations ||
-      !solarSystems ||
-      !marketRegions ||
-      !globalMarkets ||
-      !variationData);
+    (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
   const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
   const showBackControl = !isDesktop && selectedTypeId !== null;
   // The Data Age badge reflects the order book, so it only belongs on the
@@ -839,9 +867,7 @@ export function Market() {
   // just becomes the new selectedItem.
   const variationsResult = useMemo(
     () =>
-      selectedItem && variationIndex
-        ? getVariationRows(variationIndex, typesByGroup, typesById, selectedItem)
-        : null,
+      selectedItem ? getVariationRows(variationIndex, typesByGroup, typesById, selectedItem) : null,
     [variationIndex, typesByGroup, typesById, selectedItem]
   );
 

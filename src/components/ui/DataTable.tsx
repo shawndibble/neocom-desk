@@ -44,6 +44,13 @@ interface DataTableProps<T> {
    * drives a focused trigger.
    */
   rowContextMenu?: (row: T, tr: ReactElement) => ReactElement;
+  /**
+   * Makes the whole row a click target — e.g. re-anchoring the page on the
+   * row's item, rather than requiring a click on one specific cell. Also
+   * gets `tabIndex={0}` and responds to Enter/Space, same focus treatment as
+   * `rowContextMenu`.
+   */
+  onRowClick?: (row: T) => void;
 }
 
 function compareValues(a: string | number, b: string | number): number {
@@ -87,6 +94,7 @@ export function DataTable<T>({
   defaultSort,
   density = 'default',
   rowContextMenu,
+  onRowClick,
 }: DataTableProps<T>) {
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
 
@@ -159,15 +167,27 @@ export function DataTable<T>({
       </thead>
       <tbody className="divide-y divide-line">
         {sortedRows.map((row) => {
+          const focusable = Boolean(rowContextMenu) || Boolean(onRowClick);
           const tr = (
             <tr
               className={cx(
                 'hover:bg-panel-2',
-                rowContextMenu &&
+                onRowClick && 'cursor-pointer',
+                focusable &&
                   'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
                 rowClassName?.(row)
               )}
-              tabIndex={rowContextMenu ? 0 : undefined}
+              tabIndex={focusable ? 0 : undefined}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      event.preventDefault();
+                      onRowClick(row);
+                    }
+                  : undefined
+              }
             >
               {columns.map((column, i) => (
                 <td key={column.id} className={cx(cellClass[i], column.cellClassName?.(row))}>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildVariationIndex, type VariationTypeMap } from '@/engine/market/variations';
-import { getVariationRows, tierLabel, RELATED_ITEMS_LIMIT } from './variations';
+import { getVariationRows, tierLabel, VARIATIONS_LIMIT } from './variations';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 
 const META_GROUP_NAMES = { 1: 'Tech I', 2: 'Tech II', 4: 'Faction' };
@@ -93,34 +93,34 @@ describe('getVariationRows', () => {
     expect(result.truncated).toBe(false);
   });
 
-  it('bounds a large variation group at RELATED_ITEMS_LIMIT and reports the true total', () => {
+  it('bounds a large variation group at VARIATIONS_LIMIT and reports the true total', () => {
     const types: Record<number, VariationTypeMap[number]> = {
       1: { parentTypeId: null, metaGroupId: 1 },
     };
     const typesById = new Map<number, MarketTypeEntry>([[1, type(1, 'Selected', 5)]]);
-    for (let i = 0; i < RELATED_ITEMS_LIMIT + 10; i++) {
+    for (let i = 0; i < VARIATIONS_LIMIT + 10; i++) {
       const childId = 1000 + i;
       types[childId] = { parentTypeId: 1, metaGroupId: 2 };
       typesById.set(childId, type(childId, `Item ${i}`, 5));
     }
     const index = buildVariationIndex(types, META_GROUP_NAMES);
     const result = getVariationRows(index, new Map(), typesById, type(1, 'Selected', 5));
-    expect(result.rows).toHaveLength(RELATED_ITEMS_LIMIT);
-    expect(result.totalCount).toBe(RELATED_ITEMS_LIMIT + 10);
+    expect(result.rows).toHaveLength(VARIATIONS_LIMIT);
+    expect(result.totalCount).toBe(VARIATIONS_LIMIT + 10);
     expect(result.truncated).toBe(true);
   });
 
-  it('bounds a large sibling fallback at RELATED_ITEMS_LIMIT and reports the true total', () => {
+  it('bounds a large sibling fallback at VARIATIONS_LIMIT and reports the true total', () => {
     const index = buildVariationIndex({}, META_GROUP_NAMES);
-    const many = Array.from({ length: RELATED_ITEMS_LIMIT + 10 }, (_, i) =>
+    const many = Array.from({ length: VARIATIONS_LIMIT + 10 }, (_, i) =>
       type(1000 + i, `Item ${i}`, 5)
     );
     const typesByGroup = new Map<number, MarketTypeEntry[]>([
       [5, [type(1, 'Selected', 5), ...many]],
     ]);
     const result = getVariationRows(index, typesByGroup, new Map(), type(1, 'Selected', 5));
-    expect(result.rows).toHaveLength(RELATED_ITEMS_LIMIT);
-    expect(result.totalCount).toBe(RELATED_ITEMS_LIMIT + 10);
+    expect(result.rows).toHaveLength(VARIATIONS_LIMIT);
+    expect(result.totalCount).toBe(VARIATIONS_LIMIT + 10);
     expect(result.truncated).toBe(true);
   });
 });

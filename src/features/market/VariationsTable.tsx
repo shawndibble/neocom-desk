@@ -53,15 +53,14 @@ export function VariationsTable({
       id: 'name',
       header: t('market.variations.name'),
       sortValue: (row) => row.name,
+      // The whole row is the click target (onRowClick below) — identical to
+      // the old card strip, where clicking anywhere on a card re-anchored
+      // the page, not just its name.
       render: (row) => (
-        <button
-          type="button"
-          onClick={() => onSelect(row.typeId)}
-          className="text-left font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
+        <span className="font-medium text-accent">
           {row.name}
           <span aria-hidden="true"> ›</span>
-        </button>
+        </span>
       ),
     },
     {
@@ -105,6 +104,7 @@ export function VariationsTable({
         label={t('market.variations.title')}
         defaultSort={{ columnId: 'sell', direction: 'asc' }}
         density="compact"
+        onRowClick={(row) => onSelect(row.typeId)}
       />
     </div>
   );
