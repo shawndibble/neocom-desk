@@ -615,6 +615,8 @@
     "tabCorp": "Corp",
     "tabAlliance": "Alliance",
     "tabSent": "Sent",
+    "labelsFilterLabel": "Labels",
+    "loadMore": "Load more",
     "backToList": "Back",
     "reauthTitle": "Log in again to see your mail",
     "reauthHint": "Log in again to fetch this character's mail.",

@@ -524,6 +524,34 @@ describe('mail', () => {
     expect(result.data?.[0].is_read).toBe(false);
   });
 
+  it('getCharacterMailHeaders sends last_mail_id when a cursor is given', async () => {
+    let lastMailIdParam: string | null = null;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/mail`, ({ request }) => {
+        lastMailIdParam = new URL(request.url).searchParams.get('last_mail_id');
+        return HttpResponse.json([]);
+      })
+    );
+
+    await getCharacterMailHeaders(CHARACTER_ID, { lastMailId: 42 });
+
+    expect(lastMailIdParam).toBe('42');
+  });
+
+  it('getCharacterMailHeaders omits last_mail_id when no cursor is given', async () => {
+    let hasParam = true;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/mail`, ({ request }) => {
+        hasParam = new URL(request.url).searchParams.has('last_mail_id');
+        return HttpResponse.json([]);
+      })
+    );
+
+    await getCharacterMailHeaders(CHARACTER_ID);
+
+    expect(hasParam).toBe(false);
+  });
+
   it('getCharacterMail returns the body, using `read` not `is_read`', async () => {
     server.use(
       authedJson(`/characters/${CHARACTER_ID}/mail/1`, {

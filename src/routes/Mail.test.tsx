@@ -227,4 +227,97 @@ describe('Mail', () => {
     const list = screen.getByText('Mail 0').closest('ul');
     expect(list).toHaveClass('max-h-[32rem]', 'overflow-y-auto');
   });
+
+  it('does not show a custom-label filter when the character has none', async () => {
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.queryByRole('group', { name: /labels/i })).not.toBeInTheDocument();
+  });
+
+  it('shows custom labels as filter chips, distinct from the system-label tabs, and filters on toggle', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
+        HttpResponse.json({
+          labels: [...mailLabels.labels, { label_id: 100, name: 'Miners', unread_count: 0 }],
+          total_unread_count: 3,
+        })
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([...headers, { mail_id: 3, subject: 'Ore report', labels: [100] }])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.getByText('Ore report')).toBeInTheDocument();
+
+    const group = screen.getByRole('group', { name: /labels/i });
+    expect(group.querySelector('[aria-pressed="false"]')).toHaveTextContent('Miners');
+
+    await user.click(screen.getByRole('button', { name: 'Miners' }));
+    expect(screen.getByText('Ore report')).toBeInTheDocument();
+    expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
+  });
+
+  it('does not show a "load more" affordance when fewer than 50 mails are cached', async () => {
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it('shows "load more" at the 50-cap, fetches older mail via last_mail_id, and hides it once exhausted', async () => {
+    const fullPage = Array.from({ length: 50 }, (_, i) => ({
+      mail_id: 1000 - i,
+      subject: `Mail ${1000 - i}`,
+      timestamp: '2026-08-05T00:00:00Z',
+      labels: [],
+    }));
+    let lastMailIdParam: string | null = null;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, ({ request }) => {
+        const param = new URL(request.url).searchParams.get('last_mail_id');
+        if (param === null) return HttpResponse.json(fullPage);
+        lastMailIdParam = param;
+        return HttpResponse.json([{ mail_id: 5, subject: 'Older mail', labels: [] }]);
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Mail 1000');
+
+    const loadMore = screen.getByRole('button', { name: /load more/i });
+    await user.click(loadMore);
+
+    expect(await screen.findByText('Older mail')).toBeInTheDocument();
+    expect(lastMailIdParam).toBe('951');
+    expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
+  });
+
+  it('resolves sender names for mail fetched by "load more", not just the first page', async () => {
+    const fullPage = Array.from({ length: 50 }, (_, i) => ({
+      mail_id: 1000 - i,
+      from: 90000001,
+      subject: `Mail ${1000 - i}`,
+      timestamp: '2026-08-05T00:00:00Z',
+      labels: [],
+    }));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, ({ request }) => {
+        const param = new URL(request.url).searchParams.get('last_mail_id');
+        if (param === null) return HttpResponse.json(fullPage);
+        return HttpResponse.json([
+          { mail_id: 5, from: 90000002, subject: 'Older mail', labels: [] },
+        ]);
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Mail 1000');
+    await user.click(screen.getByRole('button', { name: /load more/i }));
+
+    const olderRow = (await screen.findByText('Older mail')).closest('li');
+    expect(olderRow).toHaveTextContent('Market Bot');
+  });
 });

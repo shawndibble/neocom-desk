@@ -71,3 +71,45 @@ export function unreadCountsByTab(labels: readonly SystemLabel[]): ReadonlyMap<M
   }
   return map;
 }
+
+/**
+ * A character's own labels, minus the four System Labels — surfaced as
+ * selectable filters distinct from the fixed 5-tab strip (CONTEXT.md round
+ * 22, reversing round 18's deferral), not folded into the tab bar. A label with no name is
+ * dropped too: there is nothing to show on its filter chip.
+ */
+export function buildCustomLabelList<L extends SystemLabel>(labels: readonly L[]): L[] {
+  return labels.filter((label) => {
+    if (!label.name) return false;
+    return NAME_TO_TAB[label.name.trim().toLowerCase()] === undefined;
+  });
+}
+
+interface MailHeaderLike {
+  mail_id: number;
+}
+
+export interface MergedMailHeaderPage<H extends MailHeaderLike> {
+  headers: H[];
+  /** True when `page` came back at `pageSize` — ESI gives no total count, so a full page is the only "more may exist" signal available. */
+  hasMore: boolean;
+}
+
+/** ESI's per-call cap on `/characters/{id}/mail` (both the uncursored and `last_mail_id` cursored calls). */
+export const MAIL_HEADERS_PAGE_SIZE = 50;
+
+/**
+ * Folds one more `last_mail_id`-cursored page into the already-loaded list
+ * (issue #161: pagination beyond the 50-cap). Dedupes by `mail_id` since
+ * `last_mail_id` is documented exclusive but a defensive merge costs nothing
+ * and protects against an off-by-one on ESI's side.
+ */
+export function mergeMailHeaderPage<H extends MailHeaderLike>(
+  existing: readonly H[],
+  page: readonly H[],
+  pageSize: number = MAIL_HEADERS_PAGE_SIZE
+): MergedMailHeaderPage<H> {
+  const byId = new Map<number, H>(existing.map((header) => [header.mail_id, header]));
+  for (const header of page) byId.set(header.mail_id, header);
+  return { headers: Array.from(byId.values()), hasMore: page.length >= pageSize };
+}

@@ -452,14 +452,21 @@ export interface MailHeader {
   recipients?: MailRecipient[];
 }
 
+/**
+ * `lastMailId` cursors older mail past ESI's 50-most-recent cap ("mails with
+ * ID lower than this"), user-triggered per "load more" click rather than
+ * auto-walked like `getCharacterWalletTransactions` (issue #161).
+ */
 export function getCharacterMailHeaders(
   characterId: number,
-  options: EndpointOptions = {}
+  options: EndpointOptions & { lastMailId?: number } = {}
 ): Promise<EsiResult<MailHeader[]>> {
+  const { lastMailId, ...rest } = options;
   return esiFetch<MailHeader[]>(`/characters/${characterId}/mail`, {
-    ...options,
+    ...rest,
     characterId,
     endpointId: 'getCharacterMailHeaders',
+    query: lastMailId === undefined ? undefined : { last_mail_id: lastMailId },
   });
 }
 

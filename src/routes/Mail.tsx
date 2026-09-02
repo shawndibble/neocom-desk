@@ -5,6 +5,7 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
+  FilterChip,
   Panel,
   ReauthBanner,
   Spinner,
@@ -13,13 +14,24 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
-import { loadMailHeaders, loadMailBody, loadMailLabels } from '@/features/character/mail';
+import {
+  loadMailHeaders,
+  loadMailBody,
+  loadMailLabels,
+  loadMoreMailHeaders,
+} from '@/features/character/mail';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
-import { buildLabelTabMap, resolveMailTab, unreadCountsByTab, type MailTab } from '@/engine/mail';
+import {
+  buildCustomLabelList,
+  buildLabelTabMap,
+  resolveMailTab,
+  unreadCountsByTab,
+  type MailTab,
+} from '@/engine/mail';
 import type { MailBody, MailHeader, MailLabel, MailLabels } from '@/esi/endpoints';
 
 type ActiveTab = 'all' | MailTab;
@@ -38,39 +50,47 @@ interface Snapshot {
   needsReauth: boolean;
   /** Sender + non-mailing-list recipient names, resolved together in one batch. */
   names: Map<number, string>;
+  /** True when a `last_mail_id` page beyond this list may exist (issue #161). */
+  headersHasMore: boolean;
 }
 
 /** Stable identity for the loading/failed fallback, so it doesn't churn every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_LABELS: readonly MailLabel[] = [];
 
+/**
+ * Sender + recipient ids to look up for these headers. Mailing-list recipient
+ * ids are excluded: `/universe/names` can't resolve them and fails the whole
+ * batch on an unresolvable id, which would blank every other name in the same
+ * mail.
+ */
+function namePartyIds(headers: readonly MailHeader[]): number[] {
+  return headers.flatMap((header) => [
+    ...(header.from !== undefined ? [header.from] : []),
+    ...(header.recipients ?? [])
+      .filter((r) => r.recipient_type !== 'mailing_list')
+      .map((r) => r.recipient_id),
+  ]);
+}
+
 async function loadMailSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
   const [
-    { cached: headersResult, needsReauth: headersNeedsReauth },
+    { cached: headersResult, needsReauth: headersNeedsReauth, hasMore: headersHasMore },
     { cached: labelsResult, needsReauth: labelsNeedsReauth },
   ] = await Promise.all([loadMailHeaders(characterId), loadMailLabels(characterId)]);
 
   // Already superseded: skip the name lookup, its result would be discarded.
-  // Mailing-list recipient ids are excluded: `/universe/names` can't resolve
-  // them and fails the whole batch on an unresolvable id, which would blank
-  // every other name in the same mail.
-  const ids = signal.cancelled
-    ? []
-    : (headersResult?.data ?? []).flatMap((header) => [
-        ...(header.from !== undefined ? [header.from] : []),
-        ...(header.recipients ?? [])
-          .filter((r) => r.recipient_type !== 'mailing_list')
-          .map((r) => r.recipient_id),
-      ]);
+  const ids = signal.cancelled ? [] : namePartyIds(headersResult?.data ?? []);
   const names = await resolveNames(ids);
   return {
     headersResult,
     labelsResult,
     needsReauth: headersNeedsReauth || labelsNeedsReauth,
     names,
+    headersHasMore,
   };
 }
 
@@ -87,6 +107,29 @@ export function Mail() {
     result: CachedResult<MailBody> | null;
   } | null>(null);
 
+  // Headers loaded via "load more" (issue #161) live outside useRouteSnapshot,
+  // which only supports a full reload, not an incremental patch. `null` means
+  // "no load-more yet this snapshot" — fall back to the snapshot's own list.
+  const [loadedHeaders, setLoadedHeaders] = useState<MailHeader[] | null>(null);
+  // Names for those headers: the snapshot only resolved the parties in its own
+  // first page, so without this every row past it would read "Unknown".
+  const [loadedNames, setLoadedNames] = useState<ReadonlyMap<number, string> | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedLabelIds, setSelectedLabelIds] = useState<ReadonlySet<number>>(new Set());
+  // Reset for a new snapshot (character switch, manual refresh, or the
+  // initial load) synchronously during render — the same "adjust state while
+  // rendering" pattern useRouteSnapshot itself uses — so `hasMore` is already
+  // correct on the very render that first shows this snapshot's headers,
+  // instead of lagging a render behind through a useEffect.
+  const [snapshotForHeaders, setSnapshotForHeaders] = useState<Snapshot | null>(null);
+  if (data !== snapshotForHeaders) {
+    setSnapshotForHeaders(data);
+    setLoadedHeaders(null);
+    setLoadedNames(null);
+    setHasMore(data?.headersHasMore ?? false);
+  }
+
   // Narrow screens show one column at a time (CONTEXT.md round 18); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width.
@@ -94,28 +137,52 @@ export function Mail() {
 
   const headersResult = data?.headersResult ?? null;
   const needsReauth = data?.needsReauth ?? false;
-  const names = data?.names ?? NO_NAMES;
+  const names = loadedNames ?? data?.names ?? NO_NAMES;
   const labels = data?.labelsResult?.data.labels ?? NO_LABELS;
   const labelTabById = useMemo(() => buildLabelTabMap(labels), [labels]);
   const unreadByTab = useMemo(() => unreadCountsByTab(labels), [labels]);
+  const customLabels = useMemo(() => buildCustomLabelList(labels), [labels]);
 
   const headers = useMemo(
     () =>
-      [...(headersResult?.data ?? [])].sort((a, b) =>
+      [...(loadedHeaders ?? headersResult?.data ?? [])].sort((a, b) =>
         (b.timestamp ?? '').localeCompare(a.timestamp ?? '')
       ),
-    [headersResult]
+    [loadedHeaders, headersResult]
   );
 
   const visibleHeaders = useMemo(
     () =>
-      activeTab === 'all'
-        ? headers
-        : headers.filter((h) => resolveMailTab(h.labels, labelTabById) === activeTab),
-    [headers, activeTab, labelTabById]
+      headers.filter((h) => {
+        if (activeTab !== 'all' && resolveMailTab(h.labels, labelTabById) !== activeTab) {
+          return false;
+        }
+        if (selectedLabelIds.size === 0) return true;
+        return (h.labels ?? []).some((id) => selectedLabelIds.has(id));
+      }),
+    [headers, activeTab, labelTabById, selectedLabelIds]
   );
 
   const selectedHeader = headers.find((h) => h.mail_id === selectedId) ?? null;
+
+  function toggleLabelFilter(labelId: number) {
+    setSelectedLabelIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(labelId)) next.delete(labelId);
+      else next.add(labelId);
+      return next;
+    });
+  }
+
+  async function handleLoadMore() {
+    if (activeCharacterId === null || loadingMore) return;
+    setLoadingMore(true);
+    const result = await loadMoreMailHeaders(activeCharacterId, headers);
+    setLoadedHeaders(result.headers);
+    setHasMore(result.hasMore);
+    setLoadedNames(await resolveNames(namePartyIds(result.headers)));
+    setLoadingMore(false);
+  }
 
   useEffect(() => {
     if (activeCharacterId === null || selectedId === null) return;
@@ -202,6 +269,23 @@ export function Mail() {
             />
           )}
 
+          {customLabels.length > 0 && (isDesktop || selectedId === null) && (
+            <div
+              role="group"
+              aria-label={t('mail.labelsFilterLabel')}
+              className="flex flex-wrap gap-2"
+            >
+              {customLabels.map((label) => (
+                <FilterChip
+                  key={label.label_id}
+                  label={label.name ?? ''}
+                  selected={selectedLabelIds.has(label.label_id)}
+                  onToggle={() => toggleLabelFilter(label.label_id)}
+                />
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
             <Panel padded={false} className={isDesktop || selectedId === null ? '' : 'hidden'}>
               {visibleHeaders.length === 0 ? (
@@ -244,6 +328,18 @@ export function Mail() {
                     );
                   })}
                 </ul>
+              )}
+              {hasMore && (
+                <div className="border-t border-line p-2">
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={() => void handleLoadMore()}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? t('common.loading') : t('mail.loadMore')}
+                  </Button>
+                </div>
               )}
             </Panel>
 
