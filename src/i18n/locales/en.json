@@ -797,7 +797,10 @@
   "pwa": {
     "updateReady": "A new version is available.",
     "reload": "Reload",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "installCta": "Install NeoCom Desk for quicker access.",
+    "install": "Install",
+    "installIosCta": "Install NeoCom Desk: tap Share, then Add to Home Screen."
   },
   "whatsNew": {
     "title": "What's new in v{{version}}",

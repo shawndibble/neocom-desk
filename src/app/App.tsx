@@ -32,6 +32,7 @@ import { Styleguide } from '@/routes/Styleguide';
 import { Layout } from './Layout';
 import { ReloadPrompt } from './ReloadPrompt';
 import { WhatsNewPanel } from './WhatsNewPanel';
+import { InstallPrompt } from './InstallPrompt';
 import { BootScreen } from './BootScreen';
 import { RequireCharacter } from './RequireCharacter';
 import { ScopeGate } from './ScopeGate';
@@ -142,6 +143,7 @@ export function App() {
         </Routes>
         <ReloadPrompt />
         <WhatsNewPanel />
+        <InstallPrompt />
       </BrowserRouter>
     </ErrorBoundary>
   );
