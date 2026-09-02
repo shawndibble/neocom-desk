@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DataTable, type DataTableColumn } from './DataTable';
 import {
   ContextMenu,
@@ -263,6 +263,35 @@ describe('DataTable', () => {
     });
 
     it('leaves rows non-focusable when no context menu is wired up', () => {
+      renderTable();
+      const [, firstRow] = screen.getAllByRole('row');
+      expect(firstRow).not.toHaveAttribute('tabindex');
+    });
+  });
+
+  describe('onRowClick', () => {
+    it('calls back with the row on click, anywhere in the row', async () => {
+      const user = userEvent.setup();
+      const onRowClick = vi.fn();
+      renderTable({ onRowClick });
+      const cells = screen.getAllByRole('cell');
+      await user.click(cells[1]); // the Amount cell, not just the first column
+      expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+    });
+
+    it('makes rows focusable and responds to Enter, same focus treatment as rowContextMenu', async () => {
+      const user = userEvent.setup();
+      const onRowClick = vi.fn();
+      renderTable({ onRowClick });
+      const [, firstRow] = screen.getAllByRole('row');
+      expect(firstRow).toHaveClass('focus-visible:outline-accent');
+
+      firstRow.focus();
+      await user.keyboard('{Enter}');
+      expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+    });
+
+    it('leaves rows non-focusable when no row click handler is wired up', () => {
       renderTable();
       const [, firstRow] = screen.getAllByRole('row');
       expect(firstRow).not.toHaveAttribute('tabindex');

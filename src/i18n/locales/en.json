@@ -904,8 +904,12 @@
       "removeItem": "Remove {{name}} from Quickbar",
       "reorderItem": "Reorder {{name}}"
     },
-    "relatedItems": {
-      "title": "Related Items",
+    "variations": {
+      "title": "Variations",
+      "name": "Name",
+      "tier": "Tier",
+      "sell": "Sell",
+      "buy": "Buy",
       "noOrders": "No orders",
       "capped": "Showing {{limit}} of {{total}}"
     },
