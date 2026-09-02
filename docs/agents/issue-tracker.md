@@ -32,20 +32,6 @@ ticket in the first place. Release both the assignee and the label
 (`gh issue edit <n> --remove-assignee @me --remove-label in-progress`) on any
 early exit so the ticket becomes pickable again.
 
-### Stale-claim reclaim
-
-A crashed or stalled run (process killed, or hung waiting on a step with
-nobody to nudge it) never runs its own cleanup — that cleanup is prose the
-model executes in its own turn loop, and none of it runs if the loop itself
-never resumes. Without a backstop, such a claim blocks its ticket forever.
-`scripts/next-ticket/select-ticket.mjs` sweeps for this before every
-selection: any issue that is `in-progress` + assigned, idle (`updatedAt`)
-for more than `NEXT_TICKET_RECLAIM_HOURS` (default 3h), and has no open PR
-referencing it gets its assignee and `in-progress` label removed, with a
-comment on the issue explaining why. An open PR is treated as proof the run
-is (or was) alive regardless of age, since step 8's CI wait can legitimately
-run long.
-
 ## PRs as a request surface
 
 **No.** External PRs are not triaged as feature requests. (Set to `yes` here if that changes.)
