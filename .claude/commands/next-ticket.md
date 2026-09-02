@@ -1,5 +1,5 @@
 ---
-description: Pick the next unblocked ready-for-agent issue, work it in an isolated git worktree, open a PR, drive CI green, then squash-merge and close.
+description: Pick the next unblocked ready-for-agent issue, work it in an isolated git worktree, open a PR, drive CI green, then merge and close.
 argument-hint: '[issue number] (optional — otherwise auto-picks the next unblocked ticket)'
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Skill, Agent, Task, TodoWrite, WebFetch, WebSearch
 ---
@@ -263,10 +263,13 @@ export/clipboard behaviour, reason about e2e impact from the spec instead.
   unaddressed judgement-call findings from `/code-review`).
 - `node scripts/next-ticket/open-pr.mjs "<type>: <summary> (#<n>)" <body-file>`
   — pushes the branch (`-u origin HEAD`), creates the PR against `main`, and
-  arms auto-merge (`gh pr merge --squash --auto --delete-branch`) so GitHub
-  squash-merges it itself the instant it's mergeable and green — no need to
+  arms auto-merge (`gh pr merge --merge --auto --delete-branch`) so GitHub
+  merges it itself the instant it's mergeable and green — no need to
   win a manual race in step 9, and a check-watch hiccup in step 8 can't
-  strand an otherwise-green PR. Prints
+  strand an otherwise-green PR. It is a **merge commit, not a squash**:
+  squashing rewrites the branch's commits into a new one, which orphans the
+  base of any PR stacked on this branch and scrambles its diff. `finish.mjs`
+  merges the same way — keep the two in sync. Prints
   `{"status":"open","number":<pr>,"url":"...","autoMergeArmed":true}` or
   `{"status":"error","message":"..."}`. On `error`, follow the abandon
   procedure as appropriate to the failure. If `autoMergeArmed` is
@@ -329,10 +332,11 @@ playwright-report`), then report back: the failing job and test, the
 script removes it), then:
 
 `node scripts/next-ticket/finish.mjs <pr> <n> "$WORKTREE_PATH"` —
-squash-merges and deletes the branch (a no-op if auto-merge, armed in step 7,
-already merged it — the script detects `state == MERGED` and treats that as
-success rather than a failure), polls the issue for auto-close (the squash
-commit carries `Closes #<n>`; closes it directly if auto-close hasn't landed
+merges (merge commit, not squash — see step 7) and deletes the branch (a
+no-op if auto-merge, armed in step 7, already merged it — the script detects
+`state == MERGED` and treats that as success rather than a failure), polls
+the issue for auto-close (the PR body carries `Closes #<n>`; closes it
+directly if auto-close hasn't landed
 after a few seconds), strips the `in-progress` label, then removes and prunes
 the worktree. Prints `{"status":"merged","issueClosed":true}` or
 `{"status":"merge-failed","message":"..."}`.
