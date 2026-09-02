@@ -226,7 +226,7 @@ describe('SkillPlans CRUD', () => {
       return all;
     });
     await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`));
-    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 
@@ -259,7 +259,7 @@ describe('SkillPlans CRUD', () => {
       return found!;
     });
     await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${copy.id}`));
-    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 
@@ -299,7 +299,7 @@ describe('SkillPlans CRUD', () => {
     render(<App />);
 
     await user.click(await screen.findByText('Test plan'));
-    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/skills/plans/plan-1');
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
@@ -307,7 +307,7 @@ describe('SkillPlans CRUD', () => {
     expect(window.location.pathname).toBe('/skills/plans');
 
     await user.click(await screen.findByText('Test plan'));
-    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
 
     window.history.back();
     await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
@@ -344,16 +344,26 @@ describe('SkillPlans editor: add-skill picker', () => {
     await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
     await user.click(await screen.findByRole('button', { name: 'Level I' }));
 
-    const panel = screen.getByText('Computed queue').closest('section')!;
+    const panel = screen.getByText('Your entries').closest('section')!;
     const items = await within(panel).findAllByRole('listitem');
+    // A priority-band divider ("Normal priority") precedes the whole entry
+    // block (#27) — including its leading dimmed prereq rows, not just the
+    // entry row itself, so the group reads as one visual unit.
     expect(items.map((li) => li.textContent)).toEqual([
+      expect.stringContaining('Normal priority'),
       expect.stringContaining('Gunnery I'),
       expect.stringContaining('Gunnery II'),
       expect.stringContaining('Gunnery III'),
       expect.stringContaining('Small Hybrid Turret I'),
     ]);
-    expect(items[0].textContent).toMatch(/prereq/i);
-    expect(items[3].textContent).not.toMatch(/prereq/i);
+    // The three Gunnery levels are prereqs the user didn't add directly —
+    // dimmed and tagged, positioned ahead of the one row for the entry
+    // they were needed by (#112: entry rows are one-per-entry, not
+    // one-per-level, so Small Hybrid Turret I is a single row here).
+    expect(items[1].textContent).toMatch(/prereq/i);
+    expect(items[2].textContent).toMatch(/prereq/i);
+    expect(items[3].textContent).toMatch(/prereq/i);
+    expect(items[4].textContent).not.toMatch(/prereq/i);
 
     // Column headers label the two time columns (UX-REVIEW #9).
     expect(within(panel).getByText('Per-level')).toBeInTheDocument();
@@ -396,11 +406,16 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
     goToPlanEditor();
     render(<App />);
 
-    const panel = (await screen.findByText('Computed queue')).closest('section')!;
-    expect(within(panel).getByText('Add a skill to see the training queue.')).toBeInTheDocument();
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    expect(within(panel).getByText('No entries yet. Add a skill below.')).toBeInTheDocument();
   });
 
-  it('says all selected skills are already trained, distinct from the "add a skill" empty state, when every entry is already trained', async () => {
+  // #112: the merged list no longer shows a banner distinguishing "all
+  // trained" from any other populated state — with entries present it just
+  // renders their rows, with 0m durations when nothing is left to train.
+  // The equivalent honesty check is: the entry row is there (not the
+  // empty-state banner), and its duration reads zero.
+  it('renders the entry row with a zero duration, not the empty-entries banner, when every entry is already trained', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
         HttpResponse.json({
@@ -414,13 +429,21 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
     goToPlanEditor();
     render(<App />);
 
-    const panel = (await screen.findByText('Computed queue')).closest('section')!;
-    expect(
-      await within(panel).findByText('All selected skills are already trained.')
-    ).toBeInTheDocument();
-    expect(
-      within(panel).queryByText('Add a skill to see the training queue.')
-    ).not.toBeInTheDocument();
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    expect(within(panel).queryByText('No entries yet. Add a skill below.')).not.toBeInTheDocument();
+    // A priority-band divider ("Normal priority") precedes the entry row
+    // (#27). Waits for the row's own duration to actually settle at zero
+    // (post the async ESI "already trained" skills fetch) rather than just
+    // for some listitem to exist, which could be a transient pre-recompute state.
+    await waitFor(() => {
+      const items = within(panel).getAllByRole('listitem');
+      expect(items).toHaveLength(2);
+      expect(items[1].textContent).toContain('Gunnery III');
+      // Exact-match: a span reading precisely "0m" only happens at zero
+      // duration (any real duration formats to something like "2h 5m") —
+      // the row's per-level and cumulative columns both read zero.
+      expect(within(items[1]).getAllByText('0m')).toHaveLength(2);
+    });
   });
 });
 
@@ -445,10 +468,16 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
     goToPlanEditor();
     render(<App />);
 
-    const panel = (await screen.findByText('Computed queue')).closest('section')!;
-    expect(
-      await within(panel).findByText('All selected skills are already trained.')
-    ).toBeInTheDocument();
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    // A priority-band divider ("Normal priority") precedes the entry row
+    // (#27). Waits for the row's own duration to actually settle at zero
+    // (post the async ESI skillqueue fetch) rather than just for some
+    // listitem to exist, which could be a transient pre-recompute state.
+    await waitFor(() => {
+      const items = within(panel).getAllByRole('listitem');
+      expect(items).toHaveLength(2);
+      expect(within(items[1]).getAllByText('0m')).toHaveLength(2);
+    });
   });
 
   it('does not credit a paused queue entry, which has no finish date at all', async () => {
@@ -458,10 +487,16 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
     goToPlanEditor();
     render(<App />);
 
-    const panel = (await screen.findByText('Computed queue')).closest('section')!;
-    expect(
-      within(panel).queryByText('All selected skills are already trained.')
-    ).not.toBeInTheDocument();
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    // A priority-band divider ("Normal priority") precedes the entry row
+    // (#27) — wait for the row itself before checking its duration, so a
+    // pre-recompute transient (with no rows/no "0m" either way) can't pass
+    // this negative assertion for the wrong reason.
+    const items = await within(panel).findAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    // Not credited as trained: the entry row must show real, nonzero
+    // duration rather than the "0m" it would show if wrongly treated as done.
+    expect(within(items[1]).queryByText('0m')).not.toBeInTheDocument();
   });
 });
 
@@ -539,7 +574,9 @@ describe('SkillPlans editor: import / export', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
     const entriesPanel = screen.getByText('Your entries').closest('section')!;
-    expect(await within(entriesPanel).findByText('Gunnery')).toBeInTheDocument();
+    // The entry row's name and level render as separate text nodes ("Gunnery"
+    // " " "III"), so match by regex rather than the exact string "Gunnery".
+    expect(await within(entriesPanel).findByText(/Gunnery/)).toBeInTheDocument();
     const stored = await db.skillPlans.get('plan-1');
     expect(stored?.entries).toEqual([
       { skillTypeID: 1, targetLevel: 3 },
@@ -586,7 +623,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     goToPlanEditor();
     render(<App />);
 
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
     const panel = (await screen.findByRole('heading', { name: 'Optimize remaps' })).closest(
@@ -625,7 +662,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     goToPlanEditor();
     render(<App />);
 
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
     expect(
@@ -650,7 +687,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     goToPlanEditor();
     render(<App />);
 
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     const button = screen.getByRole('button', { name: 'Optimize remaps' });
     const tooltipId = button.getAttribute('aria-describedby');
     const tooltip = document.getElementById(tooltipId!);
@@ -674,7 +711,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     goToPlanEditor();
     render(<App />);
 
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
     expect(await screen.findByRole('heading', { name: 'Optimize remaps' })).toBeInTheDocument();
 
@@ -682,13 +719,15 @@ describe('SkillPlans editor: optimize remaps', () => {
     // Remove enough entries to shrink the scheduled queue below the stale
     // segment's startIndex — must not throw, and must drop the stale panel
     // rather than render against the old (now out-of-range) schedule.
-    await user.click(within(entriesPanel).getAllByRole('button', { name: 'Remove' })[0]);
+    // Icon-only remove button (#112): accessible name is "Remove {skill}",
+    // not visible text — entries[0] is Gunnery.
+    await user.click(within(entriesPanel).getByRole('button', { name: 'Remove Gunnery' }));
 
     await waitFor(() =>
       expect(screen.queryByRole('heading', { name: 'Optimize remaps' })).not.toBeInTheDocument()
     );
     // The rest of the app must still be usable — no crash boundary tripped.
-    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
+    expect(await screen.findByText('Your entries')).toBeInTheDocument();
   });
 });
 
@@ -706,7 +745,7 @@ describe('SkillPlans editor: remap markers', () => {
     goToPlanEditor();
     render(<App />);
 
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     expect(screen.queryByText('Remap marker')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Add remap marker' }));
@@ -736,7 +775,7 @@ describe('SkillPlans editor: remap markers', () => {
     goToPlanEditor();
     render(<App />);
 
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     const optimizeButton = screen.getByRole('button', { name: 'Optimize at my markers' });
     expect(optimizeButton).toBeEnabled();
     await user.click(optimizeButton);
@@ -759,7 +798,7 @@ describe('SkillPlans editor: remap markers', () => {
     goToPlanEditor();
     render(<App />);
 
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     expect(screen.getByRole('button', { name: 'Optimize at my markers' })).toBeDisabled();
   });
 });
@@ -778,7 +817,7 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
     );
     goToPlanEditor();
     render(<App />);
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
     await screen.findByRole('heading', { name: 'Optimize remaps' });
   };
@@ -813,7 +852,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     await db.skillPlans.add(seedTwoSkillPlan());
     goToPlanEditor();
     render(<App />);
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
 
     // Skill count: distinct skills in the computed queue (Gunnery,
     // Spaceship Command), matching the same set totalSeconds times.
@@ -832,7 +871,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     await db.skillPlans.add(seedTwoSkillPlan());
     goToPlanEditor();
     render(<App />);
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
 
     expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
 
@@ -924,7 +963,7 @@ describe('SkillPlans editor: Remaps input label (UX-REVIEW #6)', () => {
     goToPlanEditor();
     render(<App />);
 
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     expect(screen.getByLabelText('Remaps available')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About remaps available' })).toBeInTheDocument();
   });
@@ -945,7 +984,7 @@ describe('SkillPlans editor: suggest reorder', () => {
     goToPlanEditor();
     render(<App />);
 
-    await screen.findByText('Computed queue');
+    await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Suggest reorder' }));
 
     expect(await screen.findByRole('heading', { name: 'Suggested reorder' })).toBeInTheDocument();
@@ -967,7 +1006,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     goToPlanEditor();
     render(<App />);
 
-    const queuePanel = (await screen.findByText('Computed queue')).closest('section')!;
+    const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
     const durationHeader = () =>
       within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
@@ -1005,7 +1044,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     goToPlanEditor();
     render(<App />);
 
-    const queuePanel = (await screen.findByText('Computed queue')).closest('section')!;
+    const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
     const durationHeader = () =>
       within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
@@ -1145,24 +1184,28 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     vi.useRealTimers();
   });
 
-  it("projects a plan finish date that matches the last step's own finish, and starts the first step at the plan start (#20)", async () => {
+  it("projects a plan finish date that matches the entry row's own finish, and starts it at the plan start (#20)", async () => {
     // Gunnery I..V is a multi-day train at these attributes, so start and
-    // finish land on different calendar dates.
+    // finish land on different calendar dates. #112: this is now a single
+    // aggregated entry row (Gunnery V), not five per-level rows, so its own
+    // timeline line must span from the plan start to the plan finish.
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
     goToPlanEditor();
     render(<App />);
 
-    const panel = (await screen.findByText('Computed queue')).closest('section')!;
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    // A priority-band divider ("Normal priority") precedes the entry row (#27).
     const items = await within(panel).findAllByRole('listitem');
+    expect(items).toHaveLength(2);
 
     const finishNote = within(panel).getByText(/^Finishes \d{4}-\d{2}-\d{2}$/);
     const planFinishDate = finishNote.textContent!.replace('Finishes ', '');
 
-    // First step starts exactly at the plan's wall-clock start.
-    expect(items[0].textContent).toContain('2026-08-29 → ');
-    // Last step's own finish is the same value the panel header projects —
+    // The row starts exactly at the plan's wall-clock start...
+    expect(items[1].textContent).toContain('2026-08-29 → ');
+    // ...and its own finish is the same value the panel header projects —
     // one number, computed one way (#20 acceptance criterion).
-    expect(items[items.length - 1].textContent).toContain(`→ ${planFinishDate}`);
+    expect(items[1].textContent).toContain(`→ ${planFinishDate}`);
   });
 
   it('shows no projected finish date, and no invented start time, for an empty plan (#20)', async () => {
@@ -1170,8 +1213,8 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     goToPlanEditor();
     render(<App />);
 
-    const panel = (await screen.findByText('Computed queue')).closest('section')!;
-    await within(panel).findByText('Add a skill to see the training queue.');
+    const panel = (await screen.findByText('Your entries')).closest('section')!;
+    await within(panel).findByText('No entries yet. Add a skill below.');
     expect(within(panel).queryByText(/^Finishes/)).not.toBeInTheDocument();
   });
 });
