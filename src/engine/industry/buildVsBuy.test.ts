@@ -65,8 +65,13 @@ describe('buildVsBuy', () => {
 
     const profit = 1_000_000 - 33_750 - 15_000 - 86_589;
     expect(r.profit).toBeCloseTo(profit, 6);
-    expect(r.marginPct).toBeCloseTo((profit / 86_589) * 100, 6);
+    expect(r.marginPct).toBeCloseTo((profit / 1_000_000) * 100, 6);
     expect(r.iskPerHour).toBeCloseTo(profit / (13_787.136 / 3600), 4);
+
+    const grossProfit = 1_000_000 - 86_589;
+    expect(r.grossProfit).toBeCloseTo(grossProfit, 6);
+    expect(r.grossMargin).toBeCloseTo((grossProfit / 1_000_000) * 100, 6);
+    expect(r.grossIskPerHour).toBeCloseTo(grossProfit / (13_787.136 / 3600), 4);
 
     expect(r.unpriceable).toBe(false);
     expect(r.unpricedMaterials).toEqual([]);
@@ -94,6 +99,9 @@ describe('buildVsBuy', () => {
     expect(r.profit).toBeNull();
     expect(r.marginPct).toBeNull();
     expect(r.iskPerHour).toBeNull();
+    expect(r.grossProfit).toBeNull();
+    expect(r.grossMargin).toBeNull();
+    expect(r.grossIskPerHour).toBeNull();
     expect(r.recommendation).toBe('unknown');
   });
 
@@ -106,6 +114,9 @@ describe('buildVsBuy', () => {
     expect(r.brokerFee).toBeNull();
     expect(r.netRevenue).toBeNull();
     expect(r.profit).toBeNull();
+    expect(r.grossProfit).toBeNull();
+    expect(r.grossMargin).toBeNull();
+    expect(r.grossIskPerHour).toBeNull();
     expect(r.recommendation).toBe('unknown');
     // build-side numbers still available
     expect(r.totalCost).toBeCloseTo(86_589, 6);

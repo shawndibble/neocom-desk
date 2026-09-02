@@ -19,6 +19,9 @@ const RESULT: BuildResult = {
   profit: 435,
   marginPct: 77,
   iskPerHour: 435,
+  grossProfit: 460,
+  grossMargin: 82,
+  grossIskPerHour: 460,
   unpricedMaterials: [],
   unpriceable: false,
   recommendation: 'build',
@@ -213,6 +216,9 @@ describe('ResultsSummary: Revenue block (#117)', () => {
         profit: null,
         marginPct: null,
         iskPerHour: null,
+        grossProfit: null,
+        grossMargin: null,
+        grossIskPerHour: null,
         unpriceable: true,
         recommendation: 'unknown',
       },
@@ -222,5 +228,36 @@ describe('ResultsSummary: Revenue block (#117)', () => {
     expect(screen.queryByText('Sales tax')).not.toBeInTheDocument();
     expect(screen.queryByText('Broker fee')).not.toBeInTheDocument();
     expect(screen.queryByText('Net revenue')).not.toBeInTheDocument();
+  });
+});
+
+describe('ResultsSummary: Gross/Net profit toggle (#118)', () => {
+  it('defaults to Net, showing the net profit/margin/ISK-per-hour figures', () => {
+    renderSummary();
+
+    const netButton = screen.getByRole('button', { name: 'Net' });
+    const grossButton = screen.getByRole('button', { name: 'Gross' });
+    expect(netButton).toHaveAttribute('aria-pressed', 'true');
+    expect(grossButton).toHaveAttribute('aria-pressed', 'false');
+
+    expect(screen.getByText('Profit').closest('div')).toHaveTextContent('435');
+    expect(screen.getByText('Margin').closest('div')).toHaveTextContent('77');
+    expect(screen.getByText('ISK/hour').closest('div')).toHaveTextContent('435');
+  });
+
+  it('switches to gross figures when Gross is clicked, keeping Sales Tax/Broker Fee rows visible', async () => {
+    renderSummary();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Gross' }));
+
+    expect(screen.getByRole('button', { name: 'Gross' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Net' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('Profit').closest('div')).toHaveTextContent('460');
+    expect(screen.getByText('Margin').closest('div')).toHaveTextContent('82');
+    expect(screen.getByText('ISK/hour').closest('div')).toHaveTextContent('460');
+
+    // Toggling never hides the fee rows from the Revenue block (#117).
+    expect(screen.getByText('Sales tax')).toBeInTheDocument();
+    expect(screen.getByText('Broker fee')).toBeInTheDocument();
   });
 });

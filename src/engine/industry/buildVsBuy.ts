@@ -52,11 +52,17 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
   let profit: number | null = null;
   let marginPct: number | null = null;
   let iskPerHour: number | null = null;
+  let grossProfit: number | null = null;
+  let grossMargin: number | null = null;
+  let grossIskPerHour: number | null = null;
   let recommendation: BuildResult['recommendation'] = 'unknown';
   if (!unpriceable && revenue !== null && tax !== null && broker !== null) {
     profit = revenue - tax - broker - totalCost;
-    marginPct = totalCost > 0 ? (profit / totalCost) * 100 : null;
+    marginPct = revenue > 0 ? (profit / revenue) * 100 : null;
     iskPerHour = seconds > 0 ? profit / (seconds / 3600) : null;
+    grossProfit = revenue - totalCost;
+    grossMargin = revenue > 0 ? (grossProfit / revenue) * 100 : null;
+    grossIskPerHour = seconds > 0 ? grossProfit / (seconds / 3600) : null;
     recommendation = totalCost <= revenue ? 'build' : 'buy';
   }
 
@@ -74,6 +80,9 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     profit,
     marginPct,
     iskPerHour,
+    grossProfit,
+    grossMargin,
+    grossIskPerHour,
     unpricedMaterials,
     unpriceable,
     recommendation,
