@@ -91,20 +91,28 @@ header only ever _extends_ the window, never shortens it below the floor.
 window for `REFRESH_BYPASS_MS`, so a manual refresh reaches ESI without
 sending every other route back to the network too.
 
-**Stale-while-revalidate.** Past the window a read is two-phase: `serveStale`
-returns the stored row immediately (`fromCache: false` — no bad news yet) and
-`revalidateInBackground` refreshes it, then fires `onCacheRevalidated`.
-`useRouteSnapshot` subscribes and re-runs its loader stamping the _unchanged_
-epoch, so the rendered snapshot stays `current` and `loading` never flips —
-the view updates in place instead of blinking back to a spinner. A signal
-arriving mid-load is held and flushed when that load settles, so a
-revalidation never cancels a load the user is waiting on and a burst across a
-page's several keys collapses into one re-run. A failed revalidation is
-recorded in `revalidationFailures` (keyed like `inFlightLoads`), which is what
-makes the re-read report `fromCache: true`/`needsReauth` — and what stops it
-starting another doomed fetch, so the signal cannot loop. Not applied to a
-manual refresh (it must report what actually happened) or to
-`STALE_AFTER.static` keys.
+**Grace period (`loadPastWindow`).** `esiFetch` has no timeout, so past the
+window a slow or hanging connection used to leave the page on a spinner over
+rows already on disk. The live call is now raced against `STALE_GRACE_MS`
+(250ms). If it answers first — which it does on any healthy connection — its
+result is returned verbatim, so the single-phase contract every caller had,
+`needsReauth` and `skipCacheOnAuthFailure` included, is completely unchanged;
+this is why racing beats substituting a stored row unconditionally, which
+broke 30 tests across 22 files by making every past-window read two-phase.
+
+When the grace expires, `readStaleRow` supplies the stored row
+(`fromCache: false` — no bad news yet) and `recordLateOutcome` follows the
+call, then fires `onCacheRevalidated`. `useRouteSnapshot` subscribes and
+re-runs its loader stamping the _unchanged_ epoch, so the rendered snapshot
+stays `current` and `loading` never flips — the view updates in place instead
+of blinking back to a spinner. A signal arriving mid-load is held and flushed
+when that load settles, so it never cancels a load the user is waiting on and
+a burst across a page's several keys collapses into one re-run. A late failure
+lands in `revalidationFailures` (keyed like `inFlightLoads`), which
+`heldAfterFailure` reads to give the re-read its `fromCache: true` /
+`needsReauth` / `cached: null` — and to stop it starting another slow call, so
+the signal cannot loop. No substitution happens for a manual refresh (it must
+report what actually happened) or for `STALE_AFTER.static` keys.
 
 **Boot prefetch.** `app/prefetch.ts` warms every granted surface into
 `esiCache` on app start and on each character switch, wired from the same

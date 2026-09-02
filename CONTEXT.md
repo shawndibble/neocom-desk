@@ -669,25 +669,28 @@
   invalidation signal is one global timestamp; unbounded, one Refresh on
   Wallet would send the next visit to every other page back to the network.
 - Prefetch progress gets **its own dot in the rail beside the sync dot**,
-  present only while a run is outstanding.
-- **Past the window a page renders its stored rows immediately and refreshes
-  behind the view** (stale-while-revalidate), rather than waiting on ESI and
-  only falling back once that attempt fails. Offline failed fast, so the
-  fallback was quick; a _slow_ connection was the case that still left a
-  spinner sitting over data the device already held. Accepting a visible
-  update a moment after the page opens is the deliberate trade.
-- **A row served mid-revalidation reads as current, not cached.** No offline
-  banner appears while the refresh is still in flight — there is no bad news
-  yet. If that refresh then fails, the view re-reads and _does_ raise the
-  banner (or the re-login prompt), so an optimistic first render never becomes
-  a permanent lie. A failed revalidation is not retried until the row would
-  have gone stale again anyway, so a re-read cannot loop.
-- **Two carve-outs from serving stale.** A manual Refresh awaits the network —
-  the user is watching the button and it must report what actually happened.
-  Game constants do not revalidate in the background at all; a lapsed 24h row
-  is a station name, and firing a request plus a re-render per distinct
-  location for data that has not changed is all cost. A second permanently-idle dot
+  present only while a run is outstanding. A second permanently-idle dot
   beside the first would say nothing.
+- **Past the window a slow call gets a quarter second before the stored rows
+  are shown instead.** The defect being closed is _slowness_, not staleness:
+  offline fails fast, so the cache fallback was already quick, but a slow or
+  hanging connection left the page on a spinner over data the device already
+  held. Racing rather than substituting a stored row unconditionally is the
+  deliberate choice — on a healthy connection the call wins comfortably, so
+  the page shows _fresh_ data with no stale-then-swap flash, and every view
+  keeps the auth-failure behaviour it had. A quarter second is under the
+  threshold where a spinner would have appeared anyway.
+- **A row substituted at the grace mark reads as current, not cached.** No
+  offline banner appears while the call is still in flight — there is no bad
+  news yet. If it then fails, the view re-reads and _does_ raise the banner
+  (or the re-login prompt), so an optimistic render never becomes a permanent
+  lie. That failure is remembered, which is also what stops the re-read
+  starting another slow call and looping.
+- **Two carve-outs from substituting a stored row.** A manual Refresh awaits
+  the network — the user is watching the button and it must report what
+  actually happened. Game constants are never substituted; a lapsed 24h row is
+  a station name, and a re-render per distinct location for data that has not
+  changed is all cost.
 
 ## Scope decisions (round 24) — Variations attribute compare
 
