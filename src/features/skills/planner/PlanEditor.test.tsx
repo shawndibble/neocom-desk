@@ -254,9 +254,9 @@ describe('PlanEditor icon-only toolbar below desktop width (#224)', () => {
       expect(button.textContent).toBe('');
     }
 
-    // `.closest` rather than `.parentElement`: every action here is wrapped
-    // in IconButton's own Tooltip span, one extra level between the button
-    // and the row div.
+    // `.closest` rather than `.parentElement`: Tooltip's Radix trigger clones
+    // its props directly onto the button (no wrapping element), but `.closest`
+    // doesn't depend on that either way.
     const importExportRow = screen
       .getByRole('button', { name: 'Import from skill queue' })
       .closest('div.flex.items-center.gap-2')!;

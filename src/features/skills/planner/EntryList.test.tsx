@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EntryList } from './EntryList';
@@ -176,7 +176,8 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
       expect(screen.getByText('10m')).toBeInTheDocument();
       // Line 2: attribute badge, priority, and per-level time (1m, with cumulative as a tooltip).
       expect(screen.getByText('PER/WIL')).toBeInTheDocument();
-      expect(screen.getByText('1m')).toBeInTheDocument();
+      const perLevelCell = screen.getByText('1m');
+      fireEvent.focus(perLevelCell);
       const tooltip = screen.getByText(/Cumulative: 10m/);
       expect(tooltip).toHaveAttribute('role', 'tooltip');
     } finally {

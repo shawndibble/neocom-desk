@@ -564,7 +564,7 @@ export function PlanEditor({
     label: string;
     onClick?: () => void;
     disabled?: boolean;
-  }): ReactElement<{ 'aria-describedby'?: string }> {
+  }): ReactElement<{ className?: string }> {
     return isDesktop ? (
       <Button size="sm" onClick={onClick} disabled={disabled}>
         {label}

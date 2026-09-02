@@ -9,19 +9,19 @@
 - ESI calls always send `X-Compatibility-Date` and a descriptive
   `X-User-Agent`; respect `X-Ratelimit-*` and `Retry-After`.
 - Refresh tokens live in Dexie only. Never send them to Firebase or logs.
-- Validate before commit: `npm run lint && npm run typecheck && npm run test:run`.
-  CI additionally runs `npm run format:check` and `npm run build`; PR gate is
-  the full set plus the Playwright `e2e` job. **Run the full validation once**,
-  after all changes for the task are made — not after every edit or every
-  commit. While iterating, use narrower checks: `npm run typecheck` and
-  `npx vitest run <path>` for the file(s) you're touching. In ticket-loop work
-  (`/next-ticket`, `/implement`), `node scripts/next-ticket/gate.mjs --build`
-  is that one final pre-PR check, not a repeated one — see
-  `.claude/commands/next-ticket.md`'s "One local gate, then CI" for the exact
-  cadence, including the bounded local-gate-failure loop (fix, re-run the
-  narrow check, only re-run the full gate once green). `/code-review`
-  sub-agents are read-only diff review and must never run tests, lint,
-  typecheck, build, or `gate.mjs`.
+- A git pre-commit hook (husky + lint-staged) auto-fixes lint/format on
+  staged files and runs `npm run typecheck` on every commit — no manual step
+  needed for those. While iterating, use narrower checks: `npm run typecheck`
+  and `npx vitest run <path>` for the file(s) you're touching. **Never run
+  the full suite (`npm run test:run`) or `npm run build` locally** — CI's
+  `validate` job runs `lint`, `format:check`, `typecheck`, `test:run`, and
+  `build` on every push, and the `e2e` job runs Playwright; that's the gate,
+  not a local pre-PR run. In ticket-loop work (`/next-ticket`, `/implement`),
+  see `.claude/commands/next-ticket.md`'s "Pre-commit hook, then CI" for the
+  exact cadence. `node scripts/next-ticket/gate.mjs [--build]` still exists
+  as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the
+  ticket loop calls it automatically. `/code-review` sub-agents are
+  read-only diff review and must never run tests, lint, typecheck, or build.
 - i18n: all UI strings through i18next (`src/i18n/locales/en.json`). English only for now.
 
 ## Agent skills
