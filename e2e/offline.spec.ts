@@ -17,8 +17,10 @@ test('serves a fresh page with no offline banner when external hosts go unreacha
   page,
 }) => {
   await loginAndSelectCharacter(page);
+  // Skills opens on Plans, so the trained view is one sub-nav click away.
   await page.getByRole('link', { name: 'Skills' }).click();
-  await page.waitForURL(/\/skills$/);
+  await page.getByRole('link', { name: 'Trained' }).click();
+  await page.waitForURL(/\/skills\/trained$/);
   await page.getByRole('button', { name: 'Expand all' }).click();
   await expect(page.getByText('Caldari Frigate', { exact: true })).toBeVisible();
 
