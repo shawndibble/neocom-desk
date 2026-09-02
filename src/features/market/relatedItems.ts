@@ -1,7 +1,8 @@
 /**
  * Related Items (CONTEXT.md round 6): the selected item's Market Group
  * siblings, offered below the order book for price comparison. Siblings
- * only — meta/tech variants need a relation the SDE build does not emit yet.
+ * only — meta/tech variants are a separate relation, resolved by
+ * src/engine/market/variations.ts and surfaced by a later ticket.
  * Pure and synchronous; the route resolves each sibling's own price.
  */
 import type { MarketTypeEntry } from '@/sde/marketTypes';

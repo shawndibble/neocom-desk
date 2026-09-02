@@ -629,10 +629,35 @@ describe('SkillPlans editor: optimize remaps', () => {
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
     expect(
-      await screen.findByText('No remap improves this plan — keeping current attributes.')
+      await screen.findByText(
+        'No remap improves this plan in its current order \u2014 keeping current attributes. Try "Suggest reorder" to group similar skills first, then optimize again.'
+      )
     ).toBeInTheDocument();
     expect(screen.queryByText(/Segment 1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Remapping saves/)).not.toBeInTheDocument();
+  });
+
+  it('carries an info tooltip on the Optimize remaps button explaining it evaluates the current order', async () => {
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount: 1,
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+
+    await screen.findByText('Computed queue');
+    const button = screen.getByRole('button', { name: 'Optimize remaps' });
+    const tooltipId = button.getAttribute('aria-describedby');
+    const tooltip = document.getElementById(tooltipId!);
+
+    expect(tooltip).toHaveTextContent(
+      'Evaluates the plan\'s entries in their current order \u2014 it never reorders them. Grouping similar skills together first (e.g. with "Suggest reorder") tends to produce bigger savings.'
+    );
   });
 
   it('clears the stale optimize result when an entry is removed, instead of crashing on an out-of-range segment index (BUG #1)', async () => {

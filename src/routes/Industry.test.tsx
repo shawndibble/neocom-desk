@@ -318,6 +318,26 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
   });
 });
 
+describe('Industry: build plan settings grouping (#120)', () => {
+  it('groups Runs/ME/TE under Blueprint and the rest under Location & market', async () => {
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    expect(screen.getByText('Blueprint')).toBeInTheDocument();
+    expect(screen.getByText('Location & market')).toBeInTheDocument();
+
+    // All the original fields still render, just regrouped.
+    expect(screen.getByLabelText('Runs')).toBeInTheDocument();
+    expect(screen.getByLabelText('ME')).toBeInTheDocument();
+    expect(screen.getByLabelText('TE')).toBeInTheDocument();
+    expect(screen.getByLabelText('Facility')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rig')).toBeInTheDocument();
+    expect(screen.getByLabelText('Security')).toBeInTheDocument();
+    expect(screen.getByLabelText('Trade hub')).toBeInTheDocument();
+  });
+});
+
 const RIFTER_BLUEPRINT = {
   name: 'Rifter Blueprint',
   time: 1200,
@@ -424,7 +444,9 @@ describe('Industry: results panel', () => {
     // value must differ, or the assertions below can't tell them apart.
     expect(expected.buyCost).not.toBe(100_000);
 
-    // Job fee breakdown, not just the total.
+    // Job fee breakdown, not just the total: expand the collapsed-by-default
+    // Job Fee row first (#116 — costs render as a stack, breakdown hidden until activated).
+    await user.click(screen.getByRole('button', { name: /job fee/i }));
     expect(screen.getByText(formatIsk(expected.jobFee.eiv))).toBeInTheDocument();
     expect(screen.getByText(formatIsk(expected.jobFee.grossCost))).toBeInTheDocument();
     expect(screen.getByText(formatIsk(expected.jobFee.sccSurcharge))).toBeInTheDocument();

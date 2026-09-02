@@ -124,148 +124,168 @@ export function BuildPlanDetail({
   return (
     <div className="space-y-4">
       <Panel title={entry.productName}>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <label className="flex flex-col gap-1 text-xs">
-            {t('industry.runs')}
-            <input
-              type="number"
-              min={1}
-              value={plan.runs}
-              onChange={(e) =>
-                update({ runs: Math.max(1, Math.round(Number(e.target.value) || 1)) })
-              }
-              className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
-            />
-          </label>
-
-          <div className="flex flex-col gap-1 text-xs">
-            <span className="flex items-center gap-1">
-              <label htmlFor="build-plan-me">{t('industry.me')}</label>
-              <InfoTooltip label={t('industry.meTooltipLabel')} content={t('industry.meTooltip')} />
-            </span>
-            <input
-              id="build-plan-me"
-              type="number"
-              min={0}
-              max={10}
-              value={plan.me}
-              onChange={(e) => update({ me: clampInt(Number(e.target.value), 0, 10) })}
-              className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
-            />
-            {ownedMatch && (
-              <span className="text-[0.6875rem] text-text-dim">
-                {t('industry.ownedHint', {
-                  me: ownedMatch.material_efficiency,
-                  te: ownedMatch.time_efficiency,
-                })}
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1 text-xs">
-            <span className="flex items-center gap-1">
-              <label htmlFor="build-plan-te">{t('industry.te')}</label>
-              <InfoTooltip label={t('industry.teTooltipLabel')} content={t('industry.teTooltip')} />
-            </span>
-            <input
-              id="build-plan-te"
-              type="number"
-              min={0}
-              max={20}
-              value={plan.te}
-              onChange={(e) => update({ te: clampInt(Number(e.target.value), 0, 20) })}
-              className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
-            />
-          </div>
-
-          <label className="flex flex-col gap-1 text-xs">
-            {t('industry.facility')}
-            <select
-              value={plan.facility}
-              onChange={(e) => {
-                const facility = e.target.value as FacilityKind;
-                const structure = FACILITY_PRESETS[facility].structure;
-                update(
-                  structure
-                    ? { facility }
-                    : { facility, rigLevel: 'none', facilityTaxPct: undefined }
-                );
-              }}
-              className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
-            >
-              {Object.values(FACILITY_PRESETS).map((f) => (
-                <option key={f.kind} value={f.kind}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-xs">
-            {t('industry.rigLevel')}
-            <select
-              value={plan.rigLevel}
-              disabled={!facilityPreset.structure}
-              onChange={(e) => update({ rigLevel: e.target.value as RigLevel })}
-              className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text disabled:opacity-40"
-            >
-              <option value="none">{t('industry.rigNone')}</option>
-              <option value="t1">{t('industry.rigT1')}</option>
-              <option value="t2">{t('industry.rigT2')}</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-xs">
-            {t('industry.security')}
-            <select
-              value={plan.security}
-              onChange={(e) => update({ security: e.target.value as SecurityBand })}
-              className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
-            >
-              <option value="highsec">{t('industry.highsec')}</option>
-              <option value="lowsec">{t('industry.lowsec')}</option>
-              <option value="nullsec">{t('industry.nullsec')}</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1 text-xs">
-            {t('industry.tradeHub')}
-            <select
-              value={plan.hubId}
-              onChange={(e) => update({ hubId: e.target.value as BuildPlanRecord['hubId'] })}
-              className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
-            >
-              {TRADE_HUBS.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {facilityPreset.structure && (
-            <div className="flex flex-col gap-1 text-xs">
-              <span className="flex items-center gap-1">
-                <label htmlFor="build-plan-facility-tax">{t('industry.facilityTax')}</label>
-                <InfoTooltip
-                  label={t('industry.facilityTaxTooltipLabel')}
-                  content={t('industry.facilityTaxTooltip')}
+        <div className="space-y-4">
+          <div>
+            <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('industry.groupBlueprint')}
+            </h3>
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <label className="flex flex-col gap-1 text-xs">
+                {t('industry.runs')}
+                <input
+                  type="number"
+                  min={1}
+                  value={plan.runs}
+                  onChange={(e) =>
+                    update({ runs: Math.max(1, Math.round(Number(e.target.value) || 1)) })
+                  }
+                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
                 />
-              </span>
-              <input
-                id="build-plan-facility-tax"
-                type="number"
-                min={0}
-                max={100}
-                step={0.1}
-                value={plan.facilityTaxPct ?? 0}
-                onChange={(e) =>
-                  update({ facilityTaxPct: Math.max(0, Number(e.target.value) || 0) })
-                }
-                className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
-              />
+              </label>
+
+              <div className="flex flex-col gap-1 text-xs">
+                <span className="flex items-center gap-1">
+                  <label htmlFor="build-plan-me">{t('industry.me')}</label>
+                  <InfoTooltip
+                    label={t('industry.meTooltipLabel')}
+                    content={t('industry.meTooltip')}
+                  />
+                </span>
+                <input
+                  id="build-plan-me"
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={plan.me}
+                  onChange={(e) => update({ me: clampInt(Number(e.target.value), 0, 10) })}
+                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
+                />
+                {ownedMatch && (
+                  <span className="text-[0.6875rem] text-text-dim">
+                    {t('industry.ownedHint', {
+                      me: ownedMatch.material_efficiency,
+                      te: ownedMatch.time_efficiency,
+                    })}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1 text-xs">
+                <span className="flex items-center gap-1">
+                  <label htmlFor="build-plan-te">{t('industry.te')}</label>
+                  <InfoTooltip
+                    label={t('industry.teTooltipLabel')}
+                    content={t('industry.teTooltip')}
+                  />
+                </span>
+                <input
+                  id="build-plan-te"
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={plan.te}
+                  onChange={(e) => update({ te: clampInt(Number(e.target.value), 0, 20) })}
+                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
+                />
+              </div>
             </div>
-          )}
+          </div>
+
+          <div>
+            <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('industry.groupLocationMarket')}
+            </h3>
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <label className="flex flex-col gap-1 text-xs">
+                {t('industry.facility')}
+                <select
+                  value={plan.facility}
+                  onChange={(e) => {
+                    const facility = e.target.value as FacilityKind;
+                    const structure = FACILITY_PRESETS[facility].structure;
+                    update(
+                      structure
+                        ? { facility }
+                        : { facility, rigLevel: 'none', facilityTaxPct: undefined }
+                    );
+                  }}
+                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
+                >
+                  {Object.values(FACILITY_PRESETS).map((f) => (
+                    <option key={f.kind} value={f.kind}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs">
+                {t('industry.rigLevel')}
+                <select
+                  value={plan.rigLevel}
+                  disabled={!facilityPreset.structure}
+                  onChange={(e) => update({ rigLevel: e.target.value as RigLevel })}
+                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text disabled:opacity-40"
+                >
+                  <option value="none">{t('industry.rigNone')}</option>
+                  <option value="t1">{t('industry.rigT1')}</option>
+                  <option value="t2">{t('industry.rigT2')}</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs">
+                {t('industry.security')}
+                <select
+                  value={plan.security}
+                  onChange={(e) => update({ security: e.target.value as SecurityBand })}
+                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
+                >
+                  <option value="highsec">{t('industry.highsec')}</option>
+                  <option value="lowsec">{t('industry.lowsec')}</option>
+                  <option value="nullsec">{t('industry.nullsec')}</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-xs">
+                {t('industry.tradeHub')}
+                <select
+                  value={plan.hubId}
+                  onChange={(e) => update({ hubId: e.target.value as BuildPlanRecord['hubId'] })}
+                  className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
+                >
+                  {TRADE_HUBS.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {facilityPreset.structure && (
+                <div className="flex flex-col gap-1 text-xs">
+                  <span className="flex items-center gap-1">
+                    <label htmlFor="build-plan-facility-tax">{t('industry.facilityTax')}</label>
+                    <InfoTooltip
+                      label={t('industry.facilityTaxTooltipLabel')}
+                      content={t('industry.facilityTaxTooltip')}
+                    />
+                  </span>
+                  <input
+                    id="build-plan-facility-tax"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.1}
+                    value={plan.facilityTaxPct ?? 0}
+                    onChange={(e) =>
+                      update({ facilityTaxPct: Math.max(0, Number(e.target.value) || 0) })
+                    }
+                    className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </Panel>
 

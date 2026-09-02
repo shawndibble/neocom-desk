@@ -695,6 +695,32 @@ export function getCharacterContracts(
   });
 }
 
+// --- GET /characters/{character_id}/contracts/{contract_id}/items (esi-contracts.read_character_contracts.v1) ---
+
+export interface ContractItem {
+  record_id: number;
+  type_id: number;
+  quantity: number;
+  /** True when the issuer hands this over; false means the acceptor must supply it. */
+  is_included: boolean;
+  is_singleton: boolean;
+  /** Present on blueprint copies only. */
+  runs?: number;
+}
+
+/** Not paginated — item_exchange/auction contracts only; courier/loan return an empty list. */
+export function getCharacterContractItems(
+  characterId: number,
+  contractId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<ContractItem[]>> {
+  return esiFetch<ContractItem[]>(`/characters/${characterId}/contracts/${contractId}/items`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterContractItems',
+  });
+}
+
 // --- GET /characters/{character_id}/orders (esi-markets.read_character_orders.v1) ---
 
 export interface MarketOrder {
