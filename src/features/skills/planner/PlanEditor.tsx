@@ -435,9 +435,7 @@ export function PlanEditor({
       // The same Boosters the computed queue schedules with, so the savings
       // figure and the queue total cannot disagree.
       booster:
-        activeBoosters.length > 0
-          ? { boosters: activeBoosters, startDate: new Date() }
-          : undefined,
+        activeBoosters.length > 0 ? { boosters: activeBoosters, startDate: new Date() } : undefined,
     });
     setOptimizeResult(result);
     setOptimizeConfirm(confirmRemapOutcome(result));
