@@ -24,6 +24,7 @@ import {
   loadSolarSystems,
   loadMarketRegions,
   loadGlobalMarkets,
+  loadVariations,
 } from '@/sde/loadMarketSde';
 import type {
   MarketGroupNode,
@@ -32,7 +33,9 @@ import type {
   SolarSystemEntry,
   MarketRegionEntry,
   GlobalMarketEntry,
+  VariationData,
 } from '@/sde/marketTypes';
+import { buildVariationIndex } from '@/engine/market/variations';
 import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
@@ -50,8 +53,8 @@ import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
 import { QuickbarList } from '@/features/market/QuickbarList';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
-import { getRelatedItems } from '@/features/market/relatedItems';
-import { RelatedItemsStrip } from '@/features/market/RelatedItemsStrip';
+import { getVariationRows } from '@/features/market/variations';
+import { VariationsTable } from '@/features/market/VariationsTable';
 import {
   addQuickbarItem,
   removeQuickbarItem,
@@ -90,6 +93,16 @@ const ROW_CAP = 15;
 
 /** Matches the `lg:` breakpoint the two-column grid switches on below. */
 const DESKTOP_QUERY = '(min-width: 64rem)';
+
+/**
+ * Stands in for variationIndex before variations.json resolves (or if it
+ * fails to load) — every lookup against it comes back empty, which
+ * getVariationRows already treats the same as "this item has no variation
+ * data" and degrades to the Market Group sibling fallback. Keeps the
+ * Variations panel's own data source independent of the page's primary
+ * catalogue load.
+ */
+const EMPTY_VARIATION_INDEX = buildVariationIndex({}, {});
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -303,6 +316,7 @@ export function Market() {
   const [solarSystems, setSolarSystems] = useState<SolarSystemEntry[] | null>(null);
   const [marketRegions, setMarketRegions] = useState<MarketRegionEntry[] | null>(null);
   const [globalMarkets, setGlobalMarkets] = useState<GlobalMarketEntry[] | null>(null);
+  const [variationData, setVariationData] = useState<VariationData | null>(null);
   const [catalogueError, setCatalogueError] = useState(false);
 
   // Blueprint catalog for the item context menu's Build Plan action, loaded
@@ -498,6 +512,25 @@ export function Market() {
     };
   }, []);
 
+  // Fetched independently of the catalogue load above: variations.json is
+  // Variations-panel-only data, so a slow or failed fetch degrades that one
+  // panel to its Market-Group-sibling fallback (see variationsResult below)
+  // rather than blocking or erroring the whole Market route.
+  useEffect(() => {
+    let cancelled = false;
+    void loadVariations()
+      .then((variations) => {
+        if (!cancelled) setVariationData(variations);
+      })
+      .catch(() => {
+        // Leaves variationData null — variationsResult below already treats
+        // that the same as "no variation data for this item".
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const id = setTimeout(() => setQuery(rawQuery), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
@@ -562,6 +595,23 @@ export function Market() {
     for (const list of map.values()) list.sort((a, b) => a.name.localeCompare(b.name));
     return map;
   }, [types]);
+
+  const typesById = useMemo(
+    () => new Map((types ?? []).map((type) => [type.typeId, type])),
+    [types]
+  );
+
+  // Built once per SDE load, not per selection — getVariations is then
+  // O(group size) per call instead of re-scanning the whole types map.
+  // Defaults to EMPTY_VARIATION_INDEX before variations.json resolves, so
+  // the Variations panel falls back to siblings rather than going blank.
+  const variationIndex = useMemo(
+    () =>
+      variationData
+        ? buildVariationIndex(variationData.types, variationData.metaGroups)
+        : EMPTY_VARIATION_INDEX,
+    [variationData]
+  );
 
   const filterResult = useMemo(
     () => (groups && types ? filterMarketTree(groups, types, query) : null),
@@ -746,6 +796,9 @@ export function Market() {
     );
   }
 
+  // variationData isn't included here — it's fetched by its own effect,
+  // independent of the primary catalogue load, so a slow or failed
+  // variations.json never blocks or errors the rest of the page.
   const catalogueLoading =
     !catalogueError &&
     (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
@@ -808,42 +861,44 @@ export function Market() {
       </>
     ) : undefined;
 
-  // Related Items (CONTEXT.md round 6): the selected item's Market Group
-  // siblings, re-anchored whenever selectedItem changes — including a click
-  // on a sibling itself, which just becomes the new selectedItem.
-  const relatedResult = useMemo(
-    () => (selectedItem ? getRelatedItems(typesByGroup, selectedItem) : null),
-    [typesByGroup, selectedItem]
+  // Variations (CONTEXT.md round 6): the selected item's Tech/Meta/Faction
+  // variation group, falling back to Market Group siblings, re-anchored
+  // whenever selectedItem changes — including a click on a row itself, which
+  // just becomes the new selectedItem.
+  const variationsResult = useMemo(
+    () =>
+      selectedItem ? getVariationRows(variationIndex, typesByGroup, typesById, selectedItem) : null,
+    [variationIndex, typesByGroup, typesById, selectedItem]
   );
 
-  const [relatedPrices, setRelatedPrices] = useState<
+  const [variationPrices, setVariationPrices] = useState<
     ReadonlyMap<number, OrderBookSummary | undefined>
   >(new Map());
   // Same "adjusting state when a prop changes" pattern as resetKey above:
-  // clears stale sibling prices the instant the sibling set or the location
-  // changes, in the same render — an Effect would let the old item's prices
-  // flash under the new strip. stationFilter is included so the strip stays
-  // in step with the order-row "filter to this station" action (CONTEXT.md
+  // clears stale row prices the instant the row set or the location changes,
+  // in the same render — an Effect would let the old item's prices flash
+  // under the new table. stationFilter is included so the table stays in
+  // step with the order-row "filter to this station" action (CONTEXT.md
   // round 10) the same way the on-screen tables do; refreshTick deliberately
   // isn't, so a manual refresh updates prices in place instead of blanking
-  // the strip back to a loading state.
-  const relatedResetKey = relatedResult
-    ? `${relatedResult.siblings.map((sibling) => sibling.typeId).join(',')}:${chosenRegionId}:${locationModeValue.mode}:${hub.stationId}:${stationFilter ?? 'none'}`
+  // the table back to a loading state.
+  const variationResetKey = variationsResult
+    ? `${variationsResult.rows.map((row) => row.typeId).join(',')}:${chosenRegionId}:${locationModeValue.mode}:${hub.stationId}:${stationFilter ?? 'none'}`
     : 'none';
-  const [relatedResetForKey, setRelatedResetForKey] = useState<string | null>(null);
-  if (relatedResetKey !== relatedResetForKey) {
-    setRelatedResetForKey(relatedResetKey);
-    setRelatedPrices(new Map());
+  const [variationResetForKey, setVariationResetForKey] = useState<string | null>(null);
+  if (variationResetKey !== variationResetForKey) {
+    setVariationResetForKey(variationResetKey);
+    setVariationPrices(new Map());
   }
 
-  // Fetched independently of the main order book, so a slow sibling price
+  // Fetched independently of the main order book, so a slow row's price
   // never delays the order book's own render (acceptance criteria). Also
   // reruns on refreshTick so a manual Refresh — which clears getOrderBook's
-  // cache — refetches sibling prices too, not just the on-screen tables.
+  // cache — refetches row prices too, not just the on-screen tables.
   useEffect(() => {
     if (
-      !relatedResult ||
-      relatedResult.siblings.length === 0 ||
+      !variationsResult ||
+      variationsResult.rows.length === 0 ||
       !hubHydrated ||
       !locationModeHydrated
     ) {
@@ -851,24 +906,24 @@ export function Market() {
     }
     let cancelled = false;
     void Promise.all(
-      relatedResult.siblings.map(async (sibling) => {
-        const region = resolveOrderBookRegion(sibling.typeId, chosenRegionId, globalMarketsMap);
+      variationsResult.rows.map(async (row) => {
+        const region = resolveOrderBookRegion(row.typeId, chosenRegionId, globalMarketsMap);
         try {
-          const result = await getOrderBook(region.regionId, sibling.typeId);
+          const result = await getOrderBook(region.regionId, row.typeId);
           if (cancelled) return;
           const locationFiltered =
             locationModeValue.mode === 'hub'
               ? filterOrdersByLocation(result.orders, hub.stationId)
               : result.orders;
           const orders = filterOrdersByLocation(locationFiltered, stationFilter);
-          setRelatedPrices((prev) => new Map(prev).set(sibling.typeId, summarizeOrderBook(orders)));
+          setVariationPrices((prev) => new Map(prev).set(row.typeId, summarizeOrderBook(orders)));
         } catch {
-          // A sibling's own price is a nice-to-have next to the order book
-          // that did load; one failed fetch reads as "no orders" rather than
-          // stalling the strip on a spinner forever.
+          // A row's own price is a nice-to-have next to the order book that
+          // did load; one failed fetch reads as "no orders" rather than
+          // stalling the table on a spinner forever.
           if (!cancelled) {
-            setRelatedPrices((prev) =>
-              new Map(prev).set(sibling.typeId, {
+            setVariationPrices((prev) =>
+              new Map(prev).set(row.typeId, {
                 bestSell: null,
                 bestBuy: null,
                 spread: null,
@@ -883,7 +938,7 @@ export function Market() {
       cancelled = true;
     };
   }, [
-    relatedResult,
+    variationsResult,
     chosenRegionId,
     globalMarketsMap,
     locationModeValue.mode,
@@ -1149,12 +1204,12 @@ export function Market() {
                     </div>
                   </div>
 
-                  {relatedResult && (
-                    <RelatedItemsStrip
-                      siblings={relatedResult.siblings}
-                      totalCount={relatedResult.totalCount}
-                      truncated={relatedResult.truncated}
-                      prices={relatedPrices}
+                  {variationsResult && (
+                    <VariationsTable
+                      rows={variationsResult.rows}
+                      totalCount={variationsResult.totalCount}
+                      truncated={variationsResult.truncated}
+                      prices={variationPrices}
                       onSelect={handleSelectItem}
                     />
                   )}

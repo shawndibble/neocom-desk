@@ -77,15 +77,21 @@ describe('flattenAssetRows', () => {
     ]);
   });
 
-  it('includes top-level node rows but not their children when collapsed', () => {
+  it('collapses a station to just its header row by default', () => {
     const tree = [station(1, [container(10, [item(11)])])];
     const rows = flattenAssetRows(tree, new Set());
+    expect(rows.map((r) => r.key)).toEqual(['station:1']);
+  });
+
+  it('includes top-level node rows but not their children once the station key is expanded', () => {
+    const tree = [station(1, [container(10, [item(11)])])];
+    const rows = flattenAssetRows(tree, new Set(['station:1']));
     expect(rows.map((r) => r.key)).toEqual(['station:1', 'station:1/i:10']);
   });
 
-  it('reveals children once the branch key is in expandedKeys', () => {
+  it('reveals children once both the station and branch keys are in expandedKeys', () => {
     const tree = [station(1, [container(10, [item(11)])])];
-    const rows = flattenAssetRows(tree, new Set(['station:1/i:10']));
+    const rows = flattenAssetRows(tree, new Set(['station:1', 'station:1/i:10']));
     expect(rows.map((r) => r.key)).toEqual(['station:1', 'station:1/i:10', 'station:1/i:10/i:11']);
     const childRow = rows[2];
     expect(childRow.type).toBe('node');
@@ -94,7 +100,7 @@ describe('flattenAssetRows', () => {
 
   it('never expands an item row, regardless of expandedKeys', () => {
     const tree = [station(1, [item(10)])];
-    const rows = flattenAssetRows(tree, new Set(['station:1/i:10']));
+    const rows = flattenAssetRows(tree, new Set(['station:1', 'station:1/i:10']));
     expect(rows.map((r) => r.key)).toEqual(['station:1', 'station:1/i:10']);
   });
 
@@ -102,7 +108,10 @@ describe('flattenAssetRows', () => {
     const tree = [
       station(1, [container(10, [bay('cargoHold', [item(11)]), bay('droneBay', [item(12)])])]),
     ];
-    const rows = flattenAssetRows(tree, new Set(['station:1/i:10', 'station:1/i:10/b:cargoHold']));
+    const rows = flattenAssetRows(
+      tree,
+      new Set(['station:1', 'station:1/i:10', 'station:1/i:10/b:cargoHold'])
+    );
     expect(rows.map((r) => r.key)).toEqual([
       'station:1',
       'station:1/i:10',
@@ -114,7 +123,7 @@ describe('flattenAssetRows', () => {
 
   it('keeps every station in one continuous row list, in the order given', () => {
     const tree = [station(2, [item(20)]), station(1, [item(10)])];
-    const rows = flattenAssetRows(tree, new Set());
+    const rows = flattenAssetRows(tree, new Set(['station:2', 'station:1']));
     expect(rows.map((r) => r.key)).toEqual([
       'station:2',
       'station:2/i:20',
@@ -125,7 +134,7 @@ describe('flattenAssetRows', () => {
 
   it('tags every node row with the owning station location id', () => {
     const tree = [station(1, [container(10, [item(11)])])];
-    const rows = flattenAssetRows(tree, new Set(['station:1/i:10']));
+    const rows = flattenAssetRows(tree, new Set(['station:1', 'station:1/i:10']));
     for (const row of rows) {
       if (row.type === 'node') expect(row.stationLocationId).toBe(1);
     }
@@ -133,7 +142,7 @@ describe('flattenAssetRows', () => {
 
   it('stamps aria-level and 1-based sibling position/count on node rows', () => {
     const tree = [station(1, [container(10, [item(11), item(12)])])];
-    const rows = flattenAssetRows(tree, new Set(['station:1/i:10']));
+    const rows = flattenAssetRows(tree, new Set(['station:1', 'station:1/i:10']));
     const container10 = rows.find((r) => r.key === 'station:1/i:10');
     const item11 = rows.find((r) => r.key === 'station:1/i:10/i:11');
     const item12 = rows.find((r) => r.key === 'station:1/i:10/i:12');

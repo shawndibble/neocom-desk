@@ -92,10 +92,11 @@
     "duplicate": "Duplicate",
     "delete": "Delete",
     "deleteConfirm": "Delete this plan? This can't be undone.",
+    "cancel": "Cancel",
     "rename": "Rename",
     "emptyTitle": "No skill plans yet",
     "emptyHint": "Create a plan to start training toward a goal.",
-    "selectHint": "Select a plan, or create one.",
+    "backToList": "Back to plans",
     "yourEntries": "Your entries",
     "yourEntriesEmpty": "No entries yet. Add a skill below.",
     "computedQueue": "Computed queue",
@@ -482,8 +483,18 @@
     "reauthHint": "Log in again to fetch this character's assets.",
     "reauthAction": "Log in again with EVE Online",
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
+    "stationsToggle": {
+      "expand": "Expand all",
+      "collapse": "Collapse all"
+    },
+    "columnStation": "Station",
+    "columnQuantity": "Qty",
+    "columnVolume": "Volume",
+    "columnEstPrice": "Est. Price",
+    "unknownValue": "-",
+    "security": {
+      "ariaLabel": "Security status: {{value}}"
+    },
     "nodeBadge_one": "{{count}} item · {{value}} ISK",
     "nodeBadge_other": "{{count}} items · {{value}} ISK",
     "crossCharacterToggle": "Search all characters",
@@ -896,8 +907,12 @@
       "removeItem": "Remove {{name}} from Quickbar",
       "reorderItem": "Reorder {{name}}"
     },
-    "relatedItems": {
-      "title": "Related Items",
+    "variations": {
+      "title": "Variations",
+      "name": "Name",
+      "tier": "Tier",
+      "sell": "Sell",
+      "buy": "Buy",
       "noOrders": "No orders",
       "capped": "Showing {{limit}} of {{total}}"
     },

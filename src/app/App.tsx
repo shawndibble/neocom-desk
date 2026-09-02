@@ -14,6 +14,7 @@ import { Characters } from '@/routes/Characters';
 import { Overview } from '@/routes/Overview';
 import { Skills } from '@/routes/Skills';
 import { SkillPlans } from '@/routes/SkillPlans';
+import { SkillPlanEditor } from '@/routes/SkillPlanEditor';
 import { SkillCompare } from '@/routes/SkillCompare';
 import { Industry } from '@/routes/Industry';
 import { Market } from '@/routes/Market';
@@ -62,6 +63,7 @@ const ROUTE_ELEMENTS = {
   '/overview': <Overview />,
   '/skills': <Skills />,
   '/skills/plans': <SkillPlans />,
+  '/skills/plans/:planId': <SkillPlanEditor />,
   '/skills/compare': <SkillCompare />,
   '/industry': <Industry />,
   '/market': <Market />,
