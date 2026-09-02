@@ -9,9 +9,9 @@ export interface NavRow {
   level: number;
   /** Whether this row has descendant rows at all — true for every station row (pruning guarantees at least one child) and every branch node. */
   hasChildren: boolean;
-  /** Whether descendant rows are currently present in the flattened list — always true for a station (its direct children are never gated), reflects `expandedKeys` for a branch node. */
+  /** Whether descendant rows are currently present in the flattened list — reflects `expandedKeys` for both a station row and a branch node. */
   isOpen: boolean;
-  /** Whether ArrowLeft/click can actually flip `isOpen` right now — false for stations (not individually collapsible) and for branch nodes while a search forces every match's ancestors open. */
+  /** Whether ArrowLeft/click can actually flip `isOpen` right now — false for every row while a search forces every match's ancestors open. */
   canToggle: boolean;
   /** Display label, for type-ahead matching. */
   label: string;

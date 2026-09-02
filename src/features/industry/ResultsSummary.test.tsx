@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildResult } from '@/engine/industry/types';
 import { ResultsSummary } from './ResultsSummary';
@@ -14,6 +15,7 @@ const RESULT: BuildResult = {
   revenue: 1000,
   salesTax: 10,
   brokerFee: 5,
+  netRevenue: 985,
   profit: 435,
   marginPct: 77,
   iskPerHour: 435,
@@ -30,6 +32,7 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
       systemCostIndex={0.023}
       productName="Rifter"
       productUnitPrice={100000}
+      productQuantity={10}
       costIndexSystemName="Jita"
       {...overrides}
     />
@@ -37,8 +40,10 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
 }
 
 describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
-  it('gives EIV and SCC surcharge chips an accessible tooltip', () => {
+  it('gives EIV and SCC surcharge rows an accessible tooltip once Job Fee is expanded', async () => {
     renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: /job fee/i }));
+
     const eivButton = screen.getByRole('button', { name: /about eiv/i });
     const eivTooltipId = eivButton.getAttribute('aria-describedby')!;
     expect(document.getElementById(eivTooltipId)?.textContent).not.toBe('');
@@ -61,5 +66,161 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
 
     renderSummary({ costIndexSystemName: 'Amarr' });
     expect(screen.getByText('Cost index (Amarr)')).toBeInTheDocument();
+  });
+});
+
+describe('ResultsSummary: Costs stack (#116)', () => {
+  it('renders Material Cost, Job Fee, Total Cost, Time, and Cost Index as a stacked list', () => {
+    renderSummary();
+
+    expect(screen.getByText('Material cost')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /job fee/i })).toBeInTheDocument();
+    expect(screen.getByText('Total cost')).toBeInTheDocument();
+    expect(screen.getByText('Time')).toBeInTheDocument();
+    expect(screen.getByText('Cost index (Jita)')).toBeInTheDocument();
+
+    // No more flat StatChip wrap for costs: values render as text within stacked row containers.
+    const totalCostRow = screen.getByText('Total cost').closest('div')!;
+    expect(totalCostRow).toHaveTextContent('565');
+  });
+
+  it('renders costs in stack order: Material Cost, Job Fee, Total Cost, Time, Cost Index', () => {
+    const { container } = renderSummary();
+    const text = container.textContent ?? '';
+    const materialIdx = text.indexOf('Material cost');
+    const jobFeeIdx = text.indexOf('Job fee');
+    const totalIdx = text.indexOf('Total cost');
+    const timeIdx = text.indexOf('Time');
+    const costIndexIdx = text.indexOf('Cost index');
+
+    expect(materialIdx).toBeGreaterThanOrEqual(0);
+    expect(materialIdx).toBeLessThan(jobFeeIdx);
+    expect(jobFeeIdx).toBeLessThan(totalIdx);
+    expect(totalIdx).toBeLessThan(timeIdx);
+    expect(timeIdx).toBeLessThan(costIndexIdx);
+  });
+
+  it('keeps the Job Fee row collapsed by default, hiding its breakdown', () => {
+    renderSummary();
+    const jobFeeButton = screen.getByRole('button', { name: /job fee/i });
+    expect(jobFeeButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('EIV')).not.toBeInTheDocument();
+    expect(screen.queryByText('Cost index fee')).not.toBeInTheDocument();
+    expect(screen.queryByText('SCC surcharge')).not.toBeInTheDocument();
+    expect(screen.queryByText('Facility tax')).not.toBeInTheDocument();
+  });
+
+  it('expands the Job Fee row on click to reveal EIV, Cost Index Fee, SCC Surcharge, and Facility Tax', async () => {
+    renderSummary();
+    const jobFeeButton = screen.getByRole('button', { name: /job fee/i });
+
+    await userEvent.click(jobFeeButton);
+
+    expect(jobFeeButton).toHaveAttribute('aria-expanded', 'true');
+
+    expect(screen.getByText('EIV').closest('div')).toHaveTextContent('1,000');
+    expect(screen.getByText('Cost index fee').closest('div')).toHaveTextContent('50');
+    expect(screen.getByText('SCC surcharge').closest('div')).toHaveTextContent('10');
+    expect(screen.getByText('Facility tax').closest('div')).toHaveTextContent('5');
+  });
+
+  it('collapses the Job Fee row again when re-activated', async () => {
+    renderSummary();
+    const jobFeeButton = screen.getByRole('button', { name: /job fee/i });
+
+    await userEvent.click(jobFeeButton);
+    expect(jobFeeButton).toHaveAttribute('aria-expanded', 'true');
+
+    await userEvent.click(jobFeeButton);
+    expect(jobFeeButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('EIV')).not.toBeInTheDocument();
+  });
+
+  it('is keyboard-operable: Enter and Space toggle the Job Fee row', async () => {
+    renderSummary();
+    const jobFeeButton = screen.getByRole('button', { name: /job fee/i });
+    jobFeeButton.focus();
+
+    await userEvent.keyboard('{Enter}');
+    expect(jobFeeButton).toHaveAttribute('aria-expanded', 'true');
+
+    await userEvent.keyboard(' ');
+    expect(jobFeeButton).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('leaves the Profit and Verdict rows unchanged from current behavior', () => {
+    renderSummary();
+    expect(screen.getByText('Profit')).toBeInTheDocument();
+    expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
+  });
+});
+
+describe('ResultsSummary: Revenue block (#117)', () => {
+  it('renders the product line as name, qty produced, unit price, and line total', () => {
+    renderSummary();
+
+    expect(screen.getByText('Rifter')).toBeInTheDocument();
+    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.getByText('100,000')).toBeInTheDocument();
+    // line total = revenue (1000), not unitPrice x qty (1_000_000) — pulled from the engine, not recomputed
+    expect(screen.getByText('1,000')).toBeInTheDocument();
+  });
+
+  it('shows Sales Tax and Broker Fee as negative deductions, then an emphasized Net Revenue total', () => {
+    renderSummary();
+
+    const salesTaxRow = screen.getByText('Sales tax').closest('div')!;
+    expect(salesTaxRow).toHaveTextContent('-10');
+    expect(salesTaxRow.querySelector('.text-isk-neg')).not.toBeNull();
+
+    const brokerFeeRow = screen.getByText('Broker fee').closest('div')!;
+    expect(brokerFeeRow).toHaveTextContent('-5');
+    expect(brokerFeeRow.querySelector('.text-isk-neg')).not.toBeNull();
+
+    const netRevenueRow = screen.getByText('Net revenue').closest('div')!;
+    expect(netRevenueRow).toHaveTextContent('985');
+  });
+
+  it('orders Revenue rows: product line, Sales Tax, Broker Fee, Net Revenue', () => {
+    const { container } = renderSummary();
+    const text = container.textContent ?? '';
+    const productIdx = text.indexOf('Rifter');
+    const salesTaxIdx = text.indexOf('Sales tax');
+    const brokerFeeIdx = text.indexOf('Broker fee');
+    const netRevenueIdx = text.indexOf('Net revenue');
+
+    expect(productIdx).toBeGreaterThanOrEqual(0);
+    expect(productIdx).toBeLessThan(salesTaxIdx);
+    expect(salesTaxIdx).toBeLessThan(brokerFeeIdx);
+    expect(brokerFeeIdx).toBeLessThan(netRevenueIdx);
+  });
+
+  it('removes the old Product sell price / Sell value chips', () => {
+    renderSummary();
+    expect(screen.queryByText('Product sell price')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sell value')).not.toBeInTheDocument();
+  });
+
+  it('hides the Revenue block entirely when the product is unpriced, rather than showing fabricated numbers', () => {
+    renderSummary({
+      result: {
+        ...RESULT,
+        buyCost: null,
+        revenue: null,
+        salesTax: null,
+        brokerFee: null,
+        netRevenue: null,
+        profit: null,
+        marginPct: null,
+        iskPerHour: null,
+        unpriceable: true,
+        recommendation: 'unknown',
+      },
+      productUnitPrice: null,
+    });
+
+    expect(screen.queryByText('Sales tax')).not.toBeInTheDocument();
+    expect(screen.queryByText('Broker fee')).not.toBeInTheDocument();
+    expect(screen.queryByText('Net revenue')).not.toBeInTheDocument();
   });
 });

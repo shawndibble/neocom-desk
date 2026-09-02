@@ -52,6 +52,38 @@ steps below (1, 2, 3, 7, 9) average well under a minute combined. Step 5
 token cost and make selection/setup deterministic; they are not primarily a
 wall-clock fix — step 5 is where a run's time actually goes.
 
+## Reliability: never background a step you need the result of
+
+This run is not interactive — nobody is watching to notice a stalled
+background wait and nudge it back the way a human can in a live session.
+Confirmed tonight (2026-09-01): resumed runs repeatedly kicked off a script
+(`gate.mjs`, etc.) with a backgrounded Bash call or a Monitor, reported
+"waiting for it to finish," and then simply stopped — the process ended with
+nothing further done, no error, no comment, and the ticket left claimed with
+real uncommitted work orphaned in its worktree. This is very likely also
+what has been killing plain `/next-ticket` loop iterations: several ran deep
+into step 5 (substantial, real diffs) and then went silent with no `RESULT`
+line.
+
+Every mechanical script call in this workflow (`gate.mjs`, `sync-main.mjs`,
+`open-pr.mjs`, `drive-ci.mjs`, `finish.mjs`, `npm ci`, etc.) is a single
+**blocking, foreground** call — issue it and read its result in the same
+turn before deciding the next step. Never hand one to `run_in_background` or
+a Monitor and end your turn assuming a later notification will resume you;
+that resumption is not guaranteed here. `drive-ci.mjs`'s `gh pr checks
+--watch` block is expected to take real wall-clock time — that is fine as an
+ordinary foreground call, not a reason to background it.
+
+The same caution applies to every sub-agent delegation below (steps 4, 5's
+`/code-review`, and 8): a spawned sub-agent reports back asynchronously, in
+a later turn, the same way a backgrounded Bash call does. Do not let your
+final response — the one that must end with the `RESULT` line — go out
+while any sub-agent you spawned is still outstanding. If you are not
+confident that outstanding sub-agent results are reliably delivered back to
+you in this run's execution mode, prefer doing that step's work inline over
+delegating it, even at extra token cost — a completed ticket that cost more
+tokens beats a silently abandoned one every time.
+
 ## Abandon procedure (referenced by later steps)
 
 Whenever a step below says "abandon": release the claim

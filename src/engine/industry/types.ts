@@ -193,6 +193,8 @@ export interface BuildResult {
   revenue: number | null;
   salesTax: number | null;
   brokerFee: number | null;
+  /** revenue - salesTax - brokerFee; null when unpriceable. */
+  netRevenue: number | null;
   /** revenue - salesTax - brokerFee - totalCost; null when unpriceable. */
   profit: number | null;
   /** profit / totalCost x 100; null when unpriceable. */

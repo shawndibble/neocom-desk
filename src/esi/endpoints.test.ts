@@ -19,6 +19,7 @@ import {
   getCharacterWalletTransactions,
   getCharacterAssets,
   getUniverseStation,
+  getUniverseSystem,
   getCharacterMailHeaders,
   getCharacterMail,
   postUniverseNames,
@@ -345,6 +346,24 @@ describe('public info endpoints', () => {
     const result = await getUniverseStation(60003760);
 
     expect(result.data?.name).toBe('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+  });
+
+  it('getUniverseSystem is unauthenticated and returns the security status', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/systems/30000142`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json({
+          system_id: 30000142,
+          name: 'Jita',
+          security_status: 0.9459,
+        });
+      })
+    );
+
+    const result = await getUniverseSystem(30000142);
+
+    expect(result.data?.security_status).toBeCloseTo(0.9459);
   });
 
   // ESI's /route/ endpoint 404s on the unversioned path once

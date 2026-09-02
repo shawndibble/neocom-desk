@@ -165,6 +165,13 @@ function seedPlan(overrides: Partial<SkillPlanRecord> = {}): SkillPlanRecord {
   };
 }
 
+/** Most editor-focused tests below seed a single plan and want its editor
+ * page open immediately, rather than exercising the list-click navigation
+ * that `SkillPlans CRUD` already covers. */
+function goToPlanEditor(id = 'plan-1') {
+  window.history.pushState({}, '', `/skills/plans/${id}`);
+}
+
 let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -194,7 +201,6 @@ beforeEach(async () => {
 
   clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
   configureClipboard(clipboardWriteText);
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
 
   markPlanDeletedMock.mockClear();
   scheduleSyncMock.mockClear();
@@ -208,61 +214,104 @@ beforeEach(async () => {
 });
 
 describe('SkillPlans CRUD', () => {
-  it('creates, renames, duplicates, and deletes a plan, persisted in Dexie', async () => {
+  it('creates a plan and navigates straight to its editor, scheduling a sync', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
-    expect(await screen.findByText('Untitled plan')).toBeInTheDocument();
-    const stored = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
-    expect(stored).toHaveLength(1);
-    const planId = stored[0].id;
 
-    await user.click(screen.getByRole('button', { name: 'Rename Untitled plan' }));
+    const stored = await waitFor(async () => {
+      const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
+      expect(all).toHaveLength(1);
+      return all;
+    });
+    await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`));
+    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  it('renames a plan from the list, scheduling a sync', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Rename Test plan' }));
     const input = screen.getByRole('textbox', { name: 'Rename' });
     await user.clear(input);
     await user.type(input, 'PvP Fit{Enter}');
+
     expect(await screen.findByText('PvP Fit')).toBeInTheDocument();
-    expect((await db.skillPlans.get(planId))?.name).toBe('PvP Fit');
-
-    const row = screen.getByText('PvP Fit').closest('li')!;
-    await user.click(within(row).getByRole('button', { name: 'Duplicate' }));
-    expect(await screen.findByText('PvP Fit (copy)')).toBeInTheDocument();
-    expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
-
-    const originalRow = screen.getByText('PvP Fit').closest('li')!;
-    await user.click(within(originalRow).getByRole('button', { name: 'Delete' }));
-    const remaining = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0].name).toBe('PvP Fit (copy)');
-    expect(window.confirm).toHaveBeenCalled();
-
-    // Deletes MUST go through markPlanDeleted (records a tombstone) — a plain
-    // Dexie delete would let the remote copy resurrect it on next sync.
-    expect(markPlanDeletedMock).toHaveBeenCalledWith(CHAR_ID, planId);
+    expect((await db.skillPlans.get('plan-1'))?.name).toBe('PvP Fit');
+    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
   });
 
-  it('schedules a sync after create, rename, and duplicate', async () => {
+  it('duplicates a plan from the list and navigates to the copy’s editor, scheduling a sync', async () => {
     const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'New plan' }));
-    expect(await screen.findByText('Untitled plan')).toBeInTheDocument();
-    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
-    scheduleSyncMock.mockClear();
+    await user.click(await screen.findByRole('button', { name: 'Duplicate Test plan' }));
 
-    await user.click(screen.getByRole('button', { name: 'Rename Untitled plan' }));
-    const input = screen.getByRole('textbox', { name: 'Rename' });
-    await user.clear(input);
-    await user.type(input, 'Renamed{Enter}');
-    expect(await screen.findByText('Renamed')).toBeInTheDocument();
+    const copy = await waitFor(async () => {
+      const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
+      const found = all.find((p) => p.name === 'Test plan (copy)');
+      expect(found).toBeDefined();
+      return found!;
+    });
+    await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${copy.id}`));
+    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
-    scheduleSyncMock.mockClear();
+  });
 
-    const row = screen.getByText('Renamed').closest('li')!;
-    await user.click(within(row).getByRole('button', { name: 'Duplicate' }));
-    expect(await screen.findByText('Renamed (copy)')).toBeInTheDocument();
-    expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
+  it('deletes a plan via the confirmation Modal, not window.confirm', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Test plan' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(async () =>
+      expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0)
+    );
+    // Deletes MUST go through markPlanDeleted (records a tombstone) — a plain
+    // Dexie delete would let the remote copy resurrect it on next sync.
+    expect(markPlanDeletedMock).toHaveBeenCalledWith(CHAR_ID, 'plan-1');
+  });
+
+  it('cancels a delete from the confirmation Modal without deleting', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Delete Test plan' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(markPlanDeletedMock).not.toHaveBeenCalled();
+  });
+
+  it('returns to the list via the back link, and via the browser’s own Back after opening a plan', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByText('Test plan'));
+    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/skills/plans/plan-1');
+
+    await user.click(screen.getByRole('link', { name: 'Back to plans' }));
+    expect(await screen.findByText('Skill Plans')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/skills/plans');
+
+    await user.click(await screen.findByText('Test plan'));
+    expect(await screen.findByText('Computed queue')).toBeInTheDocument();
+
+    window.history.back();
+    await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
+    expect(await screen.findByText('Skill Plans')).toBeInTheDocument();
   });
 });
 
@@ -287,6 +336,7 @@ describe('SkillPlans editor: add-skill picker', () => {
   it('inserts prerequisites into the computed queue, dimmed, ahead of the user entry', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     const search = await screen.findByRole('textbox', { name: 'Add skill' });
@@ -295,7 +345,7 @@ describe('SkillPlans editor: add-skill picker', () => {
     await user.click(await screen.findByRole('button', { name: 'Level I' }));
 
     const panel = screen.getByText('Computed queue').closest('section')!;
-    const items = within(panel).getAllByRole('listitem');
+    const items = await within(panel).findAllByRole('listitem');
     expect(items.map((li) => li.textContent)).toEqual([
       expect.stringContaining('Gunnery I'),
       expect.stringContaining('Gunnery II'),
@@ -317,6 +367,7 @@ describe('SkillPlans editor: add-skill picker', () => {
   it("shows the expanded skill's prerequisites (untrained) and unlocks inline (#18)", async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     const search = await screen.findByRole('textbox', { name: 'Add skill' });
@@ -342,6 +393,7 @@ describe('SkillPlans editor: add-skill picker', () => {
 describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
   it('says no entries yet when the plan is empty', async () => {
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     const panel = (await screen.findByText('Computed queue')).closest('section')!;
@@ -359,6 +411,7 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
       )
     );
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
     render(<App />);
 
     const panel = (await screen.findByText('Computed queue')).closest('section')!;
@@ -389,6 +442,7 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
       )
     );
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
     render(<App />);
 
     const panel = (await screen.findByText('Computed queue')).closest('section')!;
@@ -401,6 +455,7 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
     // peterhaneve/evemon#40 marked skills falsely complete this way. The
     // default handler's entries are dateless, i.e. paused.
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
     render(<App />);
 
     const panel = (await screen.findByText('Computed queue')).closest('section')!;
@@ -479,6 +534,7 @@ describe('SkillPlans editor: import / export', () => {
   it('imports the in-game skill queue (deduped) and exports the computed queue to the clipboard', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
@@ -506,6 +562,7 @@ describe('SkillPlans editor: import / export', () => {
     );
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
@@ -526,6 +583,7 @@ describe('SkillPlans editor: optimize remaps', () => {
         remapCount: 1,
       })
     );
+    goToPlanEditor();
     render(<App />);
 
     await screen.findByText('Computed queue');
@@ -564,16 +622,42 @@ describe('SkillPlans editor: optimize remaps', () => {
     await db.skillPlans.add(
       seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }], remapCount: 2 })
     );
+    goToPlanEditor();
     render(<App />);
 
     await screen.findByText('Computed queue');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
     expect(
-      await screen.findByText('No remap improves this plan \u2014 keeping current attributes.')
+      await screen.findByText(
+        'No remap improves this plan in its current order \u2014 keeping current attributes. Try "Suggest reorder" to group similar skills first, then optimize again.'
+      )
     ).toBeInTheDocument();
     expect(screen.queryByText(/Segment 1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Remapping saves/)).not.toBeInTheDocument();
+  });
+
+  it('carries an info tooltip on the Optimize remaps button explaining it evaluates the current order', async () => {
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount: 1,
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+
+    await screen.findByText('Computed queue');
+    const button = screen.getByRole('button', { name: 'Optimize remaps' });
+    const tooltipId = button.getAttribute('aria-describedby');
+    const tooltip = document.getElementById(tooltipId!);
+
+    expect(tooltip).toHaveTextContent(
+      'Evaluates the plan\'s entries in their current order \u2014 it never reorders them. Grouping similar skills together first (e.g. with "Suggest reorder") tends to produce bigger savings.'
+    );
   });
 
   it('clears the stale optimize result when an entry is removed, instead of crashing on an out-of-range segment index (BUG #1)', async () => {
@@ -587,6 +671,7 @@ describe('SkillPlans editor: optimize remaps', () => {
         remapCount: 1,
       })
     );
+    goToPlanEditor();
     render(<App />);
 
     await screen.findByText('Computed queue');
@@ -618,6 +703,7 @@ describe('SkillPlans editor: remap markers', () => {
         ],
       })
     );
+    goToPlanEditor();
     render(<App />);
 
     await screen.findByText('Computed queue');
@@ -647,6 +733,7 @@ describe('SkillPlans editor: remap markers', () => {
         markers: [1],
       })
     );
+    goToPlanEditor();
     render(<App />);
 
     await screen.findByText('Computed queue');
@@ -669,6 +756,7 @@ describe('SkillPlans editor: remap markers', () => {
 
   it('disables "Optimize at my markers" when the plan has no markers', async () => {
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
+    goToPlanEditor();
     render(<App />);
 
     await screen.findByText('Computed queue');
@@ -688,6 +776,7 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
         remapCount,
       })
     );
+    goToPlanEditor();
     render(<App />);
     await screen.findByText('Computed queue');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
@@ -722,6 +811,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
 
   it('shows total training time, skill count, and projected finish, plus a live savings badge', async () => {
     await db.skillPlans.add(seedTwoSkillPlan());
+    goToPlanEditor();
     render(<App />);
     await screen.findByText('Computed queue');
 
@@ -740,6 +830,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     // the explicit, Booster-aware "Optimize remaps" click supplies one.
     const user = userEvent.setup();
     await db.skillPlans.add(seedTwoSkillPlan());
+    goToPlanEditor();
     render(<App />);
     await screen.findByText('Computed queue');
 
@@ -771,7 +862,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     vi.useRealTimers();
   });
 
-  it('shows the cooldown hint and prefills a new plan with bonus remaps only', async () => {
+  it('shows the cooldown hint on the editor, and prefills a new plan created from the list with bonus remaps only', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
         HttpResponse.json({
@@ -784,15 +875,17 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     const user = userEvent.setup();
     // Seed a plan so the editor (and its hint) is visible before creating:
     // the hint appearing proves the ESI attributes have loaded, so the "New
-    // plan" that follows is guaranteed to see the prefill value.
+    // plan" that follows (from the list) is guaranteed to see the prefill value.
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     expect(
       await screen.findByText('From EVE: 2 bonus + yearly on cooldown until 2027-01-15')
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'New plan' }));
+    await user.click(screen.getByRole('link', { name: 'Back to plans' }));
+    await user.click(await screen.findByRole('button', { name: 'New plan' }));
     // Prefilled but user-editable: the yearly remap is on cooldown, so only
     // the 2 bonus remaps count.
     await waitFor(() => expect(screen.getByLabelText('Remaps available')).toHaveValue(2));
@@ -814,11 +907,13 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     );
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     expect(await screen.findByText('From EVE: 1 bonus + yearly ready')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'New plan' }));
+    await user.click(screen.getByRole('link', { name: 'Back to plans' }));
+    await user.click(await screen.findByRole('button', { name: 'New plan' }));
     await waitFor(() => expect(screen.getByLabelText('Remaps available')).toHaveValue(2));
   });
 });
@@ -826,6 +921,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
 describe('SkillPlans editor: Remaps input label (UX-REVIEW #6)', () => {
   it('labels the remap count input "Remaps available" with a helper tooltip', async () => {
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     await screen.findByText('Computed queue');
@@ -846,6 +942,7 @@ describe('SkillPlans editor: suggest reorder', () => {
         ],
       })
     );
+    goToPlanEditor();
     render(<App />);
 
     await screen.findByText('Computed queue');
@@ -867,6 +964,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
   it('recomputes training time when switching what-if implants mode', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    goToPlanEditor();
     render(<App />);
 
     const queuePanel = (await screen.findByText('Computed queue')).closest('section')!;
@@ -887,6 +985,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
   it('shows the bonus/expiry inputs only once the booster is enabled, and flags a past expiry as expired', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
     await screen.findByText('Training options');
 
@@ -903,6 +1002,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
   it('an active (non-expired) booster reaches computeSchedule and changes training time', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    goToPlanEditor();
     render(<App />);
 
     const queuePanel = (await screen.findByText('Computed queue')).closest('section')!;
@@ -925,6 +1025,7 @@ describe('SkillPlans editor: import from clipboard', () => {
   it('previews and applies a pasted skill plan, and reports unresolvable lines', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
@@ -947,6 +1048,7 @@ describe('SkillPlans editor: import from clipboard', () => {
   it('previews and applies a pasted EFT fit, resolving required skills from ESI dogma_attributes', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
@@ -983,6 +1085,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     );
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
@@ -1018,6 +1121,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     );
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
@@ -1045,6 +1149,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     // Gunnery I..V is a multi-day train at these attributes, so start and
     // finish land on different calendar dates.
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    goToPlanEditor();
     render(<App />);
 
     const panel = (await screen.findByText('Computed queue')).closest('section')!;
@@ -1062,6 +1167,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
 
   it('shows no projected finish date, and no invented start time, for an empty plan (#20)', async () => {
     await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
     render(<App />);
 
     const panel = (await screen.findByText('Computed queue')).closest('section')!;

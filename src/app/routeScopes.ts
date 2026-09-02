@@ -47,6 +47,9 @@ export const ROUTE_REQUIREMENTS = {
   // queue carries levels /skills has not caught up to — but a plan still
   // edits and still schedules without any of it.
   '/skills/plans': UNGATED,
+  // Plan editor, its own route off the list (CONTEXT.md round 17). Same
+  // reasoning as the list above — nothing here needs a scope to function.
+  '/skills/plans/:planId': UNGATED,
   // Reads each compared character's already-cached skills endpoint (same one
   // /skills itself uses); no scope of its own to gate on.
   '/skills/compare': UNGATED,
@@ -79,7 +82,13 @@ export const ROUTE_REQUIREMENTS = {
   // with a tooltip (Assets.tsx / features/character/location.ts) instead of
   // gating the whole tab on a grant most existing users don't have yet.
   '/assets': {
-    endpoints: ['getCharacterAssets', 'getUniverseStation', 'postUniverseNames', 'getUniverseType'],
+    endpoints: [
+      'getCharacterAssets',
+      'getUniverseStation',
+      'getUniverseSystem',
+      'postUniverseNames',
+      'getUniverseType',
+    ],
     strings: 'assets',
   },
   '/mail': {

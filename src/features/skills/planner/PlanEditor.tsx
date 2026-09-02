@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, Panel } from '@/components/ui';
+import { Button, InfoTooltip, Panel, Tooltip } from '@/components/ui';
 import { normalizePlan } from '@/engine/plan';
 import { effectivePriority } from '@/engine/planPriority';
 import { computeSchedule } from '@/engine/schedule';
@@ -496,9 +496,11 @@ export function PlanEditor({
           <Button size="sm" onClick={handleExportCsv} disabled={scheduled.length === 0}>
             {t('plans.exportCsvQueue')}
           </Button>
-          <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
-            {t('plans.optimizeRemaps')}
-          </Button>
+          <Tooltip content={t('plans.optimizeRemapsTooltip')}>
+            <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
+              {t('plans.optimizeRemaps')}
+            </Button>
+          </Tooltip>
           <Button
             size="sm"
             onClick={() => onUpdate({ markers: addMarker(plan.markers, plan.entries.length) })}

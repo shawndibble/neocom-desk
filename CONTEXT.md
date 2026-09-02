@@ -110,7 +110,7 @@
   the app does not take, so they render as an unknown structure — but with the
   solar system and security status, which the order payload always carries.
   Hiding the rows would misreport the best price.
-- The selected item also offers **related items** for price comparison and an
+- The selected item also offers **variations** for price comparison and an
   **item detail modal** (fitting attributes: CPU, powergrid, volume, bonuses).
 
 ## Glossary (round 6 additions)
@@ -118,8 +118,10 @@
 - **Item Detail**: The modal view of one item's own properties — fitting cost,
   volume, bonuses, description. Read live from ESI per item, not from the SDE
   snapshot, so it is the one Market Browser panel that needs the network.
-- **Related Items**: The other items in the selected item's Market Group,
-  offered beside it for price comparison.
+- **Variations**: The selected item's Tech I/II/Faction/Storyline/Officer
+  variation group, shown as a sortable table (Name, Tier, Sell, Buy) beside
+  it for price comparison; falls back to its Market Group siblings when it
+  has no variation data.
 - **Compare**: A tab that puts the Quickbar's items side by side on best sell,
   best buy, spread and volume, under the same **Location Mode** as the order
   book beside it.
@@ -137,12 +139,13 @@
 - **Items answer to a context menu** wherever they appear — tree, search
   results, Quickbar, order rows: add to Quickbar, show info, compare, copy
   name, and jump to a Build Plan. A sixth candidate action, re-anchoring the
-  Related Items strip on a chosen item, is dropped: clicking a related item
-  already replaces the selection, which re-anchors the strip as a side effect.
-- **Related Items are Market Group siblings.** Meta/tech variants are a
-  separate relation, resolved by `src/engine/market/variations.ts` from
-  `public/data/market/variations.json`; surfacing them in the UI is a later
-  step.
+  Variations table on a chosen row, is dropped: clicking a row already
+  replaces the selection, which re-anchors the table as a side effect.
+- **Variations are sourced from the SDE variation relation**, resolved by
+  `src/engine/market/variations.ts` from `public/data/market/variations.json`
+  — the Tech I root plus every Tech II/Faction/Storyline/Officer sibling
+  across the item's meta groups. Falls back to Market Group siblings when the
+  selected item has no variation data (e.g. plain commodities/minerals).
 - Compare ships with four fixed columns, but user-chosen columns are the
   expected direction, so the column set is modelled as a list, not as fixed
   table markup.

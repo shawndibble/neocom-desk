@@ -11,7 +11,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache } from '@/features/market/orderBook';
-import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
+import { loadMarketGroups, loadMarketTypes, loadVariations } from '@/sde/loadMarketSde';
 import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
@@ -24,6 +24,7 @@ import type {
   SolarSystemEntry,
   MarketRegionEntry,
   GlobalMarketEntry,
+  VariationData,
 } from '@/sde/marketTypes';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
@@ -75,7 +76,8 @@ const GROUPS: MarketGroupNode[] = [
   { id: 3, name: 'Ore', parentId: null, hasTypes: true },
   { id: 4, name: 'Destroyers', parentId: 1, hasTypes: true },
 ];
-// Destroyers (issue #10 "Related Items strip"): four Market Group siblings
+// Destroyers (issue #10 "Related Items strip", now the Variations table's
+// sibling-fallback path per issue #145): four Market Group siblings
 // sharing group 4 — Merlin and Kestrel have sell orders, Corax has a buy
 // order only (no sell), and Cormorant has none at all.
 const MERLIN_TYPE_ID = 608;
@@ -104,6 +106,12 @@ const REGIONS: MarketRegionEntry[] = [
 const GLOBAL_MARKETS: GlobalMarketEntry[] = [
   { typeId: PLEX_TYPE_ID, regionId: GPMR_REGION_ID, regionName: 'GPMR-01' },
 ];
+// Empty by default — none of the TYPES fixtures above carry a Tech/Meta/
+// Faction classification, so the Variations table falls back to Market Group
+// siblings exactly like the tests below expect. The variation-sourced path
+// is exercised separately (see "shows the variation group, not Market Group
+// siblings, when the item has variation data" below).
+const VARIATION_DATA: VariationData = { types: {}, metaGroups: {} };
 
 // Rifter's own detail attribute (issue #9 "Item Detail"): matches the
 // dogma_attributes fixture the ESI /universe/types/587 handler below returns.
@@ -123,6 +131,7 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadSolarSystems: vi.fn(async () => SYSTEMS),
   loadMarketRegions: vi.fn(async () => REGIONS),
   loadGlobalMarkets: vi.fn(async () => GLOBAL_MARKETS),
+  loadVariations: vi.fn(async () => VARIATION_DATA),
   loadAttributeDictionary: vi.fn(async () => ATTRIBUTE_DICTIONARY),
 }));
 
@@ -437,7 +446,7 @@ describe('Price History tab (issue #11)', () => {
     const historyHits = { count: 0 };
     server.use(
       ordersHandler({ count: 0 }),
-      // Tritanium's Related Items strip includes PLEX (same market group,
+      // Tritanium's Variations table falls back to PLEX (same market group,
       // fixtures above), whose order book lives at its own Global Market
       // Region rather than Tritanium's.
       plexOrdersHandler({ count: 0 }),
@@ -500,8 +509,8 @@ describe('Price History tab (issue #11)', () => {
   });
 });
 
-describe('Related Items strip (issue #10)', () => {
-  it("shows the selected item's Market Group siblings with their own sell price, excluding itself, and plainly marks a sibling with no sell orders (buy-only or none at all)", async () => {
+describe('Variations table (issue #145, formerly the Related Items strip of issue #10)', () => {
+  it("falls back to the selected item's Market Group siblings when it has no variation data, showing each sibling's own sell and buy price, excluding itself, and never conflating a missing side with true 'no orders at all'", async () => {
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup();
     render(<App />);
@@ -510,37 +519,110 @@ describe('Related Items strip (issue #10)', () => {
     await user.click(await screen.findByText('Merlin'));
     await screen.findByRole('table', { name: 'Sell Orders' });
 
-    const strip = await screen.findByRole('list', { name: 'Related Items' });
-    expect(await screen.findByText('Kestrel')).toBeInTheDocument();
-    expect(await screen.findByText('1,500,000.00')).toBeInTheDocument();
-    // Corax has a buy order but no sell order — never a fabricated zero, and
-    // never conflated with Cormorant's true "no orders at all".
-    expect(within(strip).getByText('Corax')).toBeInTheDocument();
-    expect(within(strip).getByText('No sell orders')).toBeInTheDocument();
-    expect(within(strip).getByText('Cormorant')).toBeInTheDocument();
-    expect(within(strip).getByText('No orders')).toBeInTheDocument();
+    const table = await screen.findByRole('table', { name: 'Variations' });
+    expect(await within(table).findByText('Kestrel')).toBeInTheDocument();
+    expect(within(table).getByText('1,500,000.00')).toBeInTheDocument();
+
+    // Corax has a buy order but no sell order — the Sell cell says so
+    // plainly rather than showing a fabricated zero, and the Buy cell still
+    // shows its own real price.
+    const coraxRow = within(table).getByText('Corax').closest('tr');
+    if (!coraxRow) throw new Error('expected a Corax row');
+    expect(within(coraxRow).getByText('No sell orders')).toBeInTheDocument();
+    expect(within(coraxRow).getByText('700,000.00')).toBeInTheDocument();
+
+    // Cormorant has no orders on either side — each cell independently says
+    // so, never conflated with Corax's buy-only state.
+    const cormorantRow = within(table).getByText('Cormorant').closest('tr');
+    if (!cormorantRow) throw new Error('expected a Cormorant row');
+    expect(within(cormorantRow).getAllByText('No orders')).toHaveLength(2);
   });
 
-  it('clicking a sibling selects it, reloading the order book and re-anchoring the strip on it', async () => {
+  it('shows the variation group, not Market Group siblings, when the selected item has variation data', async () => {
+    vi.mocked(loadVariations).mockResolvedValueOnce({
+      types: {
+        [MERLIN_TYPE_ID]: { parentTypeId: null, metaGroupId: 1 },
+        [KESTREL_TYPE_ID]: { parentTypeId: MERLIN_TYPE_ID, metaGroupId: 2 },
+      },
+      metaGroups: { 1: 'Tech I', 2: 'Tech II' },
+    });
     server.use(destroyerOrdersHandler(new Map()));
     const user = userEvent.setup();
     render(<App />);
 
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
-    await screen.findByText('Related Items');
+    await screen.findByRole('table', { name: 'Sell Orders' });
+
+    const table = await screen.findByRole('table', { name: 'Variations' });
+    // Kestrel is Merlin's Tech II variant, not a Market Group sibling here —
+    // Corax and Cormorant (Market Group siblings, no variation entry) are
+    // excluded once the variation group resolves.
+    const kestrelRow = await within(table)
+      .findByText('Kestrel')
+      .then((el) => el.closest('tr'));
+    if (!kestrelRow) throw new Error('expected a Kestrel row');
+    expect(within(kestrelRow).getByText('T2')).toBeInTheDocument();
+    expect(within(table).queryByText('Corax')).not.toBeInTheDocument();
+    expect(within(table).queryByText('Cormorant')).not.toBeInTheDocument();
+  });
+
+  it('a failed variations.json fetch degrades only the Variations table to its sibling fallback, not the whole Market route', async () => {
+    vi.mocked(loadVariations).mockRejectedValueOnce(new Error('network error'));
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+
+    // The order book — unrelated to variations.json — still renders fine.
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('900,000.00')).toBeInTheDocument();
+    // The Variations table degrades to the sibling fallback rather than
+    // going empty or taking the whole route down with it.
+    const table = await screen.findByRole('table', { name: 'Variations' });
+    expect(within(table).getByText('Kestrel')).toBeInTheDocument();
+  });
+
+  it('clicking a row selects it, reloading the order book and re-anchoring the table on it', async () => {
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    await screen.findByText('Variations');
 
     await user.click(await screen.findByText('Kestrel'));
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('1,500,000.00')).toBeInTheDocument();
-    // Re-anchored: Merlin, the previously-selected item, is now the sibling
+    // Re-anchored: Merlin, the previously-selected item, is now a row
     // (the tree still shows its own "Merlin" match for the lingering search).
-    const strip = await screen.findByRole('list', { name: 'Related Items' });
-    expect(within(strip).getByText('Merlin')).toBeInTheDocument();
+    const table = await screen.findByRole('table', { name: 'Variations' });
+    expect(within(table).getByText('Merlin')).toBeInTheDocument();
   });
 
-  it('a manual Refresh also refetches sibling prices, not just the on-screen order book', async () => {
+  it('re-anchors on a click anywhere in the row, not just the item name — identical to the old card click', async () => {
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    const table = await screen.findByRole('table', { name: 'Variations' });
+
+    // Click the Tier cell, not the Name cell.
+    const kestrelRow = within(table).getByText('Kestrel').closest('tr');
+    if (!kestrelRow) throw new Error('expected a Kestrel row');
+    await user.click(within(kestrelRow).getByText('—'));
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('1,500,000.00')).toBeInTheDocument();
+  });
+
+  it('a manual Refresh also refetches row prices, not just the on-screen order book', async () => {
     const hits = new Map<number, number>();
     server.use(destroyerOrdersHandler(hits));
     const user = userEvent.setup();
@@ -549,7 +631,7 @@ describe('Related Items strip (issue #10)', () => {
     await user.type(await screen.findByRole('searchbox'), 'merlin');
     await user.click(await screen.findByText('Merlin'));
     await screen.findByRole('table', { name: 'Sell Orders' });
-    await screen.findByRole('list', { name: 'Related Items' });
+    await screen.findByRole('table', { name: 'Variations' });
     await waitFor(() => expect(hits.get(KESTREL_TYPE_ID)).toBe(1));
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
@@ -569,8 +651,8 @@ describe('Related Items strip (issue #10)', () => {
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument();
-    const strip = await screen.findByRole('list', { name: 'Related Items' });
-    expect(within(strip).getByText('1,500,000.00')).toBeInTheDocument(); // Kestrel, unfiltered
+    const table = await screen.findByRole('table', { name: 'Variations' });
+    expect(within(table).getByText('1,500,000.00')).toBeInTheDocument(); // Kestrel, unfiltered
 
     const rows = within(sellTable).getAllByRole('row');
     const targetRow = rows.find((row) => within(row).queryByText('850,000.00'));
@@ -579,15 +661,15 @@ describe('Related Items strip (issue #10)', () => {
     fireEvent.contextMenu(targetRow);
     await user.click(await screen.findByRole('menuitem', { name: 'Filter to this station' }));
 
-    // Kestrel and Corax have no orders at all at that location — the strip
+    // Kestrel and Corax have no orders at all at that location — the table
     // degrades exactly as the on-screen tables do under the same filter.
     await waitFor(() => {
-      expect(within(strip).queryByText('1,500,000.00')).not.toBeInTheDocument();
+      expect(within(table).queryByText('1,500,000.00')).not.toBeInTheDocument();
     });
-    expect(within(strip).getAllByText('No orders').length).toBeGreaterThanOrEqual(2);
+    expect(within(table).getAllByText('No orders').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('an item whose Market Group has no other members shows nothing, not an empty strip', async () => {
+  it('an item whose Market Group has no other members shows nothing, not an empty table', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup();
     render(<App />);
@@ -596,7 +678,7 @@ describe('Related Items strip (issue #10)', () => {
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
 
-    expect(screen.queryByText('Related Items')).not.toBeInTheDocument();
+    expect(screen.queryByText('Variations')).not.toBeInTheDocument();
   });
 
   it('bounds a large Market Group at the cap and states the true total', async () => {
@@ -628,7 +710,7 @@ describe('Related Items strip (issue #10)', () => {
     await user.type(await screen.findByRole('searchbox'), 'Selected Widget');
     await user.click(await screen.findByText('Selected Widget'));
 
-    expect(await screen.findByText('Related Items')).toBeInTheDocument();
+    expect(await screen.findByText('Variations')).toBeInTheDocument();
     expect(screen.getByText('Showing 20 of 25')).toBeInTheDocument();
   });
 });
@@ -1020,7 +1102,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     const hits = { count: 0 };
     server.use(
       plexOrdersHandler(hits),
-      // PLEX's Related Items strip includes Tritanium (same market group,
+      // PLEX's Variations table falls back to Tritanium (same market group,
       // fixtures above), whose order book lives at the Forge region rather
       // than PLEX's Global Market Region.
       ordersHandler({ count: 0 })
@@ -1115,7 +1197,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   it('browser back and forward move through previous selections', async () => {
     server.use(
       ordersHandler({ count: 0 }),
-      // Tritanium's Related Items strip includes PLEX (same market group,
+      // Tritanium's Variations table falls back to PLEX (same market group,
       // fixtures above), whose order book lives at its own Global Market
       // Region rather than Tritanium's.
       plexOrdersHandler({ count: 0 })

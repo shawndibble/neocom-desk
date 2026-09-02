@@ -37,6 +37,8 @@ import {
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
+import { loadSystemSecurity } from '@/features/character/systemSecurity';
+import { securityStatusColor } from '@/engine/securityStatus';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadJumpsAway } from '@/features/character/routeDistance';
@@ -524,6 +526,32 @@ interface JumpsAwayBadgeProps {
  * elsewhere on this page) mirrors `CharacterBadge`'s own plain-annotation
  * treatment just above — this is the same kind of small supplementary label.
  */
+interface SecurityBadgeProps {
+  /** Undefined while still resolving/out of scope, null if unresolvable — see `JumpsAwayBadge`. */
+  security: number | null | undefined;
+  t: Translate;
+}
+
+/**
+ * A solar system's security status (issue #148), colored on the game's own
+ * scale (`securityStatusColor` — blue-green through highsec, amber/red
+ * through lowsec and nullsec). Renders nothing while unresolved, same
+ * progressive-enhancement treatment as `JumpsAwayBadge` just above.
+ */
+function SecurityBadge({ security, t }: SecurityBadgeProps) {
+  if (security === null || security === undefined) return null;
+  const value = security.toFixed(1);
+  return (
+    <span
+      className="shrink-0 text-[0.6875rem] font-semibold tabular-nums"
+      style={{ color: securityStatusColor(security) }}
+      title={t('assets.security.ariaLabel', { value })}
+    >
+      {value}
+    </span>
+  );
+}
+
 function JumpsAwayBadge({ result, t }: JumpsAwayBadgeProps) {
   if (!result) return null;
   if (result.kind === 'known') {
@@ -672,8 +700,12 @@ function AssetItemRow({ node, depth, ctx, rowKey, a11y }: AssetItemRowProps) {
               <span className="truncate">{name}</span>
               {characterBadge && <CharacterBadge characterName={characterBadge} t={ctx.t} />}
             </span>
-            <span className="shrink-0 tabular-nums text-text-dim">
-              {ctx.t('assets.quantity')} {asset.quantity.toLocaleString()}
+            <span className="flex shrink-0 items-center gap-4 tabular-nums text-text-dim">
+              <span className="w-14 text-right">{asset.quantity.toLocaleString()}</span>
+              <span className="w-16 text-right">
+                {unitVolume === undefined ? ctx.t('assets.unknownValue') : formatVolume(unitVolume)}
+              </span>
+              <span className="w-20 text-right">{formatIsk(estimatedValue)}</span>
             </span>
           </button>
           {tooltipOpen && (
@@ -771,9 +803,11 @@ interface StationHeaderRowProps {
   pinState: PinState;
   /** Undefined while still resolving/out of scope (issue #87) — see `JumpsAwayBadge`. */
   jumpsAway: JumpsAwayResult | undefined;
+  /** Undefined while still resolving/out of scope, null if unresolvable — see `SecurityBadge`. */
+  security: number | null | undefined;
+  expanded: boolean;
+  onToggle: () => void;
   onTogglePin: () => void;
-  onExpandAll: () => void;
-  onCollapseAll: () => void;
   onFocusRow: (key: string) => void;
   t: Translate;
   a11y: TreeRowA11y;
@@ -788,15 +822,25 @@ interface StationHeaderRowProps {
  * when all rows are absolutely-positioned siblings in one scroll container,
  * so this renders inline as just another row, styled to still read as a
  * section boundary (border-top, panel background) rather than a full box.
+ *
+ * Collapsed by default (issue #148): a station is now a toggleable branch
+ * like a bay/container/ship, not an always-open root. The row's DOM focus
+ * target is the outer `role="treeitem"` div (so Enter/Space/ArrowRight
+ * toggle it via the shared tree keydown handler), but the click affordance
+ * is a nested `<button>` around just the chevron/label — `StationPinButton`
+ * is a real, independently-tabbable sibling control, and nesting it inside
+ * a row-wide button would be invalid HTML, the same constraint
+ * `AssetBranchRow` doesn't have to solve since it has no sibling controls.
  */
 function StationHeaderRow({
   station,
   label,
   pinState,
   jumpsAway,
+  security,
+  expanded,
+  onToggle,
   onTogglePin,
-  onExpandAll,
-  onCollapseAll,
   onFocusRow,
   t,
   a11y,
@@ -809,7 +853,7 @@ function StationHeaderRow({
   return (
     <div
       role="treeitem"
-      aria-expanded="true"
+      aria-expanded={expanded}
       aria-level={a11y.level}
       aria-posinset={a11y.posinset}
       aria-setsize={a11y.setsize}
@@ -827,25 +871,29 @@ function StationHeaderRow({
             label={t('assets.select.stationAriaLabel', { station: label })}
           />
         )}
-        <h2
-          id={labelId}
-          className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 items-center gap-1.5 hover:text-accent"
         >
-          {label}
-        </h2>
+          <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
+            {expanded ? '▾' : '▸'}
+          </span>
+          <h2
+            id={labelId}
+            className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+          >
+            {label}
+          </h2>
+        </button>
       </div>
       <div className="flex items-center gap-2">
         <StationPinButton label={label} pinState={pinState} onToggle={onTogglePin} t={t} />
+        <SecurityBadge security={security} t={t} />
         <JumpsAwayBadge result={jumpsAway} t={t} />
         <span className="text-[0.6875rem] text-text-faint tabular-nums">
           {formatBadge(station, t)}
         </span>
-        <Button size="sm" onClick={onExpandAll}>
-          {t('assets.expandAll')}
-        </Button>
-        <Button size="sm" onClick={onCollapseAll}>
-          {t('assets.collapseAll')}
-        </Button>
       </div>
     </div>
   );
@@ -1155,9 +1203,10 @@ export function Assets() {
     setPinnedSeededForCharacter(activeCharacterId);
     const pinnedKeys = sortedTree
       .filter((station) => pinStateFor(station.locationId) !== 'unpinned')
-      .flatMap((station) =>
-        collectExpandableKeys(station.children, stationRowKey(station.locationId))
-      );
+      .flatMap((station) => {
+        const stationKey = stationRowKey(station.locationId);
+        return [stationKey, ...collectExpandableKeys(station.children, stationKey)];
+      });
     if (pinnedKeys.length > 0) {
       setExpandedKeys((prev) => new Set([...prev, ...pinnedKeys]));
     }
@@ -1173,6 +1222,7 @@ export function Assets() {
     const keys = new Set<string>();
     for (const station of sortedTree) {
       const stationKey = stationRowKey(station.locationId);
+      keys.add(stationKey);
       for (const key of collectExpandableKeys(station.children, stationKey)) keys.add(key);
     }
     return keys;
@@ -1227,10 +1277,9 @@ export function Assets() {
 
   // `flattenedRows` reduced to what `assetTreeNav.ts`'s pure keyboard-nav
   // functions need — decoupled on purpose from the asset tree's own types. A
-  // station models as an always-open, never-toggleable branch: pruning
-  // guarantees every rendered station has at least one child, and (unlike a
-  // bay/ship/container) those direct children are never gated behind
-  // `expandedKeys`.
+  // station is a toggleable branch like a bay/ship/container (issue #148):
+  // collapsed by default, its direct children gated behind `expandedKeys`
+  // the same way `pushNodeRows` already gates every other branch.
   const navRows = useMemo<NavRow[]>(
     () =>
       flattenedRows.map((row, index) => {
@@ -1239,8 +1288,8 @@ export function Assets() {
             key: row.key,
             level: row.level,
             hasChildren: true,
-            isOpen: true,
-            canToggle: false,
+            isOpen: effectiveExpandedKeys.has(row.key),
+            canToggle: !searchActive,
             label: rowLabels[index],
           };
         }
@@ -1295,8 +1344,10 @@ export function Assets() {
 
   function activateFocusedRow(index: number) {
     const row = flattenedRows[index];
-    if (!row || row.type === 'station') return;
-    if (row.node.kind === 'item') {
+    if (!row) return;
+    if (row.type === 'station') {
+      toggleKey(row.key);
+    } else if (row.node.kind === 'item') {
       handleShowInfo(row.node.asset.type_id, rowLabels[index]);
     } else {
       toggleKey(row.key);
@@ -1305,9 +1356,9 @@ export function Assets() {
 
   function handleTreeKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     // Only the tree rows themselves (`role="treeitem"`) drive roving nav — a
-    // station header also hosts real, independently-tabbable buttons (pin,
-    // expand all, collapse all); their own native Enter/Space/click handling
-    // must not be swallowed by this delegated handler.
+    // station header also hosts a real, independently-tabbable pin button;
+    // its own native Enter/Space/click handling must not be swallowed by
+    // this delegated handler.
     if ((event.target as HTMLElement).getAttribute('role') !== 'treeitem') return;
     if (flattenedRows.length === 0) return;
     const currentIndex = Math.max(
@@ -1446,8 +1497,17 @@ export function Assets() {
   const [stationSystemIds, setStationSystemIds] = useState<ReadonlyMap<number, number | null>>(
     new Map()
   );
+  // Security status (issue #148) piggybacks on `stationSystemIds`/
+  // `jumpsAwayScopedStations` above rather than resolving its own scoped
+  // station list: same station set, same reason to bound the fan-out
+  // (CONTEXT.md round 14), keyed by system id (not station id) since two
+  // stations can share a system and only need the lookup once.
+  const [securityBySystemId, setSecurityBySystemId] = useState<ReadonlyMap<number, number | null>>(
+    new Map()
+  );
   const systemIdRequested = useRef<Set<number>>(new Set());
   const jumpsAwayRequested = useRef<Set<string>>(new Set());
+  const securityRequested = useRef<Set<number>>(new Set());
   // Tracks which character an in-flight request was made for. A plain
   // per-effect `cancelled` closure would also be tripped by an *unrelated*
   // re-render that merely gives `jumpsAwayScopedStations`/`stationSystemIds`
@@ -1468,8 +1528,10 @@ export function Assets() {
     // set must not suppress this one's requests.
     setStationSystemIds(new Map());
     setJumpsAwayByKey(new Map());
+    setSecurityBySystemId(new Map());
     systemIdRequested.current = new Set();
     jumpsAwayRequested.current = new Set();
+    securityRequested.current = new Set();
   }, [activeCharacterId]);
 
   useEffect(() => {
@@ -1535,6 +1597,37 @@ export function Assets() {
     routePreference,
   ]);
 
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    const missing = new Set<number>();
+    for (const station of jumpsAwayScopedStations) {
+      const systemId = stationSystemIds.get(station.locationId);
+      if (
+        systemId != null &&
+        !securityBySystemId.has(systemId) &&
+        !securityRequested.current.has(systemId)
+      ) {
+        missing.add(systemId);
+      }
+    }
+    if (missing.size === 0) return;
+    for (const systemId of missing) securityRequested.current.add(systemId);
+
+    const requestedForCharacterId = activeCharacterId;
+    void mapWithConcurrencyLimit([...missing], ESI_FANOUT_CONCURRENCY, async (systemId) => {
+      const security = await loadSystemSecurity(systemId);
+      if (activeCharacterIdRef.current === requestedForCharacterId) {
+        setSecurityBySystemId((prev) => new Map(prev).set(systemId, security));
+      }
+    });
+  }, [activeCharacterId, jumpsAwayScopedStations, stationSystemIds, securityBySystemId]);
+
+  function securityForStation(locationId: number): number | null | undefined {
+    const systemId = stationSystemIds.get(locationId);
+    if (systemId == null) return systemId;
+    return securityBySystemId.get(systemId);
+  }
+
   function toggleKey(key: string) {
     if (searchActive) return;
     setExpandedKeys((prev) => {
@@ -1545,16 +1638,24 @@ export function Assets() {
     });
   }
 
-  function expandAll(station: AssetTreeStation, stationKey: string) {
-    if (searchActive) return;
-    const keys = collectExpandableKeys(station.children, stationKey);
-    setExpandedKeys((prev) => new Set([...prev, ...keys]));
-  }
+  // Single toolbar toggle (issue #148), replacing the old per-station
+  // `Expand all`/`Collapse all` button pair: flips every station's own
+  // header key at once, leaving each station's internal bay/ship/container
+  // expand state untouched — matches the game client's single collapse-all
+  // control, which only ever collapses/expands the top-level list.
+  const allStationsExpanded =
+    sortedTree.length > 0 &&
+    sortedTree.every((station) => effectiveExpandedKeys.has(stationRowKey(station.locationId)));
 
-  function collapseAll(station: AssetTreeStation, stationKey: string) {
+  function toggleAllStations() {
     if (searchActive) return;
-    const keys = new Set(collectExpandableKeys(station.children, stationKey));
-    setExpandedKeys((prev) => new Set([...prev].filter((k) => !keys.has(k))));
+    const stationKeys = sortedTree.map((station) => stationRowKey(station.locationId));
+    if (allStationsExpanded) {
+      const toRemove = new Set(stationKeys);
+      setExpandedKeys((prev) => new Set([...prev].filter((k) => !toRemove.has(k))));
+    } else {
+      setExpandedKeys((prev) => new Set([...prev, ...stationKeys]));
+    }
   }
 
   // Bulk actions (issue #90): the three actions the item context menu already
@@ -1618,7 +1719,20 @@ export function Assets() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div
+      className={cx(
+        'mx-auto flex max-w-5xl flex-col gap-4',
+        // Fills the remaining viewport height (issue #148) rather than
+        // growing with content: bounds the height against `<main>`'s own
+        // chrome (Layout.tsx's `p-4`, plus the mobile bottom nav's
+        // `calc(5rem+safe-area)` reservation below `md`, mirrored here since
+        // that reservation isn't itself exposed as a token) so the tree
+        // Panel below — the only `flex-1` child — has real remaining space
+        // to fill instead of a `flex-1` that's inert with no bounded
+        // ancestor.
+        'h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)]'
+      )}
+    >
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('assets.title')}</h1>
         <div className="flex items-center gap-2">
@@ -1741,7 +1855,7 @@ export function Assets() {
       ) : !assetsResult ? (
         <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
       ) : (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
           {assetsResult.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
@@ -1755,14 +1869,31 @@ export function Assets() {
             <EmptyState title={t('assets.noResults')} className="py-8" />
           ) : (
             <AssetItemActionsContext.Provider value={itemActions}>
-              <Panel padded={false}>
+              <Panel padded={false} className="relative min-h-0 flex-1">
+                <div className="flex h-9 items-center gap-2 border-b border-line bg-panel-2 px-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <FilterChip
+                    label={
+                      allStationsExpanded
+                        ? t('assets.stationsToggle.collapse')
+                        : t('assets.stationsToggle.expand')
+                    }
+                    selected={allStationsExpanded}
+                    onToggle={toggleAllStations}
+                  />
+                  <span>{t('assets.columnStation')}</span>
+                  <span className="ml-auto flex items-center gap-4 normal-case">
+                    <span className="w-14 text-right">{t('assets.columnQuantity')}</span>
+                    <span className="w-16 text-right">{t('assets.columnVolume')}</span>
+                    <span className="w-20 text-right">{t('assets.columnEstPrice')}</span>
+                  </span>
+                </div>
                 <div
                   ref={scrollParentRef}
                   data-virtual-scroll-root
                   role="tree"
                   aria-label={t('assets.treeLabel')}
                   onKeyDown={handleTreeKeyDown}
-                  className="max-h-[32rem] overflow-y-auto"
+                  className="absolute inset-x-0 bottom-0 top-9 overflow-y-auto"
                 >
                   <div
                     role="presentation"
@@ -1796,13 +1927,10 @@ export function Assets() {
                               jumpsAway={jumpsAwayByKey.get(
                                 `${row.station.locationId}:${routePreference}`
                               )}
+                              security={securityForStation(row.station.locationId)}
+                              expanded={effectiveExpandedKeys.has(row.key)}
+                              onToggle={() => toggleKey(row.key)}
                               onTogglePin={() => void handleTogglePin(row.station.locationId)}
-                              onExpandAll={() =>
-                                expandAll(row.station, stationRowKey(row.station.locationId))
-                              }
-                              onCollapseAll={() =>
-                                collapseAll(row.station, stationRowKey(row.station.locationId))
-                              }
                               onFocusRow={handleRowFocus}
                               t={t}
                               a11y={a11y}
@@ -1841,7 +1969,7 @@ export function Assets() {
               </Panel>
             </AssetItemActionsContext.Provider>
           )}
-        </>
+        </div>
       )}
 
       {infoModalItem && (
