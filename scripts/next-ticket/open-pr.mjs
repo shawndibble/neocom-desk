@@ -5,10 +5,15 @@
 // Usage: node scripts/next-ticket/open-pr.mjs <title> <body-file>
 //
 // Also arms auto-merge (repo has allow_auto_merge on, and `validate` + `e2e`
-// are required checks) so GitHub squash-merges the PR itself the moment it
-// goes green and mergeable — finish.mjs no longer races a manual merge
-// against it, and a CI-watch hiccup in drive-ci.mjs can't strand an
-// otherwise-green PR.
+// are required checks) so GitHub merges the PR itself the moment it goes
+// green and mergeable — finish.mjs no longer races a manual merge against
+// it, and a CI-watch hiccup in drive-ci.mjs can't strand an otherwise-green
+// PR.
+//
+// Deliberately `--merge`, not `--squash`: squashing rewrites the branch's
+// commits into a new one, which orphans the base of any PR stacked on this
+// branch and scrambles its diff. A merge commit preserves those commits, so
+// a stack survives the merge. Cost is a noisier `main` history — accepted.
 //
 // Prints one line of JSON to stdout:
 //   {"status":"open","number":123,"url":"...","autoMergeArmed":true}
@@ -45,7 +50,7 @@ const autoMerge = tryRun('gh', [
   'pr',
   'merge',
   String(number),
-  '--squash',
+  '--merge',
   '--auto',
   '--delete-branch',
 ]);

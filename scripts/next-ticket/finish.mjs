@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Squash-merge, verify the issue closed, and tear down the worktree.
+// Merge (merge commit, not squash), verify the issue closed, and tear down
+// the worktree.
 // Replaces next-ticket.md step 9's sequence of separate `gh`/`git` calls.
 //
 // Usage: node scripts/next-ticket/finish.mjs <pr-number> <issue-number> <worktree-path>
@@ -17,7 +18,11 @@ if (!prArg || !issueArg || !worktreePath) {
   process.exit(2);
 }
 
-const merge = tryRun('gh', ['pr', 'merge', prArg, '--squash', '--delete-branch']);
+// `--merge`, not `--squash`, for the same reason open-pr.mjs arms auto-merge
+// that way: a squash rewrites this branch's commits and breaks any PR stacked
+// on it. Keep the two in sync — a mismatch here would merge some PRs one way
+// and some the other depending on which path won the race.
+const merge = tryRun('gh', ['pr', 'merge', prArg, '--merge', '--delete-branch']);
 if (!merge.ok) {
   // open-pr.mjs arms auto-merge on this PR; it may have already merged
   // (e.g. while drive-ci.mjs's watch was still running or had errored),
