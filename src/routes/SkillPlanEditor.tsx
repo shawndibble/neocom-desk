@@ -69,7 +69,7 @@ export function SkillPlanEditor() {
           remapInfo={remapInfo}
           className={isDesktop ? '' : 'hidden'}
         />
-        <div data-testid="plan-detail-pane" className="space-y-2">
+        <div className="space-y-2">
           {!isDesktop && (
             <Link to="/skills/plans" className="inline-block text-xs text-accent hover:underline">
               {t('plans.backToList')}

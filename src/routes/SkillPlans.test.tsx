@@ -334,9 +334,9 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await user.click(await screen.findByText('Test plan'));
     await screen.findByText('Your entries');
 
-    // The list pane stays mounted (not unmounted) behind the editor — its
-    // own state (e.g. scroll position) survives being hidden, matching
-    // Market's narrow-screen precedent.
+    // The list pane is still rendered (CSS-hidden, not unmounted) behind
+    // the editor on narrow screens, matching Market's narrow-screen
+    // precedent — the same `hidden`-toggle approach, not literal DOM removal.
     const listPanelOnEditor = screen.getByText('Test plan').closest('section');
     expect(listPanelOnEditor).toHaveClass('hidden');
     expect(await screen.findByRole('link', { name: 'Back to plans' })).toBeInTheDocument();

@@ -27,8 +27,12 @@ function newPlan(characterId: number, name: string, remapCount = 0): SkillPlanRe
 
 /**
  * Plan list pane shared by the list route and the editor route (#158): both
- * keep it mounted and visible on wide screens, so opening a different plan
- * is a click in the still-visible list rather than a trip back to `/skills/plans`.
+ * render it visible on wide screens, so opening a different plan is a click
+ * in the still-visible list rather than a trip back to `/skills/plans`
+ * first. It only stays *mounted* across a plan switch while already on the
+ * editor route (`:planId` changing on the same route element) — crossing
+ * between the list route and the editor route still unmounts/remounts it
+ * like any other route change (round 17's route split is unchanged).
  */
 export function PlanListPane({ activeCharacterId, remapInfo, className }: PlanListPaneProps) {
   const { t } = useTranslation();
