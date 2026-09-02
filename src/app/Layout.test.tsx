@@ -89,16 +89,20 @@ describe('Layout sync status dot', () => {
 });
 
 describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
-  it('keeps 4 primary tabs + More in the mobile tab bar', () => {
+  it('keeps 3 primary tabs + More in the mobile tab bar', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
 
     const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
-    expect(within(mobileNav).getAllByRole('link')).toHaveLength(4);
+    expect(
+      within(mobileNav)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    ).toEqual(['Overview', 'Skills', 'Industry']);
     expect(within(mobileNav).getByRole('button', { name: 'More' })).toBeInTheDocument();
   });
 
-  it('opens a dialog listing Wallet, Assets, Mail, Calendar, Contracts, Orders and Settings (not Styleguide)', async () => {
+  it('opens a dialog listing Wallet, Assets, Mail, Calendar, Contracts and Orders (not Styleguide)', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayout();
@@ -113,18 +117,53 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
 
     const sheet = screen.getByRole('dialog', { name: 'More' });
     expect(moreButton.getAttribute('aria-controls')).toBe(sheet.id);
-    for (const label of [
-      'Wallet',
-      'Assets',
-      'Mail',
-      'Calendar',
-      'Contracts',
-      'Orders',
-      'Settings',
-    ]) {
+    for (const label of ['Wallet', 'Assets', 'Mail', 'Calendar', 'Contracts', 'Orders']) {
       expect(within(sheet).getByRole('link', { name: label })).toBeInTheDocument();
     }
     expect(within(sheet).queryByRole('link', { name: 'Styleguide' })).not.toBeInTheDocument();
+    // Overview tabs now, reached from the Overview page rather than the sheet.
+    expect(within(sheet).queryByRole('link', { name: 'Clones' })).not.toBeInTheDocument();
+    expect(
+      within(sheet).queryByRole('link', { name: 'Employment History' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('leads with a Character disclosure holding Characters and Settings', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh',
+      addedAt: 0,
+    });
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+    const user = userEvent.setup();
+    renderLayout();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+    const sheet = screen.getByRole('dialog', { name: 'More' });
+
+    const disclosure = await within(sheet).findByRole('button', { name: 'Pilot One' });
+    // First control in the sheet — Settings has no other route on a phone.
+    expect(
+      disclosure.compareDocumentPosition(within(sheet).getByRole('link', { name: 'Market' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    expect(within(sheet).queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+
+    await user.click(disclosure);
+    expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    expect(within(sheet).getByRole('link', { name: 'Characters' })).toHaveAttribute(
+      'href',
+      '/characters'
+    );
+    expect(within(sheet).getByRole('link', { name: 'Settings' })).toHaveAttribute(
+      'href',
+      '/settings'
+    );
   });
 
   it('closes on Escape and returns focus to the More trigger', async () => {
@@ -212,8 +251,7 @@ describe('Layout nav marks routes the character cannot use', () => {
     // Granted, so unmarked — and so is every ungated route.
     expect(within(rail).getByRole('link', { name: 'Mail' })).not.toHaveAttribute('title');
     expect(within(rail).getByRole('link', { name: 'Market' })).not.toHaveAttribute('title');
-    expect(within(rail).getByRole('link', { name: 'Home' })).not.toHaveAttribute('title');
-    expect(within(rail).getByRole('link', { name: 'Settings' })).not.toHaveAttribute('title');
+    expect(within(rail).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('title');
   });
 
   it('leaves the marked link navigable — the gate is where the explanation lives', async () => {
@@ -230,7 +268,7 @@ describe('Layout nav marks routes the character cannot use', () => {
 });
 
 describe('Layout desktop rail domain grouping', () => {
-  it('renders the character switcher above the nav, not in a bottom footer', async () => {
+  it('pins the character menu below the nav, in a bottom footer', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     await db.characters.put({
       characterId: CHARACTER_ID,
@@ -240,25 +278,58 @@ describe('Layout desktop rail domain grouping', () => {
     });
     useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
     renderLayout();
-    await screen.findByRole('link', { name: 'Switch character' });
+    const trigger = await screen.findByRole('button', { name: 'Pilot One' });
 
     const rail = screen.getAllByRole('navigation')[0];
-    const switcher = screen.getByRole('link', { name: 'Switch character' });
-    // The switcher must precede the nav landmark in document order — it sits
-    // above the groups, not below them.
-    expect(switcher.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The trigger must follow the nav landmark in document order — it is
+    // pinned under the groups, not stacked above them.
+    expect(rail.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('labels the Overview link "Home", not "Overview"', () => {
+  it('opens the pinned character menu onto Characters and Settings', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh',
+      addedAt: 0,
+    });
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+    const user = userEvent.setup();
+    renderLayout();
+
+    // Both routes left the rail proper; this menu is now their only pointer
+    // affordance on desktop.
+    const rail = screen.getAllByRole('navigation')[0];
+    expect(within(rail).queryByRole('link', { name: 'Characters' })).not.toBeInTheDocument();
+    expect(within(rail).queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Pilot One' }));
+
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Characters' })).toHaveAttribute(
+      'href',
+      '/characters'
+    );
+    expect(within(menu).getByRole('menuitem', { name: 'Settings' })).toHaveAttribute(
+      'href',
+      '/settings'
+    );
+  });
+
+  it('labels the Overview link "Overview", not "Home"', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
 
     const rail = screen.getAllByRole('navigation')[0];
-    expect(within(rail).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/overview');
-    expect(within(rail).queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument();
+    expect(within(rail).getByRole('link', { name: 'Overview' })).toHaveAttribute(
+      'href',
+      '/overview'
+    );
+    expect(within(rail).queryByRole('link', { name: 'Home' })).not.toBeInTheDocument();
   });
 
-  it('orders the rail as Home, then General/Progression/Economy/Social groups in full', () => {
+  it('orders the rail as Overview, then Progression/Economy/Social groups in full', () => {
     mockIsSyncConfigured.mockReturnValue(false);
     renderLayout();
 
@@ -267,18 +338,16 @@ describe('Layout desktop rail domain grouping', () => {
       el.tagName === 'P' ? `[${el.textContent}]` : el.textContent
     );
     expect(items).toEqual([
-      'Home',
-      '[General]',
-      'Characters',
-      'Market',
-      'Settings',
+      'Overview',
+      // Characters and Settings moved to the pinned character menu; Clones and
+      // Employment History became Overview tabs; Market joined Economy, which
+      // emptied General out of existence.
       '[Progression]',
       'Skills',
       'Industry',
       'Planetary Industry',
-      'Clones',
-      'Employment History',
       '[Economy]',
+      'Market',
       'Wallet',
       'Assets',
       'Orders',

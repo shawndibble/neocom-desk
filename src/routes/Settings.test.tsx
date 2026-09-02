@@ -132,7 +132,7 @@ describe('Settings', () => {
     // The character name comes from a Dexie useLiveQuery, resolved async — wait for it
     // rather than asserting it's already there, or this races the query on a slow run.
     // Scoped to the Activity Log table: the Notifications section's collapsible
-    // headers also render the character's name.
+    // headers, and the shell's character menu, also render the character's name.
     const table = screen.getByRole('table', { name: /activity log/i });
     expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
     expect(within(table).getByText('Succeeded')).toBeInTheDocument();
