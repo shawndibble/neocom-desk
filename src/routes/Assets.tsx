@@ -993,7 +993,14 @@ export function Assets() {
       return station.locationId === pathStationId;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly instead
-  }, [sortedTree, visibleStationLocationIds, pathStationId, pins, activeCharacterId, mergedLocationNames]);
+  }, [
+    sortedTree,
+    visibleStationLocationIds,
+    pathStationId,
+    pins,
+    activeCharacterId,
+    mergedLocationNames,
+  ]);
 
   // Each station's own solar system id (resolved once, then reused across a
   // preference switch) and the resulting jumps-away result per (station,
@@ -1385,20 +1392,21 @@ export function Assets() {
                       </span>
                     )}
                   </div>
-                  {resolved.station && !isUnresolvedParent(resolved.station, mergedLocationNames) && (
-                    <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-faint sm:flex">
-                      <SecurityValue
-                        security={securityForStation(resolved.station.locationId)}
-                        t={t}
-                      />
-                      <JumpsAwayText
-                        result={jumpsAwayByKey.get(
-                          `${resolved.station.locationId}:${routePreference}`
-                        )}
-                        t={t}
-                      />
-                    </span>
-                  )}
+                  {resolved.station &&
+                    !isUnresolvedParent(resolved.station, mergedLocationNames) && (
+                      <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-faint sm:flex">
+                        <SecurityValue
+                          security={securityForStation(resolved.station.locationId)}
+                          t={t}
+                        />
+                        <JumpsAwayText
+                          result={jumpsAwayByKey.get(
+                            `${resolved.station.locationId}:${routePreference}`
+                          )}
+                          t={t}
+                        />
+                      </span>
+                    )}
                   {currentTotals && (
                     <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
                       <span className="hidden sm:inline">
