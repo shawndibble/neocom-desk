@@ -893,6 +893,15 @@
       "contractAccepted": {
         "title": "Contract accepted",
         "body": "{{character}}'s contract was accepted."
+      },
+      "walletBalanceChanged": {
+        "title": "Wallet balance changed",
+        "body": "{{character}}'s wallet balance changed.",
+        "bodyWithAmount": "{{character}}'s wallet balance changed by {{amount}} ISK."
+      },
+      "marketOrderFilled": {
+        "title": "Market order filled",
+        "body": "{{character}}'s market order was filled."
       }
     }
   },

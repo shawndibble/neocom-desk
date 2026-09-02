@@ -7,6 +7,8 @@ import type {
   MailSnapshot,
   CalendarSnapshot,
   ContractSnapshot,
+  WalletSnapshot,
+  MarketOrderSnapshot,
 } from '@/engine/notificationDiffs';
 import {
   useSkillQueuePollerState,
@@ -33,6 +35,14 @@ import {
   CONTRACT_POLLER_STATE_KEY,
   DEFAULT_CONTRACT_POLLER_STATE,
   withCharacterContractSnapshot,
+  useWalletPollerState,
+  WALLET_POLLER_STATE_KEY,
+  DEFAULT_WALLET_POLLER_STATE,
+  withCharacterWalletSnapshot,
+  useMarketOrderPollerState,
+  MARKET_ORDER_POLLER_STATE_KEY,
+  DEFAULT_MARKET_ORDER_POLLER_STATE,
+  withCharacterMarketOrderSnapshot,
 } from './pollerState';
 
 const SNAPSHOT: SkillQueueSnapshot = {
@@ -62,6 +72,16 @@ const CALENDAR_SNAPSHOT: CalendarSnapshot = {
 
 const CONTRACT_SNAPSHOT: ContractSnapshot = {
   entries: [{ contractId: 1, status: 'in_progress' }],
+  nowMs: 999,
+};
+
+const WALLET_SNAPSHOT: WalletSnapshot = {
+  entries: [{ id: 5, amount: 100 }],
+  nowMs: 999,
+};
+
+const MARKET_ORDER_SNAPSHOT: MarketOrderSnapshot = {
+  entries: [{ orderId: 1, filled: true }],
   nowMs: 999,
 };
 
@@ -197,6 +217,8 @@ beforeEach(async () => {
   useMailPollerState.setState({ value: DEFAULT_MAIL_POLLER_STATE, hydrated: false });
   useCalendarPollerState.setState({ value: DEFAULT_CALENDAR_POLLER_STATE, hydrated: false });
   useContractPollerState.setState({ value: DEFAULT_CONTRACT_POLLER_STATE, hydrated: false });
+  useWalletPollerState.setState({ value: DEFAULT_WALLET_POLLER_STATE, hydrated: false });
+  useMarketOrderPollerState.setState({ value: DEFAULT_MARKET_ORDER_POLLER_STATE, hydrated: false });
 });
 
 describe('useMailPollerState', () => {
@@ -305,5 +327,101 @@ describe('withCharacterContractSnapshot', () => {
   it('sets one character snapshot without disturbing others', () => {
     const next = withCharacterContractSnapshot({ 2: CONTRACT_SNAPSHOT }, 7, CONTRACT_SNAPSHOT);
     expect(next).toEqual({ 2: CONTRACT_SNAPSHOT, 7: CONTRACT_SNAPSHOT });
+  });
+});
+
+describe('useWalletPollerState', () => {
+  it('defaults to no prior snapshots, unhydrated', () => {
+    expect(useWalletPollerState.getState().value).toEqual(DEFAULT_WALLET_POLLER_STATE);
+    expect(useWalletPollerState.getState().hydrated).toBe(false);
+  });
+
+  it('persists to Dexie under a non-syncing key', async () => {
+    expect(WALLET_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
+    await useWalletPollerState.getState().setValue({ 7: WALLET_SNAPSHOT });
+    expect((await db.settings.get(WALLET_POLLER_STATE_KEY))?.value).toEqual({
+      7: WALLET_SNAPSHOT,
+    });
+  });
+
+  it('hydrates a persisted value', async () => {
+    await db.settings.put({ key: WALLET_POLLER_STATE_KEY, value: { 7: WALLET_SNAPSHOT } });
+    await useWalletPollerState.getState().hydrate();
+    expect(useWalletPollerState.getState().value).toEqual({ 7: WALLET_SNAPSHOT });
+  });
+
+  it('falls back to the default when the stored value has the wrong shape', async () => {
+    await db.settings.put({ key: WALLET_POLLER_STATE_KEY, value: { 7: { entries: 'nope' } } });
+    await useWalletPollerState.getState().hydrate();
+    expect(useWalletPollerState.getState().value).toEqual(DEFAULT_WALLET_POLLER_STATE);
+  });
+
+  it('rejects an entry missing a required numeric field', async () => {
+    await db.settings.put({
+      key: WALLET_POLLER_STATE_KEY,
+      value: { 7: { entries: [{ amount: 100 }], nowMs: 1 } },
+    });
+    await useWalletPollerState.getState().hydrate();
+    expect(useWalletPollerState.getState().value).toEqual(DEFAULT_WALLET_POLLER_STATE);
+  });
+});
+
+describe('withCharacterWalletSnapshot', () => {
+  it('sets one character snapshot without disturbing others', () => {
+    const next = withCharacterWalletSnapshot({ 2: WALLET_SNAPSHOT }, 7, WALLET_SNAPSHOT);
+    expect(next).toEqual({ 2: WALLET_SNAPSHOT, 7: WALLET_SNAPSHOT });
+  });
+});
+
+describe('useMarketOrderPollerState', () => {
+  it('defaults to no prior snapshots, unhydrated', () => {
+    expect(useMarketOrderPollerState.getState().value).toEqual(DEFAULT_MARKET_ORDER_POLLER_STATE);
+    expect(useMarketOrderPollerState.getState().hydrated).toBe(false);
+  });
+
+  it('persists to Dexie under a non-syncing key', async () => {
+    expect(MARKET_ORDER_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
+    await useMarketOrderPollerState.getState().setValue({ 7: MARKET_ORDER_SNAPSHOT });
+    expect((await db.settings.get(MARKET_ORDER_POLLER_STATE_KEY))?.value).toEqual({
+      7: MARKET_ORDER_SNAPSHOT,
+    });
+  });
+
+  it('hydrates a persisted value', async () => {
+    await db.settings.put({
+      key: MARKET_ORDER_POLLER_STATE_KEY,
+      value: { 7: MARKET_ORDER_SNAPSHOT },
+    });
+    await useMarketOrderPollerState.getState().hydrate();
+    expect(useMarketOrderPollerState.getState().value).toEqual({ 7: MARKET_ORDER_SNAPSHOT });
+  });
+
+  it('falls back to the default when the stored value has the wrong shape', async () => {
+    await db.settings.put({
+      key: MARKET_ORDER_POLLER_STATE_KEY,
+      value: { 7: { entries: 'nope' } },
+    });
+    await useMarketOrderPollerState.getState().hydrate();
+    expect(useMarketOrderPollerState.getState().value).toEqual(DEFAULT_MARKET_ORDER_POLLER_STATE);
+  });
+
+  it('rejects an entry missing a required boolean field', async () => {
+    await db.settings.put({
+      key: MARKET_ORDER_POLLER_STATE_KEY,
+      value: { 7: { entries: [{ orderId: 1 }], nowMs: 1 } },
+    });
+    await useMarketOrderPollerState.getState().hydrate();
+    expect(useMarketOrderPollerState.getState().value).toEqual(DEFAULT_MARKET_ORDER_POLLER_STATE);
+  });
+});
+
+describe('withCharacterMarketOrderSnapshot', () => {
+  it('sets one character snapshot without disturbing others', () => {
+    const next = withCharacterMarketOrderSnapshot(
+      { 2: MARKET_ORDER_SNAPSHOT },
+      7,
+      MARKET_ORDER_SNAPSHOT
+    );
+    expect(next).toEqual({ 2: MARKET_ORDER_SNAPSHOT, 7: MARKET_ORDER_SNAPSHOT });
   });
 });

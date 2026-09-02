@@ -21,14 +21,20 @@ import { extractorProgramsFromPins } from '@/features/pi/adapters';
 import { loadMailHeaders } from '@/features/character/mail';
 import { loadCalendarEvents as loadCharacterCalendarEvents } from '@/features/character/calendar';
 import { loadContracts as loadCharacterContracts } from '@/features/character/contracts';
+import { loadWalletJournalWithStatus } from '@/features/character/wallet';
+import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import type {
   SkillQueueEntry,
   IndustryJob,
   MailHeader,
   CalendarEventSummary,
   Contract,
+  WalletJournalEntry,
+  MarketOrder,
+  MarketOrderHistory,
 } from '@/esi/endpoints';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
+import { formatIsk } from '@/lib/isk';
 import i18n from '@/i18n';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import {
@@ -60,6 +66,14 @@ import {
   type ContractEntrySnapshot,
   type ContractSnapshot,
   type ContractNotificationFire,
+  diffWalletBalanceChanged,
+  diffMarketOrderFilled,
+  type WalletJournalEntrySnapshot,
+  type WalletSnapshot,
+  type WalletNotificationFire,
+  type MarketOrderEntrySnapshot,
+  type MarketOrderSnapshot,
+  type MarketOrderNotificationFire,
 } from '@/engine/notificationDiffs';
 import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
 import { useNotificationPreferences, characterEventPrefs } from './preferences';
@@ -84,6 +98,12 @@ import {
   useContractPollerState,
   withCharacterContractSnapshot,
   type ContractPollerState,
+  useWalletPollerState,
+  withCharacterWalletSnapshot,
+  type WalletPollerState,
+  useMarketOrderPollerState,
+  withCharacterMarketOrderSnapshot,
+  type MarketOrderPollerState,
 } from './pollerState';
 
 export const POLL_INTERVAL_MS = 5 * 60 * 1000;
@@ -95,7 +115,9 @@ export type AnyNotificationFire =
   | MailNotificationFire
   | NewCalendarEventFire
   | CalendarEventStartingFire
-  | ContractNotificationFire;
+  | ContractNotificationFire
+  | WalletNotificationFire
+  | MarketOrderNotificationFire;
 
 /** `SKILL_QUEUE_NOTIFICATION_DIFFS` is the one source of which skill-queue-driven events this poller runs; industry jobs, PI colonies, mail, calendar, and contracts aren't skill-queue-driven (engine/notificationDiffs.ts), so those are listed directly. */
 const SKILL_QUEUE_EVENT_IDS = Object.keys(
@@ -107,6 +129,8 @@ const PLANETARY_EVENT_IDS = ['planetaryExtractionDone'] as const;
 const MAIL_EVENT_IDS = ['newMail'] as const;
 const CALENDAR_EVENT_IDS = ['newCalendarEvent', 'calendarEventStarting'] as const;
 const CONTRACT_EVENT_IDS = ['contractAccepted'] as const;
+const WALLET_EVENT_IDS = ['walletBalanceChanged'] as const;
+const MARKET_ORDER_EVENT_IDS = ['marketOrderFilled'] as const;
 
 const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.scope]));
 
@@ -144,6 +168,33 @@ function toContractSnapshotEntry(contract: Contract): ContractEntrySnapshot {
   return { contractId: contract.contract_id, status: contract.status };
 }
 
+function toWalletSnapshotEntry(entry: WalletJournalEntry): WalletJournalEntrySnapshot {
+  return { id: entry.id, amount: entry.amount ?? null };
+}
+
+/**
+ * Merges open orders with order history into the engine's `filled` shape.
+ * ESI's history `state` enum ('cancelled' | 'expired') has no distinct
+ * "filled" value, so filled-ness is derived here, at the ESI/engine boundary
+ * (ARCHITECTURE.md): an order still open is never filled; an order gone from
+ * the open list and present in history is filled once `volume_remain` is 0.
+ */
+export function deriveMarketOrderEntries(
+  openOrders: readonly MarketOrder[],
+  history: readonly MarketOrderHistory[]
+): MarketOrderEntrySnapshot[] {
+  const openIds = new Set(openOrders.map((order) => order.order_id));
+  const entries: MarketOrderEntrySnapshot[] = openOrders.map((order) => ({
+    orderId: order.order_id,
+    filled: false,
+  }));
+  for (const order of history) {
+    if (openIds.has(order.order_id)) continue;
+    entries.push({ orderId: order.order_id, filled: order.volume_remain === 0 });
+  }
+  return entries;
+}
+
 export interface CharacterRef {
   characterId: number;
   name: string;
@@ -159,6 +210,8 @@ export interface PollDependencies {
   loadMail: (characterId: number) => Promise<MailHeader[] | null>;
   loadCalendarEvents: (characterId: number) => Promise<CalendarEventSummary[] | null>;
   loadContracts: (characterId: number) => Promise<Contract[] | null>;
+  loadWalletJournal: (characterId: number) => Promise<WalletJournalEntry[] | null>;
+  loadMarketOrders: (characterId: number) => Promise<MarketOrderEntrySnapshot[] | null>;
   masterEnabled: () => Promise<boolean>;
   eventPrefsFor: (characterId: number) => Promise<EventEnabledMap>;
   permission: () => NotificationPermission | 'unsupported' | 'default' | 'denied';
@@ -174,6 +227,10 @@ export interface PollDependencies {
   saveCalendarState: (state: CalendarPollerState) => Promise<void>;
   prevContractState: () => Promise<ContractPollerState>;
   saveContractState: (state: ContractPollerState) => Promise<void>;
+  prevWalletState: () => Promise<WalletPollerState>;
+  saveWalletState: (state: WalletPollerState) => Promise<void>;
+  prevMarketOrderState: () => Promise<MarketOrderPollerState>;
+  saveMarketOrderState: (state: MarketOrderPollerState) => Promise<void>;
   notify: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
 }
 
@@ -201,6 +258,8 @@ interface CharacterUpdate {
   mail?: MailSnapshot;
   calendar?: CalendarSnapshot;
   contracts?: ContractSnapshot;
+  wallet?: WalletSnapshot;
+  marketOrders?: MarketOrderSnapshot;
   fires: AnyNotificationFire[];
 }
 
@@ -223,6 +282,8 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
     prevMailAll,
     prevCalendarAll,
     prevContractAll,
+    prevWalletAll,
+    prevMarketOrderAll,
   ] = await Promise.all([
     deps.prevState(),
     deps.prevIndustryJobState(),
@@ -230,6 +291,8 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
     deps.prevMailState(),
     deps.prevCalendarState(),
     deps.prevContractState(),
+    deps.prevWalletState(),
+    deps.prevMarketOrderState(),
   ]);
 
   const updates: CharacterUpdate[] = [];
@@ -346,13 +409,50 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
       }
     }
 
+    const walletEvents = enabledEventsFor(WALLET_EVENT_IDS, scopes, eventPrefs);
+    if (walletEvents.size > 0) {
+      const entries = await deps.loadWalletJournal(character.characterId);
+      if (entries !== null) {
+        const next: WalletSnapshot = {
+          entries: entries.map(toWalletSnapshotEntry),
+          nowMs: deps.now(),
+        };
+        update.wallet = next;
+        fires.push(
+          ...diffWalletBalanceChanged(
+            character.characterId,
+            prevWalletAll[character.characterId],
+            next
+          )
+        );
+      }
+    }
+
+    const marketOrderEvents = enabledEventsFor(MARKET_ORDER_EVENT_IDS, scopes, eventPrefs);
+    if (marketOrderEvents.size > 0) {
+      const entries = await deps.loadMarketOrders(character.characterId);
+      if (entries !== null) {
+        const next: MarketOrderSnapshot = { entries, nowMs: deps.now() };
+        update.marketOrders = next;
+        fires.push(
+          ...diffMarketOrderFilled(
+            character.characterId,
+            prevMarketOrderAll[character.characterId],
+            next
+          )
+        );
+      }
+    }
+
     if (
       update.skillQueue ||
       update.industryJobs ||
       update.colonies ||
       update.mail ||
       update.calendar ||
-      update.contracts
+      update.contracts ||
+      update.wallet ||
+      update.marketOrders
     ) {
       updates.push(update);
     }
@@ -366,6 +466,8 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
   let nextMailAll = prevMailAll;
   let nextCalendarAll = prevCalendarAll;
   let nextContractAll = prevContractAll;
+  let nextWalletAll = prevWalletAll;
+  let nextMarketOrderAll = prevMarketOrderAll;
   for (const update of updates) {
     if (update.skillQueue) {
       nextSkillQueueAll = withCharacterSnapshot(
@@ -405,6 +507,16 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
         update.contracts
       );
     }
+    if (update.wallet) {
+      nextWalletAll = withCharacterWalletSnapshot(nextWalletAll, update.characterId, update.wallet);
+    }
+    if (update.marketOrders) {
+      nextMarketOrderAll = withCharacterMarketOrderSnapshot(
+        nextMarketOrderAll,
+        update.characterId,
+        update.marketOrders
+      );
+    }
   }
   await Promise.all([
     deps.saveState(nextSkillQueueAll),
@@ -413,6 +525,8 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
     deps.saveMailState(nextMailAll),
     deps.saveCalendarState(nextCalendarAll),
     deps.saveContractState(nextContractAll),
+    deps.saveWalletState(nextWalletAll),
+    deps.saveMarketOrderState(nextMarketOrderAll),
   ]);
 
   const charactersById = new Map(characters.map((c) => [c.characterId, c]));
@@ -473,6 +587,30 @@ async function notificationText(
     return {
       title: i18n.t('notifications.fired.contractAccepted.title'),
       body: i18n.t('notifications.fired.contractAccepted.body', { character: character.name }),
+    };
+  }
+  if (fire.eventId === 'walletBalanceChanged') {
+    const title = i18n.t('notifications.fired.walletBalanceChanged.title');
+    if (fire.amount === null) {
+      return {
+        title,
+        body: i18n.t('notifications.fired.walletBalanceChanged.body', {
+          character: character.name,
+        }),
+      };
+    }
+    return {
+      title,
+      body: i18n.t('notifications.fired.walletBalanceChanged.bodyWithAmount', {
+        character: character.name,
+        amount: formatIsk(fire.amount, 2),
+      }),
+    };
+  }
+  if (fire.eventId === 'marketOrderFilled') {
+    return {
+      title: i18n.t('notifications.fired.marketOrderFilled.title'),
+      body: i18n.t('notifications.fired.marketOrderFilled.body', { character: character.name }),
     };
   }
   if (fire.eventId === 'characterNotTraining') {
@@ -578,6 +716,28 @@ export function liveDependencies(): PollDependencies {
       if (result.cached.truncated) return null;
       return result.cached.data;
     },
+    loadWalletJournal: async (characterId) => {
+      const result = await loadWalletJournalWithStatus(characterId);
+      if (result.needsReauth || result.cached === null) return null;
+      // A truncated page set could lower the high-water mark diffWalletBalanceChanged
+      // tracks, re-firing for entries already reported once the next complete poll
+      // sees them again (same reasoning as loadContracts' truncation guard above).
+      if (result.cached.truncated) return null;
+      return result.cached.data;
+    },
+    loadMarketOrders: async (characterId) => {
+      const [openResult, historyResult] = await Promise.all([
+        loadOrders(characterId),
+        loadOrderHistory(characterId),
+      ]);
+      if (openResult.needsReauth || openResult.cached === null) return null;
+      if (historyResult.needsReauth || historyResult.cached === null) return null;
+      // A truncated history page set would misreport a still-open order as
+      // filled-and-gone; skip this poll entirely rather than save a partial
+      // baseline (same reasoning as loadContracts' truncation guard above).
+      if (historyResult.cached.truncated) return null;
+      return deriveMarketOrderEntries(openResult.cached.data, historyResult.cached.data);
+    },
     masterEnabled: async () => (await hydratedValue(useNotificationPreferences)).masterEnabled,
     eventPrefsFor: async (characterId) =>
       characterEventPrefs(await hydratedValue(useNotificationPreferences), characterId),
@@ -594,6 +754,10 @@ export function liveDependencies(): PollDependencies {
     saveCalendarState: (state) => useCalendarPollerState.getState().setValue(state),
     prevContractState: () => hydratedValue(useContractPollerState),
     saveContractState: (state) => useContractPollerState.getState().setValue(state),
+    prevWalletState: () => hydratedValue(useWalletPollerState),
+    saveWalletState: (state) => useWalletPollerState.getState().setValue(state),
+    prevMarketOrderState: () => hydratedValue(useMarketOrderPollerState),
+    saveMarketOrderState: (state) => useMarketOrderPollerState.getState().setValue(state),
     notify: sendBrowserNotification,
   };
 }

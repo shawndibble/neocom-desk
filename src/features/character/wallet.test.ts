@@ -7,6 +7,7 @@ import {
   loadWalletBalance,
   loadWalletBalanceWithStatus,
   loadWalletJournal,
+  loadWalletJournalWithStatus,
   loadWalletTransactions,
 } from './wallet';
 
@@ -167,6 +168,59 @@ describe('loadWalletJournal', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet/journal`, () => HttpResponse.error())
     );
     expect(await loadWalletJournal(CHAR_ID)).toBeNull();
+  });
+});
+
+describe('loadWalletJournalWithStatus', () => {
+  it('reports needsReauth: true on a 403, without discarding cached data', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:journal',
+      value: [{ id: 1, date: '2026-08-01T00:00:00Z', ref_type: 'bounty', description: 'a' }],
+      fetchedAt: 1,
+      truncated: false,
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet/journal`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadWalletJournalWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached?.data).toEqual([
+      { id: 1, date: '2026-08-01T00:00:00Z', ref_type: 'bounty', description: 'a' },
+    ]);
+  });
+
+  it('reports needsReauth: true and null cached when nothing was ever cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet/journal`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    const result = await loadWalletJournalWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
+  });
+
+  it('concatenates every page on success', async () => {
+    const page1 = [{ id: 1, date: '2026-08-01T00:00:00Z', ref_type: 'bounty', description: 'a' }];
+    const page2 = [{ id: 2, date: '2026-08-02T00:00:00Z', ref_type: 'bounty', description: 'b' }];
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/wallet/journal`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? page2 : page1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+
+    const result = await loadWalletJournalWithStatus(CHAR_ID);
+
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual([...page1, ...page2]);
   });
 });
 

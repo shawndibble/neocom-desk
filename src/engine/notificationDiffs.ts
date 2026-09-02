@@ -397,6 +397,93 @@ export function diffContractAccepted(
   return fires;
 }
 
+export interface WalletJournalEntrySnapshot {
+  id: number;
+  amount: number | null;
+}
+
+export interface WalletSnapshot {
+  entries: readonly WalletJournalEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface WalletNotificationFire {
+  eventId: 'walletBalanceChanged';
+  characterId: number;
+  amount: number | null;
+}
+
+/**
+ * Fires per wallet journal entry id newly above the highest id seen in `prev`
+ * (issue #175) — same high-water-mark reasoning as `diffNewMail`: comparing
+ * `balance` numbers directly would re-fire on every poll while the balance
+ * merely differs from some baseline, whereas journal entry `id` is
+ * monotonically increasing, so gating on it fires exactly once per new entry.
+ */
+export function diffWalletBalanceChanged(
+  characterId: number,
+  prev: WalletSnapshot | undefined,
+  next: WalletSnapshot
+): WalletNotificationFire[] {
+  if (!prev) return [];
+  const maxPrevId = prev.entries.reduce((max, entry) => Math.max(max, entry.id), 0);
+  const fires: WalletNotificationFire[] = [];
+  for (const entry of next.entries) {
+    if (entry.id <= maxPrevId) continue;
+    fires.push({ eventId: 'walletBalanceChanged', characterId, amount: entry.amount });
+  }
+  return fires;
+}
+
+export interface MarketOrderEntrySnapshot {
+  orderId: number;
+  /**
+   * Derived at the adapter boundary (ARCHITECTURE.md: callers adapt ESI
+   * shapes to engine types): true once an order is gone from the open-orders
+   * list and present in order history with `volume_remain === 0` — ESI's
+   * history `state` enum ('cancelled' | 'expired') has no distinct "filled"
+   * value, so filled-ness isn't a field ESI ever hands back directly.
+   */
+  filled: boolean;
+}
+
+export interface MarketOrderSnapshot {
+  entries: readonly MarketOrderEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface MarketOrderNotificationFire {
+  eventId: 'marketOrderFilled';
+  characterId: number;
+  orderId: number;
+}
+
+/**
+ * Fires per order whose `filled` is newly true (issue #175) — edge-triggered
+ * on the transition, same shape as `diffContractAccepted`. Deliberately one
+ * event for both directions (CONTEXT.md round 20: a completed sell and a
+ * completed buy both count as `marketOrderFilled`, not two event types) —
+ * `MarketOrderEntrySnapshot` carries no buy/sell field, so the diff can't
+ * distinguish them even if it wanted to. An order missing from `prev.entries`
+ * is treated as not-previously-filled, so one discovered already filled with
+ * no prior baseline still fires once.
+ */
+export function diffMarketOrderFilled(
+  characterId: number,
+  prev: MarketOrderSnapshot | undefined,
+  next: MarketOrderSnapshot
+): MarketOrderNotificationFire[] {
+  if (!prev) return [];
+  const prevFilledById = new Map(prev.entries.map((entry) => [entry.orderId, entry.filled]));
+  const fires: MarketOrderNotificationFire[] = [];
+  for (const entry of next.entries) {
+    if (!entry.filled) continue;
+    if (prevFilledById.get(entry.orderId) === true) continue;
+    fires.push({ eventId: 'marketOrderFilled', characterId, orderId: entry.orderId });
+  }
+  return fires;
+}
+
 export const SKILL_QUEUE_NOTIFICATION_DIFFS: Record<
   SkillQueueNotificationEventId,
   (

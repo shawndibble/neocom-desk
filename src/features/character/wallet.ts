@@ -10,6 +10,7 @@ import {
   loadWithCache,
   loadWithCacheStatus,
   loadPaginatedWithCache,
+  loadPaginatedWithCacheStatus,
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
@@ -46,6 +47,20 @@ export function loadWalletJournal(
   characterId: number
 ): Promise<CachedResult<WalletJournalEntry[]> | null> {
   return loadPaginatedWithCache(characterId, KEYS.journal, () =>
+    getCharacterWalletJournal(characterId)
+  );
+}
+
+/**
+ * Same data as loadWalletJournal, with the auth-failure state exposed —
+ * the Foreground Poller (features/notifications) needs to distinguish a
+ * revoked scope from a transient offline failure the same way the other
+ * pollable domains do (features/character/contracts.ts).
+ */
+export function loadWalletJournalWithStatus(
+  characterId: number
+): Promise<StatusResult<WalletJournalEntry[]>> {
+  return loadPaginatedWithCacheStatus(characterId, KEYS.journal, () =>
     getCharacterWalletJournal(characterId)
   );
 }
