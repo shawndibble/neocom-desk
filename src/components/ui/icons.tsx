@@ -18,19 +18,26 @@ import {
   ArrowClockwise,
   ArrowDown,
   ArrowUp,
+  ArrowsDownUp,
   ArrowsLeftRight,
   CaretDown,
   CaretLeft,
   CaretRight,
   CaretUpDown,
   Check,
+  ClipboardText,
   Copy,
   DotsThreeVertical,
   DownloadSimple,
+  Export as ExportIcon,
+  Flag,
   MagnifyingGlass,
   Package,
   PencilSimple,
+  Queue,
+  Sliders,
   Star,
+  Target,
   UsersThree,
   Warning,
   X,
@@ -103,3 +110,17 @@ export const Rename = withWeight(PencilSimple);
 export const Duplicate = withWeight(Copy);
 /** Overflow menu. */
 export const More = withWeight(DotsThreeVertical);
+/** Send the plan queue to the clipboard or a CSV download (#224 icon-only toolbar). */
+export const Export = withWeight(ExportIcon);
+/** Pull the character's live skill queue into the plan (#224 icon-only toolbar). */
+export const ImportQueue = withWeight(Queue);
+/** Parse a pasted skill queue into the plan (#224 icon-only toolbar). */
+export const ImportClipboard = withWeight(ClipboardText);
+/** Tune remaps for the lowest total training time (#224 icon-only toolbar). */
+export const OptimizeRemaps = withWeight(Sliders);
+/** Drop a remap marker at the current end of the queue (#224 icon-only toolbar). */
+export const AddMarker = withWeight(Flag);
+/** Tune remaps against the plan's existing markers (#224 icon-only toolbar). */
+export const OptimizeAtMarkers = withWeight(Target);
+/** Reorder the queue by priority/attribute pair (#224 icon-only toolbar). */
+export const SuggestReorder = withWeight(ArrowsDownUp);

@@ -133,6 +133,9 @@
     "suggestReorder": "Suggest reorder",
     "remapSaves": "Remapping saves {{duration}}",
     "remapNoGain": "No remap improves this plan in its current order — keeping current attributes. Try \"Suggest reorder\" to group similar skills first, then optimize again.",
+    "optimizeConfirmSaves": "Saves {{duration}}",
+    "optimizeConfirmNoGain": "No meaningful savings",
+    "reorderSuggested": "Reorder suggested",
     "segment": "Segment {{index}}",
     "segmentRemap": "Before {{skill}}, remap to {{attributes}}",
     "reorderPreviewTitle": "Suggested reorder",
@@ -176,13 +179,18 @@
     "importAddedCount": "Added {{count}} skill(s)",
     "importAddedNone": "0 added — all trained",
     "reorderEntry": "Reorder {{name}}",
+    "moveEntryUp": "Move {{name}} up",
+    "moveEntryDown": "Move {{name}} down",
     "removeEntry": "Remove {{name}}",
     "importError": "Couldn't import the skill queue: {{message}}",
     "addMarker": "Add remap marker",
+    "markerAdded": "Marker added",
     "optimizeAtMarkers": "Optimize at my markers",
     "markerRow": "Remap marker",
     "removeMarker": "Remove marker",
     "reorderMarker": "Reorder remap marker",
+    "moveMarkerUp": "Move remap marker up",
+    "moveMarkerDown": "Move remap marker down",
     "markersNoGain": "Remapping at these markers doesn't save time — try moving them.",
     "priorityLabel": "Priority for {{name}}",
     "priorityHigh": "High",
@@ -567,7 +575,7 @@
     "unresolved": {
       "heading_one": "Location unresolved · {{count}}",
       "heading_other": "Location unresolved · {{count}}",
-      "rowHint": "Parent wasn't in this fetch"
+      "rowHint": "Not among this character's own assets — likely inside a container you don't own (e.g. a corp hangar)"
     },
     "search": {
       "resultCount_one": "{{count}} match",
@@ -583,19 +591,7 @@
       "action": "Back to all locations"
     },
     "nodeBadge_one": "{{count}} item · {{value}} ISK",
-    "nodeBadge_other": "{{count}} items · {{value}} ISK",
-    "detail": {
-      "selectHint": "Select an item to see its details.",
-      "back": "Back to list",
-      "quantity": "Quantity",
-      "volume": "Volume",
-      "volumeUnknown": "Unknown",
-      "volumeValue": "{{volume}} m3",
-      "location": "Location",
-      "jumpsAway": "Jumps away",
-      "value": "Value",
-      "valueAmount": "{{value}} ISK"
-    }
+    "nodeBadge_other": "{{count}} items · {{value}} ISK"
   },
   "mail": {
     "title": "Mail",
@@ -864,6 +860,24 @@
       "body": "NeoCom can notify you about skill training, mail, industry jobs, and more. You choose exactly what, per character, in Settings.",
       "enable": "Enable",
       "dismiss": "Not now"
+    },
+    "fired": {
+      "skillLevelComplete": {
+        "title": "Skill training complete",
+        "body": "{{character}} finished training {{skill}} {{level}}."
+      },
+      "characterNotTraining": {
+        "title": "Not training",
+        "body": "{{character}} has no skill in training."
+      },
+      "industryJobComplete": {
+        "title": "Industry job complete",
+        "body": "{{character}}'s industry job for {{item}} is complete."
+      },
+      "planetaryExtractionDone": {
+        "title": "Extraction done",
+        "body": "{{character}}'s extraction on {{planet}} has stopped."
+      }
     }
   },
   "pwa": {

@@ -11,7 +11,17 @@
 - Refresh tokens live in Dexie only. Never send them to Firebase or logs.
 - Validate before commit: `npm run lint && npm run typecheck && npm run test:run`.
   CI additionally runs `npm run format:check` and `npm run build`; PR gate is
-  the full set plus the Playwright `e2e` job.
+  the full set plus the Playwright `e2e` job. **Run the full validation once**,
+  after all changes for the task are made — not after every edit or every
+  commit. While iterating, use narrower checks: `npm run typecheck` and
+  `npx vitest run <path>` for the file(s) you're touching. In ticket-loop work
+  (`/next-ticket`, `/implement`), `node scripts/next-ticket/gate.mjs --build`
+  is that one final pre-PR check, not a repeated one — see
+  `.claude/commands/next-ticket.md`'s "One local gate, then CI" for the exact
+  cadence, including the bounded local-gate-failure loop (fix, re-run the
+  narrow check, only re-run the full gate once green). `/code-review`
+  sub-agents are read-only diff review and must never run tests, lint,
+  typecheck, build, or `gate.mjs`.
 - i18n: all UI strings through i18next (`src/i18n/locales/en.json`). English only for now.
 
 ## Agent skills

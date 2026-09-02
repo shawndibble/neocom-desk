@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -7,6 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
   InfoTooltip,
   Modal,
   NativeSelect,
@@ -14,6 +15,9 @@ import {
   TextInput,
   Tooltip,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { normalizePlanWithBoundaries } from '@/engine/plan';
 import { effectivePriority } from '@/engine/planPriority';
 import { computeSchedule } from '@/engine/schedule';
@@ -157,6 +161,10 @@ export function PlanEditor({
   onUpdate,
 }: PlanEditorProps) {
   const { t } = useTranslation();
+  // Icon-only toolbar below `lg` (#224): same breakpoint/hook the route
+  // (SkillPlanEditor.tsx) already gates its two-column layout on, so the
+  // toolbar's own switch can never disagree with the layout around it.
+  const isDesktop = useIsDesktop();
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<PlaceRemapsResult | null>(null);
@@ -165,6 +173,14 @@ export function PlanEditor({
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  // Inline, beside-the-button confirmations (#222) — same pattern as
+  // copyConfirm/importConfirm above: small text next to the triggering
+  // button, cleared after a couple of seconds. Additive to the full
+  // Panel/Modal results those same actions already produce below.
+  const [optimizeConfirm, setOptimizeConfirm] = useState<string | null>(null);
+  const [markerConfirm, setMarkerConfirm] = useState(false);
+  const [markersOptimizeConfirm, setMarkersOptimizeConfirm] = useState<string | null>(null);
+  const [reorderConfirm, setReorderConfirm] = useState(false);
 
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
@@ -265,6 +281,8 @@ export function PlanEditor({
     setOptimizeResult(null);
     setMarkersResult(null);
     setReorderPreview(null);
+    setOptimizeConfirm(null);
+    setMarkersOptimizeConfirm(null);
   }
 
   const userSkillTypeIDs = useMemo(
@@ -408,32 +426,46 @@ export function PlanEditor({
     downloadCsv('skill-queue', scheduled, queueCsvColumns(t, nameFor, userSkillTypeIDs));
   }
 
+  // Same beside-the-button confirmation for both remap-optimizing actions:
+  // the savings figure when meaningful, a short "no gain" note otherwise.
+  function confirmRemapOutcome(result: PlaceRemapsResult): string {
+    return result.savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS
+      ? t('plans.optimizeConfirmSaves', { duration: formatDuration(result.savingsSeconds) })
+      : t('plans.optimizeConfirmNoGain');
+  }
+
   function handleOptimizeRemaps() {
     if (scheduled.length === 0) return;
-    setOptimizeResult(
-      placeRemaps(scheduled, catalog.engineSkills, {
-        remapCount,
-        currentAttributes: attributes,
-        implants: effectiveImplants,
-        // The same Boosters the computed queue schedules with, so the savings
-        // figure and the queue total cannot disagree.
-        booster:
-          activeBoosters.length > 0
-            ? { boosters: activeBoosters, startDate: new Date() }
-            : undefined,
-      })
-    );
+    const result = placeRemaps(scheduled, catalog.engineSkills, {
+      remapCount,
+      currentAttributes: attributes,
+      implants: effectiveImplants,
+      // The same Boosters the computed queue schedules with, so the savings
+      // figure and the queue total cannot disagree.
+      booster:
+        activeBoosters.length > 0 ? { boosters: activeBoosters, startDate: new Date() } : undefined,
+    });
+    setOptimizeResult(result);
+    setOptimizeConfirm(confirmRemapOutcome(result));
+    setTimeout(() => setOptimizeConfirm(null), 2000);
   }
 
   function handleOptimizeAtMarkers() {
     if (scheduled.length === 0) return;
-    setMarkersResult(
-      optimizeAtMarkers(scheduled, catalog.engineSkills, {
-        markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
-        currentAttributes: attributes,
-        implants: effectiveImplants,
-      })
-    );
+    const result = optimizeAtMarkers(scheduled, catalog.engineSkills, {
+      markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
+      currentAttributes: attributes,
+      implants: effectiveImplants,
+    });
+    setMarkersResult(result);
+    setMarkersOptimizeConfirm(confirmRemapOutcome(result));
+    setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
+  }
+
+  function handleAddMarker() {
+    onUpdate({ markers: addMarker(plan.markers, plan.entries.length) });
+    setMarkerConfirm(true);
+    setTimeout(() => setMarkerConfirm(false), 2000);
   }
 
   // Shared per-segment rendering for both optimize modes: a remapped segment
@@ -473,6 +505,8 @@ export function PlanEditor({
   function handleSuggestReorder() {
     if (scheduled.length === 0) return;
     setReorderPreview(suggestReorder(scheduled, catalog.engineSkills, priorityMap));
+    setReorderConfirm(true);
+    setTimeout(() => setReorderConfirm(false), 2000);
   }
 
   function acceptReorder() {
@@ -480,6 +514,39 @@ export function PlanEditor({
     update(applyReorderSuggestion(plan.entries, reorderPreview));
     setReorderPreview(null);
   }
+
+  // One toolbar action, two renderings (#224): a full-text `Button` at `lg`+
+  // (unchanged from before this ticket), an icon-only `IconButton` below it —
+  // same `aria-label`/action either way, so a test (or a screen reader) that
+  // looks up the control by its accessible name finds it regardless of which
+  // one rendered. `label` doubles as the IconButton's Tooltip content, so no
+  // separate tooltip copy to keep in sync.
+  function toolbarAction({
+    icon,
+    label,
+    onClick,
+    disabled,
+  }: {
+    icon: ReactNode;
+    label: string;
+    onClick?: () => void;
+    disabled?: boolean;
+  }): ReactElement<{ className?: string }> {
+    return isDesktop ? (
+      <Button size="sm" onClick={onClick} disabled={disabled}>
+        {label}
+      </Button>
+    ) : (
+      <IconButton icon={icon} label={label} onClick={onClick} disabled={disabled} />
+    );
+  }
+
+  const optimizeRemapsButton = toolbarAction({
+    icon: <Icon.OptimizeRemaps />,
+    label: t('plans.optimizeRemaps'),
+    onClick: handleOptimizeRemaps,
+    disabled: scheduled.length === 0,
+  });
 
   return (
     <div className="space-y-4">
@@ -491,16 +558,32 @@ export function PlanEditor({
       />
 
       <Panel title={t('plans.importExport')}>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => void handleImport()}>
-            {t('plans.importQueue')}
-          </Button>
-          <Button size="sm" onClick={() => setImportOpen(true)}>
-            {t('plans.importClipboard')}
-          </Button>
+        {/* Below `lg` these become icon-only (#224): a horizontally scrollable
+            row rather than `flex-wrap`, since IconButtons are square and wrap
+            far less gracefully than the full-text Buttons `lg`+ keeps. */}
+        <div
+          className={cx(
+            'flex items-center gap-2',
+            isDesktop ? 'flex-wrap' : 'flex-nowrap overflow-x-auto'
+          )}
+        >
+          {toolbarAction({
+            icon: <Icon.ImportQueue />,
+            label: t('plans.importQueue'),
+            onClick: () => void handleImport(),
+          })}
+          {toolbarAction({
+            icon: <Icon.ImportClipboard />,
+            label: t('plans.importClipboard'),
+            onClick: () => setImportOpen(true),
+          })}
           <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
             <DropdownMenuTrigger asChild>
-              <Button size="sm">{t('plans.export')}</Button>
+              {isDesktop ? (
+                <Button size="sm">{t('plans.export')}</Button>
+              ) : (
+                <IconButton icon={<Icon.Export />} label={t('plans.export')} />
+              )}
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem
@@ -533,8 +616,18 @@ export function PlanEditor({
           editor in its own scroll box and a pinned toolbar has a short list to
           stay above. On a phone the editor scrolls with the page, and pinning
           a three-row toolbar there would hold a fifth of the viewport
-          permanently against the content it acts on. */}
-      <Panel title={t('plans.toolbar')} className="lg:sticky lg:top-0 lg:z-10">
+          permanently against the content it acts on.
+
+          `lg:top-[4.625rem]` (not `top-0`) stacks this below the also-sticky
+          PlanHeader summary strip above: the strip's own rendered height at
+          `lg`+ is one fixed chip row (`lg:flex-nowrap` on its chip row) plus
+          its Panel chrome, ~5.625rem (90px) border-box, and this Panel picks
+          up a 1rem `space-y-4` top margin from its parent that sticky
+          offsets count against the stuck position, so the offset that lands
+          this Panel flush under the strip is 5.625rem - 1rem = 4.625rem. If
+          PlanHeader's header content changes height, re-derive this value
+          rather than leaving it stale. */}
+      <Panel title={t('plans.toolbar')} className="lg:sticky lg:top-[4.625rem] lg:z-10">
         <div className="space-y-2">
           {/* Remaps-available is a control with a value and an explanatory
               hint, not header adornment. In the header slot the hint wrapped
@@ -569,28 +662,58 @@ export function PlanEditor({
               </span>
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Tooltip content={t('plans.optimizeRemapsTooltip')}>
-              <Button size="sm" onClick={handleOptimizeRemaps} disabled={scheduled.length === 0}>
-                {t('plans.optimizeRemaps')}
-              </Button>
-            </Tooltip>
-            <Button
-              size="sm"
-              onClick={() => onUpdate({ markers: addMarker(plan.markers, plan.entries.length) })}
-            >
-              {t('plans.addMarker')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleOptimizeAtMarkers}
-              disabled={scheduled.length === 0 || (plan.markers?.length ?? 0) === 0}
-            >
-              {t('plans.optimizeAtMarkers')}
-            </Button>
-            <Button size="sm" onClick={handleSuggestReorder} disabled={scheduled.length === 0}>
-              {t('plans.suggestReorder')}
-            </Button>
+          {/* Below `lg` these become icon-only (#224), same horizontally
+              scrollable row as the Import/Export panel above. The inline
+              confirmations stay text (never icon-only) — they're transient
+              status, not actions. */}
+          <div
+            className={cx(
+              'flex items-center gap-2',
+              isDesktop ? 'flex-wrap' : 'flex-nowrap overflow-x-auto'
+            )}
+          >
+            {isDesktop ? (
+              <Tooltip content={t('plans.optimizeRemapsTooltip')}>{optimizeRemapsButton}</Tooltip>
+            ) : (
+              optimizeRemapsButton
+            )}
+            {optimizeConfirm && (
+              <span role="status" aria-live="polite" className="text-xs text-success">
+                {optimizeConfirm}
+              </span>
+            )}
+            {toolbarAction({
+              icon: <Icon.AddMarker />,
+              label: t('plans.addMarker'),
+              onClick: handleAddMarker,
+            })}
+            {markerConfirm && (
+              <span role="status" aria-live="polite" className="text-xs text-success">
+                {t('plans.markerAdded')}
+              </span>
+            )}
+            {toolbarAction({
+              icon: <Icon.OptimizeAtMarkers />,
+              label: t('plans.optimizeAtMarkers'),
+              onClick: handleOptimizeAtMarkers,
+              disabled: scheduled.length === 0 || (plan.markers?.length ?? 0) === 0,
+            })}
+            {markersOptimizeConfirm && (
+              <span role="status" aria-live="polite" className="text-xs text-success">
+                {markersOptimizeConfirm}
+              </span>
+            )}
+            {toolbarAction({
+              icon: <Icon.SuggestReorder />,
+              label: t('plans.suggestReorder'),
+              onClick: handleSuggestReorder,
+              disabled: scheduled.length === 0,
+            })}
+            {reorderConfirm && (
+              <span role="status" aria-live="polite" className="text-xs text-success">
+                {t('plans.reorderSuggested')}
+              </span>
+            )}
           </div>
         </div>
       </Panel>

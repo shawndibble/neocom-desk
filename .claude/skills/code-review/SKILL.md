@@ -10,6 +10,8 @@ Two-axis review of the diff between `HEAD` and a fixed point:
 
 The two axes are kept **separate** so one never masks the other. **Always run them as two parallel sub-agents**, whether or not a human is driving. Each axis re-reads the whole diff; doing that inline pours both passes into the caller's context, and inside an unattended `/next-ticket` run that context is already large and gets re-sent on every subsequent turn. The sub-agents read the diff in their own fresh contexts and return only their findings. Do not merge or rerank findings across axes.
 
+Both sub-agents are **read-only diff review**: they read the diff and cited files and report findings — they never run the test suite, linter, typechecker, build, or any validation/gate script (`npm test`, `npm run lint`, `npm run typecheck`, `gate.mjs`, etc.). That validation already ran (step 6's one pre-PR gate) and CI runs it again; re-running it inside a review sub-agent is redundant and expensive. State this explicitly in each sub-agent's own prompt, not just here — the sub-agent never sees this file's prose.
+
 The issue tracker config is at `docs/agents/issue-tracker.md`.
 
 ## Process
@@ -63,6 +65,8 @@ Repo-specific hard rules to check (from `CLAUDE.md`):
 - All user-facing strings go through i18next (`src/i18n/locales/en.json`).
 
 ### 4. Run both axes
+
+Each sub-agent's prompt must open with: "This is a read-only review: read the diff and cited files only — never run tests, lint, typecheck, build, or any script."
 
 **Standards axis** — report, per file/hunk: (a) every place the diff violates a documented standard (cite the standard); (b) any baseline smell (name it, quote the hunk). Distinguish hard violations from judgement calls. Skip what tooling enforces.
 

@@ -140,8 +140,17 @@ describe('PlanEditor toolbar reorganization', () => {
       within(toolbarSection).queryByRole('button', { name: 'Import from skill queue' })
     ).toBeNull();
 
-    // Pinned near the top of the entries list, not scrolling away with it.
-    expect(toolbarSection.className).toContain('sticky');
+    // Pinned near the top of the entries list, not scrolling away with it,
+    // stacked below the also-pinned summary strip at a distinct offset so
+    // neither hides the other.
+    const summarySection = screen.getByRole('heading', { name: 'Plan summary' }).closest('section');
+    if (!summarySection) throw new Error('expected summary section');
+
+    expect(summarySection).toHaveClass('lg:sticky', 'lg:top-0');
+    // Distinct, non-zero offset so the toolbar stacks below the summary
+    // strip instead of both claiming `top-0` and overlapping.
+    expect(toolbarSection).toHaveClass('lg:sticky', 'lg:top-[4.625rem]');
+    expect(toolbarSection.className).not.toMatch(/\blg:top-0\b/);
   });
 
   it('collapses Export into one control that reveals "to clipboard" / "to CSV" only after being opened', async () => {
@@ -206,6 +215,96 @@ describe('PlanEditor toolbar reorganization', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Optimize remaps' })).toBeInTheDocument();
+  });
+});
+
+describe('PlanEditor icon-only toolbar below desktop width (#224)', () => {
+  // jsdom's default `window.matchMedia` (vitest.setup.ts) never matches, so
+  // this already runs at a narrow (below-`lg`) viewport with no mock needed.
+  it('renders the toolbar actions as icon-only buttons, same accessible names as the text buttons, in a scrollable row', () => {
+    renderEditor();
+
+    const importExportSection = screen
+      .getByRole('heading', { name: 'Import / Export' })
+      .closest('section')!;
+    const toolbarSection = screen.getByRole('heading', { name: 'Toolbar' }).closest('section')!;
+
+    const actionNames = [
+      'Import from skill queue',
+      'Import from clipboard',
+      'Export',
+      'Optimize remaps',
+      'Add remap marker',
+      'Optimize at my markers',
+      'Suggest reorder',
+    ];
+    for (const name of actionNames) {
+      const button = screen.getByRole('button', { name });
+      // Icon-only: the accessible name comes from `aria-label`, not visible
+      // text — the glyph is the only rendered child, hidden from assistive
+      // tech (IconButton.test.tsx covers that contract directly).
+      expect(button).toHaveAttribute('aria-label', name);
+      expect(button.textContent).toBe('');
+    }
+
+    // `.closest` rather than `.parentElement`: Tooltip's Radix trigger clones
+    // its props directly onto the button (no wrapping element), but `.closest`
+    // doesn't depend on that either way.
+    const importExportRow = screen
+      .getByRole('button', { name: 'Import from skill queue' })
+      .closest('div.flex.items-center.gap-2')!;
+    expect(importExportRow).toHaveClass('overflow-x-auto');
+    expect(importExportRow).not.toHaveClass('flex-wrap');
+    expect(within(importExportSection).getAllByRole('button')).toHaveLength(3);
+
+    const toolbarRow = screen
+      .getByRole('button', { name: 'Add remap marker' })
+      .closest('div.flex.items-center.gap-2')!;
+    expect(toolbarRow).toHaveClass('overflow-x-auto');
+    expect(toolbarRow).not.toHaveClass('flex-wrap');
+    // The 4 toolbar actions, plus the remap-count row's own "?" InfoTooltip
+    // button (unrelated to this ticket — not an action, not converted).
+    expect(within(toolbarSection).getAllByRole('button')).toHaveLength(5);
+  });
+
+  it('keeps full-text buttons at `lg`+, unchanged', () => {
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    try {
+      renderEditor();
+
+      const importExportRow = screen
+        .getByRole('button', { name: 'Import from skill queue' })
+        .closest('div.flex.items-center.gap-2')!;
+      expect(importExportRow).toHaveClass('flex-wrap');
+      expect(importExportRow).not.toHaveClass('overflow-x-auto');
+
+      for (const name of [
+        'Import from skill queue',
+        'Import from clipboard',
+        'Export',
+        'Optimize remaps',
+        'Add remap marker',
+        'Optimize at my markers',
+        'Suggest reorder',
+      ]) {
+        const button = screen.getByRole('button', { name });
+        expect(button).not.toHaveAttribute('aria-label');
+        expect(button.textContent).toBe(name);
+      }
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
   });
 });
 
