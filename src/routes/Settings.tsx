@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Panel, FilterChip, DataTable, EmptyState, type DataTableColumn } from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { SHORTCUTS } from '@/lib/shortcuts';
+import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
 import { db } from '@/db';
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
@@ -132,6 +133,7 @@ export function Settings() {
           ))}
         </dl>
       </Panel>
+      <NotificationsPanel />
       <ActivityLogPanel />
     </div>
   );
