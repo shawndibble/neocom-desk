@@ -43,6 +43,98 @@
   --font-display: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
 }
 
+/*
+ * Deliberately the `utilities` layer, not `components`. A cascade layer beats
+ * every earlier layer whatever the specificity, so from `components` these
+ * rules lose to the `px-3`/`text-right`/`whitespace-nowrap` utilities on the
+ * very cells they need to re-lay-out. Inside `utilities` ordinary specificity
+ * applies again and `.dt-stack td` (0,1,1) wins over a bare utility (0,1,0).
+ */
+@layer utilities {
+  /*
+   * Responsive collapse for `DataTable` (docs/DESIGN.md §4).
+   *
+   * Below `sm` a dense table cannot be a table: measured on a 390px viewport,
+   * a six-column row is 505px wide — it scrolls the whole page sideways *and*
+   * squashes the name column to 74px, shattering one item name over five
+   * lines. So each row becomes a stacked card: the first cell is the title,
+   * every other cell prints its column header into a left gutter via
+   * `data-label`.
+   *
+   * This is CSS-only on purpose. The markup is identical at every width — no
+   * `sm:hidden`/`hidden sm:flex` pair, nothing rendered twice — which is the
+   * same rule the Assets rework follows. `display: block` drops the implicit
+   * table roles in real browsers, so `DataTable` sets them explicitly.
+   */
+  @media (width < 40rem) {
+    .dt-stack,
+    .dt-stack tbody,
+    .dt-stack tr,
+    .dt-stack td {
+      display: block;
+    }
+
+    /* Redundant once every cell is labelled, but kept for header semantics. */
+    .dt-stack thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .dt-stack tr {
+      padding: 0.5rem 0.75rem;
+    }
+
+    .dt-stack td {
+      position: relative;
+      padding: 0.125rem 0 0.125rem 7rem;
+      /* Beats the `text-right`/`whitespace-nowrap` utilities on the cell:
+         nothing may force a card wider than the screen. */
+      text-align: left;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .dt-stack td::before {
+      content: attr(data-label);
+      position: absolute;
+      top: 0.125rem;
+      left: 0;
+      width: 6.5rem;
+      overflow: hidden;
+      font-size: 0.625rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-text-dim);
+    }
+
+    /* The first cell names the row, so it spans the card and drops the label. */
+    .dt-stack td:first-child {
+      padding-left: 0;
+      padding-bottom: 0.25rem;
+      font-weight: 600;
+    }
+
+    .dt-stack td:first-child::before {
+      content: none;
+    }
+
+    /*
+     * A cell with no value keeps its label and shows blank, rather than
+     * disappearing. Hiding it (`td:empty { display: none }`) would drop a
+     * field on a phone that desktop still shows as an empty column — and
+     * `:empty` only matches when `render` returns exactly nullish, so which
+     * fields vanished would depend on how each column happened to be
+     * written. A labelled blank says the same thing at both widths.
+     */
+  }
+}
+
 @layer base {
   :root {
     color-scheme: dark;

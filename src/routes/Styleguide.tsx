@@ -79,6 +79,61 @@ const SAMPLE_COLUMNS = [
   },
 ];
 
+/** Six columns of real-world width: the shape that forced the responsive collapse. */
+const WIDE_ROWS = [
+  {
+    id: 1,
+    item: 'Republic Fleet Warp Disruptor II',
+    qty: 1_250_000,
+    price: '14,320,000.00',
+    location: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+    expires: '2026-09-30',
+    issued: '2026-09-01',
+  },
+  {
+    id: 2,
+    item: 'Mexallon',
+    qty: 96_310,
+    price: '82.40',
+    location: 'Amarr VIII (Oris) - Emperor Family Academy',
+    expires: '2026-10-14',
+    issued: '2026-08-22',
+  },
+];
+
+type WideRow = (typeof WIDE_ROWS)[number];
+
+const WIDE_COLUMNS = [
+  { id: 'item', header: 'Item', render: (row: WideRow) => row.item },
+  {
+    id: 'qty',
+    header: 'Quantity',
+    align: 'right' as const,
+    className: 'tabular-nums',
+    render: (row: WideRow) => row.qty.toLocaleString(),
+  },
+  {
+    id: 'price',
+    header: 'Price',
+    align: 'right' as const,
+    className: 'tabular-nums',
+    render: (row: WideRow) => row.price,
+  },
+  { id: 'location', header: 'Location', render: (row: WideRow) => row.location },
+  {
+    id: 'expires',
+    header: 'Expires',
+    className: 'whitespace-nowrap text-text-dim',
+    render: (row: WideRow) => row.expires,
+  },
+  {
+    id: 'issued',
+    header: 'Issued',
+    className: 'whitespace-nowrap text-text-dim',
+    render: (row: WideRow) => row.issued,
+  },
+];
+
 /** A real character id, so the portrait resolves against the EVE image server. */
 const SAMPLE_CHARACTER_ID = 90_000_001;
 
@@ -260,6 +315,23 @@ export function Styleguide() {
             rows={SAMPLE_ROWS}
             rowKey={(row) => row.id}
             rowClassName={(row) => (row.qty < 0 ? 'opacity-50' : undefined)}
+          />
+        </Panel>
+      </Section>
+
+      {/*
+        The narrow sample above never exercises the responsive collapse — two
+        short columns fit a phone as a table. This one is the width a real
+        route table runs at, so shrinking the window past `sm` shows the
+        stacked-card layout the way Wallet or Orders will.
+      */}
+      <Section title="DataTable — wide (stacks below sm)">
+        <Panel padded={false}>
+          <DataTable
+            label="Wide DataTable sample"
+            columns={WIDE_COLUMNS}
+            rows={WIDE_ROWS}
+            rowKey={(row) => row.id}
           />
         </Panel>
       </Section>
