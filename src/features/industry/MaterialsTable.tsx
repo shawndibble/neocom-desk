@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import type { EffectiveMaterial, HubPrices } from '@/engine/industry/types';
@@ -10,6 +10,8 @@ interface MaterialsTableProps {
   hubPrices: HubPrices;
   /** False when prices couldn't be fetched at all (offline) — unit price and line total fall back to placeholder text. */
   pricesReady: boolean;
+  /** Wraps each row in the shared item context menu; omitted where the caller has no menu to offer. */
+  rowContextMenu?: (material: EffectiveMaterial, tr: ReactElement) => ReactElement;
 }
 
 /** Materials table: name, effective quantity, unit price, line total. Unpriced rows are flagged. */
@@ -18,6 +20,7 @@ export function MaterialsTable({
   nameFor,
   hubPrices,
   pricesReady,
+  rowContextMenu,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
@@ -73,6 +76,7 @@ export function MaterialsTable({
         rowKey={(material) => material.typeID}
         label={t('industry.materials')}
         density="compact"
+        rowContextMenu={rowContextMenu}
       />
     </div>
   );

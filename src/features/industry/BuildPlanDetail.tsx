@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -11,10 +11,17 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
-import type { FacilityKind, RigLevel, SecurityBand, SkillLevels } from '@/engine/industry/types';
+import type {
+  EffectiveMaterial,
+  FacilityKind,
+  RigLevel,
+  SecurityBand,
+  SkillLevels,
+} from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
@@ -38,6 +45,11 @@ interface BuildPlanDetailProps {
   ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
   onUpdate: (patch: PlanPatch) => void;
+  /** Materials-row context menu (CONTEXT.md round 26) — the same actions the Market and Assets rows offer. */
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  /** False with no active character — the Quickbar has nobody to save the material under. */
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 function clampInt(value: number, min: number, max: number): number {
@@ -52,6 +64,9 @@ export function BuildPlanDetail({
   ownedBlueprints,
   skills,
   onUpdate,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
 }: BuildPlanDetailProps) {
   const { t } = useTranslation();
 
@@ -114,6 +129,30 @@ export function BuildPlanDetail({
 
   function update(patch: PlanPatch) {
     onUpdate(patch);
+  }
+
+  /**
+   * Unlike Market/Assets, this page already holds the whole blueprint catalog
+   * (it needs it to render the plan at all), so the "Build Plan" action
+   * resolves synchronously — never the `undefined` "checking…" state those
+   * lazily-loading callers pass. For a material something else manufactures
+   * the action lands back here with `?product=`, creating or selecting that
+   * material's own plan so its build-vs-buy read can be compared with this one.
+   */
+  function materialContextMenu(material: EffectiveMaterial, tr: ReactElement) {
+    const name = nameForType(catalog, material.typeID);
+    return (
+      <ItemContextMenu
+        typeId={material.typeID}
+        itemName={name}
+        blueprintTypeID={catalog.byProductTypeID.get(material.typeID)?.blueprintTypeID ?? null}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable={quickbarAvailable}
+        onShowInfo={onShowInfo}
+      >
+        {tr}
+      </ItemContextMenu>
+    );
   }
 
   function exportMaterialsCsv() {
@@ -325,6 +364,7 @@ export function BuildPlanDetail({
             nameFor={(typeID) => nameForType(catalog, typeID)}
             hubPrices={snapshot?.hubPrices ?? {}}
             pricesReady={pricesReady}
+            rowContextMenu={materialContextMenu}
           />
         )}
       </Panel>

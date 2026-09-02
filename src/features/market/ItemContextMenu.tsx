@@ -1,6 +1,7 @@
 /**
  * Right-click menu for an item — the tree, search results (same tree,
- * CONTEXT.md round 8), the Quickbar, and the Assets tree (issue #83).
+ * CONTEXT.md round 8), the Quickbar, the Assets tree (issue #83), the
+ * Variations table (issue #147) and a Build Plan's materials (round 27).
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -22,6 +22,8 @@ import {
   type BlueprintCatalogEntry,
 } from '@/features/industry/blueprintCatalog';
 import { findOwnedBlueprint, loadCharacterBlueprints } from '@/features/industry/data';
+import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import { BuildPlanDetail } from '@/features/industry/BuildPlanDetail';
@@ -58,6 +60,15 @@ export function Industry() {
     if (activeCharacterId === null) return undefined;
     return db.buildPlans.where('characterId').equals(activeCharacterId).toArray();
   }, [activeCharacterId]);
+
+  // The materials table's item context menu (CONTEXT.md round 26) writes the
+  // same Quickbar record the Market Browser and Assets do, and opens the same
+  // Item Detail modal — which stays mounted at the route, not inside
+  // `BuildPlanDetail`, so switching plans while it is open doesn't tear it down.
+  const quickbar = useQuickbar(activeCharacterId);
+  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
+    null
+  );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
@@ -301,6 +312,9 @@ export function Industry() {
                   ownedBlueprints={ownedBlueprints}
                   skills={skills}
                   onUpdate={(patch) => void handleUpdate(patch)}
+                  onAddToQuickbar={quickbar.add}
+                  quickbarAvailable={quickbar.available}
+                  onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
                 />
               ) : plans.length > 0 ? (
                 <div className="flex justify-center py-8">
@@ -312,6 +326,14 @@ export function Industry() {
             </div>
           </article>
         </div>
+      )}
+
+      {infoModalItem && (
+        <ItemDetailModal
+          typeId={infoModalItem.typeId}
+          itemName={infoModalItem.itemName}
+          onClose={() => setInfoModalItem(null)}
+        />
       )}
     </div>
   );

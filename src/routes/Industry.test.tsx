@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -38,6 +38,16 @@ const BLUEPRINTS: BlueprintMap = {
     products: [{ typeID: 587, quantity: 1 }],
     skills: [],
   },
+  // Manufactures one of the Rifter's own materials, so the materials table
+  // has both a build-able row (Mechanical Parts) and rows nothing produces
+  // (the two minerals) to tell the context menu's two Build Plan states apart.
+  '9841': {
+    name: 'Mechanical Parts Blueprint',
+    time: 300,
+    materials: [{ typeID: 34, quantity: 20 }],
+    products: [{ typeID: 9840, quantity: 5 }],
+    skills: [],
+  },
 };
 const TYPES: TypeMap = {
   '587': { name: 'Rifter', groupID: 25, volume: 27289 },
@@ -50,6 +60,16 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
+}));
+
+// The materials row menu's "Show info" opens ItemDetailModal, which resolves
+// attribute ids through this dictionary. Mocked rather than fetched: the real
+// loader reads a public/data file, and `onUnhandledRequest: 'error'` rejects it.
+const STRUCTURE_HITPOINTS_ATTR_ID = 9;
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadAttributeDictionary: vi.fn(async () => ({
+    9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
+  })),
 }));
 
 const CHAR_ID = 91;
@@ -159,6 +179,7 @@ beforeEach(async () => {
   await db.skillPlans.clear();
   await db.esiCache.clear();
   await db.buildPlans.clear();
+  await db.quickbars.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useAuthFailure.setState({ failure: null });
@@ -499,5 +520,134 @@ describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => 
     expect(screen.getByRole('list')).toHaveClass('max-h-[28rem]', 'overflow-y-auto');
     expect(detailPane?.querySelector('div')).toHaveClass('lg:overflow-y-auto');
     expect(detailPane?.querySelector('div')?.className).not.toMatch(/\bmax-h-/);
+  });
+});
+describe('Industry: materials row context menu', () => {
+  /** Right-clicks a materials-table row by its item name and returns the row. */
+  async function openMaterialMenu(name: string) {
+    const row = (await screen.findByText(name)).closest('tr');
+    if (!row) throw new Error(`expected a ${name} materials row`);
+    row.focus();
+    fireEvent.contextMenu(row);
+    return row;
+  }
+
+  it('offers the shared item actions on a material row', async () => {
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    await openMaterialMenu('Mechanical Parts');
+
+    expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    // The catalog is already loaded on this page, so the label resolves
+    // straight to its answer — never the lazy callers' "checking…" state.
+    expect(screen.getByRole('menuitem', { name: 'Build Plan' })).toBeInTheDocument();
+  });
+
+  it('reads "No blueprint options" for a mineral nothing manufactures', async () => {
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    await openMaterialMenu('Tritanium');
+
+    expect(screen.getByRole('menuitem', { name: 'No blueprint options' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    expect(screen.queryByRole('menuitem', { name: 'Build Plan' })).not.toBeInTheDocument();
+  });
+
+  it('creates and selects a plan for a manufacturable material via Build Plan', async () => {
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    await openMaterialMenu('Mechanical Parts');
+
+    await user.click(screen.getByRole('menuitem', { name: 'Build Plan' }));
+
+    // Same `?product=` round trip the Market Browser's menu takes, so the
+    // material's own plan is created if missing and selected either way.
+    const row = await screen.findByRole('button', { name: 'Mechanical Parts' });
+    await waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).toArray();
+    expect(stored).toHaveLength(2);
+    expect(stored.map((p) => p.blueprintTypeID)).toContain(9841);
+    await waitFor(() => expect(window.location.search).toBe(''));
+  });
+
+  it('selects an existing plan for that material instead of duplicating it', async () => {
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    await db.buildPlans.add(
+      seedPlan({ id: 'bp-2', name: 'Parts run', blueprintTypeID: 9841, updatedAt: 2 })
+    );
+    render(<App />);
+    await openMaterialMenu('Mechanical Parts');
+
+    await user.click(screen.getByRole('menuitem', { name: 'Build Plan' }));
+
+    const row = await screen.findByRole('button', { name: 'Parts run' });
+    await waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
+  });
+
+  it('opens Item Detail for the right-clicked material via Show info', async () => {
+    server.use(
+      http.get('https://esi.evetech.net/universe/types/9840', () =>
+        HttpResponse.json({
+          type_id: 9840,
+          name: 'Mechanical Parts',
+          description: 'Basic construction components.',
+          group_id: 428,
+          published: true,
+          volume: 0.03,
+          dogma_attributes: [{ attribute_id: STRUCTURE_HITPOINTS_ATTR_ID, value: 1200 }],
+        })
+      )
+    );
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    await openMaterialMenu('Mechanical Parts');
+
+    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Mechanical Parts' });
+    expect(within(dialog).getByText('Basic construction components.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Structure Hitpoints')).toBeInTheDocument();
+  });
+
+  it('keeps the detail pane open on the new material plan below `lg`', async () => {
+    // Narrow screens show one column at a time, and `detailVisible` is gated
+    // on the *explicit* selection — so the render-time `?product=` sync has to
+    // set it, or choosing Build Plan here would drop the visitor back to the
+    // list with nothing open.
+    useNarrowViewport();
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Rifter run' }));
+    await openMaterialMenu('Mechanical Parts');
+    await user.click(screen.getByRole('menuitem', { name: 'Build Plan' }));
+
+    expect(await screen.findByRole('heading', { name: 'Mechanical Parts' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to build plans' })).toBeInTheDocument();
+  });
+
+  it('adds the right-clicked material to the Quickbar', async () => {
+    const user = userEvent.setup();
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    await openMaterialMenu('Mechanical Parts');
+
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
+
+    await waitFor(async () => {
+      const record = await db.quickbars.get(String(CHAR_ID));
+      expect(record?.items).toEqual([{ typeId: 9840, name: 'Mechanical Parts' }]);
+    });
   });
 });
