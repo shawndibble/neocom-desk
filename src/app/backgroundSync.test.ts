@@ -40,14 +40,18 @@ describe('registerPeriodicSync', () => {
 
   it('does not register when periodic-background-sync permission is not granted', async () => {
     const register = vi.fn(async () => {});
-    const sw = serviceWorkerContainer({ periodicSync: { register } as unknown as PeriodicSyncManager });
+    const sw = serviceWorkerContainer({
+      periodicSync: { register } as unknown as PeriodicSyncManager,
+    });
     await registerPeriodicSync(env({ serviceWorker: sw, permissions: permissions('denied') }));
     expect(register).not.toHaveBeenCalled();
   });
 
   it('registers with the notification-poll tag once granted, skipping the permissions check when unavailable', async () => {
     const register = vi.fn(async () => {});
-    const sw = serviceWorkerContainer({ periodicSync: { register } as unknown as PeriodicSyncManager });
+    const sw = serviceWorkerContainer({
+      periodicSync: { register } as unknown as PeriodicSyncManager,
+    });
     await registerPeriodicSync(env({ serviceWorker: sw }));
     expect(register).toHaveBeenCalledWith(PERIODIC_SYNC_TAG, {
       minInterval: PERIODIC_SYNC_MIN_INTERVAL_MS,
@@ -58,7 +62,9 @@ describe('registerPeriodicSync', () => {
     const register = vi.fn(async () => {
       throw new Error('not allowed');
     });
-    const sw = serviceWorkerContainer({ periodicSync: { register } as unknown as PeriodicSyncManager });
+    const sw = serviceWorkerContainer({
+      periodicSync: { register } as unknown as PeriodicSyncManager,
+    });
     await expect(
       registerPeriodicSync(env({ serviceWorker: sw, permissions: permissions('granted') }))
     ).resolves.toBeUndefined();

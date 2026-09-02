@@ -12,16 +12,18 @@ vi.mock('./foregroundPoller', async () => {
   const actual = await vi.importActual<typeof import('./foregroundPoller')>('./foregroundPoller');
   return {
     ...actual,
-    liveDependencies: vi.fn(() => ({ marker: 'live' }) as unknown as ReturnType<
-      typeof actual.liveDependencies
-    >),
+    liveDependencies: vi.fn(
+      () => ({ marker: 'live' }) as unknown as ReturnType<typeof actual.liveDependencies>
+    ),
   };
 });
 
 const CHAR: CharacterRef = { characterId: 1, name: 'Test Pilot' };
 const FIRE: MailNotificationFire = { eventId: 'newMail', characterId: 1, mailId: 42 };
 
-function registration(overrides: Partial<ServiceWorkerRegistration> = {}): ServiceWorkerRegistration {
+function registration(
+  overrides: Partial<ServiceWorkerRegistration> = {}
+): ServiceWorkerRegistration {
   return {
     showNotification: vi.fn(async () => {}),
     ...overrides,
@@ -53,9 +55,7 @@ describe('backgroundPermission', () => {
   });
 
   it('is "unsupported" when showNotification is absent', () => {
-    expect(
-      backgroundPermission({} as ServiceWorkerRegistration)
-    ).toBe('unsupported');
+    expect(backgroundPermission({} as ServiceWorkerRegistration)).toBe('unsupported');
   });
 });
 
