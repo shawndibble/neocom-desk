@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import { EntryList } from './EntryList';
 import { entryId } from './reorder';
+import { DEFAULT_COLUMN_VISIBILITY, type ColumnVisibility } from './columnPreference';
 import type { MergedRow } from './queueRows';
 import type { PlanEntry } from '@/engine/types';
 
@@ -21,23 +22,44 @@ function entryRow(skillTypeID: number, stepIndices: number[]): MergedRow {
 }
 
 const nameFor = (id: number) => `Skill ${id}`;
+const attributesFor = () => undefined;
 
 const noop = () => {};
+
+const defaultProps = {
+  nameFor,
+  attributesFor,
+  columns: DEFAULT_COLUMN_VISIBILITY,
+  onReorder: noop,
+  onRemove: noop,
+  onRemoveMarker: noop,
+  onSetPriority: noop,
+};
+
+/** jsdom's default `window.matchMedia` never matches, so EntryList renders its narrow (below-`md`) layout by default; mock it to exercise the desktop layout. */
+function mockDesktop(matches: boolean): () => void {
+  const original = window.matchMedia;
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+  return () => {
+    window.matchMedia = original;
+  };
+}
 
 describe('EntryList Booster marks', () => {
   it('marks only the entry row owning the boosted step', () => {
     const rows = [entryRow(1, [0]), entryRow(2, [1])];
     render(
-      <EntryList
-        rows={rows}
-        bandsAt={new Map()}
-        nameFor={nameFor}
-        boostedSteps={new Set([0])}
-        onReorder={noop}
-        onRemove={noop}
-        onRemoveMarker={noop}
-        onSetPriority={noop}
-      />
+      <EntryList rows={rows} bandsAt={new Map()} boostedSteps={new Set([0])} {...defaultProps} />
     );
     const marks = screen.getAllByRole('img', { name: /booster speeds this skill up/i });
     expect(marks).toHaveLength(1);
@@ -46,17 +68,7 @@ describe('EntryList Booster marks', () => {
 
   it('marks nothing when no Booster is active', () => {
     const rows = [entryRow(1, [0]), entryRow(2, [1])];
-    render(
-      <EntryList
-        rows={rows}
-        bandsAt={new Map()}
-        nameFor={nameFor}
-        onReorder={noop}
-        onRemove={noop}
-        onRemoveMarker={noop}
-        onSetPriority={noop}
-      />
-    );
+    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
     expect(
       screen.queryByRole('img', { name: /booster speeds this skill up/i })
     ).not.toBeInTheDocument();
@@ -65,16 +77,7 @@ describe('EntryList Booster marks', () => {
   it('an entry spanning several boosted step indices still shows exactly one mark', () => {
     const rows = [entryRow(1, [0, 1, 2])];
     render(
-      <EntryList
-        rows={rows}
-        bandsAt={new Map()}
-        nameFor={nameFor}
-        boostedSteps={new Set([1, 2])}
-        onReorder={noop}
-        onRemove={noop}
-        onRemoveMarker={noop}
-        onSetPriority={noop}
-      />
+      <EntryList rows={rows} bandsAt={new Map()} boostedSteps={new Set([1, 2])} {...defaultProps} />
     );
     expect(screen.getAllByRole('img', { name: /booster speeds this skill up/i })).toHaveLength(1);
   });
@@ -91,17 +94,7 @@ describe('EntryList prereq rows', () => {
       },
       entryRow(1, [1]),
     ];
-    render(
-      <EntryList
-        rows={rows}
-        bandsAt={new Map()}
-        nameFor={nameFor}
-        onReorder={noop}
-        onRemove={noop}
-        onRemoveMarker={noop}
-        onSetPriority={noop}
-      />
-    );
+    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText(/prereq/i)).toBeInTheDocument();
     // No drag handle (reorder label) or priority control for the prereq row's skill.
     expect(screen.queryByRole('button', { name: /reorder skill 9/i })).not.toBeInTheDocument();
@@ -111,17 +104,112 @@ describe('EntryList prereq rows', () => {
 
 describe('EntryList empty state', () => {
   it('shows the empty-entries message when there are no rows', () => {
+    render(<EntryList rows={[]} bandsAt={new Map()} {...defaultProps} />);
+    expect(screen.getByText('No entries yet. Add a skill below.')).toBeInTheDocument();
+  });
+});
+
+describe('EntryList column visibility', () => {
+  it('hides the attribute badge, priority control, per-level and cumulative time when disabled', () => {
+    const rows = [entryRow(1, [0])];
+    const columns: ColumnVisibility = {
+      attributePair: false,
+      priority: false,
+      perLevelTime: false,
+      cumulativeTime: false,
+    };
     render(
       <EntryList
-        rows={[]}
+        rows={rows}
         bandsAt={new Map()}
-        nameFor={nameFor}
-        onReorder={noop}
-        onRemove={noop}
-        onRemoveMarker={noop}
-        onSetPriority={noop}
+        {...defaultProps}
+        attributesFor={() => ({ primary: 'perception', secondary: 'willpower' })}
+        columns={columns}
       />
     );
-    expect(screen.getByText('No entries yet. Add a skill below.')).toBeInTheDocument();
+    expect(screen.queryByText('PER/WIL')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/priority for/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('1m')).not.toBeInTheDocument();
+    expect(screen.queryByText('10m')).not.toBeInTheDocument();
+    // Always-present parts remain regardless of the column toggle.
+    expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
+    expect(screen.getByText(/Skill 1/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove skill 1/i })).toBeInTheDocument();
+  });
+
+  it('shows the attribute badge, priority control, per-level and cumulative time when enabled', () => {
+    const rows = [entryRow(1, [0])];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        attributesFor={() => ({ primary: 'perception', secondary: 'willpower' })}
+      />
+    );
+    expect(screen.getByText('PER/WIL')).toBeInTheDocument();
+    expect(screen.getByLabelText(/priority for/i)).toBeInTheDocument();
+  });
+});
+
+describe('EntryList narrow vs desktop layout (#114)', () => {
+  it('folds a row to two lines below the desktop breakpoint, with cumulative time reachable from the per-level cell', () => {
+    const restore = mockDesktop(false);
+    try {
+      const rows = [entryRow(1, [5])];
+      render(
+        <EntryList
+          rows={rows}
+          bandsAt={new Map()}
+          {...defaultProps}
+          attributesFor={() => ({ primary: 'perception', secondary: 'willpower' })}
+        />
+      );
+      // Line 1: cumulative time (10m) is visible without a header row on narrow screens.
+      expect(screen.queryByText('Per-level')).not.toBeInTheDocument();
+      expect(screen.getByText('10m')).toBeInTheDocument();
+      // Line 2: attribute badge, priority, and per-level time (1m, with cumulative as a tooltip).
+      expect(screen.getByText('PER/WIL')).toBeInTheDocument();
+      expect(screen.getByText('1m')).toBeInTheDocument();
+      const tooltip = screen.getByText(/Cumulative: 10m/);
+      expect(tooltip).toHaveAttribute('role', 'tooltip');
+    } finally {
+      restore();
+    }
+  });
+
+  it('disabling cumulative time removes it from the narrow-screen tooltip as well as the row', () => {
+    const restore = mockDesktop(false);
+    try {
+      const rows = [entryRow(1, [5])];
+      render(
+        <EntryList
+          rows={rows}
+          bandsAt={new Map()}
+          {...defaultProps}
+          columns={{ ...DEFAULT_COLUMN_VISIBILITY, cumulativeTime: false }}
+        />
+      );
+      expect(screen.queryByText(/Cumulative:/)).not.toBeInTheDocument();
+      expect(screen.queryByText('10m')).not.toBeInTheDocument();
+      expect(screen.getByText('1m')).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('shows a single-line row with a column header on desktop', () => {
+    const restore = mockDesktop(true);
+    try {
+      const rows = [entryRow(1, [5])];
+      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+      expect(screen.getByText('Per-level')).toBeInTheDocument();
+      expect(screen.getByText('Cumulative')).toBeInTheDocument();
+      expect(screen.getByText('1m')).toBeInTheDocument();
+      expect(screen.getByText('10m')).toBeInTheDocument();
+      expect(screen.queryByText(/Cumulative: /)).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
   });
 });

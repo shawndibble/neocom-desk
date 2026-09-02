@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
@@ -25,6 +26,7 @@ import {
 } from '@/engine/optimizer';
 import type { PlaceRemapsResult, RemapSegment } from '@/engine/optimizer';
 import type {
+  AttributeName,
   Attributes,
   Booster,
   Implants,
@@ -39,6 +41,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
+import { useColumnVisibility } from './columnPreference';
 import { PlanHeader } from './PlanHeader';
 import {
   evaluateOptimizationBadge,
@@ -158,6 +161,15 @@ export function PlanEditor({
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
+  // "Columns" control (#114): a device-local view preference, applying the
+  // same way across every plan on this device rather than per-plan.
+  const columnVisibility = useColumnVisibility((state) => state.value);
+  const hydrateColumnVisibility = useColumnVisibility((state) => state.hydrate);
+  const setColumnVisibility = useColumnVisibility((state) => state.setValue);
+  useEffect(() => {
+    void hydrateColumnVisibility();
+  }, [hydrateColumnVisibility]);
+
   // What-If Implants (CONTEXT.md): swap the clone's real implants for a
   // hypothetical set, for optimizer/schedule exploration only — never
   // persisted (plan.remapCount etc. stay the source of truth for the plan
@@ -192,6 +204,13 @@ export function PlanEditor({
 
   const nameFor = (skillTypeID: number): string =>
     catalog.bySkillTypeID.get(skillTypeID)?.name ?? `#${skillTypeID}`;
+
+  const attributesFor = (
+    skillTypeID: number
+  ): { primary: AttributeName; secondary: AttributeName } | undefined => {
+    const skill = catalog.engineSkills.get(skillTypeID);
+    return skill ? { primary: skill.primary, secondary: skill.secondary } : undefined;
+  };
 
   const stepLabel = (step: PlanStep): string =>
     `${nameFor(step.skillTypeID)} ${ROMAN[step.level - 1]}`;
@@ -552,6 +571,32 @@ export function PlanEditor({
             {planFinish && (
               <span>{t('plans.projectedFinish', { date: formatDate(planFinish) })}</span>
             )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm">{t('plans.columns')}</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {(
+                  [
+                    ['attributePair', 'plans.columnAttributePair'],
+                    ['priority', 'plans.columnPriority'],
+                    ['perLevelTime', 'plans.columnPerLevel'],
+                    ['cumulativeTime', 'plans.columnCumulative'],
+                  ] as const
+                ).map(([key, labelKey]) => (
+                  <DropdownMenuCheckboxItem
+                    key={key}
+                    checked={columnVisibility[key]}
+                    onSelect={(event) => event.preventDefault()}
+                    onCheckedChange={(checked) =>
+                      void setColumnVisibility({ ...columnVisibility, [key]: checked })
+                    }
+                  >
+                    {t(labelKey)}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         }
       >
@@ -569,6 +614,8 @@ export function PlanEditor({
               rows={mergedRows}
               bandsAt={bandsAt}
               nameFor={nameFor}
+              attributesFor={attributesFor}
+              columns={columnVisibility}
               boostedSteps={boostedSteps}
               startDate={startDate}
               onReorder={(activeId, overId) =>
