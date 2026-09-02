@@ -107,6 +107,8 @@
     "currentQueueEmpty": "No active in-game training queue cached.",
     "computeError": "Couldn't compute this plan: {{message}}",
     "toolbar": "Toolbar",
+    "importExport": "Import / Export",
+    "export": "Export",
     "addSkill": "Add skill",
     "searchPlaceholder": "Search skills…",
     "filterByGroup": "Filter by skill group",
