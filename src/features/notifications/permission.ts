@@ -116,8 +116,9 @@ export function useNotificationPermission(): {
   );
   const refresh = useCallback(() => setPermission(readNotificationPermission()), []);
 
+  // The initial read is the `useState` initializer above; this only keeps up
+  // with changes made outside the page.
   useEffect(() => {
-    refresh();
     document.addEventListener('visibilitychange', refresh);
     window.addEventListener('focus', refresh);
     return () => {
