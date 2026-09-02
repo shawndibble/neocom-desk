@@ -19,7 +19,6 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatVolume } from '@/features/market/format';
 import { typeIconUrl } from '@/lib/eveImages';
-import { useHoverTooltip } from '@/lib/useHoverTooltip';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
@@ -255,7 +254,6 @@ export function ContainerRow({
 /* ---------------------------------------------------------------- item row */
 
 interface ItemRowProps {
-  typeId: number;
   name: string;
   quantity: number;
   unitVolume: number | undefined;
@@ -263,7 +261,10 @@ interface ItemRowProps {
   characterBadge: string | null;
   /** Wraps the row in the shared item context menu — supplied by the route. */
   wrap: (children: ReactElement) => ReactNode;
-  onShowInfo: () => void;
+  /** Selects this asset into the detail pane beside the list (issue #160). */
+  onSelect: () => void;
+  /** Whether this row's asset is the one currently shown in the detail pane. */
+  selected: boolean;
   selectMode: boolean;
   selectionState: SelectionState;
   onToggleSelection: () => void;
@@ -276,26 +277,24 @@ interface ItemRowProps {
  * old `w-14`/`w-16`/`w-20` trio) is exactly what made the row unreadable
  * below ~500px — this reflows instead of clipping or scrolling sideways.
  *
- * Hover/focus reveals a tooltip (icon, name, quantity, value, volume), same
- * as the tree view's `AssetItemRow` — only mounted while active, since a
- * virtualized list of thousands of these can't pay render cost for a bubble
- * nobody is looking at.
+ * Selecting a row shows its full detail in the pane beside the list
+ * (`AssetDetailPane`, issue #160) — replaces the previous hover/focus
+ * tooltip, which couldn't be reached on a touch device at all.
  */
 export function ItemRow({
-  typeId,
   name,
   quantity,
   unitVolume,
   estimatedValue,
   characterBadge,
   wrap,
-  onShowInfo,
+  onSelect,
+  selected,
   selectMode,
   selectionState,
   onToggleSelection,
   t,
 }: ItemRowProps) {
-  const { tooltipOpen, tooltipId, triggerHandlers } = useHoverTooltip();
   const volumeText = unitVolume === undefined ? t('assets.unknownValue') : formatVolume(unitVolume);
   return (
     <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
@@ -307,58 +306,111 @@ export function ItemRow({
         />
       )}
       {wrap(
-        <span className="group relative block min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={onShowInfo}
-            {...triggerHandlers}
-            className="flex min-h-12 w-full min-w-0 items-center gap-2.5 py-1.5 pr-3 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
-          >
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="flex min-w-0 items-center">
-                <span className="truncate text-sm">{name}</span>
-                {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
-              </span>
-              <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-faint tabular-nums">
-                <span>×{quantity.toLocaleString()}</span>
-                <span aria-hidden="true">·</span>
-                <span>{volumeText}</span>
-                <span aria-hidden="true">·</span>
-                <span className="text-isk-pos">{formatIsk(estimatedValue)}</span>
-              </span>
-            </span>
-          </button>
-          {tooltipOpen && (
-            <span
-              id={tooltipId}
-              role="tooltip"
-              className="pointer-events-none absolute bottom-full left-0 z-10 mb-1 w-64 rounded-xs border border-line bg-panel p-2 text-left text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
-            >
-              <span className="flex items-center gap-2">
-                <img
-                  src={typeIconUrl(typeId, 32)}
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="shrink-0 rounded-xs border border-line"
-                />
-                <span className="truncate font-medium text-text">{name}</span>
-              </span>
-              <span className="mt-1 block">
-                {t('assets.quantity')} {quantity.toLocaleString()}
-              </span>
-              <span className="block">
-                {t('assets.tooltip.value', { value: formatIsk(estimatedValue) })}
-              </span>
-              <span className="block">
-                {unitVolume === undefined
-                  ? t('assets.tooltip.volumeUnknown')
-                  : t('assets.tooltip.volume', { volume: formatVolume(unitVolume) })}
-              </span>
-            </span>
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-current={selected}
+          className={cx(
+            'flex min-h-12 w-full min-w-0 items-center gap-2.5 py-1.5 pr-3 text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent',
+            selected ? 'bg-panel-2' : ''
           )}
-        </span>
+        >
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="flex min-w-0 items-center">
+              <span className="truncate text-sm">{name}</span>
+              {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
+            </span>
+            <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-faint tabular-nums">
+              <span>×{quantity.toLocaleString()}</span>
+              <span aria-hidden="true">·</span>
+              <span>{volumeText}</span>
+              <span aria-hidden="true">·</span>
+              <span className="text-isk-pos">{formatIsk(estimatedValue)}</span>
+            </span>
+          </span>
+        </button>
       )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------- detail pane */
+
+export interface AssetDetailPaneProps {
+  typeId: number;
+  name: string;
+  quantity: number;
+  unitVolume: number | undefined;
+  estimatedValue: number;
+  characterBadge: string | null;
+  /** Where this asset lives, outermost first, joined the same way `SearchResultRow`'s trail is. */
+  locationLabel: string;
+  security: number | null | undefined;
+  jumpsAway: JumpsAwayResult | undefined;
+  t: Translate;
+}
+
+/**
+ * One selected asset's full detail, replacing the old hover/focus tooltip
+ * (issue #160): icon, name, quantity, estimated value, volume, and the
+ * location it lives in — security/jumps-away reuse whatever the route has
+ * already resolved for that station rather than fetching fresh per
+ * selection (CONTEXT.md round 14).
+ */
+export function AssetDetailPane({
+  typeId,
+  name,
+  quantity,
+  unitVolume,
+  estimatedValue,
+  characterBadge,
+  locationLabel,
+  security,
+  jumpsAway,
+  t,
+}: AssetDetailPaneProps) {
+  return (
+    <div className="space-y-3 text-xs">
+      <div className="flex items-center gap-2">
+        <img
+          src={typeIconUrl(typeId, 64)}
+          alt=""
+          width={48}
+          height={48}
+          className="shrink-0 rounded-xs border border-line"
+        />
+        <span className="flex min-w-0 flex-1 items-center">
+          <h2 className="truncate text-sm font-semibold">{name}</h2>
+          {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
+        </span>
+      </div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+        <dt className="text-text-dim uppercase">{t('assets.detail.quantity')}</dt>
+        <dd className="tabular-nums">{quantity.toLocaleString()}</dd>
+
+        <dt className="text-text-dim uppercase">{t('assets.detail.volume')}</dt>
+        <dd className="tabular-nums">
+          {unitVolume === undefined
+            ? t('assets.detail.volumeUnknown')
+            : t('assets.detail.volumeValue', { volume: formatVolume(unitVolume) })}
+        </dd>
+
+        <dt className="text-text-dim uppercase">{t('assets.detail.location')}</dt>
+        <dd className="flex min-w-0 items-center gap-1.5">
+          <SecurityValue security={security} t={t} />
+          <span className="min-w-0 truncate">{locationLabel}</span>
+        </dd>
+
+        <dt className="text-text-dim uppercase">{t('assets.detail.jumpsAway')}</dt>
+        <dd>
+          <JumpsAwayText result={jumpsAway} t={t} />
+        </dd>
+
+        <dt className="text-text-dim uppercase">{t('assets.detail.value')}</dt>
+        <dd className="tabular-nums font-semibold text-isk-pos">
+          {t('assets.detail.valueAmount', { value: formatIsk(estimatedValue) })}
+        </dd>
+      </dl>
     </div>
   );
 }

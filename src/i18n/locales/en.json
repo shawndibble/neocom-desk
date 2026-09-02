@@ -585,11 +585,17 @@
     },
     "nodeBadge_one": "{{count}} item · {{value}} ISK",
     "nodeBadge_other": "{{count}} items · {{value}} ISK",
-    "quantity": "Qty",
-    "tooltip": {
-      "value": "Value: {{value}} ISK",
-      "volume": "Volume: {{volume}} m3",
-      "volumeUnknown": "Volume: unknown"
+    "detail": {
+      "selectHint": "Select an item to see its details.",
+      "back": "Back to list",
+      "quantity": "Quantity",
+      "volume": "Volume",
+      "volumeUnknown": "Unknown",
+      "volumeValue": "{{volume}} m3",
+      "location": "Location",
+      "jumpsAway": "Jumps away",
+      "value": "Value",
+      "valueAmount": "{{value}} ISK"
     }
   },
   "mail": {
