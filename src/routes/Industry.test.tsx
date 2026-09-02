@@ -458,8 +458,9 @@ describe('Industry: results panel', () => {
     expect(screen.getByText(formatCostIndex(0.05))).toBeInTheDocument();
 
     // Product sell price is the unit price (100,000), distinct from the
-    // job's gross sell value (buyCost = 2 runs x 100,000 = 200,000).
-    expect(screen.getByText(formatIsk(100_000))).toBeInTheDocument();
+    // job's gross sell value (buyCost = 2 runs x 100,000 = 200,000). It also
+    // appears in the break-even section's "Current market price" comparison row.
+    expect(screen.getAllByText(formatIsk(100_000)).length).toBeGreaterThan(0);
     expect(screen.getByText(formatIsk(expected.buyCost!))).toBeInTheDocument();
 
     expect(

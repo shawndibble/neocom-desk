@@ -58,3 +58,35 @@ export function brokerFee(
   const fee = (value * brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding)) / 100;
   return Math.max(MIN_BROKER_FEE_ISK, fee);
 }
+
+/**
+ * Net sell price per unit at which selling `quantity` units exactly covers
+ * `totalCost` (profit = 0), after sales tax and broker fee. Solved directly
+ * from the rate functions rather than back-solved from a `BuildResult`'s ISK
+ * totals, which divides by revenue and breaks at zero revenue. Re-solves
+ * against the 100 ISK broker-fee minimum when the percentage fee would land
+ * below it. Returns `null` for a non-positive quantity.
+ */
+export function breakEvenPrice(
+  totalCost: number,
+  quantity: number,
+  accountingLevel: number,
+  brokerRelationsLevel: number,
+  factionStanding = 0,
+  corpStanding = 0
+): number | null {
+  if (quantity <= 0) return null;
+
+  const taxPct = salesTaxPct(accountingLevel);
+  const brokerPct = brokerFeePct(brokerRelationsLevel, factionStanding, corpStanding);
+
+  const revenueNoFloor = totalCost / (1 - (taxPct + brokerPct) / 100);
+  const impliedBrokerFee = (revenueNoFloor * brokerPct) / 100;
+
+  const revenue =
+    revenueNoFloor <= 0 || impliedBrokerFee >= MIN_BROKER_FEE_ISK
+      ? revenueNoFloor
+      : (totalCost + MIN_BROKER_FEE_ISK) / (1 - taxPct / 100);
+
+  return revenue / quantity;
+}
