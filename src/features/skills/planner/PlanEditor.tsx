@@ -41,7 +41,10 @@ import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
 import { EntryList } from './EntryList';
+import type { BandInfo } from './EntryList';
 import { useColumnVisibility } from './columnPreference';
+import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMode';
+import { attributePairBandStarts } from './attributePairBands';
 import { PlanHeader } from './PlanHeader';
 import {
   evaluateOptimizationBadge,
@@ -169,6 +172,15 @@ export function PlanEditor({
   useEffect(() => {
     void hydrateColumnVisibility();
   }, [hydrateColumnVisibility]);
+
+  // Grouping toggle (#115): priority (default) or attribute-pair band
+  // headers — visual only, same device-local preference shape as Columns.
+  const groupingMode = useGroupingMode((state) => state.value);
+  const hydrateGroupingMode = useGroupingMode((state) => state.hydrate);
+  const setGroupingMode = useGroupingMode((state) => state.setValue);
+  useEffect(() => {
+    void hydrateGroupingMode();
+  }, [hydrateGroupingMode]);
 
   // What-If Implants (CONTEXT.md): swap the clone's real implants for a
   // hypothetical set, for optimizer/schedule exploration only — never
@@ -299,11 +311,22 @@ export function PlanEditor({
     () => buildMergedRows(plan.entries, plan.markers, entryQueue),
     [plan.entries, plan.markers, entryQueue]
   );
-  const bandsAt = useMemo(
-    () =>
-      placeBandHeaders(mergedRows, bandStarts(buildRows(plan.entries, plan.markers), priorityMap)),
-    [mergedRows, plan.entries, plan.markers, priorityMap]
-  );
+  const bandsAt = useMemo<ReadonlyMap<string, BandInfo>>(() => {
+    const rows = buildRows(plan.entries, plan.markers);
+    if (groupingMode === 'attributePair') {
+      const placed = placeBandHeaders(
+        mergedRows,
+        attributePairBandStarts(rows, catalog.engineSkills)
+      );
+      return new Map(
+        [...placed].map(([id, pair]) => [id, { kind: 'attributePair', ...pair } as const])
+      );
+    }
+    const placed = placeBandHeaders(mergedRows, bandStarts(rows, priorityMap));
+    return new Map(
+      [...placed].map(([id, priority]) => [id, { kind: 'priority', priority } as const])
+    );
+  }, [groupingMode, mergedRows, plan.entries, plan.markers, priorityMap, catalog.engineSkills]);
 
   const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0;
   // No steps means no plan finish to project — never invent one for an
@@ -571,6 +594,23 @@ export function PlanEditor({
             {planFinish && (
               <span>{t('plans.projectedFinish', { date: formatDate(planFinish) })}</span>
             )}
+            <label className="flex items-center gap-1">
+              {t('plans.groupBy')}
+              <select
+                aria-label={t('plans.groupBy')}
+                value={groupingMode}
+                onChange={(e) => void setGroupingMode(e.target.value as GroupingMode)}
+                className="h-6 rounded-xs border border-line bg-panel-2 px-1 text-text"
+              >
+                {GROUPING_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode === 'priority'
+                      ? t('plans.groupByPriority')
+                      : t('plans.groupByAttributePair')}
+                  </option>
+                ))}
+              </select>
+            </label>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm">{t('plans.columns')}</Button>

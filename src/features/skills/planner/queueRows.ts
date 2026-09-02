@@ -6,7 +6,7 @@
  * and bands.ts, which this composes with (entry/marker row ids match
  * buildRows exactly, so bandStarts keeps working unmodified against those).
  */
-import type { PlanEntry, PlanPriority, ScheduledStep } from '@/engine/types';
+import type { PlanEntry, ScheduledStep } from '@/engine/types';
 import { buildRows } from './markers';
 
 export interface EntryQueueSummary {
@@ -131,16 +131,18 @@ export function buildMergedRows(
 }
 
 /**
- * Re-key bandsAt (keyed by an entry's own row id, from bandStarts) so a band
- * header renders before the FIRST row of that entry's merged block — its
- * leading prereq rows, if any, rather than landing between them and the
- * entry row itself.
+ * Re-key bandsAt (keyed by an entry's own row id, from bandStarts or
+ * attributePairBandStarts) so a band header renders before the FIRST row of
+ * that entry's merged block — its leading prereq rows, if any, rather than
+ * landing between them and the entry row itself. Generic over the band value
+ * (priority or attribute pair) since the re-keying logic has nothing
+ * priority-specific in it.
  */
-export function placeBandHeaders(
+export function placeBandHeaders<T>(
   rows: readonly MergedRow[],
-  bandsAt: ReadonlyMap<string, PlanPriority>
-): Map<string, PlanPriority> {
-  const placement = new Map<string, PlanPriority>();
+  bandsAt: ReadonlyMap<string, T>
+): Map<string, T> {
+  const placement = new Map<string, T>();
   let runStartId: string | null = null;
   for (const row of rows) {
     if (row.kind === 'prereq') {

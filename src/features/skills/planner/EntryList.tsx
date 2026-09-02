@@ -20,8 +20,13 @@ import { Button, EmptyState, Tooltip } from '@/components/ui';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { AttributeName, PlanPriority } from '@/engine/types';
 import { formatDate, formatDuration, stepTimeline } from '@/lib/duration';
+import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
 import type { MergedRow } from './queueRows';
+
+/** A band header's grouping (#115): either mode carries enough to render its label. */
+export type BandInfo =
+  { kind: 'priority'; priority: PlanPriority } | ({ kind: 'attributePair' } & AttributePair);
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const ICON_BUTTON = 'w-7 justify-center';
@@ -52,10 +57,7 @@ function attributePairLabel(primary: AttributeName, secondary: AttributeName): s
   return `${primary.slice(0, 3).toUpperCase()}/${secondary.slice(0, 3).toUpperCase()}`;
 }
 
-interface AttributePairBadgeProps {
-  primary: AttributeName;
-  secondary: AttributeName;
-}
+type AttributePairBadgeProps = AttributePair;
 
 /** A skill's primary/secondary attribute pair, toggleable via the "Columns" control (#114). */
 function AttributePairBadge({ primary, secondary }: AttributePairBadgeProps) {
@@ -112,16 +114,21 @@ function PerLevelTimeCell({
 }
 
 interface BandHeaderProps {
-  priority: PlanPriority;
+  band: BandInfo;
 }
 
-/** Divider marking where a run of same-priority entries begins (#27). */
-function BandHeader({ priority }: BandHeaderProps) {
+/** Divider marking where a run of same-priority (#27) or same-attribute-pair (#115) entries begins. */
+function BandHeader({ band }: BandHeaderProps) {
   const { t } = useTranslation();
-  const label = t(priorityLabelKey(priority));
+  const text =
+    band.kind === 'priority'
+      ? t('plans.priorityBand', { label: t(priorityLabelKey(band.priority)) })
+      : t('plans.attributePairBand', {
+          pair: attributePairLabel(band.primary, band.secondary),
+        });
   return (
     <li className="border-b border-line bg-panel-2 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-text-dim">
-      {t('plans.priorityBand', { label })}
+      {text}
     </li>
   );
 }
@@ -173,7 +180,7 @@ function TimelineLine({ start, finish }: { start: Date; finish: Date }) {
 interface EntryRowProps {
   row: Extract<MergedRow, { kind: 'entry' }>;
   name: string;
-  attributes: { primary: AttributeName; secondary: AttributeName } | undefined;
+  attributes: AttributePair | undefined;
   boosted: boolean;
   timeline: { start: Date; finish: Date } | null;
   columns: ColumnVisibility;
@@ -310,7 +317,7 @@ function EntryRow({
 interface PrereqRowProps {
   row: Extract<MergedRow, { kind: 'prereq' }>;
   name: string;
-  attributes: { primary: AttributeName; secondary: AttributeName } | undefined;
+  attributes: AttributePair | undefined;
   boosted: boolean;
   timeline: { start: Date; finish: Date } | null;
   columns: ColumnVisibility;
@@ -440,13 +447,11 @@ function MarkerRow({ id, markerIndex, onRemove }: MarkerRowProps) {
 interface EntryListProps {
   /** Pre-merged entry + marker + prereq rows (see queueRows.ts), in schedule order. */
   rows: readonly MergedRow[];
-  /** Row ids that start a new priority band (#27), from placeBandHeaders — may key a prereq row's id when that entry has leading prereq rows. */
-  bandsAt: ReadonlyMap<string, PlanPriority>;
+  /** Row ids that start a new band (#27, #115), from placeBandHeaders — may key a prereq row's id when that entry has leading prereq rows. */
+  bandsAt: ReadonlyMap<string, BandInfo>;
   nameFor: (skillTypeID: number) => string;
   /** A skill's primary/secondary attribute pair, when known (#114). */
-  attributesFor: (
-    skillTypeID: number
-  ) => { primary: AttributeName; secondary: AttributeName } | undefined;
+  attributesFor: (skillTypeID: number) => AttributePair | undefined;
   /** Which optional row parts are enabled — the "Columns" control's device-local preference (#114). */
   columns: ColumnVisibility;
   /** Step indices (into the underlying scheduled queue) a live Booster speeds up. */
@@ -519,7 +524,7 @@ export function EntryList({
               const band = bandsAt.get(row.id);
               return (
                 <Fragment key={row.id}>
-                  {band && <BandHeader priority={band} />}
+                  {band && <BandHeader band={band} />}
                   {row.kind === 'entry' && (
                     <EntryRow
                       row={row}
