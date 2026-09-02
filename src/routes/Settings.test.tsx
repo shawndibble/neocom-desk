@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -329,7 +329,10 @@ describe('Settings — Notifications (issue #170)', () => {
 
     const mailCheckbox = screen.getByRole('checkbox', { name: 'New Mail' });
     expect(mailCheckbox).toBeDisabled();
-    expect(screen.getByText(/re-authorize the character/i)).toBeInTheDocument();
+    // A disabled control can't take focus, so the tooltip only reveals on
+    // hover — a real pointermove, not the click above.
+    fireEvent.pointerMove(mailCheckbox);
+    expect(await screen.findByText(/re-authorize the character/i)).toBeInTheDocument();
 
     expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).not.toBeDisabled();
   });

@@ -10,7 +10,7 @@ Two-axis review of the diff between `HEAD` and a fixed point:
 
 The two axes are kept **separate** so one never masks the other. **Always run them as two parallel sub-agents**, whether or not a human is driving. Each axis re-reads the whole diff; doing that inline pours both passes into the caller's context, and inside an unattended `/next-ticket` run that context is already large and gets re-sent on every subsequent turn. The sub-agents read the diff in their own fresh contexts and return only their findings. Do not merge or rerank findings across axes.
 
-Both sub-agents are **read-only diff review**: they read the diff and cited files and report findings — they never run the test suite, linter, typechecker, build, or any validation/gate script (`npm test`, `npm run lint`, `npm run typecheck`, `gate.mjs`, etc.). That validation already ran (step 6's one pre-PR gate) and CI runs it again; re-running it inside a review sub-agent is redundant and expensive. State this explicitly in each sub-agent's own prompt, not just here — the sub-agent never sees this file's prose.
+Both sub-agents are **read-only diff review**: they read the diff and cited files and report findings — they never run the test suite, linter, typechecker, build, or any validation script (`npm test`, `npm run lint`, `npm run typecheck`, etc.). The pre-commit hook already covers lint/format/typecheck and CI covers the rest; re-running any of that inside a review sub-agent is redundant and expensive. State this explicitly in each sub-agent's own prompt, not just here — the sub-agent never sees this file's prose.
 
 The issue tracker config is at `docs/agents/issue-tracker.md`.
 

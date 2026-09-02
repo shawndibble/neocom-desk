@@ -51,4 +51,19 @@ if (!ci.ok) {
   process.exit(1);
 }
 
+// `npm ci`'s `prepare` lifecycle script (which installs the husky
+// pre-commit hook) is silently skipped whenever `ignore-scripts` is set —
+// true in this agent's sandboxed shell. Install it explicitly so the hook
+// is live regardless of that setting.
+const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const husky = tryRun(npxCmd, ['husky'], { cwd: worktreePath, shell: process.platform === 'win32' });
+if (!husky.ok) {
+  printResult({
+    status: 'error',
+    step: 'husky-install',
+    message: husky.stderr.trim().slice(-4000),
+  });
+  process.exit(1);
+}
+
 printResult({ status: 'ready', worktreePath, branch });

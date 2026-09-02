@@ -28,7 +28,7 @@ call made early. A recent 315-turn run spent 58M tokens to produce 75k tokens
 of actual tool output. Context, not reading, is the expense.
 
 - **Use the scripts in `scripts/next-ticket/` for every mechanical step below**
-  (selection, worktree setup, the gate, sync-with-main, PR creation, CI
+  (selection, worktree setup, sync-with-main, PR creation, CI
   driving, CI-failure fetch, merge/cleanup). Each one replaces a multi-call
   sequence with a single Bash call and prints one line of JSON — read that
   JSON, don't re-derive what it already tells you. Measured across 58 real
@@ -57,7 +57,7 @@ wall-clock fix — step 5 is where a run's time actually goes.
 This run is not interactive — nobody is watching to notice a stalled
 background wait and nudge it back the way a human can in a live session.
 Confirmed tonight (2026-09-01): resumed runs repeatedly kicked off a script
-(`gate.mjs`, etc.) with a backgrounded Bash call or a Monitor, reported
+(`sync-main.mjs`, etc.) with a backgrounded Bash call or a Monitor, reported
 "waiting for it to finish," and then simply stopped — the process ended with
 nothing further done, no error, no comment, and the ticket left claimed with
 real uncommitted work orphaned in its worktree. This is very likely also
@@ -65,7 +65,7 @@ what has been killing plain `/next-ticket` loop iterations: several ran deep
 into step 5 (substantial, real diffs) and then went silent with no `RESULT`
 line.
 
-Every mechanical script call in this workflow (`gate.mjs`, `sync-main.mjs`,
+Every mechanical script call in this workflow (`sync-main.mjs`,
 `open-pr.mjs`, `drive-ci.mjs`, `finish.mjs`, `npm ci`, etc.) is a single
 **blocking, foreground** call — issue it and read its result in the same
 turn before deciding the next step. Never hand one to `run_in_background` or
@@ -92,13 +92,13 @@ back to the main checkout, `git worktree remove "$WORKTREE_PATH" --force`,
 `git worktree prune`, then stop per that step's instructions (report and
 STOP, or continue to pick a different ticket, as stated).
 
-## Resilience: merge conflicts and failing tests
+## Resilience: merge conflicts
 
-Both failure classes below are expected, not exceptional — concurrent
-`/next-ticket` runs (or a human) can land on `main` while this one is still
-working, and a gate can fail mid-implementation. Neither should kill the run;
-both procedures are bounded, so if a bound is exceeded the run abandons
-cleanly per the procedure above instead of looping unboundedly.
+Merge conflicts are expected, not exceptional — concurrent `/next-ticket`
+runs (or a human) can land on `main` while this one is still working. This
+should not kill the run; the procedure below is bounded, so if the bound is
+exceeded the run abandons cleanly per the procedure above instead of looping
+unboundedly.
 
 ### Sync-with-main / conflict resolution procedure
 
@@ -108,61 +108,47 @@ reports `mergeStateStatus: CONFLICTING`/`DIRTY`. Up to **3 attempts**:
 1. `node scripts/next-ticket/sync-main.mjs` — fetches and merges
    `origin/main`. Prints `{"status":"already-up-to-date"}`,
    `{"status":"merged"}`, or `{"status":"conflict","files":[...]}`.
-2. On `already-up-to-date`: nothing changed — skip to step 5, no gate run.
+2. On `already-up-to-date`: nothing changed — this procedure is done; return
+   to whichever step called it.
 3. On `conflict`: invoke the `resolving-merge-conflicts` skill to resolve
    the listed files in place — it resolves and commits; never
-   `git merge --abort`. Then continue to step 4.
-4. The tree changed (`merged`, or a conflict was just resolved) — it needs
-   validating. **If this procedure is running as part of step 6** (the one
-   pre-PR gate, before the PR exists), re-run the gate
-   (`node scripts/next-ticket/gate.mjs --build`) against the merged tree; if
-   it fails, follow the local gate failure procedure below. **If running as
-   part of step 7a or step 8** (the PR is already open), skip the gate here
-   — commit and push, and let CI re-validate instead; see "One local gate,
-   then CI" below.
-5. If the merge left anything uncommitted, commit it.
+   `git merge --abort`.
+4. If the merge (or the conflict resolution's commit) left anything
+   uncommitted, commit it now. Every commit made here runs through the
+   pre-commit hook (lint-staged + typecheck — see "Pre-commit hook, then CI"
+   below). If the hook rejects it, fix the reported issue and re-commit —
+   never `git commit --no-verify`, and still never `git merge --abort`.
 
 If a 3rd attempt still leaves conflicts (main moving faster than this run can
 converge — very unlikely), abandon and report that `main` would not settle.
 
-### One local gate, then CI
+### Pre-commit hook, then CI
 
-The full gate (format:check/lint/typecheck/`test:run`/build) runs locally
-**at most once** per ticket, in step 6, right before the PR opens — this is
-what satisfies CLAUDE.md's "validate before commit" rule (skipped entirely
-if step 6's sync found nothing new to validate, per step 4 above). After the
-PR is open, the full suite and the full gate don't run locally again:
-GitHub Actions (`validate` + `e2e`) is the only place they run for the rest
-of the loop — every round of step 8's CI-failure-fix loop, and any conflict
-resolution once the PR is open (step 7a, step 8), ends in a commit-and-push,
-never a local gate re-run. A single test _file_ is still fine to run locally
-to confirm a targeted fix (e.g. `npx vitest run <path>`, as in step 8) —
-it's the full suite and the full gate that move to CI-only. This keeps
-concurrent `/next-ticket` runs from piling up repeated full test/build runs
-on the local machine.
+A pre-commit hook (`lint-staged`: `eslint --fix` + `prettier --write` on
+staged files, then `npm run typecheck`) runs on every commit, in every
+worktree. Step 3 (`setup-worktree.mjs`) installs it explicitly via
+`npx husky` right after `npm ci`, rather than relying on npm's `prepare`
+lifecycle script — this agent's sandboxed shell forces `ignore-scripts`,
+which silently skips `prepare`. (Confirmed empirically: without that
+explicit step, the hook never installs in a linked worktree and a commit
+with a real type error sails straight through.)
 
-### Local gate failure procedure
+No full local gate (format:check/lint/typecheck/`test:run`/build) runs
+anywhere in this loop. GitHub Actions' `validate` job runs exactly those
+checks on every push regardless, so a local pre-PR full run only ever
+duplicated a check CI was about to run again — it added ~10 minutes per
+ticket for no coverage CI didn't already provide. `npm run test:run` and
+`npm run build` never run locally in this loop; a single test _file_ is
+still fine to confirm a targeted fix (e.g. `npx vitest run <path>`, as in
+step 8). `node scripts/next-ticket/gate.mjs [--build]` still exists as an
+optional, manual full-CI-mirror for ad-hoc branches outside this loop —
+nothing in this loop calls it automatically anymore.
 
-Referenced by step 6 only — the single pre-PR local gate. Once the PR is
-open, GitHub Actions is the sole place these checks run (see "One local
-gate, then CI" above and step 8 below). Up to **5 rounds**:
-
-1. Read the failing command's output directly from the gate script's JSON
-   (`output.<check-name>`) — it's local, not a CI log, so no sub-agent is
-   needed here.
-2. Fix the actual cause: code or test, whichever is wrong. Never delete,
-   skip, or loosen a test just to make it pass.
-3. If a failure looks pre-existing and unrelated to this ticket's diff (e.g.
-   a flaky or environment-dependent test), confirm before ignoring it: `git
-stash`, run just that one check, `git stash pop`. If it fails identically
-   without this ticket's changes, note it in the PR's Review notes instead of
-   trying to fix it.
-4. Re-run `node scripts/next-ticket/gate.mjs` (no `--build` — that only needs
-   to run once the rest is green, as the final check before step 7 or before
-   pushing a step 8 fix).
-
-If still failing after 5 rounds: comment on the issue with a precise summary
-of the remaining failure, then abandon per the procedure above.
+The trade this makes: a full-suite regression that slips past the
+pre-commit hook and past `/implement`'s own typecheck-often /
+targeted-test-as-you-go habit (its beat 3) is now caught by CI instead of
+locally — costing one of step 8's 5 shared CI-fix rounds rather than a local
+retry.
 
 ## 1. Prepare
 
@@ -254,28 +240,14 @@ batch the exploration reads, and make one edit per file rather than a stream of
 small ones. `/code-review` runs its two axes as parallel sub-agents — do not
 run them inline.
 
-## 6. Sync with main, then the local gate (mirror CI)
+## 6. Sync with main
 
 `main` may have moved since step 3 (another `/next-ticket` run or a human
 merge) — catch that now rather than at PR-merge time. Run the sync-with-main
-procedure above once, unconditionally. This is the one pre-PR call site
-(per the procedure's step 4), so if the sync actually changed the tree
-(`merged`, or a conflict was resolved), it already runs
-`node scripts/next-ticket/gate.mjs --build` for you as part of that
-procedure and follows the local gate failure procedure on failure — nothing
-further to do here beyond that. (If sync reported `already-up-to-date`, the
-gate didn't run — `/implement`'s own validation in step 5 already covers
-this exact tree, so re-running it here would be pure waste; see "One local
-gate, then CI".)
-
-`gate.mjs --build` runs `format:check`, `lint`, `typecheck`, and `test:run`
-concurrently (they're independent — this is faster than the old sequential
-`&&` chain, and one Bash call either way), then `build` if the rest passed.
-It prints `{"status":"pass"}` or
-`{"status":"fail","failed":["lint", ...],"output":{"lint":"...tail...", ...}}`
-(each failed check's output, truncated to its last ~4000 characters — read
-`output.<check-name>` directly rather than re-running the check yourself).
-`npm run format` auto-fixes formatting.
+procedure above once, unconditionally. If it produces a commit (`merged`, or
+a conflict was resolved), that commit already ran through the pre-commit
+hook (see "Pre-commit hook, then CI" above) — nothing further to do here. If
+sync reported `already-up-to-date`, there's nothing to commit.
 
 Do **not** run `npm run test:e2e` locally — one spec
 (`e2e/plans.spec.ts` clipboard export) fails only on Windows due to a clipboard
@@ -296,8 +268,8 @@ export/clipboard behaviour, reason about e2e impact from the spec instead.
   win a manual race in step 9, and a check-watch hiccup in step 8 can't
   strand an otherwise-green PR. Prints
   `{"status":"open","number":<pr>,"url":"...","autoMergeArmed":true}` or
-  `{"status":"error","message":"..."}`. On `error`, follow the local gate /
-  abandon procedures as appropriate to the failure. If `autoMergeArmed` is
+  `{"status":"error","message":"..."}`. On `error`, follow the abandon
+  procedure as appropriate to the failure. If `autoMergeArmed` is
   `false`, note it and continue — step 9 still merges directly as a fallback.
 
 ## 7a. Immediate conflict check
@@ -308,8 +280,8 @@ locally whether `main` moved in the gap between step 6's sync and this push
 spending a full CI run on a PR that couldn't have merged anyway). Run the
 sync-with-main / conflict resolution procedure above once, unconditionally.
 `already-up-to-date` or `merged`: proceed to step 8. A real conflict:
-resolve, commit, and push (no local gate re-run — see "One local gate, then
-CI"), then proceed to step 8.
+resolve, commit (runs through the pre-commit hook — see "Pre-commit hook,
+then CI"), and push, then proceed to step 8.
 
 ## 8. Drive to a mergeable, green PR
 
@@ -321,8 +293,8 @@ it is not 5 conflict rounds plus 5 CI rounds):
   (this is the CI runtime itself, not overhead — nothing to speed up here).
   Prints one of:
   - `{"status":"conflict"}` — follow the sync-with-main / conflict resolution
-    procedure above (no local gate re-run at this point — see "One local
-    gate, then CI"), push, and restart this round.
+    procedure above (the commit runs through the pre-commit hook — see
+    "Pre-commit hook, then CI"), push, and restart this round.
   - `{"status":"green","mergeable":true}` — proceed to step 9.
   - `{"status":"checks-failed","failedRunIds":[<run-id>, ...]}` — for each
     id, within the same round budget:
@@ -339,10 +311,10 @@ playwright-report`), then report back: the failing job and test, the
     2. Fix it on the branch from that report (code or test, whichever is
        actually wrong — do not delete a failing test to make it pass). If
        the failure was a unit test, you may run that one file locally to
-       confirm the fix (`npx vitest run <path>`) — but do not re-run the
-       full gate or the full suite (`gate.mjs`, `npm run test:run`,
-       `npm run build`); the PR is already open, so CI is what validates
-       the whole tree now (see "One local gate, then CI").
+       confirm the fix (`npx vitest run <path>`) — but never the full suite
+       or a build locally (`npm run test:run`, `npm run build`); CI is what
+       validates the whole tree in this loop (see "Pre-commit hook, then
+       CI").
     3. Commit and `git push`.
     4. Restart this round (`drive-ci.mjs` again against the new commit).
 - If still not both mergeable and green after 5 rounds: comment on the PR

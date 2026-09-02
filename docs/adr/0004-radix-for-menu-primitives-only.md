@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted (2026-08-30)
+Accepted (2026-08-30). Amended by ADR 0008 — `Tooltip` also moved to Radix,
+for collision-aware placement; the "and nothing else" below no longer holds
+for `Tooltip`, but does for every other hand-rolled primitive.
 
 ## Context
 

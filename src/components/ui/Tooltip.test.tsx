@@ -3,27 +3,41 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Tooltip, InfoTooltip } from './Tooltip';
 
 describe('Tooltip', () => {
-  it('renders a role="tooltip" bubble wired to its trigger via aria-describedby', () => {
+  it('reveals a role="tooltip" bubble on hover, wired to its trigger via aria-describedby', async () => {
     render(
       <Tooltip content="One-line explanation.">
         <button type="button">Trigger</button>
       </Tooltip>
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
-    const tooltip = screen.getByRole('tooltip');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    fireEvent.pointerMove(trigger);
+    const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('One-line explanation.');
-    expect(trigger.getAttribute('aria-describedby')).toBe(tooltip.id);
+    expect(trigger).toHaveAttribute('aria-describedby', tooltip.id);
   });
 
-  it('applies a caller-supplied className to the wrapping span alongside its own', () => {
+  it('reveals the tooltip on keyboard focus too, with no hover delay', () => {
+    render(
+      <Tooltip content="One-line explanation.">
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.focus(trigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
+  });
+
+  it('merges a caller-supplied className onto the trigger element', () => {
     render(
       <Tooltip content="One-line explanation." className="w-full">
         <button type="button">Trigger</button>
       </Tooltip>
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
-    expect(trigger.parentElement?.className).toContain('w-full');
-    expect(trigger.parentElement?.className).toContain('inline-flex');
+    expect(trigger.className).toContain('w-full');
   });
 });
 
@@ -40,15 +54,14 @@ describe('Tooltip touch support', () => {
       </Tooltip>
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
-    const tooltip = screen.getByRole('tooltip');
-    expect(tooltip.className).toContain('hidden');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
 
     fireEvent.touchStart(trigger);
     act(() => {
       vi.advanceTimersByTime(500);
     });
 
-    expect(tooltip.className).not.toContain('hidden');
+    expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
   });
 
   it('does not reveal the tooltip on a quick tap, and does not block the trigger tap action', () => {
@@ -62,7 +75,6 @@ describe('Tooltip touch support', () => {
       </Tooltip>
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
-    const tooltip = screen.getByRole('tooltip');
 
     fireEvent.touchStart(trigger);
     act(() => {
@@ -71,7 +83,7 @@ describe('Tooltip touch support', () => {
     fireEvent.touchEnd(trigger);
     fireEvent.click(trigger);
 
-    expect(tooltip.className).toContain('hidden');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
@@ -83,18 +95,17 @@ describe('Tooltip touch support', () => {
       </Tooltip>
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
-    const tooltip = screen.getByRole('tooltip');
 
     fireEvent.touchStart(trigger);
     act(() => {
       vi.advanceTimersByTime(500);
     });
-    expect(tooltip.className).not.toContain('hidden');
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(1500);
     });
-    expect(tooltip.className).toContain('hidden');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('dismisses when tapping outside the trigger/tooltip', () => {
@@ -109,16 +120,21 @@ describe('Tooltip touch support', () => {
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
     const outside = screen.getByRole('button', { name: 'Outside' });
-    const tooltip = screen.getByRole('tooltip');
 
     fireEvent.touchStart(trigger);
     act(() => {
       vi.advanceTimersByTime(500);
     });
-    expect(tooltip.className).not.toContain('hidden');
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
+    // Radix's DismissableLayer defers attaching its outside-pointerdown
+    // listener by a setTimeout(0), so it never mistakes the pointerdown that
+    // opened the layer for one that should close it — flush that tick first.
+    act(() => {
+      vi.advanceTimersByTime(0);
+    });
     fireEvent.pointerDown(outside);
-    expect(tooltip.className).toContain('hidden');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('resets the auto-dismiss window on a second long-press, instead of closing on the first one’s stale timer', () => {
@@ -129,7 +145,6 @@ describe('Tooltip touch support', () => {
       </Tooltip>
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
-    const tooltip = screen.getByRole('tooltip');
 
     fireEvent.touchStart(trigger);
     act(() => {
@@ -144,26 +159,28 @@ describe('Tooltip touch support', () => {
     act(() => {
       vi.advanceTimersByTime(500); // t=1500: second reveal, resets auto-dismiss to fire at t=3000
     });
-    expect(tooltip.className).not.toContain('hidden');
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(500); // t=2000: first press's stale timer must not fire here
     });
-    expect(tooltip.className).not.toContain('hidden');
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(1000); // t=3000: second press's own auto-dismiss fires
     });
-    expect(tooltip.className).toContain('hidden');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 });
 
 describe('InfoTooltip', () => {
-  it('renders a labeled "?" button describing the tooltip content', () => {
+  it('renders a labeled "?" button describing the tooltip content once revealed', () => {
     render(<InfoTooltip label="About Material Efficiency" content="Reduces material use." />);
     const trigger = screen.getByRole('button', { name: 'About Material Efficiency' });
+
+    fireEvent.focus(trigger);
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip).toHaveTextContent('Reduces material use.');
-    expect(trigger.getAttribute('aria-describedby')).toBe(tooltip.id);
+    expect(trigger).toHaveAttribute('aria-describedby', tooltip.id);
   });
 });
