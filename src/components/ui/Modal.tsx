@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export type ModalPlacement = 'center' | 'sheet';
+export type ModalPlacement = 'center' | 'sheet' | 'wide';
 
 interface ModalProps {
   /** Parent owns the state; the modal never closes itself. */
@@ -13,7 +13,7 @@ interface ModalProps {
   /** Visible heading and the dialog's accessible name. */
   title: string;
   children: ReactNode;
-  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer. */
+  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `wide` for multi-column content (e.g. a comparison matrix). */
   placement?: ModalPlacement;
 }
 
@@ -52,7 +52,9 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
   const placementClass =
     placement === 'sheet'
       ? 'mx-auto mt-auto mb-0 max-h-[85vh] w-full max-w-md rounded-b-none'
-      : 'm-auto max-h-[85vh] w-full max-w-lg';
+      : placement === 'wide'
+        ? 'm-auto max-h-[85vh] w-full max-w-5xl'
+        : 'm-auto max-h-[85vh] w-full max-w-lg';
 
   return (
     <dialog

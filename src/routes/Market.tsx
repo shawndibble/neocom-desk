@@ -62,6 +62,7 @@ import { QuickbarList } from '@/features/market/QuickbarList';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { getVariationRows } from '@/features/market/variations';
 import { VariationsTable } from '@/features/market/VariationsTable';
+import { VariationsCompareModal } from '@/features/market/VariationsCompareModal';
 import {
   addQuickbarItem,
   removeQuickbarItem,
@@ -309,6 +310,10 @@ export function Market() {
   function handleShowInfo(typeId: number, itemName: string) {
     setInfoModalItem({ typeId, itemName });
   }
+
+  // Variations "Compare" (issue #146): every row currently shown in the
+  // Variations table, side by side — see VariationsCompareModal.
+  const [compareModalOpen, setCompareModalOpen] = useState(false);
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   const [types, setTypes] = useState<MarketTypeEntry[] | null>(null);
@@ -1214,6 +1219,7 @@ export function Market() {
                       truncated={variationsResult.truncated}
                       prices={variationPrices}
                       onSelect={handleSelectItem}
+                      onCompare={() => setCompareModalOpen(true)}
                     />
                   )}
                 </>
@@ -1238,6 +1244,14 @@ export function Market() {
           typeId={infoModalItem.typeId}
           itemName={infoModalItem.itemName}
           onClose={() => setInfoModalItem(null)}
+        />
+      )}
+
+      {compareModalOpen && variationsResult && (
+        <VariationsCompareModal
+          items={variationsResult.rows}
+          prices={variationPrices}
+          onClose={() => setCompareModalOpen(false)}
         />
       )}
     </div>
