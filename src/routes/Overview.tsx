@@ -18,6 +18,7 @@ import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap'
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { formatIsk } from '@/lib/isk';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { selectActiveQueueEntry } from './overviewQueue';
@@ -95,6 +96,7 @@ export function Overview() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
+      <OverviewSubNav />
       <header className="flex flex-wrap items-center gap-3">
         <CharacterAvatar
           characterId={activeCharacterId}

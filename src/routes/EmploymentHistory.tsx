@@ -20,6 +20,7 @@ import {
 import type { CachedResult } from '@/esi/cache';
 import type { CorporationHistoryEntry } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
+import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
 
@@ -100,6 +101,7 @@ export function EmploymentHistory() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
+      <OverviewSubNav />
       <PageHeader
         title={t('employmentHistory.title')}
         meta={historyResult && <DataAgeBadge date={historyResult.fetchedAt} />}

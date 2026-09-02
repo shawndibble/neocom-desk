@@ -28,8 +28,10 @@ test('shows cached character and skills after external hosts go unreachable', as
   await goExternallyOffline(page);
   await page.reload();
 
-  // Active character persisted in Dexie settings/characters — no ESI call needed.
-  await expect(page.getByRole('link', { name: 'Switch character' })).toContainText(CHARACTER_NAME);
+  // Active character persisted in Dexie settings/characters — no ESI call
+  // needed. The rail's pinned character menu takes its accessible name from
+  // the pilot itself, so finding the trigger by name *is* the assertion.
+  await expect(page.getByRole('button', { name: CHARACTER_NAME })).toBeVisible();
 
   // The reload resets React state, so groups are collapsed again.
   await page.getByRole('button', { name: 'Expand all' }).click();

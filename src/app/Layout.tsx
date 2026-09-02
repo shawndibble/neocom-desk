@@ -7,7 +7,17 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
-import { CharacterAvatar, LogoMark, Modal } from '@/components/ui';
+import {
+  CharacterAvatar,
+  characterAvatarBoxClassName,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  LogoMark,
+  Modal,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { useLockedRoutes } from './useGrantedScopes';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
@@ -34,7 +44,7 @@ function navClass({ isActive }: { isActive: boolean }): string {
 
 // Distinct from NAV_LINK (used by the desktop rail and the More sheet, both
 // of which scroll and have room to spare): the bottom tab bar is a fixed
-// five-way split of a viewport that can be as narrow as ~320px. `flex-1
+// four-way split of a viewport that can be as narrow as ~320px. `flex-1
 // min-w-0` forces every tab — including "More" — to always get an equal,
 // bounded share of the width, so a long label truncates instead of pushing
 // later tabs off-screen. `min-h-11` (44px) meets the mobile touch-target
@@ -48,24 +58,26 @@ function mobileNavClass({ isActive }: { isActive: boolean }): string {
   return `${MOBILE_NAV_ITEM} ${isActive ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`;
 }
 
-/** Nav-reachable routes, so `useLockedRoutes` answers for all of them at once. */
+/**
+ * Routes the shell itself renders a lock marker for, so `useLockedRoutes`
+ * answers for all of them at once. `/clones` and `/employment-history` left
+ * with the rail — they are Overview tabs now and `OverviewSubNav` asks for
+ * their state itself. `/characters` and `/settings` are UNGATED
+ * (routeScopes.ts), so the character menu has no marker to render.
+ */
 const NAV_PATHS = [
-  '/characters',
   '/overview',
   '/skills',
   '/industry',
   '/market',
   '/wallet',
-  '/clones',
   '/planetary-industry',
-  '/employment-history',
   '/assets',
   '/mail',
   '/calendar',
   '/contracts',
   '/contacts',
   '/orders',
-  '/settings',
 ] as const satisfies readonly AppRoutePath[];
 
 interface NavItemProps {
@@ -109,22 +121,165 @@ function NavGroupLabel({ children }: { children: string }) {
   );
 }
 
+interface ActiveCharacter {
+  characterId: number;
+  name: string;
+}
+
+/**
+ * Trigger face shared by the rail menu and the sheet's disclosure. The control
+ * renders through the gap where `activeCharacter` is still undefined — that is
+ * just the Dexie lookup resolving on a cold load, and hiding it would leave
+ * Characters and Settings, which appear nowhere else now, briefly unreachable.
+ *
+ * Through that gap it holds the avatar's footprint so the rail doesn't jump,
+ * and carries no text: the trigger's name comes from `aria-label` instead
+ * (see `characterTriggerLabel`). A visible "Switch character" placeholder
+ * would collide with the identically-worded shortcut description Settings
+ * lists, which is a real ambiguity for a screen reader, not just for a test.
+ */
+function CharacterTriggerFace({
+  activeCharacter,
+  size,
+}: {
+  activeCharacter: ActiveCharacter | undefined;
+  size?: 'sm';
+}) {
+  if (!activeCharacter) {
+    // Borrows the portrait's own box so the placeholder doesn't change shape
+    // when the real one arrives.
+    return (
+      <span
+        aria-hidden="true"
+        className={`${characterAvatarBoxClassName(size)} border-line bg-panel-2`}
+      />
+    );
+  }
+  return (
+    <>
+      <CharacterAvatar characterId={activeCharacter.characterId} size={size} />
+      <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
+    </>
+  );
+}
+
+/**
+ * Undefined once the Character is known: the visible name is then the better
+ * accessible name, and an `aria-label` over it would only replace what the
+ * user can see with something vaguer.
+ */
+function characterTriggerLabel(
+  activeCharacter: ActiveCharacter | undefined,
+  t: (key: string) => string
+): string | undefined {
+  return activeCharacter ? undefined : t('nav.switchCharacter');
+}
+
+/**
+ * What the character menu opens onto, in one place: the rail renders these as
+ * `DropdownMenuItem`s and the sheet as `NavItem`s, and only the mechanism
+ * differs between them. Both are UNGATED (routeScopes.ts), so neither
+ * rendering carries a missing-scope marker.
+ */
+const CHARACTER_MENU_DESTINATIONS = [
+  { to: '/characters', labelKey: 'nav.characters' },
+  { to: '/settings', labelKey: 'nav.settings' },
+] as const satisfies readonly { to: AppRoutePath; labelKey: string }[];
+
+const CHARACTER_TRIGGER =
+  'flex w-full items-center gap-2 p-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
+
+/**
+ * Desktop rail footer: the active Character, opening onto the two views that
+ * used to sit in the rail proper. The name *is* the accessible name — Radix
+ * adds `aria-haspopup="menu"`, so an extra label would only rewrite it into
+ * something less useful than the pilot's own name. Items are `asChild` links
+ * so they stay real anchors (middle-click, "open in new tab").
+ */
+function RailCharacterMenu({ activeCharacter }: { activeCharacter: ActiveCharacter | undefined }) {
+  const { t } = useTranslation();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={characterTriggerLabel(activeCharacter, t)}
+        className={`${CHARACTER_TRIGGER} shrink-0 border-t border-line`}
+      >
+        <CharacterTriggerFace activeCharacter={activeCharacter} />
+      </DropdownMenuTrigger>
+      {/* Anchored upward: the trigger is pinned to the bottom of the viewport. */}
+      <DropdownMenuContent side="top" align="start" className="w-44">
+        {CHARACTER_MENU_DESTINATIONS.map(({ to, labelKey }) => (
+          // `asChild` so each item stays a real anchor — middle-click and
+          // "open in new tab" keep working.
+          <DropdownMenuItem key={to} asChild>
+            <Link to={to}>{t(labelKey)}</Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * The sheet's equivalent of `RailCharacterMenu`, as an inline disclosure
+ * rather than a `DropdownMenu`: `DropdownMenuContent` portals to `document.body`,
+ * which sits *outside* the top-layer `<dialog>` the sheet opens with
+ * `showModal()` — and everything outside it is inert, so the menu would render
+ * and then refuse every click. `Modal` mounts its children only while open, so
+ * the expanded state resets with the sheet and never reopens pre-expanded.
+ */
+function SheetCharacterMenu({
+  activeCharacter,
+  onNavigate,
+}: {
+  activeCharacter: ActiveCharacter | undefined;
+  onNavigate: () => void;
+}) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label={characterTriggerLabel(activeCharacter, t)}
+        onClick={() => setExpanded((open) => !open)}
+        className={`${CHARACTER_TRIGGER} min-h-11 rounded-xs`}
+      >
+        <CharacterTriggerFace activeCharacter={activeCharacter} size="sm" />
+        <span aria-hidden="true" className="ml-auto shrink-0 text-text-faint">
+          {expanded ? <Icon.Expanded /> : <Icon.Descend />}
+        </span>
+      </button>
+      {expanded && (
+        <div className="ml-3 space-y-1 border-l border-line pl-2">
+          {CHARACTER_MENU_DESTINATIONS.map(({ to, labelKey }) => (
+            <NavItem key={to} to={to} label={t(labelKey)} locked={false} onClick={onNavigate} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const MORE_SHEET_ID = 'mobile-more-sheet';
 
 interface MobileMoreSheetProps {
   open: boolean;
   onClose: () => void;
-  activeCharacter: { characterId: number; name: string } | undefined;
+  activeCharacter: ActiveCharacter | undefined;
   locked: ReadonlySet<AppRoutePath>;
 }
 
 /**
  * Mobile-only overflow sheet: the Character-section views that don't fit as
- * primary bottom-tab items, plus "switch character", plus Market (which isn't
- * Character-scoped, but the tab bar is full at 4 + More). A real modal, not a
- * drawer: it covers the viewport, so the tab bar underneath must not stay
- * reachable — hence the shared `Modal` and its dismissal contract. Links close
- * it on click so it never hangs over the next route.
+ * primary bottom-tab items, plus Market (which isn't Character-scoped, but the
+ * tab bar is full at 3 + More). The Character disclosure leads, mirroring the
+ * rail's pinned menu — it is the only route to Settings on a phone. A real
+ * modal, not a drawer: it covers the viewport, so the tab bar underneath must
+ * not stay reachable — hence the shared `Modal` and its dismissal contract.
+ * Links close it on click so it never hangs over the next route.
  */
 function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreSheetProps) {
   const { t } = useTranslation();
@@ -132,22 +287,13 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
   return (
     <Modal open={open} id={MORE_SHEET_ID} onClose={onClose} title={t('nav.more')} placement="sheet">
       <div className="space-y-1 pb-3">
+        <SheetCharacterMenu activeCharacter={activeCharacter} onNavigate={onClose} />
         <NavItem
           to="/market"
           label={t('nav.market')}
           locked={locked.has('/market')}
           onClick={onClose}
         />
-        {activeCharacter && (
-          <Link
-            to="/characters"
-            onClick={onClose}
-            className="flex items-center gap-2 rounded-xs border border-transparent px-3 py-2 transition-colors hover:bg-panel-2"
-          >
-            <CharacterAvatar characterId={activeCharacter.characterId} size="sm" />
-            <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
-          </Link>
-        )}
         <NavItem
           to="/wallet"
           label={t('nav.wallet')}
@@ -155,21 +301,9 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           onClick={onClose}
         />
         <NavItem
-          to="/clones"
-          label={t('nav.clones')}
-          locked={locked.has('/clones')}
-          onClick={onClose}
-        />
-        <NavItem
           to="/planetary-industry"
           label={t('nav.pi')}
           locked={locked.has('/planetary-industry')}
-          onClick={onClose}
-        />
-        <NavItem
-          to="/employment-history"
-          label={t('nav.employmentHistory')}
-          locked={locked.has('/employment-history')}
           onClick={onClose}
         />
         <NavItem
@@ -201,12 +335,6 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           to="/orders"
           label={t('nav.orders')}
           locked={locked.has('/orders')}
-          onClick={onClose}
-        />
-        <NavItem
-          to="/settings"
-          label={t('nav.settings')}
-          locked={locked.has('/settings')}
           onClick={onClose}
         />
       </div>
@@ -259,26 +387,12 @@ export function Layout() {
           </span>
           {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
-        {activeCharacter && (
-          <Link
-            to="/characters"
-            aria-label={t('nav.switchCharacter')}
-            className="flex items-center gap-2 border-b border-line p-2 transition-colors hover:bg-panel-2"
-          >
-            <CharacterAvatar characterId={activeCharacter.characterId} />
-            <span className="min-w-0 truncate text-xs">{activeCharacter.name}</span>
-          </Link>
-        )}
-        <nav className="flex flex-1 flex-col gap-1 p-2">
+        {/* `overflow-y-auto` is what makes the character menu below actually
+            pinned: the rail is `h-screen`, so without it a tall list (large
+            text scale) would push the footer off the bottom instead of
+            scrolling. */}
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
           <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
-          <NavGroupLabel>{t('nav.groups.general')}</NavGroupLabel>
-          <NavItem
-            to="/characters"
-            label={t('nav.characters')}
-            locked={locked.has('/characters')}
-          />
-          <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
-          <NavItem to="/settings" label={t('nav.settings')} locked={locked.has('/settings')} />
           <NavGroupLabel>{t('nav.groups.progression')}</NavGroupLabel>
           <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
           <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
@@ -287,13 +401,11 @@ export function Layout() {
             label={t('nav.pi')}
             locked={locked.has('/planetary-industry')}
           />
-          <NavItem to="/clones" label={t('nav.clones')} locked={locked.has('/clones')} />
-          <NavItem
-            to="/employment-history"
-            label={t('nav.employmentHistory')}
-            locked={locked.has('/employment-history')}
-          />
           <NavGroupLabel>{t('nav.groups.economy')}</NavGroupLabel>
+          {/* Leads the group: it is the one economy view that answers a
+              question before you own anything, and the only one here that
+              isn't Character-scoped. */}
+          <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
           <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
           <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
           <NavItem to="/orders" label={t('nav.orders')} locked={locked.has('/orders')} />
@@ -303,6 +415,7 @@ export function Layout() {
           <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
           <NavItem to="/contacts" label={t('nav.contacts')} locked={locked.has('/contacts')} />
         </nav>
+        <RailCharacterMenu activeCharacter={activeCharacter} />
       </aside>
 
       <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
@@ -310,7 +423,7 @@ export function Layout() {
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar: 4 primary destinations + More. Fixed-width
+      {/* Mobile bottom tab bar: 3 primary destinations + More. Fixed-width
           items (see MOBILE_NAV_ITEM) so the bar never overflows the
           viewport; `env(safe-area-inset-bottom)` keeps it clear of the
           home-indicator gesture area on notched phones. */}
@@ -318,9 +431,6 @@ export function Layout() {
         aria-label={t('nav.mobileLabel')}
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
       >
-        <NavLink to="/characters" className={mobileNavClass}>
-          <span className="truncate">{t('nav.characters')}</span>
-        </NavLink>
         <NavLink to="/overview" className={mobileNavClass}>
           <span className="truncate">{t('nav.overview')}</span>
         </NavLink>

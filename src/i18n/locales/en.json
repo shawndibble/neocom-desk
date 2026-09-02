@@ -5,12 +5,11 @@
   },
   "nav": {
     "characters": "Characters",
-    "overview": "Home",
+    "overview": "Overview",
     "skills": "Skills",
     "industry": "Industry",
     "market": "Market",
     "groups": {
-      "general": "General",
       "progression": "Progression",
       "economy": "Economy",
       "social": "Social"

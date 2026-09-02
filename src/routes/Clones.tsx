@@ -15,6 +15,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterClones } from '@/features/character/clones';
+import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { loadCharacterSkills } from '@/features/skills/data';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';
@@ -138,6 +139,7 @@ export function Clones() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
+      <OverviewSubNav />
       <PageHeader
         title={t('clones.title')}
         meta={clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}

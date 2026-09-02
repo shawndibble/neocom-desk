@@ -202,5 +202,5 @@ Full E2E: `npm run test:e2e`. SDE rebuild: `npm run sde:build`.
 4. If the view needs calculation, add it to `src/engine/` test-first (pure, no fetch/DOM/Dexie).
 5. Add the Dexie schema bump in `src/db/index.ts` only if new local storage is needed (additive `db.version(n+1).stores({...})`, never mutate a shipped version).
 6. Build the route component in `src/routes/`, composing `components/ui` primitives (`Panel`, `DataAgeBadge` — required on every ESI-backed view, `EmptyState`, `Spinner`).
-7. Wire the route into `src/app/App.tsx` and add nav entry (`Layout.tsx`).
+7. Wire the route into `src/app/App.tsx` and give it a nav entry — the desktop rail plus the mobile More sheet (`Layout.tsx`), or a sub-nav tab if it belongs to an existing page (`features/skills/SkillsSubNav.tsx`, `features/character/OverviewSubNav.tsx`). A sub-nav tab still declares its own scopes in `routeScopes.ts`: tabs group views visually, they don't share a gate. If the route is gated, whichever nav renders it also renders the missing-scope marker.
 8. Add strings to `src/i18n/locales/en.json`; colocated unit tests; e2e mock additions in `e2e/support/mockEsi.ts` if the view needs e2e coverage.
