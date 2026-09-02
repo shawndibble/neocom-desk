@@ -856,6 +856,14 @@
     "lastSynced": "Last synced {{time}}",
     "errorNote": "Sync error — changes saved locally"
   },
+  "notifications": {
+    "prompt": {
+      "title": "Turn on notifications?",
+      "body": "NeoCom can notify you about skill training, mail, industry jobs, and more. You choose exactly what, per character, in Settings.",
+      "enable": "Enable",
+      "dismiss": "Not now"
+    }
+  },
   "pwa": {
     "updateReady": "A new version is available.",
     "reload": "Reload",
@@ -991,6 +999,9 @@
     "notificationsTitle": "Notifications",
     "notifications": {
       "hint": "Choose what you'd be notified about, per character. Stays on this device. No notifications are sent yet — this just sets your preferences for when that ships.",
+      "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
+      "enableHint": "This device hasn't granted notification permission yet.",
+      "enableButton": "Turn on browser notifications",
       "masterSwitchLabel": "Enable notifications",
       "selectAllLabel": "Toggle all notifications for {{character}}",
       "searchPlaceholder": "Search events or characters",

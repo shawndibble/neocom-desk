@@ -1,20 +1,30 @@
 /**
- * Settings' Notifications section (issue #170): persistence + UI shell only
- * — no live browser permission request and no real notifications fire yet
- * (CONTEXT.md round 20). One master switch exists above every per-Character
- * section; wiring it to gate the OS permission request and every poller is a
- * later ticket's job (issue #170's own acceptance criteria). Each section
- * lists every Notification Event, on by default, with a select-all/none
- * checkbox; a row the Character lacks the ESI scope for renders disabled
- * with a reauth tooltip instead of a working toggle (the same "compare the
- * grant, don't wait for a 403" reasoning as `ScopeGate.tsx`, applied per row
- * instead of per route). Search filters rows by event-type or Character name
- * (Trained Skills precedent, issue #108).
- */
-import { useEffect, useMemo, useState } from 'react';
+ * Settings' Notifications section. Persistence + UI shell landed with issue
+ * #170; issue #171 added the browser grant on top, so this section now renders
+ * three ways off the *live* `Notification.permission` (never off the stored
+ * outcome — the user can flip it in site settings without telling the page):
+ *
+ * - **denied** — the blocked notice stands in for the whole toggle UI. JS
+ *   cannot re-request a denied grant, so offering toggles here would be a
+ *   button that does nothing.
+ * - **default** — the toggles stay, with an Enable button above them: the
+ *   second chance for someone who dismissed the one-time explainer
+ *   (`NotificationPermissionPrompt`). That tap is the only thing in this file
+ *   that reaches the browser prompt; nothing requests permission on mount.
+ * - **granted** (and browsers with no Notification API at all) — unchanged.
+ *
+ * Below that: each Character gets a collapsible section listing every
+ * Notification Event, on by default, with a select-all/none checkbox; a row
+ * the Character lacks the ESI scope for renders disabled with a reauth tooltip
+ * instead of a working toggle (the same "compare the grant, don't wait for a
+ * 403" reasoning as `ScopeGate.tsx`, applied per row instead of per route).
+ * Search filters rows by event-type or Character name (Trained Skills
+ * precedent, issue #108). No notification actually fires yet — the pollers
+ * that would send them are a later ticket (CONTEXT.md round 20).
+ */ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { EmptyState, Panel, SearchInput, Tooltip } from '@/components/ui';
+import { Button, Panel, EmptyState, SearchInput, Tooltip } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { db } from '@/db';
 import {
@@ -32,6 +42,13 @@ import {
 } from './preferences';
 import { isEventEnabled, selectionStateForEvents } from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
+import {
+  useNotificationPermission,
+  useNotificationPromptState,
+  requestNotificationPermission,
+  promptStateAfterAsk,
+  notificationsBlocked,
+} from './permission';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
 
@@ -53,6 +70,17 @@ export function NotificationsPanel() {
   useEffect(() => {
     void hydratePrefs();
   }, [hydratePrefs]);
+
+  const { permission, refresh: refreshPermission } = useNotificationPermission();
+  const setPromptState = useNotificationPromptState((state) => state.setValue);
+
+  // Records the ask here too, so someone who ignored the one-time explainer and
+  // came to Settings instead is not offered it again on the next load.
+  async function enableNotifications() {
+    const outcome = await requestNotificationPermission();
+    await setPromptState(promptStateAfterAsk(outcome));
+    refreshPermission();
+  }
 
   const [search, setSearch] = useState('');
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
@@ -92,10 +120,39 @@ export function NotificationsPanel() {
   // same as "no characters yet" rather than blanking the whole section.
   const characterList = characters ?? [];
 
+  // JS cannot re-request a denied grant, so the toggle UI would be a set of
+  // controls that can never take effect — the notice stands in for all of it
+  // until the user unblocks the site (issue #171).
+  if (notificationsBlocked(permission)) {
+    return (
+      <Panel title={t('settings.notificationsTitle')}>
+        <div className="space-y-3">
+          <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
+          <p
+            role="status"
+            className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-text"
+          >
+            {t('settings.notifications.blockedNotice')}
+          </p>
+        </div>
+      </Panel>
+    );
+  }
+
   return (
     <Panel title={t('settings.notificationsTitle')}>
       <div className="space-y-3">
         <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
+        {permission === 'default' && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+            <p className="min-w-0 flex-1 text-xs text-text-dim">
+              {t('settings.notifications.enableHint')}
+            </p>
+            <Button size="sm" variant="primary" onClick={() => void enableNotifications()}>
+              {t('settings.notifications.enableButton')}
+            </Button>
+          </div>
+        )}
         <label className="flex items-center gap-2 text-xs font-medium text-text">
           <input
             type="checkbox"
