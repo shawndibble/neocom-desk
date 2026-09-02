@@ -113,7 +113,9 @@ beforeEach(async () => {
     scopes: ['esi-skills.read_skills.v1', 'esi-skills.read_skillqueue.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  window.history.pushState({}, '', '/skills');
+  // The trained view's own route: /skills is the section index and redirects
+  // to the plan list, which is where the Skills section now opens.
+  window.history.pushState({}, '', '/skills/trained');
 });
 
 describe('Skills', () => {

@@ -4,9 +4,8 @@ import { addCaldariCruiserToNewPlan } from './support/planHelpers';
 
 test.beforeEach(async ({ page }) => {
   await loginAndSelectCharacter(page);
+  // The rail's Skills link lands on the plan list directly: /skills redirects.
   await page.getByRole('link', { name: 'Skills' }).click();
-  await page.waitForURL(/\/skills$/);
-  await page.getByRole('link', { name: 'Plans' }).click();
   await page.waitForURL(/\/skills\/plans$/);
 });
 

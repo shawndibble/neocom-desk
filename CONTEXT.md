@@ -68,7 +68,7 @@
   fetch, and a **runtime auth-failure sink** covers the window where that
   stored grant is stale (a revoke performed in EVE's third-party-application
   portal is invisible locally until the next token refresh).
-- Multi-scope routes (`/overview`, `/skills`, `/industry`) must degrade per
+- Multi-scope routes (`/overview`, `/skills/trained`, `/industry`) must degrade per
   panel rather than gating the whole page — one missing scope must not hide the
   panels that still work. Partly done: Overview's wallet panel degrades; its
   skills and queue panels, and the Skills and Industry panels, still fall back
@@ -543,8 +543,10 @@
   and `/skills/plans/:planId` stay separate routes — this round is purely
   about how the two are presented together, not about merging them. Both
   routes render the same `PlanListPane` (data + create/duplicate/delete/
-  rename) in the left column; the right column is either a "select a plan"
-  placeholder (list route) or the full `PlanEditor` (editor route).
+  rename) in the left column; the right column is either the character's
+  current attributes (list route — round 26 replaced this round's "select a
+  plan" placeholder, which only repeated what the list beside it said) or
+  the full `PlanEditor` (editor route).
   Navigating between the two routes still unmounts/remounts that pane like
   any other route change; only switching which plan is open _within_ the
   editor route (`:planId` changing on the same route element) keeps it
@@ -697,3 +699,33 @@
   scroller is `lg:`-gated. A component absorbing all four would take more
   props than the markup it replaces. Revisit if a fifth page wants the same
   shape.
+
+## Scope decisions (round 26) — Skills opens on Plans
+
+- **The Skills section opens on Skill Plans, not trained skills.** Planning is
+  what a visitor comes to this section to _do_; the trained list is reference.
+  `/skills` becomes an index route that redirects (`replace`) to
+  `/skills/plans`, and the trained view moves to a route of its own,
+  `/skills/trained`. A redirect rather than rendering the plan list at
+  `/skills`: one view keeps one URL, which is what every existing "Back to
+  plans" link and the editor route already point at. The rail and mobile-bar
+  links stay on `/skills` (non-`end` `NavLink`s), so the section highlight
+  still covers all three tabs.
+- **`SkillsSubNav` puts Plans first**, ahead of Trained and Compare. A section
+  that lands on its second tab reads as broken.
+- **The list route's detail pane shows the character's current attributes**,
+  replacing round 21's "select a plan, or create one" placeholder (issue: that
+  box repeated what the list beside it already said). Attributes are the input
+  every plan is costed against and the thing a remap changes, so they are the
+  reference a planner wants beside the list. The pane stays desktop-only, as
+  the placeholder was: below `lg` the list owns the column, and the editor
+  takes it once a plan is open.
+- **The attribute chips are one component, shared** (`AttributeChips`), rather
+  than the trained view's markup copied. ESI reports the _effective_ value, so
+  base is what's left once the implant bonus comes off; that arithmetic now
+  lives once.
+- **A display of the character's sheet never falls back to defaults.**
+  `usePlanEditorData` keeps its `DEFAULT_ATTRIBUTES` fallback so the scheduler
+  always has numbers, and additionally exposes ESI's own nullable read
+  (`attributesResult`) for anything that _shows_ attributes — a failed fetch
+  renders unknown, not a plausible-looking sheet.
