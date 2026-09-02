@@ -466,12 +466,17 @@ describe('Industry: results panel', () => {
       screen.getByText('Not enough price data for a build-vs-buy verdict.')
     ).toBeInTheDocument();
 
-    expect(fuzzworkStations).toContain(60003760); // Jita 4-4
+    // fuzzworkStations is populated inside the MSW request handler, an async
+    // side channel the DOM assertions above don't actually wait on — under
+    // CPU contention (e.g. several /next-ticket runs at once) the request
+    // can still be in flight even once other state has settled. waitFor
+    // makes this deterministic instead of racing.
+    await waitFor(() => expect(fuzzworkStations).toContain(60003760)); // Jita 4-4
 
     await user.selectOptions(screen.getByLabelText('Trade hub'), 'amarr');
 
     await screen.findByText(formatCostIndex(0.002));
-    expect(fuzzworkStations).toContain(60008494); // Amarr
+    await waitFor(() => expect(fuzzworkStations).toContain(60008494)); // Amarr
   });
 
   it('keeps materials and time visible, but shows an empty state instead of cost/profit, when prices are unreachable (offline)', async () => {
