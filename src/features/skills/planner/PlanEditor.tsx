@@ -559,8 +559,18 @@ export function PlanEditor({
           editor in its own scroll box and a pinned toolbar has a short list to
           stay above. On a phone the editor scrolls with the page, and pinning
           a three-row toolbar there would hold a fifth of the viewport
-          permanently against the content it acts on. */}
-      <Panel title={t('plans.toolbar')} className="lg:sticky lg:top-0 lg:z-10">
+          permanently against the content it acts on.
+
+          `lg:top-[4.625rem]` (not `top-0`) stacks this below the also-sticky
+          PlanHeader summary strip above: the strip's own rendered height at
+          `lg`+ is one fixed chip row (`lg:flex-nowrap` on its chip row) plus
+          its Panel chrome, ~5.625rem (90px) border-box, and this Panel picks
+          up a 1rem `space-y-4` top margin from its parent that sticky
+          offsets count against the stuck position, so the offset that lands
+          this Panel flush under the strip is 5.625rem - 1rem = 4.625rem. If
+          PlanHeader's header content changes height, re-derive this value
+          rather than leaving it stale. */}
+      <Panel title={t('plans.toolbar')} className="lg:sticky lg:top-[4.625rem] lg:z-10">
         <div className="space-y-2">
           {/* Remaps-available is a control with a value and an explanatory
               hint, not header adornment. In the header slot the hint wrapped
