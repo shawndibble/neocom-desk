@@ -101,7 +101,6 @@ export function EmploymentHistory() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <OverviewSubNav />
       <PageHeader
         title={t('employmentHistory.title')}
         meta={historyResult && <DataAgeBadge date={historyResult.fetchedAt} />}
@@ -116,6 +115,7 @@ export function EmploymentHistory() {
           </>
         }
       />
+      <OverviewSubNav />
 
       {loading ? (
         <div className="flex justify-center py-16">
