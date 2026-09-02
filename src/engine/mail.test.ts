@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildLabelTabMap, resolveMailTab, unreadCountsByTab } from './mail';
+import {
+  buildCustomLabelList,
+  buildLabelTabMap,
+  mergeMailHeaderPage,
+  resolveMailTab,
+  unreadCountsByTab,
+} from './mail';
 
 describe('buildLabelTabMap', () => {
   it('maps each recognized System Label name to its tab, case-insensitively', () => {
@@ -88,5 +94,80 @@ describe('unreadCountsByTab', () => {
   it('defaults a missing unread_count to 0', () => {
     const map = unreadCountsByTab([{ label_id: 1, name: 'Inbox' }]);
     expect(map.get('inbox')).toBe(0);
+  });
+});
+
+describe('buildCustomLabelList', () => {
+  it('keeps a label whose name is not one of the four System Labels', () => {
+    const list = buildCustomLabelList([
+      { label_id: 1, name: 'Inbox' },
+      { label_id: 100, name: 'Miners' },
+    ]);
+    expect(list).toEqual([{ label_id: 100, name: 'Miners' }]);
+  });
+
+  it('preserves extra fields (e.g. color) on the returned label', () => {
+    const list = buildCustomLabelList([{ label_id: 100, name: 'Miners', color: '#ffaabb' }]);
+    expect(list).toEqual([{ label_id: 100, name: 'Miners', color: '#ffaabb' }]);
+  });
+
+  it('omits all four System Labels', () => {
+    const list = buildCustomLabelList([
+      { label_id: 1, name: 'Inbox' },
+      { label_id: 2, name: 'Sent' },
+      { label_id: 3, name: 'Corp' },
+      { label_id: 4, name: 'Alliance' },
+    ]);
+    expect(list).toEqual([]);
+  });
+
+  it('omits a label with no name (nothing to display as a filter)', () => {
+    const list = buildCustomLabelList([{ label_id: 100 }]);
+    expect(list).toEqual([]);
+  });
+
+  it('returns an empty list for a character with no custom labels', () => {
+    expect(buildCustomLabelList([])).toEqual([]);
+  });
+});
+
+describe('mergeMailHeaderPage', () => {
+  it('appends a new page to the existing list', () => {
+    const existing = [{ mail_id: 5 }, { mail_id: 4 }];
+    const page = [{ mail_id: 3 }, { mail_id: 2 }];
+    const result = mergeMailHeaderPage(existing, page, 2);
+    expect(result.headers).toEqual([
+      { mail_id: 5 },
+      { mail_id: 4 },
+      { mail_id: 3 },
+      { mail_id: 2 },
+    ]);
+  });
+
+  it('dedupes by mail_id when a page overlaps the existing list', () => {
+    const existing = [{ mail_id: 5 }, { mail_id: 4 }];
+    const page = [{ mail_id: 4 }, { mail_id: 3 }];
+    const result = mergeMailHeaderPage(existing, page, 2);
+    expect(result.headers).toEqual([{ mail_id: 5 }, { mail_id: 4 }, { mail_id: 3 }]);
+  });
+
+  it('reports hasMore true when the page came back at the page size cap', () => {
+    const result = mergeMailHeaderPage([], [{ mail_id: 1 }, { mail_id: 2 }], 2);
+    expect(result.hasMore).toBe(true);
+  });
+
+  it('reports hasMore false when the page came back short of the cap', () => {
+    const result = mergeMailHeaderPage([{ mail_id: 5 }], [{ mail_id: 1 }], 2);
+    expect(result.hasMore).toBe(false);
+  });
+
+  it('reports hasMore false for an empty page (exhausted)', () => {
+    const result = mergeMailHeaderPage([{ mail_id: 5 }], [], 2);
+    expect(result.hasMore).toBe(false);
+  });
+
+  it('defaults the page size to 50', () => {
+    const page = Array.from({ length: 50 }, (_, i) => ({ mail_id: i }));
+    expect(mergeMailHeaderPage([], page).hasMore).toBe(true);
   });
 });
