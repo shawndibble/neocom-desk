@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Disclosure, EmptyState, InfoTooltip, StatChip } from '@/components/ui';
+import { DataTable, Disclosure, EmptyState, InfoTooltip, StatChip } from '@/components/ui';
+import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -13,10 +14,19 @@ interface CostRowProps {
   tooltip?: string;
   emphasized?: boolean;
   indented?: boolean;
+  /** `'negative'` renders the value in the `isk-neg` tone, for deductions like Sales Tax/Broker Fee. */
+  tone?: 'negative';
 }
 
 /** One row of the Costs stack: label (+ optional tooltip) left, value right. */
-function CostRow({ label, value, tooltip, emphasized = false, indented = false }: CostRowProps) {
+function CostRow({
+  label,
+  value,
+  tooltip,
+  emphasized = false,
+  indented = false,
+  tone,
+}: CostRowProps) {
   const { t } = useTranslation();
   return (
     <div
@@ -27,12 +37,19 @@ function CostRow({ label, value, tooltip, emphasized = false, indented = false }
         {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
       </span>
       <span
-        className={`font-medium tabular-nums ${emphasized ? 'text-sm text-accent' : 'text-text'}`}
+        className={`font-medium tabular-nums ${emphasized ? 'text-sm text-accent' : tone === 'negative' ? 'text-isk-neg' : 'text-text'}`}
       >
         {value}
       </span>
     </div>
   );
+}
+
+interface RevenueRow {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
 }
 
 interface ResultsSummaryProps {
@@ -43,6 +60,8 @@ interface ResultsSummaryProps {
   productName: string;
   /** Product's lowest hub sell price (per unit); null when unpriced at this hub. */
   productUnitPrice: number | null;
+  /** Units produced by the job (per-run product quantity x runs); null when the blueprint has no product. */
+  productQuantity: number | null;
   /** Short solar-system name the build's cost index applies to (UX-REVIEW #6/#8: makes the trade-hub <-> build-system coupling explicit in the label). */
   costIndexSystemName: string;
 }
@@ -60,10 +79,39 @@ export function ResultsSummary({
   systemCostIndex,
   productName,
   productUnitPrice,
+  productQuantity,
   costIndexSystemName,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
+
+  const revenueColumns = useMemo<DataTableColumn<RevenueRow>[]>(
+    () => [
+      { id: 'product', header: t('industry.product'), render: (row) => row.name },
+      {
+        id: 'quantity',
+        header: t('industry.quantity'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => row.quantity.toLocaleString(),
+      },
+      {
+        id: 'unitPrice',
+        header: t('industry.unitPrice'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => formatIsk(row.unitPrice),
+      },
+      {
+        id: 'lineTotal',
+        header: t('industry.lineTotal'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => formatIsk(row.lineTotal),
+      },
+    ],
+    [t]
+  );
 
   if (!pricesReady) {
     return (
@@ -133,14 +181,51 @@ export function ResultsSummary({
         )}
       </div>
 
-      {(productUnitPrice !== null || result.buyCost !== null) && (
+      {result.revenue !== null &&
+        result.salesTax !== null &&
+        result.brokerFee !== null &&
+        result.netRevenue !== null &&
+        productUnitPrice !== null &&
+        productQuantity !== null && (
+          <div className="space-y-2">
+            <div className="overflow-x-auto">
+              <DataTable
+                columns={revenueColumns}
+                rows={[
+                  {
+                    name: productName,
+                    quantity: productQuantity,
+                    unitPrice: productUnitPrice,
+                    lineTotal: result.revenue,
+                  },
+                ]}
+                rowKey={() => 'revenue'}
+                label={t('industry.revenue')}
+                density="compact"
+              />
+            </div>
+            <div className="divide-y divide-line rounded-xs border border-line">
+              <CostRow
+                label={t('industry.salesTax')}
+                value={formatIsk(-result.salesTax)}
+                tone="negative"
+              />
+              <CostRow
+                label={t('industry.brokerFee')}
+                value={formatIsk(-result.brokerFee)}
+                tone="negative"
+              />
+              <CostRow
+                label={t('industry.netRevenue')}
+                value={formatIsk(result.netRevenue)}
+                emphasized
+              />
+            </div>
+          </div>
+        )}
+
+      {(result.profit !== null || result.marginPct !== null || result.iskPerHour !== null) && (
         <div className="flex flex-wrap gap-2">
-          {productUnitPrice !== null && (
-            <StatChip label={t('industry.productPrice')} value={formatIsk(productUnitPrice)} />
-          )}
-          {result.buyCost !== null && (
-            <StatChip label={t('industry.sellValue')} value={formatIsk(result.buyCost)} />
-          )}
           {result.profit !== null && (
             <StatChip
               label={t('industry.profit')}

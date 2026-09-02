@@ -46,6 +46,8 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
   const tax = revenue === null ? null : salesTax(revenue, skills[SKILL_IDS.accounting] ?? 0);
   const broker =
     revenue === null ? null : brokerFee(revenue, skills[SKILL_IDS.brokerRelations] ?? 0);
+  const netRevenue =
+    revenue === null || tax === null || broker === null ? null : revenue - tax - broker;
 
   let profit: number | null = null;
   let marginPct: number | null = null;
@@ -68,6 +70,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     revenue,
     salesTax: tax,
     brokerFee: broker,
+    netRevenue,
     profit,
     marginPct,
     iskPerHour,

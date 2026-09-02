@@ -61,6 +61,7 @@ describe('buildVsBuy', () => {
     expect(r.revenue).toBe(1_000_000);
     expect(r.salesTax).toBeCloseTo(1_000_000 * 0.03375, 6);
     expect(r.brokerFee).toBeCloseTo(1_000_000 * 0.015, 6);
+    expect(r.netRevenue).toBeCloseTo(1_000_000 - 33_750 - 15_000, 6); // 951_250
 
     const profit = 1_000_000 - 33_750 - 15_000 - 86_589;
     expect(r.profit).toBeCloseTo(profit, 6);
@@ -103,6 +104,7 @@ describe('buildVsBuy', () => {
     expect(r.buyCost).toBeNull();
     expect(r.salesTax).toBeNull();
     expect(r.brokerFee).toBeNull();
+    expect(r.netRevenue).toBeNull();
     expect(r.profit).toBeNull();
     expect(r.recommendation).toBe('unknown');
     // build-side numbers still available
