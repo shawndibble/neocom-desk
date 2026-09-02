@@ -6,6 +6,16 @@ interface PanelProps {
   children: ReactNode;
   /** Set false for flush content like tables. */
   padded?: boolean;
+  /**
+   * Makes the content wrapper itself a `flex min-h-0 flex-1 flex-col` box
+   * instead of a plain block div. Without this, a `flex h-full min-h-0
+   * flex-col` on `className` never reaches actual children — the wrapper div
+   * below breaks the chain, so a `flex-1`/`min-h-0` scroll region inside it
+   * silently does nothing and content overflows the panel instead of
+   * scrolling. Set true when the panel fills a bounded height and one of its
+   * children must scroll within it.
+   */
+  fill?: boolean;
   className?: string;
 }
 
@@ -20,7 +30,17 @@ interface PanelProps {
  * minimum height is the `md` control tier, because what sits in `actions` is
  * usually an `IconButton` at exactly that height.
  */
-export function Panel({ title, actions, children, padded = true, className = '' }: PanelProps) {
+export function Panel({
+  title,
+  actions,
+  children,
+  padded = true,
+  fill = false,
+  className = '',
+}: PanelProps) {
+  const contentClassName = [padded ? 'p-3' : '', fill ? 'flex min-h-0 flex-1 flex-col' : '']
+    .filter(Boolean)
+    .join(' ');
   return (
     <section className={`rounded-xs border border-line bg-panel/85 backdrop-blur-sm ${className}`}>
       {(title || actions) && (
@@ -33,7 +53,7 @@ export function Panel({ title, actions, children, padded = true, className = '' 
           {actions && <div className="flex items-center gap-1">{actions}</div>}
         </header>
       )}
-      <div className={padded ? 'p-3' : ''}>{children}</div>
+      <div className={contentClassName}>{children}</div>
     </section>
   );
 }
