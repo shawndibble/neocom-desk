@@ -975,7 +975,15 @@
       "sell": "Sell",
       "buy": "Buy",
       "noOrders": "No orders",
-      "capped": "Showing {{limit}} of {{total}}"
+      "capped": "Showing {{limit}} of {{total}}",
+      "compare": "Compare"
+    },
+    "variationsCompare": {
+      "title": "Compare Variations",
+      "worth": "Worth",
+      "estimatedPrice": "Estimated Price",
+      "errorTitle": "Couldn't load comparison",
+      "errorHint": "Try again, or reload the page."
     },
     "itemDetail": {
       "volume": "Volume: {{volume}} m3",

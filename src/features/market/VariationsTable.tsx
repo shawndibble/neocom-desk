@@ -6,6 +6,7 @@
  * effect of the route's own selection state.
  */
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { formatIsk } from '@/lib/isk';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
@@ -21,6 +22,8 @@ export interface VariationsTableProps {
   /** Absent key = not yet requested; undefined value = still loading. */
   prices: ReadonlyMap<number, OrderBookSummary | undefined>;
   onSelect: (typeId: number) => void;
+  /** Opens the attribute-compare modal for every row currently shown here. */
+  onCompare: () => void;
 }
 
 /** Loading, then this row's own side, then the other side's presence (matches the order-book tables' empty-state pair), then neither. */
@@ -43,6 +46,7 @@ export function VariationsTable({
   truncated,
   prices,
   onSelect,
+  onCompare,
 }: VariationsTableProps) {
   const { t } = useTranslation();
 
@@ -89,9 +93,14 @@ export function VariationsTable({
 
   return (
     <div className="border-t border-line px-3 py-2">
-      <h2 className="pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('market.variations.title')}
-      </h2>
+      <div className="flex items-center justify-between gap-2 pb-1">
+        <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('market.variations.title')}
+        </h2>
+        <Button size="sm" onClick={onCompare}>
+          {t('market.variations.compare')}
+        </Button>
+      </div>
       {truncated && (
         <p className="pb-1 text-[0.6875rem] text-warning uppercase">
           {t('market.variations.capped', { limit: rows.length, total: totalCount })}

@@ -567,6 +567,46 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     expect(within(table).queryByText('Cormorant')).not.toBeInTheDocument();
   });
 
+  it('opens the compare modal from the Variations header button, with a column per row shown in the table (issue #146)', async () => {
+    const dogma = (typeId: number, hp: number) =>
+      http.get(`${ESI_BASE_URL}/universe/types/${typeId}`, () =>
+        HttpResponse.json({
+          type_id: typeId,
+          name: `Type ${typeId}`,
+          description: 'A ship.',
+          group_id: 25,
+          published: true,
+          dogma_attributes: [{ attribute_id: STRUCTURE_HITPOINTS_ATTR_ID, value: hp }],
+        })
+      );
+    server.use(
+      destroyerOrdersHandler(new Map()),
+      dogma(KESTREL_TYPE_ID, 1200),
+      dogma(CORAX_TYPE_ID, 1400),
+      dogma(CORMORANT_TYPE_ID, 1600)
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    await screen.findByRole('table', { name: 'Variations' });
+
+    await user.click(screen.getByRole('button', { name: 'Compare' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Compare Variations' });
+    // A column per row the table is showing, and the selected item is not
+    // one of them — it isn't a row in that table either.
+    expect(await within(dialog).findByText('Kestrel')).toBeInTheDocument();
+    expect(within(dialog).getByText('Corax')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Merlin')).not.toBeInTheDocument();
+    // Estimated Price leads, then the dogma rows fetched for the modal.
+    expect(within(dialog).getByText('Estimated Price')).toBeInTheDocument();
+    expect(within(dialog).getByText('1,200 HP')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+  });
+
   it('a failed variations.json fetch degrades only the Variations table to its sibling fallback, not the whole Market route', async () => {
     vi.mocked(loadVariations).mockRejectedValueOnce(new Error('network error'));
     server.use(destroyerOrdersHandler(new Map()));
