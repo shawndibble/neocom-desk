@@ -31,8 +31,9 @@ test('exports the computed queue to the clipboard', async ({ page, context }) =>
 
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByRole('button', { name: 'Export to clipboard' }).click();
-  await expect(page.getByRole('button', { name: 'Copied to clipboard' })).toBeVisible();
+  await page.getByRole('button', { name: 'Export' }).click();
+  await page.getByRole('menuitem', { name: 'Export to clipboard' }).click();
+  await expect(page.getByRole('status', { name: 'Copied to clipboard' })).toBeVisible();
 
   const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
   expect(clipboardText).toBe(
