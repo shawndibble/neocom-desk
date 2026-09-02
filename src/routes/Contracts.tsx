@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -10,7 +9,9 @@ import {
   ReauthBanner,
   Spinner,
   type DataTableColumn,
+  IconButton,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContracts } from '@/features/character/contracts';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
@@ -157,8 +158,9 @@ export function Contracts() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('contracts.title')}</h1>
         <div className="flex items-center gap-2">
           {contractsResult && <DataAgeBadge date={contractsResult.fetchedAt} />}
-          <Button
-            size="sm"
+          <IconButton
+            icon={<Icon.Download />}
+            label={t('contracts.exportCsv')}
             disabled={contracts.length === 0}
             onClick={() =>
               downloadCsv(
@@ -169,12 +171,13 @@ export function Contracts() {
                 contractsTruncated
               )
             }
-          >
-            {t('contracts.exportCsv')}
-          </Button>
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            {t('contracts.refresh')}
-          </Button>
+          />
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('contracts.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
         </div>
       </header>
 

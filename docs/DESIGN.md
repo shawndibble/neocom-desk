@@ -164,9 +164,17 @@ lines. Both failures at once — so neither "let it scroll" nor "let it squash"
 was an option.
 
 `DataTable` therefore collapses below `sm` (`responsive="stack"`, the
-default): the header row hides, each row becomes a card, the **first column is
-the card's title**, and every other cell prints its column header into a left
-gutter. Order columns accordingly — whatever names the row goes first.
+default): the header row hides, each row becomes a card, one cell becomes the
+card's **title**, and every other cell prints its column header into a left
+gutter.
+
+The title is the first column by default, which is usually right. Where
+reading order and identity disagree, mark the identifying column
+`primary: true` rather than resorting the table — the row keeps its column
+order at every width and the card hoists that cell with CSS `order`. Wallet's
+journal is the case that motivated it: a ledger should lead with its date on
+desktop, but a card titled "9/1/2026, 9:34:21 PM" says nothing, so `refType`
+("Bounty prizes") titles it and the date becomes a labelled field.
 
 Three rules hold this together:
 

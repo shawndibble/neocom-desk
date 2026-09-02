@@ -8,9 +8,11 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  IconButton,
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
@@ -327,8 +329,9 @@ export function SkillCompare() {
         <>
           <div className="flex items-center justify-end gap-2">
             {oldestFetchedAt && <DataAgeBadge date={oldestFetchedAt} />}
-            <Button
-              size="sm"
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('skillCompare.refresh')}
               onClick={() => {
                 // loadCorrectedSkills reads the skill queue through the
                 // windowed path (issue #41); a manual refresh here must
@@ -336,9 +339,7 @@ export function SkillCompare() {
                 invalidateFreshness();
                 setRefreshNonce((n) => n + 1);
               }}
-            >
-              {t('skillCompare.refresh')}
-            </Button>
+            />
           </div>
           {/*
             The one table that keeps its columns on a phone. Comparing is the

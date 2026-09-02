@@ -327,5 +327,24 @@ describe('DataTable', () => {
       expect(screen.getAllByRole('cell')[0]).toHaveAttribute('role', 'cell');
       expect(screen.getAllByRole('rowgroup')).toHaveLength(2);
     });
+
+    it('titles the card with the first column by default', () => {
+      renderTable();
+      const [itemCell, amountCell] = screen.getAllByRole('cell');
+      expect(itemCell).toHaveClass('dt-primary');
+      expect(amountCell).not.toHaveClass('dt-primary');
+    });
+
+    it('lets a later column claim the title without moving in the table', () => {
+      renderTable({
+        columns: [columns[0], { ...columns[1], primary: true }],
+      });
+      const [itemCell, amountCell] = screen.getAllByRole('cell');
+      expect(amountCell).toHaveClass('dt-primary');
+      expect(itemCell).not.toHaveClass('dt-primary');
+      // Still the second cell: the hoist is CSS `order`, not a DOM reorder,
+      // so the table's own reading order survives at every width.
+      expect(amountCell).toHaveAttribute('data-label', 'Amount');
+    });
   });
 });

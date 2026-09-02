@@ -2,16 +2,17 @@ import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
+  IconButton,
   Panel,
   ReauthBanner,
   Spinner,
   Tabs,
   type DataTableColumn,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import {
   loadWalletBalanceWithStatus,
@@ -158,6 +159,9 @@ export function Wallet() {
         id: 'refType',
         header: t('wallet.refType'),
         className: 'whitespace-nowrap',
+        // Titles the card on a phone: "Bounty prizes" identifies the entry,
+        // where the date column it follows would not.
+        primary: true,
         render: (entry) => humanizeRefType(entry.ref_type),
       },
       {
@@ -197,6 +201,8 @@ export function Wallet() {
       {
         id: 'item',
         header: t('wallet.item'),
+        /** Titles the card on a phone — the item is what the transaction is. */
+        primary: true,
         render: (txn) => typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`,
       },
       {
@@ -252,9 +258,12 @@ export function Wallet() {
     <div className="mx-auto max-w-5xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('wallet.title')}</h1>
-        <Button size="sm" onClick={refresh} disabled={loading}>
-          {t('wallet.refresh')}
-        </Button>
+        <IconButton
+          icon={<Icon.Refresh />}
+          label={t('wallet.refresh')}
+          onClick={refresh}
+          disabled={loading}
+        />
       </header>
 
       <Tabs
@@ -356,8 +365,10 @@ export function Wallet() {
           actions={
             journalResult ? (
               <span className="flex items-center gap-2">
-                <Button
+                <IconButton
                   size="sm"
+                  icon={<Icon.Download />}
+                  label={t('wallet.exportCsvJournal')}
                   disabled={journal.length === 0}
                   onClick={() =>
                     downloadCsv(
@@ -368,9 +379,7 @@ export function Wallet() {
                       journalTruncated
                     )
                   }
-                >
-                  {t('wallet.exportCsvJournal')}
-                </Button>
+                />
                 <DataAgeBadge date={journalResult.fetchedAt} />
               </span>
             ) : undefined
@@ -410,8 +419,10 @@ export function Wallet() {
           actions={
             transactionsResult ? (
               <span className="flex items-center gap-2">
-                <Button
+                <IconButton
                   size="sm"
+                  icon={<Icon.Download />}
+                  label={t('wallet.exportCsvTransactions')}
                   disabled={transactions.length === 0}
                   onClick={() =>
                     downloadCsv(
@@ -422,9 +433,7 @@ export function Wallet() {
                       transactionsTruncated
                     )
                   }
-                >
-                  {t('wallet.exportCsvTransactions')}
-                </Button>
+                />
                 <DataAgeBadge date={transactionsResult.fetchedAt} />
               </span>
             ) : undefined

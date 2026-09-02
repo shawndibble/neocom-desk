@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
+import {
+  DataAgeBadge,
+  EmptyState,
+  IconButton,
+  Panel,
+  ReauthBanner,
+  Spinner,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
@@ -79,16 +87,20 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       actions={
         <span className="flex items-center gap-2">
           {result?.cached?.fetchedAt && <DataAgeBadge date={result.cached.fetchedAt} />}
-          <Button
+          <IconButton
             size="sm"
+            icon={<Icon.Download />}
+            label={t('industry.exportCsvJobs')}
             disabled={jobs.length === 0}
             onClick={() => downloadCsv('industry-jobs', jobs, jobsCsvColumns(t, nameForBlueprint))}
-          >
-            {t('industry.exportCsvJobs')}
-          </Button>
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            {t('industry.jobsRefresh')}
-          </Button>
+          />
+          <IconButton
+            size="sm"
+            icon={<Icon.Refresh />}
+            label={t('industry.jobsRefresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
         </span>
       }
     >

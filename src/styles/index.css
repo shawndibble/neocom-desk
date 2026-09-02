@@ -57,8 +57,8 @@
    * Below `sm` a dense table cannot be a table: measured on a 390px viewport,
    * a six-column row is 505px wide — it scrolls the whole page sideways *and*
    * squashes the name column to 74px, shattering one item name over five
-   * lines. So each row becomes a stacked card: the first cell is the title,
-   * every other cell prints its column header into a left gutter via
+   * lines. So each row becomes a stacked card: the `dt-primary` cell titles
+   * it, every other cell prints its column header into a left gutter via
    * `data-label`.
    *
    * This is CSS-only on purpose. The markup is identical at every width — no
@@ -84,7 +84,15 @@
       white-space: nowrap;
     }
 
+    /*
+     * A column flexbox, so the title cell can be hoisted to the top of the
+     * card without moving in the markup. The table keeps its own reading
+     * order at every width — a ledger still leads with its date column on
+     * desktop while the card is titled by what the row actually is.
+     */
     .dt-stack tr {
+      display: flex;
+      flex-direction: column;
       padding: 0.5rem 0.75rem;
     }
 
@@ -113,14 +121,15 @@
       color: var(--color-text-dim);
     }
 
-    /* The first cell names the row, so it spans the card and drops the label. */
-    .dt-stack td:first-child {
+    /* The cell that names the row: first in the card, no label, no gutter. */
+    .dt-stack td.dt-primary {
+      order: -1;
       padding-left: 0;
       padding-bottom: 0.25rem;
       font-weight: 600;
     }
 
-    .dt-stack td:first-child::before {
+    .dt-stack td.dt-primary::before {
       content: none;
     }
 

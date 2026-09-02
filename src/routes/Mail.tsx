@@ -9,7 +9,9 @@ import {
   ReauthBanner,
   Spinner,
   Tabs,
+  IconButton,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadMailHeaders, loadMailBody, loadMailLabels } from '@/features/character/mail';
 import type { CachedResult } from '@/esi/cache';
@@ -156,9 +158,12 @@ export function Mail() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('mail.title')}</h1>
         <div className="flex items-center gap-2">
           {headersResult && <DataAgeBadge date={headersResult.fetchedAt} />}
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            {t('mail.refresh')}
-          </Button>
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('mail.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
         </div>
       </header>
 

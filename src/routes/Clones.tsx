@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -10,7 +9,9 @@ import {
   ReauthBanner,
   Spinner,
   type DataTableColumn,
+  IconButton,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadCharacterSkills } from '@/features/skills/data';
@@ -140,9 +141,12 @@ export function Clones() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('clones.title')}</h1>
         <div className="flex items-center gap-2">
           {clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            {t('clones.refresh')}
-          </Button>
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('clones.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
         </div>
       </header>
 

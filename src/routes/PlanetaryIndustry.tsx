@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -12,7 +11,9 @@ import {
   Spinner,
   StatChip,
   type DataTableColumn,
+  IconButton,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { loadPlanetName, loadSchematicName } from '@/features/pi/names';
@@ -344,9 +345,12 @@ export function PlanetaryIndustry() {
         <h1 className="text-xl font-semibold tracking-widest uppercase">{t('pi.title')}</h1>
         <div className="flex items-center gap-2">
           {planetsResult && <DataAgeBadge date={planetsResult.fetchedAt} />}
-          <Button size="sm" onClick={refresh} disabled={loading}>
-            {t('pi.refresh')}
-          </Button>
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('pi.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
         </div>
       </header>
 
