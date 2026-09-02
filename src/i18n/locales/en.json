@@ -5,11 +5,16 @@
   },
   "nav": {
     "characters": "Characters",
-    "overview": "Overview",
+    "overview": "Home",
     "skills": "Skills",
     "industry": "Industry",
     "market": "Market",
-    "characterSection": "Character",
+    "groups": {
+      "general": "General",
+      "progression": "Progression",
+      "economy": "Economy",
+      "social": "Social"
+    },
     "wallet": "Wallet",
     "clones": "Clones",
     "pi": "Planetary Industry",
@@ -241,6 +246,8 @@
     "blueprintMissing": "This plan's blueprint isn't in the current SDE snapshot.",
     "computeError": "Couldn't compute this plan: {{message}}",
     "refresh": "Refresh",
+    "groupBlueprint": "Blueprint",
+    "groupLocationMarket": "Location & market",
     "runs": "Runs",
     "me": "ME",
     "meTooltipLabel": "About ME",

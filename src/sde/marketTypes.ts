@@ -65,3 +65,20 @@ export interface AttributeDictionaryEntry {
 }
 
 export type AttributeDictionary = Readonly<Record<number, AttributeDictionaryEntry>>;
+
+/**
+ * One entry in public/data/market/variations.json's `types` map — a
+ * published type's Tech/Meta/Faction classification (invMetaTypes.csv).
+ * `parentTypeId` is null for the Tech I root; `metaGroupId` looks up a
+ * display name in the sibling `metaGroups` map (see src/engine/market/variations.ts).
+ */
+export interface VariationEntry {
+  parentTypeId: number | null;
+  metaGroupId: number;
+}
+
+/** public/data/market/variations.json — the Tech/Meta/Faction variation relation. */
+export interface VariationData {
+  types: Readonly<Record<number, VariationEntry>>;
+  metaGroups: Readonly<Record<number, string>>;
+}

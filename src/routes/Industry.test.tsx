@@ -318,6 +318,26 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
   });
 });
 
+describe('Industry: build plan settings grouping (#120)', () => {
+  it('groups Runs/ME/TE under Blueprint and the rest under Location & market', async () => {
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    expect(screen.getByText('Blueprint')).toBeInTheDocument();
+    expect(screen.getByText('Location & market')).toBeInTheDocument();
+
+    // All the original fields still render, just regrouped.
+    expect(screen.getByLabelText('Runs')).toBeInTheDocument();
+    expect(screen.getByLabelText('ME')).toBeInTheDocument();
+    expect(screen.getByLabelText('TE')).toBeInTheDocument();
+    expect(screen.getByLabelText('Facility')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rig')).toBeInTheDocument();
+    expect(screen.getByLabelText('Security')).toBeInTheDocument();
+    expect(screen.getByLabelText('Trade hub')).toBeInTheDocument();
+  });
+});
+
 const RIFTER_BLUEPRINT = {
   name: 'Rifter Blueprint',
   time: 1200,
