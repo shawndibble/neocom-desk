@@ -172,8 +172,10 @@ CSVs — `src/sde/loadSde.ts` fetches+memoizes the built JSON once per session.
     network guard that **fails the test** if anything escapes to a real host.
     Runs its own dev server on port 5199 with blanked Firebase env (see §4).
 
-Validate before commit: `npm run lint && npm run typecheck && npm run test:run`.
-Full E2E: `npm run test:e2e`. SDE rebuild: `npm run sde:build`.
+A pre-commit hook runs lint/format (staged files) + typecheck automatically.
+CI (`validate` job) runs the full suite (`test:run`) and `build` on every
+push — don't run those locally; see `CLAUDE.md`. Full E2E: `npm run test:e2e`.
+SDE rebuild: `npm run sde:build`.
 
 ## 6. Feature inventory
 

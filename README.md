@@ -37,5 +37,9 @@ npm run lint
 npm run build
 ```
 
+`npm install` also sets up a pre-commit hook (husky + lint-staged) that
+auto-fixes lint/format on staged files and runs `typecheck` on every commit.
+The full test suite and build run in CI, not locally.
+
 Copy `.env.example` to `.env` and set `VITE_EVE_CLIENT_ID` (EVE developer
 application client ID, https://developers.eveonline.com).
