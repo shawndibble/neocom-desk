@@ -237,6 +237,9 @@ function MarketGroupTree({
 
   const roots = childrenByParent.get(null) ?? [];
   return (
+    // Flat cap, not viewport-relative: `QuickbarList` renders below this
+    // tree in the same column, so sizing the tree to all remaining viewport
+    // height would push the quickbar off-screen.
     <ul className="max-h-[32rem] overflow-y-auto">{roots.map((root) => renderGroup(root, 0))}</ul>
   );
 }
@@ -971,7 +974,7 @@ export function Market() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
         <Panel className={isDesktop || selectedTypeId === null ? '' : 'hidden'}>
           <SearchInput
             ref={searchInputRef}

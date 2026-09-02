@@ -147,6 +147,12 @@
 @layer base {
   :root {
     color-scheme: dark;
+    /* A viewport-bounded scroller (useViewportBoundedHeight) shrinking can
+       remove the document scrollbar, narrowing the viewport and reflowing
+       anything above it that wraps at that width — which would re-trigger
+       the measurement. Reserving the gutter always keeps viewport width
+       stable regardless of whether a scrollbar is actually showing. */
+    scrollbar-gutter: stable;
   }
 
   body {

@@ -35,7 +35,10 @@ export function SkillPlans() {
       <SkillsSubNav />
       {isSyncConfigured() && <SyncErrorNote {...syncStatus} />}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
+      {/* `lg:items-start`: grid items stretch to the row's height by
+          default, so without this a short right column gets pulled down to
+          match a taller plan list, or vice versa. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
         <PlanListPane activeCharacterId={activeCharacterId} remapInfo={remapInfo} />
         <Panel className={isDesktop ? '' : 'hidden'}>
           <EmptyState title={t('plans.selectHint')} className="py-8" />
