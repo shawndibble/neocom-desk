@@ -150,6 +150,7 @@ export function PlanEditor({
 }: PlanEditorProps) {
   const { t } = useTranslation();
   const [copyConfirm, setCopyConfirm] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<PlaceRemapsResult | null>(null);
   const [markersResult, setMarkersResult] = useState<PlaceRemapsResult | null>(null);
   const [reorderPreview, setReorderPreview] = useState<PlanStep[] | null>(null);
@@ -453,18 +454,20 @@ export function PlanEditor({
           <Button size="sm" onClick={() => setImportOpen(true)}>
             {t('plans.importClipboard')}
           </Button>
-          <DropdownMenu>
+          <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
             <DropdownMenuTrigger asChild>
               <Button size="sm">{t('plans.export')}</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem
-                onSelect={() => {
-                  // Deferred to a fresh macrotask: writeText() called during
-                  // Radix's own menu-close/focus-restore transition can throw
-                  // "Document is not focused" (NotAllowedError) if it races
-                  // that transition — this runs after it's settled.
-                  setTimeout(() => void handleExport(), 0);
+                onSelect={(event) => {
+                  // Keep the menu open (skip Radix's default auto-close) until
+                  // the write settles, then close it ourselves: closing first
+                  // moves focus back to the trigger as part of the same
+                  // transition, and writeText() called mid-transition can
+                  // throw "Document is not focused" (NotAllowedError).
+                  event.preventDefault();
+                  void handleExport().finally(() => setExportMenuOpen(false));
                 }}
               >
                 {t('plans.exportClipboard')}
