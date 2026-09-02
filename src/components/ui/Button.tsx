@@ -1,7 +1,8 @@
 import type { ButtonHTMLAttributes } from 'react';
+import { controlHeightClassName, type ControlSize } from './controlStyles';
 
 export type ButtonVariant = 'primary' | 'ghost' | 'danger';
-export type ButtonSize = 'sm' | 'md';
+export type ButtonSize = ControlSize;
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -15,8 +16,8 @@ const VARIANT: Record<ButtonVariant, string> = {
 };
 
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-7 px-2.5 text-[0.6875rem]',
-  md: 'h-9 px-4 text-xs',
+  sm: `${controlHeightClassName.sm} px-2.5 text-[0.6875rem]`,
+  md: `${controlHeightClassName.md} px-4 text-xs`,
 };
 
 export function Button({

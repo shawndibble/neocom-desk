@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FilterChip } from '@/components/ui';
+import { Button, FilterChip, SearchInput } from '@/components/ui';
 import type { SkillType } from '@/sde/types';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -84,8 +84,7 @@ export function SkillPicker({
 
   return (
     <div className={className}>
-      <input
-        type="text"
+      <SearchInput
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -94,7 +93,6 @@ export function SkillPicker({
         }}
         placeholder={t('plans.searchPlaceholder')}
         aria-label={t('plans.addSkill')}
-        className="h-8 w-full rounded-xs border border-line bg-panel-2 px-2 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
       />
       {groups.length > 1 && (
         <div

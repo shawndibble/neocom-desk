@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, IconButton, Modal } from '@/components/ui';
+import { Button, EmptyState, IconButton, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { SkillPlanRecord } from '@/db';
 
@@ -37,7 +37,8 @@ function PlanRow({
   return (
     <li className="flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0">
       {renaming ? (
-        <input
+        <TextInput
+          size="sm"
           autoFocus
           value={draftName}
           aria-label={t('plans.rename')}
@@ -50,7 +51,7 @@ function PlanRow({
               setRenaming(false);
             }
           }}
-          className="h-6 flex-1 rounded-xs border border-line bg-panel-2 px-1 text-text"
+          className="flex-1"
         />
       ) : (
         <button type="button" onClick={() => onOpen(plan.id)} className="flex-1 truncate text-left">

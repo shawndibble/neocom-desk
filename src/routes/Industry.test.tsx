@@ -165,7 +165,7 @@ describe('Industry: Build Plan CRUD', () => {
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
-    const search = await screen.findByRole('textbox', { name: 'Add build plan' });
+    const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 
@@ -269,7 +269,7 @@ describe('Industry: owned-blueprint prefill', () => {
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
-    const search = await screen.findByRole('textbox', { name: 'Add build plan' });
+    const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 

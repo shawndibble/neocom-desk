@@ -418,7 +418,7 @@ describe('SkillPlans editor: add-skill picker', () => {
     try {
       render(<App />);
 
-      const search = await screen.findByRole('textbox', { name: 'Add skill' });
+      const search = await screen.findByRole('searchbox', { name: 'Add skill' });
       await user.type(search, 'Small Hybrid Turret');
       await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
       await user.click(await screen.findByRole('button', { name: 'Level I' }));
@@ -462,7 +462,7 @@ describe('SkillPlans editor: add-skill picker', () => {
     goToPlanEditor();
     render(<App />);
 
-    const search = await screen.findByRole('textbox', { name: 'Add skill' });
+    const search = await screen.findByRole('searchbox', { name: 'Add skill' });
     await user.type(search, 'Small Hybrid Turret');
     await user.click(await screen.findByRole('button', { name: /Small Hybrid Turret/ }));
 

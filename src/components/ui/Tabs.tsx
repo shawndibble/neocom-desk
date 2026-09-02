@@ -1,4 +1,11 @@
 import { useRef } from 'react';
+import { cx } from '@/lib/cx';
+import {
+  tabItemActiveClassName,
+  tabItemClassName,
+  tabItemIdleClassName,
+  tabListClassName,
+} from './tabStyles';
 
 export interface TabItem {
   id: string;
@@ -36,7 +43,7 @@ export function Tabs({ tabs, value, onChange, label, className = '' }: TabsProps
       role="tablist"
       aria-label={label}
       onKeyDown={onKeyDown}
-      className={`flex items-end gap-1 border-b border-line ${className}`}
+      className={cx(tabListClassName, className)}
     >
       {tabs.map((tab) => {
         const active = tab.id === value;
@@ -49,11 +56,7 @@ export function Tabs({ tabs, value, onChange, label, className = '' }: TabsProps
             aria-selected={active}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(tab.id)}
-            className={`-mb-px inline-flex h-8 items-center border-b-2 px-3 text-xs font-semibold tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
-              active
-                ? 'border-accent bg-panel-2/60 text-text'
-                : 'border-transparent text-text-dim hover:bg-panel-2/40 hover:text-text'
-            }`}
+            className={cx(tabItemClassName, active ? tabItemActiveClassName : tabItemIdleClassName)}
           >
             {tab.label}
             {tab.badge !== undefined && tab.badge > 0 && (

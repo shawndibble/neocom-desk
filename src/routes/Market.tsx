@@ -9,7 +9,10 @@ import {
   EmptyState,
   FilterChip,
   IconButton,
+  NativeSelect,
+  PageHeader,
   Panel,
+  SearchInput,
   Spinner,
   Tabs,
 } from '@/components/ui';
@@ -906,75 +909,72 @@ export function Market() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-widest uppercase">{t('market.title')}</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label={t('market.locationMode')} className="flex gap-1.5">
-            <FilterChip
-              label={t('market.modeHub')}
-              selected={effectiveLocation.mode === 'hub'}
-              onToggle={() => handleModeChange('hub')}
-            />
-            <FilterChip
-              label={t('market.modeRegion')}
-              selected={effectiveLocation.mode === 'region'}
-              onToggle={() => handleModeChange('region')}
-            />
-          </div>
-          {effectiveLocation.mode === 'hub' ? (
-            <label className="flex items-center gap-2 text-xs">
-              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('market.tradeHub')}
-              </span>
-              <select
+      <PageHeader
+        title={t('market.title')}
+        actions={
+          <>
+            {/* The mode chip and the picker next to it printed the same words
+                twice — "TRADE HUB · REGION · TRADE HUB [Jita]". The selected chip
+                *is* the picker's label, so the picker keeps the string as its
+                `aria-label` only: still announced, no longer duplicated on
+                screen. */}
+            <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
+              <FilterChip
+                label={t('market.modeHub')}
+                selected={effectiveLocation.mode === 'hub'}
+                onToggle={() => handleModeChange('hub')}
+              />
+              <FilterChip
+                label={t('market.modeRegion')}
+                selected={effectiveLocation.mode === 'region'}
+                onToggle={() => handleModeChange('region')}
+              />
+            </div>
+            {effectiveLocation.mode === 'hub' ? (
+              <NativeSelect
+                size="sm"
+                aria-label={t('market.tradeHub')}
                 value={effectiveHub.id}
                 onChange={(e) => handleHubChange(e.target.value as TradeHub['id'])}
-                className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
               >
                 {TRADE_HUBS.map((h) => (
                   <option key={h.id} value={h.id}>
                     {h.systemName}
                   </option>
                 ))}
-              </select>
-            </label>
-          ) : (
-            <label className="flex items-center gap-2 text-xs">
-              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('market.region')}
-              </span>
-              <select
+              </NativeSelect>
+            ) : (
+              <NativeSelect
+                size="sm"
+                aria-label={t('market.region')}
                 value={chosenRegionId}
                 onChange={(e) => handleRegionChange(Number(e.target.value))}
-                className="h-8 rounded-xs border border-line bg-panel-2 px-2 text-text"
               >
                 {(marketRegions ?? []).map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
                   </option>
                 ))}
-              </select>
-            </label>
-          )}
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('market.refresh')}
-            onClick={handleRefresh}
-            disabled={selectedTypeId === null || orderBookLoading}
-          />
-        </div>
-      </header>
+              </NativeSelect>
+            )}
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('market.refresh')}
+              onClick={handleRefresh}
+              disabled={selectedTypeId === null || orderBookLoading}
+            />
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr]">
         <Panel className={isDesktop || selectedTypeId === null ? '' : 'hidden'}>
-          <input
+          <SearchInput
             ref={searchInputRef}
-            type="search"
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
             placeholder={t('market.searchPlaceholder')}
             aria-label={t('market.searchLabel')}
-            className="h-9 w-full rounded-xs border border-line bg-panel-2 px-3 text-xs text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
           />
 
           {filterResult?.capped && (

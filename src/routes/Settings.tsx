@@ -1,7 +1,14 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Panel, FilterChip, DataTable, EmptyState, type DataTableColumn } from '@/components/ui';
+import {
+  DataTable,
+  EmptyState,
+  FilterChip,
+  PageHeader,
+  Panel,
+  type DataTableColumn,
+} from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
@@ -98,8 +105,8 @@ export function Settings() {
   const setScale = useFontScale((state) => state.setValue);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className="text-xl font-semibold tracking-widest uppercase">{t('settings.title')}</h1>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <PageHeader title={t('settings.title')} />
       <Panel title={t('settings.displayTitle')}>
         <div className="space-y-2">
           <p className="text-xs text-text-dim">{t('settings.fontScaleHint')}</p>
