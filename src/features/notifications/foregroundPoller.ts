@@ -16,8 +16,10 @@ import { loadCharacterSkillQueueWithStatus } from '@/features/skills/data';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import i18n from '@/i18n';
+import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import {
   runSkillQueueNotificationDiffs,
+  SKILL_QUEUE_NOTIFICATION_DIFFS,
   type NotificationFire,
   type SkillQueueEntrySnapshot,
   type SkillQueueSnapshot,
@@ -36,10 +38,10 @@ import { loadUniverseType } from '@/features/skills/data';
 
 export const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
-const SKILL_QUEUE_EVENT_IDS: readonly SkillQueueNotificationEventId[] = [
-  'skillLevelComplete',
-  'characterNotTraining',
-];
+/** The registry itself is the one source of which events this poller runs — nothing else enumerates them. */
+const SKILL_QUEUE_EVENT_IDS = Object.keys(
+  SKILL_QUEUE_NOTIFICATION_DIFFS
+) as SkillQueueNotificationEventId[];
 
 const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.scope]));
 
@@ -178,7 +180,20 @@ async function sendBrowserNotification(
 ): Promise<void> {
   if (typeof Notification === 'undefined') return;
   const { title, body } = await notificationText(fire, character);
-  new Notification(title, { body });
+  try {
+    new Notification(title, { body });
+  } catch {
+    // A denied/changed permission mid-poll, or a platform that rejects
+    // construction outright, must not abort the rest of this poll's
+    // already-persisted fires (pollerState.ts is what prevents a re-fire,
+    // not this call succeeding).
+  }
+}
+
+/** Hydrates a `createLocalSetting` store (a no-op once already hydrated) and returns its current value. */
+async function hydratedValue<T>(store: LocalSettingStore<T>): Promise<T> {
+  await store.getState().hydrate();
+  return store.getState().value;
 }
 
 /** Real dependencies, wired against Dexie/ESI/the browser Notification API. */
@@ -196,19 +211,11 @@ export function liveDependencies(): PollDependencies {
       if (result.needsReauth || result.cached === null) return null;
       return result.cached.data;
     },
-    masterEnabled: async () => {
-      await useNotificationPreferences.getState().hydrate();
-      return useNotificationPreferences.getState().value.masterEnabled;
-    },
-    eventPrefsFor: async (characterId) => {
-      await useNotificationPreferences.getState().hydrate();
-      return characterEventPrefs(useNotificationPreferences.getState().value, characterId);
-    },
+    masterEnabled: async () => (await hydratedValue(useNotificationPreferences)).masterEnabled,
+    eventPrefsFor: async (characterId) =>
+      characterEventPrefs(await hydratedValue(useNotificationPreferences), characterId),
     permission: () => readNotificationPermission(),
-    prevState: async () => {
-      await useSkillQueuePollerState.getState().hydrate();
-      return useSkillQueuePollerState.getState().value;
-    },
+    prevState: () => hydratedValue(useSkillQueuePollerState),
     saveState: (state) => useSkillQueuePollerState.getState().setValue(state),
     notify: sendBrowserNotification,
   };
