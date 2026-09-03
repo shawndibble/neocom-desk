@@ -5,7 +5,10 @@ import {
   selectionStateForEvents,
   toggleEventChannel,
   toggleAllEventsOnChannel,
+  isEveTypeEnabledFor,
+  toggleEveTypeChannel,
   type EventEnabledMap,
+  type EveTypeEnabledMap,
 } from './eventSelection';
 
 const A = 'skillLevelComplete' satisfies NotificationEventId;
@@ -76,5 +79,46 @@ describe('toggleAllEventsOnChannel', () => {
     const next = toggleAllEventsOnChannel([A, B], map, 'browser');
     expect(isEventEnabledFor(next, A, 'browser')).toBe(true);
     expect(isEventEnabledFor(next, B, 'browser')).toBe(true);
+  });
+});
+
+const TYPE_A = 'BillOutOfMoneyMsg';
+const TYPE_B = 'AllWarDeclaredMsg';
+
+describe('isEveTypeEnabledFor', () => {
+  it('defaults an absent type to feed-on, browser-off — the opposite of isEventEnabledFor', () => {
+    expect(isEveTypeEnabledFor({}, TYPE_A, 'browser')).toBe(false);
+    expect(isEveTypeEnabledFor({}, TYPE_A, 'feed')).toBe(true);
+  });
+
+  it('reads channels independently once set', () => {
+    const map: EveTypeEnabledMap = { [TYPE_A]: { browser: true } };
+    expect(isEveTypeEnabledFor(map, TYPE_A, 'browser')).toBe(true);
+    // feed still falls back to the default, not to the browser value.
+    expect(isEveTypeEnabledFor(map, TYPE_A, 'feed')).toBe(true);
+  });
+
+  it('never falls back to another type', () => {
+    const map: EveTypeEnabledMap = { [TYPE_A]: { feed: false } };
+    expect(isEveTypeEnabledFor(map, TYPE_B, 'feed')).toBe(true);
+  });
+});
+
+describe('toggleEveTypeChannel', () => {
+  it('flips one channel off its default and leaves the other at its default', () => {
+    const next = toggleEveTypeChannel({}, TYPE_A, 'browser');
+    expect(isEveTypeEnabledFor(next, TYPE_A, 'browser')).toBe(true);
+    expect(isEveTypeEnabledFor(next, TYPE_A, 'feed')).toBe(true);
+  });
+
+  it('can opt a type out of the feed while leaving browser at its default', () => {
+    const next = toggleEveTypeChannel({}, TYPE_A, 'feed');
+    expect(isEveTypeEnabledFor(next, TYPE_A, 'feed')).toBe(false);
+    expect(isEveTypeEnabledFor(next, TYPE_A, 'browser')).toBe(false);
+  });
+
+  it('does not disturb other types', () => {
+    const next = toggleEveTypeChannel({ [TYPE_B]: { feed: false } }, TYPE_A, 'browser');
+    expect(isEveTypeEnabledFor(next, TYPE_B, 'feed')).toBe(false);
   });
 });

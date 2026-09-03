@@ -222,6 +222,15 @@ export interface NotificationFeedRecord {
   body: string;
   /** Epoch ms the poller fired this. */
   firedAt: number;
+  /**
+   * ESI's raw notification `type` string (issue #274), set only for
+   * `eventId: 'eveNotification'` rows. Carries the per-type opt-out
+   * (`eventSelection.ts`'s `EveTypeEnabledMap`) through to feed-visibility
+   * filtering, and doubles as how Settings discovers which types a Character
+   * has actually seen — there is no closed catalog to list them from
+   * up front (CCP adds types without notice).
+   */
+  eveType?: string;
 }
 
 export const db = new Dexie('neocom') as Dexie & {

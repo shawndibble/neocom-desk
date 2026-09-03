@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { NotificationFeedEntry } from './feed';
-import { visibleFeedEntries, entriesForCharacter, otherCharacterAlerts } from './feedSelection';
+import {
+  visibleFeedEntries,
+  entriesForCharacter,
+  otherCharacterAlerts,
+  knownEveTypesForCharacter,
+} from './feedSelection';
 import type { NotificationPreferencesValue } from './preferences';
 
 function entry(over: Partial<NotificationFeedEntry> = {}): NotificationFeedEntry {
@@ -44,6 +49,24 @@ describe('visibleFeedEntries', () => {
   it('keeps an entry whose event id is no longer in the catalog', () => {
     const entries = [entry({ id: 'a', eventId: 'somethingRetired' })];
     expect(visibleFeedEntries(entries, ALL_ON).map((e) => e.id)).toEqual(['a']);
+  });
+
+  it('keeps an eveNotification entry by default (feed-on is the per-type default)', () => {
+    const entries = [entry({ id: 'a', eventId: 'eveNotification', eveType: 'BillOutOfMoneyMsg' })];
+    expect(visibleFeedEntries(entries, ALL_ON).map((e) => e.id)).toEqual(['a']);
+  });
+
+  it('hides an eveNotification entry whose specific type the character opted out of on feed', () => {
+    const prefs: NotificationPreferencesValue = {
+      masterEnabled: true,
+      perCharacter: {},
+      eveNotificationTypesByCharacter: { 1: { BillOutOfMoneyMsg: { feed: false } } },
+    };
+    const entries = [
+      entry({ id: 'a', eventId: 'eveNotification', eveType: 'BillOutOfMoneyMsg' }),
+      entry({ id: 'b', eventId: 'eveNotification', eveType: 'AllWarDeclaredMsg' }),
+    ];
+    expect(visibleFeedEntries(entries, prefs).map((e) => e.id)).toEqual(['b']);
   });
 });
 
@@ -97,5 +120,30 @@ describe('otherCharacterAlerts', () => {
 
   it('is empty when only the active character has alerts', () => {
     expect(otherCharacterAlerts([entry({ characterId: 1 })], 1, names)).toEqual([]);
+  });
+});
+
+describe('knownEveTypesForCharacter', () => {
+  it('is empty with no eveNotification entries', () => {
+    expect(knownEveTypesForCharacter([entry()], 1)).toEqual([]);
+  });
+
+  it('lists distinct types this character has seen, sorted', () => {
+    const entries = [
+      entry({ id: 'a', eventId: 'eveNotification', eveType: 'BillOutOfMoneyMsg' }),
+      entry({ id: 'b', eventId: 'eveNotification', eveType: 'AllWarDeclaredMsg' }),
+      entry({ id: 'c', eventId: 'eveNotification', eveType: 'BillOutOfMoneyMsg' }),
+    ];
+    expect(knownEveTypesForCharacter(entries, 1)).toEqual([
+      'AllWarDeclaredMsg',
+      'BillOutOfMoneyMsg',
+    ]);
+  });
+
+  it('scopes to the given character', () => {
+    const entries = [
+      entry({ id: 'a', characterId: 2, eventId: 'eveNotification', eveType: 'AllWarDeclaredMsg' }),
+    ];
+    expect(knownEveTypesForCharacter(entries, 1)).toEqual([]);
   });
 });

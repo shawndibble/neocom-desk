@@ -6,6 +6,7 @@ import type {
   CalendarEventSummary,
   Contract,
   WalletJournalEntry,
+  CharacterNotification,
 } from '@/esi/endpoints';
 import {
   runForegroundPoll,
@@ -24,6 +25,7 @@ import type {
   MarketOrderSnapshot,
   ColonySnapshotEntry,
   MarketOrderEntrySnapshot,
+  EveNotificationSnapshot,
 } from '@/engine/notificationDiffs';
 import type { PollerState } from './pollerState';
 
@@ -38,6 +40,7 @@ type CalendarPollerState = PollerState<CalendarSnapshot>;
 type ContractPollerState = PollerState<ContractSnapshot>;
 type WalletPollerState = PollerState<WalletSnapshot>;
 type MarketOrderPollerState = PollerState<MarketOrderSnapshot>;
+type EveNotificationPollerState = PollerState<EveNotificationSnapshot>;
 
 const CHAR: CharacterRef = { characterId: 1, name: 'Test Pilot' };
 const SKILLQUEUE_SCOPE = 'esi-skills.read_skillqueue.v1';
@@ -48,6 +51,7 @@ const CALENDAR_SCOPE = 'esi-calendar.read_calendar_events.v1';
 const CONTRACTS_SCOPE = 'esi-contracts.read_character_contracts.v1';
 const WALLET_SCOPE = 'esi-wallet.read_character_wallet.v1';
 const MARKET_ORDERS_SCOPE = 'esi-markets.read_character_orders.v1';
+const NOTIFICATIONS_SCOPE = 'esi-characters.read_notifications.v1';
 
 function queueEntry(overrides: Partial<SkillQueueEntry> = {}): SkillQueueEntry {
   return {
@@ -94,6 +98,18 @@ function walletJournalEntry(overrides: Partial<WalletJournalEntry> = {}): Wallet
     date: '2026-01-01T00:00:00Z',
     ref_type: 'bounty',
     description: '',
+    ...overrides,
+  };
+}
+
+function eveNotification(overrides: Partial<CharacterNotification> = {}): CharacterNotification {
+  return {
+    notification_id: 1,
+    type: 'BillOutOfMoneyMsg',
+    sender_id: 1000132,
+    sender_type: 'corporation',
+    text: 'amount: 12345\n',
+    timestamp: '2026-01-01T00:00:00Z',
     ...overrides,
   };
 }
@@ -145,6 +161,9 @@ interface DomainOverrides {
   loadMarketOrders?: (characterId: number) => Promise<MarketOrderEntrySnapshot[] | null>;
   prevMarketOrderState?: () => Promise<MarketOrderPollerState>;
   saveMarketOrderState?: (state: MarketOrderPollerState) => Promise<void>;
+  loadEveNotifications?: (characterId: number) => Promise<CharacterNotification[] | null>;
+  prevEveNotificationState?: () => Promise<EveNotificationPollerState>;
+  saveEveNotificationState?: (state: EveNotificationPollerState) => Promise<void>;
 }
 
 /**
@@ -193,6 +212,9 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     loadMarketOrders = async () => [],
     prevMarketOrderState,
     saveMarketOrderState,
+    loadEveNotifications = async () => [],
+    prevEveNotificationState,
+    saveEveNotificationState,
     ...rest
   } = overrides;
 
@@ -205,6 +227,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     contracts: loadContracts,
     wallet: loadWalletJournal,
     marketOrders: loadMarketOrders,
+    eveNotification: loadEveNotifications,
   };
   const states: Record<string, DomainPollState> = {
     skillQueue: domainState(prevState, saveState),
@@ -215,6 +238,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     contracts: domainState(prevContractState, saveContractState),
     wallet: domainState(prevWalletState, saveWalletState),
     marketOrders: domainState(prevMarketOrderState, saveMarketOrderState),
+    eveNotification: domainState(prevEveNotificationState, saveEveNotificationState),
   };
 
   return {
@@ -227,6 +251,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     browserChannelEnabled: async () => true,
     feedChannelEnabled: async () => false,
     eventPrefsFor: async () => ({}),
+    eveTypePrefsFor: async () => ({}),
     permission: () => 'granted',
     notify: vi.fn(async () => {}),
     recordToFeed: vi.fn(async () => {}),
@@ -934,6 +959,136 @@ describe('runForegroundPoll', () => {
     expect(notify).toHaveBeenCalledTimes(1);
     const [fire] = notify.mock.calls[0];
     expect(fire.eventId).toBe('marketOrderFilled');
+  });
+
+  it('skips eveNotification for a character with no granted scope', async () => {
+    const loadEveNotifications = vi.fn(async () => []);
+    const deps = baseDeps({ loadEveNotifications });
+    await runForegroundPoll(deps);
+    expect(loadEveNotifications).not.toHaveBeenCalled();
+  });
+
+  it('skips eveNotification for a character who toggled the event off despite having the scope', async () => {
+    const loadEveNotifications = vi.fn(async () => []);
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, NOTIFICATIONS_SCOPE]),
+      eventPrefsFor: async () => ({ eveNotification: false }),
+      loadEveNotifications,
+    });
+    await runForegroundPoll(deps);
+    expect(loadEveNotifications).not.toHaveBeenCalled();
+  });
+
+  it('persists an eveNotification snapshot on the first poll but fires nothing (AC5, no baseline yet)', async () => {
+    let saved: EveNotificationPollerState | null = null;
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, NOTIFICATIONS_SCOPE]),
+      loadEveNotifications: async () => [eveNotification({ notification_id: 5 })],
+      saveEveNotificationState: async (state) => {
+        saved = state;
+      },
+    });
+    await runForegroundPoll(deps);
+    expect(deps.notify).not.toHaveBeenCalled();
+    expect(saved).not.toBeNull();
+    expect(saved![CHAR.characterId].entries).toEqual([
+      {
+        notificationId: 5,
+        type: 'BillOutOfMoneyMsg',
+        senderId: 1000132,
+        senderType: 'corporation',
+        text: 'amount: 12345\n',
+        timestamp: '2026-01-01T00:00:00Z',
+      },
+    ]);
+  });
+
+  it('fires eveNotification when a notification id above the previous high-water mark appears (delivered to feed, its per-type default channel)', async () => {
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, NOTIFICATIONS_SCOPE]),
+      feedChannelEnabled: async () => true,
+      prevEveNotificationState: async () => ({
+        [CHAR.characterId]: {
+          entries: [
+            {
+              notificationId: 5,
+              type: 'BillOutOfMoneyMsg',
+              senderId: 1000132,
+              senderType: 'corporation',
+              text: '',
+              timestamp: '2026-01-01T00:00:00Z',
+            },
+          ],
+          nowMs: 500,
+        },
+      }),
+      loadEveNotifications: async () => [
+        eveNotification({ notification_id: 6, type: 'AllWarDeclaredMsg' }),
+        eveNotification({ notification_id: 5 }),
+      ],
+      recordToFeed,
+    });
+    await runForegroundPoll(deps);
+    expect(recordToFeed).toHaveBeenCalledTimes(1);
+    const [fire, character] = recordToFeed.mock.calls[0];
+    expect(fire).toEqual(
+      expect.objectContaining({
+        eventId: 'eveNotification',
+        characterId: CHAR.characterId,
+        notificationId: 6,
+        type: 'AllWarDeclaredMsg',
+      })
+    );
+    expect(character).toEqual(CHAR);
+  });
+
+  it('renders a generic body and never throws for a notification type this catalog has never heard of (AC2)', async () => {
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, NOTIFICATIONS_SCOPE]),
+      feedChannelEnabled: async () => true,
+      prevEveNotificationState: async () => ({
+        [CHAR.characterId]: { entries: [], nowMs: 500 },
+      }),
+      loadEveNotifications: async () => [
+        eveNotification({ notification_id: 1, type: 'SomeBrandNewMsgType6041' }),
+      ],
+      recordToFeed,
+    });
+    await expect(runForegroundPoll(deps)).resolves.not.toThrow();
+    expect(recordToFeed).toHaveBeenCalledTimes(1);
+    const [fire] = recordToFeed.mock.calls[0];
+    expect(fire).toEqual(
+      expect.objectContaining({ eventId: 'eveNotification', type: 'SomeBrandNewMsgType6041' })
+    );
+  });
+
+  it('opts an individual EVE notification type out of a channel without touching the parent event (AC3)', async () => {
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, NOTIFICATIONS_SCOPE]),
+      feedChannelEnabled: async () => true,
+      // The type-level opt-out, not the event-level one.
+      eveTypePrefsFor: async () => ({ BillOutOfMoneyMsg: { feed: false } }),
+      prevEveNotificationState: async () => ({
+        [CHAR.characterId]: { entries: [], nowMs: 500 },
+      }),
+      loadEveNotifications: async () => [
+        eveNotification({ notification_id: 1, type: 'BillOutOfMoneyMsg' }),
+        eveNotification({ notification_id: 2, type: 'AllWarDeclaredMsg' }),
+      ],
+      notify,
+      recordToFeed,
+    });
+    await runForegroundPoll(deps);
+    // Browser stays off (feed-only default), feed gets only the type that
+    // wasn't opted out.
+    expect(notify).not.toHaveBeenCalled();
+    expect(recordToFeed).toHaveBeenCalledTimes(1);
+    const [fire] = recordToFeed.mock.calls[0];
+    expect(fire).toEqual(expect.objectContaining({ type: 'AllWarDeclaredMsg' }));
   });
 });
 
