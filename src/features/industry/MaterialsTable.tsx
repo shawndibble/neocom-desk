@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, TextInput, type DataTableColumn } from '@/components/ui';
 import type {
@@ -19,6 +19,8 @@ interface MaterialsTableProps {
   /** False when the market snapshot couldn't be fetched — hub prices fall back to placeholder text. */
   pricesReady: boolean;
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
+  /** Wraps each row in the shared item context menu; omitted where the caller has no menu to offer. */
+  rowContextMenu?: (material: MaterialCostLine, tr: ReactElement) => ReactElement;
 }
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
@@ -101,6 +103,7 @@ export function MaterialsTable({
   sourcing,
   pricesReady,
   onSourcingChange,
+  rowContextMenu,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
@@ -222,6 +225,7 @@ export function MaterialsTable({
         rowKey={(material) => material.typeID}
         label={t('industry.materials')}
         density="compact"
+        rowContextMenu={rowContextMenu}
       />
     </div>
   );
