@@ -839,6 +839,23 @@
       "resetGainColumn": "Reset now",
       "resetGainValue": "+{{amount}}/day",
       "decayedTooltip": "Every extractor here is producing under half what it did on its first cycle. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows what a day of that is worth."
+    },
+    "timeline": {
+      "title": "Extractor Timeline",
+      "listLabel": "Extractor programs across every character, the ones needing attention first",
+      "windowHint": "Every extractor program cached for any of your characters, worst first. Each bar is the time left in the next {{days}} days; a longer program fills its track.",
+      "coloniesStat": "Colonies",
+      "idleStat": "Idle",
+      "nextExpiryStat": "Next Expiry",
+      "skippedStat": "Skipped",
+      "noneValue": "None",
+      "skippedTooltip": "Characters that haven't granted this app planetary access. Nothing is fetched for them, so they never raise a log-in prompt — log in again with that character to include it here.",
+      "emptyTitle": "No extractor programs cached",
+      "emptyHint": "Colony data is cached as you open this page on each character. Refresh loads the active character now.",
+      "notLoaded": "Not loaded yet, so their programs aren't listed: {{names}}. Switch to a character and refresh to cache its colonies.",
+      "coloniesNotLoaded": "{{count}} listed colonies have no cached detail yet, so their programs aren't listed.",
+      "noColonies": "No colonies: {{names}}.",
+      "skipped": "Skipped, no planetary access granted: {{names}}."
     }
   },
   "employmentHistory": {
