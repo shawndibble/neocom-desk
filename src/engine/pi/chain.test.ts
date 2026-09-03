@@ -79,9 +79,9 @@ describe('pi.json shape assumptions', () => {
   // Guards #303's PiData reshape: every membership question this engine asks
   // goes through isP0, so a raw[] shape change fails here, loudly and once.
   it('keeps raw and schematics disjoint and complete', () => {
-    for (const typeId of pi.raw) {
-      expect(isP0(typeId, pi)).toBe(true);
-      expect(pi.schematics[String(typeId)]).toBeUndefined();
+    for (const { typeID } of pi.raw) {
+      expect(isP0(typeID, pi)).toBe(true);
+      expect(pi.schematics[String(typeID)]).toBeUndefined();
     }
     const inputIds = new Set(
       Object.values(pi.schematics).flatMap((s) => s.inputs.map((i) => i.typeID))

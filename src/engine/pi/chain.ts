@@ -56,6 +56,12 @@
  * explicit `needs-extraction-rate` result rather than a number, a zero or a
  * guess.
  *
+ * When a caller does have colonies, it should derive that rate through
+ * `engine/pi/extraction.ts` rather than reading `qty_per_cycle` straight off
+ * the pin: extractor output decays over a program, so the raw figure overstates
+ * a 14-day program by around 150%. Either way the rate arrives here as a
+ * number, and this module never computes one.
+ *
  * ## Two accounting choices worth stating outright
  *
  * - Sourced material crosses exactly one customs boundary: the import onto the
@@ -142,7 +148,7 @@ const FLOOR_TIER: Readonly<Record<SourcingFloor, PiTier>> = { P0: 0, P1: 1, P2: 
  * and nothing else.
  */
 export function isP0(typeId: number, pi: PiData): boolean {
-  return pi.raw.includes(typeId);
+  return pi.raw.some((resource) => resource.typeID === typeId);
 }
 
 function schematicFor(typeId: number, pi: PiData): PiSchematic | undefined {

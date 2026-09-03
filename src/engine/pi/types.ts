@@ -173,10 +173,15 @@ export interface ChainCostOptions {
   /** Defaults to the highsec NPC base rate. Never derived here. */
   taxRate?: number;
   /**
-   * Sustained units per hour one extractor program yields — normally the
-   * character's own installed extractors' `qty_per_cycle`, which already bakes
+   * Sustained units per hour one extractor program yields, which already bakes
    * in richness, head count, head placement and cycle time. `null` (or
-   * omitted, or non-positive) means "not known", which is a first-class state.
+   * omitted, or non-positive) means "not known", which is a first-class state
+   * — a user with no colonies has no rate to give.
+   *
+   * Derive it from a real program with `engine/pi/extraction.ts`
+   * (`programTotalYield` over the program's length), not from raw
+   * `qty_per_cycle`: output decays across a program, so `qty_per_cycle`
+   * overstates a 14-day program by ~150%.
    */
   extractionRate?: number | null;
 }
