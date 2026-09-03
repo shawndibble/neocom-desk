@@ -31,10 +31,12 @@ import {
   DownloadSimple,
   Export as ExportIcon,
   Flag,
+  Hammer,
   MagnifyingGlass,
   Package,
   PencilSimple,
   Queue,
+  ShoppingCart,
   Sliders,
   Star,
   Target,
@@ -124,3 +126,7 @@ export const AddMarker = withWeight(Flag);
 export const OptimizeAtMarkers = withWeight(Target);
 /** Reorder the queue by priority/attribute pair (#224 icon-only toolbar). */
 export const SuggestReorder = withWeight(ArrowsDownUp);
+/** A build plan material this character is better off manufacturing or growing than buying. */
+export const Build = withWeight(Hammer);
+/** The same verdict the other way: buying the material beats producing it. */
+export const Buy = withWeight(ShoppingCart);

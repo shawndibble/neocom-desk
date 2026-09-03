@@ -31,6 +31,8 @@ const FILES = [
   'industryActivitySkills.csv',
   'invMarketGroups.csv',
   'invMetaTypes.csv',
+  'planetSchematics.csv',
+  'planetSchematicsTypeMap.csv',
   'invMetaGroups.csv',
   'mapRegions.csv',
   'mapSolarSystems.csv',
@@ -456,6 +458,75 @@ async function main() {
     typeMap[typeID] = { name: t.name, groupID: t.groupID, volume: t.volume };
   }
 
+  // --- pi.json: planetary industry schematics, keyed by the typeID they
+  // produce. Item names ride along inside this payload rather than being
+  // looked up in types.json: that map only carries types some blueprint or
+  // skill references, and most planetary commodities are made by a schematic
+  // and consumed by another one, so 42 of them are absent from it.
+  const piSchematics = {};
+  const piRaw = [];
+  let piUnpublished = 0;
+  {
+    const meta = new Map();
+    {
+      const rows = raw['planetSchematics.csv'];
+      const h = indexHeader(rows);
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        meta.set(Number(r[h.schematicID]), {
+          name: r[h.schematicName],
+          cycleTime: Number(r[h.cycleTime]),
+        });
+      }
+    }
+    // One row per (schematic, type) pair; isInput splits the recipe's inputs
+    // from the single type it produces.
+    const schematicInputs = new Map();
+    const schematicOutput = new Map();
+    {
+      const rows = raw['planetSchematicsTypeMap.csv'];
+      const h = indexHeader(rows);
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const schematicID = Number(r[h.schematicID]);
+        const line = { typeID: Number(r[h.typeID]), quantity: Number(r[h.quantity]) };
+        if (r[h.isInput] === '1') {
+          const list = schematicInputs.get(schematicID) ?? [];
+          list.push(line);
+          schematicInputs.set(schematicID, list);
+        } else {
+          schematicOutput.set(schematicID, line);
+        }
+      }
+    }
+    const piName = (typeID) => types.get(typeID)?.name ?? `#${typeID}`;
+    for (const [schematicID, output] of schematicOutput) {
+      const info = meta.get(schematicID);
+      if (!info) continue;
+      if (!types.get(output.typeID)?.published) {
+        piUnpublished++;
+        continue;
+      }
+      piSchematics[output.typeID] = {
+        schematicId: schematicID,
+        name: info.name,
+        cycleTime: info.cycleTime,
+        quantity: output.quantity,
+        inputs: (schematicInputs.get(schematicID) ?? [])
+          .map((line) => ({ ...line, name: piName(line.typeID) }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    }
+    // P0 resources have no schematic — they come out of an extractor — so
+    // they are exactly the types that only ever appear on an input side.
+    const rawIds = new Set();
+    for (const list of schematicInputs.values()) {
+      for (const line of list) if (!(line.typeID in piSchematics)) rawIds.add(line.typeID);
+    }
+    piRaw.push(...[...rawIds].sort((a, b) => a - b));
+  }
+  const pi = { schematics: piSchematics, raw: piRaw };
+
   // --- market/groups.json: invMarketGroups -> MarketGroupNode[] ---
   const marketGroups = [];
   {
@@ -652,6 +723,7 @@ async function main() {
     ['skills.json', skills],
     ['blueprints.json', blueprints],
     ['types.json', typeMap],
+    ['pi.json', pi],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {
@@ -691,6 +763,13 @@ async function main() {
   console.log(`  skills: ${skills.length}`);
   console.log(`  blueprints (manufacturing): ${Object.keys(blueprints).length}`);
   console.log(`  types map entries: ${Object.keys(typeMap).length}`);
+  console.log(
+    `  planetary schematics: ${Object.keys(piSchematics).length} (+${piRaw.length} raw resources, ${piUnpublished} unpublished skipped)`
+  );
+  if (Object.keys(piSchematics).length === 0 || piRaw.length === 0) {
+    console.error('  FAIL: the planetary industry payload came out empty');
+    process.exitCode = 1;
+  }
   console.log(`  prereqs pointing outside skills.json: ${badPrereq}`);
   console.log(`  skills with rank outside 1-16: ${badRank}`);
   console.log(`  skills missing primary/secondary attr: ${badAttrs}`);

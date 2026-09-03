@@ -8,7 +8,10 @@
  * small attribute dictionary that turns attribute ids into names/units/categories.
  * Required-skill rows resolve their skill name from `skills.json`
  * (public/data, PWA-precached — not the market snapshot vite.config.ts
- * excludes from precache) rather than from anything item-specific.
+ * excludes from precache) rather than from anything item-specific. A
+ * planetary commodity also gets its schematic (pi.json, precached the same
+ * way): for those, "how is this made" is the question the modal is opened to
+ * answer, and no dogma attribute carries it.
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,7 +20,9 @@ import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAt
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
 import { getUniverseType, type UniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
-import { loadSkills } from '@/sde/loadSde';
+import { loadPi, loadSkills } from '@/sde/loadSde';
+import type { PiData } from '@/sde/types';
+import { formatDuration } from '@/lib/duration';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatAttributeValue, formatVolume } from './format';
 
@@ -30,6 +35,8 @@ export interface ItemDetailModalProps {
 interface DetailData {
   type: UniverseType;
   groups: AttributeGroup[];
+  /** Null when pi.json couldn't be read — the rest of the modal is unaffected. */
+  pi: PiData | null;
 }
 
 /** Mounted only while open (ImportClipboardDialog's pattern) — mounting is the open signal. */
@@ -46,10 +53,14 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
       setData(null);
       setError(false);
       try {
-        const [{ data: type }, dictionary, skills] = await Promise.all([
+        const [{ data: type }, dictionary, skills, pi] = await Promise.all([
           getUniverseType(typeId),
           loadAttributeDictionary(),
           loadSkills(),
+          // Caught here, not by the shared handler below: only planetary
+          // commodities have anything to lose if this payload is missing, and
+          // a rejection inside the Promise.all would blank the whole modal.
+          loadPi().catch(() => null),
         ]);
         if (cancelled) return;
         if (!type) throw new Error(`No type data for ${typeId}`);
@@ -57,6 +68,7 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
         setData({
           type,
           groups: groupItemAttributes(type.dogma_attributes, dictionary, skillNames),
+          pi,
         });
       } catch {
         if (!cancelled) setError(true);
@@ -105,6 +117,8 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
             </div>
           </div>
 
+          <PlanetaryProduction pi={data.pi} typeId={typeId} />
+
           {data.groups.length === 0 ? (
             <p className="text-xs text-text-dim">{t('market.itemDetail.noAttributes')}</p>
           ) : (
@@ -130,6 +144,49 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
         </div>
       )}
     </Modal>
+  );
+}
+
+/**
+ * How a planetary commodity is produced: the schematic's inputs, its cycle
+ * time and what one cycle yields. A P0 resource has no schematic — an
+ * extractor pulls it off the planet — so it gets the one line that says so,
+ * and everything else in New Eden renders nothing here.
+ */
+function PlanetaryProduction({ pi, typeId }: { pi: PiData | null; typeId: number }) {
+  const { t } = useTranslation();
+  if (!pi) return null;
+  const schematic = pi.schematics[String(typeId)];
+  const raw = pi.raw.includes(typeId);
+  if (!schematic && !raw) return null;
+  return (
+    <div>
+      <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {t('market.itemDetail.planetaryTitle')}
+      </h3>
+      {schematic ? (
+        <>
+          <p className="mt-1 text-xs text-text-dim">
+            {t('market.itemDetail.planetaryCycle', {
+              quantity: schematic.quantity.toLocaleString(),
+              duration: formatDuration(schematic.cycleTime),
+            })}
+          </p>
+          <ul className="mt-1 space-y-0.5 text-xs text-text">
+            {schematic.inputs.map((input) => (
+              <li key={input.typeID}>
+                {t('market.itemDetail.planetaryInput', {
+                  quantity: input.quantity.toLocaleString(),
+                  name: input.name,
+                })}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="mt-1 text-xs text-text-dim">{t('market.itemDetail.planetaryRaw')}</p>
+      )}
+    </div>
   );
 }
 

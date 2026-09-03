@@ -8,17 +8,19 @@ import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
-import { loadSkills } from '@/sde/loadSde';
+import { loadPi, loadSkills } from '@/sde/loadSde';
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(),
 }));
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(),
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
 const mockedLoadSkills = vi.mocked(loadSkills);
+const mockedLoadPi = vi.mocked(loadPi);
 
 const TYPE_ID = 587;
 
@@ -167,5 +169,87 @@ describe('ItemDetailModal', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(trigger).toHaveFocus();
+  });
+});
+
+describe('ItemDetailModal planetary production', () => {
+  const REACTIVE_METALS = 2398;
+  const SCHEMATICS = {
+    schematics: {
+      '2398': {
+        schematicId: 133,
+        name: 'Reactive Metals',
+        cycleTime: 1800,
+        quantity: 20,
+        inputs: [{ typeID: 2267, quantity: 3000, name: 'Base Metals' }],
+      },
+    },
+    raw: [2267],
+  };
+
+  function serveType(typeId: number, name: string) {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${typeId}`, () =>
+        HttpResponse.json({
+          type_id: typeId,
+          name,
+          description: `${name} description.`,
+          group_id: 429,
+          published: true,
+          volume: 0.38,
+          dogma_attributes: [],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({});
+    mockedLoadSkills.mockResolvedValue([]);
+  }
+
+  it('shows the schematic that produces a planetary commodity', async () => {
+    serveType(REACTIVE_METALS, 'Reactive Metals');
+    mockedLoadPi.mockResolvedValue(SCHEMATICS);
+
+    render(
+      <ItemDetailModal typeId={REACTIVE_METALS} itemName="Reactive Metals" onClose={() => {}} />
+    );
+
+    expect(await screen.findByText('Planetary production')).toBeInTheDocument();
+    expect(screen.getByText('20 per 30m cycle')).toBeInTheDocument();
+    expect(screen.getByText('3,000 x Base Metals')).toBeInTheDocument();
+  });
+
+  it('says a raw resource is extracted rather than made', async () => {
+    serveType(2267, 'Base Metals');
+    mockedLoadPi.mockResolvedValue(SCHEMATICS);
+
+    render(<ItemDetailModal typeId={2267} itemName="Base Metals" onClose={() => {}} />);
+
+    expect(await screen.findByText('Planetary production')).toBeInTheDocument();
+    expect(screen.getByText(/Extracted straight off a planet/)).toBeInTheDocument();
+  });
+
+  it('shows no planetary section for an item planetary industry never touches', async () => {
+    serveType(587, 'Rifter');
+    mockedLoadPi.mockResolvedValue(SCHEMATICS);
+
+    render(<ItemDetailModal typeId={587} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByText('Rifter description.')).toBeInTheDocument();
+    expect(screen.queryByText('Planetary production')).not.toBeInTheDocument();
+  });
+
+  it('still renders the item when the planetary payload cannot be read', async () => {
+    // A missing local payload costs one section, never the ESI-backed detail
+    // the modal exists for.
+    serveType(REACTIVE_METALS, 'Reactive Metals');
+    mockedLoadPi.mockRejectedValue(new Error('offline'));
+
+    render(
+      <ItemDetailModal typeId={REACTIVE_METALS} itemName="Reactive Metals" onClose={() => {}} />
+    );
+
+    expect(await screen.findByText('Reactive Metals description.')).toBeInTheDocument();
+    expect(screen.queryByText('Planetary production')).not.toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load item info")).not.toBeInTheDocument();
   });
 });
