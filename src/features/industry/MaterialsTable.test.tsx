@@ -74,10 +74,12 @@ function row(name: string): HTMLElement {
   return cell;
 }
 
+// Textboxes, not spinbuttons: the fields mask their value ("338,600"), which
+// a `type="number"` input cannot hold.
 const ownedInput = (material: string) =>
-  screen.getByRole('spinbutton', { name: `Owned quantity for ${material}` });
+  screen.getByRole('textbox', { name: `Owned quantity for ${material}` });
 const priceInput = (material: string) =>
-  screen.getByRole('spinbutton', { name: `Price for ${material}` });
+  screen.getByRole('textbox', { name: `Price for ${material}` });
 const revertButton = (material: string) =>
   screen.getByRole('button', { name: `Reset ${material} to the hub price` });
 const queryRevertButton = (material: string) =>
@@ -148,8 +150,10 @@ describe('MaterialsTable sourcing', () => {
     const tritanium = within(row('Tritanium'));
     expect(tritanium.getByText('all 1,000 owned')).toBeTruthy();
     expect(tritanium.getByText('0')).toBeTruthy();
-    // The number the player typed is kept verbatim — it is not an error to fix.
-    expect((ownedInput('Tritanium') as HTMLInputElement).value).toBe('5000');
+    // The number the player typed is kept — it is not an error to fix — and
+    // comes back masked, since 5000 is what they typed but 5,000 is what the
+    // field shows once they leave it.
+    expect((ownedInput('Tritanium') as HTMLInputElement).value).toBe('5,000');
     expect(screen.queryByRole('alert')).toBeNull();
     expect(tritanium.queryByText('No price')).toBeNull();
   });
@@ -284,6 +288,86 @@ describe('MaterialsTable stacked card', () => {
     expect(ownedInput('Tritanium')).toHaveAttribute('placeholder', '0');
     expect(valueOf(ownedInput('Tritanium'))).toBe('');
     expect(priceInput('Tritanium')).not.toHaveAttribute('placeholder');
+  });
+});
+
+/**
+ * The mask (`src/lib/numberMask.ts`): a column of prices is unreadable as
+ * `338600` beside `6622`, but a box being typed into is unusable if a
+ * formatter rewrites the digits under the caret. So the field groups at rest
+ * and shows the plain number while it has focus.
+ */
+describe('MaterialsTable number mask', () => {
+  const BIG_PRICES: HubPrices = { 34: 338600, 35: 6622.35 };
+
+  it('groups the digits at rest, in both sourcing fields', () => {
+    render(<Harness hubPrices={BIG_PRICES} initial={{ 34: { ownedQuantity: 1000 } }} />);
+
+    expect(valueOf(priceInput('Tritanium'))).toBe('338,600');
+    expect(valueOf(ownedInput('Tritanium'))).toBe('1,000');
+  });
+
+  it("keeps a price's own decimals rather than rounding them away", () => {
+    // The line total beside it is whole ISK; the field is the player's number
+    // and has to come back as they left it.
+    render(<Harness hubPrices={BIG_PRICES} />);
+
+    expect(valueOf(priceInput('Pyerite'))).toBe('6,622.35');
+  });
+
+  it('swaps the mask for a plain number to type into, and puts it back on the way out', async () => {
+    const user = userEvent.setup();
+    render(<Harness hubPrices={BIG_PRICES} />);
+
+    await user.click(priceInput('Tritanium'));
+    expect(valueOf(priceInput('Tritanium'))).toBe('338600');
+
+    await user.tab();
+    expect(valueOf(priceInput('Tritanium'))).toBe('338,600');
+  });
+
+  it('stores no override for a masked field merely clicked into and left', async () => {
+    // The guard that keeps the market default a default has to survive the
+    // mask: what is compared on blur is the typed string, not the shown one.
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness hubPrices={BIG_PRICES} onChange={onChange} />);
+
+    await user.click(priceInput('Tritanium'));
+    await user.tab();
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(within(row('Tritanium')).getByText('Hub')).toBeTruthy();
+  });
+
+  it('does not pin a stale price when the market refreshes under a focused field', async () => {
+    // The trap in unmasking on focus: the plain number would be frozen into
+    // the draft on the way in, so a snapshot landing mid-edit would be
+    // committed on blur as an override of the price that just expired. Until
+    // a key is pressed the prop stays the source of truth.
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = render(<Harness hubPrices={BIG_PRICES} onChange={onChange} />);
+
+    await user.click(priceInput('Tritanium'));
+    rerender(<Harness hubPrices={{ ...BIG_PRICES, 34: 401000 }} onChange={onChange} />);
+    expect(valueOf(priceInput('Tritanium'))).toBe('401000');
+
+    await user.tab();
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(valueOf(priceInput('Tritanium'))).toBe('401,000');
+    expect(within(row('Tritanium')).getByText('Hub')).toBeTruthy();
+  });
+
+  it('accepts a separator the player types or pastes', async () => {
+    const onChange = vi.fn();
+    render(<Harness hubPrices={BIG_PRICES} onChange={onChange} />);
+
+    await setField(priceInput('Tritanium'), '1,250,000');
+
+    expect(onChange).toHaveBeenCalledWith(34, { overridePrice: 1250000 });
+    expect(valueOf(priceInput('Tritanium'))).toBe('1,250,000');
   });
 });
 
@@ -515,7 +599,7 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     // 9,000 detected against a 1,000-unit requirement.
     expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 1000 });
     expect(within(row('Tritanium')).getByLabelText('Owned quantity for Tritanium')).toHaveValue(
-      1000
+      '1,000'
     );
   });
 
