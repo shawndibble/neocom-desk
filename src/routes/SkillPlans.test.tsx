@@ -873,6 +873,42 @@ describe('SkillPlans editor: optimize remaps', () => {
     expect(screen.queryByText(/Remapping saves/)).not.toBeInTheDocument();
   });
 
+  // The reported bug. New plans are seeded with Remaps Available from ESI,
+  // which is 0 for any character with no bonus remaps whose yearly remap is
+  // on cooldown — so `placeRemaps` short-circuits before evaluating
+  // anything. The identical plan at remapCount 1 saves time (first test in
+  // this block), so "no remap improves this plan in its current order" is
+  // false, and its advice to try "Suggest reorder" cannot help.
+  it('says the plan has no remaps to spend, rather than blaming the plan order, at 0 Remaps Available', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 3 },
+          { skillTypeID: 3, targetLevel: 1 },
+        ],
+        remapCount: 0,
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    const toolbar = screen.getByRole('button', { name: 'Optimize remaps' }).closest('section')!;
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+
+    expect(
+      await screen.findByText(
+        'This plan has 0 remaps to spend, so nothing was placed — raise "Remaps available" above and optimize again.'
+      )
+    ).toBeInTheDocument();
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent('No remaps to spend');
+    // Not the order-blaming verdict, and not the generic inline confirmation.
+    expect(screen.queryByText(/^No remap improves this plan/)).not.toBeInTheDocument();
+    expect(screen.queryByText('No meaningful savings')).not.toBeInTheDocument();
+  });
+
   it('carries an info tooltip on the Optimize remaps button explaining it evaluates the current order', async () => {
     await db.skillPlans.add(
       seedPlan({
@@ -1050,6 +1086,44 @@ describe('SkillPlans editor: remap markers', () => {
     expect(
       screen.getByText(/Before Spaceship Command I, remap to INT 27 \/ MEM 21 \//)
     ).toBeInTheDocument();
+  });
+
+  // The other half of the reported bug. "Add remap marker" appends the
+  // marker at the end of the entry list and the user drags it up; an
+  // undragged marker delimits an empty segment, which optimizeAtMarkers
+  // drops — so savings are exactly zero and no remap is ever weighed. The
+  // same plan with the marker at position 1 saves time (test above), so
+  // "remapping at these markers doesn't save time" misreads the situation.
+  it('says a marker at the end of the plan splits nothing, rather than that remapping there does not pay', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(
+      seedPlan({
+        entries: [
+          { skillTypeID: 1, targetLevel: 5 },
+          { skillTypeID: 3, targetLevel: 3 },
+        ],
+        // Where "Add remap marker" puts it: after the last entry.
+        markers: [2],
+      })
+    );
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    await screen.findByText('Your entries');
+    const toolbar = screen
+      .getByRole('button', { name: 'Optimize at my markers' })
+      .closest('section')!;
+    await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
+
+    expect(
+      await screen.findByText(
+        'Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.'
+      )
+    ).toBeInTheDocument();
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent('Marker splits nothing');
+    expect(screen.queryByText(/^Remapping at these markers/)).not.toBeInTheDocument();
+    expect(screen.queryByText('No meaningful savings')).not.toBeInTheDocument();
   });
 
   it('shows an inline confirmation beside the Optimize at my markers button (#222)', async () => {
