@@ -19,14 +19,42 @@ function line(
 }
 
 describe('materialsCsvColumns', () => {
-  it('orders columns material, quantity, unit price, line total, using the i18n keys as headers', () => {
+  it('orders columns material, quantity, unit price, line total, make or buy, using the i18n keys as headers', () => {
     const columns = materialsCsvColumns(t, nameFor, undefined, true);
     expect(columns.map((c) => c.header)).toEqual([
       'industry.csvMaterial',
       'industry.csvQuantity',
       'industry.csvUnitPriceIsk',
       'industry.csvLineTotalIsk',
+      'industry.csvMakeOrBuy',
     ]);
+  });
+
+  it('exports the make-or-buy verdict, and a blank where the row has none', () => {
+    const advised = line(9840, 12, 12, { 9840: 100 });
+    const mineral = line(34, 1000, 1000, { 34: 5 });
+    const columns = materialsCsvColumns(
+      t,
+      nameFor,
+      undefined,
+      true,
+      new Map([
+        [
+          9840,
+          {
+            method: 'manufacturing',
+            verdict: 'build',
+            makeUnitPrice: 20,
+            buyUnitPrice: 100,
+            savings: 960,
+            me: 0,
+          } as const,
+        ],
+      ])
+    );
+    const verdict = columns[4];
+    expect(verdict.value(advised)).toBe('industry.makeOrBuy.build');
+    expect(verdict.value(mineral)).toBeNull();
   });
 
   it('emits raw numbers for quantity and price, not formatted/localized strings', () => {

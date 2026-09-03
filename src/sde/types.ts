@@ -55,3 +55,34 @@ export interface TypeInfo {
 
 /** public/data/types.json: typeID -> TypeInfo */
 export type TypeMap = Record<string, TypeInfo>;
+
+/** One input line of a planetary schematic. */
+export interface PiInput {
+  typeID: number;
+  quantity: number;
+  /** Carried inline: most planetary commodities are referenced by no blueprint, so types.json has no entry for them. */
+  name: string;
+}
+
+/** One planetary schematic, keyed in pi.json by the typeID it produces. */
+export interface PiSchematic {
+  schematicId: number;
+  /** Schematic name, which is also the produced item's name. */
+  name: string;
+  /** Seconds one production cycle takes. */
+  cycleTime: number;
+  /** Units produced per cycle. */
+  quantity: number;
+  inputs: PiInput[];
+}
+
+/** public/data/pi.json: how planetary commodities are made. */
+export interface PiData {
+  /** Produced typeID -> its schematic. */
+  schematics: Record<string, PiSchematic>;
+  /**
+   * P0 resources: extracted straight off a planet, so no schematic produces
+   * them. Sorted ascending.
+   */
+  raw: number[];
+}

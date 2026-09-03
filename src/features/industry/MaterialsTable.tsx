@@ -1,6 +1,8 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, TextInput, type DataTableColumn } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import type {
   MaterialCostLine,
   MaterialSourcing,
@@ -21,6 +23,8 @@ interface MaterialsTableProps {
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
   /** Wraps each row in the shared item context menu; omitted where the caller has no menu to offer. */
   rowContextMenu?: (material: MaterialCostLine, tr: ReactElement) => ReactElement;
+  /** Make-or-buy verdicts by material typeID. A material with no entry has no advice to show; omitted entirely where the caller can't price recipes. */
+  makeOrBuy?: ReadonlyMap<number, MakeOrBuy>;
 }
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
@@ -86,6 +90,52 @@ function SourcingInput({
 }
 
 /**
+ * The row's make-or-buy verdict (CONTEXT.md round 29). Two distinct glyphs
+ * rather than one glyph in two tones: the verdict has to survive greyscale
+ * and a screen reader (docs/DESIGN.md §7), so the shape carries it and the
+ * label spells it out with both prices. Deliberately not a control — it has
+ * nothing to click, so it takes no tab stop from the sourcing inputs on the
+ * same row.
+ */
+function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: number }) {
+  const { t } = useTranslation();
+  const building = advice.verdict === 'build';
+  const method = advice.method === 'manufacturing' ? 'Manufacturing' : 'Planetary';
+  const sentences = [
+    // Two decimals on the unit prices, unlike the whole-ISK columns beside
+    // them: the verdict turns on the gap between these two numbers, and
+    // rounding a 5.4-vs-5.6 call to "5 against 5" would make it unreadable.
+    t(`industry.makeOrBuy.${building ? 'build' : 'buy'}${method}`, {
+      make: formatIsk(advice.makeUnitPrice, 2),
+      buy: formatIsk(advice.buyUnitPrice, 2),
+      me: advice.me,
+    }),
+  ];
+  // Nothing is riding on a fully owned row: there is no remainder to spend
+  // the difference on either way.
+  if (remaining > 0 && advice.savings > 0) {
+    sentences.push(
+      t('industry.makeOrBuy.savings', {
+        amount: formatIsk(advice.savings),
+        quantity: remaining.toLocaleString(),
+      })
+    );
+  }
+  const label = sentences.join(' ');
+  const Glyph = building ? Icon.Build : Icon.Buy;
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={cx('shrink-0', building ? 'text-isk-pos' : 'text-text-dim')}
+    >
+      <Glyph size={Icon.ICON_SIZE.sm} />
+    </span>
+  );
+}
+
+/**
  * Materials table: name, effective quantity, the two sourcing overrides (units
  * already owned, manual unit price), unit price and line total.
  *
@@ -104,6 +154,7 @@ export function MaterialsTable({
   pricesReady,
   onSourcingChange,
   rowContextMenu,
+  makeOrBuy,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
@@ -112,7 +163,15 @@ export function MaterialsTable({
       {
         id: 'material',
         header: t('industry.material'),
-        render: (material) => nameFor(material.typeID),
+        render: (material) => {
+          const advice = makeOrBuy?.get(material.typeID);
+          return (
+            <span className="inline-flex items-center gap-1.5">
+              {advice && <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />}
+              {nameFor(material.typeID)}
+            </span>
+          );
+        },
       },
       {
         id: 'quantity',
@@ -214,7 +273,7 @@ export function MaterialsTable({
         },
       },
     ],
-    [t, nameFor, sourcing, pricesReady, onSourcingChange]
+    [t, nameFor, sourcing, pricesReady, onSourcingChange, makeOrBuy]
   );
 
   return (

@@ -49,6 +49,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
   loadTypes: vi.fn(async () => SDE_TYPES),
   loadSkills: vi.fn(async () => []),
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
 vi.mock('@/features/market/PriceHistoryChart', () => ({

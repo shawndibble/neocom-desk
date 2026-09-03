@@ -60,6 +60,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
 // The materials row menu's "Show info" opens ItemDetailModal, which resolves
@@ -649,5 +650,78 @@ describe('Industry: materials row context menu', () => {
       const record = await db.quickbars.get(String(CHAR_ID));
       expect(record?.items).toEqual([{ typeId: 9840, name: 'Mechanical Parts' }]);
     });
+  });
+});
+
+describe('Industry: make-or-buy marker on materials', () => {
+  /** The marker inside a named material's row, or null when the row carries none. */
+  async function markerFor(name: string) {
+    const row = (await screen.findByText(name)).closest('tr');
+    if (!row) throw new Error(`expected a ${name} materials row`);
+    return within(row).queryByRole('img');
+  }
+
+  it('marks a material this plan is better off building, priced against its own job', async () => {
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    // 10 Mechanical Parts means 2 runs of 9841: 40 Tritanium at 10 = 400,
+    // plus a fee on an EIV of 320 (index 16 + SCC 12.8 + NPC tax 0.8) —
+    // 42.96 each against the hub's 50.
+    // The row renders as soon as the plan does; the verdict has to wait for
+    // the market snapshot behind it.
+    await waitFor(async () =>
+      expect(await markerFor('Mechanical Parts')).toHaveAccessibleName(
+        'Cheaper to build: 42.96 a unit to manufacture at ME0, against 50.00 to buy. ' +
+          'Worth 70 across the 10 units still to buy.'
+      )
+    );
+  });
+
+  it('quotes the sub-job at the ME of a blueprint the character owns', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () =>
+        HttpResponse.json([
+          {
+            item_id: 1,
+            type_id: 9841,
+            runs: -1,
+            material_efficiency: 10,
+            time_efficiency: 20,
+            quantity: 1,
+          },
+        ])
+      )
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    // ME10 takes the same 2 runs down to 36 Tritanium: 389.6 over 10 units.
+    await waitFor(async () =>
+      expect(await markerFor('Mechanical Parts')).toHaveAccessibleName(/38\.96 a unit .* at ME10/)
+    );
+  });
+
+  it('leaves minerals unmarked — nothing in the SDE produces them', async () => {
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    // Wait for a row that does get a verdict, so this can't pass just by
+    // reading the table before the snapshot lands.
+    await waitFor(async () => expect(await markerFor('Mechanical Parts')).not.toBeNull());
+
+    expect(await markerFor('Tritanium')).toBeNull();
+    expect(await markerFor('Pyerite')).toBeNull();
+  });
+
+  it('gives no verdict at all when prices are unreachable — a fee-free quote would flatter every build', async () => {
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', () => HttpResponse.error()),
+      http.get('https://esi.evetech.net/industry/systems', () => HttpResponse.error())
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+    expect(await screen.findByText('Price data unavailable')).toBeInTheDocument();
+
+    expect(await markerFor('Mechanical Parts')).toBeNull();
   });
 });

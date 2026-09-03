@@ -309,6 +309,15 @@
     "sourcingAllOwned": "all {{owned}} owned",
     "sourcingSplit": "{{owned}} owned + {{bought}} x {{price}}",
     "sourcingSplitUnpriced": "{{owned}} owned + {{bought}} to buy",
+    "makeOrBuy": {
+      "build": "Build",
+      "buy": "Buy",
+      "buildManufacturing": "Cheaper to build: {{make}} a unit to manufacture at ME{{me}}, against {{buy}} to buy.",
+      "buyManufacturing": "Cheaper to buy: {{buy}} a unit, against {{make}} to manufacture at ME{{me}}.",
+      "buildPlanetary": "Cheaper to make with planetary industry: {{make}} a unit in inputs, against {{buy}} to buy.",
+      "buyPlanetary": "Cheaper to buy: {{buy}} a unit, against {{make}} of planetary inputs.",
+      "savings": "Worth {{amount}} across the {{quantity}} units still to buy."
+    },
     "results": "Results",
     "eiv": "EIV",
     "eivTooltip": "Estimated Item Value: the SCC's reference price for the materials consumed, used to calculate job fees.",
@@ -381,6 +390,7 @@
     "csvQuantity": "Quantity",
     "csvUnitPriceIsk": "Unit price (ISK)",
     "csvLineTotalIsk": "Line total (ISK)",
+    "csvMakeOrBuy": "Make or buy",
     "csvJobActivity": "Activity",
     "csvJobBlueprint": "Blueprint",
     "csvJobBlueprintTypeId": "Blueprint type ID",
@@ -1046,6 +1056,10 @@
     },
     "itemDetail": {
       "volume": "Volume: {{volume}} m3",
+      "planetaryTitle": "Planetary production",
+      "planetaryCycle": "{{quantity}} per {{duration}} cycle",
+      "planetaryInput": "{{quantity}} x {{name}}",
+      "planetaryRaw": "Extracted straight off a planet with an Extractor Control Unit — no schematic produces it.",
       "noAttributes": "No fitting attributes for this item.",
       "errorTitle": "Couldn't load item info",
       "errorHint": "Try again, or reload the page."

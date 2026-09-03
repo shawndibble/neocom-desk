@@ -1,4 +1,4 @@
-import type { BlueprintMap, SkillType, TypeMap } from './types';
+import type { BlueprintMap, PiData, SkillType, TypeMap } from './types';
 
 async function fetchJson<T>(file: string): Promise<T> {
   const res = await fetch(`${import.meta.env.BASE_URL}data/${file}`);
@@ -20,3 +20,4 @@ function cached<T>(file: string): () => Promise<T> {
 export const loadSkills = cached<SkillType[]>('skills.json');
 export const loadBlueprints = cached<BlueprintMap>('blueprints.json');
 export const loadTypes = cached<TypeMap>('types.json');
+export const loadPi = cached<PiData>('pi.json');

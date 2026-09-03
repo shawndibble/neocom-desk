@@ -13,6 +13,7 @@ import type {
   MaterialSourcing,
   MaterialSourcingMap,
 } from '@/engine/industry/types';
+import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { applySourcingPatch } from './sourcingEdits';
 import { MaterialsTable } from './MaterialsTable';
 
@@ -319,5 +320,67 @@ describe('MaterialsTable', () => {
       await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
       expect(onShowInfo).toHaveBeenCalledWith(9840, 'Mechanical Parts');
     });
+  });
+});
+
+describe('MaterialsTable make-or-buy marker', () => {
+  const buildIt: MakeOrBuy = {
+    method: 'manufacturing',
+    verdict: 'build',
+    makeUnitPrice: 42.96,
+    buyUnitPrice: 50,
+    savings: 70.4,
+    me: 0,
+  };
+
+  function advise(advice: MakeOrBuy, typeID = 9840) {
+    return { makeOrBuy: new Map([[typeID, advice]]) };
+  }
+
+  it('marks a material worth building, spelling out both prices', () => {
+    renderTable(advise(buildIt));
+    const marker = within(row('Mechanical Parts')).getByRole('img');
+    expect(marker).toHaveAccessibleName(/^Cheaper to build: 42\.96 a unit to manufacture at ME0/);
+    expect(marker).toHaveAccessibleName(/against 50\.00 to buy/);
+    expect(marker).toHaveAccessibleName(/Worth 70 across the 10 units still to buy/);
+  });
+
+  it('marks a material worth buying with a different glyph, not a different colour', () => {
+    const buy = renderTable(advise({ ...buildIt, verdict: 'buy', makeUnitPrice: 60 }));
+    expect(within(row('Mechanical Parts')).getByRole('img')).toHaveAccessibleName(
+      /^Cheaper to buy: 50\.00 a unit/
+    );
+    // The opposite verdict has to differ in shape, not only in tone
+    // (docs/DESIGN.md §7) — each render is scoped to its own container, the
+    // two coexist in the document.
+    const build = renderTable(advise(buildIt));
+    const glyph = (c: HTMLElement) => c.querySelector('[role="img"] svg')?.innerHTML;
+    expect(glyph(buy.container)).toBeTruthy();
+    expect(glyph(buy.container)).not.toEqual(glyph(build.container));
+  });
+
+  it('names planetary industry rather than manufacturing for a schematic', () => {
+    renderTable(advise({ ...buildIt, method: 'planetary', me: null }));
+    expect(within(row('Mechanical Parts')).getByRole('img')).toHaveAccessibleName(
+      /Cheaper to make with planetary industry: 42\.96 a unit in inputs/
+    );
+  });
+
+  it('leaves a material with no verdict unmarked', () => {
+    renderTable(advise(buildIt));
+    expect(within(row('Tritanium')).queryByRole('img')).toBeNull();
+  });
+
+  it('renders no marker at all when the caller passes no verdicts', () => {
+    renderTable();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('drops the savings clause from a fully owned row — nothing is riding on it', () => {
+    renderTable({
+      materials: materialCostLines(MENU_MATERIALS, { 34: 10 }, { 9840: { ownedQuantity: 10 } }),
+      ...advise({ ...buildIt, savings: 0 }),
+    });
+    expect(within(row('Mechanical Parts')).getByRole('img')).not.toHaveAccessibleName(/Worth/);
   });
 });
