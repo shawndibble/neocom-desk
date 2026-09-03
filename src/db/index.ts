@@ -14,6 +14,22 @@ export interface CharacterRecord {
   ownerHash: string;
   /** Epoch ms when the character was first added. */
   addedAt: number;
+  /**
+   * The corporation the character last read as belonging to. Learned from
+   * `/characters/{id}/` (`stores/publicInfo.ts`), never from the SSO JWT,
+   * which does not carry it.
+   *
+   * The reason it is persisted at all is that a *change* here revokes consent
+   * for corp-owned cache rows (`auth/session.recordCharacterCorporation`) —
+   * without a stored prior there is nothing to compare against, so a pilot who
+   * changes corp would go on reading the old corp's data.
+   *
+   * Optional, and absent means "not yet learned", never "corporation 0": a
+   * device upgrading from v6 has records that predate the field, and an
+   * unknown prior is not a corp change. Indexed from v7 — the one thing in
+   * this file that needed a version bump rather than riding along unindexed.
+   */
+  corporationId?: number;
 }
 
 // Refresh tokens NEVER leave this device: stored only in local IndexedDB,
@@ -299,6 +315,22 @@ db.version(5).stores({
 // it whole is deliberate.
 db.version(6).stores({
   characters: 'characterId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  notificationFeed: 'id, characterId, firedAt',
+});
+
+// Additive: v1-v6 stores unchanged, plus a `corporationId` index on
+// `characters`. No table is added and no row is rewritten — Dexie builds the
+// index over what is already there, and records written before the field
+// existed simply do not appear in it until their corporation is learned.
+db.version(7).stores({
+  characters: 'characterId, corporationId',
   tokens: 'characterId',
   settings: 'key',
   skillPlans: 'id, characterId',

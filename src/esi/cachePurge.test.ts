@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
-import { GLOBAL_CACHE_CHARACTER_ID } from './cache';
+import { GLOBAL_CACHE_CHARACTER_ID, corpCacheKey } from './cache';
 import {
   CACHE_PURGE_PENDING_PREFIX,
   clearCachePurgePending,
   isCachePurgePending,
   purgeCharacterCache,
   purgeCharacterCacheOrSuppress,
+  purgeCorpScopedCache,
 } from './cachePurge';
 
 const CHAR_ID = 91;
@@ -207,5 +208,88 @@ describe('purgeCharacterCacheOrSuppress', () => {
 
     expect(await keysFor(GLOBAL_CACHE_CHARACTER_ID)).toEqual(['type:587']);
     expect(await isCachePurgePending(GLOBAL_CACHE_CHARACTER_ID)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Corp change (issue #293). Leaving a corporation revokes consent for that
+// corporation's rows and nothing else — a pilot who changes corp keeps their
+// own skills, mail and wallet.
+// ---------------------------------------------------------------------------
+
+describe('purgeCorpScopedCache', () => {
+  const CORP_A = 98000001;
+  const CORP_B = 98000002;
+
+  it('deletes the corp-scoped rows and leaves every character-scoped row intact', async () => {
+    await seed(CHAR_ID, corpCacheKey(CORP_A, 'structures'));
+    await seed(CHAR_ID, corpCacheKey(CORP_A, 'wallets'));
+    await seed(CHAR_ID, 'skills');
+    await seed(CHAR_ID, 'wallet:balance');
+    // Real key from features/character/employmentHistory.ts, plus a synthetic
+    // probe of the range's upper bound: ':' sorts below every letter, so a key
+    // merely *starting* with "corp" must fall outside `corp:`..`corp:￿`.
+    await seed(CHAR_ID, 'employment-history');
+    await seed(CHAR_ID, 'corporation-history');
+
+    const deleted = await purgeCorpScopedCache(CHAR_ID);
+
+    expect(deleted).toBe(2);
+    expect(await keysFor(CHAR_ID)).toEqual([
+      'corporation-history',
+      'employment-history',
+      'skills',
+      'wallet:balance',
+    ]);
+  });
+
+  it('deletes rows for every corporation the character holds, not just one', async () => {
+    // A pilot who has been round the block: A -> B -> A leaves rows under both.
+    await seed(CHAR_ID, corpCacheKey(CORP_A, 'structures'));
+    await seed(CHAR_ID, corpCacheKey(CORP_B, 'structures'));
+    await seed(CHAR_ID, 'skills');
+
+    await purgeCorpScopedCache(CHAR_ID);
+
+    expect(await keysFor(CHAR_ID)).toEqual(['skills']);
+  });
+
+  it('leaves ANOTHER character corp rows alone, even for the same corporation', async () => {
+    await seed(NEIGHBOUR_BELOW, corpCacheKey(CORP_A, 'structures'));
+    await seed(CHAR_ID, corpCacheKey(CORP_A, 'structures'));
+    await seed(NEIGHBOUR_ABOVE, corpCacheKey(CORP_A, 'structures'));
+
+    await purgeCorpScopedCache(CHAR_ID);
+
+    expect(await keysFor(NEIGHBOUR_BELOW)).toEqual([corpCacheKey(CORP_A, 'structures')]);
+    expect(await keysFor(NEIGHBOUR_ABOVE)).toEqual([corpCacheKey(CORP_A, 'structures')]);
+    expect(await keysFor(CHAR_ID)).toEqual([]);
+  });
+
+  it('spares GLOBAL_CACHE_CHARACTER_ID rows', async () => {
+    await seed(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
+    await seed(CHAR_ID, corpCacheKey(CORP_A, 'structures'));
+
+    await purgeCorpScopedCache(CHAR_ID);
+
+    expect(await keysFor(GLOBAL_CACHE_CHARACTER_ID)).toEqual(['type:587']);
+  });
+
+  it('refuses to purge the global sentinel itself', async () => {
+    await seed(GLOBAL_CACHE_CHARACTER_ID, corpCacheKey(CORP_A, 'structures'));
+
+    await expect(purgeCorpScopedCache(GLOBAL_CACHE_CHARACTER_ID)).resolves.toBe(0);
+
+    expect(await keysFor(GLOBAL_CACHE_CHARACTER_ID)).toEqual([
+      corpCacheKey(CORP_A, 'structures'),
+    ]);
+  });
+
+  it('is a no-op for a character with no corp rows cached', async () => {
+    await seed(CHAR_ID, 'skills');
+
+    await expect(purgeCorpScopedCache(CHAR_ID)).resolves.toBe(0);
+
+    expect(await keysFor(CHAR_ID)).toEqual(['skills']);
   });
 });

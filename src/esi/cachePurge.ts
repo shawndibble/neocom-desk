@@ -14,7 +14,7 @@
  */
 import Dexie from 'dexie';
 import { db } from '@/db';
-import { GLOBAL_CACHE_CHARACTER_ID } from './cache';
+import { CORP_CACHE_KEY_PREFIX, GLOBAL_CACHE_CHARACTER_ID } from './cache';
 
 /**
  * Delete every cached ESI row for one character. Returns the number deleted.
@@ -36,6 +36,43 @@ export async function purgeCharacterCache(characterId: number): Promise<number> 
   return db.esiCache
     .where('[characterId+key]')
     .between([characterId, Dexie.minKey], [characterId, Dexie.maxKey], true, true)
+    .delete();
+}
+
+/**
+ * Delete one character's **corp-owned** cached rows, leaving everything else.
+ * Returns the number deleted.
+ *
+ * The third consent trigger, and the only surgical one (issue #293). A
+ * character who changes corporation is still the same person under the same
+ * grant, so neither `revokedScopes` nor the `ownerHash` check fires — but the
+ * new corp's members are not entitled to the old corp's structures or wallets.
+ * The reverse is just as important: a corp change must NOT cost the pilot
+ * their own skills, mail and wallet, which is why this is a prefix range and
+ * not `purgeCharacterCache`.
+ *
+ * Precision is affordable here, unlike on scope revocation, precisely because
+ * `cache.corpCacheKey` makes corp rows self-identifying — there is no cache-key
+ * → scope map to invent.
+ *
+ * Every corporation's rows go, not just the one being left: a pilot who has
+ * moved A → B → A has rows under both, and none of them survive the move.
+ */
+export async function purgeCorpScopedCache(characterId: number): Promise<number> {
+  // Corp data is never public, so nothing should be filed under the sentinel;
+  // refusing it keeps the one rule ("global rows are owned by no character")
+  // identical across both purges.
+  if (characterId === GLOBAL_CACHE_CHARACTER_ID) return 0;
+  // Prefix range over the compound primary key, exactly as `purgeCharacterCache`
+  // ranges over one character. U+FFFF is the highest UTF-16 code unit, so the
+  // bound sits above every `corp:…` key. A key merely STARTING with "corp" is
+  // outside the range in both directions: ':' (U+003A) sorts above every digit,
+  // so `corp0…` falls under the lower bound, and below every letter, so
+  // `corporation-history` falls over the upper one.
+  const upperBound = CORP_CACHE_KEY_PREFIX + String.fromCharCode(0xffff);
+  return db.esiCache
+    .where('[characterId+key]')
+    .between([characterId, CORP_CACHE_KEY_PREFIX], [characterId, upperBound], true, true)
     .delete();
 }
 

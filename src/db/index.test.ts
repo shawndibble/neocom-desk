@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import Dexie from 'dexie';
 import { db } from './index';
 
 beforeEach(async () => {
@@ -136,5 +137,82 @@ describe('neocom database', () => {
     await db.esiCache.put({ characterId: 91, key: 'skills', value: { total_sp: 3 }, fetchedAt: 7 });
     expect(await db.esiCache.count()).toBe(2);
     expect((await db.esiCache.get([91, 'skills']))?.value).toEqual({ total_sp: 3 });
+  });
+
+  it('records and indexes a character corporation, and tolerates its absence', async () => {
+    await db.characters.add({
+      characterId: 2112625428,
+      name: 'CCP Alpha',
+      ownerHash: 'hash-1',
+      addedAt: 1000,
+      corporationId: 98000001,
+    });
+    // A character whose corp has not been learned yet: legal, just not indexed.
+    await db.characters.add({
+      characterId: 90000001,
+      name: 'CCP Beta',
+      ownerHash: 'hash-2',
+      addedAt: 1000,
+    });
+
+    expect((await db.characters.get(2112625428))?.corporationId).toBe(98000001);
+    expect((await db.characters.get(90000001))?.corporationId).toBeUndefined();
+
+    const inCorp = await db.characters.where('corporationId').equals(98000001).toArray();
+    expect(inCorp.map((c) => c.characterId)).toEqual([2112625428]);
+  });
+});
+
+/**
+ * AC 1 of issue #293: the `corporationId` bump is ADDITIVE. Run against a
+ * throwaway database rather than `neocom` so the real one is never opened at
+ * an old version mid-suite.
+ */
+describe('schema upgrade v6 -> v7', () => {
+  const NAME = 'neocom-upgrade-probe';
+
+  it('an existing device gains the corporationId index without losing data', async () => {
+    // v6: characters keyed by characterId alone, one row already stored.
+    const before = new Dexie(NAME);
+    before.version(6).stores({ characters: 'characterId' });
+    await before.open();
+    await before
+      .table('characters')
+      .put({ characterId: 2112625428, name: 'CCP Alpha', ownerHash: 'hash-1', addedAt: 1000 });
+    before.close();
+
+    // v7 adds the index and nothing else.
+    const after = new Dexie(NAME);
+    after.version(6).stores({ characters: 'characterId' });
+    after.version(7).stores({ characters: 'characterId, corporationId' });
+    await after.open();
+
+    expect(await after.table('characters').get(2112625428)).toMatchObject({
+      name: 'CCP Alpha',
+      ownerHash: 'hash-1',
+      addedAt: 1000,
+    });
+    // Pre-upgrade rows carry no corp id, so they simply are not in the index.
+    expect(await after.table('characters').where('corporationId').equals(98000001).toArray()).toEqual(
+      []
+    );
+
+    await after.table('characters').put({
+      characterId: 90000001,
+      name: 'CCP Beta',
+      ownerHash: 'hash-2',
+      addedAt: 1000,
+      corporationId: 98000001,
+    });
+    const indexed = await after.table('characters').where('corporationId').equals(98000001).toArray();
+    expect(indexed.map((c: { characterId: number }) => c.characterId)).toEqual([90000001]);
+
+    after.close();
+    await Dexie.delete(NAME);
+  });
+
+  it('the shipped database is at version 7 with the new index live', () => {
+    expect(db.verno).toBe(7);
+    expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });

@@ -16,6 +16,8 @@ import {
   readCachedRows,
   writeCached,
   GLOBAL_CACHE_CHARACTER_ID,
+  CORP_CACHE_KEY_PREFIX,
+  corpCacheKey,
 } from './cache';
 import { clearCachePurgePending, purgeCharacterCacheOrSuppress } from './cachePurge';
 
@@ -927,5 +929,42 @@ describe('grace period past the freshness window', () => {
     expect(result.cached?.data).toEqual(['a', 'b']);
     expect(result.cached?.fromCache).toBe(false);
     settle();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Corp-owned rows (issue #293). A corporation's data is fetched with a
+// character's token but is not that character's to keep across a corp change,
+// so the key carries the corporation id.
+// ---------------------------------------------------------------------------
+
+describe('corpCacheKey', () => {
+  const CORP_A = 98000001;
+  const CORP_B = 98000002;
+
+  it('embeds the corporation id under the corp prefix', () => {
+    expect(corpCacheKey(CORP_A, 'structures')).toBe(`${CORP_CACHE_KEY_PREFIX}98000001:structures`);
+  });
+
+  it('gives two corporations different keys for the same data', () => {
+    expect(corpCacheKey(CORP_A, 'structures')).not.toBe(corpCacheKey(CORP_B, 'structures'));
+  });
+
+  it('never collides with the plain character-scoped key of the same name', () => {
+    expect(corpCacheKey(CORP_A, 'structures')).not.toBe('structures');
+  });
+
+  it('makes a cross-corp read impossible: corp A rows are not served to a corp B read', async () => {
+    const fetchA = vi.fn().mockResolvedValue('corp A structures');
+    await loadWithCache(CHAR_ID, corpCacheKey(CORP_A, 'structures'), fetchA);
+
+    // Same character, same data, same instant — only the corporation moved.
+    const fetchB = vi.fn().mockResolvedValue('corp B structures');
+    const result = await loadWithCache<string>(CHAR_ID, corpCacheKey(CORP_B, 'structures'), fetchB);
+
+    expect(fetchB).toHaveBeenCalledTimes(1); // a live call, not corp A's row
+    expect(result?.data).toBe('corp B structures');
+    // Corp A's row is still exactly where it was, untouched by B's read.
+    expect(await readCached(CHAR_ID, corpCacheKey(CORP_A, 'structures'))).toBe('corp A structures');
   });
 });
