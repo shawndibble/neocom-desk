@@ -162,7 +162,7 @@ function PlanetaryProduction({ pi, typeId }: { pi: PiData | null; typeId: number
   const { t } = useTranslation();
   if (!pi) return null;
   const schematic = pi.schematics[String(typeId)];
-  const raw = pi.raw.includes(typeId);
+  const raw = pi.raw.some((resource) => resource.typeID === typeId);
   if (!schematic && !raw) return null;
   return (
     <div>
