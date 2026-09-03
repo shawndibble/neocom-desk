@@ -17,6 +17,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
+import { ExtractorTimeline } from '@/features/pi/ExtractorTimeline';
+import { loadPiRosterSnapshot, type PiRosterSnapshot } from '@/features/pi/roster';
 import { loadPlanetName, loadSchematicName } from '@/features/pi/names';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -49,7 +51,7 @@ const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_DETAILS: ReadonlyMap<number, StatusResult<CharacterPlanetDetail>> = new Map();
 const EMPTY_STATUS: ColonyStatus = { idle: false, soonestExpiryMs: null };
 
-interface Snapshot {
+interface ActiveColonies {
   planetsResult: CachedResult<CharacterPlanet[]> | null;
   /** 403 (scope never granted) means "log in again", not "offline". */
   planetsNeedsReauth: boolean;
@@ -63,13 +65,21 @@ interface Snapshot {
   loadedAt: number;
 }
 
-async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
+interface Snapshot extends ActiveColonies {
+  /** Every Character's programs, read cache-only — see `features/pi/roster.ts`. */
+  roster: PiRosterSnapshot;
+}
+
+async function loadActiveColonies(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<ActiveColonies> {
   const { cached: planetsResult, needsReauth: planetsNeedsReauth } =
     await loadCharacterPlanets(characterId);
   const loadedAt = Date.now();
   const planets = planetsResult?.data ?? [];
 
-  const empty: Snapshot = {
+  const empty: ActiveColonies = {
     planetsResult,
     planetsNeedsReauth,
     details: new Map(),
@@ -137,6 +147,21 @@ async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal):
     schematicNames,
     loadedAt,
   };
+}
+
+/**
+ * The active Character's colonies live, then every Character's programs from
+ * Dexie.
+ *
+ * Order matters and is the whole cache-first story: the live load above has
+ * already written the active Character's fresh rows, so the cache-only roster
+ * read below picks them up without a second call, and page open costs exactly
+ * the ESI traffic it cost before this panel existed. Refresh re-runs this
+ * function, so the roster is refreshed by the same gesture.
+ */
+async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
+  const active = await loadActiveColonies(characterId, signal);
+  return { ...active, roster: await loadPiRosterSnapshot() };
 }
 
 /**
@@ -444,6 +469,15 @@ export function PlanetaryIndustry() {
           </>
         }
       />
+
+      {/*
+        Above the per-colony panels, and above the branch below rather than
+        inside it: the active Character losing the planets scope, or simply
+        having no colonies, says nothing about the alts whose programs are
+        already cached — and answering "which character do I log in next" for
+        exactly that case is what a cross-character panel is for.
+      */}
+      {!loading && data && <ExtractorTimeline snapshot={data.roster} nowMs={loadedAt} />}
 
       {loading ? (
         <div className="flex justify-center py-16">

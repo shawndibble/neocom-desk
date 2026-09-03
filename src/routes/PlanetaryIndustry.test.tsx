@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -141,20 +141,58 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/planetary-industry');
 });
 
+const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
+
+async function addAlt(characterId: number, name: string, scopes: string[]) {
+  await db.characters.put({
+    characterId,
+    name,
+    ownerHash: `oh${characterId}`,
+    addedAt: characterId,
+  });
+  await db.tokens.put({
+    characterId,
+    accessToken: 'access-token',
+    refreshToken: 'refresh',
+    expiresAt: Date.now() + 3_600_000,
+    scopes,
+  });
+}
+
+/**
+ * The per-colony panel for a planet, found by its own heading.
+ *
+ * The cross-character timeline above these panels names the same planets,
+ * products and states, so a page-wide `getByText` is ambiguous here by
+ * design — the two surfaces really do say the same words about the same
+ * colony. An assertion about the pin table therefore says which panel it
+ * means rather than loosening its counts.
+ */
+async function colonyPanelFor(name: RegExp): Promise<HTMLElement> {
+  const heading = await screen.findByRole('heading', { name });
+  const panel = heading.closest('section');
+  if (!(panel instanceof HTMLElement)) throw new Error(`no colony panel for ${String(name)}`);
+  return panel;
+}
+
+function timeline(): HTMLElement {
+  return screen.getByRole('list', { name: /needing attention first/i });
+}
+
 describe('PlanetaryIndustry', () => {
   it('lists a colony with its planet, and shows the extractor as expired from expiry_time alone', async () => {
     render(<App />);
-    expect(await screen.findByText(/Jita IV/)).toBeInTheDocument();
-    expect(screen.getByText('Extractor Control Unit')).toBeInTheDocument();
-    expect(screen.getByText('Idle')).toBeInTheDocument();
+    const panel = await colonyPanelFor(/Jita IV/);
+    expect(within(panel).getByText('Extractor Control Unit')).toBeInTheDocument();
+    expect(within(panel).getByText('Idle')).toBeInTheDocument();
     // Both the per-pin Status column and the Expires column read "Expired"
     // for an already-expired extractor.
-    expect(screen.getAllByText('Expired')).toHaveLength(2);
+    expect(within(panel).getAllByText('Expired')).toHaveLength(2);
   });
 
   it('explains the staleness rule in the UI', async () => {
     render(<App />);
-    await screen.findByText(/Jita IV/);
+    await colonyPanelFor(/Jita IV/);
     expect(
       screen.getByText(/only recalculates a colony's data when it's opened in the EVE client/)
     ).toBeInTheDocument();
@@ -178,12 +216,12 @@ describe('PlanetaryIndustry', () => {
 
   it('leaves both yield columns blank for an extractor with no install-time baseline', async () => {
     render(<App />);
-    await screen.findByText(/Jita IV/);
+    const panel = await colonyPanelFor(/Jita IV/);
     // The fixture's pin has an expiry but no qty_per_cycle/cycle_time/
     // install_time, so Banked and Reset now are the only em-dashed cells —
     // never a zero, which would read as "this program has produced nothing".
-    expect(screen.getAllByText('—')).toHaveLength(2);
-    expect(screen.queryByText('0 (0%)')).not.toBeInTheDocument();
+    expect(within(panel).getAllByText('—')).toHaveLength(2);
+    expect(within(panel).queryByText('0 (0%)')).not.toBeInTheDocument();
   });
 
   it('shows banked yield, its share of the program, and the daily gain from resetting now', async () => {
@@ -193,10 +231,10 @@ describe('PlanetaryIndustry', () => {
       )
     );
     render(<App />);
-    await screen.findByText(/Jita IV/);
-    expect(screen.getByText('513,262 (27%)')).toBeInTheDocument();
-    expect(screen.getByText('+793,859/day')).toBeInTheDocument();
-    expect(screen.queryByText('—')).not.toBeInTheDocument();
+    const panel = await colonyPanelFor(/Jita IV/);
+    expect(within(panel).getByText('513,262 (27%)')).toBeInTheDocument();
+    expect(within(panel).getByText('+793,859/day')).toBeInTheDocument();
+    expect(within(panel).queryByText('—')).not.toBeInTheDocument();
   });
 
   it('flags a colony whose extractors are all past the efficient window as decayed', async () => {
@@ -206,13 +244,13 @@ describe('PlanetaryIndustry', () => {
       )
     );
     render(<App />);
-    await screen.findByText(/Jita IV/);
+    const panel = await colonyPanelFor(/Jita IV/);
     // A day in, the current cycle yields ~32% of the program's first — under
     // EFFICIENT_WINDOW_FRACTION — while expiry is still 13 days out, so this
     // is neither idle nor expiring-soon.
-    expect(screen.getByText('Decayed')).toBeInTheDocument();
-    expect(screen.queryByText('Healthy')).not.toBeInTheDocument();
-    expect(screen.queryByText('Idle')).not.toBeInTheDocument();
+    expect(within(panel).getByText('Decayed')).toBeInTheDocument();
+    expect(within(panel).queryByText('Healthy')).not.toBeInTheDocument();
+    expect(within(panel).queryByText('Idle')).not.toBeInTheDocument();
   });
 
   it('titles each stacked pin card by its product, not by the pin type on every row', async () => {
@@ -222,12 +260,14 @@ describe('PlanetaryIndustry', () => {
       )
     );
     render(<App />);
-    await screen.findByText(/Jita IV/);
+    const panel = await colonyPanelFor(/Jita IV/);
     // `dt-primary` is what `.dt-stack` hoists as the card title below `sm`
     // (docs/DESIGN.md §4a) — "Extractor Control Unit" reads identically on
     // every extractor row and identifies nothing.
-    expect(screen.getByText('Felsic Magma').closest('td')).toHaveClass('dt-primary');
-    expect(screen.getByText('Extractor Control Unit').closest('td')).not.toHaveClass('dt-primary');
+    expect(within(panel).getByText('Felsic Magma').closest('td')).toHaveClass('dt-primary');
+    expect(within(panel).getByText('Extractor Control Unit').closest('td')).not.toHaveClass(
+      'dt-primary'
+    );
   });
 
   it('shows an unknown status rather than a confident Healthy when a colony detail failed to load', async () => {
@@ -235,8 +275,95 @@ describe('PlanetaryIndustry', () => {
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () => HttpResponse.error())
     );
     render(<App />);
-    await screen.findByText(/Jita IV/);
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
-    expect(screen.queryByText('Healthy')).not.toBeInTheDocument();
+    const panel = await colonyPanelFor(/Jita IV/);
+    expect(within(panel).getByText('Unknown')).toBeInTheDocument();
+    expect(within(panel).queryByText('Healthy')).not.toBeInTheDocument();
+  });
+
+  it("lists an alt's cached programs beside the active character's, without fetching for it", async () => {
+    const ALT_ID = 92;
+    const ALT_PLANET_ID = 40000002;
+    const altPlanetsFetch = vi.fn();
+    await addAlt(ALT_ID, 'Alt Two', [PLANETS_SCOPE]);
+    // Cached on a previous visit to this page as that character. Page open
+    // must read it, not re-fetch it.
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: 'planets',
+      value: [{ ...planetsPayload[0], planet_id: ALT_PLANET_ID, owner_id: ALT_ID }],
+      fetchedAt: Date.now(),
+    });
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: `planet:${ALT_PLANET_ID}`,
+      value: {
+        links: [],
+        routes: [],
+        pins: [
+          {
+            pin_id: 9,
+            type_id: 2848,
+            latitude: 0,
+            longitude: 0,
+            expiry_time: new Date(BASE_NOW + 5 * DAY_MS).toISOString(),
+            extractor_details: { heads: [{ head_id: 1, latitude: 0, longitude: 0 }] },
+          },
+        ],
+      },
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.get(`${ESI}/characters/${ALT_ID}/planets`, () => {
+        altPlanetsFetch();
+        return HttpResponse.json([]);
+      })
+    );
+
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+
+    const rows = within(timeline()).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    // Worst first: the active character's extractor has already expired, the
+    // alt's runs for another five days.
+    expect(rows[0]).toHaveTextContent('Pilot One');
+    expect(rows[1]).toHaveTextContent('Alt Two');
+    expect(altPlanetsFetch).not.toHaveBeenCalled();
+  });
+
+  it('skips an alt without the planets scope: no ESI call, no re-auth banner', async () => {
+    const SCOPELESS_ID = 93;
+    const scopelessFetch = vi.fn();
+    await addAlt(SCOPELESS_ID, 'Scopeless Alt', ['esi-skills.read_skills.v1']);
+    server.use(
+      http.get(`${ESI}/characters/${SCOPELESS_ID}/planets`, () => {
+        scopelessFetch();
+        return HttpResponse.json({ error: 'missing scope' }, { status: 403 });
+      })
+    );
+
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+
+    expect(scopelessFetch).not.toHaveBeenCalled();
+    expect(screen.getByText(/Scopeless Alt/)).toHaveTextContent(/no planetary access/i);
+    // The trap this guards: a live 403 on an alt raises the app-wide re-auth
+    // banner, naming a character the player never asked about.
+    expect(screen.queryByText('Log in again to see your colonies')).not.toBeInTheDocument();
+  });
+
+  it('reads an alt with nothing cached as "not loaded yet", never as having no colonies', async () => {
+    await addAlt(92, 'Unread Alt', [PLANETS_SCOPE]);
+    await addAlt(93, 'Empty Alt', [PLANETS_SCOPE]);
+    await db.esiCache.put({ characterId: 93, key: 'planets', value: [], fetchedAt: Date.now() });
+
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+
+    const unread = screen.getByText(/Unread Alt/);
+    const empty = screen.getByText(/Empty Alt/);
+    expect(unread).not.toBe(empty);
+    expect(unread).toHaveTextContent(/not loaded yet/i);
+    expect(empty).toHaveTextContent(/No colonies/i);
   });
 });
