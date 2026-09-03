@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
-import { Spinner } from '@/components/ui';
+import { PageHeader, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -77,6 +77,10 @@ export function SkillPlanEditor() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
+      {/* Same title as the other two Skills views: the editor is a third view
+          of the same section, and dropping the <h1> when a plan opens made the
+          page look like it had navigated somewhere else. */}
+      <PageHeader title={t('nav.skills')} />
       <SkillsSubNav />
 
       {/* Below `lg` the list is not on screen at all, so this is the only way

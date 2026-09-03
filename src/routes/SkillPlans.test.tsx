@@ -342,6 +342,21 @@ describe('SkillPlans CRUD', () => {
   });
 });
 
+describe('SkillPlans: the section title survives opening a plan', () => {
+  it('keeps the Skills page title above the sub-nav in the editor, as on the list', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan());
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Skills' })).toBeInTheDocument();
+
+    await user.click(await screen.findByText('Test plan'));
+    await screen.findByText('Your entries');
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Skills' })).toBeInTheDocument();
+  });
+});
+
 describe('SkillPlans layout: side by side list + editor (#158)', () => {
   it('shows one column at a time on narrow screens, with a back control that returns to the list', async () => {
     // jsdom's default `window.matchMedia` (vitest.setup.ts) never matches,
