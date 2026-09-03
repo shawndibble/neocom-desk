@@ -12,7 +12,7 @@ import {
   enumUnitLabel,
   idReferenceKind,
   isEnumUnit,
-  isResolvableId,
+  looksLikeId,
   type IdReferenceKind,
 } from './attributeUnits';
 
@@ -33,15 +33,17 @@ export interface DisplayAttribute {
   attributeId: number;
   name: string;
   /**
-   * Null for an enum-legend "unit" (`attributeUnits`): the legend is never a
-   * suffix to append, so a value it doesn't name shows as a bare number.
+   * Null once the "unit" is not a suffix to append (`attributeUnits`): always
+   * for an enum legend, so a value it doesn't name shows as a bare number;
+   * for an id reference only once something has actually named the id, so an
+   * unresolved one keeps rendering as it does today.
    */
   unit: string | null;
   value: number;
   /**
-   * Overrides value/unit in display. Set for required-skill rows
-   * ("<Skill name> <roman level>") and for enum-legend units ("True",
-   * "Large") — see `attributeUnits`.
+   * Overrides value/unit in display: a required-skill row's
+   * "<Skill name> <roman level>", an enum legend's member ("True", "Large"),
+   * or the name an id reference points at — see `attributeUnits`.
    */
   displayValue?: string;
 }
@@ -57,7 +59,7 @@ export interface AttributeGroup {
  * raw value it does today. `attributeID` references need no map — the
  * dictionary already names every attribute.
  */
-export interface AttributeNames {
+export interface AttributeReferenceNames {
   /** typeID -> name. Skill names are type names, so one map serves both. */
   types?: Readonly<Record<number, string>>;
   /** groupID -> item **Group** name (`invGroups`), never a Market Group. */
@@ -86,7 +88,7 @@ export function collectAttributeIdReferences(
   const groupIds = new Set<number>();
   for (const { attribute_id, value } of dogmaAttributes ?? []) {
     const unit = dictionary[attribute_id]?.unit;
-    if (!isResolvableId(value)) continue;
+    if (!looksLikeId(value)) continue;
     const kind = idReferenceKind(unit);
     if (kind === 'type') typeIds.add(value);
     else if (kind === 'group') groupIds.add(value);
@@ -125,9 +127,9 @@ function idReferenceName(
   kind: IdReferenceKind,
   value: number,
   dictionary: AttributeDictionary,
-  names: AttributeNames
+  names: AttributeReferenceNames
 ): string | null {
-  if (!isResolvableId(value)) return null;
+  if (!looksLikeId(value)) return null;
   if (kind === 'attribute') return dictionary[value]?.name ?? null;
   const map = kind === 'type' ? names.types : names.groups;
   return map?.[value] ?? null;
@@ -137,7 +139,7 @@ function idReferenceName(
 export function groupItemAttributes(
   dogmaAttributes: readonly RawDogmaAttribute[] | undefined,
   dictionary: AttributeDictionary,
-  names: AttributeNames = {}
+  names: AttributeReferenceNames = {}
 ): AttributeGroup[] {
   if (!dogmaAttributes || dogmaAttributes.length === 0) return [];
 
@@ -184,7 +186,7 @@ export function groupItemAttributes(
         : idReferenceName(kind, value, dictionary, names);
     // An enum legend is never a suffix worth keeping, resolved or not; an id
     // reference keeps its unit until something actually resolves it.
-    const dropUnit = isEnumUnit(entry.unit) || (kind !== null && resolved !== null);
+    const dropUnit = kind === null ? isEnumUnit(entry.unit) : resolved !== null;
     push(
       {
         attributeId: attribute_id,

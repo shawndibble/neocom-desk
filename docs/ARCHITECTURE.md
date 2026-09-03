@@ -130,10 +130,11 @@ reaches `esiFetch`.
 `loadWithCacheStatus` takes `detectAuthFailure`/`skipCacheOnAuthFailure`
 options for `industry/jobs.ts`'s narrower definition (only a 403, and no
 cache fallback — a character that never granted the scope has never cached
-a jobs response). `features/character/{names,typeNames}.ts` do their own
-batch/partial-resolution instead of a single-key read-through, so they only
-share the raw `readCached`/`writeCached` primitives and the
-`GLOBAL_CACHE_CHARACTER_ID` sentinel, not `loadWithCache` itself.
+a jobs response). `features/character/{names,typeNames}.ts` and
+`features/market/groupNames.ts` do their own batch/partial-resolution
+instead of a single-key read-through, so they only share the raw
+`readCached`/`writeCached` primitives and the `GLOBAL_CACHE_CHARACTER_ID`
+sentinel, not `loadWithCache` itself.
 
 **Skill plan edit → sync**
 UI mutates `db.skillPlans`/`db.buildPlans`/`setSyncedSetting` directly, then

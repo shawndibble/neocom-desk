@@ -19,7 +19,7 @@
 import {
   collectAttributeIdReferences,
   type AttributeDictionary,
-  type AttributeNames,
+  type AttributeReferenceNames,
   type RawDogmaAttribute,
 } from '@/engine/market/itemAttributes';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -27,10 +27,10 @@ import { loadSkills } from '@/sde/loadSde';
 import { loadGroupNames } from './groupNames';
 
 /** Names for every id referenced across `items`, resolved in one round per kind. */
-export async function loadAttributeNames(
+export async function loadAttributeReferenceNames(
   items: readonly (readonly RawDogmaAttribute[] | undefined)[],
   dictionary: AttributeDictionary
-): Promise<AttributeNames> {
+): Promise<AttributeReferenceNames> {
   const typeIds = new Set<number>();
   const groupIds = new Set<number>();
   for (const dogmaAttributes of items) {
@@ -40,18 +40,29 @@ export async function loadAttributeNames(
   }
 
   const [skills, groups] = await Promise.all([
-    loadSkills().catch(() => []),
+    typeIds.size === 0 ? [] : loadSkills().catch(() => []),
     groupIds.size === 0
       ? new Map<number, string>()
       : loadGroupNames([...groupIds]).catch(() => new Map<number, string>()),
   ]);
 
+  // Only the skills this item actually references: handing the engine all 511
+  // would be mostly entries nothing asks about.
   const types: Record<number, string> = {};
-  for (const skill of skills) types[skill.typeID] = skill.name;
+  for (const skill of skills) {
+    if (typeIds.has(skill.typeID)) types[skill.typeID] = skill.name;
+  }
   const missing = [...typeIds].filter((id) => !(id in types));
   if (missing.length > 0) {
     const resolved = await loadTypeNames(missing).catch(() => new Map<number, string>());
-    for (const [id, name] of resolved) types[id] = name;
+    // `loadTypeNames` fills its own "Type #id" placeholder for ids it can't
+    // resolve. Passing that on would make an unresolved type reference render
+    // unlike an unresolved group or attribute one, and would turn a skill the
+    // snapshot missed into "Type #3436 III" instead of the pair loop's own
+    // "#3436 III". Drop it and let the row keep its raw value.
+    for (const [id, name] of resolved) {
+      if (name !== `Type #${id}`) types[id] = name;
+    }
   }
 
   return { types, groups: Object.fromEntries(groups) };

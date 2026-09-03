@@ -14,7 +14,7 @@
 import {
   groupItemAttributes,
   type AttributeDictionary,
-  type AttributeNames,
+  type AttributeReferenceNames,
   type RawDogmaAttribute,
 } from './itemAttributes';
 
@@ -67,7 +67,7 @@ export function buildCompareMatrix(
   items: readonly CompareMatrixItem[],
   dictionary: AttributeDictionary,
   labels: CompareMatrixLabels,
-  names: AttributeNames = {}
+  names: AttributeReferenceNames = {}
 ): CompareAttributeGroup[] {
   const priceCells = new Map<number, CompareCell>();
   for (const item of items) {

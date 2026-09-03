@@ -137,6 +137,22 @@ export async function installEsiMock(page: Page): Promise<void> {
       if (info) return json(info);
     }
 
+    // Item Detail resolves a dogma attribute that names a Group by id
+    // (features/market/groupNames.ts). No fixture carries such an attribute
+    // today, but one gaining `dogma_attributes` shouldn't fail the run on the
+    // network guard.
+    const groupMatch = /^\/universe\/groups\/(\d+)$/.exec(path);
+    if (groupMatch) {
+      const groupId = Number(groupMatch[1]);
+      return json({
+        group_id: groupId,
+        name: `Group ${groupId}`,
+        category_id: 7,
+        published: true,
+        types: [],
+      });
+    }
+
     // Unknown ESI path: fall through to the network guard so it shows up as
     // an explicit "unmocked request" failure rather than a silent 404.
     await route.fallback();

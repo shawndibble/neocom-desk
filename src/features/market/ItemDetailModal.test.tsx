@@ -147,7 +147,7 @@ describe('ItemDetailModal', () => {
 
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Miner" onClose={() => {}} />);
 
-    expect(await screen.findByText('99,999 groupID')).toBeInTheDocument();
+    expect(await screen.findByText('99999 groupID')).toBeInTheDocument();
   });
 
   it('shows an attributeID attribute as the attribute it names, using the dictionary alone', async () => {

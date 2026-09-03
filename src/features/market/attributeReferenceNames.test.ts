@@ -21,13 +21,13 @@ vi.mock('./groupNames', () => ({
 const { loadSkills } = await import('@/sde/loadSde');
 const { loadTypeNames } = await import('@/features/character/typeNames');
 const { loadGroupNames } = await import('./groupNames');
-const { loadAttributeNames } = await import('./attributeNames');
+const { loadAttributeReferenceNames } = await import('./attributeReferenceNames');
 
 beforeEach(() => vi.clearAllMocks());
 
-describe('loadAttributeNames', () => {
+describe('loadAttributeReferenceNames', () => {
   it('resolves type and group references across every item it is given', async () => {
-    const names = await loadAttributeNames(
+    const names = await loadAttributeReferenceNames(
       [[{ attribute_id: 137, value: 483 }], [{ attribute_id: 1632, value: 11 }]],
       DICTIONARY
     );
@@ -36,13 +36,16 @@ describe('loadAttributeNames', () => {
   });
 
   it('covers a skill reference from the precached snapshot, without an id lookup', async () => {
-    const names = await loadAttributeNames([[{ attribute_id: 182, value: 3436 }]], DICTIONARY);
+    const names = await loadAttributeReferenceNames(
+      [[{ attribute_id: 182, value: 3436 }]],
+      DICTIONARY
+    );
     expect(names.types?.[3436]).toBe('Spaceship Command');
     expect(loadTypeNames).not.toHaveBeenCalled();
   });
 
   it('asks for each distinct id once, however many items reference it', async () => {
-    await loadAttributeNames(
+    await loadAttributeReferenceNames(
       [[{ attribute_id: 137, value: 483 }], [{ attribute_id: 137, value: 483 }]],
       DICTIONARY
     );
@@ -50,7 +53,10 @@ describe('loadAttributeNames', () => {
   });
 
   it('looks nothing up for an item whose attributes reference no ids', async () => {
-    const names = await loadAttributeNames([[{ attribute_id: 9, value: 1200 }]], DICTIONARY);
+    const names = await loadAttributeReferenceNames(
+      [[{ attribute_id: 9, value: 1200 }]],
+      DICTIONARY
+    );
     expect(loadGroupNames).not.toHaveBeenCalled();
     expect(loadTypeNames).not.toHaveBeenCalled();
     expect(names.groups).toEqual({});
@@ -58,7 +64,7 @@ describe('loadAttributeNames', () => {
 
   it('still returns the names it could resolve when another lookup fails', async () => {
     vi.mocked(loadGroupNames).mockRejectedValueOnce(new Error('offline'));
-    const names = await loadAttributeNames(
+    const names = await loadAttributeReferenceNames(
       [
         [
           { attribute_id: 137, value: 483 },
@@ -71,9 +77,21 @@ describe('loadAttributeNames', () => {
     expect(names.types?.[11]).toBe('T11');
   });
 
+  it('drops the "Type #id" placeholder, so an unnamed type keeps its raw row', async () => {
+    vi.mocked(loadTypeNames).mockResolvedValueOnce(new Map([[11, 'Type #11']]));
+    const names = await loadAttributeReferenceNames(
+      [[{ attribute_id: 1632, value: 11 }]],
+      DICTIONARY
+    );
+    expect(names.types?.[11]).toBeUndefined();
+  });
+
   it('survives the skill snapshot being unreadable', async () => {
     vi.mocked(loadSkills).mockRejectedValueOnce(new Error('404'));
-    const names = await loadAttributeNames([[{ attribute_id: 182, value: 3436 }]], DICTIONARY);
+    const names = await loadAttributeReferenceNames(
+      [[{ attribute_id: 182, value: 3436 }]],
+      DICTIONARY
+    );
     expect(names.types?.[3436]).toBe('T3436');
   });
 });

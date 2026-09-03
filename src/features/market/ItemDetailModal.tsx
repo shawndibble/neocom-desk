@@ -8,7 +8,7 @@
  * small attribute dictionary that turns attribute ids into names/units/categories.
  * Rows whose value is an id rather than a measurement — a required skill, a
  * Group a module can be fitted to — resolve to names through
- * `attributeNames.ts`, which starts from `skills.json` (public/data,
+ * `attributeReferenceNames.ts`, which starts from `skills.json` (public/data,
  * PWA-precached — not the market snapshot vite.config.ts excludes from
  * precache) and only reaches for ESI for ids no local payload covers. A
  * planetary commodity also gets its schematic (pi.json, precached the same
@@ -26,7 +26,7 @@ import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
 import { typeIconUrl } from '@/lib/eveImages';
-import { loadAttributeNames } from './attributeNames';
+import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
 
 export interface ItemDetailModalProps {
@@ -68,7 +68,7 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
         if (!type) throw new Error(`No type data for ${typeId}`);
         // Needs the dictionary to know which values are ids, so it can't join
         // the fetch above; it never rejects, so it can't blank the modal.
-        const names = await loadAttributeNames([type.dogma_attributes], dictionary);
+        const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
         if (cancelled) return;
         setData({
           type,
@@ -138,7 +138,7 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
                       <dt className="text-text-dim">{attribute.name}</dt>
                       <dd className="text-right text-text">
                         {attribute.displayValue ??
-                          `${formatAttributeValue(attribute.value)}${attribute.unit ? ` ${attribute.unit}` : ''}`}
+                          `${formatAttributeValue(attribute.value, attribute.unit)}${attribute.unit ? ` ${attribute.unit}` : ''}`}
                       </dd>
                     </div>
                   ))}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { enumUnitLabel, idReferenceKind, isEnumUnit } from './attributeUnits';
+import { enumUnitLabel, idReferenceKind, isEnumUnit, looksLikeId } from './attributeUnits';
 
 describe('isEnumUnit', () => {
   it('recognises a legend regardless of how many members it lists', () => {
@@ -41,6 +41,10 @@ describe('enumUnitLabel', () => {
     expect(enumUnitLabel('1=small 2=medium 3=l', 3)).toBe('Large');
   });
 
+  it('names size class 4 — capital rigs and citadel missiles are real', () => {
+    expect(enumUnitLabel('1=small 2=medium 3=l', 4)).toBe('X-Large');
+  });
+
   it('parses an untruncated legend on its own, without needing a repair entry', () => {
     expect(enumUnitLabel('1=small 2=medium 3=large 4=x-large', 4)).toBe('X-large');
   });
@@ -56,8 +60,7 @@ describe('enumUnitLabel', () => {
   });
 
   it('returns null for a value the legend does not list, rather than inventing one', () => {
-    // charge size 4 (XL) is real and outside the legend's 1-3.
-    expect(enumUnitLabel('1=small 2=medium 3=l', 4)).toBeNull();
+    expect(enumUnitLabel('1=small 2=medium 3=l', 5)).toBeNull();
     expect(enumUnitLabel('1=True 0=False', 2)).toBeNull();
     expect(enumUnitLabel('1=True 0=False', 0.5)).toBeNull();
   });
@@ -93,5 +96,20 @@ describe('idReferenceKind', () => {
     for (const legend of ['1=True 0=False', '1=small 2=medium 3=l', '1=Male 2=Unisex 3=Female']) {
       expect(idReferenceKind(legend), legend).toBeNull();
     }
+  });
+});
+
+describe('looksLikeId', () => {
+  it('accepts a positive whole number', () => {
+    expect(looksLikeId(1)).toBe(true);
+    expect(looksLikeId(99999)).toBe(true);
+  });
+
+  it('rejects what can never be an id', () => {
+    // Dogma parks an unused reference slot at 0, and ESI sends floats.
+    expect(looksLikeId(0)).toBe(false);
+    expect(looksLikeId(-1)).toBe(false);
+    expect(looksLikeId(1.5)).toBe(false);
+    expect(looksLikeId(Number.NaN)).toBe(false);
   });
 });

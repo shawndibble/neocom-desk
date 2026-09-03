@@ -128,13 +128,18 @@ describe('groupItemAttributes', () => {
   });
 
   it('drops an enum legend the value falls outside of, so the bare number shows', () => {
-    const groups = groupItemAttributes([{ attribute_id: 128, value: 4 }], DICTIONARY);
+    const groups = groupItemAttributes([{ attribute_id: 128, value: 9 }], DICTIONARY);
     expect(groups[0].attributes[0]).toEqual({
       attributeId: 128,
       name: 'Charge size',
       unit: null,
-      value: 4,
+      value: 9,
     });
+  });
+
+  it('names size class 4, which the truncated legend cannot show', () => {
+    const groups = groupItemAttributes([{ attribute_id: 128, value: 4 }], DICTIONARY);
+    expect(groups[0].attributes[0].displayValue).toBe('X-Large');
   });
 
   it('resolves a required-skill attribute to a skill name and roman-numeral level', () => {

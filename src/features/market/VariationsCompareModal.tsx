@@ -21,7 +21,7 @@ import {
 } from '@/engine/market/attributeCompareMatrix';
 import type {
   AttributeDictionary,
-  AttributeNames,
+  AttributeReferenceNames,
   RawDogmaAttribute,
 } from '@/engine/market/itemAttributes';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
@@ -29,7 +29,7 @@ import { getUniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
-import { loadAttributeNames } from './attributeNames';
+import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue } from './format';
 
 export interface VariationsCompareModalItem {
@@ -46,13 +46,14 @@ export interface VariationsCompareModalProps {
 interface FetchedData {
   dogmaByTypeId: ReadonlyMap<number, readonly RawDogmaAttribute[] | undefined>;
   dictionary: AttributeDictionary;
-  names: AttributeNames;
+  names: AttributeReferenceNames;
 }
 
 function formatCell(kind: 'price' | 'attribute', cell: CompareCell): string {
   if (kind === 'price') return formatIsk(cell.value, 2);
   return (
-    cell.displayValue ?? `${formatAttributeValue(cell.value)}${cell.unit ? ` ${cell.unit}` : ''}`
+    cell.displayValue ??
+    `${formatAttributeValue(cell.value, cell.unit)}${cell.unit ? ` ${cell.unit}` : ''}`
   );
 }
 
@@ -106,7 +107,7 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
         );
         // One resolve for the whole matrix: ids repeat hard across variations,
         // so every column shares the lookups the first one paid for.
-        const names = await loadAttributeNames([...dogmaByTypeId.values()], dictionary);
+        const names = await loadAttributeReferenceNames([...dogmaByTypeId.values()], dictionary);
         if (cancelled) return;
         setData({ dogmaByTypeId, dictionary, names });
       } catch {

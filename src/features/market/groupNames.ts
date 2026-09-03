@@ -8,9 +8,11 @@
  *
  * So: one `GET /universe/groups/{id}` per id, at the shared fan-out limit,
  * cached in the generic `esiCache` under the global sentinel (`esi/cache`) —
- * a Group's name is a constant, so a hit is served without a live call rather
- * than on a freshness window, and the ids an item references dedupe to a
- * handful. An id that resolves to nothing is simply absent from the returned
+ * and read cache-first, without a freshness window. Deliberately not
+ * `STALE_AFTER.static`: even that 24h window would spend a live call per
+ * distinct Group per day, on a taxonomy that changes when CCP ships an
+ * expansion, to refresh a name the row would render identically. The cost of
+ * being wrong is a renamed Group reading stale until the cache is cleared. An id that resolves to nothing is simply absent from the returned
  * map: `groupItemAttributes` then leaves that row as the raw value it renders
  * today rather than inventing a label. Item Detail already reads ESI on open
  * (CONTEXT.md round 6), and this endpoint is public, so `/market`'s

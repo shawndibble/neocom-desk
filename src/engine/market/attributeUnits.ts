@@ -1,6 +1,9 @@
 /**
- * Some of EVE's dogma "units" are not units at all. `eveUnits.displayName`
- * for a handful of them is an inline legend naming what each value means —
+ * Some of EVE's dogma "units" are not units at all — they say how to read the
+ * value rather than what to append to it. Two kinds, both handled here.
+ *
+ * **Inline legends.** `eveUnits.displayName` for a handful of attributes names
+ * what each value means —
  * "1=True 0=False", "1=Male 2=Unisex 3=Female", "1=small 2=medium 3=l" — so
  * appending it the way HP or m/sec is appended produces rows that read
  * "Crystals Take Damage   1 1=True 0=False". This module recognises those
@@ -13,16 +16,26 @@
  * adds in a later SDE is handled the day the snapshot is rebuilt, without a
  * code change. `scripts/build-sde.mjs` keeps shipping the raw string — the
  * repair below wants the SDE's own text to compare against.
+ *
+ * **Id references.** `typeID`, `groupID` and `attributeID` say the value is an
+ * id, not a measurement. This module classifies them and screens out values
+ * that could not be one; `itemAttributes` does the resolving, since that is
+ * where the lookups arrive.
  */
 
 /**
- * `eveUnits.displayName` is capped at 20 characters in the SDE, which cuts
- * the size legend off mid-word ("3=l"). Keyed by the exact truncated string:
- * an SDE that one day ships the full legend simply misses this map and is
- * parsed correctly on its own.
+ * The SDE ships the size legend cut off mid-word — literally
+ * "1=small 2=medium 3=l" — for reasons upstream; the gender legend beside it
+ * survives at 24 characters, so it is not a general width limit and not
+ * something to reason about, just something to repair. The repair also names
+ * size class 4, which the truncated string cannot show and the game
+ * definitely has: capital rigs are rig size 4 and citadel missiles are charge
+ * size 4, and without it every one of them renders a bare, unlabelled "4".
+ * Keyed by the exact truncated string, so an SDE that one day ships the
+ * legend whole misses this map and is parsed correctly on its own.
  */
 const LEGEND_REPAIRS: Readonly<Record<string, string>> = {
-  '1=small 2=medium 3=l': '1=small 2=medium 3=large',
+  '1=small 2=medium 3=l': '1=small 2=medium 3=large 4=X-Large',
 };
 
 /** A legend starts a member with "<int>=" at the string start or after a space. */
@@ -77,10 +90,10 @@ export function idReferenceKind(unit: string | null | undefined): IdReferenceKin
 }
 
 /**
- * Whether `value` could name anything. Dogma leaves unused reference slots at
- * 0, and ESI sends every value as a float — neither 0, a negative, nor 1.5 is
- * an id, and asking a lookup for one only wastes the call.
+ * Whether `value` could be an id at all — not whether anything can name it.
+ * Dogma leaves unused reference slots at 0 and ESI sends every value as a
+ * float, so neither 0, a negative, nor 1.5 is worth a lookup.
  */
-export function isResolvableId(value: number): boolean {
+export function looksLikeId(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }

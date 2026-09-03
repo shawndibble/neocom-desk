@@ -1,4 +1,5 @@
 /** Display helpers for the Market Browser's order tables. */
+import { idReferenceKind } from '@/engine/market/attributeUnits';
 import type { ResolvedOrderLocation } from '@/engine/market/orderBook';
 
 const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
@@ -10,8 +11,14 @@ export function formatVolume(value: number): string {
 
 const ATTRIBUTE_VALUE_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
 
-/** An Item Detail attribute's raw ESI value, thousands-separated and trimmed to 2 decimal places. */
-export function formatAttributeValue(value: number): string {
+/**
+ * An Item Detail attribute's raw ESI value, thousands-separated and trimmed to
+ * 2 decimal places — except when `unit` says the value is an id nothing could
+ * name (`engine/market/attributeUnits`). "1,872 groupID" reads like a
+ * measurement; an identifier is printed as written.
+ */
+export function formatAttributeValue(value: number, unit?: string | null): string {
+  if (idReferenceKind(unit) !== null) return String(value);
   return ATTRIBUTE_VALUE_FORMAT.format(value);
 }
 
