@@ -31,7 +31,12 @@ export function StatChip({
   const { t } = useTranslation();
   return (
     <span
-      className={`inline-flex h-7 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2.5 text-[0.6875rem] ${className}`}
+      // `h-7` is a fixed height, so the chip cannot absorb a second line of
+      // text: left to shrink, a flex row squeezes it until the label wraps and
+      // spills past the border. `shrink-0` + `whitespace-nowrap` make the chip
+      // an indivisible box, so a `flex-wrap` strip moves the whole chip to the
+      // next line instead — which is what a stat strip should do.
+      className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2.5 text-[0.6875rem] whitespace-nowrap ${className}`}
     >
       <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
       {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}

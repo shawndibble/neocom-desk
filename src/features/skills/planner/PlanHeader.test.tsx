@@ -116,4 +116,33 @@ describe('PlanHeader', () => {
     expect(screen.getByText(/\+12/)).toBeInTheDocument();
     expect(screen.getByText(/booster/i)).toBeInTheDocument();
   });
+
+  it('wraps whole chips onto a second line rather than crushing them into one', () => {
+    // Reported with a Booster on: five chips is more than the strip fits
+    // beside the sidebar, and it used to answer that by refusing to wrap
+    // (`lg:flex-nowrap`) and scrolling sideways instead. StatChip is a
+    // fixed-height box, so the chips ahead of the scroll got squeezed until
+    // their labels broke over two lines inside a one-line-tall border.
+    render(
+      <PlanHeader
+        totalSeconds={1000}
+        skillCount={2}
+        projectedFinish={new Date('2026-09-01T00:00:00Z')}
+        badge={{
+          savingsSeconds: 500,
+          evaluatedRemapCount: 2,
+          requestedRemapCount: 2,
+          capped: false,
+        }}
+        booster={{ bonus: 12, expiresAt: new Date('2026-09-15T21:00:00Z') }}
+      />
+    );
+
+    const strip = screen.getByText('16m').closest('div');
+    expect(strip).toHaveClass('flex-wrap');
+    // A hidden sideways scroller would put stats off-screen with nothing to
+    // suggest going looking for them.
+    expect(strip).not.toHaveClass('lg:flex-nowrap');
+    expect(strip).not.toHaveClass('lg:overflow-x-auto');
+  });
 });
