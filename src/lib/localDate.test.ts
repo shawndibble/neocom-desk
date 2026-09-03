@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { formatLocalDate } from './localDate';
+import { formatLocalDate, formatLocalDateTime } from './localDate';
 
 const originalTz = process.env.TZ;
 afterAll(() => {
@@ -21,5 +21,22 @@ describe('formatLocalDate', () => {
   it('renders as the next local day in a positive-offset zone', () => {
     process.env.TZ = 'Pacific/Kiritimati';
     expect(formatLocalDate(new Date('2026-08-31T23:45:00Z'))).toBe('2026-09-01');
+  });
+});
+
+describe('formatLocalDateTime', () => {
+  it('carries the time of day the date-only formatter drops', () => {
+    process.env.TZ = 'UTC';
+    expect(formatLocalDateTime(new Date('2026-09-01T14:51:00Z'))).toBe('2026-09-01, 14:51');
+  });
+
+  it('shifts date and time together into the host local timezone', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    expect(formatLocalDateTime(new Date('2026-09-01T00:30:00Z'))).toBe('2026-08-31, 17:30');
+  });
+
+  it('renders midnight as 00:00 rather than 24:00', () => {
+    process.env.TZ = 'UTC';
+    expect(formatLocalDateTime(new Date('2026-09-01T00:00:00Z'))).toBe('2026-09-01, 00:00');
   });
 });

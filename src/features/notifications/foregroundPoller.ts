@@ -41,6 +41,7 @@ import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
 import { notificationOptionsFor } from './notificationOptions';
 import { eveNotificationText } from './eveNotificationText';
+import { resolveEveNotificationNames } from './eveNotificationNames';
 
 export type { AnyNotificationFire } from './pollDomains';
 
@@ -375,7 +376,10 @@ export async function notificationText(
     };
   }
   if (fire.eventId === 'eveNotification') {
-    return eveNotificationText(fire, character);
+    // Resolution is best-effort and never rejects (issue #300): whatever it
+    // could not look up renders as an id or a neutral phrase rather than
+    // holding the notification back.
+    return eveNotificationText(fire, character, await resolveEveNotificationNames(fire));
   }
   if (fire.eventId === 'characterNotTraining') {
     return {
