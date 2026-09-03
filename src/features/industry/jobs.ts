@@ -35,8 +35,31 @@ export function loadCharacterIndustryJobs(characterId: number): Promise<JobsLoad
 
 // --- Pure view helpers (no fetch/DOM/Dexie — safe to unit-test with plain numbers) ---
 
+/**
+ * The fields the Active jobs list actually reads.
+ *
+ * Structural, not nominal, so the corporation job shape satisfies it as-is
+ * (issue #298): the two differ only in `location_id` vs `station_id` and a
+ * handful of corp-only ids, none of which this list renders. Typing the helpers
+ * and the CSV columns on the subset is what lets one table serve both owners
+ * rather than a second panel serving the second one.
+ */
+export type ActiveJob = Pick<
+  IndustryJob,
+  | 'job_id'
+  | 'activity_id'
+  | 'blueprint_type_id'
+  | 'runs'
+  | 'start_date'
+  | 'end_date'
+  | 'status'
+  | 'cost'
+>;
+
 /** Ending soonest first. */
-export function sortJobsBySoonest(jobs: readonly IndustryJob[]): IndustryJob[] {
+export function sortJobsBySoonest<T extends Pick<IndustryJob, 'end_date'>>(
+  jobs: readonly T[]
+): T[] {
   return [...jobs].sort((a, b) => Date.parse(a.end_date) - Date.parse(b.end_date));
 }
 
