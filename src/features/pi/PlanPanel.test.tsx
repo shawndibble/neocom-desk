@@ -49,7 +49,12 @@ const { PlanPanel } = await import('./PlanPanel');
 
 beforeEach(() => {
   loadPlanPrices.mockReset();
-  loadPlanPrices.mockResolvedValue({ prices: fullPrices, unpriced: [], failed: false });
+  loadPlanPrices.mockResolvedValue({
+    prices: fullPrices,
+    unpriced: [],
+    failed: false,
+    fetchedAt: new Date(),
+  });
   loadCustomsCodeExpertise.mockReset();
   loadCustomsCodeExpertise.mockResolvedValue(4);
 });
@@ -90,7 +95,7 @@ describe('PlanPanel', () => {
     renderPanel();
     const panel = await verdict();
     // 16 factory pins, the ticket's worked example.
-    expect(within(panel).getByText(/16 factory pins on 1 planets/)).toBeInTheDocument();
+    expect(within(panel).getByText('16 factory pins')).toBeInTheDocument();
     expect(isNegative(ledgerValue(panel, 'Margin per unit'))).toBe(false);
   });
 
@@ -143,6 +148,9 @@ describe('PlanPanel', () => {
     const panel = await verdict();
     expect(within(panel).getByText(/9 extractors/)).toBeInTheDocument();
     expect(within(panel).getByText(/valued at the hub, not at zero/)).toBeInTheDocument();
+    // The tax-boundary count keeps its own labelled row rather than riding in
+    // the footprint, where it would read as "40 pins fit on 1 planet".
+    expect(ledgerValue(panel, 'Planets taxed across')).toBe('1');
   });
 
   it("prefills the highsec rate from the character's Customs Code Expertise and says so", async () => {
@@ -204,6 +212,58 @@ describe('PlanPanel', () => {
     expect(best(p1)[4]).toBe(true); // 10%
   });
 
+  it("folds the user's own rate into the sweep, so the control moves the answer", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await verdict();
+    await user.click(screen.getByRole('button', { name: 'Extract P0' }));
+    await user.type(
+      within(await verdict()).getByLabelText('Extractor yield (units/hour)'),
+      '1000000'
+    );
+
+    // 3% is not one of the fixed columns, so a column only exists here because
+    // the control was driven — and P0 still wins below the ~5.7% crossover.
+    await setCustomsRate('3');
+
+    const table = await screen.findByRole('table', {
+      name: /Margin per unit for each sourcing floor/,
+    });
+    const header = within(table).getAllByRole('columnheader');
+    const rateIndex = header.findIndex((cell) => cell.textContent?.trim() === '3%');
+    expect(rateIndex).toBeGreaterThan(-1);
+
+    const p0Row = within(table)
+      .getAllByRole('row')
+      .find((row) => within(row).queryByText('Extract P0') !== null);
+    if (!p0Row) throw new Error('no P0 row');
+    expect(within(p0Row).getAllByRole('cell')[rateIndex].textContent).toContain('★');
+  });
+
+  it('gives no verdict at all, and no chain table, until an output rate is given', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await verdict();
+
+    await user.clear(screen.getByLabelText('Output per day'));
+
+    expect(await screen.findByText('Enter an output rate')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Verdict' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Chain' })).not.toBeInTheDocument();
+    // And the controls are still there to type into.
+    expect(screen.getByLabelText('Output per day')).toBeInTheDocument();
+  });
+
+  it('writes the selected commodity back out, so the route can hold it in the URL', async () => {
+    const user = userEvent.setup();
+    const { onTypeIdChange } = renderPanel();
+    await verdict();
+
+    await user.selectOptions(screen.getByLabelText('Product'), '9828');
+
+    expect(onTypeIdChange).toHaveBeenCalledWith(9828);
+  });
+
   it('shows what the P0 floor really costs in planets, not just in ISK', async () => {
     const user = userEvent.setup();
     renderPanel();
@@ -214,7 +274,7 @@ describe('PlanPanel', () => {
       '1000000'
     );
     // 40 factory pins plus 9 extractors, against the six planets a character has.
-    expect(within(await verdict()).getByText(/40 factory pins/)).toBeInTheDocument();
+    expect(within(await verdict()).getByText('40 factory pins, 9 extractors')).toBeInTheDocument();
   });
 
   it('gives no verdict at all when the hub does not quote the product', async () => {
@@ -224,6 +284,7 @@ describe('PlanPanel', () => {
       prices: withoutTarget,
       unpriced: [BROADCAST_NODE],
       failed: false,
+      fetchedAt: new Date(),
     });
 
     renderPanel();
@@ -242,7 +303,9 @@ describe('PlanPanel', () => {
   it('titles each stacked chain card by the commodity, not by its tier', async () => {
     renderPanel();
     const table = await screen.findByRole('table', { name: /Production chain for Broadcast Node/ });
-    const [headerRow] = within(table).getAllByRole('row');
-    expect(within(headerRow).getAllByRole('columnheader')[0]).toHaveTextContent('Commodity');
+    // `dt-primary` is the cell `.dt-stack` hoists as the card title below `sm`
+    // (docs/DESIGN.md §4a) — the tier chip carries the hierarchy instead.
+    expect(within(table).getByText('Broadcast Node').closest('td')).toHaveClass('dt-primary');
+    expect(within(table).getAllByText('P4')[0].closest('td')).not.toHaveClass('dt-primary');
   });
 });

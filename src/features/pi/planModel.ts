@@ -200,7 +200,12 @@ export function taxSplit(breakdown: ChainCostBreakdown, targetTier: PiTier): Tax
     0
   );
   const exportBase = CUSTOMS_TAXABLE_VALUE[targetTier];
-  const betweenPlanetsBase = breakdown.taxBase - importBase - exportBase;
+  // A residue, so it carries the float drift of the whole sum. Clamped at a
+  // millionth of an ISK of taxable value: a real between-planets base is
+  // thousands, and an unclamped -7e-12 would render as a negative customs row
+  // on the layout that charges none at all.
+  const residue = breakdown.taxBase - importBase - exportBase;
+  const betweenPlanetsBase = Math.abs(residue) < 1e-6 ? 0 : residue;
   const rate = breakdown.taxRate;
   return {
     importBase,

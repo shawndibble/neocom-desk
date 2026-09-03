@@ -1,12 +1,23 @@
-import { describe, it, expect } from 'vitest';
-import {
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const loadCorrectedSkills = vi.fn();
+vi.mock('@/features/skills/correctedSkills', () => ({
+  loadCorrectedSkills: (...args: unknown[]) => loadCorrectedSkills(...args),
+}));
+
+const {
   CUSTOMS_CODE_EXPERTISE_SKILL_ID,
   COLONY_SPACES,
   customsRateSource,
   defaultCustomsRate,
   highsecCustomsRate,
-  type ColonySpace,
-} from './customsRate';
+  loadCustomsCodeExpertise,
+} = await import('./customsRate');
+type ColonySpace = import('./customsRate').ColonySpace;
+
+beforeEach(() => {
+  loadCorrectedSkills.mockReset();
+});
 
 describe('highsecCustomsRate', () => {
   it('is the engine default at level 0 and falls one point per level', () => {
@@ -59,5 +70,32 @@ describe('COLONY_SPACES', () => {
 describe('CUSTOMS_CODE_EXPERTISE_SKILL_ID', () => {
   it('is the SDE typeID for Customs Code Expertise', () => {
     expect(CUSTOMS_CODE_EXPERTISE_SKILL_ID).toBe(33467);
+  });
+});
+
+describe('loadCustomsCodeExpertise', () => {
+  it('reads the corrected level, so a queue entry the API has not applied still counts', async () => {
+    loadCorrectedSkills.mockResolvedValue({
+      skillsResult: { data: { skills: [], total_sp: 0 }, fetchedAt: new Date(), fromCache: false },
+      trained: new Map([[CUSTOMS_CODE_EXPERTISE_SKILL_ID, { level: 5, sp: 0 }]]),
+    });
+
+    expect(await loadCustomsCodeExpertise(91, 0)).toBe(5);
+    expect(loadCorrectedSkills).toHaveBeenCalledWith(91, 0, { skipQueueWithoutScope: true });
+  });
+
+  it('is a confident 0 when skills loaded and the character has never trained it', async () => {
+    loadCorrectedSkills.mockResolvedValue({
+      skillsResult: { data: { skills: [], total_sp: 0 }, fetchedAt: new Date(), fromCache: false },
+      trained: new Map(),
+    });
+
+    expect(await loadCustomsCodeExpertise(91, 0)).toBe(0);
+  });
+
+  it('is null — not 0 — when there is no skill data at all to read', async () => {
+    loadCorrectedSkills.mockResolvedValue({ skillsResult: null, trained: new Map() });
+
+    expect(await loadCustomsCodeExpertise(91, 0)).toBeNull();
   });
 });

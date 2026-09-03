@@ -22,7 +22,7 @@
  */
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, EmptyState, InfoTooltip, Panel, StatChip } from '@/components/ui';
+import { DataAgeBadge, DataTable, EmptyState, InfoTooltip, Panel, StatChip } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { PiTier, SourcingFloor } from '@/engine/pi/chain';
 import { formatIsk } from '@/lib/isk';
@@ -36,7 +36,11 @@ function formatRate(rate: number): string {
   return `${RATE_FORMAT.format(rate * 100)}%`;
 }
 
-function iskTone(value: number): string {
+function iskTone(value: number): 'positive' | 'negative' {
+  return value >= 0 ? 'positive' : 'negative';
+}
+
+function iskToneClass(value: number): string {
   return value >= 0 ? 'text-isk-pos' : 'text-isk-neg';
 }
 
@@ -45,11 +49,20 @@ interface LedgerRowProps {
   value: ReactNode;
   tooltip?: string;
   emphasized?: boolean;
-  tone?: string;
+  /** Same vocabulary as `features/industry/ResultsSummary`'s `CostRow`, not a raw class name. */
+  tone?: 'negative' | 'positive';
 }
 
 function LedgerRow({ label, value, tooltip, emphasized = false, tone }: LedgerRowProps) {
   const { t } = useTranslation();
+  const toneClass =
+    tone === 'negative'
+      ? 'text-isk-neg'
+      : tone === 'positive'
+        ? 'text-isk-pos'
+        : emphasized
+          ? 'text-accent'
+          : 'text-text';
   return (
     <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem]">
       <span className="flex items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
@@ -58,9 +71,7 @@ function LedgerRow({ label, value, tooltip, emphasized = false, tone }: LedgerRo
         <span>{label}</span>
         {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
       </span>
-      <span
-        className={`font-medium tabular-nums ${emphasized ? 'text-sm' : ''} ${tone ?? 'text-text'}`}
-      >
+      <span className={`font-medium tabular-nums ${emphasized ? 'text-sm' : ''} ${toneClass}`}>
         {value}
       </span>
     </div>
@@ -69,26 +80,41 @@ function LedgerRow({ label, value, tooltip, emphasized = false, tone }: LedgerRo
 
 export interface FootprintProps {
   factoryPins: number;
-  planetCount: number;
   /** Extractor programs, on the P0 floor only. */
   extractors: number | null;
 }
 
-/** Pins, planets and — on the P0 floor — extractors, as a plain figure. Never a verdict. */
-export function Footprint({ factoryPins, planetCount, extractors }: FootprintProps) {
+/**
+ * The pins and extractors a floor costs.
+ *
+ * Deliberately *not* the engine's `planetCount`: that is how many planet
+ * boundaries the layout puts inside the chain — always 1 on `single-planet` —
+ * which is the number the customs bill is charged over, not the number of
+ * planets the operation occupies. Showing it under a six-planet-cap tooltip
+ * would read as "40 pins and 9 extractors fit on 1 planet", which is the exact
+ * confident-wrong-number this surface exists to prevent. The tax-boundary
+ * count keeps its own labelled row in the verdict instead.
+ */
+function useFootprintText(): (factoryPins: number, extractors: number | null) => string {
   const { t } = useTranslation();
-  const label =
-    extractors != null
-      ? t('piPlan.footprintWithExtractors', {
-          pins: factoryPins,
-          planets: planetCount,
-          extractors,
-        })
-      : t('piPlan.footprintPins', { pins: factoryPins, planets: planetCount });
+  return (factoryPins, extractors) => {
+    const pins = t('piPlan.footprintPins', { count: factoryPins });
+    if (extractors == null) return pins;
+    return t('piPlan.footprintJoin', {
+      pins,
+      extractors: t('piPlan.footprintExtractors', { count: extractors }),
+    });
+  };
+}
+
+/** Pins and — on the P0 floor — extractors, as a plain figure. Never a feasibility verdict. */
+export function Footprint({ factoryPins, extractors }: FootprintProps) {
+  const { t } = useTranslation();
+  const footprintText = useFootprintText();
   return (
     <StatChip
       label={t('piPlan.footprintLabel')}
-      value={label}
+      value={footprintText(factoryPins, extractors)}
       tooltip={t('piPlan.footprintTooltip')}
     />
   );
@@ -100,8 +126,9 @@ interface PlanVerdictProps {
   targetName: string;
   unitsPerDay: number;
   factoryPins: number;
-  planetCount: number;
   hubName: string;
+  /** When the hub prices behind these numbers were read; null before they land. */
+  pricesFetchedAt: Date | null;
   /**
    * The editable yield input, passed only on the P0 floor — the one floor it
    * applies to. It lives here rather than in the controls rail so that
@@ -127,8 +154,8 @@ export function PlanVerdict({
   targetName,
   unitsPerDay,
   factoryPins,
-  planetCount,
   hubName,
+  pricesFetchedAt,
   extractionRateField,
 }: PlanVerdictProps) {
   const { t } = useTranslation();
@@ -181,6 +208,11 @@ export function PlanVerdict({
             tooltip={t('piPlan.customsBetweenTooltip')}
           />
           <LedgerRow
+            label={t('piPlan.planetsTaxed')}
+            value={breakdown.planetCount}
+            tooltip={t('piPlan.planetsTaxedTooltip')}
+          />
+          <LedgerRow
             label={t('piPlan.totalCost')}
             value={formatIsk(-breakdown.totalCost)}
             tooltip={t('piPlan.totalCostTooltip')}
@@ -212,11 +244,13 @@ export function PlanVerdict({
       title={t('piPlan.verdictTitle')}
       padded={false}
       actions={
-        <Footprint
-          factoryPins={factoryPins}
-          planetCount={breakdown?.planetCount ?? planetCount}
-          extractors={breakdown?.extraction?.totalExtractors ?? null}
-        />
+        <>
+          <Footprint
+            factoryPins={factoryPins}
+            extractors={breakdown?.extraction?.totalExtractors ?? null}
+          />
+          {pricesFetchedAt && <DataAgeBadge date={pricesFetchedAt} />}
+        </>
       }
     >
       {body}
@@ -287,7 +321,7 @@ export function PlanChainTable({ rows, productName }: PlanChainTableProps) {
             <span className={row.role === 'make' ? 'text-accent' : 'text-text-dim'}>
               {row.role === 'make' ? t('piPlan.roleMake') : t('piPlan.roleBuy')}
             </span>
-            <span className="text-text-faint">
+            <span className="text-text-dim">
               {row.read === null
                 ? t('piPlan.readUnknown')
                 : row.read === 'make'
@@ -303,7 +337,7 @@ export function PlanChainTable({ rows, productName }: PlanChainTableProps) {
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (row) =>
-          row.valueAddPerHour == null ? undefined : iskTone(row.valueAddPerHour),
+          row.valueAddPerHour == null ? undefined : iskToneClass(row.valueAddPerHour),
         sortValue: (row) => row.valueAddPerHour ?? undefined,
         render: (row) => (row.valueAddPerHour == null ? '—' : formatIsk(row.valueAddPerHour, 2)),
       },
@@ -341,6 +375,7 @@ interface PlanSensitivityProps {
  */
 export function PlanSensitivity({ grid, rates }: PlanSensitivityProps) {
   const { t } = useTranslation();
+  const footprintText = useFootprintText();
 
   const columns = useMemo<DataTableColumn<SensitivityRow>[]>(() => {
     const floorColumn: DataTableColumn<SensitivityRow> = {
@@ -353,14 +388,7 @@ export function PlanSensitivity({ grid, rates }: PlanSensitivityProps) {
       id: 'footprint',
       header: t('piPlan.footprintLabel'),
       className: 'text-text-dim tabular-nums',
-      render: (row) =>
-        row.extractors != null
-          ? t('piPlan.footprintWithExtractors', {
-              pins: row.factoryPins,
-              planets: row.planetCount,
-              extractors: row.extractors,
-            })
-          : t('piPlan.footprintPins', { pins: row.factoryPins, planets: row.planetCount }),
+      render: (row) => footprintText(row.factoryPins, row.extractors),
     };
     const rateColumns: DataTableColumn<SensitivityRow>[] = rates.map((rate, index) => ({
       id: `rate-${index}`,
@@ -377,17 +405,25 @@ export function PlanSensitivity({ grid, rates }: PlanSensitivityProps) {
         }
         return (
           <span
-            className={cell.best ? `font-semibold ${iskTone(cell.margin)}` : iskTone(cell.margin)}
-            title={cell.best ? t('piPlan.bestFloor') : undefined}
+            className={
+              cell.best ? `font-semibold ${iskToneClass(cell.margin)}` : iskToneClass(cell.margin)
+            }
           >
-            {cell.best && <span aria-label={t('piPlan.bestFloor')}>★ </span>}
+            {cell.best && (
+              <>
+                {/* The glyph is decorative; the words are what a screen reader
+                    reads, so the marker is never colour-and-shape alone. */}
+                <span aria-hidden="true">★ </span>
+                <span className="sr-only">{t('piPlan.bestFloor')}: </span>
+              </>
+            )}
             {formatIsk(cell.margin)}
           </span>
         );
       },
     }));
     return [floorColumn, footprintColumn, ...rateColumns];
-  }, [t, rates]);
+  }, [t, rates, footprintText]);
 
   return (
     <Panel title={t('piPlan.sensitivityTitle')} padded={false}>

@@ -51,6 +51,7 @@ vi.mock('@/features/pi/planPrices', () => ({
     ),
     unpriced: [],
     failed: false,
+    fetchedAt: new Date(),
   })),
 }));
 

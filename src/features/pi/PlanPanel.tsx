@@ -42,14 +42,7 @@ import {
   type ColonySpace,
 } from './customsRate';
 import { loadPlanPrices, type PlanPrices } from './planPrices';
-import {
-  costPlan,
-  factoryPinsAbove,
-  planRows,
-  planetCountFor,
-  sensitivityGrid,
-  validFloors,
-} from './planModel';
+import { costPlan, factoryPinsAbove, planRows, sensitivityGrid, validFloors } from './planModel';
 import { PlanChainTable, PlanSensitivity, PlanVerdict } from './PlanResults';
 
 const HOURS_PER_DAY = 24;
@@ -140,7 +133,17 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
   const [floor, setFloor] = useState<SourcingFloor>('P1');
   const [extractionRateText, setExtractionRateText] = useState('');
 
-  const [prices, setPrices] = useState<PlanPrices | null>(null);
+  /**
+   * Prices, stamped with the request that produced them.
+   *
+   * Derived-stale rather than cleared in the effect: reading the stamp back
+   * out below means a hub switch cannot cost the previous hub's prices while
+   * the "not priceable at this hub" line names the new one — and it does it
+   * without a synchronous `setState` inside the effect.
+   */
+  const [priceState, setPriceState] = useState<{ requestKey: string; value: PlanPrices } | null>(
+    null
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -176,11 +179,13 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
     [products, typeId]
   );
 
-  const unitsPerDay = parsePositive(perDayText) ?? 1;
+  // Null, not a fallback of 1: costing a blank field at one unit a day would
+  // print a confident "Margin per day" for a rate the user never asked for.
+  const unitsPerDay = parsePositive(perDayText);
   const hub = TRADE_HUBS.find((candidate) => candidate.id === hubId) ?? DEFAULT_TRADE_HUB;
 
   const chain = useMemo(() => {
-    if (!pi || !selected) return null;
+    if (!pi || !selected || unitsPerDay === null) return null;
     try {
       return expandChain(selected.typeId, pi, { unitsPerHour: unitsPerDay / HOURS_PER_DAY });
     } catch {
@@ -198,6 +203,8 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
     [chain]
   );
 
+  const priceRequestKey = `${hub.id}|${priceTypeIdsKey}`;
+
   useEffect(() => {
     if (priceTypeIdsKey === '') return;
     let cancelled = false;
@@ -205,12 +212,14 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
       const ids = priceTypeIdsKey.split(',').map(Number);
       const result = await loadPlanPrices(hub, ids);
       if (cancelled) return;
-      setPrices(result);
+      setPriceState({ requestKey: `${hub.id}|${priceTypeIdsKey}`, value: result });
     })();
     return () => {
       cancelled = true;
     };
   }, [priceTypeIdsKey, hub]);
+
+  const prices = priceState?.requestKey === priceRequestKey ? priceState.value : null;
 
   const floors = useMemo(() => (selected ? validFloors(selected.tier) : []), [selected]);
   // Derived, not corrected by an effect: a P1 product admits only the P0
@@ -293,7 +302,7 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
       </div>
     );
   }
-  if (loadFailed || !pi || !selected || !chain) {
+  if (loadFailed || !pi || !selected) {
     return <EmptyState title={t('piPlan.loadFailedTitle')} hint={t('piPlan.loadFailedHint')} />;
   }
 
@@ -453,8 +462,20 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
         </div>
       </Panel>
 
+      {/* One guard over the whole results column, not just the verdict: a
+          chain table full of "Unpriced" rows under a spinner, or left standing
+          under a failed price fetch, is the same wrong-with-confidence the
+          verdict's own branch avoids. */}
       <div className="min-w-0 space-y-3">
-        {prices?.failed ? (
+        {chain === null || unitsPerDay === null || result === null ? (
+          <Panel>
+            <EmptyState
+              title={t('piPlan.outputRequiredTitle')}
+              hint={t('piPlan.outputRequiredHint')}
+              className="py-6"
+            />
+          </Panel>
+        ) : prices?.failed ? (
           <Panel>
             <EmptyState
               title={t('piPlan.pricesFailedTitle')}
@@ -463,30 +484,27 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
             />
           </Panel>
         ) : prices === null ? (
-          // No verdict at all until prices land — an empty price map would
-          // otherwise flash "not priceable" for one frame on every open.
           <Panel>
             <div className="flex justify-center py-10">
               <Spinner label={t('common.loading')} />
             </div>
           </Panel>
         ) : (
-          result && (
+          <>
             <PlanVerdict
               result={result}
               targetTier={selected.tier}
               targetName={selected.name}
               unitsPerDay={unitsPerDay}
               factoryPins={factoryPinsAbove(chain, effectiveFloor)}
-              planetCount={planetCountFor(chain, effectiveFloor, layout)}
               hubName={hub.systemName}
+              pricesFetchedAt={prices.fetchedAt}
               extractionRateField={effectiveFloor === 'P0' ? extractionRateField : undefined}
             />
-          )
+            <PlanChainTable rows={rows} productName={selected.name} />
+            <PlanSensitivity grid={grid} rates={sensitivityRates} />
+          </>
         )}
-
-        <PlanChainTable rows={rows} productName={selected.name} />
-        <PlanSensitivity grid={grid} rates={sensitivityRates} />
       </div>
     </div>
   );

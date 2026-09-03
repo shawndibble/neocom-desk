@@ -8,6 +8,13 @@
  * `systemCostIndex` are simply unused here — a planetary chain has no
  * blueprint, no job cost and no EIV.
  *
+ * `fetchedAt` is when this read completed, which is what the Plan tab's
+ * `DataAgeBadge` shows. It is a lower bound on the true age, not the exact
+ * one: `getHubPrices` keeps its own 15-minute TTL cache underneath, so a read
+ * that hits it returns prices up to that much older. The badge's finest bucket
+ * is an hour, so the tone is right either way, and the alternative — no badge
+ * at all on an ESI-backed view — is the worse trade (docs/DESIGN.md §4).
+ *
  * A type the hub has no sell order for stays *absent* from `prices`, never
  * zero: `engine/pi/chain.ts` refuses to cost a chain with a missing price, and
  * `planModel.costPlan` turns that refusal into a "not priceable" state. Zero
@@ -24,18 +31,21 @@ export interface PlanPrices {
   unpriced: number[];
   /** True when the price fetch itself failed, as opposed to the hub simply not quoting a type. */
   failed: boolean;
+  /** When this read completed. See the note above on why it is a lower bound. */
+  fetchedAt: Date;
 }
 
 /** Lowest hub sell for every type a chain can involve, in one call. */
 export async function loadPlanPrices(hub: TradeHub, typeIds: number[]): Promise<PlanPrices> {
   const wanted = [...new Set(typeIds)];
-  if (wanted.length === 0) return { prices: {}, unpriced: [], failed: false };
+  if (wanted.length === 0)
+    return { prices: {}, unpriced: [], failed: false, fetchedAt: new Date() };
 
   let hubPrices: Record<number, number>;
   try {
     hubPrices = (await loadMarketSnapshot(hub, wanted)).hubPrices;
   } catch {
-    return { prices: {}, unpriced: wanted, failed: true };
+    return { prices: {}, unpriced: wanted, failed: true, fetchedAt: new Date() };
   }
 
   const prices: Record<number, number> = {};
@@ -45,5 +55,5 @@ export async function loadPlanPrices(hub: TradeHub, typeIds: number[]): Promise<
     if (price != null && Number.isFinite(price)) prices[typeId] = price;
     else unpriced.push(typeId);
   }
-  return { prices, unpriced, failed: false };
+  return { prices, unpriced, failed: false, fetchedAt: new Date() };
 }
