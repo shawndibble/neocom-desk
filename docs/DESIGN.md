@@ -211,6 +211,14 @@ Three rules hold this together:
 - **Roles are explicit.** `display: block` strips the implicit ARIA table
   roles in real browsers, so `DataTable` writes `role="table"`/`rowgroup`/
   `row`/`columnheader`/`cell` itself.
+- **A cell never right-aligns itself below `sm`.** `align: 'right'` on a
+  column is handled — `.dt-stack td` overrides `text-right`. What it cannot
+  reach is alignment a cell renders for itself: a `flex … items-end` wrapper,
+  a `justify-end`, a `text-right` input. Those keep hugging the card's right
+  edge while plain cells start at the 7rem gutter, and the card reads as a
+  zigzag instead of label/value pairs. Hold that alignment behind `sm:`
+  (`items-start sm:items-end`) — Industry's materials table is the worked
+  example.
 
 Opt out with `responsive="table"` in two cases, and no others. Either the
 columns _are_ the content — `SkillCompare` is a character-by-skill matrix,
