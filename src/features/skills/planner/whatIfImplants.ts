@@ -12,21 +12,16 @@
 import type { WhatIfImplantPreset, WhatIfImplantSelection } from '@/db';
 import type { AttributeName, Attributes, Implants } from '@/engine/types';
 
-/**
- * What the planner is costing against: one of the uniform presets, or the
- * user's own five per-slot bonuses.
- *
- * A preset resolves *late*, against whatever the clone is wearing right now —
- * which is what keeps "Current" honest when ESI re-reads the character's
- * implants. A custom set is the user's own five numbers, so it holds still.
- *
- * Both shapes are declared with the rest of the Skill Plan record in `@/db`
- * (the lens is saved on the plan and syncs with it) and re-exported here,
- * where the behaviour lives, so callers keep importing them from one place.
- */
-export type { WhatIfImplantPreset, WhatIfImplantSelection };
+// The two persisted shapes are declared with the rest of the Skill Plan
+// record in `@/db`, and imported from there by everything that touches them —
+// the same way `PlanBooster` is. No re-export: a second import path for one
+// type is how two modules end up disagreeing about where it lives.
+//
+// A preset resolves *late*, against whatever the clone is wearing right now,
+// which is what keeps "Current" honest when ESI re-reads the character's
+// implants. A custom set is the user's own five numbers, so it holds still.
 
-/** The one-click sets. `+N` is that bonus in every slot. */
+/** The one-click sets, in picker order (the union is `WhatIfImplantPreset`). */
 export const WHAT_IF_IMPLANT_PRESETS: readonly WhatIfImplantPreset[] = [
   'none',
   'current',
@@ -52,10 +47,15 @@ export const DEFAULT_WHAT_IF_SELECTION: WhatIfImplantSelection = {
  * overshot (`Infinity` included, which is only ever an overflowed "high");
  * a NaN — a pasted word, an implausible stored value — reads as +0, because
  * the scheduler would otherwise add it to an attribute and report NaN days.
+ *
+ * Takes `unknown`, not `number`: since the selection is persisted and synced,
+ * a stored slot can hold a string, and `Math.round('abc')` is a NaN that
+ * escapes both `Math.min` and `Math.max`. Typed at the door instead.
  */
-function clampBonus(raw: number): number {
-  if (Number.isNaN(raw)) return MIN_IMPLANT_BONUS;
-  return Math.min(MAX_IMPLANT_BONUS, Math.max(MIN_IMPLANT_BONUS, Math.round(raw)));
+function clampBonus(raw: unknown): number {
+  const value = typeof raw === 'number' ? raw : Number.NaN;
+  if (Number.isNaN(value)) return MIN_IMPLANT_BONUS;
+  return Math.min(MAX_IMPLANT_BONUS, Math.max(MIN_IMPLANT_BONUS, Math.round(value)));
 }
 
 /** Build a full five-slot set from a per-attribute read. */

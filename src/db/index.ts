@@ -45,9 +45,16 @@ export type WhatIfImplantPreset = 'none' | 'current' | '+1' | '+2' | '+3' | '+4'
  * Behaviour lives in `features/skills/planner/whatIfImplants.ts`; the shape is
  * declared here because it is persisted, like every other record shape in
  * this file.
+ *
+ * `bonuses` is typed `Implants` (a partial map) because a value read back can
+ * be sparse, but every writer emits all five slots — which is what keeps an
+ * `undefined` member, the one thing Firestore rejects, out of a pushed doc.
+ * `readonly` throughout: `setWhatIfBonus` builds a new selection rather than
+ * editing one, and a test pins that.
  */
 export type WhatIfImplantSelection =
-  { kind: 'preset'; preset: WhatIfImplantPreset } | { kind: 'custom'; bonuses: Implants };
+  | { readonly kind: 'preset'; readonly preset: WhatIfImplantPreset }
+  | { readonly kind: 'custom'; readonly bonuses: Implants };
 
 /**
  * A Skill Plan's Booster (CONTEXT.md): the cerebral accelerator the plan is

@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import type { WhatIfImplantSelection } from '@/db';
 import type { Implants } from '@/engine/types';
 import {
   DEFAULT_WHAT_IF_SELECTION,
   normalizeWhatIfSelection,
   setWhatIfBonus,
   whatIfImplants,
-  type WhatIfImplantSelection,
 } from './whatIfImplants';
 
 const preset = (p: 'none' | 'current' | '+1' | '+2' | '+3' | '+4' | '+5'): WhatIfImplantSelection =>
@@ -195,6 +195,14 @@ describe('normalizeWhatIfSelection', () => {
     expect(
       normalizeWhatIfSelection({ kind: 'custom', bonuses: { memory: 9, perception: 4 } })
     ).toEqual(custom({ intelligence: 0, memory: 5, perception: 4, willpower: 0, charisma: 0 }));
+  });
+
+  it('reads a non-numeric stored slot as +0 instead of leaking NaN', () => {
+    // A slot can hold anything once it has been through Firestore and back;
+    // Math.round('abc') is a NaN that escapes both Math.min and Math.max.
+    expect(
+      normalizeWhatIfSelection({ kind: 'custom', bonuses: { memory: 'abc', perception: 4 } })
+    ).toEqual(custom({ intelligence: 0, memory: 0, perception: 4, willpower: 0, charisma: 0 }));
   });
 
   it('falls back to the default rather than trusting a malformed stored value', () => {

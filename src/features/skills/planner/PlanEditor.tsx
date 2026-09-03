@@ -44,7 +44,12 @@ import type {
   ScheduledStep,
   TrainedSkill,
 } from '@/engine/types';
-import type { PlanBooster, SkillPlanRecord } from '@/db';
+import type {
+  PlanBooster,
+  SkillPlanRecord,
+  WhatIfImplantPreset,
+  WhatIfImplantSelection,
+} from '@/db';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import { loadCharacterSkillQueue, type CachedResult } from '../data';
@@ -91,15 +96,13 @@ import {
   MAX_IMPLANT_BONUS,
   MIN_IMPLANT_BONUS,
   WHAT_IF_IMPLANT_PRESETS,
-  type WhatIfImplantPreset,
-  type WhatIfImplantSelection,
 } from './whatIfImplants';
 import {
   boosterExpiryFromInput,
   boosterExpiryToInput,
-  normalizePlanBooster,
+  clampBoosterBonus,
+  resolvePlanBooster,
   toBooster,
-  DEFAULT_PLAN_BOOSTER,
   MAX_BOOSTER_BONUS,
 } from './planBooster';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
@@ -317,18 +320,14 @@ export function PlanEditor({
   // uniform bonus to every attribute until its expiry. Saved on the plan for
   // the same reason as the lens above.
   //
-  // The prefill is a pure derivation, not seeded state: `plan.booster`
-  // being ABSENT is what "the user has never answered this" means, so a
-  // detected accelerator fills the controls until they do, and the moment
-  // they touch anything the whole answer is written — including an unticked
-  // box, which is the legitimate "that accelerator is gone" answer and has to
-  // survive a reload rather than being re-prefilled on the next one.
-  const planBooster = useMemo<PlanBooster>(() => {
-    if (plan.booster !== undefined) return normalizePlanBooster(plan.booster);
-    return detectedAccelerator !== null
-      ? { enabled: true, bonus: detectedAccelerator, expiresAt: null }
-      : DEFAULT_PLAN_BOOSTER;
-  }, [plan.booster, detectedAccelerator]);
+  // A pure derivation, not seeded state — the prefill rule and its "an
+  // absent field is what 'unanswered' means" gate live in planBooster.ts,
+  // where they are unit-tested; the moment the user touches any control the
+  // whole answer is written back through `patchBooster`.
+  const planBooster = useMemo<PlanBooster>(
+    () => resolvePlanBooster(plan.booster, detectedAccelerator),
+    [plan.booster, detectedAccelerator]
+  );
   const patchBooster = (patch: Partial<PlanBooster>): void =>
     onUpdate({ booster: { ...planBooster, ...patch } });
 
@@ -336,21 +335,44 @@ export function PlanEditor({
   const activeBoosters = useMemo<Booster[]>(() => (booster ? [booster] : []), [booster]);
 
   // The expiry control edits text; the plan stores the instant that text
-  // names. A half-typed value names no instant, so it has nowhere to live on
-  // the plan — it is held here until it is one (or until the field is
-  // cleared, which IS an answer: "no expiry"). Without this, every keystroke
-  // that left the value incomplete would round-trip through the plan as
-  // `null` and wipe the field out from under the typing.
-  const [expiryDraft, setExpiryDraft] = useState<string | null>(null);
-  const boosterExpiresAtInput = expiryDraft ?? boosterExpiryToInput(planBooster.expiresAt);
+  // names. A value that names no instant — half-typed, or emptied — has
+  // nowhere to live on the plan, so it is held here until the field is left.
+  //
+  // Committing an empty value on `change` is what makes this necessary, and
+  // it is a data-loss path, not a cosmetic one: a native `datetime-local`
+  // reports `value === ''` for ANY incomplete state, including the moment a
+  // segment of an already-complete value is cleared to retype it. Writing
+  // `null` there would erase a saved expiry mid-edit, re-cost the plan, and
+  // push the erasure to the user's other devices two seconds later. So an
+  // empty field is committed on blur — where it means "no expiry", the
+  // legitimate answer — and an unfinished one is simply dropped, leaving the
+  // stored value standing.
+  //
+  // Keyed, so a draft can only ever mask the value it was typed against:
+  // switching plans, or a sync pulling a new expiry in from another device
+  // mid-typing, both discard it.
+  const [expiryDraft, setExpiryDraft] = useState<{ key: string; text: string } | null>(null);
+  const expiryDraftKey = `${plan.id}:${planBooster.expiresAt ?? ''}`;
+  const boosterExpiresAtInput =
+    (expiryDraft?.key === expiryDraftKey ? expiryDraft.text : null) ??
+    boosterExpiryToInput(planBooster.expiresAt);
   const handleBoosterExpiryChange = (raw: string): void => {
     const expiresAt = boosterExpiryFromInput(raw);
-    if (expiresAt === null && raw !== '') {
-      setExpiryDraft(raw);
+    if (expiresAt === null) {
+      setExpiryDraft({ key: expiryDraftKey, text: raw });
       return;
     }
     setExpiryDraft(null);
     patchBooster({ expiresAt });
+  };
+  const handleBoosterExpiryBlur = (): void => {
+    if (expiryDraft === null) return;
+    setExpiryDraft(null);
+    // Only a deliberately emptied field is an answer. Anything else is an
+    // edit the user walked away from, and the stored expiry survives it.
+    if (expiryDraft.text === '' && planBooster.expiresAt !== null) {
+      patchBooster({ expiresAt: null });
+    }
   };
 
   // Display-only "expired" hint: reads the wall clock, which is unavoidably
@@ -406,10 +428,6 @@ export function PlanEditor({
     setPrevPlanId(plan.id);
     setPrevEntries(plan.entries);
     setPrevMarkers(plan.markers);
-    // A half-typed expiry describes the plan that was open when it was
-    // typed; carrying it into the next one would show that plan an expiry
-    // it does not have.
-    if (prevPlanId !== plan.id) setExpiryDraft(null);
     setOptimizeResult(null);
     setMarkersResult(null);
     setOptimizeVerdict(null);
@@ -1057,12 +1075,19 @@ export function PlanEditor({
                   size="md"
                   type="number"
                   min={1}
-                  // Accelerator tiers run past the +9 this once allowed: the
-                  // reported case was a +12, and a detected bonus the field
-                  // cannot hold would be prefilled into an invalid input.
+                  // Generous by design (planBooster.ts): a detected bonus
+                  // the field could not hold would be prefilled into an
+                  // invalid input.
                   max={MAX_BOOSTER_BONUS}
                   value={planBooster.bonus}
-                  onChange={(e) => patchBooster({ bonus: Number(e.target.value) || 0 })}
+                  // Clamped at the write, like Remaps Available above and
+                  // the industry panel's runs/ME/TE: storing a 45 the plan
+                  // is not costed under would make the record disagree with
+                  // every number on the page, and would resurrect the 45 the
+                  // day the cap moves.
+                  onChange={(e) =>
+                    patchBooster({ bonus: clampBoosterBonus(Number(e.target.value)) })
+                  }
                   className="field-no-spinner w-16 text-center"
                 />
               </label>
@@ -1079,6 +1104,7 @@ export function PlanEditor({
                   // device in another timezone (planBooster.ts).
                   value={boosterExpiresAtInput}
                   onChange={(e) => handleBoosterExpiryChange(e.target.value)}
+                  onBlur={handleBoosterExpiryBlur}
                   className="min-w-0 flex-1"
                 />
               </label>
@@ -1175,7 +1201,7 @@ export function PlanEditor({
           // small lie. The tools pane keeps the "Expired" hint for that case.
           //
           // Read off `booster.bonus` — the map computeSchedule costed with —
-          // rather than the `planBooster.bonus` input beside it. They agree while
+          // rather than the bonus the input beside it edits. They agree while
           // the input writes one figure into all five attributes, but a
           // per-attribute Booster would desync them, and a chip stating a
           // bonus the arithmetic did not apply is the very thing it exists

@@ -116,11 +116,15 @@ function renderEditor(
         attributesResult={ATTRIBUTES_RESULT}
         remapInfo={null}
         listPane={<div data-testid="plan-list-pane" />}
+        {...rest}
+        // After the spread, not before: the write-back is this harness's
+        // whole point, and an `overrides.onUpdate` would otherwise turn it
+        // off silently. Tests observe the patches through the `onUpdate` spy
+        // this closes over instead.
         onUpdate={(patch) => {
           onUpdate(patch);
           setPlan((current) => ({ ...current, ...patch, updatedAt: current.updatedAt + 1 }));
         }}
-        {...rest}
       />
     );
   }
@@ -129,11 +133,6 @@ function renderEditor(
   return { onUpdate };
 }
 
-/**
- * jsdom's default `window.matchMedia` (vitest.setup.ts) never matches, so
- * every test here runs below `lg` unless it opts in — which is where the
- * tools pane is a collapsed disclosure.
- */
 /** The five per-slot What-If inputs, in INT/MEM/PER/WIL/CHA order. */
 function bonusInputValues(): string[] {
   return ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma'].map(
@@ -141,6 +140,14 @@ function bonusInputValues(): string[] {
   );
 }
 
+/** A clone wearing an unmatched set — the case a uniform "+N" cannot say. */
+const FITTED: Implants = { perception: 4, memory: 3 };
+
+/**
+ * jsdom's default `window.matchMedia` (vitest.setup.ts) never matches, so
+ * every test here runs below `lg` unless it opts in — which is where the
+ * tools pane is a collapsed disclosure.
+ */
 async function openTools(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /plan tools/i }));
 }
@@ -540,15 +547,9 @@ describe('PlanEditor grouping toggle (#115)', () => {
 });
 
 describe('PlanEditor what-if implants', () => {
-  // A clone wearing an unmatched set — the case a uniform "+N" cannot say.
-  const FITTED: Implants = { perception: 4, memory: 3 };
-
   function renderWithImplants() {
     renderEditor(vi.fn(), { implants: FITTED });
   }
-
-  /** The five per-slot inputs, in INT/MEM/PER/WIL/CHA order. */
-  const bonusInputs = bonusInputValues;
 
   it("opens on the clone's own per-slot implants, unmatched set and all", async () => {
     const user = userEvent.setup();
@@ -556,7 +557,7 @@ describe('PlanEditor what-if implants', () => {
     await openTools(user);
 
     expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('current');
-    expect(bonusInputs()).toEqual(['0', '3', '4', '0', '0']);
+    expect(bonusInputValues()).toEqual(['0', '3', '4', '0', '0']);
   });
 
   it('suppresses the platform spinner, which would break the row on hover', async () => {
@@ -585,7 +586,7 @@ describe('PlanEditor what-if implants', () => {
 
     await user.selectOptions(screen.getByLabelText('What-if implants'), '+4');
 
-    expect(bonusInputs()).toEqual(['4', '4', '4', '4', '4']);
+    expect(bonusInputValues()).toEqual(['4', '4', '4', '4', '4']);
     // "Custom" is not offered while a preset is in force — you become custom
     // by editing a value, not by picking it.
     expect(screen.queryByRole('option', { name: 'Custom' })).toBeNull();
@@ -601,7 +602,7 @@ describe('PlanEditor what-if implants', () => {
     await user.clear(perception);
     await user.type(perception, '5');
 
-    expect(bonusInputs()).toEqual(['4', '4', '5', '4', '4']);
+    expect(bonusInputValues()).toEqual(['4', '4', '5', '4', '4']);
     expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('custom');
   });
 
@@ -630,7 +631,7 @@ describe('PlanEditor what-if implants', () => {
 
     await user.selectOptions(screen.getByLabelText('What-if implants'), 'current');
 
-    expect(bonusInputs()).toEqual(['0', '3', '4', '0', '0']);
+    expect(bonusInputValues()).toEqual(['0', '3', '4', '0', '0']);
   });
 });
 
@@ -706,8 +707,6 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
  * training times than the ones its owner left it showing.
  */
 describe('PlanEditor persists the lenses the plan is costed under', () => {
-  const FITTED: Implants = { perception: 4, memory: 3 };
-
   it('saves a What-If Implants preset onto the plan', async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { implants: FITTED });
@@ -790,6 +789,78 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(true);
     expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('6');
     expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('2099-06-02T13:45');
+  });
+
+  it('does not erase a saved expiry when the control reports an incomplete value', async () => {
+    // The data-loss path: a native datetime-local reports '' for ANY
+    // incomplete state, including a segment cleared to be retyped. Writing
+    // null there would erase the stored expiry, re-cost the plan, and sync
+    // the erasure away.
+    const user = userEvent.setup();
+    const saved = new Date(2099, 0, 1, 0, 0).getTime();
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: { ...PLAN, booster: { enabled: true, bonus: 3, expiresAt: saved } },
+    });
+    await openTools(user);
+
+    const expires = screen.getByLabelText<HTMLInputElement>('Expires');
+    await user.clear(expires);
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(expires.value).toBe('');
+  });
+
+  it('commits an emptied expiry on blur — clearing it IS an answer', async () => {
+    const user = userEvent.setup();
+    const saved = new Date(2099, 0, 1, 0, 0).getTime();
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: { ...PLAN, booster: { enabled: true, bonus: 3, expiresAt: saved } },
+    });
+    await openTools(user);
+
+    await user.clear(screen.getByLabelText('Expires'));
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      booster: { enabled: true, bonus: 3, expiresAt: null },
+    });
+  });
+
+  it('replaces a saved expiry in one write, never through a null in between', async () => {
+    const user = userEvent.setup();
+    const saved = new Date(2099, 0, 1, 0, 0).getTime();
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: { ...PLAN, booster: { enabled: true, bonus: 3, expiresAt: saved } },
+    });
+    await openTools(user);
+
+    const expires = screen.getByLabelText<HTMLInputElement>('Expires');
+    await user.clear(expires);
+    await user.type(expires, '2100-06-02T13:45');
+    await user.tab();
+
+    // One write, carrying the new instant. The incomplete states the control
+    // reports along the way must not each land on the plan.
+    expect(onUpdate.mock.calls).toEqual([
+      [{ booster: { enabled: true, bonus: 3, expiresAt: new Date(2100, 5, 2, 13, 45).getTime() } }],
+    ]);
+  });
+
+  it('clamps the bonus where it is written, not only where it is read', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: { ...PLAN, booster: { enabled: true, bonus: 3, expiresAt: null } },
+    });
+    await openTools(user);
+
+    const bonus = screen.getByLabelText('Bonus');
+    await user.clear(bonus);
+    await user.type(bonus, '45');
+
+    // Never a stored 45 the plan is not costed under.
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      booster: { enabled: true, bonus: 30, expiresAt: null },
+    });
   });
 
   it('does not re-prefill a detected accelerator over a saved "no booster" answer', async () => {

@@ -3,9 +3,11 @@ import type { PlanBooster } from '@/db';
 import {
   DEFAULT_PLAN_BOOSTER,
   MAX_BOOSTER_BONUS,
+  clampBoosterBonus,
   boosterExpiryFromInput,
   boosterExpiryToInput,
   normalizePlanBooster,
+  resolvePlanBooster,
   toBooster,
 } from './planBooster';
 
@@ -43,6 +45,15 @@ describe('normalizePlanBooster', () => {
   it('reads a NaN bonus as +0 rather than letting it reach the scheduler', () => {
     expect(normalizePlanBooster({ enabled: false, bonus: Number.NaN, expiresAt: null }).bonus).toBe(
       0
+    );
+  });
+
+  it('drops an expiry outside the range a Date can name', () => {
+    // `Number.isFinite` is not enough: JS instants stop at +/-8.64e15, and
+    // anything past that makes an Invalid Date the UI would still render.
+    expect(normalizePlanBooster({ enabled: true, bonus: 3, expiresAt: 1e17 }).expiresAt).toBe(null);
+    expect(normalizePlanBooster({ enabled: true, bonus: 3, expiresAt: 8.64e15 }).expiresAt).toBe(
+      8.64e15
     );
   });
 
@@ -101,5 +112,48 @@ describe('booster expiry <-> datetime-local input', () => {
   it('reads a half-typed or nonsense value as no expiry', () => {
     expect(boosterExpiryFromInput('2026-09')).toBe(null);
     expect(boosterExpiryFromInput('not a date')).toBe(null);
+  });
+});
+
+describe('resolvePlanBooster', () => {
+  it('is what the plan stored, whenever it stored one', () => {
+    const stored = booster({ enabled: true, bonus: 4, expiresAt: 1_700_000_000_000 });
+    expect(resolvePlanBooster(stored, 12)).toEqual(stored);
+  });
+
+  it('prefills a detected accelerator while the plan has stored no answer', () => {
+    // The bonus is readable from the sheet; its expiry is not, so the control
+    // opens on "nothing is applied yet" and says so.
+    expect(resolvePlanBooster(undefined, 12)).toEqual({
+      enabled: true,
+      bonus: 12,
+      expiresAt: null,
+    });
+  });
+
+  it('does not overrule a stored "no booster" — unticking the box is an answer', () => {
+    const answered = booster({ enabled: false, bonus: 12, expiresAt: null });
+    expect(resolvePlanBooster(answered, 12)).toEqual(answered);
+  });
+
+  it('is the default when nothing is stored and no accelerator is detected', () => {
+    expect(resolvePlanBooster(undefined, null)).toEqual(DEFAULT_PLAN_BOOSTER);
+  });
+
+  it('normalizes a stored answer rather than trusting it', () => {
+    expect(resolvePlanBooster({ enabled: true, bonus: 999, expiresAt: 'soon' }, null)).toEqual({
+      enabled: true,
+      bonus: MAX_BOOSTER_BONUS,
+      expiresAt: null,
+    });
+  });
+});
+
+describe('clampBoosterBonus', () => {
+  it('clamps what the input writes, so the stored plan says what it is costed under', () => {
+    expect(clampBoosterBonus(45)).toBe(MAX_BOOSTER_BONUS);
+    expect(clampBoosterBonus(-3)).toBe(0);
+    expect(clampBoosterBonus(2.6)).toBe(3);
+    expect(clampBoosterBonus(Number.NaN)).toBe(0);
   });
 });

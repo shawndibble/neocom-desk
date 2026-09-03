@@ -555,6 +555,9 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     await triggerSync(1);
     const remote = remoteStore.get(path)?.get(record.id);
     expect(remote).toBeDefined();
+    // Asserted key by key, and each wrapped back into a one-key object, so a
+    // missing field fails naming itself rather than as one line of a
+    // whole-document diff.
     for (const [key, value] of Object.entries(record)) {
       expect({ [key]: remote?.[key] }).toEqual({ [key]: value });
     }

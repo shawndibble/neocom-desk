@@ -28,7 +28,13 @@ import type { Attributes, Booster } from '@/engine/types';
  * about what CCP ships.
  */
 export const MAX_BOOSTER_BONUS = 30;
-export const MIN_BOOSTER_BONUS = 0;
+/**
+ * Not the input's floor — that is 1, because a +0 accelerator is not a thing
+ * anyone means to enter. This is the floor a *stored or cleared* value lands
+ * on, which is why it is private: an emptied field reports `0`, and so can a
+ * row written by an older build.
+ */
+const MIN_BOOSTER_BONUS = 0;
 
 /**
  * What a plan with no stored Booster is costed under: none at all. `bonus`
@@ -39,16 +45,33 @@ export const MIN_BOOSTER_BONUS = 0;
 export const DEFAULT_PLAN_BOOSTER: PlanBooster = { enabled: false, bonus: 3, expiresAt: null };
 
 /** The shape a `datetime-local` control emits: `YYYY-MM-DDTHH:mm`. */
-const DATETIME_LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+const DATETIME_LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
-function clampBonus(raw: unknown): number {
+/**
+ * A whole bonus inside the accelerator range.
+ *
+ * Exported because the input writes through it too: clamping only on the read
+ * side would store a `45` the plan is not actually costed under — and would
+ * resurrect it the day the cap moves. Same rule as the Remaps Available field
+ * beside it, and as the industry panel's runs/ME/TE.
+ */
+export function clampBoosterBonus(raw: unknown): number {
   const value = typeof raw === 'number' ? raw : Number.NaN;
   if (Number.isNaN(value)) return MIN_BOOSTER_BONUS;
   return Math.min(MAX_BOOSTER_BONUS, Math.max(MIN_BOOSTER_BONUS, Math.round(value)));
 }
 
+/**
+ * An epoch-ms instant a `Date` can actually name.
+ *
+ * `Number.isFinite` is not enough: JS instants stop at +/-8.64e15, and a
+ * larger number — which a doc from another device can carry — makes an
+ * Invalid Date that the scheduler ignores while the header chip still claims
+ * a live Booster. Rejecting it here keeps every reader agreeing.
+ */
 function usableInstant(raw: unknown): number | null {
-  return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
+  return Number.isNaN(new Date(raw).getTime()) ? null : raw;
 }
 
 /**
@@ -65,9 +88,34 @@ export function normalizePlanBooster(raw: unknown): PlanBooster {
   if (typeof record.enabled !== 'boolean') return DEFAULT_PLAN_BOOSTER;
   return {
     enabled: record.enabled,
-    bonus: clampBonus(record.bonus),
+    bonus: clampBoosterBonus(record.bonus),
     expiresAt: usableInstant(record.expiresAt),
   };
+}
+
+/**
+ * The Booster a plan is costed under: the stored answer, or — while it has
+ * none — a cerebral accelerator detected in the character's ESI sheet
+ * (`engine/attributeBaseline.ts`), prefilled into the control the user
+ * already knows.
+ *
+ * The plan storing NOTHING is what "the user has not answered" means, and it
+ * is the whole gate: an answer that happens to read like a default is still
+ * an answer. Unticking the box — "that accelerator is gone" — stores
+ * `enabled: false`, and this must not prefill over it on the next visit.
+ *
+ * The expiry is left null on the prefill on purpose: no ESI endpoint exposes
+ * a running booster's life, only the arithmetic that recovers its size, and
+ * a blank expiry applies nothing at all (see `toBooster`).
+ */
+export function resolvePlanBooster(
+  stored: unknown | undefined,
+  detectedAccelerator: number | null
+): PlanBooster {
+  if (stored !== undefined) return normalizePlanBooster(stored);
+  return detectedAccelerator !== null
+    ? { enabled: true, bonus: clampBoosterBonus(detectedAccelerator), expiresAt: null }
+    : DEFAULT_PLAN_BOOSTER;
 }
 
 /**
