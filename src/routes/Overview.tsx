@@ -19,6 +19,7 @@ import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
+import { NotificationFeedPanel } from '@/features/notifications/NotificationFeedPanel';
 import { formatIsk } from '@/lib/isk';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { selectActiveQueueEntry } from './overviewQueue';
@@ -143,6 +144,13 @@ export function Overview() {
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : (
         <>
+          {/*
+            Above the wallet: the feed is what the user came to check after
+            being away, and on a platform that cannot raise an OS
+            notification it is the only place these ever appear.
+          */}
+          <NotificationFeedPanel />
+
           <Panel
             title={t('overview.wallet')}
             actions={walletResult ? <DataAgeBadge date={walletResult.fetchedAt} /> : undefined}

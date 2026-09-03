@@ -39,6 +39,10 @@ import {
   useNotificationPreferences,
   characterEventPrefs,
   withMasterEnabled,
+  withBrowserEnabled,
+  withFeedEnabled,
+  isBrowserChannelEnabled,
+  isFeedChannelEnabled,
   withEventToggled,
   withAllEventsToggledForCharacter,
 } from './preferences';
@@ -166,6 +170,48 @@ export function NotificationsPanel() {
           />
           {t('settings.notifications.masterSwitchLabel')}
         </label>
+
+        {/*
+          The two delivery channels, nested under the master switch and
+          disabled with it. They are independent rather than a fallback
+          chain: browser notifications need a permission grant and an OS that
+          will raise one (never iOS while the app is closed, ADR 0007), while
+          the Overview feed works everywhere and is the only channel some
+          devices will ever see — so switching one off must not touch the
+          other.
+        */}
+        <fieldset disabled={!prefsValue.masterEnabled} className="ml-6 space-y-2">
+          <label className="flex items-center gap-2 text-xs text-text">
+            <input
+              type="checkbox"
+              checked={isBrowserChannelEnabled(prefsValue)}
+              onChange={() =>
+                void setPrefsValue(
+                  withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
+                )
+              }
+              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
+            />
+            {t('settings.notifications.browserChannelLabel')}
+          </label>
+          <p className="ml-6 text-[0.6875rem] text-text-dim">
+            {t('settings.notifications.browserChannelHint')}
+          </p>
+          <label className="flex items-center gap-2 text-xs text-text">
+            <input
+              type="checkbox"
+              checked={isFeedChannelEnabled(prefsValue)}
+              onChange={() =>
+                void setPrefsValue(withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue)))
+              }
+              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
+            />
+            {t('settings.notifications.feedChannelLabel')}
+          </label>
+          <p className="ml-6 text-[0.6875rem] text-text-dim">
+            {t('settings.notifications.feedChannelHint')}
+          </p>
+        </fieldset>
 
         {characterList.length === 0 ? (
           <EmptyState title={t('settings.notifications.emptyTitle')} />

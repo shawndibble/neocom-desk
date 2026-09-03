@@ -76,7 +76,13 @@ import {
   type MarketOrderNotificationFire,
 } from '@/engine/notificationDiffs';
 import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
-import { useNotificationPreferences, characterEventPrefs } from './preferences';
+import {
+  useNotificationPreferences,
+  characterEventPrefs,
+  isBrowserChannelEnabled,
+  isFeedChannelEnabled,
+} from './preferences';
+import { recordFeedEntry } from './feed';
 import { isEventEnabled, type EventEnabledMap } from './eventSelection';
 import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
@@ -214,6 +220,9 @@ export interface PollDependencies {
   loadWalletJournal: (characterId: number) => Promise<WalletJournalEntry[] | null>;
   loadMarketOrders: (characterId: number) => Promise<MarketOrderEntrySnapshot[] | null>;
   masterEnabled: () => Promise<boolean>;
+  /** The two delivery channels, independently toggleable (preferences.ts). */
+  browserChannelEnabled: () => Promise<boolean>;
+  feedChannelEnabled: () => Promise<boolean>;
   eventPrefsFor: (characterId: number) => Promise<EventEnabledMap>;
   permission: () => NotificationPermission | 'unsupported' | 'default' | 'denied';
   prevState: () => Promise<SkillQueuePollerState>;
@@ -233,6 +242,7 @@ export interface PollDependencies {
   prevMarketOrderState: () => Promise<MarketOrderPollerState>;
   saveMarketOrderState: (state: MarketOrderPollerState) => Promise<void>;
   notify: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
+  recordToFeed: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
 }
 
 /** Which of a set of candidate events this character is eligible for right now: has the scope, and the event isn't toggled off. */
@@ -271,7 +281,19 @@ interface CharacterUpdate {
  */
 export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
   if (!(await deps.masterEnabled())) return;
-  if (deps.permission() !== 'granted') return;
+
+  // Each channel decides for itself. The browser channel additionally needs a
+  // live permission grant; the feed needs nothing, which is the point of it —
+  // a device that can never raise an OS notification (iOS, a denied grant)
+  // still accumulates everything the poll finds. AC5 survives as "no ESI
+  // calls when *neither* channel could show anything", not "when the browser
+  // one can't".
+  const [browserAllowed, feedEnabled] = await Promise.all([
+    deps.browserChannelEnabled(),
+    deps.feedChannelEnabled(),
+  ]);
+  const browserEnabled = browserAllowed && deps.permission() === 'granted';
+  if (!browserEnabled && !feedEnabled) return;
 
   const characters = await deps.characters();
   if (characters.length === 0) return;
@@ -535,7 +557,10 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
     const character = charactersById.get(update.characterId);
     if (!character) continue;
     for (const fire of update.fires) {
-      await deps.notify(fire, character);
+      // Feed first: it is the channel that cannot fail for platform reasons,
+      // so a fire is recorded before anything that might silently no-op.
+      if (feedEnabled) await deps.recordToFeed(fire, character);
+      if (browserEnabled) await deps.notify(fire, character);
     }
   }
 }
@@ -652,6 +677,35 @@ async function sendBrowserNotification(
   await displayPageNotification(livePageDisplayEnv(), title, body);
 }
 
+/**
+ * Renders the same copy the browser notification carries and files it in the
+ * Notification Feed. `notificationText` is called separately from
+ * `sendBrowserNotification`'s call rather than threaded through both: its
+ * ESI lookups (`loadUniverseType`, `loadPlanetName`) read the Dexie cache, so
+ * the second render costs a cache hit, and keeping `notify`'s signature
+ * untouched is what lets `backgroundPoller.ts` override it without knowing
+ * the feed exists (the Service Worker's poll files to the feed too).
+ */
+async function recordFeedNotification(
+  fire: AnyNotificationFire,
+  character: CharacterRef
+): Promise<void> {
+  try {
+    const { title, body } = await notificationText(fire, character);
+    await recordFeedEntry({
+      characterId: character.characterId,
+      eventId: fire.eventId,
+      title,
+      body,
+      firedAt: Date.now(),
+    });
+  } catch {
+    // Same fire-and-forget contract as sendBrowserNotification: pollerState
+    // is already persisted, so a failed write must not abort the remaining
+    // fires of this poll.
+  }
+}
+
 /** Hydrates a `createLocalSetting` store (a no-op once already hydrated) and returns its current value. */
 async function hydratedValue<T>(store: LocalSettingStore<T>): Promise<T> {
   await store.getState().hydrate();
@@ -741,6 +795,10 @@ export function liveDependencies(): PollDependencies {
       return deriveMarketOrderEntries(openResult.cached.data, historyResult.cached.data);
     },
     masterEnabled: async () => (await hydratedValue(useNotificationPreferences)).masterEnabled,
+    browserChannelEnabled: async () =>
+      isBrowserChannelEnabled(await hydratedValue(useNotificationPreferences)),
+    feedChannelEnabled: async () =>
+      isFeedChannelEnabled(await hydratedValue(useNotificationPreferences)),
     eventPrefsFor: async (characterId) =>
       characterEventPrefs(await hydratedValue(useNotificationPreferences), characterId),
     permission: () => readNotificationPermission(),
@@ -761,5 +819,6 @@ export function liveDependencies(): PollDependencies {
     prevMarketOrderState: () => hydratedValue(useMarketOrderPollerState),
     saveMarketOrderState: (state) => useMarketOrderPollerState.getState().setValue(state),
     notify: sendBrowserNotification,
+    recordToFeed: recordFeedNotification,
   };
 }

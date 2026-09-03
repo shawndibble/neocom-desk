@@ -14,6 +14,20 @@ export const NOTIFICATION_PREFS_SETTING_KEY = 'notificationPreferences';
 
 export interface NotificationPreferencesValue {
   masterEnabled: boolean;
+  /**
+   * Delivery channels, both gated by `masterEnabled` above and by the
+   * per-Character event toggles below. Absent means enabled — the same
+   * "absence is on" idiom `eventSelection.ts` uses, which is what lets
+   * preferences stored before channels existed keep every per-Character
+   * toggle instead of being rejected by `parse` and reset to defaults.
+   *
+   * They are genuinely independent, not a fallback chain: the browser
+   * channel needs a permission grant and a platform that can raise a
+   * notification (never iOS while closed), while the feed works everywhere
+   * and is the only channel some devices will ever see.
+   */
+  browserEnabled?: boolean;
+  feedEnabled?: boolean;
   perCharacter: Record<number, EventEnabledMap>;
 }
 
@@ -34,10 +48,19 @@ function isPerCharacterMap(raw: unknown): raw is Record<number, EventEnabledMap>
   );
 }
 
+function isOptionalBoolean(raw: unknown): boolean {
+  return raw === undefined || typeof raw === 'boolean';
+}
+
 function isNotificationPreferencesValue(raw: unknown): raw is NotificationPreferencesValue {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  return typeof r.masterEnabled === 'boolean' && isPerCharacterMap(r.perCharacter);
+  return (
+    typeof r.masterEnabled === 'boolean' &&
+    isOptionalBoolean(r.browserEnabled) &&
+    isOptionalBoolean(r.feedEnabled) &&
+    isPerCharacterMap(r.perCharacter)
+  );
 }
 
 export const useNotificationPreferences = createLocalSetting<NotificationPreferencesValue>({
@@ -51,6 +74,30 @@ export function characterEventPrefs(
   characterId: number
 ): EventEnabledMap {
   return value.perCharacter[characterId] ?? {};
+}
+
+/** Browser (OS) notifications on this device. Absent means on. */
+export function isBrowserChannelEnabled(value: NotificationPreferencesValue): boolean {
+  return value.browserEnabled ?? true;
+}
+
+/** The Overview's Notification Feed. Absent means on. */
+export function isFeedChannelEnabled(value: NotificationPreferencesValue): boolean {
+  return value.feedEnabled ?? true;
+}
+
+export function withBrowserEnabled(
+  value: NotificationPreferencesValue,
+  browserEnabled: boolean
+): NotificationPreferencesValue {
+  return { ...value, browserEnabled };
+}
+
+export function withFeedEnabled(
+  value: NotificationPreferencesValue,
+  feedEnabled: boolean
+): NotificationPreferencesValue {
+  return { ...value, feedEnabled };
 }
 
 export function withMasterEnabled(

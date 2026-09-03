@@ -124,6 +124,8 @@ function baseDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
     loadWalletJournal: async () => [],
     loadMarketOrders: async () => [],
     masterEnabled: async () => true,
+    browserChannelEnabled: async () => true,
+    feedChannelEnabled: async () => false,
     eventPrefsFor: async () => ({}),
     permission: () => 'granted',
     prevState: async () => saved,
@@ -159,6 +161,7 @@ function baseDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
       savedMarketOrders = state;
     },
     notify: vi.fn(async () => {}),
+    recordToFeed: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -237,7 +240,7 @@ describe('runForegroundPoll', () => {
     expect(characters).not.toHaveBeenCalled();
   });
 
-  it('does nothing without granted browser permission', async () => {
+  it('does nothing when neither channel can show anything', async () => {
     const characters = vi.fn(async () => [CHAR]);
     const deps = baseDeps({ permission: () => 'default', characters });
     await runForegroundPoll(deps);
@@ -870,5 +873,67 @@ describe('runForegroundPoll', () => {
     expect(notify).toHaveBeenCalledTimes(1);
     const [fire] = notify.mock.calls[0];
     expect(fire.eventId).toBe('marketOrderFilled');
+  });
+});
+
+describe('runForegroundPoll delivery channels', () => {
+  /** A poll whose skill queue went empty between two polls: fires characterNotTraining once. */
+  function firingDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
+    return baseDeps({
+      now: () => 3000,
+      prevState: async () => ({
+        [CHAR.characterId]: {
+          entries: [{ skillId: 100, finishedLevel: 1, queuePosition: 0, finishMs: 2000 }],
+          nowMs: 1000,
+        },
+      }),
+      loadSkillQueue: async () => [],
+      ...overrides,
+    });
+  }
+
+  it('records to the feed and shows a browser notification when both channels are on', async () => {
+    const deps = firingDeps({ feedChannelEnabled: async () => true });
+    await runForegroundPoll(deps);
+    expect(deps.recordToFeed).toHaveBeenCalledTimes(1);
+    expect(deps.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('still fills the feed when browser permission was never granted (the iOS case)', async () => {
+    const deps = firingDeps({
+      feedChannelEnabled: async () => true,
+      permission: () => 'denied',
+    });
+    await runForegroundPoll(deps);
+    expect(deps.recordToFeed).toHaveBeenCalledTimes(1);
+    expect(deps.notify).not.toHaveBeenCalled();
+  });
+
+  it('still fills the feed when the browser channel is switched off in settings', async () => {
+    const deps = firingDeps({
+      feedChannelEnabled: async () => true,
+      browserChannelEnabled: async () => false,
+    });
+    await runForegroundPoll(deps);
+    expect(deps.recordToFeed).toHaveBeenCalledTimes(1);
+    expect(deps.notify).not.toHaveBeenCalled();
+  });
+
+  it('notifies without recording when only the browser channel is on', async () => {
+    const deps = firingDeps({ feedChannelEnabled: async () => false });
+    await runForegroundPoll(deps);
+    expect(deps.recordToFeed).not.toHaveBeenCalled();
+    expect(deps.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes no ESI calls when both channels are off', async () => {
+    const characters = vi.fn(async () => [CHAR]);
+    const deps = firingDeps({
+      characters,
+      browserChannelEnabled: async () => false,
+      feedChannelEnabled: async () => false,
+    });
+    await runForegroundPoll(deps);
+    expect(characters).not.toHaveBeenCalled();
   });
 });

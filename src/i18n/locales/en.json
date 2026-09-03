@@ -486,7 +486,12 @@
     "reauthAction": "Log in again with EVE Online",
     "queueReauthTitle": "Log in again to see the training queue",
     "queueReauthHint": "Log in again to fetch this character's in-game skill queue.",
-    "queueReauthAction": "Log in again with EVE Online"
+    "queueReauthAction": "Log in again with EVE Online",
+    "notifications": "Notifications",
+    "notificationsEmpty": "No notifications yet",
+    "notificationsEmptyHint": "Events you have enabled will appear here while the app is open.",
+    "notificationsDismissAll": "Dismiss all",
+    "notificationsDismiss": "Dismiss {{title}}"
   },
   "common": {
     "close": "Close",
@@ -1102,7 +1107,7 @@
     "fontScaleExtraLarge": "Extra large",
     "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Choose what you'd be notified about, per character. Stays on this device. No notifications are sent yet — this just sets your preferences for when that ships.",
+      "hint": "Choose how you'd like to be told, and what about, per character. Stays on this device.",
       "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
       "enableHint": "This device hasn't granted notification permission yet.",
       "enableButton": "Turn on browser notifications",
@@ -1123,7 +1128,11 @@
         "calendarEventStarting": "Calendar Event Starting",
         "contractAccepted": "Contract Accepted",
         "walletBalanceChanged": "Wallet Balance Changed"
-      }
+      },
+      "browserChannelLabel": "Browser notifications",
+      "browserChannelHint": "Pop-ups from your operating system. Needs permission, and only appears while the app is open on iPhone and iPad.",
+      "feedChannelLabel": "Overview notifications",
+      "feedChannelHint": "A dismissible list on the Overview page. Works on every device."
     }
   },
   "shortcuts": {
