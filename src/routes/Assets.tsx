@@ -1409,7 +1409,7 @@ export function Assets() {
                       value={stationSortField}
                       onValueChange={(value) => void setStationSortField(value as StationSortField)}
                     >
-                      <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-32">
+                      <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-36">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
