@@ -16,6 +16,7 @@
 
 import {
   ArrowClockwise,
+  ArrowCounterClockwise,
   ArrowDown,
   ArrowUp,
   ArrowsDownUp,
@@ -89,6 +90,8 @@ export const Ascending = withWeight(ArrowUp);
 export const Descending = withWeight(ArrowDown);
 /** Re-fetch from ESI. */
 export const Refresh = withWeight(ArrowClockwise);
+/** Puts a field back to the value it would have had if nobody had touched it. Deliberately not `Refresh`, which fetches new data — these sit two controls apart on the Industry panel. */
+export const Revert = withWeight(ArrowCounterClockwise);
 /** Download the current view as CSV. */
 export const Download = withWeight(DownloadSimple);
 /** Search / filter. */
