@@ -27,6 +27,17 @@ describe('CORP_SCOPES_FOR_CAPABILITY', () => {
    * group, so a capability needing something the group does not carry would sit
    * at `roles-without-grant` forever, one click away from nothing.
    */
+  it('is satisfied in full by granting the corp group, for every set of roles', () => {
+    // The Grant button asks for the whole group, so every capability's needs
+    // must be inside it — the round trip has to end at `ready`.
+    for (const roles of [['Director'], ['Accountant'], ['Station_Manager'], ['Factory_Manager']]) {
+      expect(
+        missingCorpScopes(corpCapabilities(roles), [...scopesForGroup('corp')]),
+        roles[0]
+      ).toEqual([]);
+    }
+  });
+
   it('names only scopes the corp group actually requests', () => {
     const group = new Set<string>(scopesForGroup('corp'));
     for (const capability of CORP_CAPABILITIES) {
@@ -58,7 +69,9 @@ describe('the required scope set', () => {
   it('unions without duplicating when several capabilities are held', () => {
     const scopes = requiredFor(['Director']);
     expect(new Set(scopes).size).toBe(scopes.length);
-    expect(scopes).toHaveLength(CORP_CAPABILITIES.length);
+    // Not one per capability: a capability may need more than one scope, and
+    // two do (corpScopes.ts).
+    expect(scopes.length).toBeGreaterThanOrEqual(CORP_CAPABILITIES.length);
   });
 });
 
@@ -67,6 +80,19 @@ describe('missingCorpScopes', () => {
     expect(missingCorpScopes(corpCapabilities(['Factory_Manager']), [])).toEqual([
       'esi-industry.read_corporation_jobs.v1',
     ]);
+  });
+
+  /**
+   * The half-blind case: the wallet scope alone renders divisions as
+   * "Division 3" rather than the name the corp gave them, so a Character
+   * holding only it is not `ready`.
+   */
+  it('still reports the divisions scope when only the wallet scope is granted', () => {
+    expect(
+      missingCorpScopes(corpCapabilities(['Accountant']), [
+        'esi-wallet.read_corporation_wallets.v1',
+      ])
+    ).toEqual(['esi-corporations.read_divisions.v1']);
   });
 
   it('reports nothing once every needed scope is granted', () => {
@@ -88,15 +114,16 @@ describe('missingCorpScopes', () => {
     expect(factoryManager).toEqual(['esi-industry.read_corporation_jobs.v1']);
     expect(factoryManager).not.toContain('esi-wallet.read_corporation_wallets.v1');
     expect(director).toContain('esi-wallet.read_corporation_wallets.v1');
-    expect(director).toHaveLength(CORP_CAPABILITIES.length);
+    expect(director.length).toBeGreaterThan(factoryManager.length);
   });
 
   it('reports the remainder when a Director has granted only some of them', () => {
+    const all = requiredFor(['Director']);
     const missing = missingCorpScopes(corpCapabilities(['Director']), [
       'esi-corporations.read_structures.v1',
     ]);
     expect(missing).not.toContain('esi-corporations.read_structures.v1');
-    expect(missing).toHaveLength(CORP_CAPABILITIES.length - 1);
+    expect(missing).toHaveLength(all.length - 1);
   });
 
   it('ignores unrelated granted scopes', () => {

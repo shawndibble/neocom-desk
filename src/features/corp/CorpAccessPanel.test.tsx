@@ -54,7 +54,10 @@ describe('CorpAccessPanel — the four states', () => {
   it('unknown: says it is still reading, and offers no Grant button', () => {
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     render(<CorpAccessPanel />);
-    expect(screen.getByText('Checking…')).toBeInTheDocument();
+    // Both cells: with no answer yet, "Roles: None" would be an answer, and the
+    // wrong one for a Director whose read is still in flight.
+    expect(screen.getAllByText('Checking…')).toHaveLength(2);
+    expect(screen.queryByText('None')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /grant access/i })).not.toBeInTheDocument();
   });
 

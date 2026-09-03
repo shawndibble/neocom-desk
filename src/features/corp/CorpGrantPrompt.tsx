@@ -52,21 +52,26 @@ export function CorpGrantPrompt() {
   if (access.state !== 'roles-without-grant') return null;
   if (isGrantPromptDismissed(dismissals, activeCharacterId)) return null;
 
-  const remember = () =>
-    void setDismissals(withGrantPromptDismissed(dismissals, activeCharacterId));
+  const remember = () => setDismissals(withGrantPromptDismissed(dismissals, activeCharacterId));
 
-  const grant = () => {
-    remember();
+  const grant = async () => {
+    // Awaited before leaving the page: `beginEveLogin` navigates away, and a
+    // Dexie write racing a full page navigation can lose. Cancel at the SSO
+    // screen with the write lost and this comes back — "at most once" gone.
+    await remember();
     // A known Character, so the request unions with its existing grant rather
     // than replacing it (app/loginFlow.ts).
-    void beginEveLogin({ characterId: activeCharacterId, groups: ['corp'] });
+    await beginEveLogin({ characterId: activeCharacterId, groups: ['corp'] });
   };
 
   return (
     <div
       role="alert"
       aria-label={t('corp.grantPromptTitle')}
-      className="fixed bottom-16 left-4 z-50 max-w-sm space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-4"
+      // Stacked above `NotificationPermissionPrompt`, which is itself above
+      // `InstallPrompt`: all three are fixed banners in the same corner, and a
+      // new Director on a fresh device can plausibly meet all three at once.
+      className="fixed inset-x-4 bottom-40 z-50 max-w-sm space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-28 md:left-auto"
     >
       <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {t('corp.grantPromptTitle')}
@@ -79,10 +84,10 @@ export function CorpGrantPrompt() {
       </p>
       <p className="text-xs text-text-dim">{t('corp.grantPromptHint')}</p>
       <div className="flex gap-2">
-        <Button size="sm" variant="primary" onClick={grant}>
+        <Button size="sm" variant="primary" onClick={() => void grant()}>
           {t('corp.grantPromptGrant')}
         </Button>
-        <Button size="sm" onClick={remember}>
+        <Button size="sm" onClick={() => void remember()}>
           {t('corp.grantPromptDismiss')}
         </Button>
       </div>

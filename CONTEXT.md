@@ -1357,12 +1357,23 @@
   application's own registration — would otherwise purge the cache on every
   login, forever.
 - **Two login branches, split on whether the returning Character is knowable at
-  redirect time.** Add-a-character asks for the Base Grant alone, because SSO
-  decides who comes back _after_ the redirect. Every other entry point — the
-  Settings Corp access row, the grant prompt, the `ReauthBanner` — is initiated
-  from a Character context and unions with that Character's own stored grant.
-  Unioning across _every_ stored Character, as #293 did, is safe but over-asks:
-  an alt would be shown corp scopes only a main ever granted.
+  redirect time.** `beginAddCharacterLogin()` asks for the Base Grant alone,
+  because SSO decides who comes back _after_ the redirect; its two callers are
+  the Login page and the Characters page's Add button. `beginEveLogin()` is
+  every other entry point — the Settings Corp access row, the grant prompt, the
+  `ReauthBanner`, `ScopeGate`, `AuthFailureNotice` — and unions with that
+  Character's own stored grant. Unioning across _every_ stored Character, as
+  #293 did, is safe but over-asks: an alt would be shown corp scopes only a
+  main ever granted.
+- **`beginEveLogin` defaults to the active Character**, rather than making
+  ~15 re-auth call sites each name one. Every one of them is pressed while
+  looking at one Character's data, so the active Character _is_ what
+  "re-authorize" means there; a bare call that asked for the Base Grant instead
+  would silently drop that Character's corp grant, since EVE issues a token
+  carrying exactly what was requested. Adding a Character is the exception, and
+  gets its own function rather than a flag — an active Character is usually
+  signed in when Add is pressed, and unioning with _their_ grant is precisely
+  the over-ask, aimed at somebody else.
 - **The accepted trade: an add-a-character login by an already-granted
   Character narrows its stored grant.** EVE issues a token carrying exactly
   what was requested, so the narrowing is real rather than a bookkeeping

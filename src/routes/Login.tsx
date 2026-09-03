@@ -1,6 +1,6 @@
 import { useState, type ComponentType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { beginEveLogin } from '@/app/loginFlow';
+import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { DataAgeBadge, LogoMark, Panel, StatChip } from '@/components/ui';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
 import {
@@ -54,7 +54,9 @@ export function Login() {
 
   function onLogin() {
     setPending(true);
-    void beginEveLogin().catch(() => setPending(false));
+    // The add-a-character branch: nobody is signed in yet, so there is no
+    // grant to union with and the base set is the whole request (#295).
+    void beginAddCharacterLogin().catch(() => setPending(false));
   }
 
   // Wall-clock reads for illustrative "how fresh is this" values in the

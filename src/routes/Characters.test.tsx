@@ -16,7 +16,9 @@ import {
 import { FONT_SCALE_KEY, useFontScale } from '@/lib/fontScale';
 import { Characters } from './Characters';
 
-vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@/app/loginFlow', () => ({
+  beginAddCharacterLogin: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('@/features/character/removeCharacter', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/character/removeCharacter')>()),
@@ -143,12 +145,14 @@ describe('Characters', () => {
     expect((await db.settings.get(ACTIVE_CHARACTER_KEY))?.value).toBe(91);
   });
 
-  it('add character starts a new EVE login', async () => {
-    const { beginEveLogin } = await import('@/app/loginFlow');
+  it('add character starts an ADD-A-CHARACTER login, not a re-auth', async () => {
+    // Not `beginEveLogin`: that unions with the active Character's grant, and
+    // the character arriving here is by definition somebody else (#295).
+    const { beginAddCharacterLogin } = await import('@/app/loginFlow');
     const user = userEvent.setup();
     renderCharacters();
     await user.click(await screen.findByRole('button', { name: /add character/i }));
-    expect(beginEveLogin).toHaveBeenCalledTimes(1);
+    expect(beginAddCharacterLogin).toHaveBeenCalledTimes(1);
   });
 
   it('shows an empty state when no characters exist', async () => {

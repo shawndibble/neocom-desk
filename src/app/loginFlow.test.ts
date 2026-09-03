@@ -4,11 +4,12 @@ import { setupServer } from 'msw/node';
 import { db, type TokenRecord } from '@/db';
 import { SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
 import { completeLogin } from '@/auth/session';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 
 const { assignLocation } = vi.hoisted(() => ({ assignLocation: vi.fn<(url: string) => void>() }));
 vi.mock('./navigation', () => ({ assignLocation }));
 
-import { beginEveLogin } from './loginFlow';
+import { beginAddCharacterLogin, beginEveLogin } from './loginFlow';
 
 const CHAR_ID = 2112625428;
 const OTHER_CHAR_ID = 90000001;
@@ -70,6 +71,10 @@ afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   sessionStorage.clear();
   assignLocation.mockClear();
+  // Set explicitly in every test that cares: `beginEveLogin` defaults to the
+  // active Character, so a test relying on the store's initial value would be
+  // proving the default rather than the branch it names.
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   await db.tokens.clear();
   await db.characters.clear();
   await db.esiCache.clear();
@@ -83,15 +88,15 @@ beforeEach(async () => {
 // (issue #295).
 // ---------------------------------------------------------------------------
 
-describe('beginEveLogin: adding a character', () => {
+describe('beginAddCharacterLogin', () => {
   it('sends the base SCOPES when no character has logged in yet', async () => {
-    await beginEveLogin();
+    await beginAddCharacterLogin();
 
     expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
   });
 
   it('puts NO corp scope on the consent screen (AC 1)', async () => {
-    await beginEveLogin();
+    await beginAddCharacterLogin();
 
     const requested = new Set(requestedScopes());
     for (const scope of scopesForGroup('corp')) expect(requested.has(scope), scope).toBe(false);
@@ -106,15 +111,28 @@ describe('beginEveLogin: adding a character', () => {
     // whole ticket exists to prevent.
     await seedGrant(OTHER_CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
 
-    await beginEveLogin();
+    await beginAddCharacterLogin();
+
+    expect(requestedScopes()).not.toContain(EXTRA_SCOPE);
+  });
+
+  it('does NOT inherit the ACTIVE character’s grant either', async () => {
+    // The reason this is its own entry point rather than `beginEveLogin()`:
+    // somebody is usually signed in when Add character is pressed, and the
+    // character arriving is by definition somebody else.
+    await seedGrant(CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
+    useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
+
+    await beginAddCharacterLogin();
 
     expect(requestedScopes()).not.toContain(EXTRA_SCOPE);
   });
 
   it('ignores a LEGACY token record with no scopes field', async () => {
     await seedGrant(CHAR_ID, undefined);
+    useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
 
-    await beginEveLogin();
+    await beginAddCharacterLogin();
 
     expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
   });
@@ -134,7 +152,7 @@ describe('beginEveLogin: adding a character', () => {
     await seedGrant(CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
     await db.esiCache.put({ characterId: CHAR_ID, key: 'skills', value: 'mine', fetchedAt: 1 });
 
-    await beginEveLogin();
+    await beginAddCharacterLogin();
     const state = new URL(assignLocation.mock.calls.at(-1)![0]).searchParams.get('state')!;
     await completeLogin({ code: 'good-code', state });
 
@@ -174,6 +192,40 @@ describe('beginEveLogin: re-auth for a known character', () => {
     await beginEveLogin({ characterId: CHAR_ID });
 
     expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
+  });
+
+  /**
+   * The default is what makes the ~15 `ReauthBanner` / `ScopeGate` /
+   * `AuthFailureNotice` call sites branch 2 without each naming a character:
+   * every one of them is pressed while looking at the active Character's data,
+   * and asking for less than that Character holds would silently drop their
+   * corp grant.
+   */
+  it('defaults to the ACTIVE character, so a bare re-auth is not a narrowing', async () => {
+    await seedGrant(CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
+    useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
+
+    await beginEveLogin();
+
+    expect(requestedScopes()).toContain(EXTRA_SCOPE);
+  });
+
+  it('sends the base set when there is no active character to default to', async () => {
+    await seedGrant(CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
+
+    await beginEveLogin();
+
+    expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
+  });
+
+  it('lets an explicit characterId win over the active one', async () => {
+    await seedGrant(CHAR_ID, [...SCOPES]);
+    await seedGrant(OTHER_CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
+    useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
+
+    await beginEveLogin({ characterId: OTHER_CHAR_ID });
+
+    expect(requestedScopes()).toContain(EXTRA_SCOPE);
   });
 });
 

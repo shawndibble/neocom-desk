@@ -57,10 +57,17 @@ export function CorpAccessPanel() {
             <dl className="divide-y divide-line text-xs">
               <div className="flex items-center justify-between gap-4 py-2">
                 <dt className="text-text-dim">{t('corp.accessRolesLabel')}</dt>
+                {/*
+                  `unknown` has no answer yet, and "None" would be one — the
+                  wrong one, for the Director whose roles read is still in
+                  flight. Both cells say the same thing until it lands.
+                */}
                 <dd className="text-right">
-                  {roles.length === 0
-                    ? t('corp.accessRolesNone')
-                    : roles.map(corpRoleLabel).join(', ')}
+                  {state === 'unknown'
+                    ? t('corp.accessGrantChecking')
+                    : roles.length === 0
+                      ? t('corp.accessRolesNone')
+                      : roles.map(corpRoleLabel).join(', ')}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4 py-2">
@@ -79,9 +86,11 @@ export function CorpAccessPanel() {
               has nothing left to ask for.
             */}
             {state === 'roles-without-grant' && (
+              // `ghost`, not `primary`: /settings already spends its one
+              // primary on the notifications panel's Enable
+              // (docs/DESIGN.md §6, "One `primary` button per view").
               <Button
                 size="sm"
-                variant="primary"
                 onClick={() =>
                   void beginEveLogin({ characterId: activeCharacterId, groups: ['corp'] })
                 }

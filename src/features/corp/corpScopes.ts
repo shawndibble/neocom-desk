@@ -18,14 +18,29 @@ import { CORP_CAPABILITIES, type CorpCapabilities, type CorpCapability } from '@
 import type { Scope } from '@/esi/registry';
 
 /**
- * The scope each capability's endpoints require, from
- * https://esi.evetech.net/meta/openapi.json. One scope each today; the type is
- * a list so a capability that grows a second requirement does not change shape.
+ * The scopes each capability's endpoints require, from
+ * https://esi.evetech.net/meta/openapi.json.
+ *
+ * Two capabilities need more than one, and both matter: without
+ * `read_divisions` a corp wallet renders as "Division 3" rather than the name
+ * the corp gave it, and `membertracking` answers nothing useful without the
+ * membership list beside it. Naming only one scope each would let
+ * `missingCorpScopes` under-report and call a Character `ready` for a surface
+ * that is still half-blind.
+ *
+ * `esi-industry.read_corporation_mining.v1` is deliberately absent: no
+ * capability in `engine/corpRoles.ts` stands for moon extractions yet, and its
+ * `x-required-roles` is not among the mappings #294 settled. It is registered
+ * and requested with the group; the capability that claims it arrives with the
+ * surface that reads it.
  */
 export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly Scope[]>> = {
-  canReadWallet: ['esi-wallet.read_corporation_wallets.v1'],
+  canReadWallet: ['esi-wallet.read_corporation_wallets.v1', 'esi-corporations.read_divisions.v1'],
   canReadStructures: ['esi-corporations.read_structures.v1'],
-  canReadMembers: ['esi-corporations.track_members.v1'],
+  canReadMembers: [
+    'esi-corporations.track_members.v1',
+    'esi-corporations.read_corporation_membership.v1',
+  ],
   canReadIndustry: ['esi-industry.read_corporation_jobs.v1'],
 };
 

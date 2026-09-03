@@ -13,7 +13,7 @@ import {
   NO_CORP_CAPABILITIES,
   type CorpCapabilities,
 } from '@/engine/corpRoles';
-import type { EsiScopeName } from '@/esi/registry';
+import type { Scope } from '@/esi/registry';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { corpWideRoles, loadCharacterRoles } from './roles';
@@ -38,7 +38,7 @@ export interface CorpAccess {
   /** What this Character can see. All false unless `state` is `roles-without-grant` or `ready`. */
   capabilities: CorpCapabilities;
   /** Scopes to ask for, for the capabilities this Character actually holds. Empty unless `roles-without-grant`. */
-  missingScopes: readonly EsiScopeName[];
+  missingScopes: readonly Scope[];
   /**
    * The corporation-wide roles ESI reported, raw. Empty while `unknown`, and
    * empty for a Character that genuinely holds none — but *not* empty merely
