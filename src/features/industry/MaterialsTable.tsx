@@ -11,6 +11,9 @@ import type {
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { materialRowState } from './materialRow';
+import { suggestedOwnedQuantity } from '@/engine/industry/ownedStock';
+import { OwnedStockHint } from './OwnedStockHint';
+import type { OwnedStockDetection } from './ownedStockDetection';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -21,6 +24,8 @@ interface MaterialsTableProps {
   /** False when the market snapshot couldn't be fetched — hub prices fall back to placeholder text. */
   pricesReady: boolean;
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
+  /** ESI-detected owned stock (issue #181); omitted where no detection ran. Never written by itself. */
+  detection?: OwnedStockDetection;
   /** Wraps each row in the shared item context menu; omitted where the caller has no menu to offer. */
   rowContextMenu?: (material: MaterialCostLine, tr: ReactElement) => ReactElement;
   /** Make-or-buy verdicts by material typeID. A material with no entry has no advice to show; omitted entirely where the caller can't price recipes. */
@@ -153,6 +158,7 @@ export function MaterialsTable({
   sourcing,
   pricesReady,
   onSourcingChange,
+  detection,
   rowContextMenu,
   makeOrBuy,
 }: MaterialsTableProps) {
@@ -184,16 +190,37 @@ export function MaterialsTable({
         id: 'owned',
         header: t('industry.ownedQuantity'),
         align: 'right',
-        render: (material) => (
-          <SourcingInput
-            value={sourcing?.[material.typeID]?.ownedQuantity}
-            label={t('industry.ownedQuantityFor', { material: nameFor(material.typeID) })}
-            step={1}
-            widthClassName="w-20"
-            parse={parseCount}
-            onCommit={(ownedQuantity) => onSourcingChange(material.typeID, { ownedQuantity })}
-          />
-        ),
+        render: (material) => {
+          const stock = detection?.stockFor(material.typeID);
+          const owned = sourcing?.[material.typeID]?.ownedQuantity;
+          // A row already holding what the action would write has nothing left
+          // to apply — compared against the clamped suggestion, not the raw
+          // detected total, or the affordance would linger on every row whose
+          // requirement is smaller than the stock behind it.
+          const suggestion = stock ? suggestedOwnedQuantity(stock.quantity, material.quantity) : 0;
+          return (
+            <span className="flex flex-col items-end gap-0.5">
+              <SourcingInput
+                value={owned}
+                label={t('industry.ownedQuantityFor', { material: nameFor(material.typeID) })}
+                step={1}
+                widthClassName="w-20"
+                parse={parseCount}
+                onCommit={(ownedQuantity) => onSourcingChange(material.typeID, { ownedQuantity })}
+              />
+              {stock && detection && (
+                <OwnedStockHint
+                  stock={stock}
+                  detection={detection}
+                  materialName={nameFor(material.typeID)}
+                  suggestion={suggestion}
+                  canApply={owned !== suggestion}
+                  onApply={() => onSourcingChange(material.typeID, { ownedQuantity: suggestion })}
+                />
+              )}
+            </span>
+          );
+        },
       },
       {
         id: 'overridePrice',
@@ -273,7 +300,7 @@ export function MaterialsTable({
         },
       },
     ],
-    [t, nameFor, sourcing, pricesReady, onSourcingChange, makeOrBuy]
+    [t, nameFor, sourcing, pricesReady, onSourcingChange, detection, makeOrBuy]
   );
 
   return (

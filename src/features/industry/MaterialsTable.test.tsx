@@ -13,9 +13,11 @@ import type {
   MaterialSourcing,
   MaterialSourcingMap,
 } from '@/engine/industry/types';
+import type { OwnedStockPlacement } from '@/engine/industry/ownedStock';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { applySourcingPatch } from './sourcingEdits';
 import { MaterialsTable } from './MaterialsTable';
+import type { OwnedStockDetection } from './ownedStockDetection';
 
 const NAMES: Record<number, string> = {
   34: 'Tritanium',
@@ -35,6 +37,7 @@ interface HarnessProps {
   hubPrices?: HubPrices;
   pricesReady?: boolean;
   onChange?: (typeID: number, patch: MaterialSourcing) => void;
+  detection?: OwnedStockDetection;
 }
 
 /**
@@ -42,7 +45,13 @@ interface HarnessProps {
  * re-prices through the same engine call the real panel uses, so a test can
  * assert what an edit does to the row rather than only that a callback fired.
  */
-function Harness({ initial, hubPrices = HUB_PRICES, pricesReady = true, onChange }: HarnessProps) {
+function Harness({
+  initial,
+  hubPrices = HUB_PRICES,
+  pricesReady = true,
+  onChange,
+  detection,
+}: HarnessProps) {
   const [sourcing, setSourcing] = useState<MaterialSourcingMap | undefined>(initial);
   return (
     <MaterialsTable
@@ -50,6 +59,7 @@ function Harness({ initial, hubPrices = HUB_PRICES, pricesReady = true, onChange
       nameFor={nameFor}
       sourcing={sourcing}
       pricesReady={pricesReady}
+      detection={detection}
       onSourcingChange={(typeID, patch) => {
         onChange?.(typeID, patch);
         setSourcing((current) => applySourcingPatch(current, typeID, patch));
@@ -320,6 +330,142 @@ describe('MaterialsTable', () => {
       await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
       expect(onShowInfo).toHaveBeenCalledWith(9840, 'Mechanical Parts');
     });
+  });
+});
+
+describe('MaterialsTable detected owned stock (issue #181)', () => {
+  const CHARACTER_NAMES: Record<number, string> = { 91: 'Main Pilot', 92: 'Alt Pilot' };
+  const LOCATION_NAMES: Record<number, string> = {
+    60003760: 'Jita IV - Moon 4',
+    60008494: 'Amarr',
+  };
+
+  function placement(
+    characterId: number,
+    locationId: number,
+    quantity: number
+  ): OwnedStockPlacement {
+    return { characterId, locationId, locationType: 'station', quantity };
+  }
+
+  function detectionOf(
+    stock: Record<number, { quantity: number; placements?: OwnedStockPlacement[] }>,
+    overrides: Partial<OwnedStockDetection> = {}
+  ): OwnedStockDetection {
+    return {
+      stockFor: (typeID) => {
+        const entry = stock[typeID];
+        return entry ? { quantity: entry.quantity, placements: entry.placements ?? [] } : undefined;
+      },
+      lowerBound: false,
+      incompleteCharacters: [],
+      characterNameFor: (characterId) => CHARACTER_NAMES[characterId] ?? 'Unknown',
+      locationLabelFor: (p) => LOCATION_NAMES[p.locationId] ?? `Station #${p.locationId}`,
+      ...overrides,
+    };
+  }
+
+  const TRIT_STOCK = {
+    34: {
+      quantity: 9000,
+      placements: [placement(91, 60003760, 6000), placement(92, 60008494, 3000)],
+    },
+  };
+
+  it('shows the detected total beside the Owned input, and none for a material without stock', () => {
+    render(<Harness detection={detectionOf(TRIT_STOCK)} />);
+
+    expect(
+      within(row('Tritanium')).getByRole('button', { name: /detected for Tritanium/ })
+    ).toHaveTextContent('9,000 owned');
+    expect(
+      within(row('Pyerite')).queryByRole('button', { name: /detected for/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('persists nothing by merely rendering a detection', () => {
+    const onChange = vi.fn();
+    render(<Harness detection={detectionOf(TRIT_STOCK)} onChange={onChange} />);
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('writes min(detected, required) — the same value typing it would store', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness detection={detectionOf(TRIT_STOCK)} onChange={onChange} />);
+
+    await user.click(
+      within(row('Tritanium')).getByRole('button', {
+        name: 'Use 1,000 detected owned for Tritanium',
+      })
+    );
+
+    // 9,000 detected against a 1,000-unit requirement.
+    expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 1000 });
+    expect(within(row('Tritanium')).getByLabelText('Owned quantity for Tritanium')).toHaveValue(
+      1000
+    );
+  });
+
+  it('drops the use action once the row already holds the clamped suggestion', () => {
+    render(
+      <Harness initial={{ 34: { ownedQuantity: 1000 } }} detection={detectionOf(TRIT_STOCK)} />
+    );
+
+    expect(
+      within(row('Tritanium')).queryByRole('button', {
+        name: 'Use 1,000 detected owned for Tritanium',
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it('breaks the total down by Character and location', async () => {
+    const user = userEvent.setup();
+    render(<Harness detection={detectionOf(TRIT_STOCK)} />);
+
+    await user.click(
+      within(row('Tritanium')).getByRole('button', { name: /detected for Tritanium/ })
+    );
+
+    const menu = screen.getByRole('dialog');
+    expect(menu).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
+    expect(menu).toHaveTextContent('Alt Pilot — Amarr');
+  });
+
+  it('caps the breakdown at five locations with a remainder line', async () => {
+    const user = userEvent.setup();
+    const placements = Array.from({ length: 7 }, (_, i) => placement(91, 70000000 + i, 100 - i));
+    render(<Harness detection={detectionOf({ 34: { quantity: 700, placements } })} />);
+
+    await user.click(
+      within(row('Tritanium')).getByRole('button', { name: /detected for Tritanium/ })
+    );
+
+    expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(6);
+    expect(screen.getByRole('dialog')).toHaveTextContent('and 2 more');
+  });
+
+  it('renders an incomplete detection as a lower bound and names the Characters behind it', async () => {
+    const user = userEvent.setup();
+    render(
+      <Harness
+        detection={detectionOf(TRIT_STOCK, {
+          lowerBound: true,
+          incompleteCharacters: ['Alt Pilot', 'No Scope Pilot'],
+        })}
+      />
+    );
+
+    const trigger = within(row('Tritanium')).getByRole('button', {
+      name: /detected for Tritanium/,
+    });
+    expect(trigger).toHaveTextContent('≥ 9,000 owned');
+
+    await user.click(trigger);
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Asset data is incomplete for Alt Pilot, No Scope Pilot'
+    );
   });
 });
 

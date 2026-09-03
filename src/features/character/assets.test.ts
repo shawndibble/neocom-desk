@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCharacterAssets, loadOtherCharactersAssets } from './assets';
+import { loadAllCharactersAssets, loadCharacterAssets, loadOtherCharactersAssets } from './assets';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -13,7 +13,20 @@ beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
   await db.characters.clear();
+  await db.tokens.clear();
 });
+
+const ASSETS_SCOPE = 'esi-assets.read_assets.v1';
+
+function tokenWith(characterId: number, scopes: string[]) {
+  return {
+    characterId,
+    accessToken: 'at',
+    refreshToken: 'rt',
+    expiresAt: Date.now() + 6e5,
+    scopes,
+  };
+}
 afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
@@ -137,5 +150,91 @@ describe('loadOtherCharactersAssets (issue #85)', () => {
     const results = await loadOtherCharactersAssets(CHAR_ID);
 
     expect(results).toEqual([{ characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] }]);
+  });
+});
+
+describe('loadAllCharactersAssets (issue #181)', () => {
+  const OTHER_ID = 92;
+  const THIRD_ID = 93;
+
+  beforeEach(async () => {
+    await db.characters.bulkPut([
+      { characterId: CHAR_ID, name: 'Active Pilot', ownerHash: 'oh1', addedAt: 1 },
+      { characterId: OTHER_ID, name: 'Alt Pilot', ownerHash: 'oh2', addedAt: 2 },
+      { characterId: THIRD_ID, name: 'No Scope Pilot', ownerHash: 'oh3', addedAt: 3 },
+    ]);
+    await db.tokens.bulkPut([
+      tokenWith(CHAR_ID, [ASSETS_SCOPE]),
+      tokenWith(OTHER_ID, [ASSETS_SCOPE]),
+      tokenWith(THIRD_ID, [ASSETS_SCOPE]),
+    ]);
+  });
+
+  it('includes the active Character, unlike the cross-character search fan-out', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/:characterId/assets`, ({ params }) =>
+        HttpResponse.json([ASSET(Number(params.characterId))], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const { entries, skipped } = await loadAllCharactersAssets();
+
+    expect(entries.map((e) => e.characterId).sort()).toEqual([CHAR_ID, OTHER_ID, THIRD_ID]);
+    expect(entries.every((e) => e.truncated === false)).toBe(true);
+    expect(skipped).toEqual([]);
+  });
+
+  it('skips a Character that never granted the assets scope without calling ESI', async () => {
+    // This fan-out runs on every Build Plan open, and a live 403 raises the
+    // app-wide re-auth banner for an alt the player never asked about — with
+    // nothing cached to stop it happening again on the next plan.
+    await db.tokens.put(tokenWith(THIRD_ID, ['esi-skills.read_skills.v1']));
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () => {
+        throw new Error('must not call ESI for a Character without the scope');
+      }),
+      http.get(`${ESI_BASE_URL}/characters/:characterId/assets`, ({ params }) =>
+        HttpResponse.json([ASSET(Number(params.characterId))], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const { entries, skipped } = await loadAllCharactersAssets();
+
+    expect(entries.map((e) => e.characterId).sort()).toEqual([CHAR_ID, OTHER_ID]);
+    expect(skipped).toEqual([{ characterId: THIRD_ID, name: 'No Scope Pilot' }]);
+  });
+
+  it('records a Character it could not read instead of failing the whole fan-out', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/:characterId/assets`, ({ params }) =>
+        HttpResponse.json([ASSET(Number(params.characterId))], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const { entries, skipped } = await loadAllCharactersAssets();
+
+    expect(entries.map((e) => e.characterId).sort()).toEqual([CHAR_ID, OTHER_ID]);
+    expect(skipped).toEqual([{ characterId: THIRD_ID, name: 'No Scope Pilot' }]);
+  });
+
+  it('reports a capped list as truncated so totals derived from it read as a floor', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page') ?? '1');
+        return page === 1
+          ? HttpResponse.json([ASSET(1)], { headers: { 'X-Pages': '2' } })
+          : HttpResponse.json({ error: 'gone' }, { status: 404 });
+      }),
+      http.get(`${ESI_BASE_URL}/characters/:characterId/assets`, ({ params }) =>
+        HttpResponse.json([ASSET(Number(params.characterId))], { headers: { 'X-Pages': '1' } })
+      )
+    );
+
+    const { entries } = await loadAllCharactersAssets();
+
+    expect(entries.find((e) => e.characterId === OTHER_ID)?.truncated).toBe(true);
   });
 });

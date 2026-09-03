@@ -58,6 +58,7 @@ export default tseslint.config(
     files: [
       'src/components/ui/ContextMenu.tsx',
       'src/components/ui/DropdownMenu.tsx',
+      'src/components/ui/Popover.tsx',
       'src/components/ui/Select.tsx',
     ],
     rules: {

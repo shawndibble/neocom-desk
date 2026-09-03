@@ -28,7 +28,11 @@ import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
-import { BuildPlanDetail, type PlanPatch } from '@/features/industry/BuildPlanDetail';
+import {
+  BuildPlanDetail,
+  type PlanPatch,
+  type SourcingPatchEntry,
+} from '@/features/industry/BuildPlanDetail';
 import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
 
 function newBuildPlan(
@@ -247,6 +251,20 @@ export function Industry() {
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
+  /**
+   * "Use all detected" (issue #181), applied one row at a time through the very
+   * same write path a typed value takes. Awaited in sequence, not fired in
+   * parallel: each `saveSourcingEdit` merges into the record it reads inside
+   * its own transaction, so overlapping writes would drop all but the last.
+   */
+  async function handleSourcingChangeMany(patches: readonly SourcingPatchEntry[]) {
+    if (!selectedPlan) return;
+    for (const { typeID, patch } of patches) {
+      await saveSourcingEdit(selectedPlan.id, typeID, patch);
+    }
+    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
+  }
+
   async function handleSourcingChange(typeID: number, patch: MaterialSourcing) {
     if (!selectedPlan) return;
     await saveSourcingEdit(selectedPlan.id, typeID, patch);
@@ -324,6 +342,7 @@ export function Industry() {
                   skills={skills}
                   onUpdate={(patch) => void handleUpdate(patch)}
                   onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
+                  onSourcingChangeMany={(patches) => void handleSourcingChangeMany(patches)}
                   onAddToQuickbar={quickbar.add}
                   quickbarAvailable={quickbar.available}
                   onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
