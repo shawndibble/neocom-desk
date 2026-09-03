@@ -472,6 +472,7 @@ describe('PlanEditor prereq promotion', () => {
         trainedSkills={NO_TRAINED}
         attributes={ATTRIBUTES}
         implants={IMPLANTS}
+        attributesResult={null}
         remapInfo={null}
         listPane={<div data-testid="plan-list-pane" />}
         onUpdate={onUpdate}
