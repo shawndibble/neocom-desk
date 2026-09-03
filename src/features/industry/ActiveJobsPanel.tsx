@@ -20,12 +20,17 @@ import {
   isCompletingSoon,
   secondsRemaining,
   activityI18nKey,
+  type ActiveJob,
   type JobsLoadResult,
 } from './jobs';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { jobsCsvColumns } from './jobsCsv';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { useCorpOwner } from '@/features/corp/owner';
+import { OwnerSwitch } from '@/features/corp/OwnerSwitch';
+import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
+import { loadCorporationIndustryJobs, type CorpJobsLoadResult } from '@/features/corp/jobs';
 
 interface ActiveJobsPanelProps {
   characterId: number;
@@ -60,6 +65,12 @@ async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
  * sorted soonest-ending first. Sits above the Build Plan list on /industry.
  * Independent of the blueprint catalog/build-plan state: fetches its own
  * jobs + SDE type names, so it isn't blocked on that load.
+ *
+ * For a Character holding the corp industry capability it also offers "My jobs
+ * / Corp jobs" (issue #298) — genuinely the same list with a different owner,
+ * since the two ESI job shapes differ only in fields this list never renders.
+ * For everyone else the switch is not rendered at all and this panel is exactly
+ * what it was.
  */
 export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
@@ -69,15 +80,40 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
     characterId
   );
 
+  const {
+    owner,
+    setOwner,
+    available: corpAvailable,
+    corporationId,
+  } = useCorpOwner('canReadIndustry');
+  const showingCorp = owner === 'corporation' && corporationId !== null;
+
+  // Nothing is fetched until the switch is actually flipped: the key is null
+  // while the personal side is showing, and it carries the corporation so a
+  // corp change resets rather than relabels.
+  const corp = useCorpSnapshot<CorpJobsLoadResult | null>(
+    showingCorp ? `${characterId}:${corporationId}` : null,
+    async () =>
+      corporationId === null ? null : loadCorporationIndustryJobs(characterId, corporationId)
+  );
+
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(id);
   }, []);
 
-  const result = data?.result ?? null;
   const types = data?.types ?? {};
+  // Each side keeps its own result, so the badge below reports the age of the
+  // data actually on screen — the two have different cache windows and must
+  // never share one value.
+  const result: JobsLoadResult | CorpJobsLoadResult | null = showingCorp
+    ? corp.data
+    : (data?.result ?? null);
+  const listLoading = showingCorp ? corp.loading : loading;
+  const listRefreshCount = showingCorp ? corp.refreshCount : refreshCount;
+  const listRefresh = showingCorp ? corp.refresh : refresh;
 
-  const jobs = useMemo(() => sortJobsBySoonest(result?.cached?.data ?? []), [result]);
+  const jobs = useMemo(() => sortJobsBySoonest<ActiveJob>(result?.cached?.data ?? []), [result]);
 
   const nameForBlueprint = (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`;
 
@@ -92,26 +128,51 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
             icon={<Icon.Download />}
             label={t('industry.exportCsvJobs')}
             disabled={jobs.length === 0}
-            onClick={() => downloadCsv('industry-jobs', jobs, jobsCsvColumns(t, nameForBlueprint))}
+            onClick={() =>
+              downloadCsv(
+                showingCorp ? 'corp-industry-jobs' : 'industry-jobs',
+                jobs,
+                jobsCsvColumns(t, nameForBlueprint)
+              )
+            }
           />
           <IconButton
             size="sm"
             icon={<Icon.Refresh />}
             label={t('industry.jobsRefresh')}
-            onClick={refresh}
-            disabled={loading}
+            onClick={listRefresh}
+            disabled={listLoading}
           />
         </span>
       }
     >
-      {loading ? (
+      {/*
+        First row inside the body rather than beside the header's badge and two
+        icon buttons: at 390px that row has no space left, and the switch is a
+        change of what the list below shows, not a header action.
+      */}
+      {corpAvailable && (
+        <OwnerSwitch
+          className="mb-2"
+          value={owner}
+          onChange={setOwner}
+          label={t('industry.jobsOwnerLabel')}
+          personalLabel={t('industry.jobsOwnerPersonal')}
+          corporationLabel={t('industry.jobsOwnerCorporation')}
+        />
+      )}
+      {listLoading ? (
         <div className="flex justify-center py-4">
           <Spinner size="sm" label={t('common.loading')} />
         </div>
       ) : result?.needsReauth ? (
         <ReauthBanner
           title={t('industry.jobsReauthTitle')}
-          hint={t('industry.jobsReauthHint')}
+          // Only a 401 reaches here on the corp side — its 403 is the in-game
+          // role gate, which `corpAuthFailure.ts` deliberately does not call a
+          // re-auth — so the personal hint's "granted the new permission"
+          // story would be the wrong explanation for it.
+          hint={t(showingCorp ? 'industry.jobsCorpReauthHint' : 'industry.jobsReauthHint')}
           actionLabel={t('industry.jobsReauthAction')}
           onLogin={() => void beginEveLogin()}
         />
@@ -120,14 +181,18 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         // (the common case) from "no data at all" (never fetched, offline).
         result?.cached ? (
           <EmptyState
-            title={t('industry.jobsNoneActiveTitle')}
-            hint={t('industry.jobsNoneActiveHint')}
+            title={t(
+              showingCorp ? 'industry.jobsCorpNoneActiveTitle' : 'industry.jobsNoneActiveTitle'
+            )}
+            hint={t(
+              showingCorp ? 'industry.jobsCorpNoneActiveHint' : 'industry.jobsNoneActiveHint'
+            )}
             className="py-4"
           />
         ) : (
           <EmptyState
             title={t('industry.jobsEmptyTitle')}
-            hint={t('industry.jobsEmptyHint')}
+            hint={t(showingCorp ? 'industry.jobsCorpEmptyHint' : 'industry.jobsEmptyHint')}
             className="py-4"
           />
         )
@@ -135,7 +200,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         <div className="space-y-2">
           {result?.cached?.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">
-              {refreshCount > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
+              {listRefreshCount > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
             </p>
           )}
           <ul className="space-y-2">

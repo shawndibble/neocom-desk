@@ -10,7 +10,12 @@ export type CsvSurface =
   | 'skill-queue'
   | 'build-materials'
   | 'industry-jobs'
+  // Corp-owned exports get their own surface rather than sharing the personal
+  // one: the two files hold different owners' rows and must not land in a
+  // downloads folder under the same name (issue #298).
+  | 'corp-industry-jobs'
   | 'wallet-journal'
+  | 'corp-wallet-journal'
   | 'wallet-transactions'
   | 'assets'
   | 'contracts'
