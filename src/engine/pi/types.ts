@@ -10,6 +10,24 @@
 export interface ExtractorProgram {
   pinId: number;
   expiryTimeMs: number;
+  /**
+   * Install-time baseline for the yield curve (`engine/pi/extraction.ts`).
+   * Optional because ESI marks every one of `qty_per_cycle`, `cycle_time` and
+   * `install_time` optional — a pin with a trustworthy `expiry_time` but no
+   * quantity still counts for colony health, it just can't be projected.
+   * `hasYieldBaseline` narrows a program to `ExtractorYieldProgram` when all
+   * three are present and usable.
+   */
+  qtyPerCycle?: number;
+  cycleTimeMs?: number;
+  installTimeMs?: number;
+}
+
+/** An `ExtractorProgram` whose install-time baseline is complete enough to project. */
+export interface ExtractorYieldProgram extends ExtractorProgram {
+  qtyPerCycle: number;
+  cycleTimeMs: number;
+  installTimeMs: number;
 }
 
 export type ExtractorState = 'active' | 'expiring-soon' | 'expired';
