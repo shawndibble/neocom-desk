@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, IconButton, TextInput, type DataTableColumn } from '@/components/ui';
+import { DataTable, IconButton, TextInput, Tooltip, type DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import type {
@@ -140,6 +140,14 @@ function SourcingInput({
  * label spells it out with both prices. Deliberately not a control — it has
  * nothing to click, so it takes no tab stop from the sourcing inputs on the
  * same row.
+ *
+ * The house `Tooltip` reads that same label on hover or touch-and-hold —
+ * never a bare `title`, which every other pointer-revealed hint in the app
+ * already avoids (docs/DESIGN.md's component table). `Tooltip`'s trigger
+ * only needs `asChild`, not focusability: Radix reveals it on pointer
+ * movement regardless of tab order, and only wires up its `onFocus` handler,
+ * which never fires without a `tabIndex` to focus onto. So wrapping the span
+ * costs nothing of the "no tab stop" rule above — there's a test pinning it.
  */
 function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: number }) {
   const { t } = useTranslation();
@@ -168,14 +176,15 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
   const label = sentences.join(' ');
   const Glyph = building ? Icon.Build : Icon.Buy;
   return (
-    <span
-      role="img"
-      aria-label={label}
-      title={label}
-      className={cx('shrink-0', building ? 'text-isk-pos' : 'text-text-dim')}
-    >
-      <Glyph size={Icon.ICON_SIZE.sm} />
-    </span>
+    <Tooltip content={label}>
+      <span
+        role="img"
+        aria-label={label}
+        className={cx('shrink-0', building ? 'text-isk-pos' : 'text-text-dim')}
+      >
+        <Glyph size={Icon.ICON_SIZE.sm} />
+      </span>
+    </Tooltip>
   );
 }
 
