@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, EmptyState, IconButton, Panel } from '@/components/ui';
+import { Button, EmptyState, IconButton, Panel, buttonClassName } from '@/components/ui';
 import { Close } from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -71,21 +71,18 @@ export function NotificationFeedPanel() {
     <Panel
       title={t('overview.notifications')}
       actions={
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {mine.length > 0 && (
             <Button size="sm" onClick={() => void dismissFeedEntries(mine.map((e) => e.id))}>
               {t('overview.notificationsDismissAll')}
             </Button>
           )}
           {/*
-            A plain link rather than an icon button: the header already
-            carries "Dismiss all", and a second glyph beside it would be one
-            more thing to decode where a word is unambiguous.
+            A Link styled via `buttonClassName` rather than `Button`: it
+            navigates, so it stays an anchor, but it sits beside "Dismiss
+            all" and should read as the same kind of control.
           */}
-          <Link
-            to="/settings#notifications"
-            className="text-[0.6875rem] tracking-widest text-text-dim uppercase underline-offset-2 hover:text-text hover:underline"
-          >
+          <Link to="/settings#notifications" className={buttonClassName({ size: 'sm' })}>
             {t('overview.notificationsSettings')}
           </Link>
         </div>

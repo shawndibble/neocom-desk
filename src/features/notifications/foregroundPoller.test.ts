@@ -1154,6 +1154,25 @@ describe('runForegroundPoll delivery channels', () => {
     await runForegroundPoll(deps);
     expect(characters).not.toHaveBeenCalled();
   });
+
+  it('leaves an in-progress poll alone rather than starting a second one, so an overlapping trigger cannot double-record the same fire', async () => {
+    // firingDeps' baseline is static (not persisted between calls), so two
+    // independent runs would each fire once on their own — this only stays
+    // at one call if the second `runForegroundPoll` reuses the first's
+    // still-running promise instead of starting its own poll.
+    const deps = firingDeps({ feedChannelEnabled: async () => true });
+    const first = runForegroundPoll(deps);
+    const second = runForegroundPoll(deps);
+    await Promise.all([first, second]);
+    expect(deps.recordToFeed).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows a fresh poll once the previous one has finished', async () => {
+    const deps = firingDeps({ feedChannelEnabled: async () => true });
+    await runForegroundPoll(deps);
+    await runForegroundPoll(deps);
+    expect(deps.recordToFeed).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('runForegroundPoll per-event channel columns', () => {

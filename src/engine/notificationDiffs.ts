@@ -419,6 +419,14 @@ export interface WalletNotificationFire {
  * `balance` numbers directly would re-fire on every poll while the balance
  * merely differs from some baseline, whereas journal entry `id` is
  * monotonically increasing, so gating on it fires exactly once per new entry.
+ *
+ * Sorted oldest-new-entry-first rather than left in ESI's own order (the
+ * journal comes back newest-first): the delivery loop stamps each fire's
+ * feed entry with `Date.now()` as it's recorded, in this array's order, and
+ * the feed then sorts newest-`firedAt`-first — so whichever entry is pushed
+ * last here is the one that lands on top. Recording oldest first keeps that
+ * outcome matching real chronology when more than one entry arrives in the
+ * same poll.
  */
 export function diffWalletBalanceChanged(
   characterId: number,
@@ -427,12 +435,10 @@ export function diffWalletBalanceChanged(
 ): WalletNotificationFire[] {
   if (!prev) return [];
   const maxPrevId = prev.entries.reduce((max, entry) => Math.max(max, entry.id), 0);
-  const fires: WalletNotificationFire[] = [];
-  for (const entry of next.entries) {
-    if (entry.id <= maxPrevId) continue;
-    fires.push({ eventId: 'walletBalanceChanged', characterId, amount: entry.amount });
-  }
-  return fires;
+  return next.entries
+    .filter((entry) => entry.id > maxPrevId)
+    .sort((a, b) => a.id - b.id)
+    .map((entry) => ({ eventId: 'walletBalanceChanged', characterId, amount: entry.amount }));
 }
 
 export interface MarketOrderEntrySnapshot {
