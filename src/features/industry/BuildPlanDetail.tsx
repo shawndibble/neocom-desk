@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   DataAgeBadge,
   EmptyState,
   IconButton,
@@ -31,6 +32,9 @@ import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { MaterialsTable } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
+import { bulkOwnedStockSuggestions } from '@/engine/industry/ownedStock';
+import { stockLocationLabel, type OwnedStockDetection } from './ownedStockDetection';
+import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { ResultsSummary } from './ResultsSummary';
 
 /** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
@@ -40,6 +44,12 @@ export type PlanPatch = Partial<
     'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'hubId' | 'facilityTaxPct'
   >
 >;
+
+/** One material's sourcing edit, for the bulk "use all detected" action. */
+export interface SourcingPatchEntry {
+  typeID: number;
+  patch: MaterialSourcing;
+}
 
 interface BuildPlanDetailProps {
   plan: BuildPlanRecord;
@@ -53,6 +63,14 @@ interface BuildPlanDetailProps {
    * merge against the stored record, not against this render’s `plan`.
    */
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
+  /**
+   * Several rows' sourcing edits at once, for "use all detected". Separate from
+   * `onSourcingChange` because the caller has to serialise the writes: each one
+   * is a read-modify-write of the same nested map, so firing them concurrently
+   * would have later ones merging into a record read before the earlier ones
+   * landed.
+   */
+  onSourcingChangeMany: (patches: readonly SourcingPatchEntry[]) => void;
   /** Materials-row context menu (CONTEXT.md round 26) — the same actions the Market and Assets rows offer. */
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   /** False with no active character — the Quickbar has nobody to save the material under. */
@@ -73,6 +91,7 @@ export function BuildPlanDetail({
   skills,
   onUpdate,
   onSourcingChange,
+  onSourcingChangeMany,
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
@@ -117,6 +136,30 @@ export function BuildPlanDetail({
     [ownedBlueprints, plan.blueprintTypeID]
   );
 
+  // Keyed off the blueprint, not the computed cost lines: detected stock does
+  // not depend on runs/ME/TE, and this array keys the detection memo.
+  const materialTypeIds = useMemo(
+    () => (blueprint ? blueprint.materials.map((m) => m.typeID) : []),
+    [blueprint]
+  );
+  const {
+    stock: detectedStock,
+    characterNames,
+    locationNames,
+    incompleteCharacters,
+  } = useDetectedOwnedStock(materialTypeIds);
+
+  const detection = useMemo<OwnedStockDetection>(
+    () => ({
+      stockFor: (typeID) => detectedStock.get(typeID),
+      lowerBound: incompleteCharacters.length > 0,
+      incompleteCharacters,
+      characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
+      locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
+    }),
+    [detectedStock, characterNames, locationNames, incompleteCharacters, t]
+  );
+
   const { result, error } = useMemo(() => {
     if (!blueprint) return { result: null, error: t('industry.blueprintMissing') };
     return computeBuildPlan({
@@ -131,6 +174,18 @@ export function BuildPlanDetail({
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
+
+  // "Use all detected" fills only rows with nothing typed in them: a
+  // hand-entered value, including a deliberate 0, is never clobbered by a bulk
+  // action. The per-row action is the one that overwrites — clicking it on that
+  // row means it.
+  const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
+    () =>
+      bulkOwnedStockSuggestions(result?.materials ?? [], plan.materialSourcing, detectedStock).map(
+        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
+      ),
+    [result, plan.materialSourcing, detectedStock]
+  );
 
   if (!entry || !blueprint) {
     return <EmptyState title={t('industry.blueprintMissing')} className="py-8" />;
@@ -348,6 +403,11 @@ export function BuildPlanDetail({
           // (min-height, not fixed) header beats clipping.
           <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-text-dim">
             {fetchedAt && <DataAgeBadge date={fetchedAt} />}
+            {bulkDetectedPatches.length > 0 && (
+              <Button size="sm" onClick={() => onSourcingChangeMany(bulkDetectedPatches)}>
+                {t('industry.useAllDetected')}
+              </Button>
+            )}
             <IconButton
               size="sm"
               icon={<Icon.Download />}
@@ -374,6 +434,7 @@ export function BuildPlanDetail({
             sourcing={plan.materialSourcing}
             pricesReady={pricesReady}
             onSourcingChange={onSourcingChange}
+            detection={detection}
             rowContextMenu={materialContextMenu}
           />
         )}

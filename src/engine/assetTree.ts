@@ -102,6 +102,16 @@ function bayKindFor(locationFlag: string): AssetTreeBayKind | null {
   return null;
 }
 
+/**
+ * True for a `location_flag` that only ever appears on something held by a
+ * ship — fitted, in the hold, or in the drone bay. Shared with the industry
+ * owned-stock engine (issue #181), which excludes ship-held rows from a Build
+ * Plan's detected stock, so the "what is a ship bay" heuristic has one home.
+ */
+export function isShipBayFlag(locationFlag: string): boolean {
+  return bayKindFor(locationFlag) !== null;
+}
+
 const BAY_ORDER: AssetTreeBayKind[] = ['cargoHold', 'droneBay', 'fitting'];
 
 interface BuildContext {
