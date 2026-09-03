@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Implants } from '@/engine/types';
 import {
   DEFAULT_WHAT_IF_SELECTION,
+  normalizeWhatIfSelection,
   setWhatIfBonus,
   whatIfImplants,
   type WhatIfImplantSelection,
@@ -178,5 +179,31 @@ describe('setWhatIfBonus', () => {
     setWhatIfBonus(before, {}, 'perception', 1);
 
     expect(before).toEqual(custom({ perception: 4 }));
+  });
+});
+
+describe('normalizeWhatIfSelection', () => {
+  it("is the clone's own set when the plan has never had a lens stored", () => {
+    expect(normalizeWhatIfSelection(undefined)).toEqual(DEFAULT_WHAT_IF_SELECTION);
+  });
+
+  it('keeps a stored preset', () => {
+    expect(normalizeWhatIfSelection({ kind: 'preset', preset: '+4' })).toEqual(preset('+4'));
+  });
+
+  it('keeps a stored custom set, clamped slot by slot', () => {
+    expect(
+      normalizeWhatIfSelection({ kind: 'custom', bonuses: { memory: 9, perception: 4 } })
+    ).toEqual(custom({ intelligence: 0, memory: 5, perception: 4, willpower: 0, charisma: 0 }));
+  });
+
+  it('falls back to the default rather than trusting a malformed stored value', () => {
+    // Reachable: a doc pulled from Firestore, or a row from an older build.
+    expect(normalizeWhatIfSelection({ kind: 'preset', preset: '+9' })).toEqual(
+      DEFAULT_WHAT_IF_SELECTION
+    );
+    expect(normalizeWhatIfSelection({ kind: 'custom' })).toEqual(DEFAULT_WHAT_IF_SELECTION);
+    expect(normalizeWhatIfSelection('+3')).toEqual(DEFAULT_WHAT_IF_SELECTION);
+    expect(normalizeWhatIfSelection(null)).toEqual(DEFAULT_WHAT_IF_SELECTION);
   });
 });

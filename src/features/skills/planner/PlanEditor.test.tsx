@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -88,25 +88,44 @@ const PLAN: SkillPlanRecord = {
   updatedAt: 0,
 };
 
+/**
+ * `PlanEditor` is a controlled component: everything it persists — entries,
+ * markers, the remap count, and the two lenses the plan is costed under
+ * (What-If Implants, Booster) — lives on the `plan` prop, and an edit is a
+ * patch the owner writes back. The route does that through Dexie, and the
+ * updated record returns via `useLiveQuery`; this harness does the same
+ * synchronously, so a control the user just moved reads back the way it does
+ * in the app instead of snapping to a frozen prop.
+ */
 function renderEditor(
   onUpdate = vi.fn(),
   overrides: Partial<ComponentProps<typeof PlanEditor>> = {}
 ) {
-  render(
-    <PlanEditor
-      characterId={1}
-      plan={PLAN}
-      catalog={CATALOG}
-      trainedSkills={NO_TRAINED}
-      attributes={ATTRIBUTES}
-      implants={IMPLANTS}
-      attributesResult={ATTRIBUTES_RESULT}
-      remapInfo={null}
-      listPane={<div data-testid="plan-list-pane" />}
-      onUpdate={onUpdate}
-      {...overrides}
-    />
-  );
+  const { plan: initialPlan = PLAN, ...rest } = overrides;
+
+  function Harness() {
+    const [plan, setPlan] = useState(initialPlan);
+    return (
+      <PlanEditor
+        characterId={1}
+        plan={plan}
+        catalog={CATALOG}
+        trainedSkills={NO_TRAINED}
+        attributes={ATTRIBUTES}
+        implants={IMPLANTS}
+        attributesResult={ATTRIBUTES_RESULT}
+        remapInfo={null}
+        listPane={<div data-testid="plan-list-pane" />}
+        onUpdate={(patch) => {
+          onUpdate(patch);
+          setPlan((current) => ({ ...current, ...patch, updatedAt: current.updatedAt + 1 }));
+        }}
+        {...rest}
+      />
+    );
+  }
+
+  render(<Harness />);
   return { onUpdate };
 }
 
@@ -115,6 +134,13 @@ function renderEditor(
  * every test here runs below `lg` unless it opts in — which is where the
  * tools pane is a collapsed disclosure.
  */
+/** The five per-slot What-If inputs, in INT/MEM/PER/WIL/CHA order. */
+function bonusInputValues(): string[] {
+  return ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma'].map(
+    (attribute) => screen.getByLabelText<HTMLInputElement>(`${attribute} implant bonus`).value
+  );
+}
+
 async function openTools(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /plan tools/i }));
 }
@@ -522,11 +548,7 @@ describe('PlanEditor what-if implants', () => {
   }
 
   /** The five per-slot inputs, in INT/MEM/PER/WIL/CHA order. */
-  function bonusInputs(): string[] {
-    return ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma'].map(
-      (attribute) => screen.getByLabelText<HTMLInputElement>(`${attribute} implant bonus`).value
-    );
-  }
+  const bonusInputs = bonusInputValues;
 
   it("opens on the clone's own per-slot implants, unmatched set and all", async () => {
     const user = userEvent.setup();
@@ -675,6 +697,116 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
 
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
+  });
+});
+
+/**
+ * The lenses every number on this page is costed under are part of the plan,
+ * not of the session: a plan reopened on a different lens quotes different
+ * training times than the ones its owner left it showing.
+ */
+describe('PlanEditor persists the lenses the plan is costed under', () => {
+  const FITTED: Implants = { perception: 4, memory: 3 };
+
+  it('saves a What-If Implants preset onto the plan', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), { implants: FITTED });
+    await openTools(user);
+
+    await user.selectOptions(screen.getByLabelText('What-if implants'), '+4');
+
+    expect(onUpdate).toHaveBeenCalledWith({ whatIfImplants: { kind: 'preset', preset: '+4' } });
+  });
+
+  it('saves a per-slot What-If set onto the plan', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), { implants: FITTED });
+    await openTools(user);
+
+    const perception = screen.getByLabelText('Perception implant bonus');
+    await user.clear(perception);
+    await user.type(perception, '5');
+
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      whatIfImplants: {
+        kind: 'custom',
+        bonuses: { intelligence: 0, memory: 3, perception: 5, willpower: 0, charisma: 0 },
+      },
+    });
+  });
+
+  it('reopens on the lens the plan was saved with', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), {
+      implants: FITTED,
+      plan: { ...PLAN, whatIfImplants: { kind: 'preset', preset: '+5' } },
+    });
+    await openTools(user);
+
+    expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('+5');
+    expect(bonusInputValues()).toEqual(['5', '5', '5', '5', '5']);
+  });
+
+  it('saves the whole Booster answer the first time any part of it is touched', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    await user.click(screen.getByLabelText('Booster'));
+
+    // Not just the box: a stored Booster is what tells the editor the user
+    // has answered, so it has to carry the bonus and expiry it was showing.
+    expect(onUpdate).toHaveBeenCalledWith({
+      booster: { enabled: true, bonus: 3, expiresAt: null },
+    });
+  });
+
+  it('stores the expiry as the instant the control names, not its wall-clock text', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    await user.click(screen.getByLabelText('Booster'));
+    await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
+
+    // Local time, because that is what a datetime-local control means — and
+    // an instant, because the plan syncs to devices in other timezones.
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      booster: { enabled: true, bonus: 3, expiresAt: new Date(2099, 0, 1, 0, 0).getTime() },
+    });
+    expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('2099-01-01T00:00');
+  });
+
+  it('reopens on the Booster the plan was saved with', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), {
+      plan: {
+        ...PLAN,
+        booster: { enabled: true, bonus: 6, expiresAt: new Date(2099, 5, 2, 13, 45).getTime() },
+      },
+    });
+    await openTools(user);
+
+    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(true);
+    expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('6');
+    expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('2099-06-02T13:45');
+  });
+
+  it('does not re-prefill a detected accelerator over a saved "no booster" answer', async () => {
+    // Unticking the box is a legitimate answer — "that accelerator is gone" —
+    // and the prefill must not overrule it on the next visit.
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), {
+      attributeBaseline: {
+        kind: 'accelerated',
+        acceleratorBonus: 12,
+        attributes: ATTRIBUTES,
+      },
+      plan: { ...PLAN, booster: { enabled: false, bonus: 12, expiresAt: null } },
+    });
+    await openTools(user);
+
+    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(false);
   });
 });
 

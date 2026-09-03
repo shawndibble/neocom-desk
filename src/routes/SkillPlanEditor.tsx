@@ -1,13 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type SkillPlanRecord } from '@/db';
+import { db } from '@/db';
 import { PageHeader, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
-import { PlanEditor } from '@/features/skills/planner/PlanEditor';
+import { PlanEditor, type PlanPatch } from '@/features/skills/planner/PlanEditor';
 import { PlanEditorLayout } from '@/features/skills/planner/PlanEditorLayout';
 import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
@@ -67,9 +67,7 @@ export function SkillPlanEditor() {
     if (activeCharacterId !== null && isSyncConfigured()) scheduleSync(activeCharacterId);
   }
 
-  async function handleUpdate(
-    patch: Partial<Pick<SkillPlanRecord, 'entries' | 'remapCount' | 'markers'>>
-  ) {
+  async function handleUpdate(patch: PlanPatch) {
     if (!plan) return;
     await db.skillPlans.put({ ...plan, ...patch, updatedAt: Date.now() });
     syncAfterEdit();

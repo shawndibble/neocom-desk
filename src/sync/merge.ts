@@ -11,7 +11,14 @@
 //   mergeSettings — keyed by setting key; local tombstones never expire (only a
 //                   newer write to the key supersedes them). See issue #13.
 
-import type { BuildPlanRecord, QuickbarRecord, SkillPlanRecord, StationPinRecord } from '@/db';
+import type {
+  BuildPlanRecord,
+  PlanBooster,
+  QuickbarRecord,
+  SkillPlanRecord,
+  StationPinRecord,
+  WhatIfImplantSelection,
+} from '@/db';
 
 export const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -36,6 +43,8 @@ export interface RemotePlanDoc extends RemoteDoc {
   entries: SkillPlanRecord['entries'];
   remapCount: number;
   markers?: number[];
+  whatIfImplants?: WhatIfImplantSelection;
+  booster?: PlanBooster;
 }
 
 /** Remote Firestore doc at /characters/{uid}/buildPlans/{planId}. */

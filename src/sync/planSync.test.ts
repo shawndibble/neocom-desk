@@ -242,6 +242,47 @@ describe('markers field mapping', () => {
   });
 });
 
+describe('plan lens field mapping (What-If Implants + Booster)', () => {
+  // The two lenses a plan is costed under are Editable Data like the entries
+  // themselves — a plan that synced without them would quote different
+  // training times on the other device.
+  const whatIfImplants = { kind: 'custom' as const, bonuses: { memory: 5, perception: 4 } };
+  const booster = { enabled: true, bonus: 12, expiresAt: 4_102_444_800_000 };
+
+  it('round-trips both through push and pull', async () => {
+    await db.skillPlans.add(plan({ whatIfImplants, booster }));
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote?.whatIfImplants).toEqual(whatIfImplants);
+    expect(remote?.booster).toEqual(booster);
+
+    await db.skillPlans.delete('p1');
+    seedRemote(PLANS_PATH, [remoteDoc({ whatIfImplants, booster, updatedAt: Date.now() + 1000 })]);
+    await triggerSync(1);
+    const local = await db.skillPlans.get('p1');
+    expect(local?.whatIfImplants).toEqual(whatIfImplants);
+    expect(local?.booster).toEqual(booster);
+  });
+
+  it('carries a Booster with no expiry set — null is a value, undefined is not', async () => {
+    await db.skillPlans.add(plan({ booster: { enabled: false, bonus: 3, expiresAt: null } }));
+    await triggerSync(1);
+    expect(remoteStore.get(PLANS_PATH)?.get('p1')?.booster).toEqual({
+      enabled: false,
+      bonus: 3,
+      expiresAt: null,
+    });
+  });
+
+  it('omits both keys entirely when undefined (Firestore rejects undefined)', async () => {
+    await db.skillPlans.add(plan());
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote && 'whatIfImplants' in remote).toBe(false);
+    expect(remote && 'booster' in remote).toBe(false);
+  });
+});
+
 describe('triggerSync: plans', () => {
   it('pushes a local-only plan with ownerHash and deleted: false', async () => {
     const p = plan();
