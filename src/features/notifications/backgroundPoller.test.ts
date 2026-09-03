@@ -34,9 +34,17 @@ describe('sendBackgroundNotification', () => {
   it('calls showNotification with the same copy the foreground poller renders', async () => {
     const reg = registration();
     await sendBackgroundNotification(reg, FIRE, CHAR);
-    expect(reg.showNotification).toHaveBeenCalledWith('New mail', {
-      body: 'Test Pilot has new mail.',
-    });
+    expect(reg.showNotification).toHaveBeenCalledWith(
+      'New mail',
+      expect.objectContaining({
+        body: 'Test Pilot has new mail.',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/badge-96.png',
+        tag: '1:newMail',
+        renotify: true,
+        data: { url: '/mail' },
+      })
+    );
   });
 
   it('swallows a rejection from showNotification (permission revoked mid-flight)', async () => {
@@ -68,8 +76,16 @@ describe('backgroundDependencies', () => {
     expect(deps.permission()).toBe('granted');
 
     await deps.notify(FIRE, CHAR);
-    expect(reg.showNotification).toHaveBeenCalledWith('New mail', {
-      body: 'Test Pilot has new mail.',
-    });
+    expect(reg.showNotification).toHaveBeenCalledWith(
+      'New mail',
+      expect.objectContaining({
+        body: 'Test Pilot has new mail.',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/badge-96.png',
+        tag: '1:newMail',
+        renotify: true,
+        data: { url: '/mail' },
+      })
+    );
   });
 });

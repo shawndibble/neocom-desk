@@ -14,6 +14,7 @@
  * rather than derived from the fire's contents.
  */
 import { db, type NotificationFeedRecord } from '@/db';
+import { refreshAppBadge } from './appBadge';
 
 /**
  * How many entries the feed keeps. Chosen to be comfortably more than a
@@ -45,10 +46,12 @@ export async function recordFeedEntry(entry: NewNotificationFeedEntry): Promise<
   await db.notificationFeed.put({ ...entry, id: crypto.randomUUID() });
   const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT);
   if (stale.length > 0) await db.notificationFeed.bulkDelete(stale);
+  await refreshAppBadge();
 }
 
 export async function dismissFeedEntry(id: string): Promise<void> {
   await db.notificationFeed.delete(id);
+  await refreshAppBadge();
 }
 
 /**
@@ -59,4 +62,5 @@ export async function dismissFeedEntry(id: string): Promise<void> {
  */
 export async function dismissFeedEntries(ids: readonly string[]): Promise<void> {
   await db.notificationFeed.bulkDelete([...ids]);
+  await refreshAppBadge();
 }

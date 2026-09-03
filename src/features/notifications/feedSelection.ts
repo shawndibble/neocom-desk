@@ -8,10 +8,10 @@
  * flipping it back on restores them — a toggle is a view preference here, not
  * a destructive edit. Dismissing is the destructive one.
  */
-import { isEventEnabled } from './eventSelection';
+import { isEventEnabledFor } from './eventSelection';
 import { characterEventPrefs, type NotificationPreferencesValue } from './preferences';
 import type { NotificationEventId } from './events';
-import type { NotificationFeedEntry } from './feed';
+import type { NotificationFeedRecord as NotificationFeedEntry } from '@/db';
 
 export interface OtherCharacterAlerts {
   characterId: number;
@@ -20,9 +20,12 @@ export interface OtherCharacterAlerts {
 }
 
 /**
+ * Gated on the **feed** channel specifically: an event can be set to raise a
+ * browser notification while staying out of this list, and the reverse.
+ *
  * `eventId` is a plain string on the stored record (`src/db` holds no
  * dependency on this feature), and an entry written by an older build may
- * name an event the catalog no longer has. `isEventEnabled` defaults absent
+ * name an event the catalog no longer has. `isEventEnabledFor` defaults absent
  * ids to enabled, so such a row stays visible and dismissible rather than
  * becoming unreachable clutter.
  */
@@ -31,7 +34,7 @@ function isEntryVisible(
   prefs: NotificationPreferencesValue
 ): boolean {
   const forCharacter = characterEventPrefs(prefs, entry.characterId);
-  return isEventEnabled(forCharacter, entry.eventId as NotificationEventId);
+  return isEventEnabledFor(forCharacter, entry.eventId as NotificationEventId, 'feed');
 }
 
 export function visibleFeedEntries(

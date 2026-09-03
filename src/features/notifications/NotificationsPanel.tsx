@@ -43,11 +43,17 @@ import {
   withFeedEnabled,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
-  withEventToggled,
+  withEventChannelToggled,
   withAllEventsToggledForCharacter,
 } from './preferences';
-import { isEventEnabled, selectionStateForEvents } from './eventSelection';
+import {
+  isEventEnabledFor,
+  selectionStateForEvents,
+  NOTIFICATION_CHANNELS,
+  type NotificationChannel,
+} from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
+import { refreshAppBadge } from './appBadge';
 import {
   useNotificationPermission,
   useNotificationPromptState,
@@ -76,6 +82,14 @@ export function NotificationsPanel() {
   useEffect(() => {
     void hydratePrefs();
   }, [hydratePrefs]);
+
+  // The Overview panel refreshes the app-icon badge when preferences change,
+  // but it is unmounted while the user is on Settings — which is the only
+  // place these toggles live. Without this the badge keeps a count the feed
+  // no longer shows until the next Overview visit or app restart.
+  useEffect(() => {
+    void refreshAppBadge();
+  }, [prefsValue]);
 
   const { permission, refresh: refreshPermission } = useNotificationPermission();
   const setPromptState = useNotificationPromptState((state) => state.setValue);
@@ -126,29 +140,27 @@ export function NotificationsPanel() {
   // same as "no characters yet" rather than blanking the whole section.
   const characterList = characters ?? [];
 
-  // JS cannot re-request a denied grant, so the toggle UI would be a set of
-  // controls that can never take effect — the notice stands in for all of it
-  // until the user unblocks the site (issue #171).
-  if (notificationsBlocked(permission)) {
-    return (
-      <Panel title={t('settings.notificationsTitle')}>
-        <div className="space-y-3">
-          <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
+  // A denied grant disables the *browser* column and its Enable button — JS
+  // cannot re-request one, so those controls could never take effect. It no
+  // longer stands in for the whole panel: the Overview feed is designed to
+  // work with no grant at all (`foregroundPoller` keeps filing it when
+  // permission is 'denied'), so blanking this section left exactly the user
+  // whose only channel is the feed with no way to configure it — and the
+  // Overview's own "Settings" link landing on a dead end.
+  const browserBlocked = notificationsBlocked(permission);
+
+  return (
+    <Panel title={t('settings.notificationsTitle')}>
+      <div className="space-y-3">
+        <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
+        {browserBlocked && (
           <p
             role="status"
             className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-text"
           >
             {t('settings.notifications.blockedNotice')}
           </p>
-        </div>
-      </Panel>
-    );
-  }
-
-  return (
-    <Panel title={t('settings.notificationsTitle')}>
-      <div className="space-y-3">
-        <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
+        )}
         {permission === 'default' && (
           <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
             <p className="min-w-0 flex-1 text-xs text-text-dim">
@@ -184,13 +196,14 @@ export function NotificationsPanel() {
           <label className="flex items-center gap-2 text-xs text-text">
             <input
               type="checkbox"
-              checked={isBrowserChannelEnabled(prefsValue)}
+              checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
+              disabled={browserBlocked}
               onChange={() =>
                 void setPrefsValue(
                   withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
                 )
               }
-              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
+              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
             />
             {t('settings.notifications.browserChannelLabel')}
           </label>
@@ -240,7 +253,6 @@ export function NotificationsPanel() {
                   grantedScopes.has(eventDef(eventId).scope)
                 );
                 const prefs = characterEventPrefs(prefsValue, character.characterId);
-                const selectionState = selectionStateForEvents(togglableEventIds, prefs);
 
                 return (
                   <div
@@ -264,62 +276,91 @@ export function NotificationsPanel() {
                         </span>
                         <span className="min-w-0 truncate normal-case">{character.name}</span>
                       </button>
-                      <SelectionCheckbox
-                        state={selectionState}
-                        onToggle={() =>
-                          void setPrefsValue(
-                            withAllEventsToggledForCharacter(
-                              prefsValue,
-                              character.characterId,
-                              togglableEventIds
-                            )
-                          )
-                        }
-                        label={t('settings.notifications.selectAllLabel', {
-                          character: character.name,
-                        })}
-                      />
+                      {/* One select-all per column, in the same grid track as
+                          the checkboxes below so each sits over its own column. */}
+                      <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                        {NOTIFICATION_CHANNELS.map((channel) => (
+                          <SelectionCheckbox
+                            key={channel}
+                            state={selectionStateForEvents(togglableEventIds, prefs, channel)}
+                            onToggle={() =>
+                              void setPrefsValue(
+                                withAllEventsToggledForCharacter(
+                                  prefsValue,
+                                  character.characterId,
+                                  togglableEventIds,
+                                  channel
+                                )
+                              )
+                            }
+                            label={t(`settings.notifications.selectAll.${channel}`, {
+                              character: character.name,
+                            })}
+                          />
+                        ))}
+                      </div>
                     </div>
                     {expanded && (
-                      <ul className="divide-y divide-line bg-panel-2">
-                        {visibleEventIds.map((eventId) => {
-                          const def = eventDef(eventId);
-                          const hasScope = grantedScopes.has(def.scope);
-                          const enabled = isEventEnabled(prefs, eventId);
-                          const eventLabel = t(def.labelKey);
-                          const checkbox = (
-                            <input
-                              type="checkbox"
-                              checked={hasScope && enabled}
-                              disabled={!hasScope}
-                              onChange={() =>
-                                void setPrefsValue(
-                                  withEventToggled(prefsValue, character.characterId, eventId)
-                                )
-                              }
-                              aria-label={eventLabel}
-                              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            />
-                          );
-                          return (
-                            <li
-                              key={eventId}
-                              className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
-                            >
-                              <span className={hasScope ? 'text-text' : 'text-text-faint'}>
-                                {eventLabel}
+                      <div className="bg-panel-2">
+                        {/* Column captions, aligned to the same two tracks the
+                            rows below use — an event can raise a browser
+                            notification without joining the Overview list, or
+                            the reverse. */}
+                        <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5">
+                          <span className="sr-only">{t('settings.notifications.columnEvent')}</span>
+                          <span aria-hidden="true" className="flex-1" />
+                          <div className="grid shrink-0 grid-cols-2 gap-x-6 text-center">
+                            {NOTIFICATION_CHANNELS.map((channel) => (
+                              <span
+                                key={channel}
+                                className="w-4 text-[0.6875rem] leading-tight text-text-dim"
+                              >
+                                {t(`settings.notifications.column.${channel}`)}
                               </span>
-                              {hasScope ? (
-                                checkbox
-                              ) : (
-                                <Tooltip content={t('settings.notifications.reauthHint')}>
-                                  {checkbox}
-                                </Tooltip>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
+                            ))}
+                          </div>
+                        </div>
+                        <ul className="divide-y divide-line">
+                          {visibleEventIds.map((eventId) => {
+                            const def = eventDef(eventId);
+                            const hasScope = grantedScopes.has(def.scope);
+                            const eventLabel = t(def.labelKey);
+                            return (
+                              <li
+                                key={eventId}
+                                className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                              >
+                                <span className={hasScope ? 'text-text' : 'text-text-faint'}>
+                                  {eventLabel}
+                                </span>
+                                <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                                  {NOTIFICATION_CHANNELS.map((channel) => (
+                                    <ChannelCheckbox
+                                      key={channel}
+                                      channel={channel}
+                                      eventLabel={eventLabel}
+                                      hasScope={
+                                        hasScope && !(channel === 'browser' && browserBlocked)
+                                      }
+                                      checked={isEventEnabledFor(prefs, eventId, channel)}
+                                      onToggle={() =>
+                                        void setPrefsValue(
+                                          withEventChannelToggled(
+                                            prefsValue,
+                                            character.characterId,
+                                            eventId,
+                                            channel
+                                          )
+                                        )
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 );
@@ -330,4 +371,39 @@ export function NotificationsPanel() {
       </div>
     </Panel>
   );
+}
+
+/**
+ * One event's checkbox for one delivery channel. Its accessible name names
+ * both — "New Mail, browser notifications" — because two visually adjacent
+ * checkboxes on a row are indistinguishable to a screen reader otherwise, and
+ * the column caption above is not associated with them.
+ */
+function ChannelCheckbox({
+  channel,
+  eventLabel,
+  hasScope,
+  checked,
+  onToggle,
+}: {
+  channel: NotificationChannel;
+  eventLabel: string;
+  hasScope: boolean;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const label = t(`settings.notifications.toggleLabel.${channel}`, { event: eventLabel });
+  const checkbox = (
+    <input
+      type="checkbox"
+      checked={hasScope && checked}
+      disabled={!hasScope}
+      onChange={onToggle}
+      aria-label={label}
+      className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
+    />
+  );
+  if (hasScope) return checkbox;
+  return <Tooltip content={t('settings.notifications.reauthHint')}>{checkbox}</Tooltip>;
 }
