@@ -187,11 +187,16 @@ async function openPlanTools() {
   }
 }
 
-/** The tools-pane section a heading titles (Actions / Training / Import / Export). */
+/**
+ * The tools-pane section a heading titles (Actions / Attributes /
+ * Import / Export). `closest('section')`, not `parentElement`: a heading
+ * shares a flex row with its section's optional right-aligned actions (the
+ * Attributes section's `DataAgeBadge`).
+ */
 function toolsSection(title: string): HTMLElement {
-  const section = screen.getByRole('heading', { name: title }).parentElement;
+  const section = screen.getByRole('heading', { name: title }).closest('section');
   if (!section) throw new Error(`expected the "${title}" tools section`);
-  return section;
+  return section as HTMLElement;
 }
 
 let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;
@@ -485,6 +490,37 @@ describe('SkillPlans: current attributes beside the plan list', () => {
     const panel = await attributesPanel();
     expect(await within(panel).findByText('—')).toBeInTheDocument();
     expect(within(panel).queryByText('Intelligence')).not.toBeInTheDocument();
+  });
+});
+
+describe('SkillPlans editor: the same attributes, on the route they are costed on', () => {
+  it("shows the character's current attributes in the editor's tools pane, dated", async () => {
+    // Distinct from usePlanEditorData's DEFAULT_ATTRIBUTES (20/20/20/20/19),
+    // so this proves ESI's own read reached the editor and not the fallback
+    // sheet computeSchedule falls back to.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          charisma: 21,
+          intelligence: 24,
+          memory: 23,
+          perception: 22,
+          willpower: 25,
+        })
+      )
+    );
+    await db.skillPlans.add(seedPlan());
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+
+    const section = toolsSection('Attributes');
+    expect(await within(section).findByText('24')).toBeInTheDocument();
+    expect(within(section).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(section).getByText('25')).toBeInTheDocument();
+    expect(section.querySelector('time')).not.toBeNull();
+    // The what-if lens sits directly beneath the sheet it reinterprets.
+    expect(within(section).getByLabelText('What-if implants')).toBeInTheDocument();
   });
 });
 

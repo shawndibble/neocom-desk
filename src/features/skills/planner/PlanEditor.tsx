@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DataAgeBadge,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -44,7 +45,9 @@ import type {
   TrainedSkill,
 } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
-import { loadCharacterSkillQueue } from '../data';
+import type { CharacterAttributes } from '@/esi/endpoints';
+import { AttributeChips } from '@/features/skills/AttributeChips';
+import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
@@ -114,6 +117,14 @@ interface PlanEditorProps {
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   attributes: Attributes;
   implants: Implants;
+  /**
+   * ESI's own attributes read, carrying its `fetchedAt` — what the tools
+   * pane *displays*. Deliberately not derived from `attributes` above: that
+   * one is the scheduler's base sheet, which falls back to placeholder
+   * numbers when ESI could not be read and is clamped to the base minimum,
+   * so showing it would present a fallback as the character's own sheet.
+   */
+  attributesResult: CachedResult<CharacterAttributes> | null;
   /** Remaps Available from ESI (bonus + yearly), for the hint next to the count input. */
   remapInfo: RemapAvailability | null;
   /**
@@ -181,6 +192,7 @@ export function PlanEditor({
   trainedSkills,
   attributes,
   implants,
+  attributesResult,
   remapInfo,
   listPane,
   onUpdate,
@@ -755,10 +767,52 @@ export function PlanEditor({
       ),
     },
     {
-      id: 'training',
-      title: t('plans.toolsTraining'),
+      // Round 17 called this section "Training" and gave it the two what-if
+      // lenses. It is the character's *attributes* that those lenses move,
+      // and attributes are the one piece of character state that explains
+      // every number on this page — training time, projected finish, the
+      // savings the remap optimizer quotes. So the section leads with the
+      // sheet itself and keeps the lenses beneath it, which is why it is
+      // named for the sheet now (and named the same as the plan list's
+      // pane, which shows exactly this).
+      //
+      // Why here, and not a fourth panel: the sidebar already carries the
+      // plan list plus this one tools panel, and the round-17 redesign
+      // exists precisely because the page had grown too many peer panels.
+      // Another one would cost another header strip to say the same thing,
+      // and below `lg` — where there is no sidebar at all — it would land as
+      // a second always-open block above the entry list, undoing the "the
+      // whole tool set costs one collapsed row" rule. Inside the pane, the
+      // attributes cost no rows on a phone and sit a line above the control
+      // that reinterprets them on a desktop.
+      //
+      // The tradeoff that buys: below `lg` the attributes are behind the
+      // same one tap as every other tool. Accepted deliberately — the plan
+      // leads the page there, and a reference read is worth a tap where a
+      // permanently-open block is not.
+      id: 'attributes',
+      title: t('plans.toolsAttributes'),
+      // Dated like every other ESI-derived view, and in the same place the
+      // plan list's Attributes panel dates it.
+      actions: attributesResult?.fetchedAt && <DataAgeBadge date={attributesResult.fetchedAt} />,
       content: (
         <div className="space-y-2 text-xs">
+          {/* The clone's real sheet, never re-rendered through the what-if
+              lens below: "current" has to keep meaning current, or the one
+              honest reading of the character on this page becomes another
+              hypothetical. The lens's effect is visible where it belongs —
+              in the plan's own numbers. */}
+          <AttributeChips
+            attributes={attributesResult?.data ?? null}
+            implantBonuses={implants}
+            dense
+          />
+          {/* Says which half of this section is fact. An earlier draft read
+              "every estimate on this page is costed against these", which is
+              false the moment the lens leaves "current" — the estimates are
+              costed against the lens, not against the chips. */}
+          <p className="text-[0.6875rem] text-text-dim">{t('plans.attributesCurrentNote')}</p>
+
           <label className="flex items-center justify-between gap-2">
             {t('plans.whatIfImplants')}
             <NativeSelect
