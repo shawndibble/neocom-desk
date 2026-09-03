@@ -22,6 +22,8 @@
  * exactly the confident-wrong-number the colony `unknown` state avoids.
  */
 
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+
 /** SDE typeID of Customs Code Expertise. */
 export const CUSTOMS_CODE_EXPERTISE_SKILL_ID = 33467;
 
@@ -74,4 +76,29 @@ export function customsRateSource(space: ColonySpace, level: number | null): Cus
     kind: 'highsec-skill',
     level: Math.min(Math.max(Math.trunc(level), 0), MAX_SKILL_LEVEL),
   };
+}
+
+/**
+ * The character's trained Customs Code Expertise, or `null` when the app has
+ * no skill data for them at all.
+ *
+ * `null` and `0` are deliberately different answers and both are real: a
+ * character who has never trained it is a confident 0, while a character whose
+ * `/skills` has never loaded is unknown. Both start the rate at 10%, but only
+ * the first may say so on screen.
+ *
+ * Read through `loadCorrectedSkills` rather than `/skills` directly, for the
+ * same reason every other planner in the app does: `/skills` lags a finished
+ * queue entry until the character next logs in, and this skill is cheap enough
+ * to be exactly the kind that finishes unnoticed.
+ */
+export async function loadCustomsCodeExpertise(
+  characterId: number,
+  nowMs: number
+): Promise<number | null> {
+  const corrected = await loadCorrectedSkills(characterId, nowMs, {
+    skipQueueWithoutScope: true,
+  });
+  if (!corrected.skillsResult) return null;
+  return corrected.trained.get(CUSTOMS_CODE_EXPERTISE_SKILL_ID)?.level ?? 0;
 }
