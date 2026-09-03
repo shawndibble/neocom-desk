@@ -304,6 +304,38 @@ describe('EntryList reorder affordance', () => {
   });
 });
 
+describe('EntryList marker row attributes', () => {
+  const rows: MergedRow[] = [
+    entryRow(1, [0]),
+    { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
+  ];
+
+  it('shows the plain divider when no target attributes are known for this marker', () => {
+    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+    expect(screen.getByText('Remap marker')).toBeInTheDocument();
+    expect(screen.queryByText(/PER 27/)).not.toBeInTheDocument();
+  });
+
+  it("shows the marker's target attribute spread instead of the divider once known", () => {
+    const attributes = {
+      intelligence: 17,
+      memory: 17,
+      perception: 27,
+      willpower: 21,
+      charisma: 17,
+    };
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        markerAttributesFor={(markerIndex) => (markerIndex === 0 ? attributes : undefined)}
+      />
+    );
+    expect(screen.getByText('PER 27 / WIL 21 / INT 17 / MEM 17 / CHA 17')).toBeInTheDocument();
+  });
+});
+
 describe('EntryList band headers (#115)', () => {
   it('renders a priority band header', () => {
     const rows = [entryRow(1, [0])];
