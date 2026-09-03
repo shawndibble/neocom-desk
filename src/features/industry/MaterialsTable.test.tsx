@@ -746,4 +746,41 @@ describe('MaterialsTable make-or-buy marker', () => {
     });
     expect(within(row('Mechanical Parts')).getByRole('img')).not.toHaveAccessibleName(/Worth/);
   });
+
+  it('reveals the house Tooltip bubble on hover, not a bare browser title', async () => {
+    renderTable(advise(buildIt));
+    const marker = within(row('Mechanical Parts')).getByRole('img');
+    // A native `title` fights the app's own tooltip — the browser draws its
+    // unstyled one a beat after Radix draws ours, so this has to be gone,
+    // not merely duplicated by the real thing.
+    expect(marker).not.toHaveAttribute('title');
+    expect(screen.queryByRole('tooltip')).toBeNull();
+
+    fireEvent.pointerMove(marker);
+
+    // Radix's first hover in a session goes through its own open delay
+    // (zeroed, but still a real timer) rather than opening synchronously —
+    // `findByRole` is what `Tooltip.test.tsx`'s own hover case waits on too.
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent(/Cheaper to build: 42\.96 a unit/);
+    expect(marker).toHaveAttribute('aria-describedby', tooltip.id);
+  });
+
+  it('never takes a tab stop — a marker has nothing to click', async () => {
+    // `fireEvent.focus` fires React's handler on whatever node it targets,
+    // focusable or not, so it can't tell this apart from a real tab stop —
+    // it would pass just as well on a `<button>`, which is the mistake this
+    // guards against (every other `Tooltip` call in the app wraps one).
+    // `userEvent.tab()` walks focus the way a browser actually does, landing
+    // only on elements the platform considers focusable.
+    const user = userEvent.setup();
+    renderTable(advise(buildIt));
+    const marker = within(row('Mechanical Parts')).getByRole('img');
+    expect(marker).not.toHaveAttribute('tabindex');
+
+    for (let i = 0; i < 4; i++) {
+      await user.tab();
+      expect(document.activeElement).not.toBe(marker);
+    }
+  });
 });
