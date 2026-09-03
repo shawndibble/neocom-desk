@@ -17,6 +17,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
+import { ExtractorTimeline } from '@/features/pi/ExtractorTimeline';
+import { loadPiRosterSnapshot, type PiRosterSnapshot } from '@/features/pi/roster';
 import { loadPlanetName, loadSchematicName } from '@/features/pi/names';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -32,7 +34,14 @@ import {
   extractorState,
   sortColoniesByAttention,
 } from '@/engine/pi/colonyStatus';
-import type { ColonyAttention, ColonyStatus } from '@/engine/pi/types';
+import {
+  extractorCycleYields,
+  fractionOfPeak,
+  hasYieldBaseline,
+  programTotalYield,
+  yieldBankedBy,
+} from '@/engine/pi/extraction';
+import type { ColonyAttention, ColonyStatus, ExtractorYieldProgram } from '@/engine/pi/types';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -42,7 +51,7 @@ const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_DETAILS: ReadonlyMap<number, StatusResult<CharacterPlanetDetail>> = new Map();
 const EMPTY_STATUS: ColonyStatus = { idle: false, soonestExpiryMs: null };
 
-interface Snapshot {
+interface ActiveColonies {
   planetsResult: CachedResult<CharacterPlanet[]> | null;
   /** 403 (scope never granted) means "log in again", not "offline". */
   planetsNeedsReauth: boolean;
@@ -56,13 +65,21 @@ interface Snapshot {
   loadedAt: number;
 }
 
-async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
+interface Snapshot extends ActiveColonies {
+  /** Every Character's programs, read cache-only — see `features/pi/roster.ts`. */
+  roster: PiRosterSnapshot;
+}
+
+async function loadActiveColonies(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<ActiveColonies> {
   const { cached: planetsResult, needsReauth: planetsNeedsReauth } =
     await loadCharacterPlanets(characterId);
   const loadedAt = Date.now();
   const planets = planetsResult?.data ?? [];
 
-  const empty: Snapshot = {
+  const empty: ActiveColonies = {
     planetsResult,
     planetsNeedsReauth,
     details: new Map(),
@@ -133,6 +150,21 @@ async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal):
 }
 
 /**
+ * The active Character's colonies live, then every Character's programs from
+ * Dexie.
+ *
+ * Order matters and is the whole cache-first story: the live load above has
+ * already written the active Character's fresh rows, so the cache-only roster
+ * read below picks them up without a second call, and page open costs exactly
+ * the ESI traffic it cost before this panel existed. Refresh re-runs this
+ * function, so the roster is refreshed by the same gesture.
+ */
+async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
+  const active = await loadActiveColonies(characterId, signal);
+  return { ...active, roster: await loadPiRosterSnapshot() };
+}
+
+/**
  * `colonyAttention` only ever sees full, successfully-fetched data — it can't
  * tell "verified healthy" from "we have no idea". `unknown` is that missing
  * case: a colony whose detail failed to load, or that has an extractor pin
@@ -141,9 +173,16 @@ async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal):
  */
 type EffectiveAttention = ColonyAttention | 'unknown';
 
-const ATTENTION_TONE: Record<EffectiveAttention, 'danger' | 'warning' | 'success' | 'default'> = {
+// `decayed` is deliberately not `warning`: it would then be indistinguishable
+// at a glance from `expiring-soon`, which is the more urgent call. `accent`
+// reads as "worth a look", which is all the flag claims to be.
+const ATTENTION_TONE: Record<
+  EffectiveAttention,
+  'danger' | 'warning' | 'accent' | 'success' | 'default'
+> = {
   idle: 'danger',
   'expiring-soon': 'warning',
+  decayed: 'accent',
   healthy: 'success',
   unknown: 'default',
 };
@@ -153,6 +192,25 @@ const STATE_CLASS: Record<'active' | 'expiring-soon' | 'expired', string> = {
   'expiring-soon': 'text-warning',
   expired: 'text-danger',
 };
+
+const DAY_MS = 86_400_000;
+
+/**
+ * A day's output a reinstall would recover right now: the gap between a fresh
+ * program's opening cycle and this program's current one, scaled to a day.
+ *
+ * A fresh program's opening cycle depends only on the install-time baseline,
+ * never on how long the program runs — CCP's curve enters at cycle 0 either
+ * way — so the same `qty_per_cycle`/`cycle_time` reinstalled today opens
+ * exactly where this one did. Display-side arithmetic over
+ * `engine/pi/extraction`'s exports, not new decay maths; `nowMs` is the
+ * loader's `loadedAt`, never `Date.now()`.
+ */
+function resetGainPerDay(program: ExtractorYieldProgram, nowMs: number): number {
+  const peak = extractorCycleYields(program, 1)[0] ?? 0;
+  const current = peak * fractionOfPeak(program, nowMs);
+  return Math.max(0, (peak - current) * (DAY_MS / program.cycleTimeMs));
+}
 
 interface ColonyPanelProps {
   planet: CharacterPlanet;
@@ -186,6 +244,17 @@ function ColonyPanel({
       ? 'unknown'
       : colonyAttention(status, loadedAt);
 
+  // Keyed by pin so a table cell can find its own program without re-parsing
+  // ESI timestamps per render. Only programs with a complete install-time
+  // baseline go in: a pin missing one is listed with an em dash, never a zero.
+  const yieldProgramsByPin = useMemo(() => {
+    const map = new Map<number, ExtractorYieldProgram>();
+    for (const program of extractorProgramsFromPins(detail?.pins ?? [])) {
+      if (hasYieldBaseline(program)) map.set(program.pinId, program);
+    }
+    return map;
+  }, [detail]);
+
   const columns = useMemo<DataTableColumn<PlanetPin>[]>(
     () => [
       {
@@ -201,6 +270,10 @@ function ColonyPanel({
       {
         id: 'detail',
         header: t('pi.column.detail'),
+        // Titles the card below `sm` (docs/DESIGN.md §4a): the pin column
+        // reads "Extractor Control Unit" on every extractor row, so the
+        // product is what actually identifies a card.
+        primary: true,
         render: (pin) => {
           const role = pinRole(pin);
           if (role === 'extractor') {
@@ -245,8 +318,42 @@ function ColonyPanel({
             : t('pi.expiresIn', { duration: formatDuration((expiryMs - loadedAt) / 1000) });
         },
       },
+      {
+        id: 'banked',
+        header: t('pi.yield.bankedColumn'),
+        align: 'right',
+        className: 'tabular-nums',
+        // No self-rendered alignment: `align: 'right'` is the column prop
+        // `.dt-stack` already overrides below `sm` (docs/DESIGN.md §4a), and
+        // the amount and its percentage are one interpolated string rather
+        // than a `justify-end` pair that would hug the card's edge.
+        render: (pin) => {
+          const program = yieldProgramsByPin.get(pin.pin_id);
+          if (!program) return '—';
+          const total = programTotalYield(program);
+          if (total <= 0) return '—';
+          const banked = yieldBankedBy(program, loadedAt);
+          return t('pi.yield.bankedValue', {
+            amount: Math.round(banked).toLocaleString(),
+            percent: Math.round((banked / total) * 100),
+          });
+        },
+      },
+      {
+        id: 'resetGain',
+        header: t('pi.yield.resetGainColumn'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (pin) => {
+          const program = yieldProgramsByPin.get(pin.pin_id);
+          if (!program) return '—';
+          return t('pi.yield.resetGainValue', {
+            amount: Math.round(resetGainPerDay(program, loadedAt)).toLocaleString(),
+          });
+        },
+      },
     ],
-    [t, pinTypeNames, productNames, schematicNames, loadedAt]
+    [t, pinTypeNames, productNames, schematicNames, yieldProgramsByPin, loadedAt]
   );
 
   const planetName =
@@ -263,7 +370,13 @@ function ColonyPanel({
             label={t('pi.attentionLabel')}
             value={t(`pi.attention.${attention}`)}
             tone={ATTENTION_TONE[attention]}
-            tooltip={attention === 'unknown' ? t('pi.attentionUnknownTooltip') : undefined}
+            tooltip={
+              attention === 'unknown'
+                ? t('pi.attentionUnknownTooltip')
+                : attention === 'decayed'
+                  ? t('pi.yield.decayedTooltip')
+                  : undefined
+            }
           />
           <StatChip
             label={t('pi.lastUpdate')}
@@ -356,6 +469,15 @@ export function PlanetaryIndustry() {
           </>
         }
       />
+
+      {/*
+        Above the per-colony panels, and above the branch below rather than
+        inside it: the active Character losing the planets scope, or simply
+        having no colonies, says nothing about the alts whose programs are
+        already cached — and answering "which character do I log in next" for
+        exactly that case is what a cross-character panel is for.
+      */}
+      {!loading && data && <ExtractorTimeline snapshot={data.roster} nowMs={loadedAt} />}
 
       {loading ? (
         <div className="flex justify-center py-16">

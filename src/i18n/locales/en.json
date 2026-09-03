@@ -792,6 +792,7 @@
     "attention": {
       "idle": "Idle",
       "expiring-soon": "Expiring soon",
+      "decayed": "Decayed",
       "healthy": "Healthy",
       "unknown": "Unknown"
     },
@@ -833,7 +834,31 @@
     "unknownProduct": "Unknown product",
     "unknownSchematic": "Unknown schematic",
     "expired": "Expired",
-    "expiresIn": "in {{duration}}"
+    "expiresIn": "in {{duration}}",
+    "yield": {
+      "bankedColumn": "Banked",
+      "bankedValue": "{{amount}} ({{percent}}%)",
+      "resetGainColumn": "Reset now",
+      "resetGainValue": "+{{amount}}/day",
+      "decayedTooltip": "Every extractor here is producing under half what it did on its first cycle. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows what a day of that is worth."
+    },
+    "timeline": {
+      "title": "Extractor Timeline",
+      "listLabel": "Extractor programs across every character, the ones needing attention first",
+      "windowHint": "Every extractor program cached for any of your characters, worst first. Each bar is the time left in the next {{days}} days; a longer program fills its track.",
+      "coloniesStat": "Colonies",
+      "idleStat": "Idle",
+      "nextExpiryStat": "Next Expiry",
+      "skippedStat": "Skipped",
+      "noneValue": "None",
+      "skippedTooltip": "Characters that haven't granted this app planetary access. Nothing is fetched for them, so they never raise a log-in prompt — log in again with that character to include it here.",
+      "emptyTitle": "No extractor programs cached",
+      "emptyHint": "Colony data is cached as you open this page on each character. Refresh loads the active character now.",
+      "notLoaded": "Not loaded yet, so their programs aren't listed: {{names}}. Switch to a character and refresh to cache its colonies.",
+      "coloniesNotLoaded": "{{count}} listed colonies have no cached detail yet, so their programs aren't listed.",
+      "noColonies": "No colonies: {{names}}.",
+      "skipped": "Skipped, no planetary access granted: {{names}}."
+    }
   },
   "employmentHistory": {
     "title": "Employment",
@@ -990,6 +1015,10 @@
       "planetaryExtractionDone": {
         "title": "Extraction done",
         "body": "{{character}}'s extraction on {{planet}} has stopped."
+      },
+      "planetaryExtractorExpiring": {
+        "title": "Extractor expiring",
+        "body": "{{character}}'s extractor on {{planet}} expires in under {{hours}} hours."
       },
       "newMail": {
         "title": "New mail",
@@ -1265,6 +1294,7 @@
         "industryJobComplete": "Industry Job Complete",
         "newMail": "New Mail",
         "planetaryExtractionDone": "Planetary Extraction Done",
+        "planetaryExtractorExpiring": "Planetary Extractor Expiring",
         "marketOrderFilled": "Market Order Filled",
         "newCalendarEvent": "New Calendar Event",
         "calendarEventStarting": "Calendar Event Starting",
@@ -1272,6 +1302,7 @@
         "walletBalanceChanged": "Wallet Balance Changed",
         "eveNotification": "EVE Notifications"
       },
+      "extractorExpiringHint": "Checked every five minutes while the app is open. With the app closed, this warning rides on background sync: the installed app on Chrome or Edge only, on a schedule the browser decides, and not at all on iPhone, iPad, or Firefox — so it can arrive late or not at all. The Planetary Industry page always shows the real expiry.",
       "browserChannelLabel": "Browser notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission, and only appears while the app is open on iPhone and iPad.",
       "feedChannelLabel": "Overview notifications",

@@ -480,7 +480,24 @@ describe('runForegroundPoll', () => {
     expect(loadColonyExtractors).not.toHaveBeenCalled();
   });
 
-  it('skips planetary extraction for a character who toggled the event off despite having the scope', async () => {
+  it('skips planetary extraction for a character who toggled every colony event off despite having the scope', async () => {
+    const loadColonyExtractors = vi.fn(async () => []);
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, PLANETS_SCOPE]),
+      eventPrefsFor: async () => ({
+        planetaryExtractionDone: false,
+        planetaryExtractorExpiring: false,
+      }),
+      loadColonyExtractors,
+    });
+    await runForegroundPoll(deps);
+    expect(loadColonyExtractors).not.toHaveBeenCalled();
+  });
+
+  it("still fetches colonies when only one of the domain's two events is on (issue #310)", async () => {
+    // One snapshot answers for both planetary events, so the fetch is skipped
+    // only when every event of the domain is off — which is what makes each
+    // diff's own `gatedOn` gate load-bearing rather than redundant.
     const loadColonyExtractors = vi.fn(async () => []);
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, PLANETS_SCOPE]),
@@ -488,7 +505,7 @@ describe('runForegroundPoll', () => {
       loadColonyExtractors,
     });
     await runForegroundPoll(deps);
-    expect(loadColonyExtractors).not.toHaveBeenCalled();
+    expect(loadColonyExtractors).toHaveBeenCalled();
   });
 
   it('persists a colony snapshot on the first poll but fires nothing (no baseline yet)', async () => {

@@ -77,6 +77,30 @@ async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
   return map;
 }
 
+/**
+ * Type names from the local SDE snapshot and `esiCache` only — never a live
+ * call. For fan-outs that run on page open (the cross-character PI timeline),
+ * where `loadTypeNames`' POST /universe/names fallback would be exactly the
+ * live traffic the caller is avoiding. Unresolved ids are absent rather than
+ * filled with "Type #id": the caller decides what an unknown name reads as.
+ */
+export async function readCachedTypeNames(
+  typeIds: readonly number[]
+): Promise<Map<number, string>> {
+  const unique = [...new Set(typeIds)];
+  const types = await loadTypes();
+  const map = new Map<number, string>();
+  await Promise.all(
+    unique.map(async (id) => {
+      const name =
+        types[String(id)]?.name ??
+        (await readCached<string>(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id)));
+      if (name) map.set(id, name);
+    })
+  );
+  return map;
+}
+
 /** Type name for one typeID, or the "Type #id" fallback. */
 export async function loadTypeName(typeId: number): Promise<string> {
   const names = await loadTypeNames([typeId]);

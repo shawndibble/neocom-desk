@@ -1,5 +1,7 @@
 // Shapes of the slim SDE JSON emitted by scripts/build-sde.mjs.
 
+import type { PlanetType } from '@/esi/endpoints';
+
 export type CharacterAttribute =
   'charisma' | 'intelligence' | 'memory' | 'perception' | 'willpower';
 
@@ -73,16 +75,34 @@ export interface PiSchematic {
   cycleTime: number;
   /** Units produced per cycle. */
   quantity: number;
+  /** m3 of one unit, from invTypes.volume. */
+  volume: number;
   inputs: PiInput[];
+}
+
+/**
+ * One P0 resource: extracted straight off a planet, so no schematic produces
+ * it and no blueprint references it — which is why its name and volume ride
+ * along here instead of being looked up in types.json.
+ */
+export interface PiRawResource {
+  typeID: number;
+  name: string;
+  /** m3 of one unit, from invTypes.volume. */
+  volume: number;
+  /**
+   * Planet types whose extractors yield it, sorted alphabetically. Same
+   * strings ESI reports as `CharacterPlanet.planet_type`, so a colony matches
+   * this list directly. Which planet types, never how much — per-planet
+   * richness is scanner-only and out of scope.
+   */
+  planetTypes: PlanetType[];
 }
 
 /** public/data/pi.json: how planetary commodities are made. */
 export interface PiData {
   /** Produced typeID -> its schematic. */
   schematics: Record<string, PiSchematic>;
-  /**
-   * P0 resources: extracted straight off a planet, so no schematic produces
-   * them. Sorted ascending.
-   */
-  raw: number[];
+  /** P0 resources, sorted by typeID ascending. */
+  raw: PiRawResource[];
 }

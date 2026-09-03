@@ -327,6 +327,17 @@ export async function notificationText(
       }),
     };
   }
+  if (fire.eventId === 'planetaryExtractorExpiring') {
+    const planetName = (await loadPlanetName(fire.planetId)) ?? `#${fire.planetId}`;
+    return {
+      title: i18n.t('notifications.fired.planetaryExtractorExpiring.title'),
+      body: i18n.t('notifications.fired.planetaryExtractorExpiring.body', {
+        character: character.name,
+        planet: planetName,
+        hours: Math.round(fire.thresholdMs / 3_600_000),
+      }),
+    };
+  }
   if (fire.eventId === 'newMail') {
     return {
       title: i18n.t('notifications.fired.newMail.title'),

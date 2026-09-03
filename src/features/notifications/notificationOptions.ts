@@ -34,6 +34,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   characterNotTraining: '/skills/trained',
   industryJobComplete: '/industry',
   planetaryExtractionDone: '/planetary-industry',
+  planetaryExtractorExpiring: '/planetary-industry',
   newMail: '/mail',
   newCalendarEvent: '/calendar',
   calendarEventStarting: '/calendar',
