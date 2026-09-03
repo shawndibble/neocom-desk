@@ -6,7 +6,21 @@ import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useAuthFailure } from '@/stores/authFailure';
+import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
+import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
 import { Layout } from './Layout';
+
+vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
+const mockedCorpAccess = vi.mocked(useCorpAccess);
+
+function corpAccess(state: CorpAccessState) {
+  return {
+    state,
+    capabilities: NO_CORP_CAPABILITIES,
+    missingScopes: [],
+    roles: [],
+  };
+}
 
 const mockSubscribe = vi.fn();
 vi.mock('@/sync', () => ({
@@ -66,6 +80,8 @@ beforeEach(async () => {
   mockIsSyncConfigured.mockReset();
   useAuthFailure.setState({ failure: null });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
+  // The ~95% case: a Character with no corporation role at all.
+  mockedCorpAccess.mockReturnValue(corpAccess('none'));
   await db.tokens.clear();
   await db.characters.clear();
 });
@@ -503,5 +519,35 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     } finally {
       menu.remove();
     }
+  });
+});
+
+/**
+ * AC1: the Corp nav entry exists only for a Character whose Corp Access is
+ * `ready`, and in the other three states it does not render *at all* — no
+ * link, no lock marker. Corp UI hides rather than locks (CONTEXT.md round 35),
+ * because what stands in the way is an in-game role only CCP can grant and no
+ * re-login can produce.
+ */
+describe('Layout corp nav entry', () => {
+  it.each(['unknown', 'none', 'roles-without-grant'] as const)(
+    'renders nothing for a %s character — not even a locked link',
+    (state) => {
+      mockIsSyncConfigured.mockReturnValue(false);
+      mockedCorpAccess.mockReturnValue(corpAccess(state));
+      renderLayout();
+      expect(screen.queryByRole('link', { name: 'Corporation' })).not.toBeInTheDocument();
+    }
+  );
+
+  it('renders the entry once corp access is ready', () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    mockedCorpAccess.mockReturnValue(corpAccess('ready'));
+    renderLayout();
+    const link = screen.getByRole('link', { name: 'Corporation' });
+    expect(link).toHaveAttribute('href', '/corp');
+    // No lock marker: there is no state in which this renders and is unusable,
+    // so the amber dot would offer a re-login for a role nobody can grant here.
+    expect(link).not.toHaveAttribute('title');
   });
 });

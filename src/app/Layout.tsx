@@ -25,6 +25,7 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
+import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import type { AppRoutePath } from './routeScopes';
 
 /**
@@ -87,6 +88,10 @@ function mobileNavClass({ isActive }: { isActive: boolean }): string {
  * with the rail — they are Overview tabs now and `OverviewSubNav` asks for
  * their state itself. `/characters` and `/settings` are UNGATED
  * (routeScopes.ts), so the character menu has no marker to render.
+ *
+ * `/corp` is deliberately absent: this list is what draws the amber lock dot,
+ * and corp UI hides rather than locks (CONTEXT.md round 35). Its entry is
+ * rendered conditionally on `useCorpAccess()` instead — see `CorpNavItem`.
  */
 const NAV_PATHS = [
   '/overview',
@@ -133,6 +138,27 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
       )}
     </NavLink>
   );
+}
+
+/**
+ * The Corp section's entry, present only for a Character whose Corp Access is
+ * `ready`.
+ *
+ * Hidden, never locked, in all three other states — including `unknown`, which
+ * renders as `none` here on purpose: a nav item that flickers into existence
+ * mid-load is worse than one that appears a beat late (CONTEXT.md round 35).
+ * The route itself takes the opposite view of `unknown` and waits, so a
+ * deep-linked Director is not bounced (`routes/Corp.tsx`).
+ *
+ * `locked` is hard-wired false rather than read from `useLockedRoutes`: there
+ * is no state in which this renders and is unusable, and the amber dot would
+ * offer a re-login for a role only CCP can grant.
+ */
+function CorpNavItem({ onClick }: { onClick?: () => void }) {
+  const { t } = useTranslation();
+  const { state } = useCorpAccess();
+  if (state !== 'ready') return null;
+  return <NavItem to="/corp" label={t('nav.corp')} locked={false} onClick={onClick} />;
 }
 
 /** Small heading introducing a group of NavItems in the desktop rail. */
@@ -311,6 +337,8 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
     <Modal open={open} id={MORE_SHEET_ID} onClose={onClose} title={t('nav.more')} placement="sheet">
       <div className="space-y-1 pb-3">
         <SheetCharacterMenu activeCharacter={activeCharacter} onNavigate={onClose} />
+        {/* The phone's only route to /corp: the tab bar is full at 3 + More. */}
+        <CorpNavItem onClick={onClose} />
         <NavItem
           to="/market"
           label={t('nav.market')}
@@ -417,6 +445,15 @@ export function Layout() {
             scrolling. */}
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
           <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
+          {/*
+            Beside Overview rather than inside a group: the two are the same
+            kind of destination — "this pilot" and "this corporation" — and the
+            Corp section has sub-navigation of its own for the views that land
+            under it (`CorpSubNav`). No group label, because a heading over a
+            conditionally-rendered item would strand itself for the ~95% of
+            users who never see the item.
+          */}
+          <CorpNavItem />
           <NavGroupLabel>{t('nav.groups.progression')}</NavGroupLabel>
           <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
           <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />

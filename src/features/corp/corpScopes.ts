@@ -28,15 +28,20 @@ import type { Scope } from '@/esi/registry';
  * `missingCorpScopes` under-report and call a Character `ready` for a surface
  * that is still half-blind.
  *
- * `esi-industry.read_corporation_mining.v1` is deliberately absent: no
- * capability in `engine/corpRoles.ts` stands for moon extractions yet, and its
- * `x-required-roles` is not among the mappings #294 settled. It is registered
- * and requested with the group; the capability that claims it arrives with the
- * surface that reads it.
+ * `esi-industry.read_corporation_mining.v1` was registered by #295 with no
+ * capability claiming it. The moon-chunk clock is one of the corp board's item
+ * kinds (#296), so `canReadMoonExtractions` now claims it — every registered
+ * corp scope is spoken for.
  */
 export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly Scope[]>> = {
   canReadWallet: ['esi-wallet.read_corporation_wallets.v1', 'esi-corporations.read_divisions.v1'],
   canReadStructures: ['esi-corporations.read_structures.v1'],
+  /**
+   * Its own entry rather than a second scope on `canReadStructures`, even
+   * though `Station_Manager` opens both: keyed per capability, a Character
+   * missing only this one is reported as missing only this one.
+   */
+  canReadMoonExtractions: ['esi-industry.read_corporation_mining.v1'],
   canReadMembers: [
     'esi-corporations.track_members.v1',
     'esi-corporations.read_corporation_membership.v1',

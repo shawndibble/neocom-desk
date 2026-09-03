@@ -24,6 +24,16 @@ export interface CorpCapabilities {
   canReadWallet: boolean;
   /** GET /corporations/{id}/structures. */
   canReadStructures: boolean;
+  /**
+   * GET /corporation/{id}/mining/extractions — the moon-chunk schedule.
+   *
+   * Separate from `canReadStructures` even though the two share a role: they
+   * are separate reads behind separate scopes, and a capability names what a
+   * Character can *read*. Folding the moon drill into "structures" would make
+   * that capability stand for something it does not, and would leave the moon
+   * panel with nothing of its own to gate on.
+   */
+  canReadMoonExtractions: boolean;
   /** GET /corporations/{id}/membertracking. */
   canReadMembers: boolean;
   /** GET /corporations/{id}/industry/jobs. */
@@ -42,6 +52,7 @@ export type CorpCapability = keyof CorpCapabilities;
 export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadWallet',
   'canReadStructures',
+  'canReadMoonExtractions',
   'canReadMembers',
   'canReadIndustry',
 ];
@@ -50,6 +61,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
 export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadWallet: false,
   canReadStructures: false,
+  canReadMoonExtractions: false,
   canReadMembers: false,
   canReadIndustry: false,
 };
@@ -65,6 +77,11 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
 const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> = {
   canReadWallet: ['Accountant', 'Junior_Accountant'],
   canReadStructures: ['Station_Manager'],
+  // Same role as the structure list, straight from `x-required-roles` on the
+  // mining/extractions path. Issue #296's brief calls this role
+  // `Structure_manager`; that string appears nowhere in ESI's spec, and using
+  // it would have denied the moon board to every user entitled to it.
+  canReadMoonExtractions: ['Station_Manager'],
   canReadMembers: [],
   canReadIndustry: ['Factory_Manager'],
 };

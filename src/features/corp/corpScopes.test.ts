@@ -62,8 +62,15 @@ describe('the required scope set', () => {
     expect(requiredFor([])).toEqual([]);
   });
 
+  /**
+   * Two scopes for one role: `Station_Manager` opens both the structure list
+   * and the moon-extraction schedule, and each is behind a scope of its own.
+   */
   it('asks only for the scopes the held capabilities need', () => {
-    expect(requiredFor(['Station_Manager'])).toEqual(['esi-corporations.read_structures.v1']);
+    expect(requiredFor(['Station_Manager'])).toEqual([
+      'esi-corporations.read_structures.v1',
+      'esi-industry.read_corporation_mining.v1',
+    ]);
   });
 
   it('unions without duplicating when several capabilities are held', () => {
