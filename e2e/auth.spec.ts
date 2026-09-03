@@ -6,7 +6,9 @@ test('logs in via mocked EVE SSO, picks a character, sees the overview wallet', 
 }) => {
   await page.goto('./');
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByText('NeoCom Desk')).toBeVisible();
+  // Unlike RTL's getByText (exact by default), Playwright's matches
+  // substrings — the permissions-hint paragraph also mentions "NeoCom Desk".
+  await expect(page.getByText('NeoCom Desk', { exact: true })).toBeVisible();
   await expect(
     page.getByRole('heading', { name: /command deck for every character you fly/i })
   ).toBeVisible();

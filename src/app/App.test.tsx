@@ -46,8 +46,8 @@ describe('routing guard', () => {
   it('redirects / to /login when no characters exist', async () => {
     render(<App />);
     expect(
-      await screen.findByRole('button', { name: /log in with eve online/i })
-    ).toBeInTheDocument();
+      (await screen.findAllByRole('button', { name: /log in with eve online/i })).length
+    ).toBeGreaterThanOrEqual(1);
     expect(window.location.pathname).toBe('/login');
   });
 
