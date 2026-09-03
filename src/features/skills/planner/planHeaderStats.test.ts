@@ -76,12 +76,18 @@ describe('evaluateOptimizationBadge', () => {
     expect(uncapped.savingsSeconds).toBeGreaterThan(capped.savingsSeconds);
   });
 
-  it('reports zero remaps evaluated for a zero request', () => {
-    const badge = evaluateOptimizationBadge(STEPS, SKILLS, {
-      remapCount: 0,
-      currentAttributes: CURRENT,
-    });
-    expect(badge).toMatchObject({ evaluatedRemapCount: 0, requestedRemapCount: 0, capped: false });
+  // A plan with no remaps to spend has none to place, so there is no savings
+  // figure to report. The badge used to render "Remap savings: None" here,
+  // which asserts that remapping cannot help this plan — a verdict the run
+  // never reached, and one that contradicts the editor's own "raise Remaps
+  // available and optimize again". No chip at all, as for an empty plan.
+  it('returns null when the plan has no remaps to spend', () => {
+    expect(
+      evaluateOptimizationBadge(STEPS, SKILLS, { remapCount: 0, currentAttributes: CURRENT })
+    ).toBeNull();
+    expect(
+      evaluateOptimizationBadge(STEPS, SKILLS, { remapCount: -1, currentAttributes: CURRENT })
+    ).toBeNull();
   });
 });
 

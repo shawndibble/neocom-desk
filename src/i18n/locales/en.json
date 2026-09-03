@@ -196,7 +196,7 @@
     "reorderMarker": "Reorder remap marker",
     "markersNoGain": "Remapping at these markers doesn't save time — try moving them.",
     "markersAtEnd": "Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.",
-    "optimizeConfirmMarkersAtEnd": "Marker splits nothing",
+    "optimizeConfirmMarkersAtEnd": "No marker splits the plan",
     "priorityLabel": "Priority for {{name}}",
     "priorityHigh": "High",
     "priorityNormal": "Normal",

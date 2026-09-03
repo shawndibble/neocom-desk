@@ -414,6 +414,10 @@ export function PlanEditor({
   // shows nothing until the user has clicked it once — never a stale or
   // wrong number, never a spinner.
   const headerBadge = useMemo(() => {
+    // A plan with no remaps to spend gets no chip on either path — the rule
+    // and the reasoning live in evaluateOptimizationBadge, but the Booster
+    // branch below never reaches it.
+    if (plan.remapCount <= 0) return null;
     if (activeBoosters.length > 0) {
       return optimizeResult
         ? toOptimizationBadge(optimizeResult.savingsSeconds, remapCount, plan.remapCount)
@@ -740,7 +744,11 @@ export function PlanEditor({
                     : t('plans.markersNoGain')}
                 </p>
               )}
-              {renderSegments(markersResult.segments)}
+              {/* Segments are the plan as the markers would train it — worth
+                  seeing even when the trade is poor, but not when no marker
+                  split anything: the lone "keep current attributes" row then
+                  reads as a contradiction of the message above it. */}
+              {markersVerdict.kind !== 'markersAtEnd' && renderSegments(markersResult.segments)}
             </div>
           )}
         </div>
