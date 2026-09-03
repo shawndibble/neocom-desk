@@ -77,6 +77,23 @@ describe('createLocalSetting', () => {
     expect((await db.settings.get(key))?.value).toBe(2);
   });
 
+  it('shows the new value before the write settles, so a control is not gated on Dexie', async () => {
+    // The frame that matters is the one the click handler runs in: a control
+    // that only repaints once IndexedDB has confirmed the write looks dead on
+    // the press, and every test that asserts the effect of such a click is
+    // racing an IO round-trip it cannot await (which is exactly what made
+    // Calendar's view-switch tests flaky).
+    const key = freshKey();
+    const useSetting = createLocalSetting({ key, defaultValue: 1 });
+
+    const persisted = useSetting.getState().setValue(2);
+    expect(useSetting.getState().value).toBe(2);
+    expect(useSetting.getState().hydrated).toBe(true);
+
+    await persisted;
+    expect((await db.settings.get(key))?.value).toBe(2);
+  });
+
   it('fires onApply on hydrate and on set, with the resolved value', async () => {
     const key = freshKey();
     await db.settings.put({ key, value: 1.25 });
