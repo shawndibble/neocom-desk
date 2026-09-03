@@ -355,7 +355,9 @@ describe('eveNotificationText — bills', () => {
     expect(body).toContain('2022-04-0');
   });
 
-  it('CorpOfficeExpirationMsg says what happened even though its payload is unparsed', () => {
+  it('CorpOfficeExpirationMsg says what happened even when CCP sends no fields at all', () => {
+    // No public schema and no public sample exists for this type, so the plain
+    // sentence is the floor rather than a degraded state.
     const { title, body } = eveNotificationText(
       fire({ type: 'CorpOfficeExpirationMsg', text: '' }),
       CHARACTER
@@ -363,6 +365,14 @@ describe('eveNotificationText — bills', () => {
     expect(title).toBe('Corporation office expiring');
     expect(body).toContain('office');
     expectNotTheGenericBody(body, 'CorpOfficeExpirationMsg');
+  });
+
+  it('CorpOfficeExpirationMsg names the expiry when the payload carries a due date', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'CorpOfficeExpirationMsg', text: 'dueDate: 132936019800000000\n' }),
+      CHARACTER
+    );
+    expect(body).toContain('2022-04-0');
   });
 });
 

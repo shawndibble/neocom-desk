@@ -80,6 +80,15 @@ export interface EveNotificationPayload {
   warHqName?: string;
 }
 
+/** Drops a matching pair of surrounding quotes, leaving an unbalanced one alone. */
+function unquote(value: string): string {
+  const quoted =
+    value.length >= 2 &&
+    (value.startsWith('"') || value.startsWith("'")) &&
+    value.endsWith(value[0]);
+  return quoted ? value.slice(1, -1) : value;
+}
+
 /**
  * Top-level `key: value` scalars, keyed by lower-cased key. Lower-casing is
  * not cosmetic: CCP spells the same concept `solarsystemID` on the structure
@@ -88,6 +97,11 @@ export interface EveNotificationPayload {
  */
 function scalarLines(text: string): Map<string, string> {
   const fields = new Map<string, string>();
+  // `text` is typed `string`, but it arrives from an ESI response body that
+  // TypeScript cannot vouch for at runtime — a type CCP ships without the
+  // field would make this a `.split` on `undefined`, i.e. the one throw the
+  // whole module promises not to do.
+  if (typeof text !== 'string') return fields;
   for (const line of text.split('\n')) {
     // A leading space means a nested map's key or a list continuation; a
     // leading `-` means a list item. Neither is a top-level scalar.
@@ -111,6 +125,10 @@ function scalarLines(text: string): Map<string, string> {
     // `*id001` — an alias whose target this parser does not track. Ignoring it
     // is safer than recording the alias name as if it were the value.
     if (value.startsWith('*')) continue;
+    // A structure name containing a colon, or starting with a character YAML
+    // reserves, comes back quoted from any emitter — the quotes are syntax,
+    // not part of the name.
+    value = unquote(value);
     if (value.length === 0) continue;
     fields.set(key, value);
   }

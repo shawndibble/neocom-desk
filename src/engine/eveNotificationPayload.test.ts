@@ -38,6 +38,15 @@ describe('parseEveNotificationPayload — degrades instead of throwing', () => {
     const text = Array.from({ length: 5_000 }, (_, i) => `key${i}: value${i}`).join('\n');
     expect(() => parseEveNotificationPayload(text)).not.toThrow();
   });
+
+  it('never throws when ESI omits `text` entirely, which the type system cannot prevent', () => {
+    // `EveNotificationFire.text` is typed `string`, but it comes from a
+    // response body TypeScript never sees — a `.split` on `undefined` is the
+    // one throw this module promises not to do.
+    const notAString = undefined as unknown as string;
+    expect(() => parseEveNotificationPayload(notAString)).not.toThrow();
+    expect(parseEveNotificationPayload(notAString)).toEqual(parseEveNotificationPayload(''));
+  });
 });
 
 describe('parseEveNotificationPayload — YAML subset the payloads actually use', () => {
@@ -61,6 +70,23 @@ describe('parseEveNotificationPayload — YAML subset the payloads actually use'
       'structureLink: <a href="showinfo:35835//1000000000001">Amamake - Alpha</a>'
     );
     expect(payload.structureName).toBe('Amamake - Alpha');
+  });
+
+  it('drops the quotes an emitter adds around a name that needs them', () => {
+    // A structure name containing a colon has to come back quoted; the quotes
+    // are YAML syntax, not part of what the pilot named the thing.
+    expect(parseEveNotificationPayload("structureName: 'Chunk Line 3'").structureName).toBe(
+      'Chunk Line 3'
+    );
+    expect(parseEveNotificationPayload('structureName: "Home: Alpha"').structureName).toBe(
+      'Home: Alpha'
+    );
+  });
+
+  it('leaves an unbalanced quote alone rather than eating a real apostrophe', () => {
+    expect(parseEveNotificationPayload("structureName: Pilot's Rest").structureName).toBe(
+      "Pilot's Rest"
+    );
   });
 
   it('ignores indented keys so a nested map cannot shadow a top-level one', () => {

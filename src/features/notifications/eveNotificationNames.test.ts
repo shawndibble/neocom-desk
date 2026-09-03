@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
 
 const loadStructureName =
@@ -15,11 +15,18 @@ vi.mock('@/features/character/names', () => ({
 
 const { resolveEveNotificationNames } = await import('./eveNotificationNames');
 
+/**
+ * Resolution is memoized per notification id, so every test that expects a
+ * fresh lookup needs its own id — the same discipline the real feed gets for
+ * free from ESI's monotonic ids.
+ */
+let nextNotificationId = 1;
+
 function fire(overrides: Partial<EveNotificationFire> = {}): EveNotificationFire {
   return {
     eventId: 'eveNotification',
     characterId: 2114794365,
-    notificationId: 1,
+    notificationId: nextNotificationId++,
     type: 'StructureFuelAlert',
     senderId: 1000132,
     senderType: 'corporation',
@@ -143,5 +150,72 @@ describe('resolveEveNotificationNames — only looks up what a body will use', (
     );
     expect(resolveNames).toHaveBeenCalledWith([1011]);
     expect(names.entities?.get(1011)).toBe('Bad Pilot');
+  });
+});
+
+/**
+ * Issue #300's "name resolution must not block the notification" — the rule
+ * that a caught rejection alone does not satisfy, because a lookup that simply
+ * never settles delays the alert just as effectively as one that throws.
+ */
+describe('resolveEveNotificationNames — a slow lookup cannot hold the notification back', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('gives up on a structure lookup that never settles and renders without the name', async () => {
+    loadStructureName.mockReturnValue(new Promise<string | null>(() => {}));
+    const pending = resolveEveNotificationNames(fire());
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(pending).resolves.toEqual({});
+  });
+
+  it('gives up on a hung entity lookup too', async () => {
+    resolveNames.mockReturnValue(new Promise<Map<number, string>>(() => {}));
+    const pending = resolveEveNotificationNames(
+      fire({ type: 'CorpAppNewMsg', text: 'charID: 1011\n' })
+    );
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(pending).resolves.toEqual({});
+  });
+
+  it('still returns a lookup that settles inside the budget', async () => {
+    loadStructureName.mockReturnValue(
+      new Promise<string | null>((resolve) => setTimeout(() => resolve('Chunk Line 3'), 100))
+    );
+    const pending = resolveEveNotificationNames(fire());
+    await vi.advanceTimersByTimeAsync(200);
+    await expect(pending).resolves.toEqual({ structure: 'Chunk Line 3' });
+  });
+});
+
+describe('resolveEveNotificationNames — the second render of a fire costs no second round-trip', () => {
+  it('reuses the first resolution for the same notification id', async () => {
+    resolveNames.mockResolvedValue(new Map([[1011, 'Hopeful Recruit']]));
+    const applicant = fire({
+      type: 'CorpAppNewMsg',
+      text: 'applicationText: hi\ncharID: 1011\ncorpID: 2001\n',
+    });
+    // `notificationText` renders twice per fire: once for the browser
+    // notification, once for the Notification Feed entry.
+    const [browser, feed] = await Promise.all([
+      resolveEveNotificationNames(applicant),
+      resolveEveNotificationNames(applicant),
+    ]);
+    expect(resolveNames).toHaveBeenCalledTimes(1);
+    expect(browser.entities?.get(1011)).toBe('Hopeful Recruit');
+    expect(feed).toEqual(browser);
+  });
+
+  it('does not confuse two different notifications', async () => {
+    loadStructureName.mockResolvedValueOnce('First Refinery');
+    loadStructureName.mockResolvedValueOnce('Second Refinery');
+    const first = await resolveEveNotificationNames(fire());
+    const second = await resolveEveNotificationNames(fire());
+    expect(first.structure).toBe('First Refinery');
+    expect(second.structure).toBe('Second Refinery');
   });
 });

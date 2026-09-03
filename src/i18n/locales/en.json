@@ -1077,7 +1077,8 @@
           },
           "CorpOfficeExpirationMsg": {
             "title": "Corporation office expiring",
-            "body": "{{character}}: a corporation office rental is about to expire."
+            "body": "{{character}}: a corporation office rental is about to expire.",
+            "bodyWithDue": "{{character}}: a corporation office rental expires {{due}}."
           },
           "WarDeclared": {
             "title": "War declared",

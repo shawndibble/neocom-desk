@@ -184,9 +184,15 @@ const TYPE_RENDERERS: Readonly<Record<string, (ctx: RenderContext) => BodyChoice
     return { key: 'body', vars: { due: formatLocalDate(new Date(payload.dueDateMs)) } };
   },
   // CCP publishes no payload schema for this type and it appears in no public
-  // sample, so nothing is parsed out of it — a fixed body still beats the raw
-  // type string, and guessing at key names would risk a wrong due date.
-  CorpOfficeExpirationMsg: fixedBody,
+  // sample, so this reads `dueDate` opportunistically — the key every other
+  // billing type uses — and says the plain thing when it is absent. What it
+  // does *not* do is guess at key names it has no evidence for: a wrong expiry
+  // date would cost an office, which is exactly what the notification exists
+  // to prevent.
+  CorpOfficeExpirationMsg: ({ payload }) =>
+    payload.dueDateMs === undefined
+      ? { key: 'body', vars: {} }
+      : { key: 'bodyWithDue', vars: { due: formatLocalDate(new Date(payload.dueDateMs)) } },
   WarDeclared: warDeclared(true),
   AllWarDeclaredMsg: warDeclared(false),
   // Genuinely an empty payload (`{}`): there is no aggressor yet, only the
