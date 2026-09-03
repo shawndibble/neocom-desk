@@ -21,6 +21,11 @@ interface AttributesPaneProps {
  * said only what the list beside it already said). Attributes are the input
  * every plan is costed against and the thing a remap changes, so this is
  * reference the planner wants in view, not a duplicate of the trained view.
+ *
+ * The editor route wants the same reference for the same reason and shows the
+ * same `AttributeChips` + `DataAgeBadge` pair — but as a section inside
+ * `PlanToolsPane`, not as another panel, because its sidebar already carries
+ * the plan list and the tools panel. See `PlanEditor`'s `attributes` section.
  */
 export function AttributesPane({
   result,

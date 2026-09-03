@@ -352,12 +352,25 @@
   plan-switcher sidebar, pinned toolbar above the list", and #158's list pane
   beside the editor). The sidebar carries the plan list and, below it, a
   single **Plan Tools** panel of three labelled sections: Actions
-  (reorder/optimize/marker, the ones used while working the list), Training
-  (the what-if implants/booster lens), and Import / Export. The main column
+  (reorder/optimize/marker, the ones used while working the list),
+  **Attributes** (the character's current attributes, then the what-if
+  implants/booster lenses over them), and Import / Export. The main column
   carries only the plan summary strip and the entry list. Rationale: five
   peer panels said the controls mattered as much as the plan, cost five panel
   header strips of chrome to say it, and left the sidebar empty below a short
   plan list.
+  - The **Attributes** section is where the editor route shows the
+    character's attributes, rendered by the same `AttributeChips` +
+    `DataAgeBadge` pair as the plan list's Attributes panel. They belong on
+    this route because they are what every estimate on it is costed against,
+    and they belong _inside_ the tools panel because a fourth peer panel is
+    what this round removed — and below `lg` it would land as a second
+    always-open block above the entry list. Costing a tap on a phone is the
+    accepted price. Chips show the clone's _real_ implants and never
+    re-render through the what-if lens sitting under them: "current" has to
+    keep meaning current, and the lens's effect is visible in the plan's own
+    numbers. General character stats (total SP, wallet) stay off this route —
+    they explain nothing here.
   - Below `lg` the sidebar is not built at all: the tools move into the one
     column as a **collapsed disclosure** above the entry list, so the whole
     tool set costs one row rather than three panels, and the plan leads the

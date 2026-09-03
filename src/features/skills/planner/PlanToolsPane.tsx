@@ -9,6 +9,14 @@ export interface PlanToolSection {
   id: string;
   title: string;
   content: ReactNode;
+  /**
+   * Right-aligned beside the section heading, the way `Panel` puts a
+   * `DataAgeBadge` beside its own title — so a section carrying ESI-derived
+   * data can date it without that badge sinking into the content. Outside
+   * the `<h3>` on purpose: inside it, the badge's text would join the
+   * heading's accessible name.
+   */
+  actions?: ReactNode;
 }
 
 interface PlanToolsPaneProps {
@@ -24,8 +32,9 @@ interface PlanToolsPaneProps {
 
 /**
  * Every control that acts on the open plan — optimize/marker actions, the
- * what-if training lens, import/export — framed as one panel of labelled
- * sections instead of three sibling panels.
+ * attributes it is costed against plus the what-if lenses over them,
+ * import/export — framed as one panel of labelled sections instead of three
+ * sibling panels.
  *
  * The three used to be peers of the entry list, which said they mattered as
  * much as the plan itself and cost three panel header strips of chrome to
@@ -53,9 +62,12 @@ export function PlanToolsPane({ sections, asDisclosure, className }: PlanToolsPa
         !asDisclosure && index < sections.length - 1 && 'border-b border-line'
       )}
     >
-      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {section.title}
-      </h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {section.title}
+        </h3>
+        {section.actions}
+      </div>
       {section.content}
     </section>
   ));

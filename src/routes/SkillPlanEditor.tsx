@@ -27,7 +27,7 @@ export function SkillPlanEditor() {
   const { planId } = useParams<{ planId: string }>();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
-  const { catalog, trainedSkills, attributes, implants, remapInfo } =
+  const { catalog, trainedSkills, attributes, attributesResult, implants, remapInfo } =
     usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
 
@@ -107,6 +107,7 @@ export function SkillPlanEditor() {
           trainedSkills={trainedSkills}
           attributes={attributes}
           implants={implants}
+          attributesResult={attributesResult}
           remapInfo={remapInfo}
           listPane={
             <PlanListPane
