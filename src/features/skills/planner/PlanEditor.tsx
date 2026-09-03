@@ -8,6 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
   InfoTooltip,
   Modal,
   NativeSelect,
@@ -85,6 +86,7 @@ import {
   markerStepIndices,
   markersAfterEntryRemoval,
   removeMarker,
+  segmentsToMarkers,
 } from './markers';
 import { planDrop, promotePrereq } from './planDrop';
 import { bandStarts } from './bands';
@@ -107,21 +109,9 @@ import {
   MAX_BOOSTER_BONUS,
 } from './planBooster';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
+import { attributeShort, remapInstruction } from './remapInstruction';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-
-/** "PER": the house three-letter attribute code, as EntryList's pair badge writes it. */
-function attributeShort(name: AttributeName): string {
-  return name.slice(0, 3).toUpperCase();
-}
-
-/** "PER 27 / WIL 21 / INT 17 / …": full remap spread, highest first. */
-function remapInstruction(attributes: Attributes): string {
-  return [...ATTRIBUTE_NAMES]
-    .sort((a, b) => attributes[b] - attributes[a])
-    .map((name) => `${attributeShort(name)} ${attributes[name]}`)
-    .join(' / ');
-}
 
 /** The persisted fields the editor may change. */
 export type PlanPatch = Partial<
@@ -253,6 +243,7 @@ export function PlanEditor({
   // Panel/Modal results those same actions already produce below.
   const [optimizeConfirm, setOptimizeConfirm] = useState<string | null>(null);
   const [markerConfirm, setMarkerConfirm] = useState(false);
+  const [markersAppliedConfirm, setMarkersAppliedConfirm] = useState(false);
   const [markersOptimizeConfirm, setMarkersOptimizeConfirm] = useState<string | null>(null);
   const [reorderConfirm, setReorderConfirm] = useState(false);
   // Outcome of the last drag on the entry list. A drop that would land a
@@ -626,6 +617,27 @@ export function PlanEditor({
     setTimeout(() => setOptimizeConfirm(null), 2000);
   }
 
+  /**
+   * "Apply as markers": turn the last Optimize Remaps result's segments into
+   * actual Remap Markers, so the user doesn't have to drag/add them by hand
+   * to match what the search already found. Replaces `plan.markers` wholesale
+   * rather than diffing — that's "move the existing one, add the missing
+   * one" in a single write.
+   */
+  function handleApplyOptimizedMarkers() {
+    if (!optimizeResult) return;
+    onUpdate({
+      markers: segmentsToMarkers(
+        plan.entries,
+        optimizeResult.segments,
+        catalog.engineSkills,
+        trainedSkills
+      ),
+    });
+    setMarkersAppliedConfirm(true);
+    setTimeout(() => setMarkersAppliedConfirm(false), 2000);
+  }
+
   function handleOptimizeAtMarkers() {
     if (scheduled.length === 0) return;
     const result = optimizeAtMarkers(scheduled, catalog.engineSkills, {
@@ -638,6 +650,37 @@ export function PlanEditor({
     setMarkersVerdict(verdict);
     setMarkersOptimizeConfirm(confirmRemapOutcome(verdict));
     setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
+  }
+
+  /**
+   * A marker's target attributes, once "Optimize at my markers" has run.
+   * Keyed by STEP INDEX, not by ordinal position: `optimizeAtMarkers` dedupes
+   * its cut points (`[...new Set(...)]`), so two distinct markers collapse
+   * into one remap segment whenever an entry between them contributes no
+   * step (already trained, or missing from the catalog) — the two then sit
+   * at the same step index. Indexing the remapped segments by ordinal
+   * position would misattribute every marker after such a collision to the
+   * wrong segment; both colliding markers correctly show the one segment
+   * they actually share. `markersResult` is cleared alongside `plan.markers`
+   * whenever entries/markers change, so a stale result never applies to the
+   * wrong marker.
+   */
+  const markerAttributesByStepIndex = useMemo(() => {
+    if (!markersResult) return null;
+    return new Map(
+      markersResult.segments.filter((s) => s.remap).map((s) => [s.startIndex, s.attributes])
+    );
+  }, [markersResult]);
+  const markerStepIndicesForResult = useMemo(
+    () =>
+      markersResult
+        ? markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills)
+        : null,
+    [markersResult, plan.entries, plan.markers, catalog.engineSkills, trainedSkills]
+  );
+  function markerAttributesFor(markerIndex: number): Attributes | undefined {
+    const stepIndex = markerStepIndicesForResult?.[markerIndex];
+    return stepIndex === undefined ? undefined : markerAttributesByStepIndex?.get(stepIndex);
   }
 
   /** "{Skill} III" — how a promoted prereq is named back to the user. */
@@ -714,20 +757,21 @@ export function PlanEditor({
           const anchor = scheduled[segment.startIndex];
           if (!anchor) return null;
           return (
-            <li
-              key={index}
-              className="flex flex-wrap items-center gap-2 border-b border-line pb-1 last:border-b-0"
-            >
-              <span className="font-semibold">{t('plans.segment', { index: index + 1 })}</span>
-              <span className="flex-1">
+            <li key={index} className="space-y-0.5 border-b border-line pb-1 last:border-b-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold">{t('plans.segment', { index: index + 1 })}</span>
+                <span className="tabular-nums text-text-dim">
+                  {formatDuration(segment.seconds)}
+                </span>
+              </div>
+              <p className="text-text-dim">
                 {segment.remap
                   ? t('plans.segmentRemap', {
                       skill: stepLabel(anchor),
                       attributes: remapInstruction(segment.attributes),
                     })
                   : t('plans.segmentCurrent', { skill: stepLabel(anchor) })}
-              </span>
-              <span className="tabular-nums text-text-dim">{formatDuration(segment.seconds)}</span>
+              </p>
             </li>
           );
         })}
@@ -886,6 +930,10 @@ export function PlanEditor({
                     })}
                   </p>
                   {renderSegments(optimizeResult.segments)}
+                  <Button size="sm" onClick={handleApplyOptimizedMarkers}>
+                    {t('plans.applyAsMarkers')}
+                  </Button>
+                  {markersAppliedConfirm && confirmation(t('plans.markersApplied'))}
                 </div>
               ) : (
                 // `remapNoGain` blames the entry order and points at
@@ -1121,57 +1169,6 @@ export function PlanEditor({
         </div>
       ),
     },
-    {
-      id: 'importExport',
-      title: t('plans.importExport'),
-      content: (
-        <div className="space-y-1.5">
-          {toolAction({
-            icon: <Icon.ImportQueue size={Icon.ICON_SIZE.sm} />,
-            label: t('plans.importQueue'),
-            onClick: () => void handleImport(),
-          })}
-          {toolAction({
-            icon: <Icon.ImportClipboard size={Icon.ICON_SIZE.sm} />,
-            label: t('plans.importClipboard'),
-            onClick: () => setImportOpen(true),
-          })}
-          <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
-            <DropdownMenuTrigger asChild>
-              {toolButton({
-                icon: <Icon.Export size={Icon.ICON_SIZE.sm} />,
-                label: t('plans.export'),
-              })}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem
-                onSelect={(event) => {
-                  // Keep the menu open (skip Radix's default auto-close) until
-                  // the write settles, then close it ourselves: closing first
-                  // moves focus back to the trigger as part of the same
-                  // transition, and writeText() called mid-transition can
-                  // throw "Document is not focused" (NotAllowedError).
-                  event.preventDefault();
-                  void handleExport().finally(() => setExportMenuOpen(false));
-                }}
-              >
-                {t('plans.exportClipboard')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={handleExportCsv} disabled={scheduled.length === 0}>
-                {t('plans.exportCsvQueue')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {copyConfirm && confirmation(t('plans.exportCopied'))}
-          {importConfirm && confirmation(importConfirm)}
-          {importError && (
-            <p role="alert" className="text-xs text-danger">
-              {importError}
-            </p>
-          )}
-        </div>
-      ),
-    },
   ];
 
   // One instance, placed on one side or the other — never both. The two
@@ -1222,7 +1219,54 @@ export function PlanEditor({
         <Panel
           title={t('plans.yourEntries')}
           actions={
-            <div className="flex items-center gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
+            // Import/Export used to be a whole tools-pane section, buried
+            // below Actions and Attributes. Icon buttons in the panel header
+            // (Wallet.tsx's export-in-a-Panel-header pattern) put them one
+            // tap away instead — wraps under the stats on a narrow phone, the
+            // same way the group-by/columns row below it does.
+            <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
+              <span className="flex items-center gap-1">
+                <IconButton
+                  size="sm"
+                  icon={<Icon.ImportQueue size={Icon.ICON_SIZE.sm} />}
+                  label={t('plans.importQueue')}
+                  onClick={() => void handleImport()}
+                />
+                <IconButton
+                  size="sm"
+                  icon={<Icon.ImportClipboard size={Icon.ICON_SIZE.sm} />}
+                  label={t('plans.importClipboard')}
+                  onClick={() => setImportOpen(true)}
+                />
+                <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <IconButton
+                      size="sm"
+                      icon={<Icon.Export size={Icon.ICON_SIZE.sm} />}
+                      label={t('plans.export')}
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        // Keep the menu open (skip Radix's default auto-close)
+                        // until the write settles, then close it ourselves:
+                        // closing first moves focus back to the trigger as
+                        // part of the same transition, and writeText() called
+                        // mid-transition can throw "Document is not focused"
+                        // (NotAllowedError).
+                        event.preventDefault();
+                        void handleExport().finally(() => setExportMenuOpen(false));
+                      }}
+                    >
+                      {t('plans.exportClipboard')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={handleExportCsv} disabled={scheduled.length === 0}>
+                      {t('plans.exportCsvQueue')}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </span>
               <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
               {planFinish && (
                 <span>{t('plans.projectedFinish', { date: formatLocalDate(planFinish) })}</span>
@@ -1231,6 +1275,13 @@ export function PlanEditor({
           }
         >
           <div className="space-y-3">
+            {copyConfirm && confirmation(t('plans.exportCopied'))}
+            {importConfirm && confirmation(importConfirm)}
+            {importError && (
+              <p role="alert" className="text-xs text-danger">
+                {importError}
+              </p>
+            )}
             {/* Group-by and Columns are view controls for the list below, and
                 they were the two widest things in the panel header. Sat there
                 with the two stats, the row could not fit a phone. */}
@@ -1337,6 +1388,7 @@ export function PlanEditor({
                       markers: removeMarker(plan.markers, markerIndex, plan.entries.length),
                     })
                   }
+                  markerAttributesFor={markerAttributesFor}
                   onSetPriority={(skillTypeID, priority) =>
                     update(setEntryPriority(plan.entries, skillTypeID, priority))
                   }

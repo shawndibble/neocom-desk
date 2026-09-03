@@ -27,7 +27,7 @@ import {
   CaretUpDown,
   ChartLineUp,
   Check,
-  ClipboardText,
+  Clipboard,
   Copy,
   DotsThreeVertical,
   DownloadSimple,
@@ -127,8 +127,8 @@ export const More = withWeight(DotsThreeVertical);
 export const Export = withWeight(ExportIcon);
 /** Pull the character's live skill queue into the plan (#224 icon-only toolbar). */
 export const ImportQueue = withWeight(Queue);
-/** Parse a pasted skill queue into the plan (#224 icon-only toolbar). */
-export const ImportClipboard = withWeight(ClipboardText);
+/** Parse a pasted skill queue into the plan (#224 icon-only toolbar) — a plain clipboard, for "paste in". */
+export const ImportClipboard = withWeight(Clipboard);
 /** Tune remaps for the lowest total training time (#224 icon-only toolbar). */
 export const OptimizeRemaps = withWeight(Sliders);
 /** Drop a remap marker at the current end of the queue (#224 icon-only toolbar). */

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { AttributeName, EngineSkill, PlanEntry } from '@/engine/types';
+import type { AttributeName, Attributes, EngineSkill, PlanEntry } from '@/engine/types';
+import type { RemapSegment } from '@/engine/optimizer';
 import {
   addMarker,
   buildRows,
@@ -9,6 +10,7 @@ import {
   normalizeMarkers,
   removeMarker,
   reorderRows,
+  segmentsToMarkers,
 } from './markers';
 
 const entry = (skillTypeID: number, targetLevel = 1): PlanEntry => ({ skillTypeID, targetLevel });
@@ -22,6 +24,22 @@ const skill = (
 
 const skillMap = (...list: EngineSkill[]): Map<number, EngineSkill> =>
   new Map(list.map((s) => [s.typeID, s]));
+
+const ATTRS: Attributes = {
+  intelligence: 17,
+  memory: 17,
+  perception: 27,
+  willpower: 21,
+  charisma: 17,
+};
+
+const seg = (startIndex: number, endIndex: number, remap = true): RemapSegment => ({
+  startIndex,
+  endIndex,
+  attributes: ATTRS,
+  seconds: 0,
+  remap,
+});
 
 describe('normalizeMarkers', () => {
   it('clamps to [0, entryCount], sorts, and dedupes', () => {
@@ -138,5 +156,60 @@ describe('markerStepIndices', () => {
     expect(markerStepIndices([entry(99), entry(1), entry(3)], [1, 2], skills, new Map())).toEqual([
       0, 1,
     ]);
+  });
+});
+
+describe('segmentsToMarkers', () => {
+  it('places one marker per remapped segment at the entry it starts', () => {
+    const skills = skillMap(skill(1), skill(2), skill(3));
+    const entries = [entry(1), entry(2), entry(3)];
+    // Steps [1, 2, 3], one per entry: segment starts line up with entry boundaries exactly.
+    const segments = [seg(0, 0), seg(1, 1), seg(2, 2)];
+    expect(segmentsToMarkers(entries, segments, skills, new Map())).toEqual([0, 1, 2]);
+  });
+
+  it('ignores the leading current-attributes segment', () => {
+    const skills = skillMap(skill(1), skill(2), skill(3));
+    const entries = [entry(1), entry(2), entry(3)];
+    const segments = [seg(0, 0, false), seg(1, 2, true)];
+    expect(segmentsToMarkers(entries, segments, skills, new Map())).toEqual([1]);
+  });
+
+  it('skips entries whose skill is missing from the catalog when placing the marker', () => {
+    const skills = skillMap(skill(1), skill(2));
+    // Entry 99 is unknown and contributes no step; the first real step is entry 1's.
+    const entries = [entry(99), entry(1), entry(2)];
+    const segments = [seg(0, 0)];
+    expect(segmentsToMarkers(entries, segments, skills, new Map())).toEqual([1]);
+  });
+
+  it('skips an already-trained entry that contributes no step', () => {
+    const skills = skillMap(skill(1), skill(3, 'intelligence', 'memory'));
+    const trained = new Map([[1, { level: 3, sp: 1415 }]]);
+    // Entry 1 is fully trained already (targets III, already III): 0 steps.
+    // Entry 3 contributes the plan's only step.
+    const entries = [entry(1, 3), entry(3)];
+    const segments = [seg(0, 0)];
+    expect(segmentsToMarkers(entries, segments, skills, trained)).toEqual([1]);
+  });
+
+  it('collapses a segment boundary that falls inside one entry (prereq expansion) to before that entry', () => {
+    // Entry 2 requires skill 1 (a different attribute pair) as a prereq, so
+    // it alone expands to two steps: [1-I, 2-I]. A segment boundary between
+    // them cannot be represented as an entry-list position without splitting
+    // the entry, so it snaps to before the whole entry.
+    const skills = skillMap(
+      skill(1, 'intelligence', 'memory'),
+      skill(2, 'perception', 'willpower', [{ typeID: 1, level: 1 }])
+    );
+    const entries = [entry(2)];
+    const segments = [seg(0, 0), seg(1, 1)];
+    expect(segmentsToMarkers(entries, segments, skills, new Map())).toEqual([0]);
+  });
+
+  it('returns no markers for no remapped segments', () => {
+    expect(segmentsToMarkers([], [], new Map(), new Map())).toEqual([]);
+    const skills = skillMap(skill(1));
+    expect(segmentsToMarkers([entry(1)], [seg(0, 0, false)], skills, new Map())).toEqual([]);
   });
 });
