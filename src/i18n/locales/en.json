@@ -838,7 +838,7 @@
       "bankedValue": "{{amount}} ({{percent}}%)",
       "resetGainColumn": "Reset now",
       "resetGainValue": "+{{amount}}/day",
-      "decayedTooltip": "Every extractor here is producing under half what it did on its first cycle. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows what a day of that is worth."
+      "decayedTooltip": "Every extractor here has fallen to under 35% of the output it managed in its first day. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows what a day of that is worth."
     },
     "timeline": {
       "title": "Extractor Timeline",

@@ -73,11 +73,15 @@ const NAMES: Record<number, { name: string; category: string }> = {
  * install age absorbs the test's runtime: elapsed stays inside cycle 48 —
  * 24h to 24.5h — so the banked figure is the deterministic 513,262 of
  * `extraction.test.ts`, not a value that drifts with wall-clock timing.
+ *
+ * A day in is *not* decayed: `EFFICIENT_WINDOW_FRACTION` reads a trailing day
+ * of output against the program's first day, and one day in those are the same
+ * day. `decayedDetailPayload` below is the aged one.
  */
 const BASE_NOW = Date.now();
 const DAY_MS = 86_400_000;
 
-const decayedDetailPayload = {
+const agedDetailPayload = {
   links: [],
   pins: [
     {
@@ -96,6 +100,22 @@ const decayedDetailPayload = {
     },
   ],
   routes: [],
+};
+
+/**
+ * The same program five days in, where its trailing day runs at 24% of its
+ * first — under `EFFICIENT_WINDOW_FRACTION` — with expiry still nine days off,
+ * so the colony is decayed without being idle or expiring-soon.
+ */
+const decayedDetailPayload = {
+  ...agedDetailPayload,
+  pins: [
+    {
+      ...agedDetailPayload.pins[0],
+      install_time: new Date(BASE_NOW - 5 * DAY_MS - 60_000).toISOString(),
+      expiry_time: new Date(BASE_NOW + 9 * DAY_MS).toISOString(),
+    },
+  ],
 };
 
 const server = setupServer(
@@ -227,7 +247,7 @@ describe('PlanetaryIndustry', () => {
   it('shows banked yield, its share of the program, and the daily gain from resetting now', async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
-        HttpResponse.json(decayedDetailPayload)
+        HttpResponse.json(agedDetailPayload)
       )
     );
     render(<App />);
@@ -245,12 +265,26 @@ describe('PlanetaryIndustry', () => {
     );
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
-    // A day in, the current cycle yields ~32% of the program's first — under
-    // EFFICIENT_WINDOW_FRACTION — while expiry is still 13 days out, so this
-    // is neither idle nor expiring-soon.
+    // Five days in, a trailing day of output runs at ~24% of the program's
+    // first day — under EFFICIENT_WINDOW_FRACTION — while expiry is still nine
+    // days out, so this is neither idle nor expiring-soon.
     expect(within(panel).getByText('Decayed')).toBeInTheDocument();
     expect(within(panel).queryByText('Healthy')).not.toBeInTheDocument();
     expect(within(panel).queryByText('Idle')).not.toBeInTheDocument();
+  });
+
+  it('leaves a colony one day into its program healthy, not decayed', async () => {
+    // The regression #316 exists for: on the old per-cycle read this colony
+    // wore the badge four hours in, with 6% of a fortnight's output banked.
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
+        HttpResponse.json(agedDetailPayload)
+      )
+    );
+    render(<App />);
+    const panel = await colonyPanelFor(/Jita IV/);
+    expect(within(panel).getByText('Healthy')).toBeInTheDocument();
+    expect(within(panel).queryByText('Decayed')).not.toBeInTheDocument();
   });
 
   it('titles each stacked pin card by its product, not by the pin type on every row', async () => {

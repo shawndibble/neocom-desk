@@ -45,8 +45,9 @@ export interface ColonyStatus {
   /** Soonest expiry across the colony's extractor programs; null when it has none. */
   soonestExpiryMs: number | null;
   /**
-   * True when every projectable program is past `EFFICIENT_WINDOW_FRACTION` of
-   * its own peak. Absent — not `false` — when no program carries a yield
+   * True when every projectable program's trailing day of output has fallen
+   * under `EFFICIENT_WINDOW_FRACTION` of its own first day's. Absent — not
+   * `false` — when no program carries a yield
    * baseline: decay is then unknowable rather than absent, the same
    * distinction the optional baseline fields above draw. `colonyAttention`
    * reads `decayed === true`, so an absent flag stays `healthy` instead of
