@@ -243,16 +243,33 @@ export function buildAssetTree(
   const realRoots = groupByLocationId(assets.filter((a) => a.location_type !== 'item'));
   for (const [locationId, group] of realRoots) stations.push(buildStation(locationId, group));
 
-  // Orphans: an 'item'-typed asset never reached from a real root — either its parent is
-  // missing from this list, or it's part of an isolated cycle. Each becomes its own
-  // top-level group (or joins a sibling orphan sharing the same location_id), matching
-  // the flat fallback this replaces. Re-checked at build time: a sibling orphan
-  // processed earlier in this same pass may already have pulled this one in as a
-  // descendant, in which case it's not built again here.
-  const orphanCandidates = groupByLocationId(
-    assets.filter((a) => a.location_type === 'item' && !ctx.visited.has(a.item_id))
+  const presentItemIds = new Set(assets.map((a) => a.item_id));
+  const unreached = (a: EngineAsset) => a.location_type === 'item' && !ctx.visited.has(a.item_id);
+
+  // Orphans proper: an 'item'-typed asset whose parent has no row in this list at all.
+  // Overwhelmingly that parent is a player-owned structure — ESI reports everything
+  // docked there as 'item' pointing at the structure id but never returns the structure
+  // itself as an asset — so each such group is a real location, and becomes its own
+  // top-level group (or joins a sibling orphan sharing the same location_id).
+  //
+  // Requiring the parent to be *absent* is what makes this pass order-independent, and
+  // that property is the point of splitting it out: every asset has exactly one parent
+  // id, so a group keyed on an id no asset carries can never be reached from another
+  // group's node — these groups are pairwise disjoint and none can nest another.
+  const absentParentGroups = groupByLocationId(
+    assets.filter((a) => unreached(a) && !presentItemIds.has(a.location_id))
   );
-  for (const [locationId, group] of orphanCandidates) {
+  for (const [locationId, group] of absentParentGroups)
+    stations.push(buildStation(locationId, group));
+
+  // Anything still unreached sits in or under an isolated cycle: its parent is present,
+  // so nothing above ever reaches it. Promote it rather than drop it —
+  // `buildNode`'s ancestor guard cuts the loop. Note `unreached` reads `ctx.visited` at
+  // call time, and the pass above has grown it since, so this sees the smaller remainder
+  // rather than the same candidates twice. Order genuinely matters within this pass too,
+  // hence the second re-check below: a cycle-mate built a moment ago already covers this
+  // group's roots.
+  for (const [locationId, group] of groupByLocationId(assets.filter(unreached))) {
     const roots = group.roots.filter((a) => !ctx.visited.has(a.item_id));
     if (roots.length === 0) continue;
     stations.push(buildStation(locationId, { ...group, roots }));
