@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Panel, StatChip } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
+import { formatLocalDate } from '@/lib/localDate';
 import { MIN_MEANINGFUL_SAVINGS_SECONDS, type OptimizationBadge } from './planHeaderStats';
 
 interface PlanHeaderProps {
@@ -63,14 +64,14 @@ export function PlanHeader({
             tooltip={t('plans.headerBoosterTooltip')}
             value={t('plans.headerBoosterValue', {
               bonus: booster.bonus,
-              date: booster.expiresAt.toLocaleDateString(),
+              date: formatLocalDate(booster.expiresAt),
             })}
           />
         )}
         <StatChip label={t('plans.headerSkillCount')} value={skillCount} />
         <StatChip
           label={t('plans.headerProjectedFinish')}
-          value={projectedFinish ? projectedFinish.toLocaleDateString() : t('plans.headerNoFinish')}
+          value={projectedFinish ? formatLocalDate(projectedFinish) : t('plans.headerNoFinish')}
         />
         {badge && (
           <StatChip

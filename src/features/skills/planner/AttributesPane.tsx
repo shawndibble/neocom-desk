@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, Panel } from '@/components/ui';
 import { AttributeChips } from '@/features/skills/AttributeChips';
-import { formatDate } from '@/lib/duration';
+import { formatLocalDate } from '@/lib/localDate';
 import type { CachedResult } from '@/features/skills/data';
 import type { RemapAvailability } from './remapAvailability';
 import type { CharacterAttributes } from '@/esi/endpoints';
@@ -47,7 +47,7 @@ export function AttributesPane({
             ? t('plans.remapFromEveReady', { bonus: remapInfo.bonus })
             : t('plans.remapFromEveCooldown', {
                 bonus: remapInfo.bonus,
-                date: remapInfo.cooldownUntil ? formatDate(remapInfo.cooldownUntil) : '',
+                date: remapInfo.cooldownUntil ? formatLocalDate(remapInfo.cooldownUntil) : '',
               })}
         </p>
       )}

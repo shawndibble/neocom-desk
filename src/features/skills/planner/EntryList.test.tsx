@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@/i18n';
 import { EntryList } from './EntryList';
@@ -69,6 +69,27 @@ function mockDesktop(matches: boolean): () => void {
     window.matchMedia = original;
   };
 }
+
+describe('EntryList step timeline renders in the viewer local timezone (#207)', () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = originalTz;
+  });
+
+  it('renders the previous local day for a start instant just after UTC midnight', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    const rows = [entryRow(1, [0])];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        startDate={new Date('2026-09-01T00:00:00Z')}
+        {...defaultProps}
+      />
+    );
+    expect(screen.getByText(/2026-08-31/)).toBeInTheDocument();
+  });
+});
 
 describe('EntryList Booster marks', () => {
   it('marks only the entry row owning the boosted step', () => {

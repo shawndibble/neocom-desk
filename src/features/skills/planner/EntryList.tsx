@@ -20,7 +20,8 @@ import { Button, Caret, EmptyState, NativeSelect, Tooltip } from '@/components/u
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { AttributeName, PlanPriority, ScheduledStep } from '@/engine/types';
-import { formatDate, formatDuration, stepTimeline } from '@/lib/duration';
+import { formatDuration, stepTimeline } from '@/lib/duration';
+import { formatLocalDate } from '@/lib/localDate';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
 import type { MergedRow } from './queueRows';
@@ -189,7 +190,7 @@ function TimelineLine({ start, finish }: { start: Date; finish: Date }) {
   const { t } = useTranslation();
   return (
     <div className="mt-0.5 text-[0.625rem] tabular-nums text-text-dim">
-      {t('plans.stepTimeline', { start: formatDate(start), finish: formatDate(finish) })}
+      {t('plans.stepTimeline', { start: formatLocalDate(start), finish: formatLocalDate(finish) })}
     </div>
   );
 }
