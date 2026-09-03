@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
+import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { clearMarketPriceCache } from '@/market/prices';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
@@ -345,7 +346,7 @@ describe('Assets', () => {
       characterId: CHAR_ID,
       key: 'assets',
       value: assetPage1,
-      fetchedAt: Date.now(),
+      fetchedAt: STALE_FETCHED_AT,
     });
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () => HttpResponse.error())

@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { invalidateFreshness } from '@/esi/cache';
+import { invalidateFreshness, onCacheRevalidated } from '@/esi/cache';
 
 /**
  * Flipped by the effect cleanup when the character changes, a refresh starts,
@@ -79,6 +79,18 @@ export function useRouteSnapshot<T>(
   });
   const [snapshot, setSnapshot] = useState<StampedSnapshot<T> | null>(null);
 
+  /**
+   * Bumped when a background revalidation settles (`esi/cache.ts` serves a
+   * lapsed row immediately and refreshes it behind the view). Deliberately NOT
+   * part of `epoch`: the re-run stamps the epoch it already had, so the
+   * rendered snapshot stays `current` throughout and `loading` never flips —
+   * the view keeps showing the stale rows until the new ones replace them,
+   * rather than blinking back to a spinner.
+   */
+  const [revalidation, setRevalidation] = useState(0);
+  const loadInFlight = useRef(false);
+  const revalidationPending = useRef(false);
+
   // Adjusting state during render, React's documented way to reset on a
   // changed input: it re-renders before committing, so no effect round-trip
   // and no frame showing the previous character's data.
@@ -93,10 +105,31 @@ export function useRouteSnapshot<T>(
     loadRef.current = load;
   });
 
+  /**
+   * A revalidation must never cancel a load the user is waiting on, so a
+   * signal arriving mid-load is held and flushed once that load settles. One
+   * page reads several keys and each revalidates separately, so this also
+   * collapses a burst into a single re-run — and it cannot stall the way a
+   * resetting debounce would, because the flush is driven by the load
+   * finishing rather than by the signals going quiet.
+   */
+  useEffect(
+    () =>
+      onCacheRevalidated(() => {
+        if (loadInFlight.current) {
+          revalidationPending.current = true;
+          return;
+        }
+        setRevalidation((n) => n + 1);
+      }),
+    []
+  );
+
   const { characterId, epoch } = lifecycle;
   useEffect(() => {
     if (characterId === null) return;
     const signal: RouteSnapshotSignal = { cancelled: false };
+    loadInFlight.current = true;
     void (async () => {
       try {
         const data = await loadRef.current(characterId, signal);
@@ -105,12 +138,23 @@ export function useRouteSnapshot<T>(
         // Stamping the failure is what clears `loading` and re-enables Refresh.
         // Swallowing it would leave the view spinning with no way back.
         if (!signal.cancelled) setSnapshot({ epoch, data: null, error });
+      } finally {
+        if (!signal.cancelled) {
+          loadInFlight.current = false;
+          if (revalidationPending.current) {
+            revalidationPending.current = false;
+            setRevalidation((n) => n + 1);
+          }
+        }
       }
     })();
     return () => {
       signal.cancelled = true;
     };
-  }, [characterId, epoch]);
+    // `revalidation` re-runs the loader without touching `epoch`; see its
+    // declaration for why that distinction is what keeps the view from
+    // blinking.
+  }, [characterId, epoch, revalidation]);
 
   const current = snapshot?.epoch === epoch ? snapshot : null;
 

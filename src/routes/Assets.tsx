@@ -21,14 +21,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
-import { isSyncConfigured } from '@/app/syncStatus';
-import {
-  clearStationPin,
-  scheduleSync,
-  setAccountStationPin,
-  setCharacterStationPin,
-} from '@/sync';
-import { db, type QuickbarItem } from '@/db';
+import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@/sync';
+import { db } from '@/db';
 import { cx } from '@/lib/cx';
 import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
 import {
@@ -86,6 +80,7 @@ import {
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { addQuickbarItem } from '@/features/market/quickbar';
+import { useQuickbar } from '@/features/market/useQuickbar';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -579,27 +574,13 @@ export function Assets() {
   // (not a plain boolean) so every memo below gets a non-null value for free.
   const activeCrossCharacterData = crossCharacterSearch && searchActive ? crossCharacterData : null;
 
-  // Quickbar (CONTEXT.md): the same Editable Data record the Market
-  // Browser's item context menu writes to, keyed by the active character.
-  const quickbarRecord = useLiveQuery(async () => {
-    if (activeCharacterId === null) return undefined;
-    return db.quickbars.get(String(activeCharacterId));
-  }, [activeCharacterId]);
-  const quickbarItems = quickbarRecord?.items ?? [];
-
-  async function writeQuickbar(items: QuickbarItem[]) {
-    if (activeCharacterId === null) return;
-    await db.quickbars.put({
-      id: String(activeCharacterId),
-      characterId: activeCharacterId,
-      items,
-      updatedAt: Date.now(),
-    });
-    if (isSyncConfigured()) scheduleSync(activeCharacterId);
-  }
-  function handleAddToQuickbar(typeId: number, itemName: string) {
-    void writeQuickbar(addQuickbarItem(quickbarItems, { typeId, name: itemName }));
-  }
+  // Quickbar (CONTEXT.md): the same Editable Data record the Market Browser's
+  // and Industry's item context menus write to, keyed by the active character.
+  const {
+    items: quickbarItems,
+    write: writeQuickbar,
+    add: handleAddToQuickbar,
+  } = useQuickbar(activeCharacterId);
 
   // Station Pins (issue #84): also Editable Data, synced the same way as the
   // Quickbar. Loaded whole (every Character's pin rows, not just the active

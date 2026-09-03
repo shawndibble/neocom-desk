@@ -1,6 +1,11 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { PlanEntry } from '@/engine/types';
-import type { FacilityKind, RigLevel, SecurityBand } from '@/engine/industry/types';
+import type {
+  FacilityKind,
+  MaterialSourcing,
+  RigLevel,
+  SecurityBand,
+} from '@/engine/industry/types';
 import type { TradeHub } from '@/market/hubs';
 
 export interface CharacterRecord {
@@ -109,6 +114,13 @@ export interface BuildPlanRecord {
   hubId: TradeHub['id'];
   /** Facility tax, percent of EIV. Structures only — NPC station tax is fixed. */
   facilityTaxPct?: number;
+  /**
+   * Per-material sourcing overrides, keyed by material typeID: units already
+   * owned (free) and/or a manual unit price for the rest. Additive and
+   * unindexed, so it needs no schema version bump; a missing key means "buy
+   * every unit at the hub", which is how every plan behaved before it existed.
+   */
+  materialSourcing?: Record<number, MaterialSourcing>;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

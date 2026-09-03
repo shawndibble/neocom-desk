@@ -6,7 +6,7 @@
  * fetch per system id.
  */
 import { getUniverseSystem, type UniverseSystem } from '@/esi/endpoints';
-import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
+import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER } from '@/esi/cache';
 
 function cacheKey(systemId: number): string {
   return `system:${systemId}`;
@@ -16,7 +16,9 @@ async function loadSystem(systemId: number): Promise<UniverseSystem | null> {
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     cacheKey(systemId),
-    async () => (await getUniverseSystem(systemId)).data
+    async () => (await getUniverseSystem(systemId)).data,
+    // A solar system's name and security status are map constants.
+    { staleAfterMs: STALE_AFTER.static }
   );
   return result?.data ?? null;
 }

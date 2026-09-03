@@ -11,6 +11,7 @@ import {
   loadWithCache,
   loadWithCacheStatus,
   writeCached,
+  STALE_AFTER,
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
@@ -95,6 +96,9 @@ export function loadMailBody(
   return loadWithCache(
     characterId,
     KEYS.body(mailId),
-    async () => (await getCharacterMail(characterId, mailId)).data
+    async () => (await getCharacterMail(characterId, mailId)).data,
+    // A delivered mail's body never changes. Read-only app, so not even the
+    // `read` flag moves it — that lives on the header.
+    { staleAfterMs: STALE_AFTER.static }
   );
 }

@@ -855,6 +855,9 @@
     "lastSynced": "Last synced {{time}}",
     "errorNote": "Sync error — changes saved locally"
   },
+  "prefetch": {
+    "running": "Loading character data…"
+  },
   "notifications": {
     "prompt": {
       "title": "Turn on notifications?",

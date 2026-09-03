@@ -456,6 +456,41 @@ describe('triggerSync: build plans', () => {
     });
   });
 
+  it('round-trips materialSourcing through the pushed doc', async () => {
+    await db.buildPlans.put(buildPlan({ materialSourcing: { 34: { ownedQuantity: 500 } } }));
+    await triggerSync(1);
+    expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')?.materialSourcing).toEqual({
+      34: { ownedQuantity: 500 },
+    });
+  });
+
+  it('drops undefined members inside materialSourcing (Firestore rejects undefined at any depth)', async () => {
+    await db.buildPlans.put(
+      buildPlan({ materialSourcing: { 34: { ownedQuantity: 500, overridePrice: undefined } } })
+    );
+    await triggerSync(1);
+    const entry = (
+      remoteStore.get(BUILD_PLANS_PATH)?.get('b1')?.materialSourcing as Record<string, object>
+    )?.[34];
+    expect(entry).toEqual({ ownedQuantity: 500 });
+    expect('overridePrice' in (entry ?? {})).toBe(false);
+  });
+
+  it('omits an empty materialSourcing map from the pushed doc', async () => {
+    await db.buildPlans.put(buildPlan({ materialSourcing: {} }));
+    await triggerSync(1);
+    const doc = remoteStore.get(BUILD_PLANS_PATH)?.get('b1');
+    expect(doc).toBeDefined();
+    expect('materialSourcing' in (doc ?? {})).toBe(false);
+  });
+
+  it('pulls materialSourcing from a remote build plan into Dexie', async () => {
+    const expected = buildPlan({ materialSourcing: { 34: { overridePrice: 6.5 } } });
+    seedRemote(BUILD_PLANS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    await triggerSync(1);
+    expect(await db.buildPlans.get('b1')).toEqual(expected);
+  });
+
   it('omits undefined facilityTaxPct from the pushed doc (Firestore rejects undefined)', async () => {
     await db.buildPlans.put(buildPlan());
     await triggerSync(1);
