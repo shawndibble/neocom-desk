@@ -83,16 +83,30 @@ import {
 import { bandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
 import type { RemapAvailability } from './remapAvailability';
-import { whatIfImplants, WHAT_IF_IMPLANT_MODES, type WhatIfImplantMode } from './whatIfImplants';
+import {
+  whatIfImplants,
+  setWhatIfBonus,
+  DEFAULT_WHAT_IF_SELECTION,
+  MAX_IMPLANT_BONUS,
+  MIN_IMPLANT_BONUS,
+  WHAT_IF_IMPLANT_PRESETS,
+  type WhatIfImplantPreset,
+  type WhatIfImplantSelection,
+} from './whatIfImplants';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
+
+/** "PER": the house three-letter attribute code, as EntryList's pair badge writes it. */
+function attributeShort(name: AttributeName): string {
+  return name.slice(0, 3).toUpperCase();
+}
 
 /** "PER 27 / WIL 21 / INT 17 / …": full remap spread, highest first. */
 function remapInstruction(attributes: Attributes): string {
   return [...ATTRIBUTE_NAMES]
     .sort((a, b) => attributes[b] - attributes[a])
-    .map((name) => `${name.slice(0, 3).toUpperCase()} ${attributes[name]}`)
+    .map((name) => `${attributeShort(name)} ${attributes[name]}`)
     .join(' / ');
 }
 
@@ -223,14 +237,16 @@ export function PlanEditor({
   }, [hydrateGroupingMode]);
 
   // What-If Implants (CONTEXT.md): swap the clone's real implants for a
-  // hypothetical set, for optimizer/schedule exploration only — never
-  // persisted (plan.remapCount etc. stay the source of truth for the plan
-  // itself; this is a "what if" lens on top of it).
-  const [whatIfMode, setWhatIfMode] = useState<WhatIfImplantMode>('current');
-  const effectiveImplants = useMemo(
-    () => whatIfImplants(whatIfMode, implants),
-    [whatIfMode, implants]
-  );
+  // hypothetical set — a uniform preset, or five per-slot bonuses, since EVE's
+  // hardwirings are per attribute. For optimizer/schedule exploration only,
+  // and never persisted (plan.remapCount etc. stay the source of truth for the
+  // plan itself; this is a "what if" lens on top of it). Session-local rather
+  // than a stored preference like Columns/Group-by above, because it changes
+  // the *numbers* — and below `lg` this pane is a collapsed disclosure, so a
+  // remembered lens would inflate every figure on the page with nothing on
+  // screen saying why.
+  const [whatIf, setWhatIf] = useState<WhatIfImplantSelection>(DEFAULT_WHAT_IF_SELECTION);
+  const effectiveImplants = useMemo(() => whatIfImplants(whatIf, implants), [whatIf, implants]);
 
   // Booster (CONTEXT.md): a single optional cerebral accelerator, applying a
   // uniform bonus to every attribute until its expiry. Session-local only.
@@ -707,20 +723,67 @@ export function PlanEditor({
             {t('plans.whatIfImplants')}
             <NativeSelect
               size="md"
-              value={whatIfMode}
-              onChange={(e) => setWhatIfMode(e.target.value as WhatIfImplantMode)}
+              value={whatIf.kind === 'custom' ? 'custom' : whatIf.preset}
+              onChange={(e) => {
+                const value = e.target.value;
+                // 'custom' is a readout of the grid below, never a thing to
+                // pick — it is only in the list while it is already the state.
+                if (value !== 'custom') {
+                  setWhatIf({ kind: 'preset', preset: value as WhatIfImplantPreset });
+                }
+              }}
             >
-              {WHAT_IF_IMPLANT_MODES.map((mode) => (
-                <option key={mode} value={mode}>
-                  {mode === 'none'
+              {WHAT_IF_IMPLANT_PRESETS.map((preset) => (
+                <option key={preset} value={preset}>
+                  {preset === 'none'
                     ? t('plans.whatIfNone')
-                    : mode === 'current'
+                    : preset === 'current'
                       ? t('plans.whatIfCurrent')
-                      : mode}
+                      : preset}
                 </option>
               ))}
+              {whatIf.kind === 'custom' && (
+                <option value="custom">{t('plans.whatIfCustom')}</option>
+              )}
             </NativeSelect>
           </label>
+
+          {/* EVE's hardwirings are per slot (+4 PER / +5 INT / nothing in
+              CHA), which a uniform preset cannot say. One row of five, always
+              visible: a preset fills them in, editing one leaves the other
+              four alone and flips the select above to "Custom", so what the
+              plan is being costed against is legible without opening
+              anything. The three-letter codes are the same abbreviation the
+              entry list's attribute-pair badge uses; each input's accessible
+              name spells the attribute out. */}
+          <div
+            role="group"
+            aria-label={t('plans.whatIfPerAttribute')}
+            className="grid grid-cols-5 gap-1"
+          >
+            {ATTRIBUTE_NAMES.map((name) => (
+              <label key={name} className="flex flex-col items-center gap-0.5">
+                <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
+                  {attributeShort(name)}
+                </span>
+                <TextInput
+                  size="md"
+                  type="number"
+                  min={MIN_IMPLANT_BONUS}
+                  max={MAX_IMPLANT_BONUS}
+                  step={1}
+                  aria-label={t('plans.whatIfAttributeBonus', {
+                    attribute: t(`skills.attr.${name}`),
+                  })}
+                  value={effectiveImplants[name]}
+                  onChange={(e) =>
+                    setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
+                  }
+                  className="w-full text-center"
+                />
+              </label>
+            ))}
+          </div>
 
           <label className="flex items-center gap-1.5">
             <input

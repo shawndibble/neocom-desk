@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { ComponentProps } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -76,7 +77,10 @@ const PLAN: SkillPlanRecord = {
   updatedAt: 0,
 };
 
-function renderEditor(onUpdate = vi.fn()) {
+function renderEditor(
+  onUpdate = vi.fn(),
+  overrides: Partial<ComponentProps<typeof PlanEditor>> = {}
+) {
   render(
     <PlanEditor
       characterId={1}
@@ -88,6 +92,7 @@ function renderEditor(onUpdate = vi.fn()) {
       remapInfo={null}
       listPane={<div data-testid="plan-list-pane" />}
       onUpdate={onUpdate}
+      {...overrides}
     />
   );
   return { onUpdate };
@@ -327,5 +332,85 @@ describe('PlanEditor grouping toggle (#115)', () => {
     expect(screen.getByText('PER/WIL attributes')).toBeInTheDocument();
     expect(screen.getByText('INT/MEM attributes')).toBeInTheDocument();
     expect(onUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlanEditor what-if implants', () => {
+  // A clone wearing an unmatched set — the case a uniform "+N" cannot say.
+  const FITTED: Implants = { perception: 4, memory: 3 };
+
+  function renderWithImplants() {
+    renderEditor(vi.fn(), { implants: FITTED });
+  }
+
+  /** The five per-slot inputs, in INT/MEM/PER/WIL/CHA order. */
+  function bonusInputs(): string[] {
+    return ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma'].map(
+      (attribute) => screen.getByLabelText<HTMLInputElement>(`${attribute} implant bonus`).value
+    );
+  }
+
+  it("opens on the clone's own per-slot implants, unmatched set and all", async () => {
+    const user = userEvent.setup();
+    renderWithImplants();
+    await openTools(user);
+
+    expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('current');
+    expect(bonusInputs()).toEqual(['0', '3', '4', '0', '0']);
+  });
+
+  it('a preset fills all five in one click', async () => {
+    const user = userEvent.setup();
+    renderWithImplants();
+    await openTools(user);
+
+    await user.selectOptions(screen.getByLabelText('What-if implants'), '+4');
+
+    expect(bonusInputs()).toEqual(['4', '4', '4', '4', '4']);
+    // "Custom" is not offered while a preset is in force — you become custom
+    // by editing a value, not by picking it.
+    expect(screen.queryByRole('option', { name: 'Custom' })).toBeNull();
+  });
+
+  it('editing one slot leaves the other four alone and stops claiming the preset', async () => {
+    const user = userEvent.setup();
+    renderWithImplants();
+    await openTools(user);
+
+    await user.selectOptions(screen.getByLabelText('What-if implants'), '+4');
+    const perception = screen.getByLabelText('Perception implant bonus');
+    await user.clear(perception);
+    await user.type(perception, '5');
+
+    expect(bonusInputs()).toEqual(['4', '4', '5', '4', '4']);
+    expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('custom');
+  });
+
+  it('clamps a slot to the documented +0..+5 range', async () => {
+    const user = userEvent.setup();
+    renderWithImplants();
+    await openTools(user);
+
+    const memory = screen.getByLabelText('Memory implant bonus');
+    await user.clear(memory);
+    await user.type(memory, '9');
+
+    expect(screen.getByLabelText<HTMLInputElement>('Memory implant bonus').value).toBe('5');
+  });
+
+  it('"Current" is still one click back to the real fitted set after experimenting', async () => {
+    const user = userEvent.setup();
+    renderWithImplants();
+    await openTools(user);
+
+    await user.selectOptions(screen.getByLabelText('What-if implants'), '+5');
+    const charisma = screen.getByLabelText('Charisma implant bonus');
+    await user.clear(charisma);
+    await user.type(charisma, '1');
+    expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('custom');
+
+    await user.selectOptions(screen.getByLabelText('What-if implants'), 'current');
+
+    expect(bonusInputs()).toEqual(['0', '3', '4', '0', '0']);
   });
 });

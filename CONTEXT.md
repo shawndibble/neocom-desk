@@ -29,7 +29,7 @@
 - **Optimize Modes**: Skill Plan optimizer actions — "optimize now" (optimizer chooses remap placement, keeps order), "optimize at remap points" (user drags **Remap Markers** into the plan; optimizer computes the best attribute spread for each marker-delimited segment), "suggest full reorder" (attribute-grouped reorder honoring prerequisites; user accepts or rejects). Reorder never applies silently.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
 - **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap when off cooldown. Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
-- **What-If Implants**: Optimizer override that assumes a hypothetical implant set (+3/+4/+5) instead of the clone's current implants.
+- **What-If Implants**: Optimizer override that assumes a hypothetical implant set instead of the clone's current implants. Five independent per-attribute bonuses (+0..+5 each), since EVE's attribute hardwirings are per slot — a clone can run +4 PER / +5 INT / +3 MEM and nothing in WIL or CHA. The matched sets (+1..+5 in every slot) remain one-click **presets** over those five values; see round 28.
 - **Booster**: Cerebral accelerator; user toggles it on manually with an expiry date for training-time math.
 
 ## Scope decisions (round 2)
@@ -844,3 +844,50 @@
   copied per page. Three surfaces now offer "Add to Quickbar", and the write
   is a `db.quickbars.put` plus an `isSyncConfigured()`-guarded sync schedule
   that a fourth surface could easily get half-right.
+
+## Scope decisions (round 28) — per-attribute What-If Implants
+
+- **A What-If Implant set is five independent bonuses, not one number.** The
+  control only offered a uniform +1..+5 in every slot, which no real clone
+  wears: hardwirings are fitted per attribute, so +4 PER / +5 INT / +3 MEM /
+  nothing else is the ordinary case and was inexpressible. The presets stay
+  exactly as they were — **None**, **Current** and the five matched sets are
+  each still one click — and per-attribute editing is layered on top of them
+  rather than replacing them, so the common case never costs five
+  interactions.
+- **A preset populates the five values; editing one value makes the selection
+  Custom.** Picking a preset fills all five; editing a slot seeds a custom set
+  from whatever the preset currently resolves to, changes that one slot and
+  leaves the other four alone, and the picker flips to a **Custom** entry that
+  exists only while it is in force — Custom is a readout of the values, never
+  something to choose. The five inputs are always visible (one row of five
+  under the picker, not a disclosure), because the whole point of the lens is
+  that what the plan is being costed against is legible.
+- **"Current" stays a distinct preset rather than becoming initial values.**
+  It resolves late, against whatever the character is wearing when the
+  schedule is computed, so it is always the clone's real fitted set and never
+  a snapshot that goes stale when ESI re-reads the implants. That is also what
+  makes it the one-click way back after experimenting, which is required: a
+  hypothesis the user cannot undo is a trap.
+- **The lens is not persisted, unlike the Columns and Group-by preferences
+  beside it in the same pane.** Those are presentation-only; this one changes
+  the numbers — the header's projected finish, the optimization badge and both
+  optimizer results are all computed against it. Below `lg` the tools pane is
+  a _collapsed_ disclosure, so a remembered "+5 everywhere" would silently
+  inflate every figure on the page with nothing on screen saying why. It
+  therefore resets to **Current** — the truth — on every mount.
+- **The +0..+5 clamp lives in the resolver, not only on the input.** Bonuses
+  are rounded and clamped as they are read, so a cleared field, a pasted word
+  or an implausible stored value can never reach `computeSchedule`, which
+  would otherwise add it to an attribute and report a NaN finish date. The
+  resolver returns all five slots (`0` for an empty one) rather than a sparse
+  map: every consumer already reads `implants[name] ?? 0`, and one shape means
+  the control never has to ask whether a slot is absent or zero.
+- **The what-if control and a display of the character's current attributes
+  stay two things.** They share five attribute names but not a unit — the
+  control edits _implant bonuses_ (0..5), an attributes display reads
+  _effective attribute points_ (`20 + 4 = 24`, which `AttributeChips` already
+  folds the bonus into). Merging them would either make the character's real
+  sheet look editable or make the hypothesis look like fact, and round 26
+  already rules that a display of the sheet never falls back to defaults while
+  the planner's lens must always be operable.
