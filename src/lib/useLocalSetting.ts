@@ -43,6 +43,12 @@ export interface LocalSettingState<T> {
   /** True once the Dexie read has settled — successfully or not. */
   hydrated: boolean;
   hydrate: () => Promise<void>;
+  /**
+   * Applies the value first and persists it second, so subscribers see the
+   * new choice in the same tick and a control repaints on the press. The
+   * returned promise settles when the write does — await it only when you
+   * need the row on disk, never to read the value back.
+   */
   setValue: (value: T) => Promise<void>;
 }
 
