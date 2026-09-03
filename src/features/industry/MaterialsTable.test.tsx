@@ -267,7 +267,10 @@ describe('MaterialsTable stacked card', () => {
       'items-start',
       'sm:items-end'
     );
-    expect(tritanium.getByText('Hub').parentElement).toHaveClass('justify-start', 'sm:justify-end');
+    // The price cell reaches the same right edge by mirroring rather than by
+    // `justify-end` — see the alignment test below — so what matters here is
+    // that it starts at the gutter on the card like everything else.
+    expect(tritanium.getByText('Hub').parentElement).toHaveClass('justify-start');
   });
 
   it('left-aligns the digits inside a sourcing field below sm, so they sit in the value column too', () => {
@@ -358,6 +361,25 @@ describe('MaterialsTable number mask', () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(valueOf(priceInput('Tritanium'))).toBe('401,000');
     expect(within(row('Tritanium')).getByText('Hub')).toBeTruthy();
+  });
+
+  it('puts the field on the cell edge the PRICE header is aligned to', async () => {
+    // The header is right-aligned to the cell, so whatever sits last in the
+    // cell is what PRICE ends up over. With the field first and the tag and
+    // revert control after it, the header floated a `Hub ↺` clear of the
+    // digits it names. Mirroring from `sm` up puts the field last on the wide
+    // table while the card keeps reading field-first.
+    render(<Harness hubPrices={BIG_PRICES} onChange={vi.fn()} />);
+
+    const cell = priceInput('Tritanium').parentElement;
+    expect(cell).toHaveClass('sm:flex-row-reverse');
+    expect(cell?.firstElementChild).toBe(priceInput('Tritanium'));
+
+    // And it holds once a row grows a revert button: the field is a fixed
+    // width against a fixed edge, so nothing beside it can move it.
+    await setField(priceInput('Tritanium'), '7');
+    expect(revertButton('Tritanium')).toBeInTheDocument();
+    expect(priceInput('Tritanium').parentElement?.firstElementChild).toBe(priceInput('Tritanium'));
   });
 
   it('accepts a separator the player types or pastes', async () => {
