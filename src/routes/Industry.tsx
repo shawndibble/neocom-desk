@@ -15,6 +15,8 @@ import {
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { MaterialSourcing, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import { loadPi } from '@/sde/loadSde';
+import type { PiData } from '@/sde/types';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import {
   loadBlueprintCatalog,
@@ -77,6 +79,10 @@ export function Industry() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
+  // Planetary schematics, for the materials table's make-or-buy marker. Loaded
+  // beside the catalog so both are in place before a plan first renders — a
+  // late arrival would widen the price fetch's type list and refire it.
+  const [pi, setPi] = useState<PiData | null>(null);
   const [ownedBlueprints, setOwnedBlueprints] = useState<CharacterBlueprint[]>([]);
   const [blueprintsNeedsReauth, setBlueprintsNeedsReauth] = useState(false);
   const [skills, setSkills] = useState<SkillLevels>({});
@@ -85,13 +91,17 @@ export function Industry() {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [cat, owned, corrected] = await Promise.all([
+      const [cat, planetary, owned, corrected] = await Promise.all([
         loadBlueprintCatalog(),
+        // Only the make-or-buy marker needs this one, so its failure costs a
+        // handful of verdicts rather than the whole page.
+        loadPi().catch(() => null),
         loadCharacterBlueprints(activeCharacterId),
         loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true }),
       ]);
       if (cancelled) return;
       setCatalog(cat);
+      setPi(planetary);
       setOwnedBlueprints(owned.cached?.data ?? []);
       setBlueprintsNeedsReauth(owned.needsReauth);
       // /skills lags until the character logs in; completed queue entries are
@@ -327,6 +337,7 @@ export function Industry() {
                   key={selectedPlan.id}
                   plan={selectedPlan}
                   catalog={catalog}
+                  pi={pi}
                   ownedBlueprints={ownedBlueprints}
                   skills={skills}
                   onUpdate={(patch) => void handleUpdate(patch)}

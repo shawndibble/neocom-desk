@@ -6,9 +6,24 @@ import { PlanToolsPane } from './PlanToolsPane';
 
 const SECTIONS = [
   { id: 'actions', title: 'Actions', content: <button type="button">Optimize remaps</button> },
-  { id: 'training', title: 'Training', content: <button type="button">Booster</button> },
+  {
+    id: 'attributes',
+    title: 'Attributes',
+    content: <button type="button">Booster</button>,
+    actions: <time dateTime="2025-01-01T00:00:00.000Z">2 days ago</time>,
+  },
   { id: 'importExport', title: 'Import / Export', content: <button type="button">Export</button> },
 ];
+
+/**
+ * `closest('section')`, not `parentElement`: a heading shares a flex row with
+ * its section's optional right-aligned actions.
+ */
+function sectionFor(title: string): HTMLElement {
+  const section = screen.getByRole('heading', { name: title }).closest('section');
+  if (!section) throw new Error(`expected a section for "${title}"`);
+  return section as HTMLElement;
+}
 
 describe('PlanToolsPane', () => {
   it('groups every tool into one panel of labelled sections, not one panel each', () => {
@@ -31,9 +46,7 @@ describe('PlanToolsPane', () => {
   it('separates sections with a single hairline, never two stacked borders', () => {
     render(<PlanToolsPane sections={SECTIONS} asDisclosure={false} />);
 
-    const sections = SECTIONS.map(
-      (s) => screen.getByRole('heading', { name: s.title }).parentElement as HTMLElement
-    );
+    const sections = SECTIONS.map((s) => sectionFor(s.title));
 
     // Every section but the last carries the separator; the last carries none,
     // so the panel's own bottom border isn't doubled.
@@ -66,8 +79,18 @@ describe('PlanToolsPane', () => {
     await user.click(screen.getByRole('button', { name: /plan tools/i }));
 
     for (const { title } of SECTIONS) {
-      const section = screen.getByRole('heading', { name: title }).parentElement as HTMLElement;
-      expect(section).not.toHaveClass('border-b');
+      expect(sectionFor(title)).not.toHaveClass('border-b');
     }
+  });
+
+  it("renders a section's actions beside its heading, not inside its accessible name", () => {
+    render(<PlanToolsPane sections={SECTIONS} asDisclosure={false} />);
+
+    // The badge is in the section's header row...
+    const section = sectionFor('Attributes');
+    expect(section.querySelector('time')).toHaveTextContent('2 days ago');
+    // ...but the heading is still named for the section alone, so a lookup by
+    // title can't drift with the badge's ticking text.
+    expect(screen.getByRole('heading', { name: 'Attributes' }).textContent).toBe('Attributes');
   });
 });

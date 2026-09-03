@@ -12,6 +12,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import type {
   EffectiveMaterial,
   FacilityKind,
@@ -23,10 +24,12 @@ import type {
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import type { PiData } from '@/sde/types';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
+import { materialRecipe, recipeInputTypeIds } from './recipes';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -54,6 +57,8 @@ export interface SourcingPatchEntry {
 interface BuildPlanDetailProps {
   plan: BuildPlanRecord;
   catalog: BlueprintCatalog;
+  /** Planetary schematics, for materials no blueprint makes. Null while pi.json loads, or if it failed. */
+  pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
   onUpdate: (patch: PlanPatch) => void;
@@ -87,6 +92,7 @@ function clampInt(value: number, min: number, max: number): number {
 export function BuildPlanDetail({
   plan,
   catalog,
+  pi,
   ownedBlueprints,
   skills,
   onUpdate,
@@ -108,8 +114,12 @@ export function BuildPlanDetail({
     const ids = new Set(blueprint.materials.map((m) => m.typeID));
     const product = blueprint.products[0];
     if (product) ids.add(product.typeID);
+    // One level deeper than the plan itself needs: the make-or-buy marker
+    // quotes each material's own recipe, and a quote is only as good as the
+    // inputs it can price. Same batched Fuzzwork call either way.
+    for (const id of recipeInputTypeIds([...ids], { catalog, pi })) ids.add(id);
     return [...ids];
-  }, [blueprint]);
+  }, [blueprint, catalog, pi]);
 
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
@@ -128,7 +138,8 @@ export function BuildPlanDetail({
     };
     // typeIds/blueprint are stable references keyed off `entry` (the catalog Map holds one
     // entry per blueprintTypeID), so this only refires on a real hub or blueprint change,
-    // plus the manual-refresh tick.
+    // plus the manual-refresh tick. `catalog`/`pi` land together in one state
+    // update on the route, so widening typeIds above cannot make this fire twice.
   }, [hub, typeIds, blueprint, refreshTick]);
 
   const ownedMatch = useMemo(
@@ -187,6 +198,47 @@ export function BuildPlanDetail({
     [result, plan.materialSourcing, detectedStock]
   );
 
+  /**
+   * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
+   * the table and the CSV export rather than per row render.
+   *
+   * Gated on `pricesReady` for the same reason the results panel is: without
+   * live adjusted prices and a system cost index there is no job fee, and a
+   * fee-free quote would call almost everything worth building.
+   */
+  const advice = useMemo(() => {
+    const verdicts = new Map<number, MakeOrBuy>();
+    if (!result || !snapshot || snapshot.adjustedPrices === null) return verdicts;
+    if (snapshot.systemCostIndex === null) return verdicts;
+    const context = {
+      facility: facilityPreset,
+      rig: plan.rigLevel,
+      security: plan.security,
+      facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
+      systemCostIndex: snapshot.systemCostIndex,
+      adjustedPrices: snapshot.adjustedPrices,
+      hubPrices: snapshot.hubPrices,
+      skills,
+    };
+    for (const material of result.materials) {
+      const recipe = materialRecipe(material.typeID, { catalog, pi, ownedBlueprints });
+      const verdict = makeOrBuy(material, recipe, context);
+      if (verdict) verdicts.set(material.typeID, verdict);
+    }
+    return verdicts;
+  }, [
+    result,
+    snapshot,
+    facilityPreset,
+    plan.rigLevel,
+    plan.security,
+    plan.facilityTaxPct,
+    skills,
+    catalog,
+    pi,
+    ownedBlueprints,
+  ]);
+
   if (!entry || !blueprint) {
     return <EmptyState title={t('industry.blueprintMissing')} className="py-8" />;
   }
@@ -228,7 +280,8 @@ export function BuildPlanDetail({
         t,
         (typeID) => nameForType(catalog, typeID),
         plan.materialSourcing,
-        pricesReady
+        pricesReady,
+        advice
       )
     );
   }
@@ -436,6 +489,7 @@ export function BuildPlanDetail({
             onSourcingChange={onSourcingChange}
             detection={detection}
             rowContextMenu={materialContextMenu}
+            makeOrBuy={advice}
           />
         )}
       </Panel>

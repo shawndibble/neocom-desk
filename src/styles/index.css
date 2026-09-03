@@ -142,6 +142,43 @@
      * written. A labelled blank says the same thing at both widths.
      */
   }
+
+  /*
+   * A `type="number"` field narrow enough that the platform spin buttons
+   * would break it. Same call `NativeSelect` makes with `appearance-none`
+   * and its own caret: the browser's own control is the wrong size for this
+   * system.
+   *
+   * Measured on the plan editor's what-if implant row (five fields across a
+   * 294px sidebar): each field is 55.6px wide, and `px-3` leaves a 29.6px
+   * content box. Chrome only draws the spinner on hover and focus, and it
+   * takes roughly half of that and shoves the digit hard left — so the one
+   * cell under the cursor jumps out of alignment with the other four. The
+   * pane's other two number fields (`w-14` remaps-available, `w-16` booster
+   * bonus) are the same field at the same size, so they take it too — one
+   * hover behaviour across the pane, not two.
+   *
+   * Nothing is lost. Mobile browsers never render spin buttons for
+   * `type="number"` at all (they raise the numeric keypad instead), so touch
+   * users never had them; `ArrowUp`/`ArrowDown` still step the value, and
+   * the `spinbutton` role with its `min`/`max`/`step` semantics is untouched.
+   * Only the drawn buttons go.
+   *
+   * Not folded into `TextInput` for every `type="number"` in the app: the
+   * Industry fields are wide enough that their spinners are harmless, and
+   * a field with room for one is better with it.
+   */
+  .field-no-spinner {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .field-no-spinner::-webkit-outer-spin-button,
+  .field-no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
 }
 
 @layer base {

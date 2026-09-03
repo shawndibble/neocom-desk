@@ -15,6 +15,7 @@ vi.mock('@/sde/loadMarketSde', () => ({
 }));
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(),
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);

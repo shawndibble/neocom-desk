@@ -237,6 +237,43 @@ describe('buildAssetTree', () => {
     expect(grandTotal).toBe(totalQuantity);
   });
 
+  // A player-owned structure is never an asset row of its own: ESI reports
+  // everything docked there as location_type 'item' pointing at the structure
+  // id. That makes the ships AND their contents orphan candidates, so an input
+  // order that puts a ship's cargo ahead of the ship itself used to promote the
+  // ship's own item_id to a top-level group while still nesting that ship under
+  // the structure — the same hull and cargo counted in two places.
+  it("conserves total quantity when a structure's ships are listed after their cargo", () => {
+    const structureId = 1_040_000_000_001;
+    const indices = [1, 2, 3, 4, 5];
+    const cargo = indices.map((n) =>
+      asset({
+        item_id: 9000 + n,
+        type_id: 34,
+        quantity: 100,
+        location_id: 2000 + n,
+        location_type: 'item',
+        location_flag: 'Cargo',
+      })
+    );
+    const ships = indices.map((n) =>
+      asset({
+        item_id: 2000 + n,
+        type_id: 17364,
+        location_id: structureId,
+        location_type: 'item',
+      })
+    );
+    const assets = [...cargo, ...ships];
+
+    const tree = buildAssetTree(assets);
+
+    const totalQuantity = assets.reduce((sum, a) => sum + a.quantity, 0);
+    expect(tree.reduce((sum, station) => sum + station.itemCount, 0)).toBe(totalQuantity);
+    // ...and no phantom location row keyed on a ship's item_id beside the structure.
+    expect(tree.map((station) => station.locationId)).toEqual([structureId]);
+  });
+
   it('cuts a reachable cycle instead of recursing forever', () => {
     // A claims to be a top-level orphan container holding B; B claims to hold A back.
     const assets = [

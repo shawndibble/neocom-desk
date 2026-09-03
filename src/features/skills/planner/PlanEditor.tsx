@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DataAgeBadge,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -44,7 +45,9 @@ import type {
   TrainedSkill,
 } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
-import { loadCharacterSkillQueue } from '../data';
+import type { CharacterAttributes } from '@/esi/endpoints';
+import { AttributeChips } from '@/features/skills/AttributeChips';
+import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
@@ -75,8 +78,8 @@ import {
   markerStepIndices,
   markersAfterEntryRemoval,
   removeMarker,
-  reorderRows,
 } from './markers';
+import { planDrop, promotePrereq } from './planDrop';
 import { bandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
 import type { RemapAvailability } from './remapAvailability';
@@ -114,6 +117,14 @@ interface PlanEditorProps {
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   attributes: Attributes;
   implants: Implants;
+  /**
+   * ESI's own attributes read, carrying its `fetchedAt` — what the tools
+   * pane *displays*. Deliberately not derived from `attributes` above: that
+   * one is the scheduler's base sheet, which falls back to placeholder
+   * numbers when ESI could not be read and is clamped to the base minimum,
+   * so showing it would present a fallback as the character's own sheet.
+   */
+  attributesResult: CachedResult<CharacterAttributes> | null;
   /** Remaps Available from ESI (bonus + yearly), for the hint next to the count input. */
   remapInfo: RemapAvailability | null;
   /**
@@ -160,7 +171,13 @@ function computeQueue(
     );
     const scheduled = computeSchedule(
       steps,
-      { attributes, implants, boosters, startDate },
+      // `trainedSkills` is read twice, for two different things:
+      // normalizePlanWithBoundaries takes the levels (which steps to emit),
+      // computeSchedule takes the SP (how much of the first such step is
+      // already paid for). Without the second, a plan that opens on the skill
+      // the character is currently training re-charges the whole level and
+      // reads hours longer than the in-game queue for it.
+      { attributes, implants, boosters, startDate, trainedSkills },
       catalog.engineSkills
     );
     return { scheduled, entryBoundaries, error: null, startDate };
@@ -181,6 +198,7 @@ export function PlanEditor({
   trainedSkills,
   attributes,
   implants,
+  attributesResult,
   remapInfo,
   listPane,
   onUpdate,
@@ -212,6 +230,13 @@ export function PlanEditor({
   const [markerConfirm, setMarkerConfirm] = useState(false);
   const [markersOptimizeConfirm, setMarkersOptimizeConfirm] = useState<string | null>(null);
   const [reorderConfirm, setReorderConfirm] = useState(false);
+  // Outcome of the last drag on the entry list. A drop that would land a
+  // skill after something requiring it is refused rather than silently
+  // re-normalized back (planDrop.ts), so the refusal has to say why; a
+  // promoted prereq row is a quieter change than it looks (a dimmed row turns
+  // into user data), so it says so too.
+  const [dropError, setDropError] = useState<string | null>(null);
+  const [promoteConfirm, setPromoteConfirm] = useState<string | null>(null);
 
   // The entry list is the only thing that scrolls independently: it gets a
   // live-measured cap so it fills the room actually left below it, while the
@@ -326,6 +351,11 @@ export function PlanEditor({
     setReorderPreview(null);
     setOptimizeConfirm(null);
     setMarkersOptimizeConfirm(null);
+    // A refusal describes one drag against one entry order — once the order
+    // moves on it describes nothing. (promoteConfirm is the opposite: a
+    // "that worked" note about the change that just landed, so it clears on
+    // its own timer like markerAdded, not here.)
+    setDropError(null);
   }
 
   const userSkillTypeIDs = useMemo(
@@ -414,6 +444,10 @@ export function PlanEditor({
   // shows nothing until the user has clicked it once — never a stale or
   // wrong number, never a spinner.
   const headerBadge = useMemo(() => {
+    // A plan with no remaps to spend gets no chip on either path — the rule
+    // and the reasoning live in evaluateOptimizationBadge, but the Booster
+    // branch below never reaches it.
+    if (plan.remapCount <= 0) return null;
     if (activeBoosters.length > 0) {
       return optimizeResult
         ? toOptimizationBadge(optimizeResult.savingsSeconds, remapCount, plan.remapCount)
@@ -519,6 +553,61 @@ export function PlanEditor({
     setMarkersVerdict(verdict);
     setMarkersOptimizeConfirm(confirmRemapOutcome(verdict));
     setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
+  }
+
+  /** "{Skill} III" — how a promoted prereq is named back to the user. */
+  function levelLabel(skillTypeID: number, level: number): string {
+    return `${nameFor(skillTypeID)} ${ROMAN[level - 1]}`;
+  }
+
+  function confirmPromotion(skillTypeID: number, level: number) {
+    setPromoteConfirm(t('plans.prereqPromoted', { name: levelLabel(skillTypeID, level) }));
+    setTimeout(() => setPromoteConfirm(null), 4000);
+  }
+
+  /**
+   * One drag on the merged list. planDrop decides what it meant — a plain
+   * reorder, a prereq row promoted into a real entry, or a drop the
+   * normalizer would silently undo, which is refused with the entry that
+   * requires the dragged skill named rather than springing back unexplained.
+   */
+  function handleDrop(activeId: string, overId: string) {
+    const result = planDrop({
+      entries: plan.entries,
+      markers: plan.markers,
+      rows: mergedRows,
+      activeId,
+      overId,
+      skills: catalog.engineSkills,
+      trainedSkills,
+    });
+    if (!result.ok) {
+      setDropError(
+        t('plans.dropBlocked', {
+          skill: nameFor(result.skillTypeID),
+          blocker: nameFor(result.blockedBy),
+        })
+      );
+      return;
+    }
+    setDropError(null);
+    onUpdate({ entries: result.entries, markers: result.markers });
+    if (result.promoted) confirmPromotion(result.promoted.skillTypeID, result.promoted.level);
+  }
+
+  /** The "+" on a prereq row: the same promotion, without needing a drag. */
+  function handlePromotePrereq(rowId: string) {
+    const result = promotePrereq({
+      entries: plan.entries,
+      markers: plan.markers,
+      rows: mergedRows,
+      rowId,
+    });
+    if (!result) return;
+    setDropError(null);
+    onUpdate({ entries: result.entries, markers: result.markers });
+    const row = mergedRows.find((r) => r.id === rowId);
+    if (row?.kind === 'prereq') confirmPromotion(row.step.skillTypeID, row.step.level);
   }
 
   function handleAddMarker() {
@@ -652,7 +741,7 @@ export function PlanEditor({
               onChange={(e) =>
                 onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
               }
-              className="w-14 text-center"
+              className="field-no-spinner w-14 text-center"
             />
           </div>
           {remapInfo && (
@@ -740,17 +829,63 @@ export function PlanEditor({
                     : t('plans.markersNoGain')}
                 </p>
               )}
-              {renderSegments(markersResult.segments)}
+              {/* Segments are the plan as the markers would train it — worth
+                  seeing even when the trade is poor, but not when no marker
+                  split anything: the lone "keep current attributes" row then
+                  reads as a contradiction of the message above it. */}
+              {markersVerdict.kind !== 'markersAtEnd' && renderSegments(markersResult.segments)}
             </div>
           )}
         </div>
       ),
     },
     {
-      id: 'training',
-      title: t('plans.toolsTraining'),
+      // Round 17 called this section "Training" and gave it the two what-if
+      // lenses. It is the character's *attributes* that those lenses move,
+      // and attributes are the one piece of character state that explains
+      // every number on this page — training time, projected finish, the
+      // savings the remap optimizer quotes. So the section leads with the
+      // sheet itself and keeps the lenses beneath it, which is why it is
+      // named for the sheet now (and named the same as the plan list's
+      // pane, which shows exactly this).
+      //
+      // Why here, and not a fourth panel: the sidebar already carries the
+      // plan list plus this one tools panel, and the round-17 redesign
+      // exists precisely because the page had grown too many peer panels.
+      // Another one would cost another header strip to say the same thing,
+      // and below `lg` — where there is no sidebar at all — it would land as
+      // a second always-open block above the entry list, undoing the "the
+      // whole tool set costs one collapsed row" rule. Inside the pane, the
+      // attributes cost no rows on a phone and sit a line above the control
+      // that reinterprets them on a desktop.
+      //
+      // The tradeoff that buys: below `lg` the attributes are behind the
+      // same one tap as every other tool. Accepted deliberately — the plan
+      // leads the page there, and a reference read is worth a tap where a
+      // permanently-open block is not.
+      id: 'attributes',
+      title: t('plans.toolsAttributes'),
+      // Dated like every other ESI-derived view, and in the same place the
+      // plan list's Attributes panel dates it.
+      actions: attributesResult?.fetchedAt && <DataAgeBadge date={attributesResult.fetchedAt} />,
       content: (
         <div className="space-y-2 text-xs">
+          {/* The clone's real sheet, never re-rendered through the what-if
+              lens below: "current" has to keep meaning current, or the one
+              honest reading of the character on this page becomes another
+              hypothetical. The lens's effect is visible where it belongs —
+              in the plan's own numbers. */}
+          <AttributeChips
+            attributes={attributesResult?.data ?? null}
+            implantBonuses={implants}
+            dense
+          />
+          {/* Says which half of this section is fact. An earlier draft read
+              "every estimate on this page is costed against these", which is
+              false the moment the lens leaves "current" — the estimates are
+              costed against the lens, not against the chips. */}
+          <p className="text-[0.6875rem] text-text-dim">{t('plans.attributesCurrentNote')}</p>
+
           <label className="flex items-center justify-between gap-2">
             {t('plans.whatIfImplants')}
             <NativeSelect
@@ -811,7 +946,12 @@ export function PlanEditor({
                   onChange={(e) =>
                     setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
                   }
-                  className="w-full text-center"
+                  // `field-no-spinner` (src/styles/index.css): Chrome draws
+                  // the spin buttons on hover and focus into a 29.6px content
+                  // box, taking about half of it and shoving the digit left —
+                  // so the cell under the cursor would break the row's
+                  // alignment with the other four.
+                  className="field-no-spinner w-full text-center"
                 />
               </label>
             ))}
@@ -838,7 +978,7 @@ export function PlanEditor({
                   max={9}
                   value={boosterBonus}
                   onChange={(e) => setBoosterBonus(Number(e.target.value) || 0)}
-                  className="w-16 text-center"
+                  className="field-no-spinner w-16 text-center"
                 />
               </label>
               <label className="flex items-center justify-between gap-2">
@@ -935,6 +1075,24 @@ export function PlanEditor({
           skillCount={scheduledSkillCount}
           projectedFinish={planFinish}
           badge={headerBadge}
+          // Only when it actually shortened these totals: an expired Booster
+          // is ignored by computeSchedule, so disclosing one would be its own
+          // small lie. The tools pane keeps the "Expired" hint for that case.
+          //
+          // Read off `booster.bonus` — the map computeSchedule costed with —
+          // rather than the `boosterBonus` input beside it. They agree while
+          // the input writes one figure into all five attributes, but a
+          // per-attribute Booster would desync them, and a chip stating a
+          // bonus the arithmetic did not apply is the very thing it exists
+          // to prevent.
+          booster={
+            booster && !boosterExpired
+              ? {
+                  bonus: Math.max(...ATTRIBUTE_NAMES.map((name) => booster.bonus[name] ?? 0)),
+                  expiresAt: booster.expiresAt,
+                }
+              : null
+          }
         />
 
         {!isDesktop && toolsPane}
@@ -1005,6 +1163,14 @@ export function PlanEditor({
               trainedSkills={trainedSkills}
               onAdd={(entry) => update(upsertEntry(plan.entries, entry))}
             />
+            {/* Outside the scroller, so a refusal is on screen wherever in a
+                long queue the drag happened. */}
+            {dropError && (
+              <p role="alert" className="text-xs text-danger">
+                {dropError}
+              </p>
+            )}
+            {promoteConfirm && confirmation(promoteConfirm)}
             {/* Only the list scrolls: the panel header, the view controls and
                 the picker above stay put, so adding a skill never means
                 scrolling back up past a long queue to reach the field. The
@@ -1027,9 +1193,8 @@ export function PlanEditor({
                   columns={columnVisibility}
                   boostedSteps={boostedSteps}
                   startDate={startDate}
-                  onReorder={(activeId, overId) =>
-                    onUpdate(reorderRows(plan.entries, plan.markers, activeId, overId))
-                  }
+                  onReorder={handleDrop}
+                  onPromotePrereq={handlePromotePrereq}
                   onRemove={(skillTypeID) => {
                     const entryIndex = plan.entries.findIndex((e) => e.skillTypeID === skillTypeID);
                     onUpdate({

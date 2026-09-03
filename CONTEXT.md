@@ -352,12 +352,25 @@
   plan-switcher sidebar, pinned toolbar above the list", and #158's list pane
   beside the editor). The sidebar carries the plan list and, below it, a
   single **Plan Tools** panel of three labelled sections: Actions
-  (reorder/optimize/marker, the ones used while working the list), Training
-  (the what-if implants/booster lens), and Import / Export. The main column
+  (reorder/optimize/marker, the ones used while working the list),
+  **Attributes** (the character's current attributes, then the what-if
+  implants/booster lenses over them), and Import / Export. The main column
   carries only the plan summary strip and the entry list. Rationale: five
   peer panels said the controls mattered as much as the plan, cost five panel
   header strips of chrome to say it, and left the sidebar empty below a short
   plan list.
+  - The **Attributes** section is where the editor route shows the
+    character's attributes, rendered by the same `AttributeChips` +
+    `DataAgeBadge` pair as the plan list's Attributes panel. They belong on
+    this route because they are what every estimate on it is costed against,
+    and they belong _inside_ the tools panel because a fourth peer panel is
+    what this round removed — and below `lg` it would land as a second
+    always-open block above the entry list. Costing a tap on a phone is the
+    accepted price. Chips show the clone's _real_ implants and never
+    re-render through the what-if lens sitting under them: "current" has to
+    keep meaning current, and the lens's effect is visible in the plan's own
+    numbers. General character stats (total SP, wallet) stay off this route —
+    they explain nothing here.
   - Below `lg` the sidebar is not built at all: the tools move into the one
     column as a **collapsed disclosure** above the entry list, so the whole
     tool set costs one row rather than three panels, and the plan leads the
@@ -378,8 +391,9 @@
   plan entry (not exploded per individual level), draggable, with priority,
   target level, and an icon-only remove button, plus per-level and cumulative
   training time. Prerequisite skills the user did not add directly still
-  appear as their own dimmed, non-interactive rows, positioned where the
-  schedule actually trains them.
+  appear as their own dimmed rows, positioned where the schedule actually
+  trains them. (Round 31 supersedes "non-interactive": those rows are
+  draggable, and dragging one is a **Prereq Promotion**.)
 - **An entry row names the level range it trains, and discloses those levels
   on request.** A "Caldari Carrier V" entry queues I–V as five scheduled
   steps, but the row showed one aggregated time while each prerequisite got a
@@ -891,3 +905,120 @@
   sheet look editable or make the hypothesis look like fact, and round 26
   already rules that a display of the sheet never falls back to defaults while
   the planner's lens must always be operable.
+
+## Scope decisions (round 29) — make-or-buy marker + planetary recipes
+
+- **One glyph per material row, and it carries the verdict, not the source.**
+  "Better to craft or buy" is what the marker answers: a hammer for a
+  material worth producing, a cart for one worth buying, and nothing at all
+  for a material nothing produces. Two distinct shapes rather than one shape
+  in two tones, because the verdict has to survive greyscale and a screen
+  reader (docs/DESIGN.md §7); how it is produced — a blueprint or a planetary
+  schematic — is named in the label instead of taking a glyph of its own.
+- **It is the deliberate one-level version of the rollup round 27 scoped
+  out.** Each material is quoted on its own recipe with the inputs priced at
+  the hub, never recursively: a component's own components stay at their
+  market price. That is the read an industrialist actually makes at the shelf
+  — "buy this part, or run a job for it" — and it needs no change to
+  `BuildPlanRecord`, which is still one blueprint per plan.
+- **A quote is sized to a real job, at the ME the character actually has.**
+  Runs are `ceil(units still to buy / units per run)`, because EVE rounds
+  material use once per job rather than per run, and ME comes from the best
+  copy of the sub-blueprint the character owns (else 0) — the same rule the
+  ME field's "Owned" hint already shows. The job fee is included; sales tax
+  and broker fee are not, since a material is consumed by the parent job and
+  never listed.
+- **No verdict beats a bad verdict.** The marker is gated on the same live
+  prices the results panel needs: without adjusted prices and a system cost
+  index there is no job fee, and a fee-free quote would call almost
+  everything worth building. A material with an unpriced recipe input, or no
+  price of its own, is likewise left unmarked.
+- **Planetary industry gets a recipe payload of its own** (`public/data/pi.json`,
+  ~13 KB, precached): schematics keyed by the typeID they produce, with item
+  names carried inline because most planetary commodities are referenced by
+  no blueprint and so are absent from `types.json`. Its costing is the
+  inputs at hub prices over one cycle's output — planet setup, cycle time and
+  the customs-office export tax are outside the number, and said so in the
+  label. The same payload answers "how is this made" in Item Detail, which
+  is the question a planetary commodity's info panel exists for.
+
+## Glossary (round 30 addition)
+
+- **Training Progress**: How much SP a Character has already banked toward
+  the level it is training _right now_. Distinct from **Trained Skills**,
+  which is levels finished. ESI reports it in two places that disagree:
+  `/skills`' `skillpoints_in_skill` is frozen near where training began,
+  while `/skillqueue` carries `training_start_sp`, `level_end_sp` and the
+  window the level trains across — enough to interpolate the true figure,
+  which is what the in-game queue itself displays.
+
+## Scope decisions (round 30) — a plan's times match the in-game queue
+
+- **A part-trained level is charged for what is left of it, not for the whole
+  level.** `computeSchedule` previously costed every step as a full level, so
+  a plan opening on the skill the Character was training re-charged SP
+  already paid for and read hours longer than the in-game queue for the same
+  entry. The credit is `remainingSpForLevel`, and it applies only to the
+  level actually in progress — `currentSp` is clamped into that level's own
+  band, so no later level of the same skill is discounted.
+- **Training Progress is a snapshot, not a live ticker.** It is interpolated
+  once per load, in `applyTrainingProgress`, from the queue as of that
+  moment. The alternative — a ticking clock the plan recomputes against —
+  would make every number in the editor move while being read, for a
+  precision nobody planning months of training needs. It is folded in
+  alongside the existing completed-queue correction (round 4's issue #40
+  work): that pass raises finished _levels_, this one raises the _SP_ inside
+  the level still running, and neither is a widening of the other.
+- **The credit is opt-in at the engine boundary**, an optional
+  `ScheduleOptions.trainedSkills`. `placeRemaps` deliberately does not pass
+  it: it takes its no-remap baseline from `computeSchedule` but costs its
+  remap branches from `(rank, level)` alone, so crediting one side only would
+  make the baseline artificially cheap and shrink reported savings toward a
+  false "no remap improves this plan". A uniform overstatement on both sides
+  cancels out of a difference, which is all that verdict reports.
+- **The plan summary discloses a What-If Booster on the total.** Its
+  arithmetic was never wrong — a +12 accelerator adds exactly `12 + 12/2 = 18`
+  SP/min, around a third of a typical rate — but the headline training time is
+  the number users check against the in-game queue, and it read a third fast
+  with nothing on it to say why. `EntryList`'s per-row Booster mark already
+  covered the rows; this covers the total. Shown only while the Booster is
+  live, since `computeSchedule` ignores an expired one and disclosing it
+  would be its own small untruth.
+
+## Glossary (round 31 addition)
+
+- **Prereq Promotion**: turning a derived prerequisite row in the Skill Plan
+  editor into a real, user-owned plan entry at that position. Prereq rows are
+  recomputed from the entry list on every schedule run, so they have no
+  position of their own to save; promotion is what gives one. A promoted
+  prereq is an ordinary entry from then on — same drag handle, priority
+  control and remove button — and its own upstream prerequisites stay derived,
+  moving with it.
+
+## Scope decisions (round 31) — draggable prereq rows
+
+- **Prereq rows are draggable, and dragging one promotes it** (supersedes
+  round 17's "dimmed, non-interactive rows"). There is nowhere else for a
+  dragged prereq row to persist a position to: the normalizer rebuilds those
+  rows from the entry list every run and would discard any parallel ordering
+  stored beside them. So the drag creates the entry rather than trying to
+  remember the row — target level is the level of the row dragged, and if the
+  skill is already an entry that entry is moved and its target raised rather
+  than duplicated (one entry per skill, as `reorder.ts` requires).
+- **Promotion has a non-drag path.** Every prereq row carries a "+" button
+  that promotes it exactly where it already sits. Drag is a discovery problem
+  on a phone and a dexterity problem for some users, and neither is a good
+  reason to be unable to claim a prerequisite.
+- **No automatic demotion.** An entry whose levels a later edit makes
+  redundant stays an entry; it leaves the plan only via its own remove
+  button. Promotion is the user taking ownership of a row, and silently
+  handing it back would be the same class of surprise this round removes.
+- **A drop the scheduler would silently undo is refused, with a reason.**
+  Prerequisite order is enforced by construction in `plan.ts`, so dropping a
+  skill after something that requires it never errored — it produced a
+  zero-time ghost row while the schedule trained the skill where it always
+  had. The editor now rejects that drop outright and names the entry that has
+  to stay behind it, leaving the plan untouched. This covers ordinary entry
+  drags too, not just promotions: the silent correction was the same one.
+  It is the same principle as "reorder never applies silently" (round 12) read
+  from the other side — the plan never _ignores_ a reorder silently either.

@@ -80,6 +80,53 @@ describe('loadCorrectedSkills', () => {
     expect(result.totalSp).toBe(301_255);
   });
 
+  it('interpolates the in-progress level SP that /skills has frozen at training start', async () => {
+    // The "Coherent Ore Processing IV: plan 2d 2h, game 1d 9h" report. ESI's
+    // /skills reports the SP as of the last apply, so a skill half-way
+    // through a level still reads as if it had just begun, and the planner
+    // charges the whole level again.
+    vi.mocked(loadCharacterSkillsWithStatus).mockResolvedValue(
+      skillsStatus({
+        data: {
+          skills: [
+            {
+              skill_id: 60_378,
+              trained_skill_level: 3,
+              active_skill_level: 3,
+              skillpoints_in_skill: 48_000,
+            },
+          ],
+          total_sp: 48_000,
+          unallocated_sp: 0,
+        },
+      })
+    );
+    vi.mocked(loadCharacterSkillQueueWithStatus).mockResolvedValue(
+      queueStatus({
+        data: [
+          {
+            skill_id: 60_378,
+            queue_position: 0,
+            finished_level: 4,
+            start_date: '2026-08-30T00:00:00Z',
+            finish_date: '2026-08-31T00:00:00Z',
+            training_start_sp: 48_000,
+            level_end_sp: 271_530,
+          } as SkillQueueEntry,
+        ],
+      })
+    );
+
+    const result = await loadCorrectedSkills(CHAR_ID, NOW);
+
+    // Half-way through the window: 48,000 + (271,530 - 48,000)/2.
+    expect(result.trained.get(60_378)).toEqual({ level: 3, sp: 159_765 });
+    // The level is not raised — that entry has not finished — and total_sp
+    // still reports only what completed levels credit, as it always has.
+    expect(result.completedLevels.size).toBe(0);
+    expect(result.totalSp).toBe(48_000);
+  });
+
   it('adds a skill /skills omits entirely, keeping its nullable SP in provenance but a usable 0 in the merged map', async () => {
     vi.mocked(loadCharacterSkillsWithStatus).mockResolvedValue(
       skillsStatus({ data: { skills: [], total_sp: 0, unallocated_sp: 0 } })

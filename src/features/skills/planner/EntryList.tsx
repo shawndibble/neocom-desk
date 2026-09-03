@@ -17,6 +17,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret, EmptyState, NativeSelect, Tooltip } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { AttributeName, PlanPriority, ScheduledStep } from '@/engine/types';
 import { formatDate, formatDuration, stepTimeline } from '@/lib/duration';
@@ -458,9 +459,16 @@ interface PrereqRowProps {
   timeline: { start: Date; finish: Date } | null;
   columns: ColumnVisibility;
   isDesktop: boolean;
+  onPromote: (rowId: string) => void;
 }
 
-/** Prereq-inserted step the user didn't add directly: dimmed, non-interactive, not draggable. */
+/**
+ * Prereq-inserted step the user didn't add directly: dimmed, and derived
+ * rather than stored — but draggable, because dragging one promotes it into a
+ * real entry at that position (CONTEXT.md "Prereq Promotion"). The "+" button
+ * beside it does the same promotion in place, so the affordance is reachable
+ * without guessing that a dimmed row can be dragged.
+ */
 function PrereqRow({
   row,
   name,
@@ -469,8 +477,36 @@ function PrereqRow({
   timeline,
   columns,
   isDesktop,
+  onPromote,
 }: PrereqRowProps) {
   const { t } = useTranslation();
+  const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
+  const label = `${name} ${ROMAN[row.step.level - 1]}`;
+
+  const dragHandle = (
+    <button
+      type="button"
+      {...handleProps}
+      aria-label={t('plans.dragPrereq', { name: label })}
+      className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      ⠿
+    </button>
+  );
+
+  // Icon-only with an aria-label, exactly like EntryRow's remove button —
+  // and deliberately not wrapped in a Tooltip, which would put a Radix
+  // provider on every row of a long queue to restate the label.
+  const promoteButton = (
+    <Button
+      size="sm"
+      className={ICON_BUTTON}
+      onClick={() => onPromote(row.id)}
+      aria-label={t('plans.promotePrereq', { name: label })}
+    >
+      <Icon.AddToPlan size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+    </Button>
+  );
 
   // Carries the entry row's caret spacer too, so prereq and entry names sit in
   // the same column even though a prereq row is a single level and never
@@ -500,10 +536,16 @@ function PrereqRow({
   const hasSecondLine = Boolean(attributeBadge) || columns.perLevelTime;
 
   return (
-    <li className="border-b border-line px-2 py-1.5 text-xs text-text-faint italic last:border-b-0">
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`border-b border-line px-2 py-1.5 text-xs text-text-faint italic last:border-b-0 ${
+        isDragging ? 'bg-panel-2' : ''
+      }`}
+    >
       {isDesktop ? (
         <div className="flex items-center justify-between gap-2">
-          <span className="w-6" aria-hidden="true" />
+          {dragHandle}
           {nameSpan}
           {attributeBadge}
           {columns.perLevelTime && (
@@ -515,13 +557,15 @@ function PrereqRow({
             />
           )}
           {cumulativeTimeCell}
+          {promoteButton}
         </div>
       ) : (
         <>
           <div className="flex items-center justify-between gap-2">
-            <span className="w-6" aria-hidden="true" />
+            {dragHandle}
             {nameSpan}
             {cumulativeTimeCell}
+            {promoteButton}
           </div>
           {hasSecondLine && (
             <div className="mt-0.5 flex items-center gap-2 pl-6 text-[0.6875rem]">
@@ -604,16 +648,20 @@ interface EntryListProps {
   onRemove: (skillTypeID: number) => void;
   onRemoveMarker: (markerIndex: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
+  /** Turn a derived prereq row into a real entry where it already sits (CONTEXT.md "Prereq Promotion"). */
+  onPromotePrereq: (rowId: string) => void;
 }
 
 /**
  * Drag-and-drop (keyboard-accessible) list merging plan entries, Remap
  * Markers, and their computed queue (#112): one row per entry with its own
- * per-level/cumulative time, dimmed non-interactive rows for any
- * prereq-inserted steps positioned just ahead of it. Optional columns
- * (attribute pair, priority, per-level time, cumulative time) are
- * individually toggleable, and rows fold to two lines below the `md`
- * breakpoint (#114).
+ * per-level/cumulative time, dimmed rows for any prereq-inserted steps
+ * positioned just ahead of it. Every row is draggable — dragging a dimmed
+ * prereq row promotes it into a real entry (see planDrop.ts), which is why the
+ * list hands ids straight to SortableContext rather than filtering prereq rows
+ * out of it. Optional columns (attribute pair, priority, per-level time,
+ * cumulative time) are individually toggleable, and rows fold to two lines
+ * below the `md` breakpoint (#114).
  *
  * An entry row spanning several levels labels the range it trains ("I–V") and
  * discloses the individual levels and their times behind a caret (#254) — it
@@ -631,6 +679,7 @@ export function EntryList({
   onRemove,
   onRemoveMarker,
   onSetPriority,
+  onPromotePrereq,
 }: EntryListProps) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -660,7 +709,7 @@ export function EntryList({
     return <EmptyState title={t('plans.yourEntriesEmpty')} className="py-4" />;
   }
 
-  const sortableIds = rows.filter((r) => r.kind !== 'prereq').map((r) => r.id);
+  const sortableIds = rows.map((r) => r.id);
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -714,6 +763,7 @@ export function EntryList({
                       timeline={startDate ? stepTimeline(row.step, startDate) : null}
                       columns={columns}
                       isDesktop={isDesktop}
+                      onPromote={onPromotePrereq}
                     />
                   )}
                   {row.kind === 'marker' && (

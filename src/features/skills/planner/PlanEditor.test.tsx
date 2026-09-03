@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ComponentProps } from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { SkillType } from '@/sde/types';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
+import type { CachedResult } from '@/features/skills/data';
+import type { CharacterAttributes } from '@/esi/endpoints';
 import { buildUnlockIndex } from '@/engine/skillUnlocks';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
@@ -64,6 +66,15 @@ const ATTRIBUTES: Attributes = {
 };
 const IMPLANTS: Implants = {};
 
+// ESI's own reading, distinct from ATTRIBUTES above (the scheduler's base
+// sheet) so a test can tell which one the tools pane put on screen.
+const ATTRIBUTES_RESULT: CachedResult<CharacterAttributes> = {
+  data: { intelligence: 24, memory: 23, perception: 22, willpower: 25, charisma: 21 },
+  fetchedAt: new Date('2025-01-01T00:00:00Z'),
+  fromCache: false,
+  truncated: false,
+};
+
 const PLAN: SkillPlanRecord = {
   id: 'plan-1',
   characterId: 1,
@@ -89,6 +100,7 @@ function renderEditor(
       trainedSkills={NO_TRAINED}
       attributes={ATTRIBUTES}
       implants={IMPLANTS}
+      attributesResult={ATTRIBUTES_RESULT}
       remapInfo={null}
       listPane={<div data-testid="plan-list-pane" />}
       onUpdate={onUpdate}
@@ -107,11 +119,15 @@ async function openTools(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /plan tools/i }));
 }
 
-/** The tools-pane section a heading titles. */
+/**
+ * The tools-pane section a heading titles. `closest('section')`, not
+ * `parentElement`: a heading now shares a flex row with its section's
+ * optional right-aligned actions (the Attributes section's `DataAgeBadge`).
+ */
 function sectionFor(title: string): HTMLElement {
-  const section = screen.getByRole('heading', { name: title }).parentElement;
+  const section = screen.getByRole('heading', { name: title }).closest('section');
   if (!section) throw new Error(`expected a section for "${title}"`);
-  return section;
+  return section as HTMLElement;
 }
 
 /** Runs `body` with `matchMedia` reporting a `lg`+ viewport, then restores it. */
@@ -152,7 +168,7 @@ describe('PlanEditor tools pane', () => {
     await openTools(user);
 
     const actions = sectionFor('Actions');
-    const training = sectionFor('Training');
+    const attributesSection = sectionFor('Attributes');
     const importExport = sectionFor('Import / Export');
 
     // Actions: the ones used while working the list.
@@ -166,9 +182,11 @@ describe('PlanEditor tools pane', () => {
     }
     expect(within(actions).getByLabelText('Remaps available')).toBeInTheDocument();
 
-    // Training: the what-if lens, which changes the numbers rather than the plan.
-    expect(within(training).getByLabelText('What-if implants')).toBeInTheDocument();
-    expect(within(training).getByLabelText('Booster')).toBeInTheDocument();
+    // Attributes: the sheet every estimate is costed against, then the two
+    // what-if lenses over it — which change the numbers, not the plan.
+    expect(within(attributesSection).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(attributesSection).getByLabelText('What-if implants')).toBeInTheDocument();
+    expect(within(attributesSection).getByLabelText('Booster')).toBeInTheDocument();
 
     // Import/Export: plan-level file operations, still their own section.
     for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
@@ -315,6 +333,166 @@ describe('PlanEditor tools pane placement', () => {
   });
 });
 
+describe('PlanEditor: the attributes every estimate is costed against', () => {
+  it("shows ESI's own reading, not the scheduler's fallback base sheet", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+
+    const section = sectionFor('Attributes');
+    expect(within(section).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(section).getByText('24')).toBeInTheDocument();
+    expect(within(section).getByText('25')).toBeInTheDocument();
+    // `attributes` (what computeSchedule runs on) is all 20s here, and falls
+    // back to placeholder numbers when ESI can't be read — presenting it as
+    // the character's own sheet is exactly the mistake to avoid.
+    expect(within(section).queryByText('20')).toBeNull();
+    // The caption naming which half of the section is fact. Asserted on the
+    // rendered text, not the key: a mistyped key renders as its own name and
+    // nothing else in the gate — `tsc` included — can see that.
+    expect(within(section).getByText(/current sheet/i)).toBeInTheDocument();
+  });
+
+  it('dates the attributes, as every ESI-derived view must', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+
+    const badge = sectionFor('Attributes').querySelector('time');
+    expect(badge).toHaveAttribute('datetime', ATTRIBUTES_RESULT.fetchedAt.toISOString());
+  });
+
+  it("keeps the chips on the clone's real implants when the what-if lens changes", async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), {
+      implants: { perception: 3 },
+      attributesResult: {
+        ...ATTRIBUTES_RESULT,
+        data: { ...ATTRIBUTES_RESULT.data, perception: 25 },
+      },
+    });
+    await openTools(user);
+
+    const section = sectionFor('Attributes');
+    expect(within(section).getByText('22 + 3 = 25')).toBeInTheDocument();
+
+    await user.selectOptions(within(section).getByLabelText('What-if implants'), '+5');
+
+    // The lens re-costs the plan; it does not rewrite the character. "Current
+    // attributes" has to keep meaning current, or the page has no honest
+    // reading of the pilot left on it.
+    expect(within(section).getByText('22 + 3 = 25')).toBeInTheDocument();
+  });
+
+  it('says the attributes are unknown when ESI could not be read, rather than inventing a sheet', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { attributesResult: null });
+    await openTools(user);
+
+    const section = sectionFor('Attributes');
+    expect(within(section).getByText('—')).toBeInTheDocument();
+    expect(within(section).queryByText('Intelligence')).toBeNull();
+    expect(section.querySelector('time')).toBeNull();
+  });
+
+  it('adds attributes only — general character stats explain nothing on this page', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+
+    for (const label of ['Total SP', 'Unallocated SP', 'Wallet']) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
+  });
+
+  it('costs no extra row below `lg`: the attributes ride the same collapsed tools disclosure', () => {
+    renderEditor();
+
+    expect(screen.getByRole('button', { name: /plan tools/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    // No second always-open block above the entry list — the plan still leads
+    // the page, and the attributes cost the same one tap as every other tool.
+    expect(screen.queryByRole('heading', { name: 'Attributes' })).toBeNull();
+    expect(screen.queryByText('Intelligence')).toBeNull();
+  });
+
+  it('shows them in the sidebar with no interaction at `lg`+, beside the lens that reinterprets them', () => {
+    withDesktopViewport(() => {
+      renderEditor();
+
+      const sidebar = screen.getByTestId('plan-list-pane').closest('aside');
+      if (!sidebar) throw new Error('expected a sidebar');
+      const section = within(sidebar).getByRole('heading', { name: 'Attributes' });
+      expect(section).toBeInTheDocument();
+      expect(within(sidebar).getByText('24')).toBeInTheDocument();
+      // Still one tools panel, not a fourth peer panel beside it.
+      expect(within(sidebar).getAllByRole('heading', { name: 'Plan tools' })).toHaveLength(1);
+    });
+  });
+});
+
+describe('PlanEditor prereq promotion', () => {
+  // Skill D needs Skill A at II, so a plan holding only D renders two dimmed
+  // prereq rows (A I, A II) ahead of it.
+  const PREREQ_SKILLS: SkillType[] = [
+    SKILLS[0],
+    skill({ typeID: 40, name: 'Skill D', prereqs: [{ skillTypeID: 10, level: 2 }] }),
+  ];
+  const PREREQ_CATALOG: SkillCatalog = (() => {
+    const engineSkills = new Map(
+      PREREQ_SKILLS.map((s) => [
+        s.typeID,
+        {
+          typeID: s.typeID,
+          name: s.name,
+          rank: s.rank,
+          primary: s.primaryAttr,
+          secondary: s.secondaryAttr,
+          prereqs: s.prereqs.map((p) => ({ typeID: p.skillTypeID, level: p.level })),
+        },
+      ])
+    );
+    return {
+      engineSkills,
+      bySkillTypeID: new Map(PREREQ_SKILLS.map((s) => [s.typeID, s])),
+      unlocksByTypeID: buildUnlockIndex(engineSkills),
+    };
+  })();
+
+  it('promotes a dimmed prereq row into a real entry where the schedule already trains it', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <PlanEditor
+        characterId={1}
+        plan={{ ...PLAN, entries: [{ skillTypeID: 40, targetLevel: 3 }] }}
+        catalog={PREREQ_CATALOG}
+        trainedSkills={NO_TRAINED}
+        attributes={ATTRIBUTES}
+        implants={IMPLANTS}
+        attributesResult={null}
+        remapInfo={null}
+        listPane={<div data-testid="plan-list-pane" />}
+        onUpdate={onUpdate}
+      />
+    );
+
+    expect(screen.getAllByText('Prereq')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Add Skill A II to the plan' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      entries: [
+        { skillTypeID: 10, targetLevel: 2 },
+        { skillTypeID: 40, targetLevel: 3 },
+      ],
+      markers: [],
+    });
+    expect(screen.getByText('Skill A II is now a plan entry')).toBeInTheDocument();
+  });
+});
+
 describe('PlanEditor grouping toggle (#115)', () => {
   it('defaults to Priority band headers', () => {
     renderEditor();
@@ -357,6 +535,25 @@ describe('PlanEditor what-if implants', () => {
 
     expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('current');
     expect(bonusInputs()).toEqual(['0', '3', '4', '0', '0']);
+  });
+
+  it('suppresses the platform spinner, which would break the row on hover', async () => {
+    const user = userEvent.setup();
+    renderWithImplants();
+    await openTools(user);
+
+    // Measured: five fields across a 294px sidebar leaves a 29.6px content
+    // box each, and Chrome's hover/focus spin buttons take about half of it
+    // and shove the digit left — so the hovered cell falls out of alignment
+    // with the other four. jsdom has no layout, so the class is the only
+    // thing a unit test can hold on to; the rule and the reasoning are in
+    // src/styles/index.css.
+    for (const attribute of ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma']) {
+      expect(screen.getByLabelText(`${attribute} implant bonus`)).toHaveClass('field-no-spinner');
+    }
+    // The pane's other two number fields are the same field at the same
+    // size, so they behave the same way on hover.
+    expect(screen.getByLabelText('Remaps available')).toHaveClass('field-no-spinner');
   });
 
   it('a preset fills all five in one click', async () => {

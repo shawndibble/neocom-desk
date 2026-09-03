@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeSchedule } from '@/engine/schedule';
-import type { Attributes, EngineSkill, PlanStep } from '@/engine/types';
+import type { Attributes, EngineSkill, PlanStep, TrainedSkill } from '@/engine/types';
 
 const GUNNERY: EngineSkill = {
   typeID: 100,
@@ -142,5 +142,97 @@ describe('computeSchedule', () => {
     expect(() =>
       computeSchedule([{ skillTypeID: 999, level: 1 }], { attributes: attrs(20, 20) }, skills)
     ).toThrow(/999/);
+  });
+});
+
+describe('computeSchedule partial-SP credit', () => {
+  const trained = (level: number, sp: number): ReadonlyMap<number, TrainedSkill> =>
+    new Map<number, TrainedSkill>([[100, { level, sp }]]);
+
+  it('charges the full level when no trainedSkills map is given', () => {
+    // The default has to stay exactly as it was: the optimizer's remap DP
+    // costs its branches from (rank, level) alone, so a schedule that
+    // silently credited partial SP would make its baseline incomparable.
+    const [step] = computeSchedule(L1, { attributes: attrs(20, 20) }, skills);
+    expect(step.sp).toBe(250);
+    expect(step.seconds).toBe(500);
+  });
+
+  it('credits SP already banked in the level being trained', () => {
+    // rate 30 SP/min. L1 is 250 SP; 100 already banked leaves 150 SP -> 300 s.
+    const [step] = computeSchedule(
+      L1,
+      { attributes: attrs(20, 20), trainedSkills: trained(0, 100) },
+      skills
+    );
+    expect(step.sp).toBe(150);
+    expect(step.seconds).toBe(300);
+  });
+
+  it("reports `sp` as the SP the step must still train, not the level's full cost", () => {
+    // L2 costs 1165 SP; the skill holds 750, i.e. 500 into level 2 already.
+    const [step] = computeSchedule(
+      [{ skillTypeID: 100, level: 2 }],
+      { attributes: attrs(20, 20), trainedSkills: trained(1, 750) },
+      skills
+    );
+    expect(step.sp).toBe(1415 - 750);
+    expect(step.seconds).toBeCloseTo(((1415 - 750) / 30) * 60, 6);
+  });
+
+  it('credits the level in progress only, never the levels queued behind it', () => {
+    // Banked SP belongs to level 1. Level 2 must still cost its full 1165 SP.
+    const result = computeSchedule(
+      [
+        { skillTypeID: 100, level: 1 },
+        { skillTypeID: 100, level: 2 },
+      ],
+      { attributes: attrs(20, 20), trainedSkills: trained(0, 100) },
+      skills
+    );
+    expect(result[0].sp).toBe(150);
+    expect(result[1].sp).toBe(1165);
+    expect(result[1].cumulativeSeconds).toBeCloseTo(300 + 2330, 6);
+  });
+
+  it('leaves a skill absent from the map costed as a full level', () => {
+    const [step] = computeSchedule(
+      L1,
+      { attributes: attrs(20, 20), trainedSkills: new Map() },
+      skills
+    );
+    expect(step.sp).toBe(250);
+  });
+
+  it('costs a fully-paid level at zero rather than looping or going negative', () => {
+    // A stale `/skills` read can report SP past the level the plan still
+    // lists. Zero seconds is the honest answer; a negative `remaining` would
+    // never satisfy the rate loop's exit condition.
+    const [step] = computeSchedule(
+      L1,
+      { attributes: attrs(20, 20), trainedSkills: trained(1, 5000) },
+      skills
+    );
+    expect(step.sp).toBe(0);
+    expect(step.seconds).toBe(0);
+    expect(step.cumulativeSeconds).toBe(0);
+  });
+
+  it('applies the credit before boosters, so a shortened step still splits correctly', () => {
+    // base rate 25, boosted +10 int -> 35 for the first 300 s. 150 SP left of
+    // L1: 300 s * 35/60 = 175 SP would overshoot, so it finishes inside the
+    // window at 150 / (35/60) = 1800/7 s.
+    const [step] = computeSchedule(
+      L1,
+      {
+        attributes: attrs(20, 10),
+        trainedSkills: trained(0, 100),
+        boosters: [{ bonus: { intelligence: 10 }, expiresAt: new Date(300_000) }],
+        startDate: new Date(0),
+      },
+      skills
+    );
+    expect(step.sp).toBe(150);
+    expect(step.seconds).toBeCloseTo(1800 / 7, 6);
   });
 });

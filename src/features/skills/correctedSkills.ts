@@ -19,7 +19,12 @@ import {
   type CachedResult,
 } from './data';
 import { toTrainedSkillsMap } from './skillMap';
-import { applyCompletedQueueEntries, completedQueueLevels, completedSpGain } from './queueStatus';
+import {
+  applyCompletedQueueEntries,
+  applyTrainingProgress,
+  completedQueueLevels,
+  completedSpGain,
+} from './queueStatus';
 import type { CompletedLevel } from './queueStatus';
 
 const QUEUE_SCOPE = ESI_REGISTRY.getCharacterSkillQueue.scope;
@@ -46,7 +51,12 @@ export interface CorrectedSkills {
    * /skills omits it.
    */
   completedLevels: Map<number, CompletedLevel>;
-  /** Trained skills, corrected by `completedLevels`, ready for engine input. */
+  /**
+   * Trained skills, ready for engine input: levels corrected by
+   * `completedLevels`, and the in-progress level's `sp` interpolated from the
+   * queue as of `nowMs`. That `sp` is a snapshot, not a live ticker — it is
+   * only as current as the load that produced it.
+   */
   trained: Map<number, TrainedSkill>;
   /** SP the completed levels add on top of ESI's stale total_sp. */
   completedSp: number;
@@ -93,7 +103,16 @@ export async function loadCorrectedSkills(
   const queueEntries = queueResult?.data ?? [];
   const rawSkills = skillsResult?.data?.skills ?? [];
   const completedLevels = completedQueueLevels(queueEntries, nowMs);
-  const trained = applyCompletedQueueEntries(toTrainedSkillsMap(rawSkills), queueEntries, nowMs);
+  // Two corrections, in order, because they fix different halves of the same
+  // staleness: the first raises levels the queue has finished but /skills has
+  // not applied, the second raises the SP banked inside the level still
+  // training. Without the second a planner charges a part-trained level in
+  // full and disagrees with the in-game queue.
+  const trained = applyTrainingProgress(
+    applyCompletedQueueEntries(toTrainedSkillsMap(rawSkills), queueEntries, nowMs),
+    queueEntries,
+    nowMs
+  );
   const completedSp = completedSpGain(rawSkills, completedLevels);
   const totalSp = skillsResult?.data ? skillsResult.data.total_sp + completedSp : null;
 

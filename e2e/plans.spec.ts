@@ -116,16 +116,37 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
     expect(overflowed).toBe(true);
   }).toPass();
 
+  // Closing the dialog returns focus to the "Import from clipboard" button in
+  // the sidebar, and the browser scrolls that button into view. Once the
+  // sidebar is taller than the viewport that button is below the fold, so the
+  // page lands scrolled and every coordinate measured afterwards is off by
+  // however far it went. Establish the precondition rather than assuming it:
+  // this test is about a page sitting at its natural top.
+  await page.evaluate(() => window.scrollTo(0, 0));
+
   // Real wheel scroll over the entries area, not a container scrollTop
   // assignment — the browser picks the scrolling ancestor the same way a
   // real user's scroll would, which a synthetic `el.scrollTop = n` can get
   // wrong (and did, while writing this test).
+  //
+  // Aim at the capped list itself, not an offset guessed from the heading
+  // above it: `heading.y + height + 100` fell 10px short of the list's top
+  // once the page scrolled, landing on the summary panel's chip row, so the
+  // wheel went to the window and this test failed for a reason that had
+  // nothing to do with the sticky panes it exists to protect. Exact class
+  // match, for the same reason the overflow probe above uses one.
   const entriesHeading = page.getByRole('heading', { name: 'Your entries' });
-  const box = await entriesHeading.boundingBox();
-  if (!box) throw new Error('expected Your entries panel to be visible');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height + 100);
+  const scroller = page.locator('div[class="lg:overflow-y-auto"]');
+  const box = await scroller.boundingBox();
+  if (!box) throw new Error('expected the capped entry list to be visible');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.wheel(0, 700);
   await page.waitForTimeout(100);
+
+  // The list is what consumed the wheel. Without this, everything below can
+  // hold with nothing having scrolled anywhere — which is exactly how the
+  // premise broke silently the first time.
+  expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
 
   // The list scrolled inside its own box, so everything framing it is still
   // on screen: the summary strip above, the panel's own header, and the

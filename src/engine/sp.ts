@@ -35,6 +35,33 @@ export function spBetween(rank: number, fromLevel: number, toLevel: number): num
   return spForLevel(rank, toLevel) - spForLevel(rank, fromLevel);
 }
 
+/**
+ * SP still needed to finish `level`, given the skill currently holds
+ * `currentSp` total skill points.
+ *
+ * This is what separates "how big is this level" (`spBetween`) from "how much
+ * of it is left to train". A character part-way through a level has already
+ * banked SP toward it, and charging the whole level anyway overstates the
+ * plan — visibly so for the skill currently training, which is exactly where
+ * a user compares the plan against the in-game queue.
+ *
+ * `currentSp` is clamped into the level's own band, so it is safe against the
+ * two ways a real SP figure can sit outside it: below the level's start (SP
+ * belonging to lower levels, which must not be discounted from this level's
+ * cost) and at or past its end (a `/skills` read that has run ahead of the
+ * plan, which costs zero rather than going negative). `spForLevel` rounds up,
+ * so a skill sitting exactly at a boundary gets no phantom credit.
+ */
+export function remainingSpForLevel(rank: number, level: number, currentSp: number): number {
+  if (!Number.isInteger(level) || level < 1 || level > 5) {
+    throw new RangeError(`level must be an integer 1..5, got ${level}`);
+  }
+  const start = spForLevel(rank, level - 1);
+  const end = spForLevel(rank, level);
+  const banked = Math.min(Math.max(currentSp, start), end);
+  return end - banked;
+}
+
 /** Training speed in SP per minute (Omega): primary + secondary/2. */
 export function trainingRate(primaryVal: number, secondaryVal: number): number {
   if (!(primaryVal > 0) || !(secondaryVal > 0)) {
