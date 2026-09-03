@@ -10,6 +10,7 @@ import type {
 } from '@/engine/industry/types';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
+import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 import { materialRowState } from './materialRow';
 import { suggestedOwnedQuantity } from '@/engine/industry/ownedStock';
 import { OwnedStockHint } from './OwnedStockHint';
@@ -34,20 +35,20 @@ interface MaterialsTableProps {
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
 function parseCount(raw: string): number | undefined {
-  const n = Number(raw);
-  return raw.trim() === '' || !Number.isFinite(n) || n < 0 ? undefined : Math.floor(n);
+  const value = unmaskNumber(raw);
+  // Materials are consumed in whole units everywhere in the engine, so a
+  // typed fraction is floored rather than refused.
+  return value === undefined ? undefined : Math.floor(value);
 }
 
-function parsePrice(raw: string): number | undefined {
-  const n = Number(raw);
-  return raw.trim() === '' || !Number.isFinite(n) || n < 0 ? undefined : n;
-}
+const parsePrice = unmaskNumber;
 
 interface SourcingInputProps {
   value: number | undefined;
   /** Accessible name — the column alone cannot name it, a `<th>` does not label a form control. */
   label: string;
-  step: number | 'any';
+  /** Which keypad a phone raises: `numeric` for a whole count, `decimal` where a fraction is legal. */
+  inputMode: 'numeric' | 'decimal';
   widthClassName: string;
   /**
    * Shown while the field is empty. Only right where empty means a known
@@ -68,24 +69,33 @@ interface SourcingInputProps {
  * and flip the row's state labels mid-edit. While focused the raw string is
  * held locally so a half-typed value survives; the moment the edit ends the
  * prop is the source of truth again.
+ *
+ * It masks at rest and unmasks to edit: a column of prices is unreadable as
+ * `338600` beside `6622`, and a box you are typing into is unusable if a
+ * formatter rewrites the digits under the caret. So the grouped number shows
+ * while the field sits, focus swaps in the plain one, and blur puts the mask
+ * back. That costs `type="number"` — an input holding "338,600" is invalid to
+ * the browser and reads back as empty — so this is a text field with the
+ * numeric keypad asked for explicitly. Nothing is lost: the spin buttons were
+ * already suppressed on a phone, Enter still commits, and `unmaskNumber`
+ * accepts the separators a pasted number brings with it.
  */
 function SourcingInput({
   value,
   label,
-  step,
+  inputMode,
   widthClassName,
   placeholder,
   parse,
   onCommit,
 }: SourcingInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   return (
     <TextInput
       size="sm"
-      type="number"
-      min={0}
-      step={step}
-      inputMode="decimal"
+      type="text"
+      inputMode={inputMode}
       aria-label={label}
       placeholder={placeholder}
       // Digits sit right in the table, where they line up with the numeric
@@ -93,11 +103,22 @@ function SourcingInput({
       // up with, and right-aligned digits would float a width away from the
       // label that names them.
       className={cx(widthClassName, 'text-left tabular-nums sm:text-right')}
-      value={draft ?? value ?? ''}
+      // Three states, and the order matters. A typed draft wins, verbatim — a
+      // half-finished "6622." has to survive a keystroke a formatter would
+      // eat. Otherwise the prop is shown: plain while focused, masked at rest.
+      //
+      // Deliberately not "unmask into the draft on focus": that would freeze
+      // the number as it stood when the field was entered, and a market
+      // refresh landing mid-edit would then be committed on blur as an
+      // override of the stale price. Until a key is pressed the prop stays the
+      // source of truth, exactly as it was before the mask existed.
+      value={draft ?? (value === undefined ? '' : editing ? String(value) : maskNumber(value))}
+      onFocus={() => setEditing(true)}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={(event) => {
         const next = parse(event.target.value);
         setDraft(null);
+        setEditing(false);
         // Tabbing through an untouched field must not rewrite the record.
         // This is also what keeps the price field's market default a default:
         // its `value` is the hub price when nothing is stored, so a field
@@ -237,7 +258,7 @@ export function MaterialsTable({
               <SourcingInput
                 value={owned}
                 label={t('industry.ownedQuantityFor', { material: nameFor(material.typeID) })}
-                step={1}
+                inputMode="numeric"
                 widthClassName="w-20"
                 placeholder="0"
                 parse={parseCount}
@@ -280,7 +301,7 @@ export function MaterialsTable({
               <SourcingInput
                 value={state.unitPrice ?? undefined}
                 label={t('industry.priceFor', { material: name })}
-                step="any"
+                inputMode="decimal"
                 widthClassName="w-24"
                 parse={parsePrice}
                 onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}

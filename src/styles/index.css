@@ -165,8 +165,11 @@
    * Only the drawn buttons go.
    *
    * Not folded into `TextInput` for every `type="number"` in the app: the
-   * Industry fields are wide enough that their spinners are harmless, and
-   * a field with room for one is better with it.
+   * remaining number fields are wide enough that their spinners are harmless,
+   * and a field with room for one is better with it. The Industry sourcing
+   * fields are no longer among them — they mask their value
+   * (`src/lib/numberMask.ts`), which a `number` input cannot hold, so they are
+   * text fields with `inputMode` and have no spinner to suppress.
    */
   .field-no-spinner {
     -moz-appearance: textfield;
