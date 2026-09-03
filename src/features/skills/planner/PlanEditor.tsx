@@ -70,7 +70,8 @@ import { boostedStepIndices } from '@/engine/boosterImpact';
 import type { AttributeBaseline } from '@/engine/attributeBaseline';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
-import { formatDate, formatDuration } from '@/lib/duration';
+import { formatDuration } from '@/lib/duration';
+import { formatLocalDate } from '@/lib/localDate';
 import {
   dedupeEntries,
   removeEntry,
@@ -834,7 +835,7 @@ export function PlanEditor({
                 ? t('plans.remapFromEveReady', { bonus: remapInfo.bonus })
                 : t('plans.remapFromEveCooldown', {
                     bonus: remapInfo.bonus,
-                    date: remapInfo.cooldownUntil ? formatDate(remapInfo.cooldownUntil) : '',
+                    date: remapInfo.cooldownUntil ? formatLocalDate(remapInfo.cooldownUntil) : '',
                   })}
             </p>
           )}
@@ -1224,7 +1225,7 @@ export function PlanEditor({
             <div className="flex items-center gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
               <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
               {planFinish && (
-                <span>{t('plans.projectedFinish', { date: formatDate(planFinish) })}</span>
+                <span>{t('plans.projectedFinish', { date: formatLocalDate(planFinish) })}</span>
               )}
             </div>
           }

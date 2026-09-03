@@ -29,8 +29,3 @@ export function stepTimeline(
   const start = new Date(finish.getTime() - step.seconds * 1000);
   return { start, finish };
 }
-
-/** YYYY-MM-DD, locale-independent — matches the remap-cooldown date format. */
-export function formatDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}

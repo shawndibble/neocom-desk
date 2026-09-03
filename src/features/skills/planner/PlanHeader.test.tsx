@@ -1,9 +1,32 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import { PlanHeader } from './PlanHeader';
 
 describe('PlanHeader', () => {
+  describe('projected finish and booster expiry render in the viewer local timezone (#207)', () => {
+    const originalTz = process.env.TZ;
+    afterEach(() => {
+      process.env.TZ = originalTz;
+    });
+
+    it('renders the previous local day for an instant just after UTC midnight', () => {
+      process.env.TZ = 'America/Los_Angeles';
+      render(
+        <PlanHeader
+          totalSeconds={0}
+          skillCount={0}
+          projectedFinish={new Date('2026-09-01T00:00:00Z')}
+          badge={null}
+          booster={{ bonus: 12, expiresAt: new Date('2026-09-15T00:30:00Z') }}
+        />
+      );
+
+      expect(screen.getByText('2026-08-31')).toBeInTheDocument();
+      expect(screen.getByText(/2026-09-14/)).toBeInTheDocument();
+    });
+  });
+
   it('shows total training time, skill count, and projected finish', () => {
     render(
       <PlanHeader

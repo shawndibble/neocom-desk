@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDate, formatDuration, stepTimeline } from './duration';
+import { formatDuration, stepTimeline } from './duration';
 
 describe('formatDuration', () => {
   it('formats minutes only under an hour', () => {
@@ -32,11 +32,5 @@ describe('stepTimeline', () => {
     const startDate = new Date('2026-01-01T00:00:00Z');
     const { start } = stepTimeline({ seconds: 500, cumulativeSeconds: 500 }, startDate);
     expect(start.getTime()).toBe(startDate.getTime());
-  });
-});
-
-describe('formatDate', () => {
-  it('formats as YYYY-MM-DD regardless of time-of-day', () => {
-    expect(formatDate(new Date('2026-08-31T23:45:00Z'))).toBe('2026-08-31');
   });
 });
