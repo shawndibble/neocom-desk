@@ -1016,7 +1016,88 @@
       },
       "eveNotification": {
         "title": "EVE notification",
-        "body": "{{character}} received a new EVE notification ({{type}})."
+        "body": "{{character}} received a new EVE notification ({{type}}).",
+        "structureById": "structure #{{id}}",
+        "entityById": "#{{id}}",
+        "types": {
+          "StructureUnderAttack": {
+            "title": "Structure under attack",
+            "body": "{{character}}: {{structure}} is under attack.",
+            "bodyWithAggressor": "{{character}}: {{structure}} is under attack by {{aggressor}}."
+          },
+          "StructureLostShields": {
+            "title": "Structure reinforced",
+            "body": "{{character}}: {{structure}} lost its shields and is now reinforced.",
+            "bodyWithTimer": "{{character}}: {{structure}} lost its shields. Reinforcement ends {{timer}}."
+          },
+          "StructureLostArmor": {
+            "title": "Structure reinforced",
+            "body": "{{character}}: {{structure}} lost its armor and is now reinforced.",
+            "bodyWithTimer": "{{character}}: {{structure}} lost its armor. Hull timer ends {{timer}}."
+          },
+          "StructureFuelAlert": {
+            "title": "Structure low on fuel",
+            "body": "{{character}}: {{structure}} is running out of fuel."
+          },
+          "StructureWentLowPower": {
+            "title": "Structure went low power",
+            "body": "{{character}}: {{structure}} dropped to low power."
+          },
+          "StructureWentHighPower": {
+            "title": "Structure went high power",
+            "body": "{{character}}: {{structure}} is back on high power."
+          },
+          "StructureServicesOffline": {
+            "title": "Structure services offline",
+            "body": "{{character}}: {{structure}} has taken its service modules offline."
+          },
+          "StructureImpendingAbandonmentAssetsAtRisk": {
+            "title": "Assets at risk",
+            "body": "{{character}}: assets at {{structure}} are at risk — the structure is close to being abandoned.",
+            "bodyWithDays_one": "{{character}}: assets at {{structure}} are at risk — the structure is abandoned in {{count}} day.",
+            "bodyWithDays_other": "{{character}}: assets at {{structure}} are at risk — the structure is abandoned in {{count}} days."
+          },
+          "MoonminingExtractionFinished": {
+            "title": "Moon extraction ready",
+            "body": "{{character}}: the moon extraction at {{structure}} has finished and is ready to fracture."
+          },
+          "MoonminingAutomaticFracture": {
+            "title": "Moon chunk fractured",
+            "body": "{{character}}: the moon chunk at {{structure}} fractured on its own."
+          },
+          "CorpAllBillMsg": {
+            "title": "Corporation bill issued",
+            "body": "{{character}}: a corporation bill of {{amount}} ISK is due {{due}}.",
+            "bodyWithoutAmount": "{{character}}: a corporation bill is due {{due}}.",
+            "bodyWithoutDue": "{{character}}: a corporation bill of {{amount}} ISK was issued."
+          },
+          "BillOutOfMoneyMsg": {
+            "title": "Bill could not be paid",
+            "body": "{{character}}: the corporation wallet is short of ISK for a bill due {{due}}."
+          },
+          "CorpOfficeExpirationMsg": {
+            "title": "Corporation office expiring",
+            "body": "{{character}}: a corporation office rental is about to expire.",
+            "bodyWithDue": "{{character}}: a corporation office rental expires {{due}}."
+          },
+          "WarDeclared": {
+            "title": "War declared",
+            "body": "{{character}}: {{aggressor}} has declared war.",
+            "bodyWithHq": "{{character}}: {{aggressor}} has declared war. War HQ: {{warHq}}."
+          },
+          "AllWarDeclaredMsg": {
+            "title": "War declared on your alliance",
+            "body": "{{character}}: {{aggressor}} has declared war on your alliance."
+          },
+          "CorpBecameWarEligible": {
+            "title": "Corporation is war eligible",
+            "body": "{{character}}'s corporation can now have war declared on it."
+          },
+          "CorpAppNewMsg": {
+            "title": "New corporation application",
+            "body": "{{character}}: {{applicant}} has applied to join the corporation."
+          }
+        }
       }
     }
   },
