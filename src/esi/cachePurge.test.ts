@@ -280,9 +280,7 @@ describe('purgeCorpScopedCache', () => {
 
     await expect(purgeCorpScopedCache(GLOBAL_CACHE_CHARACTER_ID)).resolves.toBe(0);
 
-    expect(await keysFor(GLOBAL_CACHE_CHARACTER_ID)).toEqual([
-      corpCacheKey(CORP_A, 'structures'),
-    ]);
+    expect(await keysFor(GLOBAL_CACHE_CHARACTER_ID)).toEqual([corpCacheKey(CORP_A, 'structures')]);
   });
 
   it('is a no-op for a character with no corp rows cached', async () => {

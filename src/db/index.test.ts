@@ -193,9 +193,9 @@ describe('schema upgrade v6 -> v7', () => {
       addedAt: 1000,
     });
     // Pre-upgrade rows carry no corp id, so they simply are not in the index.
-    expect(await after.table('characters').where('corporationId').equals(98000001).toArray()).toEqual(
-      []
-    );
+    expect(
+      await after.table('characters').where('corporationId').equals(98000001).toArray()
+    ).toEqual([]);
 
     await after.table('characters').put({
       characterId: 90000001,
@@ -204,7 +204,11 @@ describe('schema upgrade v6 -> v7', () => {
       addedAt: 1000,
       corporationId: 98000001,
     });
-    const indexed = await after.table('characters').where('corporationId').equals(98000001).toArray();
+    const indexed = await after
+      .table('characters')
+      .where('corporationId')
+      .equals(98000001)
+      .toArray();
     expect(indexed.map((c: { characterId: number }) => c.characterId)).toEqual([90000001]);
 
     after.close();
