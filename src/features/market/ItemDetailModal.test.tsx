@@ -9,6 +9,7 @@ import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi, loadSkills } from '@/sde/loadSde';
+import type { PiData } from '@/sde/types';
 import { db } from '@/db';
 
 vi.mock('@/sde/loadMarketSde', () => ({
@@ -305,17 +306,25 @@ describe('ItemDetailModal', () => {
 
 describe('ItemDetailModal planetary production', () => {
   const REACTIVE_METALS = 2398;
-  const SCHEMATICS = {
+  const SCHEMATICS: PiData = {
     schematics: {
       '2398': {
         schematicId: 133,
         name: 'Reactive Metals',
         cycleTime: 1800,
         quantity: 20,
+        volume: 0.19,
         inputs: [{ typeID: 2267, quantity: 3000, name: 'Base Metals' }],
       },
     },
-    raw: [2267],
+    raw: [
+      {
+        typeID: 2267,
+        name: 'Base Metals',
+        volume: 0.005,
+        planetTypes: ['barren', 'gas', 'lava', 'plasma', 'storm'],
+      },
+    ],
   };
 
   function serveType(typeId: number, name: string) {
