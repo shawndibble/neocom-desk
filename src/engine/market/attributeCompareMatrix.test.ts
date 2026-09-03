@@ -9,9 +9,11 @@ const DICTIONARY: AttributeDictionary = {
   37: { name: 'Maximum Velocity', unit: 'm/sec', category: 'Speed and Travel' },
   38: { name: 'Capacity', unit: 'm3', category: 'Fitting' },
   182: { name: 'Primary Skill required', unit: 'typeID', category: 'Required Skills' },
+  786: { name: 'Crystals Take Damage', unit: '1=True 0=False', category: 'Miscellaneous' },
+  137: { name: 'Used with (Launcher Group)', unit: 'groupID', category: 'Miscellaneous' },
 };
 
-const SKILL_NAMES = { 24241: 'Caldari Frigate' };
+const NAMES = { types: { 24241: 'Caldari Frigate' }, groups: { 483: 'Mining Laser' } };
 
 describe('buildCompareMatrix', () => {
   it('always leads with a Worth group carrying the Estimated Price row', () => {
@@ -96,13 +98,36 @@ describe('buildCompareMatrix', () => {
     const items: CompareMatrixItem[] = [
       { typeId: 1, dogmaAttributes: [{ attribute_id: 182, value: 24241 }], bestSell: null },
     ];
-    const groups = buildCompareMatrix(items, DICTIONARY, LABELS, SKILL_NAMES);
+    const groups = buildCompareMatrix(items, DICTIONARY, LABELS, NAMES);
     const skillRow = groups.find((g) => g.category === 'Required Skills')!.rows[0];
     expect(skillRow.cells.get(1)).toEqual({
       value: 24241,
       unit: null,
       displayValue: 'Caldari Frigate I',
     });
+  });
+
+  it('carries an enum-legend row through as its member, so cells differ readably', () => {
+    const items: CompareMatrixItem[] = [
+      { typeId: 1, dogmaAttributes: [{ attribute_id: 786, value: 1 }], bestSell: null },
+      { typeId: 2, dogmaAttributes: [{ attribute_id: 786, value: 0 }], bestSell: null },
+    ];
+    const row = buildCompareMatrix(items, DICTIONARY, LABELS).flatMap((g) => g.rows)[1];
+    expect(row.name).toBe('Crystals Take Damage');
+    expect(row.cells.get(1)).toEqual({ value: 1, unit: null, displayValue: 'True' });
+    expect(row.cells.get(2)).toEqual({ value: 0, unit: null, displayValue: 'False' });
+  });
+
+  it('carries a resolved id reference through as the name it points at', () => {
+    const items: CompareMatrixItem[] = [
+      { typeId: 1, dogmaAttributes: [{ attribute_id: 137, value: 483 }], bestSell: null },
+      { typeId: 2, dogmaAttributes: [{ attribute_id: 137, value: 99999 }], bestSell: null },
+    ];
+    const row = buildCompareMatrix(items, DICTIONARY, LABELS, NAMES).flatMap((g) => g.rows)[1];
+    expect(row.name).toBe('Used with (Launcher Group)');
+    expect(row.cells.get(1)).toEqual({ value: 483, unit: null, displayValue: 'Mining Laser' });
+    // Unresolvable: unchanged from today rather than blanked.
+    expect(row.cells.get(2)).toEqual({ value: 99999, unit: 'groupID' });
   });
 
   it('marks non-price rows as kind "attribute"', () => {

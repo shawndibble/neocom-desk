@@ -8,6 +8,7 @@ import { ESI_BASE_URL } from '@/esi/client';
 import { VariationsCompareModal } from './VariationsCompareModal';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadSkills } from '@/sde/loadSde';
+import { db } from '@/db';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 
 vi.mock('@/sde/loadMarketSde', () => ({
@@ -15,6 +16,7 @@ vi.mock('@/sde/loadMarketSde', () => ({
 }));
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(),
+  loadTypes: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
@@ -33,9 +35,12 @@ function summary(bestSell: number | null): OrderBookSummary {
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
-afterEach(() => {
+afterEach(async () => {
   server.resetHandlers();
   vi.clearAllMocks();
+  // Group names cache under the global sentinel; clear so each test's
+  // request count is its own.
+  await db.esiCache.clear();
 });
 
 describe('VariationsCompareModal', () => {
@@ -187,5 +192,43 @@ describe('VariationsCompareModal', () => {
     await screen.findByRole('dialog');
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
+  });
+  it('resolves an id-reference row once for the whole matrix, not once per column', async () => {
+    let groupCalls = 0;
+    const rifter = (typeId: number, name: string) =>
+      http.get(`${ESI_BASE_URL}/universe/types/${typeId}`, () =>
+        HttpResponse.json({
+          type_id: typeId,
+          name,
+          description: '',
+          group_id: 25,
+          published: true,
+          volume: 27289,
+          dogma_attributes: [{ attribute_id: 137, value: 483 }],
+        })
+      );
+    server.use(
+      rifter(587, 'Rifter'),
+      rifter(588, 'Republic Fleet Rifter'),
+      http.get(`${ESI_BASE_URL}/universe/groups/483`, () => {
+        groupCalls += 1;
+        return HttpResponse.json({
+          group_id: 483,
+          name: 'Mining Laser',
+          category_id: 7,
+          published: true,
+          types: [],
+        });
+      })
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      137: { name: 'Used with (Launcher Group)', unit: 'groupID', category: 'Miscellaneous' },
+    });
+    mockedLoadSkills.mockResolvedValue([]);
+
+    render(<VariationsCompareModal items={ITEMS} prices={new Map()} onClose={() => {}} />);
+
+    expect(await screen.findAllByText('Mining Laser')).toHaveLength(2);
+    expect(groupCalls).toBe(1);
   });
 });

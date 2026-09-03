@@ -14,6 +14,7 @@
 import {
   groupItemAttributes,
   type AttributeDictionary,
+  type AttributeReferenceNames,
   type RawDogmaAttribute,
 } from './itemAttributes';
 
@@ -27,7 +28,11 @@ export interface CompareMatrixItem {
 export interface CompareCell {
   value: number;
   unit: string | null;
-  /** Set only for required-skill rows: "<Skill name> <roman level>", overriding value/unit in display. */
+  /**
+   * Overrides value/unit in display: a required-skill row's
+   * "<Skill name> <roman level>", an enum legend's member, or the name an id
+   * reference points at (see `itemAttributes`).
+   */
   displayValue?: string;
 }
 
@@ -62,7 +67,7 @@ export function buildCompareMatrix(
   items: readonly CompareMatrixItem[],
   dictionary: AttributeDictionary,
   labels: CompareMatrixLabels,
-  skillNames: Readonly<Record<number, string>> = {}
+  names: AttributeReferenceNames = {}
 ): CompareAttributeGroup[] {
   const priceCells = new Map<number, CompareCell>();
   for (const item of items) {
@@ -79,7 +84,7 @@ export function buildCompareMatrix(
   >();
 
   for (const item of items) {
-    const groups = groupItemAttributes(item.dogmaAttributes, dictionary, skillNames);
+    const groups = groupItemAttributes(item.dogmaAttributes, dictionary, names);
     for (const group of groups) {
       let attrs = categories.get(group.category);
       if (!attrs) {

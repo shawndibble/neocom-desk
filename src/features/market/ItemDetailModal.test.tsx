@@ -9,12 +9,14 @@ import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi, loadSkills } from '@/sde/loadSde';
+import { db } from '@/db';
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(),
 }));
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(),
+  loadTypes: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
@@ -27,9 +29,12 @@ const TYPE_ID = 587;
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
-afterEach(() => {
+afterEach(async () => {
   server.resetHandlers();
   vi.clearAllMocks();
+  // Group names are cached under the global sentinel and would otherwise
+  // leak a resolved name into the next test's "unresolvable" case.
+  await db.esiCache.clear();
 });
 
 describe('ItemDetailModal', () => {
@@ -81,6 +86,132 @@ describe('ItemDetailModal', () => {
     expect(screen.getByText('Speed and Travel')).toBeInTheDocument();
     expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
     expect(screen.getByText('250 m/sec')).toBeInTheDocument();
+  });
+
+  it('shows a groupID attribute as the Group name, not "483 groupID"', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Modulated Deep Core Miner II',
+          description: '',
+          group_id: 54,
+          published: true,
+          volume: 5,
+          dogma_attributes: [{ attribute_id: 137, value: 483 }],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/universe/groups/483`, () =>
+        HttpResponse.json({
+          group_id: 483,
+          name: 'Mining Laser',
+          category_id: 7,
+          published: true,
+          types: [],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      137: { name: 'Used with (Launcher Group)', unit: 'groupID', category: 'Miscellaneous' },
+    });
+    mockedLoadSkills.mockResolvedValue([]);
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Miner" onClose={() => {}} />);
+
+    expect(await screen.findByText('Mining Laser')).toBeInTheDocument();
+    expect(screen.queryByText(/groupID/)).not.toBeInTheDocument();
+  });
+
+  it('leaves a group it cannot name as the raw value it shows today', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Modulated Deep Core Miner II',
+          description: '',
+          group_id: 54,
+          published: true,
+          volume: 5,
+          dogma_attributes: [{ attribute_id: 137, value: 99999 }],
+        })
+      ),
+      http.get(
+        `${ESI_BASE_URL}/universe/groups/99999`,
+        () => new HttpResponse(null, { status: 404 })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      137: { name: 'Used with (Launcher Group)', unit: 'groupID', category: 'Miscellaneous' },
+    });
+    mockedLoadSkills.mockResolvedValue([]);
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Miner" onClose={() => {}} />);
+
+    expect(await screen.findByText('99999 groupID')).toBeInTheDocument();
+  });
+
+  it('shows an attributeID attribute as the attribute it names, using the dictionary alone', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Cybernetic Subprocessor',
+          description: '',
+          group_id: 300,
+          published: true,
+          volume: 1,
+          dogma_attributes: [{ attribute_id: 180, value: 165 }],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      180: { name: 'Primary attribute', unit: 'attributeID', category: 'Miscellaneous' },
+      165: { name: 'Intelligence', unit: 'points', category: 'Miscellaneous' },
+    });
+    mockedLoadSkills.mockResolvedValue([]);
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Implant" onClose={() => {}} />);
+
+    expect(await screen.findByText('Intelligence')).toBeInTheDocument();
+    expect(screen.queryByText(/attributeID/)).not.toBeInTheDocument();
+  });
+
+  it('shows an enum-legend attribute as the member it names, not "1 1=True 0=False"', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Ubiquitous Moon Mining Crystal Type A I',
+          description: '',
+          group_id: 25,
+          published: true,
+          volume: 1,
+          dogma_attributes: [
+            { attribute_id: 786, value: 1 },
+            { attribute_id: 128, value: 3 },
+          ],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      786: { name: 'Crystals Take Damage', unit: '1=True 0=False', category: 'Miscellaneous' },
+      128: { name: 'Charge size', unit: '1=small 2=medium 3=l', category: 'Miscellaneous' },
+    });
+    mockedLoadSkills.mockResolvedValue([]);
+
+    render(
+      <ItemDetailModal
+        typeId={TYPE_ID}
+        itemName="Ubiquitous Moon Mining Crystal Type A I"
+        onClose={() => {}}
+      />
+    );
+
+    expect(await screen.findByText('Crystals Take Damage')).toBeInTheDocument();
+    expect(screen.getByText('True')).toBeInTheDocument();
+    expect(screen.getByText('Large')).toBeInTheDocument();
+    expect(screen.queryByText(/1=True 0=False/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/1=small/)).not.toBeInTheDocument();
   });
 
   it('renders description markup as formatting instead of literal tags, and resolves required skills to names', async () => {
