@@ -17,7 +17,7 @@
     "wallet": "Wallet",
     "clones": "Clones",
     "pi": "Planetary Industry",
-    "employmentHistory": "Employment History",
+    "employmentHistory": "Employment",
     "assets": "Assets",
     "mail": "Mail",
     "calendar": "Calendar",
@@ -474,6 +474,7 @@
   },
   "overview": {
     "title": "Overview",
+    "refresh": "Refresh",
     "wallet": "Wallet",
     "walletEmpty": "No wallet data cached. Reconnect to fetch it.",
     "isk": "ISK",
@@ -773,7 +774,7 @@
     "expiresIn": "in {{duration}}"
   },
   "employmentHistory": {
-    "title": "Employment History",
+    "title": "Employment",
     "refresh": "Refresh",
     "emptyTitle": "No employment history cached",
     "emptyHint": "Reconnect to fetch this character's corporation history.",

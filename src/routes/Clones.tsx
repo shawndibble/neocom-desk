@@ -6,7 +6,6 @@ import {
   DataTable,
   EmptyState,
   IconButton,
-  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
@@ -14,7 +13,13 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { loadCharacterClones } from '@/features/character/clones';
+import {
+  loadCharacterSpSummary,
+  NO_SP_SUMMARY,
+  type CharacterSpSummary,
+} from '@/features/character/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { loadCharacterSkills } from '@/features/skills/data';
 import { loadStationName } from '@/features/character/stations';
@@ -37,6 +42,8 @@ interface Snapshot {
   infomorphLevel: number;
   implantNames: Map<number, string>;
   locationNames: Map<number, string>;
+  /** Total/unallocated SP for the shared Character-overview header. */
+  sp: CharacterSpSummary;
   /** Captured in the loader, not at render: `Date.now()` is impure and React forbids it in render/useMemo. */
   loadedAt: number;
 }
@@ -45,8 +52,12 @@ async function loadClonesSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [{ cached: clonesResult, needsReauth: clonesNeedsReauth }, skillsResult] =
-    await Promise.all([loadCharacterClones(characterId), loadCharacterSkills(characterId)]);
+  const [{ cached: clonesResult, needsReauth: clonesNeedsReauth }, skillsResult, sp] =
+    await Promise.all([
+      loadCharacterClones(characterId),
+      loadCharacterSkills(characterId),
+      loadCharacterSpSummary(characterId, Date.now()),
+    ]);
   const loadedAt = Date.now();
   const infomorphLevel =
     skillsResult?.data.skills.find((skill) => skill.skill_id === INFOMORPH_SYNCHRONIZING_SKILL_ID)
@@ -81,7 +92,15 @@ async function loadClonesSnapshot(
     if (name) locationNames.set(id, name);
   });
 
-  return { clonesResult, clonesNeedsReauth, infomorphLevel, implantNames, locationNames, loadedAt };
+  return {
+    clonesResult,
+    clonesNeedsReauth,
+    infomorphLevel,
+    implantNames,
+    locationNames,
+    sp,
+    loadedAt,
+  };
 }
 
 /** Clones: jump clones, their locations and implants, plus the current jump cooldown. */
@@ -95,6 +114,7 @@ export function Clones() {
   const infomorphLevel = data?.infomorphLevel ?? 0;
   const implantNames = data?.implantNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
+  const sp = data?.sp ?? NO_SP_SUMMARY;
   const loadedAt = data?.loadedAt ?? 0;
 
   const clones = clonesResult?.data.jump_clones ?? [];
@@ -139,11 +159,13 @@ export function Clones() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        title={t('clones.title')}
-        meta={clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
+      <CharacterHeader
+        characterId={activeCharacterId}
+        totalSp={sp.totalSp}
+        unallocatedSp={sp.unallocatedSp}
         actions={
           <>
+            {clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
             <IconButton
               icon={<Icon.Refresh />}
               label={t('clones.refresh')}

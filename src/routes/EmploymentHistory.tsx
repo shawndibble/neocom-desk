@@ -6,7 +6,6 @@ import {
   DataTable,
   EmptyState,
   IconButton,
-  PageHeader,
   Panel,
   Spinner,
   type DataTableColumn,
@@ -20,6 +19,12 @@ import {
 import type { CachedResult } from '@/esi/cache';
 import type { CorporationHistoryEntry } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
+import { CharacterHeader } from '@/features/character/CharacterHeader';
+import {
+  loadCharacterSpSummary,
+  NO_SP_SUMMARY,
+  type CharacterSpSummary,
+} from '@/features/character/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
@@ -27,6 +32,8 @@ import { formatDuration } from '@/lib/duration';
 interface Snapshot {
   historyResult: CachedResult<CorporationHistoryEntry[]> | null;
   corpNames: Map<number, string>;
+  /** Total/unallocated SP for the shared Character-overview header. */
+  sp: CharacterSpSummary;
   /** Captured in the loader, not at render: `Date.now()` is impure and React forbids it in render/useMemo. */
   loadedAt: number;
 }
@@ -38,14 +45,20 @@ async function loadEmploymentHistorySnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const historyResult = await loadEmploymentHistory(characterId);
+  // The SP pair the shared header shows. Skips its ESI read entirely without
+  // the /skills grant (characterSp.ts), so this route stays as public as its
+  // corporation history is.
+  const [historyResult, sp] = await Promise.all([
+    loadEmploymentHistory(characterId),
+    loadCharacterSpSummary(characterId, Date.now()),
+  ]);
   const loadedAt = Date.now();
   // Already superseded: skip the name lookup, its result would be discarded.
   const corporationIds = signal.cancelled
     ? []
     : (historyResult?.data ?? []).map((entry) => entry.corporation_id);
   const corpNames = await resolveNames(corporationIds);
-  return { historyResult, corpNames, loadedAt };
+  return { historyResult, corpNames, sp, loadedAt };
 }
 
 /** Employment History: a character's corporation history. Public endpoint, no scope, no re-auth. */
@@ -57,6 +70,7 @@ export function EmploymentHistory() {
 
   const historyResult = data?.historyResult ?? null;
   const corpNames = data?.corpNames ?? NO_NAMES;
+  const sp = data?.sp ?? NO_SP_SUMMARY;
 
   // Falls back to 0 when nothing has loaded yet: `historyResult` is null then too,
   // so `deriveEmploymentHistoryRows` receives no entries and the value is unused.
@@ -101,11 +115,13 @@ export function EmploymentHistory() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        title={t('employmentHistory.title')}
-        meta={historyResult && <DataAgeBadge date={historyResult.fetchedAt} />}
+      <CharacterHeader
+        characterId={activeCharacterId}
+        totalSp={sp.totalSp}
+        unallocatedSp={sp.unallocatedSp}
         actions={
           <>
+            {historyResult && <DataAgeBadge date={historyResult.fetchedAt} />}
             <IconButton
               icon={<Icon.Refresh />}
               label={t('employmentHistory.refresh')}

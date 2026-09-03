@@ -673,8 +673,24 @@
   of three tabs of a single page shape it no longer is. The app-wide
   `max-w-6xl` pass (#212) settled this on its own while this work was in
   flight, so nothing here changes a width; the constraint is recorded because
-  re-tiering Overview away from Clones and Employment History would now
   reintroduce the jump.
+- **The three tabs also share one header.** Everything above the tab strip is
+  the same on all three: portrait, character name (the `<h1>`), corporation /
+  alliance and the two SP chips — `features/character/CharacterHeader.tsx`.
+  Only the per-view slot beside it differs (that view's `DataAgeBadge` and its
+  Refresh). Clones and Employment History previously opened with a `PageHeader`
+  whose title merely restated the tab directly beneath it, so switching tabs
+  swapped the identity block in and out — the same page visibly rebuilding, the
+  width rule above in a different guise. The two scope-light tabs feed the SP
+  chips from `features/character/characterSp.ts`, which **skips its /skills
+  read entirely without the grant** and leaves the chips reading "—":
+  Employment History is public and must not start demanding a scope, and a
+  guaranteed 401 would raise the shell's stale-grant notice over it.
+- The tab reads **"Employment"**, not "Employment History": the tab strip is
+  the label's only home now, "history" is what a list of past corporations
+  self-evidently is, and the shorter word keeps the three tabs on one line on
+  a phone. The route (`/employment-history`), its module names and the view's
+  own copy are unchanged.
 - Mobile: the bottom bar drops Characters (Overview / Skills / Industry /
   More), and the More sheet leads with the Character disclosure. That
   disclosure is a hand-rolled `aria-expanded` row, **not** a `DropdownMenu`:
