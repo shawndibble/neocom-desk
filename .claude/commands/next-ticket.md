@@ -249,10 +249,12 @@ a conflict was resolved), that commit already ran through the pre-commit
 hook (see "Pre-commit hook, then CI" above) — nothing further to do here. If
 sync reported `already-up-to-date`, there's nothing to commit.
 
-Do **not** run `npm run test:e2e` locally — one spec
-(`e2e/plans.spec.ts` clipboard export) fails only on Windows due to a clipboard
-round-trip quirk; CI runs e2e on Linux where it passes. If you genuinely changed
-export/clipboard behaviour, reason about e2e impact from the spec instead.
+Do **not** run the full `npm run test:e2e` locally — the whole Playwright
+suite is CI's job, the same way the full unit suite is. (The clipboard-export
+spec that used to fail only on Windows was a CRLF assertion bug in the spec,
+fixed in #247 — the suite is cross-platform now.) If you genuinely changed
+export/clipboard behaviour, reason about e2e impact from the spec, or run just
+that one spec: `npx playwright test e2e/plans.spec.ts -g "<test name>"`.
 
 ## 7. Open the PR
 
