@@ -1,5 +1,8 @@
-import { controlHeightClassName } from './controlStyles';
-import type { ButtonAlign, ButtonSize, ButtonVariant } from './Button';
+import { controlHeightClassName, type ControlSize } from './controlStyles';
+
+export type ButtonVariant = 'primary' | 'ghost' | 'danger';
+export type ButtonSize = ControlSize;
+export type ButtonAlign = 'center' | 'start';
 
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'border-accent bg-accent text-accent-contrast hover:bg-accent/85',

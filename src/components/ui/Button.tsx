@@ -1,10 +1,12 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
-import type { ControlSize } from './controlStyles';
-import { buttonClassName } from './buttonClassName';
+import {
+  buttonClassName,
+  type ButtonAlign,
+  type ButtonSize,
+  type ButtonVariant,
+} from './buttonClassName';
 
-export type ButtonVariant = 'primary' | 'ghost' | 'danger';
-export type ButtonSize = ControlSize;
-export type ButtonAlign = 'center' | 'start';
+export type { ButtonVariant, ButtonSize, ButtonAlign };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;

@@ -586,6 +586,20 @@ describe('diffWalletBalanceChanged', () => {
       { eventId: 'walletBalanceChanged', characterId: 7, amount: 100 },
     ]);
   });
+
+  it('orders fires oldest-entry-first even though ESI returns the journal newest-first, so the delivery loop records (and the feed shows) the newest one last', () => {
+    const prev = walletSnapshot([walletEntry(5)], T0);
+    // ESI's own order: id 7 (newest) before id 6 (older) before the
+    // already-seen id 5.
+    const next = walletSnapshot(
+      [walletEntry(7, 700), walletEntry(6, 600), walletEntry(5, 500)],
+      T0 + 2000
+    );
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
+      { eventId: 'walletBalanceChanged', characterId: 7, amount: 600 },
+      { eventId: 'walletBalanceChanged', characterId: 7, amount: 700 },
+    ]);
+  });
 });
 
 function orderEntry(orderId: number, filled: boolean): MarketOrderEntrySnapshot {
