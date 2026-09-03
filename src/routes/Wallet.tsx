@@ -6,6 +6,7 @@ import {
   DataTable,
   EmptyState,
   IconButton,
+  NativeSelect,
   PageHeader,
   Panel,
   ReauthBanner,
@@ -22,10 +23,19 @@ import {
 } from '@/features/character/wallet';
 import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
 import { resolveNames } from '@/features/character/names';
-import type { CachedResult } from '@/esi/cache';
+import type { CachedResult, StatusResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useCorpOwner } from '@/features/corp/owner';
+import { OwnerSwitch } from '@/features/corp/OwnerSwitch';
+import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
+import { walletDivisions, type WalletDivision } from '@/features/corp/divisions';
+import {
+  loadCorporationDivisions,
+  loadCorporationWalletJournal,
+  loadCorporationWallets,
+} from '@/features/corp/wallet';
 import { formatIsk } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
@@ -35,6 +45,8 @@ import {
 } from '@/features/character/walletTransactionsCsv';
 import type {
   CharacterLoyaltyPoints,
+  CorporationDivisions,
+  CorporationWalletDivision,
   WalletJournalEntry,
   WalletTransaction,
 } from '@/esi/endpoints';
@@ -99,13 +111,222 @@ async function loadWalletSnapshot(
   };
 }
 
-/** Wallet: ISK balance, journal, and recent transactions. Read-only, cached for offline. */
+/** Balances and the division names, which need two separate reads and two separate scopes. */
+interface CorpBalancesSnapshot {
+  walletsResult: StatusResult<CorporationWalletDivision[]>;
+  divisionsResult: StatusResult<CorporationDivisions>;
+}
+
+async function loadCorpBalances(
+  characterId: number,
+  corporationId: number
+): Promise<CorpBalancesSnapshot> {
+  const [walletsResult, divisionsResult] = await Promise.all([
+    loadCorporationWallets(characterId, corporationId),
+    loadCorporationDivisions(characterId, corporationId),
+  ]);
+  return { walletsResult, divisionsResult };
+}
+
+interface CorpWalletViewProps {
+  tab: 'balance' | 'journal' | 'transactions';
+  balances: CorpBalancesSnapshot | null;
+  balancesLoading: boolean;
+  journalResult: CachedResult<WalletJournalEntry[]> | null;
+  journal: WalletJournalEntry[];
+  journalLoading: boolean;
+  /** The page's own journal columns — the corp journal is the same table, not a second one. */
+  journalColumns: DataTableColumn<WalletJournalEntry>[];
+  division: WalletDivision | null;
+  divisionLabel: (entry: WalletDivision) => string;
+  offlineTitleKey: string;
+}
+
+/**
+ * The corporation side of the page: one division's balance and its journal.
+ *
+ * Reuses the page's own journal columns rather than declaring its own — ESI
+ * returns the same schema for both journals, which is the whole reason this
+ * direction works. There is no loyalty panel (that is a Character's own) and no
+ * transactions tab (see `effectiveTab`).
+ */
+function CorpWalletView({
+  tab,
+  balances,
+  balancesLoading,
+  journalResult,
+  journal,
+  journalLoading,
+  journalColumns,
+  division,
+  divisionLabel,
+  offlineTitleKey,
+}: CorpWalletViewProps) {
+  const { t } = useTranslation();
+
+  if (tab === 'balance') {
+    const walletsResult = balances?.walletsResult.cached ?? null;
+    return (
+      <Panel
+        title={t('wallet.balanceTab')}
+        actions={walletsResult ? <DataAgeBadge date={walletsResult.fetchedAt} /> : undefined}
+      >
+        {balancesLoading ? (
+          <div className="flex justify-center py-8">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : !walletsResult || division === null ? (
+          <EmptyState title={t('wallet.corpBalanceEmpty')} className="py-4" />
+        ) : (
+          <>
+            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {divisionLabel(division)}
+            </p>
+            <p className={`text-lg font-medium tabular-nums ${iskToneClass(division.balance)}`}>
+              {formatIsk(division.balance, 2)}
+            </p>
+            {walletsResult.fromCache && (
+              <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
+            )}
+          </>
+        )}
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel
+      padded={false}
+      title={t('wallet.journalTab')}
+      actions={
+        journalResult ? (
+          <span className="flex items-center gap-2">
+            <IconButton
+              size="sm"
+              icon={<Icon.Download />}
+              label={t('wallet.exportCsvJournal')}
+              disabled={journal.length === 0}
+              onClick={() =>
+                downloadCsv(
+                  'corp-wallet-journal',
+                  journal,
+                  walletJournalCsvColumns(t),
+                  new Date(),
+                  journalResult.truncated
+                )
+              }
+            />
+            <DataAgeBadge date={journalResult.fetchedAt} />
+          </span>
+        ) : undefined
+      }
+    >
+      {journalLoading ? (
+        <div className="flex justify-center py-8">
+          <Spinner label={t('common.loading')} />
+        </div>
+      ) : !journalResult || journal.length === 0 ? (
+        <EmptyState
+          title={t('wallet.corpJournalEmptyTitle')}
+          hint={t('wallet.corpJournalEmptyHint')}
+          className="py-8"
+        />
+      ) : (
+        <>
+          {journalResult.fromCache && (
+            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+              {t(offlineTitleKey)}
+            </p>
+          )}
+          {journalResult.truncated && (
+            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+              {t('common.incompleteTitle')}
+            </p>
+          )}
+          <DataTable
+            label={t('wallet.journalTab')}
+            columns={journalColumns}
+            rows={journal}
+            rowKey={(entry) => entry.id}
+          />
+        </>
+      )}
+    </Panel>
+  );
+}
+
+/**
+ * Wallet: ISK balance, journal, and recent transactions. Read-only, cached for
+ * offline.
+ *
+ * For a Character holding the corp wallet capability the same page also shows
+ * the corporation's wallet, one division at a time (issue #298) — the same
+ * journal table under a different owner, with a division selector beside the
+ * switch. For everyone else the switch does not render and this page is exactly
+ * what it was (CONTEXT.md round 35).
+ */
 export function Wallet() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadWalletSnapshot);
 
   const [tab, setTab] = useState<'balance' | 'journal' | 'transactions'>('balance');
+
+  const {
+    owner,
+    setOwner,
+    available: corpAvailable,
+    corporationId,
+  } = useCorpOwner('canReadWallet');
+  const showingCorp =
+    owner === 'corporation' && corporationId !== null && activeCharacterId !== null;
+
+  // Nothing is fetched until the switch is flipped; the key carries the
+  // corporation, so a corp change resets rather than relabelling its rows.
+  const corpBalances = useCorpSnapshot<CorpBalancesSnapshot | null>(
+    showingCorp ? `${activeCharacterId}:${corporationId}` : null,
+    async () =>
+      activeCharacterId === null || corporationId === null
+        ? null
+        : loadCorpBalances(activeCharacterId, corporationId)
+  );
+
+  const divisions = useMemo<WalletDivision[]>(
+    () =>
+      walletDivisions(
+        corpBalances.data?.walletsResult.cached?.data ?? [],
+        corpBalances.data?.divisionsResult.cached?.data ?? null
+      ),
+    [corpBalances.data]
+  );
+
+  // Derived, not effect-synced, the same way Industry picks its selected plan:
+  // falls back to the first division whenever the chosen one isn't in this
+  // corporation's list — which is exactly what a corp change looks like.
+  const [division, setDivision] = useState(1);
+  const effectiveDivision = divisions.some((entry) => entry.division === division)
+    ? division
+    : (divisions[0]?.division ?? division);
+  const selectedDivision = divisions.find((entry) => entry.division === effectiveDivision) ?? null;
+
+  // Its own key, division included: ESI publishes no all-divisions journal and
+  // each division caches separately (features/corp/wallet.ts).
+  const corpJournal = useCorpSnapshot<StatusResult<WalletJournalEntry[]> | null>(
+    showingCorp ? `${activeCharacterId}:${corporationId}:${effectiveDivision}` : null,
+    async () =>
+      activeCharacterId === null || corporationId === null
+        ? null
+        : loadCorporationWalletJournal(activeCharacterId, corporationId, effectiveDivision)
+  );
+
+  const divisionLabel = (entry: WalletDivision) =>
+    entry.name ?? t('wallet.corpDivisionFallback', { division: entry.division });
+
+  /** One Refresh button, so it reloads whichever corp reads this page is showing. */
+  const handleCorpRefresh = () => {
+    corpBalances.refresh();
+    corpJournal.refresh();
+  };
 
   // A manual Refresh that still falls back to cache is a more alarming case
   // than the initial load finding cache first — same banner, different copy.
@@ -246,6 +467,20 @@ export function Wallet() {
     [transactionsResult]
   );
 
+  const corpJournalResult = corpJournal.data?.cached ?? null;
+  const corpJournalEntries = useMemo(
+    () => [...(corpJournalResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
+    [corpJournalResult]
+  );
+
+  // Transactions are personal-only, and that is a registry fact rather than a
+  // layout choice: ESI publishes a corp wallet transactions endpoint but #295
+  // registered only the journal, and nothing here may add one
+  // (`esi/scopes.ts` derives everything from `ESI_REGISTRY`). Landing on that
+  // tab and flipping the switch falls back to the journal rather than showing
+  // an empty third tab.
+  const effectiveTab = showingCorp && tab === 'transactions' ? 'journal' : tab;
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -264,25 +499,82 @@ export function Wallet() {
             <IconButton
               icon={<Icon.Refresh />}
               label={t('wallet.refresh')}
-              onClick={refresh}
-              disabled={loading}
+              onClick={showingCorp ? handleCorpRefresh : refresh}
+              disabled={showingCorp ? corpBalances.loading || corpJournal.loading : loading}
             />
           </>
         }
       />
 
+      {/*
+        The switch and, beside it, the division selector — one wrapping row, so
+        a phone stacks them rather than scrolling the page sideways. Rendered
+        only for a Character that actually holds the capability; for everyone
+        else this is not on the page at all.
+      */}
+      {corpAvailable && (
+        <div className="flex flex-wrap items-center gap-2">
+          <OwnerSwitch
+            value={owner}
+            onChange={setOwner}
+            label={t('wallet.ownerLabel')}
+            personalLabel={t('wallet.ownerPersonal')}
+            corporationLabel={t('wallet.ownerCorporation')}
+          />
+          {showingCorp && divisions.length > 0 && (
+            <NativeSelect
+              size="sm"
+              className="w-56"
+              aria-label={t('wallet.corpDivisionLabel')}
+              value={effectiveDivision}
+              onChange={(event) => setDivision(Number(event.target.value))}
+            >
+              {divisions.map((entry) => (
+                <option key={entry.division} value={entry.division}>
+                  {divisionLabel(entry)}
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+        </div>
+      )}
+
       <Tabs
         label={t('wallet.title')}
-        value={tab}
+        value={effectiveTab}
         onChange={(id) => setTab(id as typeof tab)}
-        tabs={[
-          { id: 'balance', label: t('wallet.balanceTab') },
-          { id: 'journal', label: t('wallet.journalTab') },
-          { id: 'transactions', label: t('wallet.transactionsTab') },
-        ]}
+        tabs={
+          showingCorp
+            ? [
+                { id: 'balance', label: t('wallet.balanceTab') },
+                { id: 'journal', label: t('wallet.journalTab') },
+              ]
+            : [
+                { id: 'balance', label: t('wallet.balanceTab') },
+                { id: 'journal', label: t('wallet.journalTab') },
+                { id: 'transactions', label: t('wallet.transactionsTab') },
+              ]
+        }
       />
 
-      {loading ? (
+      {showingCorp ? (
+        <CorpWalletView
+          tab={effectiveTab}
+          balances={corpBalances.data}
+          balancesLoading={corpBalances.loading}
+          journalResult={corpJournalResult}
+          journal={corpJournalEntries}
+          journalLoading={corpJournal.loading}
+          journalColumns={journalColumns}
+          division={selectedDivision}
+          divisionLabel={divisionLabel}
+          offlineTitleKey={
+            corpBalances.refreshCount > 0 || corpJournal.refreshCount > 0
+              ? 'common.refreshFailedTitle'
+              : 'common.offlineTitle'
+          }
+        />
+      ) : loading ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
