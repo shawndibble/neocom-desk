@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { NotificationFeedPanel } from './NotificationFeedPanel';
 import {
   useNotificationPreferences,
@@ -11,14 +13,31 @@ import {
 } from './preferences';
 import { recordFeedEntry } from './feed';
 
+const ACTIVE = 1;
+const ALT = 2;
+
 beforeEach(async () => {
   await db.notificationFeed.clear();
   await db.settings.clear();
+  await db.characters.clear();
+  await db.characters.bulkPut([
+    { characterId: ACTIVE, name: 'Active Pilot', ownerHash: 'h1', addedAt: 0 },
+    { characterId: ALT, name: 'Alt One', ownerHash: 'h2', addedAt: 0 },
+  ]);
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
+  useActiveCharacter.setState({ activeCharacterId: ACTIVE, hydrated: true });
 });
 
-async function seed(title: string, body: string, firedAt: number) {
-  await recordFeedEntry({ characterId: 1, eventId: 'newMail', title, body, firedAt });
+async function seed(title: string, body: string, firedAt: number, characterId = ACTIVE) {
+  await recordFeedEntry({ characterId, eventId: 'newMail', title, body, firedAt });
+}
+
+function renderPanel() {
+  return render(
+    <MemoryRouter>
+      <NotificationFeedPanel />
+    </MemoryRouter>
+  );
 }
 
 describe('NotificationFeedPanel', () => {
@@ -26,7 +45,7 @@ describe('NotificationFeedPanel', () => {
     await seed('Older', 'first body', 1000);
     await seed('Newer', 'second body', 2000);
 
-    render(<NotificationFeedPanel />);
+    renderPanel();
 
     const items = await screen.findAllByRole('listitem');
     expect(items).toHaveLength(2);
@@ -35,7 +54,7 @@ describe('NotificationFeedPanel', () => {
   });
 
   it('shows an empty state with nothing fired', async () => {
-    render(<NotificationFeedPanel />);
+    renderPanel();
     expect(await screen.findByText('No notifications yet')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Dismiss all' })).not.toBeInTheDocument();
   });
@@ -43,7 +62,7 @@ describe('NotificationFeedPanel', () => {
   it('dismisses one notification at a time, leaving the rest', async () => {
     await seed('Keep me', 'a', 1000);
     await seed('Dismiss me', 'b', 2000);
-    render(<NotificationFeedPanel />);
+    renderPanel();
     await screen.findByText('Dismiss me');
 
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss Dismiss me' }));
@@ -56,7 +75,7 @@ describe('NotificationFeedPanel', () => {
   it('dismisses every notification in bulk', async () => {
     await seed('One', 'a', 1000);
     await seed('Two', 'b', 2000);
-    render(<NotificationFeedPanel />);
+    renderPanel();
     await screen.findByText('Two');
 
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss all' }));
@@ -72,10 +91,63 @@ describe('NotificationFeedPanel', () => {
     });
     await seed('Hidden', 'a', 1000);
 
-    const { container } = render(<NotificationFeedPanel />);
+    const { container } = renderPanel();
 
     await waitFor(() => expect(useNotificationPreferences.getState().hydrated).toBe(true));
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('shows only the active character, counting the others separately', async () => {
+    await seed('Mine', 'a', 2000, ACTIVE);
+    await seed('Alt alert', 'b', 1000, ALT);
+    await seed('Alt alert two', 'c', 900, ALT);
+
+    renderPanel();
+
+    expect(await screen.findByText('Mine')).toBeInTheDocument();
+    expect(screen.queryByText('Alt alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Alt One/ })).toHaveTextContent('2');
+  });
+
+  it('switches the active character when an other-character count is tapped', async () => {
+    await seed('Alt alert', 'b', 1000, ALT);
+    renderPanel();
+
+    await userEvent.click(await screen.findByRole('button', { name: /Alt One/ }));
+
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(ALT));
+  });
+
+  it('dismisses all for the active character without touching another character', async () => {
+    await seed('Mine', 'a', 2000, ACTIVE);
+    await seed('Alt alert', 'b', 1000, ALT);
+    renderPanel();
+    await screen.findByText('Mine');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss all' }));
+
+    await waitFor(() => expect(screen.getByText('No notifications yet')).toBeInTheDocument());
+    const left = await db.notificationFeed.toArray();
+    expect(left.map((e) => e.characterId)).toEqual([ALT]);
+  });
+
+  it('hides an entry as soon as its event type is switched off', async () => {
+    await seed('Mail alert', 'a', 1000, ACTIVE);
+    renderPanel();
+    await screen.findByText('Mail alert');
+
+    await useNotificationPreferences.getState().setValue({
+      masterEnabled: true,
+      perCharacter: { [ACTIVE]: { newMail: false } },
+    });
+
+    await waitFor(() => expect(screen.queryByText('Mail alert')).not.toBeInTheDocument());
+  });
+
+  it('links to the notification settings section', async () => {
+    renderPanel();
+    const link = await screen.findByRole('link', { name: 'Settings' });
+    expect(link).toHaveAttribute('href', '/settings#notifications');
   });
 
   it('renders nothing when the master switch is off', async () => {
@@ -85,7 +157,7 @@ describe('NotificationFeedPanel', () => {
     });
     await seed('Hidden', 'a', 1000);
 
-    const { container } = render(<NotificationFeedPanel />);
+    const { container } = renderPanel();
 
     await waitFor(() => expect(useNotificationPreferences.getState().hydrated).toBe(true));
     expect(container).toBeEmptyDOMElement();

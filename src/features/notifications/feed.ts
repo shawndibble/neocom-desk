@@ -51,6 +51,12 @@ export async function dismissFeedEntry(id: string): Promise<void> {
   await db.notificationFeed.delete(id);
 }
 
-export async function dismissAllFeedEntries(): Promise<void> {
-  await db.notificationFeed.clear();
+/**
+ * Bulk dismiss. Takes explicit ids rather than clearing the table: "dismiss
+ * all" on the Overview means the active Character's alerts, and wiping
+ * another Character's along with them would silently discard the very rows
+ * the other-Characters row is counting.
+ */
+export async function dismissFeedEntries(ids: readonly string[]): Promise<void> {
+  await db.notificationFeed.bulkDelete([...ids]);
 }

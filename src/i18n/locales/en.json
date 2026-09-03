@@ -491,7 +491,9 @@
     "notificationsEmpty": "No notifications yet",
     "notificationsEmptyHint": "Events you have enabled will appear here while the app is open.",
     "notificationsDismissAll": "Dismiss all",
-    "notificationsDismiss": "Dismiss {{title}}"
+    "notificationsDismiss": "Dismiss {{title}}",
+    "notificationsSettings": "Settings",
+    "notificationsOtherCharacters": "Other characters"
   },
   "common": {
     "close": "Close",

@@ -144,13 +144,6 @@ export function Overview() {
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : (
         <>
-          {/*
-            Above the wallet: the feed is what the user came to check after
-            being away, and on a platform that cannot raise an OS
-            notification it is the only place these ever appear.
-          */}
-          <NotificationFeedPanel />
-
           <Panel
             title={t('overview.wallet')}
             actions={walletResult ? <DataAgeBadge date={walletResult.fetchedAt} /> : undefined}
@@ -207,6 +200,13 @@ export function Overview() {
               </p>
             )}
           </Panel>
+
+          {/*
+            Below the queue: the feed grows with however many event types are
+            enabled, so it sits under the two fixed-height panels rather than
+            pushing them off the first screen.
+          */}
+          <NotificationFeedPanel />
         </>
       )}
     </div>

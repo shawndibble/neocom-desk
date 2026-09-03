@@ -6,7 +6,7 @@ import {
   recordFeedEntry,
   readFeed,
   dismissFeedEntry,
-  dismissAllFeedEntries,
+  dismissFeedEntries,
 } from './feed';
 
 beforeEach(async () => {
@@ -97,7 +97,7 @@ describe('dismissing', () => {
     expect(feed[0].title).toBe('a');
   });
 
-  it('dismisses everything in bulk', async () => {
+  it('dismisses the given ids in bulk, leaving the others', async () => {
     for (let i = 0; i < 4; i++) {
       await recordFeedEntry({
         characterId: i,
@@ -107,7 +107,13 @@ describe('dismissing', () => {
         firedAt: i,
       });
     }
-    await dismissAllFeedEntries();
-    expect(await readFeed()).toEqual([]);
+    const feed = await readFeed();
+    const doomed = feed.filter((e) => e.characterId !== 3).map((e) => e.id);
+
+    await dismissFeedEntries(doomed);
+
+    const left = await readFeed();
+    expect(left).toHaveLength(1);
+    expect(left[0].characterId).toBe(3);
   });
 });

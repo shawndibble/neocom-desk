@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   DataTable,
@@ -103,6 +104,15 @@ export function Settings() {
   const { t } = useTranslation();
   const scale = useFontScale((state) => state.value);
   const setScale = useFontScale((state) => state.setValue);
+  const { hash } = useLocation();
+
+  // react-router does not act on a URL hash by itself, so a deep link from
+  // elsewhere in the app (the Overview feed's "Settings" link) would land at
+  // the top of a long page with no sign of what it came for.
+  useEffect(() => {
+    if (!hash) return;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [hash]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -145,7 +155,13 @@ export function Settings() {
           ))}
         </dl>
       </Panel>
-      <NotificationsPanel />
+      {/*
+        Anchor for the Overview feed's "Settings" link. Scrolled to by the
+        effect above — react-router does not act on a hash by itself.
+      */}
+      <div id="notifications" className="scroll-mt-4">
+        <NotificationsPanel />
+      </div>
       <ActivityLogPanel />
     </div>
   );
