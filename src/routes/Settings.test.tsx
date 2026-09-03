@@ -239,6 +239,30 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(mailCheckbox).toBeChecked();
   });
 
+  it('offers the extractor-expiring event on both channels and discloses that delivery is best-effort', async () => {
+    // Issue #310, AC4 and AC5: a 24-hour lead time is only as good as the
+    // poll that delivers it, and the app is not allowed to imply otherwise.
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await user.click(
+      await within(await notificationsPanel()).findByRole('button', { name: /pilot one/i })
+    );
+
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Planetary Extractor Expiring, browser notifications',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Planetary Extractor Expiring, Overview list',
+      })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/every five minutes while the app is open/i)).toBeInTheDocument();
+    expect(screen.getByText(/not at all on iPhone, iPad, or Firefox/i)).toBeInTheDocument();
+  });
+
   it("select-all/none checkbox toggles every togglable event for that character's section", async () => {
     const user = userEvent.setup();
     render(<App />);

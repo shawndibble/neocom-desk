@@ -58,9 +58,44 @@ const detailPayload = {
   routes: [],
 };
 
+const PRODUCT_ID = 2288;
+
 const NAMES: Record<number, { name: string; category: string }> = {
   [SYSTEM_ID]: { name: 'Jita', category: 'solar_system' },
   2848: { name: 'Extractor Control Unit', category: 'inventory_type' },
+  [PRODUCT_ID]: { name: 'Felsic Magma', category: 'inventory_type' },
+};
+
+/**
+ * A colony one day into CCP's worked 14-day program (qty_per_cycle 6,965 on a
+ * 30-minute cycle), built off a timestamp captured before the route loads so
+ * the loader's own `loadedAt` is always at or after it. The extra minute of
+ * install age absorbs the test's runtime: elapsed stays inside cycle 48 —
+ * 24h to 24.5h — so the banked figure is the deterministic 513,262 of
+ * `extraction.test.ts`, not a value that drifts with wall-clock timing.
+ */
+const BASE_NOW = Date.now();
+const DAY_MS = 86_400_000;
+
+const decayedDetailPayload = {
+  links: [],
+  pins: [
+    {
+      pin_id: 2,
+      type_id: 2848,
+      latitude: 0,
+      longitude: 0,
+      install_time: new Date(BASE_NOW - DAY_MS - 60_000).toISOString(),
+      expiry_time: new Date(BASE_NOW + 13 * DAY_MS).toISOString(),
+      extractor_details: {
+        heads: [{ head_id: 1, latitude: 0, longitude: 0 }],
+        product_type_id: PRODUCT_ID,
+        qty_per_cycle: 6965,
+        cycle_time: 1800,
+      },
+    },
+  ],
+  routes: [],
 };
 
 const server = setupServer(
@@ -139,6 +174,60 @@ describe('PlanetaryIndustry', () => {
     );
     render(<App />);
     expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
+  });
+
+  it('leaves both yield columns blank for an extractor with no install-time baseline', async () => {
+    render(<App />);
+    await screen.findByText(/Jita IV/);
+    // The fixture's pin has an expiry but no qty_per_cycle/cycle_time/
+    // install_time, so Banked and Reset now are the only em-dashed cells —
+    // never a zero, which would read as "this program has produced nothing".
+    expect(screen.getAllByText('—')).toHaveLength(2);
+    expect(screen.queryByText('0 (0%)')).not.toBeInTheDocument();
+  });
+
+  it('shows banked yield, its share of the program, and the daily gain from resetting now', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
+        HttpResponse.json(decayedDetailPayload)
+      )
+    );
+    render(<App />);
+    await screen.findByText(/Jita IV/);
+    expect(screen.getByText('513,262 (27%)')).toBeInTheDocument();
+    expect(screen.getByText('+793,859/day')).toBeInTheDocument();
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
+  });
+
+  it('flags a colony whose extractors are all past the efficient window as decayed', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
+        HttpResponse.json(decayedDetailPayload)
+      )
+    );
+    render(<App />);
+    await screen.findByText(/Jita IV/);
+    // A day in, the current cycle yields ~32% of the program's first — under
+    // EFFICIENT_WINDOW_FRACTION — while expiry is still 13 days out, so this
+    // is neither idle nor expiring-soon.
+    expect(screen.getByText('Decayed')).toBeInTheDocument();
+    expect(screen.queryByText('Healthy')).not.toBeInTheDocument();
+    expect(screen.queryByText('Idle')).not.toBeInTheDocument();
+  });
+
+  it('titles each stacked pin card by its product, not by the pin type on every row', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
+        HttpResponse.json(decayedDetailPayload)
+      )
+    );
+    render(<App />);
+    await screen.findByText(/Jita IV/);
+    // `dt-primary` is what `.dt-stack` hoists as the card title below `sm`
+    // (docs/DESIGN.md §4a) — "Extractor Control Unit" reads identically on
+    // every extractor row and identifies nothing.
+    expect(screen.getByText('Felsic Magma').closest('td')).toHaveClass('dt-primary');
+    expect(screen.getByText('Extractor Control Unit').closest('td')).not.toHaveClass('dt-primary');
   });
 
   it('shows an unknown status rather than a confident Healthy when a colony detail failed to load', async () => {
