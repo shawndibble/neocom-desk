@@ -9,11 +9,19 @@
  * presets because a matched set is the common case; a per-attribute edit is
  * what the presets could not express.
  */
+import type { WhatIfImplantPreset, WhatIfImplantSelection } from '@/db';
 import type { AttributeName, Attributes, Implants } from '@/engine/types';
 
-/** The one-click sets. `+N` is that bonus in every slot. */
-export type WhatIfImplantPreset = 'none' | 'current' | '+1' | '+2' | '+3' | '+4' | '+5';
+// The two persisted shapes are declared with the rest of the Skill Plan
+// record in `@/db`, and imported from there by everything that touches them —
+// the same way `PlanBooster` is. No re-export: a second import path for one
+// type is how two modules end up disagreeing about where it lives.
+//
+// A preset resolves *late*, against whatever the clone is wearing right now,
+// which is what keeps "Current" honest when ESI re-reads the character's
+// implants. A custom set is the user's own five numbers, so it holds still.
 
+/** The one-click sets, in picker order (the union is `WhatIfImplantPreset`). */
 export const WHAT_IF_IMPLANT_PRESETS: readonly WhatIfImplantPreset[] = [
   'none',
   'current',
@@ -28,18 +36,7 @@ export const WHAT_IF_IMPLANT_PRESETS: readonly WhatIfImplantPreset[] = [
 export const MIN_IMPLANT_BONUS = 0;
 export const MAX_IMPLANT_BONUS = 5;
 
-/**
- * What the planner is costing against.
- *
- * A preset resolves *late*, against whatever the clone is wearing right now —
- * which is what keeps "Current" honest when ESI re-reads the character's
- * implants. A custom set is the user's own five numbers, so it holds still.
- */
-export type WhatIfImplantSelection =
-  | { readonly kind: 'preset'; readonly preset: WhatIfImplantPreset }
-  | { readonly kind: 'custom'; readonly bonuses: Implants };
-
-/** The truth, not a hypothesis: the editor opens on the clone's real set. */
+/** The truth, not a hypothesis: a plan with no stored lens opens on the clone's real set. */
 export const DEFAULT_WHAT_IF_SELECTION: WhatIfImplantSelection = {
   kind: 'preset',
   preset: 'current',
@@ -50,10 +47,15 @@ export const DEFAULT_WHAT_IF_SELECTION: WhatIfImplantSelection = {
  * overshot (`Infinity` included, which is only ever an overflowed "high");
  * a NaN — a pasted word, an implausible stored value — reads as +0, because
  * the scheduler would otherwise add it to an attribute and report NaN days.
+ *
+ * Takes `unknown`, not `number`: since the selection is persisted and synced,
+ * a stored slot can hold a string, and `Math.round('abc')` is a NaN that
+ * escapes both `Math.min` and `Math.max`. Typed at the door instead.
  */
-function clampBonus(raw: number): number {
-  if (Number.isNaN(raw)) return MIN_IMPLANT_BONUS;
-  return Math.min(MAX_IMPLANT_BONUS, Math.max(MIN_IMPLANT_BONUS, Math.round(raw)));
+function clampBonus(raw: unknown): number {
+  const value = typeof raw === 'number' ? raw : Number.NaN;
+  if (Number.isNaN(value)) return MIN_IMPLANT_BONUS;
+  return Math.min(MAX_IMPLANT_BONUS, Math.max(MIN_IMPLANT_BONUS, Math.round(value)));
 }
 
 /** Build a full five-slot set from a per-attribute read. */
@@ -111,4 +113,30 @@ export function setWhatIfBonus(
     kind: 'custom',
     bonuses: { ...whatIfImplants(selection, currentImplants), [name]: clampBonus(bonus) },
   };
+}
+
+/**
+ * A usable selection from whatever was stored on the plan, falling back to
+ * `DEFAULT_WHAT_IF_SELECTION` when the value is not a selection at all.
+ *
+ * The lens is persisted and synced, so what comes back can be a doc written
+ * by an older build or by another device — normalized on every read, the way
+ * `markers.ts` normalizes marker positions, rather than trusted. A custom set
+ * is re-clamped slot by slot for the same reason `whatIfImplants` clamps: the
+ * scheduler adds these straight onto the attributes.
+ */
+export function normalizeWhatIfSelection(raw: unknown): WhatIfImplantSelection {
+  if (typeof raw !== 'object' || raw === null) return DEFAULT_WHAT_IF_SELECTION;
+  const record = raw as Record<string, unknown>;
+  if (record.kind === 'preset') {
+    return WHAT_IF_IMPLANT_PRESETS.includes(record.preset as WhatIfImplantPreset)
+      ? { kind: 'preset', preset: record.preset as WhatIfImplantPreset }
+      : DEFAULT_WHAT_IF_SELECTION;
+  }
+  if (record.kind === 'custom') {
+    const { bonuses } = record;
+    if (typeof bonuses !== 'object' || bonuses === null) return DEFAULT_WHAT_IF_SELECTION;
+    return { kind: 'custom', bonuses: fill((name) => (bonuses as Implants)[name] ?? 0) };
+  }
+  return DEFAULT_WHAT_IF_SELECTION;
 }

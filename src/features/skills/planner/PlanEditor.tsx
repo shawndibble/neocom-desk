@@ -44,7 +44,12 @@ import type {
   ScheduledStep,
   TrainedSkill,
 } from '@/engine/types';
-import type { SkillPlanRecord } from '@/db';
+import type {
+  PlanBooster,
+  SkillPlanRecord,
+  WhatIfImplantPreset,
+  WhatIfImplantSelection,
+} from '@/db';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import { loadCharacterSkillQueue, type CachedResult } from '../data';
@@ -86,14 +91,20 @@ import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueR
 import type { RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
+  normalizeWhatIfSelection,
   setWhatIfBonus,
-  DEFAULT_WHAT_IF_SELECTION,
   MAX_IMPLANT_BONUS,
   MIN_IMPLANT_BONUS,
   WHAT_IF_IMPLANT_PRESETS,
-  type WhatIfImplantPreset,
-  type WhatIfImplantSelection,
 } from './whatIfImplants';
+import {
+  boosterExpiryFromInput,
+  boosterExpiryToInput,
+  clampBoosterBonus,
+  resolvePlanBooster,
+  toBooster,
+  MAX_BOOSTER_BONUS,
+} from './planBooster';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
@@ -110,6 +121,11 @@ function remapInstruction(attributes: Attributes): string {
     .map((name) => `${attributeShort(name)} ${attributes[name]}`)
     .join(' / ');
 }
+
+/** The persisted fields the editor may change. */
+export type PlanPatch = Partial<
+  Pick<SkillPlanRecord, 'entries' | 'remapCount' | 'markers' | 'whatIfImplants' | 'booster'>
+>;
 
 interface PlanEditorProps {
   characterId: number;
@@ -143,7 +159,7 @@ interface PlanEditorProps {
    * callbacks crossing the boundary for no gain.
    */
   listPane: ReactNode;
-  onUpdate: (patch: Partial<Pick<SkillPlanRecord, 'entries' | 'remapCount' | 'markers'>>) => void;
+  onUpdate: (patch: PlanPatch) => void;
 }
 
 interface ComputeResult {
@@ -274,30 +290,22 @@ export function PlanEditor({
 
   // What-If Implants (CONTEXT.md): swap the clone's real implants for a
   // hypothetical set — a uniform preset, or five per-slot bonuses, since EVE's
-  // hardwirings are per attribute. For optimizer/schedule exploration only,
-  // and never persisted (plan.remapCount etc. stay the source of truth for the
-  // plan itself; this is a "what if" lens on top of it). Session-local rather
-  // than a stored preference like Columns/Group-by above, because it changes
-  // the *numbers* — and below `lg` this pane is a collapsed disclosure, so a
-  // remembered lens would inflate every figure on the page with nothing on
-  // screen saying why.
-  const [whatIf, setWhatIf] = useState<WhatIfImplantSelection>(DEFAULT_WHAT_IF_SELECTION);
+  // hardwirings are per attribute. Saved on the plan and synced with it, not
+  // held for the session: it is one of the two lenses every number on this
+  // page is costed under, so a plan that reopened on a different lens reopened
+  // quoting different training times than the ones the user left it showing.
+  // Device-local view preferences (Columns, Group-by above) are the opposite
+  // case — they change what is *shown*, not what is *computed*.
+  //
+  // Normalized on read rather than trusted: the value can arrive from another
+  // device or an older build (whatIfImplants.ts).
+  const whatIf = useMemo(
+    () => normalizeWhatIfSelection(plan.whatIfImplants),
+    [plan.whatIfImplants]
+  );
+  const setWhatIf = (selection: WhatIfImplantSelection): void =>
+    onUpdate({ whatIfImplants: selection });
   const effectiveImplants = useMemo(() => whatIfImplants(whatIf, implants), [whatIf, implants]);
-
-  // Booster (CONTEXT.md): a single optional cerebral accelerator, applying a
-  // uniform bonus to every attribute until its expiry. Session-local only.
-  const [boosterEnabled, setBoosterEnabled] = useState(false);
-  const [boosterBonus, setBoosterBonus] = useState(3);
-  const [boosterExpiresAt, setBoosterExpiresAt] = useState('');
-  const booster = useMemo<Booster | null>(() => {
-    if (!boosterEnabled || !boosterExpiresAt) return null;
-    const expiresAt = new Date(boosterExpiresAt);
-    if (Number.isNaN(expiresAt.getTime())) return null;
-    const bonus: Partial<Attributes> = {};
-    for (const name of ATTRIBUTE_NAMES) bonus[name] = boosterBonus;
-    return { bonus, expiresAt };
-  }, [boosterEnabled, boosterExpiresAt, boosterBonus]);
-  const activeBoosters = useMemo<Booster[]>(() => (booster ? [booster] : []), [booster]);
 
   // An in-game cerebral accelerator is baked into the attributes ESI reports
   // and cannot be read back out of any endpoint, so `attributeBaseline`
@@ -305,21 +313,67 @@ export function PlanEditor({
   // Booster the What-If control drives — one mechanism, applied once. Prefill
   // is the point: the alternative is correcting the baseline silently, which
   // leaves the user's plan slower with nothing on screen saying why.
-  //
-  // Seeded during render (React's "adjusting state when a prop changes"),
-  // like the stale-result clear below, so it lands in the same commit as the
-  // data rather than a tick later. Keyed on the detected NUMBER and gated on
-  // a still-pristine control, so a user's own edit is never stomped.
   const detectedAccelerator =
     attributeBaseline?.kind === 'accelerated' ? attributeBaseline.acceleratorBonus : null;
-  const [seededAccelerator, setSeededAccelerator] = useState<number | null>(null);
-  if (detectedAccelerator !== null && detectedAccelerator !== seededAccelerator) {
-    setSeededAccelerator(detectedAccelerator);
-    if (!boosterEnabled && boosterExpiresAt === '') {
-      setBoosterEnabled(true);
-      setBoosterBonus(detectedAccelerator);
+
+  // Booster (CONTEXT.md): a single optional cerebral accelerator, applying a
+  // uniform bonus to every attribute until its expiry. Saved on the plan for
+  // the same reason as the lens above.
+  //
+  // A pure derivation, not seeded state — the prefill rule and its "an
+  // absent field is what 'unanswered' means" gate live in planBooster.ts,
+  // where they are unit-tested; the moment the user touches any control the
+  // whole answer is written back through `patchBooster`.
+  const planBooster = useMemo<PlanBooster>(
+    () => resolvePlanBooster(plan.booster, detectedAccelerator),
+    [plan.booster, detectedAccelerator]
+  );
+  const patchBooster = (patch: Partial<PlanBooster>): void =>
+    onUpdate({ booster: { ...planBooster, ...patch } });
+
+  const booster = useMemo<Booster | null>(() => toBooster(planBooster), [planBooster]);
+  const activeBoosters = useMemo<Booster[]>(() => (booster ? [booster] : []), [booster]);
+
+  // The expiry control edits text; the plan stores the instant that text
+  // names. A value that names no instant — half-typed, or emptied — has
+  // nowhere to live on the plan, so it is held here until the field is left.
+  //
+  // Committing an empty value on `change` is what makes this necessary, and
+  // it is a data-loss path, not a cosmetic one: a native `datetime-local`
+  // reports `value === ''` for ANY incomplete state, including the moment a
+  // segment of an already-complete value is cleared to retype it. Writing
+  // `null` there would erase a saved expiry mid-edit, re-cost the plan, and
+  // push the erasure to the user's other devices two seconds later. So an
+  // empty field is committed on blur — where it means "no expiry", the
+  // legitimate answer — and an unfinished one is simply dropped, leaving the
+  // stored value standing.
+  //
+  // Keyed, so a draft can only ever mask the value it was typed against:
+  // switching plans, or a sync pulling a new expiry in from another device
+  // mid-typing, both discard it.
+  const [expiryDraft, setExpiryDraft] = useState<{ key: string; text: string } | null>(null);
+  const expiryDraftKey = `${plan.id}:${planBooster.expiresAt ?? ''}`;
+  const boosterExpiresAtInput =
+    (expiryDraft?.key === expiryDraftKey ? expiryDraft.text : null) ??
+    boosterExpiryToInput(planBooster.expiresAt);
+  const handleBoosterExpiryChange = (raw: string): void => {
+    const expiresAt = boosterExpiryFromInput(raw);
+    if (expiresAt === null) {
+      setExpiryDraft({ key: expiryDraftKey, text: raw });
+      return;
     }
-  }
+    setExpiryDraft(null);
+    patchBooster({ expiresAt });
+  };
+  const handleBoosterExpiryBlur = (): void => {
+    if (expiryDraft === null) return;
+    setExpiryDraft(null);
+    // Only a deliberately emptied field is an answer. Anything else is an
+    // edit the user walked away from, and the stored expiry survives it.
+    if (expiryDraft.text === '' && planBooster.expiresAt !== null) {
+      patchBooster({ expiresAt: null });
+    }
+  };
 
   // Display-only "expired" hint: reads the wall clock, which is unavoidably
   // impure (there's no ticking-clock store in this codebase to subscribe to
@@ -998,8 +1052,8 @@ export function PlanEditor({
           <label className="flex items-center gap-1.5">
             <input
               type="checkbox"
-              checked={boosterEnabled}
-              onChange={(e) => setBoosterEnabled(e.target.checked)}
+              checked={planBooster.enabled}
+              onChange={(e) => patchBooster({ enabled: e.target.checked })}
             />
             {t('plans.booster')}
           </label>
@@ -1011,7 +1065,7 @@ export function PlanEditor({
               {t('plans.boosterDetected', { bonus: detectedAccelerator })}
             </p>
           )}
-          {boosterEnabled && (
+          {planBooster.enabled && (
             // Indented under its own checkbox: these only exist while the
             // booster is on, and the rule says so without a second heading.
             <div className="space-y-2 border-l border-line pl-2">
@@ -1021,12 +1075,19 @@ export function PlanEditor({
                   size="md"
                   type="number"
                   min={1}
-                  // Accelerator tiers run past the +9 this once allowed: the
-                  // reported case was a +12, and a detected bonus the field
-                  // cannot hold would be prefilled into an invalid input.
-                  max={30}
-                  value={boosterBonus}
-                  onChange={(e) => setBoosterBonus(Number(e.target.value) || 0)}
+                  // Generous by design (planBooster.ts): a detected bonus
+                  // the field could not hold would be prefilled into an
+                  // invalid input.
+                  max={MAX_BOOSTER_BONUS}
+                  value={planBooster.bonus}
+                  // Clamped at the write, like Remaps Available above and
+                  // the industry panel's runs/ME/TE: storing a 45 the plan
+                  // is not costed under would make the record disagree with
+                  // every number on the page, and would resurrect the 45 the
+                  // day the cap moves.
+                  onChange={(e) =>
+                    patchBooster({ bonus: clampBoosterBonus(Number(e.target.value)) })
+                  }
                   className="field-no-spinner w-16 text-center"
                 />
               </label>
@@ -1037,15 +1098,20 @@ export function PlanEditor({
                 <TextInput
                   size="md"
                   type="datetime-local"
-                  value={boosterExpiresAt}
-                  onChange={(e) => setBoosterExpiresAt(e.target.value)}
+                  // The control edits local wall-clock text; the plan stores
+                  // the instant it names, because the plan syncs and a bare
+                  // wall-clock string would mean a different moment on a
+                  // device in another timezone (planBooster.ts).
+                  value={boosterExpiresAtInput}
+                  onChange={(e) => handleBoosterExpiryChange(e.target.value)}
+                  onBlur={handleBoosterExpiryBlur}
                   className="min-w-0 flex-1"
                 />
               </label>
               {/* A blank expiry means no Booster is applied at all, so a
                   prefilled bonus would otherwise sit there looking active
                   while every number on the page ignored it. */}
-              {detectedAccelerator !== null && boosterExpiresAt === '' && (
+              {detectedAccelerator !== null && planBooster.expiresAt === null && (
                 <p className="text-warning">{t('plans.boosterDetectedNoExpiry')}</p>
               )}
               {boosterExpired && <p className="text-warning">{t('plans.boosterExpired')}</p>}
@@ -1135,7 +1201,7 @@ export function PlanEditor({
           // small lie. The tools pane keeps the "Expired" hint for that case.
           //
           // Read off `booster.bonus` — the map computeSchedule costed with —
-          // rather than the `boosterBonus` input beside it. They agree while
+          // rather than the bonus the input beside it edits. They agree while
           // the input writes one figure into all five attributes, but a
           // per-attribute Booster would desync them, and a chip stating a
           // bonus the arithmetic did not apply is the very thing it exists

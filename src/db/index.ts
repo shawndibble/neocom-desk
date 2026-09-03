@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { PlanEntry } from '@/engine/types';
+import type { Implants, PlanEntry } from '@/engine/types';
 import type {
   FacilityKind,
   MaterialSourcing,
@@ -32,6 +32,45 @@ export interface SettingRecord {
   value: unknown;
 }
 
+/**
+ * The one-click What-If Implant sets (CONTEXT.md). `+N` is that bonus in
+ * every slot; `current` resolves late, against whatever the clone is
+ * actually wearing.
+ */
+export type WhatIfImplantPreset = 'none' | 'current' | '+1' | '+2' | '+3' | '+4' | '+5';
+
+/**
+ * A Skill Plan's What-If Implants lens: either one of the uniform presets, or
+ * the user's own five per-slot bonuses (EVE's hardwirings are per slot).
+ * Behaviour lives in `features/skills/planner/whatIfImplants.ts`; the shape is
+ * declared here because it is persisted, like every other record shape in
+ * this file.
+ *
+ * `bonuses` is typed `Implants` (a partial map) because a value read back can
+ * be sparse, but every writer emits all five slots — which is what keeps an
+ * `undefined` member, the one thing Firestore rejects, out of a pushed doc.
+ * `readonly` throughout: `setWhatIfBonus` builds a new selection rather than
+ * editing one, and a test pins that.
+ */
+export type WhatIfImplantSelection =
+  | { readonly kind: 'preset'; readonly preset: WhatIfImplantPreset }
+  | { readonly kind: 'custom'; readonly bonuses: Implants };
+
+/**
+ * A Skill Plan's Booster (CONTEXT.md): the cerebral accelerator the plan is
+ * costed under. `expiresAt` is an **instant** (epoch ms), not the
+ * `datetime-local` string the input edits — the plan syncs across devices,
+ * and a bare wall-clock string would mean a different moment in each
+ * timezone. `null` means no expiry has been entered yet, in which case
+ * nothing is applied however `enabled` reads.
+ */
+export interface PlanBooster {
+  enabled: boolean;
+  /** Uniform per-attribute bonus while the accelerator is live. */
+  bonus: number;
+  expiresAt: number | null;
+}
+
 /** User-editable Skill Plan: an ordered list of skill-level targets. */
 export interface SkillPlanRecord {
   id: string;
@@ -46,6 +85,19 @@ export interface SkillPlanRecord {
    * additive — not indexed, so no Dexie schema version bump is needed.
    */
   markers?: number[];
+  /**
+   * What-If Implants lens the plan is costed under. Optional and additive —
+   * absent means the clone's real implants ('current'), which is how every
+   * plan behaved before the lens was persisted at all. Not indexed, so no
+   * Dexie schema version bump is needed.
+   */
+  whatIfImplants?: WhatIfImplantSelection;
+  /**
+   * Booster the plan is costed under. Optional the same way, and its absence
+   * carries meaning beyond "off": a plan that has never had one configured is
+   * the only one the editor may prefill from a detected in-game accelerator.
+   */
+  booster?: PlanBooster;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

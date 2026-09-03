@@ -84,6 +84,11 @@ export function PlanListPane({
       entries: source.entries,
       remapCount: source.remapCount,
       ...(source.markers ? { markers: source.markers } : {}),
+      // The lenses the source is costed under travel with the copy: a
+      // duplicate that dropped them would quote different training times
+      // than the plan it was copied from.
+      ...(source.whatIfImplants ? { whatIfImplants: source.whatIfImplants } : {}),
+      ...(source.booster ? { booster: source.booster } : {}),
     };
     await db.skillPlans.add(copy);
     syncAfterEdit();
