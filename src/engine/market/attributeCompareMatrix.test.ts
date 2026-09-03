@@ -9,6 +9,7 @@ const DICTIONARY: AttributeDictionary = {
   37: { name: 'Maximum Velocity', unit: 'm/sec', category: 'Speed and Travel' },
   38: { name: 'Capacity', unit: 'm3', category: 'Fitting' },
   182: { name: 'Primary Skill required', unit: 'typeID', category: 'Required Skills' },
+  786: { name: 'Crystals Take Damage', unit: '1=True 0=False', category: 'Miscellaneous' },
 };
 
 const SKILL_NAMES = { 24241: 'Caldari Frigate' };
@@ -103,6 +104,17 @@ describe('buildCompareMatrix', () => {
       unit: null,
       displayValue: 'Caldari Frigate I',
     });
+  });
+
+  it('carries an enum-legend row through as its member, so cells differ readably', () => {
+    const items: CompareMatrixItem[] = [
+      { typeId: 1, dogmaAttributes: [{ attribute_id: 786, value: 1 }], bestSell: null },
+      { typeId: 2, dogmaAttributes: [{ attribute_id: 786, value: 0 }], bestSell: null },
+    ];
+    const row = buildCompareMatrix(items, DICTIONARY, LABELS).flatMap((g) => g.rows)[1];
+    expect(row.name).toBe('Crystals Take Damage');
+    expect(row.cells.get(1)).toEqual({ value: 1, unit: null, displayValue: 'True' });
+    expect(row.cells.get(2)).toEqual({ value: 0, unit: null, displayValue: 'False' });
   });
 
   it('marks non-price rows as kind "attribute"', () => {

@@ -83,6 +83,44 @@ describe('ItemDetailModal', () => {
     expect(screen.getByText('250 m/sec')).toBeInTheDocument();
   });
 
+  it('shows an enum-legend attribute as the member it names, not "1 1=True 0=False"', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Ubiquitous Moon Mining Crystal Type A I',
+          description: '',
+          group_id: 25,
+          published: true,
+          volume: 1,
+          dogma_attributes: [
+            { attribute_id: 786, value: 1 },
+            { attribute_id: 128, value: 3 },
+          ],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      786: { name: 'Crystals Take Damage', unit: '1=True 0=False', category: 'Miscellaneous' },
+      128: { name: 'Charge size', unit: '1=small 2=medium 3=l', category: 'Miscellaneous' },
+    });
+    mockedLoadSkills.mockResolvedValue([]);
+
+    render(
+      <ItemDetailModal
+        typeId={TYPE_ID}
+        itemName="Ubiquitous Moon Mining Crystal Type A I"
+        onClose={() => {}}
+      />
+    );
+
+    expect(await screen.findByText('Crystals Take Damage')).toBeInTheDocument();
+    expect(screen.getByText('True')).toBeInTheDocument();
+    expect(screen.getByText('Large')).toBeInTheDocument();
+    expect(screen.queryByText(/1=True 0=False/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/1=small/)).not.toBeInTheDocument();
+  });
+
   it('renders description markup as formatting instead of literal tags, and resolves required skills to names', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>

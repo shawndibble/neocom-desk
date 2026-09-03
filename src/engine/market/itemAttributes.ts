@@ -8,6 +8,7 @@
  * reason: it would silently drop whatever mattered for an item class nobody
  * thought about.
  */
+import { enumUnitLabel, isEnumUnit } from './attributeUnits';
 
 export interface RawDogmaAttribute {
   attribute_id: number;
@@ -25,9 +26,17 @@ export type AttributeDictionary = Readonly<Record<number, AttributeDictionaryEnt
 export interface DisplayAttribute {
   attributeId: number;
   name: string;
+  /**
+   * Null for an enum-legend "unit" (`attributeUnits`): the legend is never a
+   * suffix to append, so a value it doesn't name shows as a bare number.
+   */
   unit: string | null;
   value: number;
-  /** Set only for required-skill rows: "<Skill name> <roman level>", overriding value/unit in display. */
+  /**
+   * Overrides value/unit in display. Set for required-skill rows
+   * ("<Skill name> <roman level>") and for enum-legend units ("True",
+   * "Large") — see `attributeUnits`.
+   */
   displayValue?: string;
 }
 
@@ -101,7 +110,17 @@ export function groupItemAttributes(
     if (pairedAttributeIds.has(attribute_id)) continue;
     const entry = dictionary[attribute_id];
     if (!entry) continue;
-    push({ attributeId: attribute_id, name: entry.name, unit: entry.unit, value }, entry.category);
+    const legendMember = enumUnitLabel(entry.unit, value);
+    push(
+      {
+        attributeId: attribute_id,
+        name: entry.name,
+        unit: isEnumUnit(entry.unit) ? null : entry.unit,
+        value,
+        ...(legendMember === null ? {} : { displayValue: legendMember }),
+      },
+      entry.category
+    );
   }
 
   const groups = [...byCategory.entries()].map(([category, attributes]) => ({
