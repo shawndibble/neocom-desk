@@ -348,6 +348,10 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     // back to placeholder numbers when ESI can't be read — presenting it as
     // the character's own sheet is exactly the mistake to avoid.
     expect(within(section).queryByText('20')).toBeNull();
+    // The caption naming which half of the section is fact. Asserted on the
+    // rendered text, not the key: a mistyped key renders as its own name and
+    // nothing else in the gate — `tsc` included — can see that.
+    expect(within(section).getByText(/current sheet/i)).toBeInTheDocument();
   });
 
   it('dates the attributes, as every ESI-derived view must', async () => {
