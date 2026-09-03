@@ -46,10 +46,13 @@ export function PlanHeader({
     // that there is no second sticky panel below needing this one's rendered
     // height; nothing here has to stay in sync with anything.
     <Panel title={t('plans.headerTitle')} className="lg:sticky lg:top-0 lg:z-10">
-      {/* `lg:flex-nowrap` keeps this row one line at `lg`+, where the sidebar
-          leaves it less width than the page; `lg:overflow-x-auto` keeps any
-          overflow reachable at the narrow end of that range. */}
-      <div className="flex flex-wrap gap-2 lg:flex-nowrap lg:overflow-x-auto">
+      {/* A plain wrapping strip, like every other row of StatChips in the app.
+          This one used to hold `lg:flex-nowrap lg:overflow-x-auto` to stay a
+          single line beside the sidebar, but a fifth chip (the Booster) made
+          that a horizontal scroller at the narrow end of `lg` and crushed the
+          chips at the wide end. Whole chips moving to a second line reads
+          better than either. */}
+      <div className="flex flex-wrap gap-2">
         <StatChip label={t('plans.headerTrainingTime')} value={formatDuration(totalSeconds)} />
         {booster && (
           // Immediately after the total, because it is a caveat on that
