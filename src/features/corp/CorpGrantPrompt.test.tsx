@@ -11,7 +11,11 @@ import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { beginEveLogin } from '@/app/loginFlow';
 import { scopesForGroup } from '@/esi/scopes';
 import { loadCharacterRoles } from './roles';
-import { NO_DISMISSALS, useGrantPromptDismissals } from './grantPromptDismissal';
+import {
+  NO_DISMISSALS,
+  useGrantPromptDismissals,
+  withGrantPromptDismissed,
+} from './grantPromptDismissal';
 import { CorpGrantPrompt } from './CorpGrantPrompt';
 
 vi.mock('./roles', async (importOriginal) => ({
@@ -136,5 +140,49 @@ describe('CorpGrantPrompt — asked at most once', () => {
     render(<CorpGrantPrompt />);
 
     await waitFor(() => expect(prompt()).toBeInTheDocument());
+  });
+});
+
+/**
+ * Issue #331: the corp group can grow (it did, in round 41), and a dismissal
+ * recorded against a narrower group must not silently suppress the prompt
+ * forever once the group widens past it.
+ */
+describe('CorpGrantPrompt — re-offered when the group grows (issue #331)', () => {
+  it('re-offers a Character who dismissed a narrower version of the group', async () => {
+    const narrowerScopes = ALL_CORP_SCOPES.slice(0, -1);
+    useGrantPromptDismissals.setState({
+      value: withGrantPromptDismissed(NO_DISMISSALS, CHARACTER_ID, narrowerScopes),
+      hydrated: true,
+    });
+
+    render(<CorpGrantPrompt />);
+
+    await waitFor(() => expect(prompt()).toBeInTheDocument());
+  });
+
+  it('does not re-offer a Character dismissed against the current, full group', async () => {
+    useGrantPromptDismissals.setState({
+      value: withGrantPromptDismissed(NO_DISMISSALS, CHARACTER_ID, ALL_CORP_SCOPES),
+      hydrated: true,
+    });
+
+    render(<CorpGrantPrompt />);
+
+    await waitFor(() => expect(mockedLoadRoles).toHaveBeenCalled());
+    expect(prompt()).not.toBeInTheDocument();
+  });
+
+  it('does not re-offer a Character with no corp role, regardless of any stored dismissal (AC 5)', async () => {
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo([]));
+    useGrantPromptDismissals.setState({
+      value: withGrantPromptDismissed(NO_DISMISSALS, CHARACTER_ID, ALL_CORP_SCOPES.slice(0, -1)),
+      hydrated: true,
+    });
+
+    render(<CorpGrantPrompt />);
+
+    await waitFor(() => expect(mockedLoadRoles).toHaveBeenCalled());
+    expect(prompt()).not.toBeInTheDocument();
   });
 });
