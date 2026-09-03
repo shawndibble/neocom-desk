@@ -107,9 +107,11 @@ Sources live in `assets/brand/` (not shipped). Everything under
 - `LogoMark` (`src/components/ui/`) is the mark for UI use: inline SVG, corner
   brackets on `currentColor` so `--color-accent` drives them. Simplified from
   the artwork, because the bevels and glow read as dirt below ~64px.
-- `public/brand/lockup.png` is the full mark-plus-wordmark artwork, login page
-  only. It is the one place the wordmark appears as art rather than as text,
-  which is why the rule above still holds: no font is bundled.
+- `public/brand/lockup.png` is the full mark-plus-wordmark artwork. Unused by
+  any route today (the login page now uses `LogoMark` plus the text wordmark,
+  like everywhere else) but kept for future marketing use — it is still the
+  one place the wordmark exists as art rather than as text, which is why the
+  rule above still holds: no font is bundled.
 - App icons carry an opaque `--color-bg` plate, the mark at 78% of the canvas.
   All of them centre on the hexagon, never on the artwork's bounding box: the
   glow pools under the bottom vertex, so the box reaches further down than the

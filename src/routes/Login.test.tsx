@@ -15,16 +15,21 @@ beforeEach(() => {
 });
 
 describe('Login', () => {
-  it('shows the app name and SSO button', () => {
+  it('shows the app name, hero heading and SSO button', () => {
     render(<Login />);
-    expect(screen.getByRole('heading', { name: 'NeoCom Desk' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /log in with eve online/i })).toBeInTheDocument();
+    expect(screen.getByText('NeoCom Desk')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /command deck for every character you fly/i })
+    ).toBeInTheDocument();
+    const buttons = screen.getAllByRole('button', { name: /log in with eve online/i });
+    expect(buttons.length).toBeGreaterThanOrEqual(2);
   });
 
   it('builds a PKCE authorize URL and navigates to EVE SSO', async () => {
     const user = userEvent.setup();
     render(<Login />);
-    await user.click(screen.getByRole('button', { name: /log in with eve online/i }));
+    const [firstButton] = screen.getAllByRole('button', { name: /log in with eve online/i });
+    await user.click(firstButton);
 
     await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
     const url = new URL(vi.mocked(assignLocation).mock.calls[0][0]);
