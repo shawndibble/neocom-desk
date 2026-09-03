@@ -41,6 +41,7 @@ import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
 import { notificationOptionsFor } from './notificationOptions';
 import { eveNotificationText } from './eveNotificationText';
+import { resolveEveNotificationNames } from './eveNotificationNames';
 
 export type { AnyNotificationFire } from './pollDomains';
 
@@ -375,7 +376,10 @@ export async function notificationText(
     };
   }
   if (fire.eventId === 'eveNotification') {
-    return eveNotificationText(fire, character);
+    // Resolution is best-effort, time-boxed and never rejects (issue #300):
+    // whatever it could not look up in its budget renders as an id or a
+    // neutral phrase rather than holding the notification back.
+    return eveNotificationText(fire, character, await resolveEveNotificationNames(fire));
   }
   if (fire.eventId === 'characterNotTraining') {
     return {
@@ -422,8 +426,11 @@ async function sendBrowserNotification(
  * Renders the same copy the browser notification carries and files it in the
  * Notification Feed. `notificationText` is called separately from
  * `sendBrowserNotification`'s call rather than threaded through both: its
- * ESI lookups (`loadUniverseType`, `loadPlanetName`) read the Dexie cache, so
- * the second render costs a cache hit, and keeping `notify`'s signature
+ * ESI lookups (`loadUniverseType`, `loadPlanetName`) read the Dexie cache and
+ * `resolveEveNotificationNames` memoizes per notification id, so the second
+ * render costs a cache hit rather than a second round-trip — issue #300's
+ * `postUniverseNames` path asks ESI live before it consults its own cache, so
+ * that memo is what keeps this sentence true. Keeping `notify`'s signature
  * untouched is what lets `backgroundPoller.ts` override it without knowing
  * the feed exists (the Service Worker's poll files to the feed too).
  */

@@ -20,3 +20,21 @@ const OPTIONS: Intl.DateTimeFormatOptions = {
 export function formatLocalDate(date: Date): string {
   return date.toLocaleDateString('en-CA', OPTIONS);
 }
+
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  ...OPTIONS,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+};
+
+/**
+ * Renders an instant as the viewer's local date *and* time (YYYY-MM-DD, HH:MM).
+ * A structure's reinforcement timer (issue #300) is only actionable to the
+ * minute — a date alone would leave a director guessing which fifteen-minute
+ * window to be in space for — but every other constraint from `formatLocalDate`
+ * still applies, so this shares its numeric-only, per-call-formatter shape.
+ */
+export function formatLocalDateTime(date: Date): string {
+  return date.toLocaleString('en-CA', DATE_TIME_OPTIONS);
+}
