@@ -172,6 +172,16 @@ describe('Overview', () => {
     expect(screen.queryByText('5,000,000')).not.toBeInTheDocument();
   });
 
+  it('offers Refresh from the shared header, like the sibling tabs do', async () => {
+    render(<App />);
+    // Wait for the load to settle: Refresh is disabled while one is in flight.
+    await screen.findByText(/1,234,567\.89/);
+
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    // The identity block is the header's, not a page title restating the tab.
+    expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).toBeNull();
+  });
+
   it('falls back gracefully when the wallet fetch fails offline', async () => {
     server.use(
       http.get('https://esi.evetech.net/characters/:id/wallet', () => HttpResponse.error())
