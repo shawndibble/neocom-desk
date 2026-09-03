@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -16,9 +16,9 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, NativeSelect, Tooltip } from '@/components/ui';
+import { Button, Caret, EmptyState, NativeSelect, Tooltip } from '@/components/ui';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
-import type { AttributeName, PlanPriority } from '@/engine/types';
+import type { AttributeName, PlanPriority, ScheduledStep } from '@/engine/types';
 import { formatDate, formatDuration, stepTimeline } from '@/lib/duration';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
@@ -38,6 +38,14 @@ const ICON_BUTTON = 'w-7 justify-center';
  * across two lines mid-value ("123d 18h" / "58m").
  */
 const TIME_CELL = 'w-24 shrink-0 whitespace-nowrap text-right';
+/**
+ * The name cell, shared by every row kind so the skill names form one column.
+ * `min-w-0` is what lets the inner `truncate` still work once the cell became
+ * a flex container to hold the level caret.
+ */
+const NAME_CELL = 'flex min-w-0 flex-1 items-center gap-1.5';
+/** Stands in for the level caret (`ICON_SIZE.sm`) on rows that have none, so names stay aligned. */
+const CARET_SPACER = 'w-4 shrink-0';
 /** Matches Layout.tsx's phone/desktop line (#114). */
 const DESKTOP_QUERY = '(min-width: 48rem)';
 
@@ -185,14 +193,81 @@ function TimelineLine({ start, finish }: { start: Date; finish: Date }) {
   );
 }
 
+interface LevelBreakdownProps {
+  /** The entry's own steps, one per level the plan trains (`steps[i]` at `stepIndices[i]`). */
+  steps: readonly ScheduledStep[];
+  stepIndices: readonly number[];
+  name: string;
+  columns: ColumnVisibility;
+  isDesktop: boolean;
+  boostedSteps: ReadonlySet<number> | undefined;
+}
+
+/**
+ * The levels behind a single entry row (#254), revealed by its caret. A "Carrier
+ * V" entry queues I–V as five scheduled steps but shows one aggregated time,
+ * which read as the missing levels the user reported; this is where those
+ * levels and their individual times live.
+ *
+ * The per-level duration is always shown — it is the whole content of the
+ * disclosure, and unlike the row above it, it is opened on request rather than
+ * always on screen, so `columns.perLevelTime` doesn't gate it. The level's
+ * running total follows the same fold as the row above (#114): its own column
+ * on desktop, under a header naming it, and a tooltip on the duration below
+ * `md`, where two unlabelled 6rem columns would neither fit a phone nor say
+ * which number is which. `w-7` trails the line to clear the row's remove
+ * button and keep the durations in their column.
+ */
+function LevelBreakdown({
+  steps,
+  stepIndices,
+  name,
+  columns,
+  isDesktop,
+  boostedSteps,
+}: LevelBreakdownProps) {
+  const { t } = useTranslation();
+  return (
+    <ul
+      aria-label={t('plans.levelBreakdown', { name })}
+      className="mt-1 border-t border-line pt-1 pl-6 text-[0.6875rem] text-text-dim"
+    >
+      {steps.map((step, i) => (
+        <li key={step.level} className="flex items-center justify-between gap-2 py-0.5">
+          <span className="flex-1 truncate" aria-label={t('plans.level', { level: step.level })}>
+            {ROMAN[step.level - 1]}
+            {(boostedSteps?.has(stepIndices[i]) ?? false) && <BoosterMark />}
+          </span>
+          <PerLevelTimeCell
+            seconds={step.seconds}
+            cumulativeSeconds={step.cumulativeSeconds}
+            showCumulativeTooltip={!isDesktop && columns.cumulativeTime}
+            dim={false}
+          />
+          {isDesktop && columns.cumulativeTime && (
+            <span className={`${TIME_CELL} tabular-nums`}>
+              {formatDuration(step.cumulativeSeconds)}
+            </span>
+          )}
+          <span aria-hidden="true" className="w-7 shrink-0" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 interface EntryRowProps {
   row: Extract<MergedRow, { kind: 'entry' }>;
   name: string;
   attributes: AttributePair | undefined;
-  boosted: boolean;
+  /** Step indices a live Booster speeds up — the row's own mark and its per-level marks both read this. */
+  boostedSteps: ReadonlySet<number> | undefined;
   timeline: { start: Date; finish: Date } | null;
   columns: ColumnVisibility;
   isDesktop: boolean;
+  /** Whether this row's level breakdown is open. Owned by EntryList so a row can be re-rendered/reordered without losing it. */
+  expanded: boolean;
+  onToggleLevels: (rowId: string) => void;
   onRemove: (skillTypeID: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
 }
@@ -201,16 +276,19 @@ function EntryRow({
   row,
   name,
   attributes,
-  boosted,
+  boostedSteps,
   timeline,
   columns,
   isDesktop,
+  expanded,
+  onToggleLevels,
   onRemove,
   onSetPriority,
 }: EntryRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
-  const { entry } = row;
+  const { entry, steps, stepIndices } = row;
+  const boosted = stepIndices.some((i) => boostedSteps?.has(i) ?? false);
 
   const dragHandle = (
     <button
@@ -223,11 +301,51 @@ function EntryRow({
     </button>
   );
 
-  const nameSpan = (
-    <span className="flex-1 truncate">
-      {name} {ROMAN[entry.targetLevel - 1]}
-      {boosted && <BoosterMark />}
-    </span>
+  /**
+   * The levels this entry actually trains, taken from its scheduled steps
+   * rather than `targetLevel` — a "Carrier V" entry on a level-III character
+   * queues IV and V, and labelling it "I–V" would be a lie. Only a row with
+   * more than one level has anything to disclose, so only that row gets a
+   * caret; one level (or none, for an already-trained or unknown skill) reads
+   * exactly as it did before.
+   */
+  const expandable = steps.length > 1;
+  const levelLabel = expandable
+    ? t('plans.levelRange', {
+        from: ROMAN[steps[0].level - 1],
+        to: ROMAN[steps[steps.length - 1].level - 1],
+      })
+    : ROMAN[entry.targetLevel - 1];
+
+  const nameContent = (
+    <>
+      {expandable ? (
+        <Caret expanded={expanded} />
+      ) : (
+        <span aria-hidden="true" className={CARET_SPACER} />
+      )}
+      <span className="truncate">
+        {name} {levelLabel}
+        {boosted && <BoosterMark />}
+      </span>
+    </>
+  );
+
+  // A button, not an extra icon control: the caret rides in front of the name
+  // the way the Skills group headers and the Market group tree do it, so the
+  // whole name is the target and the row spends no width it doesn't already
+  // have. The drag handle stays the sole reorder affordance.
+  const nameSpan = expandable ? (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      onClick={() => onToggleLevels(row.id)}
+      className={`${NAME_CELL} text-left hover:text-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
+    >
+      {nameContent}
+    </button>
+  ) : (
+    <span className={NAME_CELL}>{nameContent}</span>
   );
 
   const attributeBadge =
@@ -318,6 +436,16 @@ function EntryRow({
         </>
       )}
       {timeline && <TimelineLine start={timeline.start} finish={timeline.finish} />}
+      {expandable && expanded && (
+        <LevelBreakdown
+          steps={steps}
+          stepIndices={stepIndices}
+          name={name}
+          columns={columns}
+          isDesktop={isDesktop}
+          boostedSteps={boostedSteps}
+        />
+      )}
     </li>
   );
 }
@@ -344,11 +472,17 @@ function PrereqRow({
 }: PrereqRowProps) {
   const { t } = useTranslation();
 
+  // Carries the entry row's caret spacer too, so prereq and entry names sit in
+  // the same column even though a prereq row is a single level and never
+  // discloses anything.
   const nameSpan = (
-    <span className="flex-1 truncate">
-      {name} {ROMAN[row.step.level - 1]}
-      <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
-      {boosted && <BoosterMark />}
+    <span className={NAME_CELL}>
+      <span aria-hidden="true" className={CARET_SPACER} />
+      <span className="truncate">
+        {name} {ROMAN[row.step.level - 1]}
+        <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
+        {boosted && <BoosterMark />}
+      </span>
     </span>
   );
 
@@ -480,6 +614,10 @@ interface EntryListProps {
  * (attribute pair, priority, per-level time, cumulative time) are
  * individually toggleable, and rows fold to two lines below the `md`
  * breakpoint (#114).
+ *
+ * An entry row spanning several levels labels the range it trains ("I–V") and
+ * discloses the individual levels and their times behind a caret (#254) — it
+ * stays one draggable row, which is the point of the merge.
  */
 export function EntryList({
   rows,
@@ -500,6 +638,18 @@ export function EntryList({
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  // Which entry rows have their level breakdown open (#254). Keyed by row id,
+  // which is derived from the skill, so reordering a row keeps its state.
+  // Deliberately in-memory: a transient "show me the levels", not a view
+  // preference like the Columns toggle.
+  const [expandedRowIds, setExpandedRowIds] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleLevels = useCallback((rowId: string) => {
+    setExpandedRowIds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(rowId)) next.add(rowId);
+      return next;
+    });
+  }, []);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -538,7 +688,7 @@ export function EntryList({
                       row={row}
                       name={nameFor(row.entry.skillTypeID)}
                       attributes={attributesFor(row.entry.skillTypeID)}
-                      boosted={row.stepIndices.some((i) => boostedSteps?.has(i) ?? false)}
+                      boostedSteps={boostedSteps}
                       timeline={
                         startDate && row.stepIndices.length > 0
                           ? stepTimeline(
@@ -549,6 +699,8 @@ export function EntryList({
                       }
                       columns={columns}
                       isDesktop={isDesktop}
+                      expanded={expandedRowIds.has(row.id)}
+                      onToggleLevels={toggleLevels}
                       onRemove={onRemove}
                       onSetPriority={onSetPriority}
                     />

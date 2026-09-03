@@ -22,7 +22,7 @@ describe('summarizeEntryQueue', () => {
     const scheduled = [step(1, 1, 100, 100)];
     const info = summarizeEntryQueue([entry(1)], [1], scheduled, alwaysKnown);
     expect(info.get(1)).toEqual({
-      summary: { seconds: 100, cumulativeSeconds: 100, stepIndices: [0] },
+      summary: { seconds: 100, cumulativeSeconds: 100, steps: [scheduled[0]], stepIndices: [0] },
       prereqRows: [],
     });
   });
@@ -31,7 +31,7 @@ describe('summarizeEntryQueue', () => {
     const scheduled = [step(9, 1, 50, 50), step(1, 1, 100, 150)];
     const info = summarizeEntryQueue([entry(1)], [2], scheduled, alwaysKnown);
     expect(info.get(1)).toEqual({
-      summary: { seconds: 100, cumulativeSeconds: 150, stepIndices: [1] },
+      summary: { seconds: 100, cumulativeSeconds: 150, steps: [scheduled[1]], stepIndices: [1] },
       prereqRows: [{ step: scheduled[0], stepIndex: 0 }],
     });
   });
@@ -40,9 +40,17 @@ describe('summarizeEntryQueue', () => {
     const scheduled = [step(1, 1, 100, 100), step(1, 2, 200, 300), step(1, 3, 300, 600)];
     const info = summarizeEntryQueue([entry(1, 3)], [3], scheduled, alwaysKnown);
     expect(info.get(1)).toEqual({
-      summary: { seconds: 600, cumulativeSeconds: 600, stepIndices: [0, 1, 2] },
+      summary: { seconds: 600, cumulativeSeconds: 600, steps: scheduled, stepIndices: [0, 1, 2] },
       prereqRows: [],
     });
+  });
+
+  it('carries the levels it actually trains, which start above an already-trained level rather than at I', () => {
+    // "Caldari Carrier V" on a character already at III: the plan queues IV
+    // and V only, so the row must label itself IV–V and not I–V (#254).
+    const scheduled = [step(1, 4, 400, 400), step(1, 5, 500, 900)];
+    const info = summarizeEntryQueue([entry(1, 5)], [2], scheduled, alwaysKnown);
+    expect(info.get(1)?.summary.steps.map((s) => s.level)).toEqual([4, 5]);
   });
 
   it('an already-trained entry (empty range) carries the previous cumulative forward with zero seconds', () => {
@@ -50,7 +58,7 @@ describe('summarizeEntryQueue', () => {
     // entry 1 owns steps[0:1], entry 2 (already trained) owns steps[1:1] (empty)
     const info = summarizeEntryQueue([entry(1), entry(2)], [1, 1], scheduled, alwaysKnown);
     expect(info.get(2)).toEqual({
-      summary: { seconds: 0, cumulativeSeconds: 100, stepIndices: [] },
+      summary: { seconds: 0, cumulativeSeconds: 100, steps: [], stepIndices: [] },
       prereqRows: [],
     });
   });
@@ -59,7 +67,7 @@ describe('summarizeEntryQueue', () => {
     const scheduled: ScheduledStep[] = [];
     const info = summarizeEntryQueue([entry(1)], [0], scheduled, alwaysKnown);
     expect(info.get(1)).toEqual({
-      summary: { seconds: 0, cumulativeSeconds: 0, stepIndices: [] },
+      summary: { seconds: 0, cumulativeSeconds: 0, steps: [], stepIndices: [] },
       prereqRows: [],
     });
   });
@@ -75,11 +83,11 @@ describe('summarizeEntryQueue', () => {
     ];
     const info = summarizeEntryQueue([entry(1), entry(2)], [1, 4], scheduled, alwaysKnown);
     expect(info.get(1)).toEqual({
-      summary: { seconds: 10, cumulativeSeconds: 10, stepIndices: [0] },
+      summary: { seconds: 10, cumulativeSeconds: 10, steps: [scheduled[0]], stepIndices: [0] },
       prereqRows: [],
     });
     expect(info.get(2)).toEqual({
-      summary: { seconds: 10, cumulativeSeconds: 40, stepIndices: [3] },
+      summary: { seconds: 10, cumulativeSeconds: 40, steps: [scheduled[3]], stepIndices: [3] },
       prereqRows: [
         { step: scheduled[1], stepIndex: 1 },
         { step: scheduled[2], stepIndex: 2 },
@@ -93,11 +101,11 @@ describe('summarizeEntryQueue', () => {
     // entryBoundaries only covers the known entry (skillTypeID 1).
     const info = summarizeEntryQueue([entry(999), entry(1)], [1], scheduled, isKnown);
     expect(info.get(999)).toEqual({
-      summary: { seconds: 0, cumulativeSeconds: 0, stepIndices: [] },
+      summary: { seconds: 0, cumulativeSeconds: 0, steps: [], stepIndices: [] },
       prereqRows: [],
     });
     expect(info.get(1)).toEqual({
-      summary: { seconds: 100, cumulativeSeconds: 100, stepIndices: [0] },
+      summary: { seconds: 100, cumulativeSeconds: 100, steps: [scheduled[0]], stepIndices: [0] },
       prereqRows: [],
     });
   });
@@ -107,7 +115,7 @@ describe('summarizeEntryQueue', () => {
     const isKnown = (skillTypeID: number) => skillTypeID !== 999;
     const info = summarizeEntryQueue([entry(1), entry(999)], [1], scheduled, isKnown);
     expect(info.get(999)).toEqual({
-      summary: { seconds: 0, cumulativeSeconds: 100, stepIndices: [] },
+      summary: { seconds: 0, cumulativeSeconds: 100, steps: [], stepIndices: [] },
       prereqRows: [],
     });
   });
@@ -126,6 +134,7 @@ describe('buildMergedRows', () => {
         entry: entries[0],
         seconds: 100,
         cumulativeSeconds: 100,
+        steps: [scheduled[0]],
         stepIndices: [0],
       },
       {
@@ -134,6 +143,7 @@ describe('buildMergedRows', () => {
         entry: entries[1],
         seconds: 50,
         cumulativeSeconds: 150,
+        steps: [scheduled[1]],
         stepIndices: [1],
       },
     ]);
@@ -152,6 +162,7 @@ describe('buildMergedRows', () => {
         entry: entries[0],
         seconds: 100,
         cumulativeSeconds: 150,
+        steps: [scheduled[1]],
         stepIndices: [1],
       },
     ]);
@@ -176,6 +187,7 @@ describe('buildMergedRows', () => {
         entry: entries[0],
         seconds: 0,
         cumulativeSeconds: 0,
+        steps: [],
         stepIndices: [],
       },
     ]);
