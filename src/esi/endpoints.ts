@@ -936,6 +936,36 @@ export function getCharacterCorporationHistory(
   });
 }
 
+// --- GET /characters/{character_id}/roles (esi-characters.read_corporation_roles.v1) ---
+
+/**
+ * Every field is optional: ESI omits an array rather than sending `[]`, so a
+ * character with no corporation roles at all gets `{}` back. This endpoint has
+ * no `x-required-roles` of its own, which is what lets it answer for every
+ * character instead of 403-ing the ones with nothing to report.
+ *
+ * `roles` is the corporation-wide grant. The `roles_at_*` variants are scoped
+ * to a single office and do not open the corporation-wide endpoints — see
+ * `engine/corpRoles.ts`, which reads `roles` only.
+ */
+export interface CharacterCorporationRoles {
+  roles?: string[];
+  roles_at_hq?: string[];
+  roles_at_base?: string[];
+  roles_at_other?: string[];
+}
+
+export function getCharacterRoles(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterCorporationRoles>> {
+  return esiFetch<CharacterCorporationRoles>(`/characters/${characterId}/roles`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterRoles',
+  });
+}
+
 // --- GET /characters/{character_id}/clones (esi-clones.read_clones.v1) ---
 
 export interface JumpClone {

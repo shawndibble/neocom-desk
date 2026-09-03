@@ -146,6 +146,16 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/corporationhistory',
     scope: PUBLIC,
   },
+  /**
+   * The one corp-adjacent scope in the base grant. It is cheap, has no role
+   * gate of its own, and every corp surface downstream needs it for *every*
+   * character in order to know whether to render at all — so it is not
+   * something to offer as an opt-in (CONTEXT.md round 35).
+   */
+  getCharacterRoles: {
+    route: '/characters/{character_id}/roles',
+    scope: 'esi-characters.read_corporation_roles.v1',
+  },
   getCharacterClones: {
     route: '/characters/{character_id}/clones',
     scope: 'esi-clones.read_clones.v1',
