@@ -533,12 +533,14 @@ export function PlanetaryIndustry() {
       ) : (
         <>
           {/*
-        Above the per-colony panels, and above the branch below rather than
-        inside it: the active Character losing the planets scope, or simply
-        having no colonies, says nothing about the alts whose programs are
-        already cached — and answering "which character do I log in next" for
-        exactly that case is what a cross-character panel is for.
-      */}
+            Above the per-colony panels, and above the branch below rather
+            than inside it: the active Character losing the planets scope, or
+            simply having no colonies, says nothing about the alts whose
+            programs are already cached — and answering "which character do I
+            log in next" for exactly that case is what a cross-character panel
+            is for. It stays inside the Colonies tab: it is a colony readout,
+            and #321 owns that component next.
+          */}
           {!loading && data && <ExtractorTimeline snapshot={data.roster} nowMs={loadedAt} />}
 
           {loading ? (
