@@ -76,8 +76,13 @@ function row(name: string): HTMLElement {
 
 const ownedInput = (material: string) =>
   screen.getByRole('spinbutton', { name: `Owned quantity for ${material}` });
-const overrideInput = (material: string) =>
-  screen.getByRole('spinbutton', { name: `Override unit price for ${material}` });
+const priceInput = (material: string) =>
+  screen.getByRole('spinbutton', { name: `Price for ${material}` });
+const revertButton = (material: string) =>
+  screen.getByRole('button', { name: `Reset ${material} to the hub price` });
+const queryRevertButton = (material: string) =>
+  screen.queryByRole('button', { name: `Reset ${material} to the hub price` });
+const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 
 async function setField(input: HTMLElement, value: string) {
   const user = userEvent.setup();
@@ -90,9 +95,13 @@ describe('MaterialsTable sourcing', () => {
   it('prices every row at the hub with no overrides set', () => {
     render(<Harness />);
     const tritanium = within(row('Tritanium'));
-    expect(tritanium.getByText('5')).toBeTruthy();
+    // The hub price is the field's value, not a separate read-only column:
+    // one price per row, already filled in, and editing it is the override.
+    expect(valueOf(priceInput('Tritanium'))).toBe('5');
     expect(tritanium.getByText('5,000')).toBeTruthy();
     expect(tritanium.getByText('Hub')).toBeTruthy();
+    // Nothing to revert to — the row is already showing the market's number.
+    expect(queryRevertButton('Tritanium')).toBeNull();
   });
 
   it('falls back to placeholder text for every row when prices could not be loaded', () => {
@@ -100,6 +109,9 @@ describe('MaterialsTable sourcing', () => {
     const tritanium = within(row('Tritanium'));
     expect(tritanium.getByText('No price')).toBeTruthy();
     expect(tritanium.getByText('—')).toBeTruthy();
+    // Empty rather than 0: the market has no number for this row, and a
+    // filled-in 0 would read as a price.
+    expect(valueOf(priceInput('Tritanium'))).toBe('');
   });
 
   it('keeps showing an override price when prices could not be loaded', () => {
@@ -107,6 +119,7 @@ describe('MaterialsTable sourcing', () => {
     // price the row — and the results panel already counts it.
     render(<Harness initial={{ 34: { overridePrice: 7 } }} pricesReady={false} />);
     const tritanium = within(row('Tritanium'));
+    expect(valueOf(priceInput('Tritanium'))).toBe('7');
     expect(tritanium.getByText('Override')).toBeTruthy();
     expect(tritanium.getByText('7,000')).toBeTruthy();
     expect(tritanium.queryByText('No price')).toBeNull();
@@ -145,12 +158,13 @@ describe('MaterialsTable sourcing', () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
 
-    await setField(overrideInput('Tritanium'), '7');
+    await setField(priceInput('Tritanium'), '7');
 
     expect(onChange).toHaveBeenCalledWith(34, { overridePrice: 7 });
     const tritanium = within(row('Tritanium'));
-    expect(tritanium.getByText('7')).toBeTruthy();
+    expect(valueOf(priceInput('Tritanium'))).toBe('7');
     expect(tritanium.getByText('7,000')).toBeTruthy();
+    expect(tritanium.getByText('Override')).toBeTruthy();
   });
 
   it('clearing an override price reverts the row to the hub price', async () => {
@@ -158,7 +172,7 @@ describe('MaterialsTable sourcing', () => {
     render(<Harness initial={{ 34: { overridePrice: 7 } }} onChange={onChange} />);
     expect(within(row('Tritanium')).getByText('7,000')).toBeTruthy();
 
-    await setField(overrideInput('Tritanium'), '');
+    await setField(priceInput('Tritanium'), '');
 
     expect(onChange).toHaveBeenCalledWith(34, { overridePrice: undefined });
     const tritanium = within(row('Tritanium'));
@@ -199,14 +213,14 @@ describe('MaterialsTable sourcing', () => {
     await user.keyboard('250');
     // Tab out: blur is what commits.
     await user.tab();
-    expect(document.activeElement).toBe(overrideInput('Tritanium'));
+    expect(document.activeElement).toBe(priceInput('Tritanium'));
     expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 250 });
     expect(within(row('Tritanium')).getByText('250 owned + 750 x 5')).toBeTruthy();
   });
 
   it('keeps a visible focus ring on both editable inputs', () => {
     render(<Harness />);
-    for (const input of [ownedInput('Tritanium'), overrideInput('Tritanium')]) {
+    for (const input of [ownedInput('Tritanium'), priceInput('Tritanium')]) {
       expect(input.className).toContain('focus-visible:outline-2');
       expect(input.className).toContain('border');
     }
@@ -255,33 +269,69 @@ describe('MaterialsTable stacked card', () => {
   it('left-aligns the digits inside a sourcing field below sm, so they sit in the value column too', () => {
     render(<Harness />);
 
-    for (const input of [ownedInput('Tritanium'), overrideInput('Tritanium')]) {
+    for (const input of [ownedInput('Tritanium'), priceInput('Tritanium')]) {
       expect(input).toHaveClass('text-left', 'sm:text-right');
     }
   });
 
-  it('shows 0 in an empty sourcing field instead of an unexplained empty box', () => {
+  it('shows 0 in an empty owned field instead of an unexplained empty box', () => {
     render(<Harness />);
 
-    for (const input of [ownedInput('Tritanium'), overrideInput('Tritanium')]) {
-      expect(input).toHaveAttribute('placeholder', '0');
-      // Placeholder only. An empty field still means "not set": a stored 0
-      // owned is the same as none, but a stored 0 override price would value
-      // the material at nothing, and neither may be written by rendering.
-      expect((input as HTMLInputElement).value).toBe('');
-    }
+    // Placeholder only: an empty owned field still means "not set", and 0 is
+    // what not setting it comes to. The price field carries no placeholder —
+    // it is filled with the market price, and a ghost 0 on the rows that have
+    // no price at all would read as free.
+    expect(ownedInput('Tritanium')).toHaveAttribute('placeholder', '0');
+    expect(valueOf(ownedInput('Tritanium'))).toBe('');
+    expect(priceInput('Tritanium')).not.toHaveAttribute('placeholder');
+  });
+});
+
+describe('MaterialsTable price field', () => {
+  it('reverts to the hub price from the button, which is only there once a row is overridden', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    expect(queryRevertButton('Tritanium')).toBeNull();
+
+    await setField(priceInput('Tritanium'), '7');
+    expect(valueOf(priceInput('Tritanium'))).toBe('7');
+
+    await user.click(revertButton('Tritanium'));
+
+    expect(onChange).toHaveBeenLastCalledWith(34, { overridePrice: undefined });
+    const tritanium = within(row('Tritanium'));
+    expect(valueOf(priceInput('Tritanium'))).toBe('5');
+    expect(tritanium.getByText('Hub')).toBeTruthy();
+    expect(tritanium.getByText('5,000')).toBeTruthy();
+    // Back to tracking the market, so there is nothing left to revert.
+    expect(queryRevertButton('Tritanium')).toBeNull();
   });
 
-  it('writes nothing to the plan for a field left at its placeholder', async () => {
+  it('leaves the other rows alone when one is reverted', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={{ 34: { overridePrice: 7 }, 35: { overridePrice: 12 } }} />);
+
+    await user.click(revertButton('Tritanium'));
+
+    expect(valueOf(priceInput('Pyerite'))).toBe('12');
+    expect(within(row('Pyerite')).getByText('Override')).toBeTruthy();
+  });
+
+  it('stores no override for a row merely tabbed across, so it keeps tracking the market', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
 
+    // Owned, then price, then out of the row — the price field holds the hub
+    // price the whole way, and a blur must not freeze it into the plan.
     await user.tab();
     await user.tab();
     await user.tab();
 
     expect(onChange).not.toHaveBeenCalled();
+    expect(within(row('Tritanium')).getByText('Hub')).toBeTruthy();
+    expect(queryRevertButton('Tritanium')).toBeNull();
   });
 });
 

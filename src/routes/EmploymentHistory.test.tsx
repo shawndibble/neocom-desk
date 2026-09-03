@@ -30,9 +30,35 @@ const history = [
   { record_id: 1, corporation_id: 100, start_date: '2025-01-01T00:00:00Z' },
 ];
 
+let skillCalls = 0;
+
 const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/corporationhistory`, () =>
     HttpResponse.json(history)
+  ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () => {
+    skillCalls += 1;
+    return HttpResponse.json({ skills: [], total_sp: 1_000, unallocated_sp: 0 });
+  }),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}`, () =>
+    HttpResponse.json({
+      name: 'Pilot One',
+      corporation_id: 200,
+      birthday: '2015-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'female',
+      race_id: 1,
+    })
+  ),
+  http.get('https://esi.evetech.net/corporations/200', () =>
+    HttpResponse.json({
+      name: 'Current Corp',
+      ticker: 'CC',
+      ceo_id: 1,
+      creator_id: 1,
+      member_count: 5,
+      tax_rate: 0.1,
+    })
   ),
   http.post('https://esi.evetech.net/universe/names', () =>
     HttpResponse.json([
@@ -46,6 +72,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {
+  skillCalls = 0;
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -69,14 +96,31 @@ beforeEach(async () => {
 describe('EmploymentHistory', () => {
   it('lists corporations most-recent first, with resolved names, without any granted scope', async () => {
     render(<App />);
-    expect(await screen.findByText('Current Corp')).toBeInTheDocument();
-    expect(screen.getByText('Past Corp')).toBeInTheDocument();
+    // 'Past Corp' rather than 'Current Corp': the shared header names the
+    // character's *current* corporation too, and it resolves first.
+    expect(await screen.findByText('Past Corp')).toBeInTheDocument();
+    expect(screen.getByText('Current Corp', { selector: 'td' })).toBeInTheDocument();
     const rows = screen.getAllByRole('row');
     // Row 0 is the header; row 1 should be the most recent corp.
     expect(rows[1]).toHaveTextContent('Current Corp');
     expect(rows[2]).toHaveTextContent('Past Corp');
     // Past Corp ran exactly 2025-01-01 to 2026-01-01: a full non-leap year.
     expect(rows[2]).toHaveTextContent('365d');
+  });
+
+  it('carries the same character header the Overview tab shows, without reaching for a scope', async () => {
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).toBeInTheDocument();
+    expect(await screen.findByText('Current Corp', { selector: 'p' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Employment' })).toBeNull();
+
+    // The SP chips hold their place with "—" rather than the header changing
+    // shape — and nothing asked ESI for skills this character never granted.
+    for (const label of ['Total SP', 'Unallocated SP']) {
+      expect(screen.getByText(label).parentElement).toHaveTextContent('—');
+    }
+    expect(skillCalls).toBe(0);
   });
 
   it('falls back to cached history offline', async () => {
@@ -92,8 +136,8 @@ describe('EmploymentHistory', () => {
       )
     );
     render(<App />);
-    expect(await screen.findByText(/#200|Current Corp/)).toBeInTheDocument();
-    expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
+    expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
+    expect(screen.getByText(/#200|Current Corp/, { selector: 'td' })).toBeInTheDocument();
   });
 
   it('shows the empty state when there is no data at all', async () => {
