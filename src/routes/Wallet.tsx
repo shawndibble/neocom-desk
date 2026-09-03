@@ -309,10 +309,21 @@ export function Wallet() {
     : (divisions[0]?.division ?? division);
   const selectedDivision = divisions.find((entry) => entry.division === effectiveDivision) ?? null;
 
+  // Transactions are personal-only, and that is a registry fact rather than a
+  // layout choice: ESI publishes a corp wallet transactions endpoint but #295
+  // registered only the journal, and nothing here may add one (`esi/scopes.ts`
+  // derives everything from `ESI_REGISTRY`). Landing on that tab and flipping
+  // the switch falls back to the journal rather than showing an empty third tab.
+  const effectiveTab = showingCorp && tab === 'transactions' ? 'journal' : tab;
+
   // Its own key, division included: ESI publishes no all-divisions journal and
-  // each division caches separately (features/corp/wallet.ts).
+  // each division caches separately (features/corp/wallet.ts). Gated on the tab
+  // as well, so opening the corp side on Balance doesn't page a whole journal
+  // nobody asked to see.
   const corpJournal = useCorpSnapshot<StatusResult<WalletJournalEntry[]> | null>(
-    showingCorp ? `${activeCharacterId}:${corporationId}:${effectiveDivision}` : null,
+    showingCorp && effectiveTab === 'journal'
+      ? `${activeCharacterId}:${corporationId}:${effectiveDivision}`
+      : null,
     async () =>
       activeCharacterId === null || corporationId === null
         ? null
@@ -472,14 +483,6 @@ export function Wallet() {
     () => [...(corpJournalResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
     [corpJournalResult]
   );
-
-  // Transactions are personal-only, and that is a registry fact rather than a
-  // layout choice: ESI publishes a corp wallet transactions endpoint but #295
-  // registered only the journal, and nothing here may add one
-  // (`esi/scopes.ts` derives everything from `ESI_REGISTRY`). Landing on that
-  // tab and flipping the switch falls back to the journal rather than showing
-  // an empty third tab.
-  const effectiveTab = showingCorp && tab === 'transactions' ? 'journal' : tab;
 
   if (!hydrated) {
     return (
