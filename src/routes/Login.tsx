@@ -125,9 +125,7 @@ export function Login() {
             <span className={`${tabItemClassName} ${tabItemActiveClassName}`}>
               {t('nav.overview')}
             </span>
-            <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
-              {t('nav.clones')}
-            </span>
+            <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>{t('nav.clones')}</span>
             <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
               {t('nav.employmentHistory')}
             </span>
@@ -178,10 +176,7 @@ export function Login() {
         <h2 className="text-xl font-semibold">{t('login.featuresHeading')}</h2>
         <div className="mt-6 border-t border-line">
           {FEATURES.map(({ icon: Icon, key }) => (
-            <div
-              key={key}
-              className="flex flex-wrap items-center gap-4 border-b border-line py-4"
-            >
+            <div key={key} className="flex flex-wrap items-center gap-4 border-b border-line py-4">
               <Icon size={ICON_SIZE.lg} className="shrink-0 text-accent" />
               <span className="w-44 shrink-0 text-sm font-semibold">
                 {t(`login.features.${key}.name`)}
