@@ -115,6 +115,11 @@ describe('EmploymentHistory', () => {
     expect(await screen.findByText('Current Corp', { selector: 'p' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Employment' })).toBeNull();
 
+    // Data age and Refresh belong to this tab's panel, below the tabs.
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
+    expect(header?.contains(refresh)).toBe(false);
+
     // The SP chips hold their place with "—" rather than the header changing
     // shape — and nothing asked ESI for skills this character never granted.
     for (const label of ['Total SP', 'Unallocated SP']) {
@@ -148,5 +153,7 @@ describe('EmploymentHistory', () => {
     );
     render(<App />);
     expect(await screen.findByText(/no employment history cached/i)).toBeInTheDocument();
+    // The panel's toolbar outlives its rows, so there is still a way back.
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 });

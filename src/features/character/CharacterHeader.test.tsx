@@ -67,16 +67,14 @@ describe('CharacterHeader', () => {
     }
   });
 
-  it('renders the view-specific controls passed to it', () => {
-    render(
-      <CharacterHeader
-        characterId={CHARACTER_ID}
-        totalSp={null}
-        unallocatedSp={null}
-        actions={<button type="button">Refresh</button>}
-      />
-    );
+  it('carries no controls of its own', async () => {
+    // It takes no actions slot at all: a view's data age and its Refresh
+    // describe that view's data, so they belong to its panel below the tabs.
+    // Anything rendered here would be a control that changes from tab to tab
+    // in the block every tab shares.
+    render(<CharacterHeader characterId={CHARACTER_ID} totalSp={1} unallocatedSp={2} />);
+    await screen.findByRole('heading', { level: 1, name: 'Mero Otichoda' });
 
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 });

@@ -475,7 +475,6 @@
   },
   "overview": {
     "title": "Overview",
-    "refresh": "Refresh",
     "wallet": "Wallet",
     "walletEmpty": "No wallet data cached. Reconnect to fetch it.",
     "isk": "ISK",

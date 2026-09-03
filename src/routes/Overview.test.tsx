@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -172,13 +172,15 @@ describe('Overview', () => {
     expect(screen.queryByText('5,000,000')).not.toBeInTheDocument();
   });
 
-  it('offers Refresh from the shared header, like the sibling tabs do', async () => {
+  it('keeps the block above the tabs to identity and SP alone', async () => {
     render(<App />);
-    // Wait for the load to settle: Refresh is disabled while one is in flight.
     await screen.findByText(/1,234,567\.89/);
 
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
-    // The identity block is the header's, not a page title restating the tab.
+    // No page title restating the tab, and no controls: the wallet and queue
+    // panels below carry their own data age.
+    const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
+    expect(header).not.toBeNull();
+    expect(within(header as HTMLElement).queryAllByRole('button')).toHaveLength(0);
     expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).toBeNull();
   });
 

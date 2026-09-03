@@ -166,7 +166,27 @@ describe('Clones', () => {
     expect(await screen.findByText('Test Corp / Test Alliance')).toBeInTheDocument();
     expect(await screen.findByText('135,765')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 1, name: 'Clones' })).not.toBeInTheDocument();
-    // Refresh is a per-view control and still belongs to the header.
+  });
+
+  it("keeps this view's data age and Refresh below the tabs, not in the shared header", async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'Pilot One' });
+
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
+    expect(header?.contains(refresh)).toBe(false);
+    expect(await screen.findByText('just now')).toBeInTheDocument();
+  });
+
+  it('offers Refresh even when there is nothing to show', async () => {
+    // The empty and failed states are the ones a Refresh exists for, so the
+    // panel's toolbar has to outlive its rows.
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json({ jump_clones: [] }))
+    );
+    render(<App />);
+    await screen.findByText('No jump clones cached');
+
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 
