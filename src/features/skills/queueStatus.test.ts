@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyCompletedQueueEntries,
+  applyTrainingProgress,
   classifySkillQueue,
   completedQueueLevels,
   completedSpGain,
@@ -393,4 +394,150 @@ describe('completedQueueLevels: ESI responses are untrusted input', () => {
       expect(levels.get(3300)).toEqual({ level: 4, sp: null });
     }
   );
+});
+
+describe('applyTrainingProgress', () => {
+  // Half-way through a 24h training: 12h of it elapsed as of NOW.
+  const training = (over: Partial<SkillQueueEntry> = {}) =>
+    entry({
+      queue_position: 0,
+      skill_id: 60378,
+      finished_level: 4,
+      start_date: at('2026-08-30T00:00:00Z'),
+      finish_date: at('2026-08-31T00:00:00Z'),
+      training_start_sp: 100_000,
+      level_end_sp: 200_000,
+      ...over,
+    });
+
+  it('interpolates the training skill SP across its own start/finish window', () => {
+    // The whole point: /skills reports SP as of the last apply, so the skill
+    // currently training reads stale and the planner charges a level the
+    // character is part-way through in full.
+    const merged = applyTrainingProgress(
+      new Map([[60378, { level: 3, sp: 100_000 }]]),
+      [training()],
+      NOW
+    );
+    expect(merged.get(60378)).toEqual({ level: 3, sp: 150_000 });
+  });
+
+  it('never lowers SP /skills already reports higher', () => {
+    const merged = applyTrainingProgress(
+      new Map([[60378, { level: 3, sp: 190_000 }]]),
+      [training()],
+      NOW
+    );
+    expect(merged.get(60378)).toEqual({ level: 3, sp: 190_000 });
+  });
+
+  it('adds a first-time skill /skills omits entirely, at level 0', () => {
+    const merged = applyTrainingProgress(new Map(), [training({ finished_level: 1 })], NOW);
+    expect(merged.get(60378)).toEqual({ level: 0, sp: 150_000 });
+  });
+
+  it('raises SP without ever raising the level — that is the completed pass job', () => {
+    const merged = applyTrainingProgress(
+      new Map([[60378, { level: 3, sp: 0 }]]),
+      [training()],
+      NOW
+    );
+    expect(merged.get(60378)?.level).toBe(3);
+  });
+
+  it('only touches the row that is actually training, not the ones queued behind it', () => {
+    const merged = applyTrainingProgress(
+      new Map(),
+      [
+        training(),
+        training({
+          queue_position: 1,
+          skill_id: 3387,
+          start_date: at('2026-08-31T00:00:00Z'),
+          finish_date: at('2026-09-02T00:00:00Z'),
+        }),
+      ],
+      NOW
+    );
+    expect(merged.get(60378)?.sp).toBe(150_000);
+    expect(merged.has(3387)).toBe(false);
+  });
+
+  it('contributes nothing when the head entry has already finished', () => {
+    // A past finish_date is `completed`, which applyCompletedQueueEntries
+    // owns. Interpolating it here would double-count against that pass.
+    const trained = new Map([[60378, { level: 3, sp: 100_000 }]]);
+    const merged = applyTrainingProgress(
+      trained,
+      [
+        training({
+          start_date: at('2026-08-28T00:00:00Z'),
+          finish_date: at('2026-08-29T00:00:00Z'),
+        }),
+      ],
+      NOW
+    );
+    expect(merged.get(60378)).toEqual({ level: 3, sp: 100_000 });
+  });
+
+  it('falls back to training_start_sp as a floor when the queue is paused', () => {
+    // A paused queue omits its dates, so there is nothing to interpolate
+    // across — but the SP banked when training began is still a lower bound.
+    const merged = applyTrainingProgress(
+      new Map([[60378, { level: 3, sp: 48_000 }]]),
+      [entry({ queue_position: 0, skill_id: 60378, training_start_sp: 100_000 })],
+      NOW
+    );
+    expect(merged.get(60378)).toEqual({ level: 3, sp: 100_000 });
+  });
+
+  it('changes nothing when ESI withheld the SP fields', () => {
+    const trained = new Map([[60378, { level: 3, sp: 48_000 }]]);
+    const merged = applyTrainingProgress(
+      trained,
+      [training({ training_start_sp: undefined, level_end_sp: undefined })],
+      NOW
+    );
+    expect(merged.get(60378)).toEqual({ level: 3, sp: 48_000 });
+  });
+
+  it('survives a zero-length or malformed training window', () => {
+    const trained = new Map([[60378, { level: 3, sp: 48_000 }]]);
+    for (const over of [
+      { start_date: at('2026-08-31T00:00:00Z') }, // start === finish
+      { start_date: 'not-a-date' },
+    ]) {
+      const merged = applyTrainingProgress(trained, [training(over)], NOW);
+      // Falls back to the banked floor rather than NaN or a divide-by-zero.
+      expect(merged.get(60378)).toEqual({ level: 3, sp: 100_000 });
+    }
+  });
+
+  it('does not credit SP past the level end when the clock has run over', () => {
+    // start_date in the future is nonsense but reachable via clock skew;
+    // the fraction is clamped both ways rather than extrapolated.
+    const merged = applyTrainingProgress(
+      new Map([[60378, { level: 3, sp: 0 }]]),
+      [
+        training({
+          start_date: at('2026-08-30T18:00:00Z'),
+          finish_date: at('2026-08-31T18:00:00Z'),
+        }),
+      ],
+      NOW
+    );
+    expect(merged.get(60378)).toEqual({ level: 3, sp: 100_000 });
+  });
+
+  it('leaves every other skill untouched', () => {
+    const merged = applyTrainingProgress(
+      new Map([
+        [60378, { level: 3, sp: 100_000 }],
+        [3387, { level: 3, sp: 16_000 }],
+      ]),
+      [training()],
+      NOW
+    );
+    expect(merged.get(3387)).toEqual({ level: 3, sp: 16_000 });
+  });
 });

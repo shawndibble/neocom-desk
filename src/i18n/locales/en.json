@@ -230,7 +230,10 @@
     "headerProjectedFinish": "Projected finish",
     "headerNoFinish": "—",
     "headerSavingsLabel": "Remap savings",
-    "headerSavingsNone": "None"
+    "headerSavingsNone": "None",
+    "headerBoosterLabel": "Booster assumed",
+    "headerBoosterValue": "+{{bonus}} until {{date}}",
+    "headerBoosterTooltip": "These times assume the booster you entered under Training, not one the game knows about. Until it expires they run faster than your in-game skill queue."
   },
   "skillCompare": {
     "pickCharacters": "Characters to compare",

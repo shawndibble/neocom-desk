@@ -91,4 +91,29 @@ describe('PlanHeader', () => {
 
     expect(screen.getByText('None')).toBeInTheDocument();
   });
+
+  it('does not mention a booster when none is assumed', () => {
+    render(<PlanHeader totalSeconds={1000} skillCount={2} projectedFinish={null} badge={null} />);
+
+    expect(screen.queryByText(/booster/i)).not.toBeInTheDocument();
+  });
+
+  it('discloses on the total itself that the estimate assumes a hypothetical booster', () => {
+    // The bug report compared this total against the in-game queue and found
+    // it 32% fast. It was: the user had a +12 accelerator ticked in the
+    // What-if panel. The per-row BoosterMark said so per skill, but the one
+    // number they actually compared said nothing at all.
+    render(
+      <PlanHeader
+        totalSeconds={1000}
+        skillCount={2}
+        projectedFinish={null}
+        badge={null}
+        booster={{ bonus: 12, expiresAt: new Date('2026-09-15T21:00:00Z') }}
+      />
+    );
+
+    expect(screen.getByText(/\+12/)).toBeInTheDocument();
+    expect(screen.getByText(/booster/i)).toBeInTheDocument();
+  });
 });
