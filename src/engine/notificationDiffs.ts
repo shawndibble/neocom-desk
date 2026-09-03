@@ -225,6 +225,85 @@ export function diffPlanetaryExtractionDone(
   return fires;
 }
 
+/**
+ * Lead times before an extractor program's `expiry_time` at which a warning
+ * fires (issue #310), most distant first: a poll that skips over both edges
+ * reports both, and the notification tag is per Character *and* per event, so
+ * emitting the 12-hour copy last is what leaves the more urgent one on screen.
+ *
+ * Deliberately its own constant rather than an import of
+ * `pi/colonyStatus.ts`'s `EXPIRING_SOON_WINDOW_MS`: that one is the Planetary
+ * Industry table's colour threshold, and the two are free to diverge — a
+ * notification cadence is not a status colour.
+ */
+export const EXTRACTOR_EXPIRY_WARNING_MS: readonly number[] = [24 * 3_600_000, 12 * 3_600_000];
+
+export interface ExtractorExpiringFire {
+  eventId: 'planetaryExtractorExpiring';
+  characterId: number;
+  planetId: number;
+  pinId: number;
+  /** Which lead-time window was crossed, in ms — one of `EXTRACTOR_EXPIRY_WARNING_MS`. */
+  thresholdMs: number;
+}
+
+/**
+ * Fires per extractor program that has newly crossed into a lead-time window
+ * before its `expiry_time` (issue #310), once per window.
+ *
+ * The predicate is deliberately **not** `diffCalendarEventStarting`'s "newly
+ * in the past" shape. `expiry - now <= 24h` stays true forever once the
+ * program has expired, so that shape would tell a user who closed the app at
+ * T−30h and reopened at T+5h that a program dead for five hours is "expiring
+ * soon". Both halves are required:
+ *
+ * - the **window-crossing edge** — the program was outside the window at
+ *   `prev.nowMs` and is inside it at `next.nowMs`; and
+ * - **`expiryTimeMs > next.nowMs`** — it has not already expired. An expired
+ *   program is `diffPlanetaryExtractionDone`'s to report, never this event's,
+ *   and the boundary lines up exactly: `colonyStatus` reads a colony as idle
+ *   from `nowMs >= expiryTimeMs`, which is where this diff stops firing.
+ *
+ * A program's identity is `(pinId, expiryTimeMs)`, because `expiry_time` is
+ * fixed for a program's life: a pin whose expiry changed is carrying a *new*
+ * program, and the dead one's position inside a window must not swallow the
+ * new one's first crossing. A program with no counterpart in `prev` — a new
+ * pin, or a colony this character's poll has not seen before — is treated as
+ * not-previously-inside, so one first observed already inside a window still
+ * fires once for it, matching `diffPlanetaryExtractionDone`'s treatment of a
+ * colony first seen idle. `prev === undefined` fires nothing, like every
+ * other diff in this module.
+ */
+export function diffPlanetaryExtractorExpiring(
+  characterId: number,
+  prev: PlanetarySnapshot | undefined,
+  next: PlanetarySnapshot
+): ExtractorExpiringFire[] {
+  if (!prev) return [];
+  const prevByPlanet = new Map(prev.colonies.map((c) => [c.planetId, c]));
+  const fires: ExtractorExpiringFire[] = [];
+  for (const colony of next.colonies) {
+    const prevColony = prevByPlanet.get(colony.planetId);
+    const prevByPin = new Map((prevColony?.extractors ?? []).map((e) => [e.pinId, e]));
+    for (const extractor of colony.extractors) {
+      if (extractor.expiryTimeMs <= next.nowMs) continue;
+      const observedBefore = prevByPin.get(extractor.pinId)?.expiryTimeMs === extractor.expiryTimeMs;
+      for (const thresholdMs of EXTRACTOR_EXPIRY_WARNING_MS) {
+        if (extractor.expiryTimeMs - next.nowMs > thresholdMs) continue;
+        if (observedBefore && extractor.expiryTimeMs - prev.nowMs <= thresholdMs) continue;
+        fires.push({
+          eventId: 'planetaryExtractorExpiring',
+          characterId,
+          planetId: colony.planetId,
+          pinId: extractor.pinId,
+          thresholdMs,
+        });
+      }
+    }
+  }
+  return fires;
+}
+
 export interface MailHeaderSnapshot {
   mailId: number;
 }
