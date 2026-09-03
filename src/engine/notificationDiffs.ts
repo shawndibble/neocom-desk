@@ -287,7 +287,8 @@ export function diffPlanetaryExtractorExpiring(
     const prevByPin = new Map((prevColony?.extractors ?? []).map((e) => [e.pinId, e]));
     for (const extractor of colony.extractors) {
       if (extractor.expiryTimeMs <= next.nowMs) continue;
-      const observedBefore = prevByPin.get(extractor.pinId)?.expiryTimeMs === extractor.expiryTimeMs;
+      const observedBefore =
+        prevByPin.get(extractor.pinId)?.expiryTimeMs === extractor.expiryTimeMs;
       for (const thresholdMs of EXTRACTOR_EXPIRY_WARNING_MS) {
         if (extractor.expiryTimeMs - next.nowMs > thresholdMs) continue;
         if (observedBefore && extractor.expiryTimeMs - prev.nowMs <= thresholdMs) continue;
