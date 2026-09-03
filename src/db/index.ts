@@ -147,6 +147,31 @@ export interface StationPinRecord {
   updatedAt: number;
 }
 
+/**
+ * One notification the Foreground Poller fired, kept so the Overview's
+ * Notification Feed can show what was missed (CONTEXT.md round 20). Device-
+ * local and never synced, like the preferences that gate it: the poller runs
+ * per device, so two devices legitimately hold different feeds.
+ *
+ * `title`/`body` are stored already rendered rather than re-derived on read —
+ * the copy depends on ESI lookups (a skill's name, a planet's) that may not
+ * resolve later, and a notification should read the same in the feed as it
+ * did on the lock screen.
+ *
+ * `eventId` is the plain string rather than the feature's `NotificationEventId`
+ * union: `src/db` holds no dependency on `src/features` (ARCHITECTURE.md
+ * module map), and nothing here needs the narrower type.
+ */
+export interface NotificationFeedRecord {
+  id: string;
+  characterId: number;
+  eventId: string;
+  title: string;
+  body: string;
+  /** Epoch ms the poller fired this. */
+  firedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -156,6 +181,7 @@ export const db = new Dexie('neocom') as Dexie & {
   buildPlans: EntityTable<BuildPlanRecord, 'id'>;
   quickbars: EntityTable<QuickbarRecord, 'id'>;
   stationPins: EntityTable<StationPinRecord, 'id'>;
+  notificationFeed: EntityTable<NotificationFeedRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -204,4 +230,18 @@ db.version(5).stores({
   buildPlans: 'id, characterId',
   quickbars: 'id, characterId',
   stationPins: 'id, characterId, locationId',
+});
+
+// Additive: v1-v5 stores unchanged, plus the Notification Feed. `firedAt` is
+// indexed so the panel reads newest-first without loading the whole table.
+db.version(6).stores({
+  characters: 'characterId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  notificationFeed: 'id, characterId, firedAt',
 });
