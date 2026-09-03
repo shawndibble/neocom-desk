@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -7,6 +10,11 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import { expandChain } from '@/engine/pi/chain';
+import type { PiData } from '@/sde/types';
+
+/** The ticket's worked example, and the Plan tab's own default product. */
+const BROADCAST_NODE = 2867;
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -16,10 +24,34 @@ vi.mock('virtual:pwa-register/react', () => ({
   }),
 }));
 
+// The Plan tab needs the real recipe graph — its numbers are claims about the
+// shipped `pi.json`, so a stub would pin nothing. Everything else this route
+// never reads.
+const piData = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
+) as PiData;
+
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => ({})),
   loadBlueprints: vi.fn(async () => ({})),
+  loadPi: vi.fn(async () => piData),
+}));
+
+// The one price path, stubbed at the feature seam: `loadMarketSnapshot` goes
+// to Fuzzwork, which this suite's MSW server (`onUnhandledRequest: 'error'`)
+// rightly refuses. The real path is covered by `planPrices.test.ts`.
+vi.mock('@/features/pi/planPrices', () => ({
+  loadPlanPrices: vi.fn(async () => ({
+    prices: Object.fromEntries(
+      expandChain(BROADCAST_NODE, piData, { unitsPerHour: 1 }).nodes.map((node) => [
+        node.typeId,
+        [5, 760, 14_000, 100_000, 1_900_000][node.tier],
+      ])
+    ),
+    unpriced: [],
+    failed: false,
+  })),
 }));
 
 const CHAR_ID = 91;
@@ -130,6 +162,19 @@ const server = setupServer(
       system_id: SYSTEM_ID,
       type_id: 11,
       position: { x: 0, y: 0, z: 0 },
+    })
+  ),
+  http.get(`${ESI}/characters/${CHAR_ID}/skills`, () =>
+    HttpResponse.json({
+      skills: [
+        {
+          skill_id: 33467,
+          trained_skill_level: 4,
+          active_skill_level: 4,
+          skillpoints_in_skill: 90510,
+        },
+      ],
+      total_sp: 90510,
     })
   ),
   http.post(`${ESI}/universe/names`, async ({ request }) => {
@@ -384,6 +429,52 @@ describe('PlanetaryIndustry', () => {
     // The trap this guards: a live 403 on an alt raises the app-wide re-auth
     // banner, naming a character the player never asked about.
     expect(screen.queryByText('Log in again to see your colonies')).not.toBeInTheDocument();
+  });
+
+  it('keeps the colony view on the default tab, with no URL param needed', async () => {
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    expect(screen.getByRole('tab', { name: 'Colonies' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.location.search).toBe('');
+  });
+
+  it('opens the planner on the Plan tab and records it in the URL', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+
+    await user.click(screen.getByRole('tab', { name: 'Plan' }));
+
+    await screen.findByRole('heading', { name: 'Verdict' });
+    expect(window.location.search).toContain('tab=plan');
+    // The colony surface is a peer view, not a section below the planner.
+    expect(screen.queryByRole('heading', { name: /Jita IV/ })).not.toBeInTheDocument();
+  });
+
+  it('restores the tab and the planned commodity from the URL alone', async () => {
+    window.history.pushState({}, '', `/planetary-industry?tab=plan&type=${BROADCAST_NODE}`);
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Verdict' });
+    expect(screen.getByRole('tab', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByLabelText('Product')).toHaveValue(String(BROADCAST_NODE));
+  });
+
+  it('falls back to the colony view rather than crashing on a tab it does not know', async () => {
+    window.history.pushState({}, '', '/planetary-industry?tab=nonsense&type=not-a-number');
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    expect(screen.getByRole('tab', { name: 'Colonies' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('puts the verdict before the chain table, so the answer is not below the tree', async () => {
+    window.history.pushState({}, '', '/planetary-industry?tab=plan');
+    render(<App />);
+
+    const verdict = await screen.findByRole('heading', { name: 'Verdict' });
+    const chain = await screen.findByRole('heading', { name: 'Chain' });
+    // DOM order, not a visual reorder: this is the mobile stacking order.
+    expect(verdict.compareDocumentPosition(chain) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('reads an alt with nothing cached as "not loaded yet", never as having no colonies', async () => {
