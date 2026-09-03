@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -98,8 +98,11 @@ describe('Calendar', () => {
     render(<App />);
     await screen.findByText('Fleet Op');
     await user.click(screen.getByRole('tab', { name: 'Agenda' }));
+    // 'Fleet Op' renders in Month too, so it does not prove the switch landed;
+    // the response line is Agenda's alone, and awaiting it is what waits out
+    // the persisted view change.
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
-    expect(screen.getByText(/Accepted/)).toBeInTheDocument();
+    expect(await screen.findByText(/Accepted/)).toBeInTheDocument();
   });
 
   it('remembers the last-picked view across a reload', async () => {
@@ -107,7 +110,14 @@ describe('Calendar', () => {
     const { unmount } = render(<App />);
     await screen.findByText('Fleet Op');
     await user.click(screen.getByRole('tab', { name: 'Week' }));
-    expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true');
+    // Awaited, not asserted straight after the click: picking a view goes
+    // through `useCalendarView.setValue`, which persists to Dexie *before* it
+    // applies to the store, so the tab flips a write later than the click
+    // settles. A synchronous assertion here passes only while the machine is
+    // quick enough (CI run 33737544880 caught the other one of these).
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true')
+    );
     unmount();
 
     // Simulate a fresh page load: drop the in-memory store so the remount
@@ -142,7 +152,9 @@ describe('Calendar', () => {
     render(<App />);
     const more = await screen.findByText('+1 more');
     await user.click(more);
-    expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true')
+    );
     expect(await screen.findByText(/Op 4/)).toBeInTheDocument();
   });
 
