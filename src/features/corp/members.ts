@@ -121,14 +121,16 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
 }
 
 /**
- * Character names for a roster of any size.
+ * `/universe/names` for more ids than one call accepts.
  *
- * `resolveNames` is the app's one bulk resolver and is used as it is; the only
- * thing added here is the batch limit, because a corporation can hold more
- * members than `/universe/names` accepts in one call and an alliance holding
- * corp routinely does.
+ * Named for entities rather than for members because both halves of the page go
+ * through it: `/universe/names` answers for characters and NPC locations alike,
+ * and a resolver called `resolveMemberNames` would be lying at its second call
+ * site. `resolveNames` is the app's one bulk resolver and is used as it is; the
+ * only thing added here is the batch limit, because a corporation can hold more
+ * members than one call accepts and an alliance holding corp routinely does.
  */
-async function resolveMemberNames(ids: readonly number[]): Promise<Map<number, string>> {
+async function resolveEntityNames(ids: readonly number[]): Promise<Map<number, string>> {
   const unique = [...new Set(ids)];
   const names = new Map<number, string>();
   for (const batch of chunk(unique, UNIVERSE_NAMES_BATCH)) {
@@ -153,7 +155,7 @@ async function resolveLocationNames(
   const structureIds = unique.filter((id) => id >= UPWELL_STRUCTURE_ID_FLOOR);
   const bulkIds = unique.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
 
-  const names = await resolveMemberNames(bulkIds);
+  const names = await resolveEntityNames(bulkIds);
   const structureNames = await Promise.all(
     structureIds.map(async (id) => [id, await loadStructureName(characterId, id)] as const)
   );
@@ -196,7 +198,7 @@ export async function loadMemberLabels(
     .filter((id): id is number => id !== null);
 
   const [characters, ships, locations] = await Promise.all([
-    resolveMemberNames([...members.map((member) => member.characterId), ...extraCharacterIds]),
+    resolveEntityNames([...members.map((member) => member.characterId), ...extraCharacterIds]),
     // SDE snapshot first, ESI only for what it misses — `typeNames.ts`.
     loadTypeNames(shipTypeIds),
     resolveLocationNames(characterId, locationIds),

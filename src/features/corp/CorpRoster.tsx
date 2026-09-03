@@ -61,7 +61,7 @@ export function CorpRosterSummary({
     ids.map((id) => names.get(id) ?? `#${id}`).join(', ');
 
   return (
-    <p className="text-xs text-text-dim" data-testid="roster-changes">
+    <p className="text-text-dim text-xs">
       {diff.joined.length > 0 && (
         <span className="text-success">
           {t('corp.members.joined', {

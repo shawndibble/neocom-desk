@@ -87,13 +87,19 @@ async function loadMembersSnapshot(
 
   const memberIds = roster.cached?.data ?? null;
   // The baseline is read *and* replaced in the same pass, so the summary
-  // reports each change exactly once. A roster we could not read at all leaves
-  // the baseline alone — overwriting it with nothing would silently swallow
-  // every change made since the last successful read.
+  // reports each change exactly once. Two things must not consume it:
+  //
+  // - A roster we could not read at all. Overwriting the baseline with nothing
+  //   would silently swallow every change made since the last successful read.
+  // - A run whose result is about to be thrown away. `useRouteSnapshot`
+  //   discards a stale response, but a write already made is not discarded with
+  //   it — a cancelled run would consume the change and the user would never see
+  //   the summary. Skipping the write is the safe direction: the next run diffs
+  //   against the older baseline and reports the change again.
   let diff = EMPTY_ROSTER_DIFF;
   if (memberIds !== null) {
     diff = diffRoster(await readPreviousRoster(characterId, corporationId), memberIds);
-    await recordRoster(characterId, corporationId, memberIds, loadedAt);
+    if (!signal.cancelled) await recordRoster(characterId, corporationId, memberIds, loadedAt);
   }
 
   const members = toMemberActivity(tracking.cached?.data ?? []);

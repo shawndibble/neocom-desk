@@ -259,22 +259,23 @@ describe('the joins/leaves summary', () => {
   it('shows nothing at all when the roster has not changed (AC6)', async () => {
     mocked.readPreviousRoster.mockResolvedValue([1001, 1002]);
     await rosterTable();
-    expect(screen.queryByTestId('roster-changes')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ joined:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ left:/)).not.toBeInTheDocument();
   });
 
   it('shows nothing on a first visit, when there is no baseline to compare against', async () => {
     mocked.readPreviousRoster.mockResolvedValue(undefined);
     await rosterTable();
-    expect(screen.queryByTestId('roster-changes')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ joined:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d+ left:/)).not.toBeInTheDocument();
   });
 
   it('names who joined and who left since the last visit', async () => {
     mocked.readPreviousRoster.mockResolvedValue([1001, 1004]);
     mocked.loadCorporationMemberIds.mockResolvedValue(cached([1001, 1002]));
     await rosterTable();
-    const summary = screen.getByTestId('roster-changes');
-    expect(summary).toHaveTextContent('1 joined: Silent Ren');
-    expect(summary).toHaveTextContent('1 left: Departed Soul');
+    expect(screen.getByText('1 joined: Silent Ren')).toBeInTheDocument();
+    expect(screen.getByText('1 left: Departed Soul')).toBeInTheDocument();
   });
 
   /** A leaver is in neither read any more, so their name has to be asked for. */
