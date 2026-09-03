@@ -35,6 +35,7 @@ import {
   MagnifyingGlass,
   Package,
   PencilSimple,
+  Plus,
   Queue,
   ShoppingCart,
   Sliders,
@@ -130,3 +131,5 @@ export const SuggestReorder = withWeight(ArrowsDownUp);
 export const Build = withWeight(Hammer);
 /** The same verdict the other way: buying the material beats producing it. */
 export const Buy = withWeight(ShoppingCart);
+/** Promote a derived prereq row into a real Skill Plan entry (CONTEXT.md "Prereq Promotion"). */
+export const AddToPlan = withWeight(Plus);

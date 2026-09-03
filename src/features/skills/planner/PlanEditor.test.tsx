@@ -433,6 +433,65 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
   });
 });
 
+describe('PlanEditor prereq promotion', () => {
+  // Skill D needs Skill A at II, so a plan holding only D renders two dimmed
+  // prereq rows (A I, A II) ahead of it.
+  const PREREQ_SKILLS: SkillType[] = [
+    SKILLS[0],
+    skill({ typeID: 40, name: 'Skill D', prereqs: [{ skillTypeID: 10, level: 2 }] }),
+  ];
+  const PREREQ_CATALOG: SkillCatalog = (() => {
+    const engineSkills = new Map(
+      PREREQ_SKILLS.map((s) => [
+        s.typeID,
+        {
+          typeID: s.typeID,
+          name: s.name,
+          rank: s.rank,
+          primary: s.primaryAttr,
+          secondary: s.secondaryAttr,
+          prereqs: s.prereqs.map((p) => ({ typeID: p.skillTypeID, level: p.level })),
+        },
+      ])
+    );
+    return {
+      engineSkills,
+      bySkillTypeID: new Map(PREREQ_SKILLS.map((s) => [s.typeID, s])),
+      unlocksByTypeID: buildUnlockIndex(engineSkills),
+    };
+  })();
+
+  it('promotes a dimmed prereq row into a real entry where the schedule already trains it', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <PlanEditor
+        characterId={1}
+        plan={{ ...PLAN, entries: [{ skillTypeID: 40, targetLevel: 3 }] }}
+        catalog={PREREQ_CATALOG}
+        trainedSkills={NO_TRAINED}
+        attributes={ATTRIBUTES}
+        implants={IMPLANTS}
+        remapInfo={null}
+        listPane={<div data-testid="plan-list-pane" />}
+        onUpdate={onUpdate}
+      />
+    );
+
+    expect(screen.getAllByText('Prereq')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Add Skill A II to the plan' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      entries: [
+        { skillTypeID: 10, targetLevel: 2 },
+        { skillTypeID: 40, targetLevel: 3 },
+      ],
+      markers: [],
+    });
+    expect(screen.getByText('Skill A II is now a plan entry')).toBeInTheDocument();
+  });
+});
+
 describe('PlanEditor grouping toggle (#115)', () => {
   it('defaults to Priority band headers', () => {
     renderEditor();
