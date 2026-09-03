@@ -150,6 +150,33 @@ describe('Skills', () => {
     expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
   });
 
+  it('detects a cerebral accelerator and shows it as a third term, separate from implants', async () => {
+    // A legal base spread (20/20/20/20/19, sums to 99) with a uniform +4
+    // booster on every attribute, plus the fixture's own +3 perception
+    // implant on top of that. Once the implant comes off, what's left is
+    // inflated by exactly +4 everywhere — the signature deriveAttributeBaseline
+    // reads as an accelerator.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({
+          charisma: 23,
+          intelligence: 24,
+          memory: 24,
+          perception: 27,
+          willpower: 24,
+        })
+      )
+    );
+
+    render(<App />);
+
+    // Perception: base 20 + implant 3 + booster 4 = effective 27.
+    expect(await screen.findByText('20 + 3 implant + 4 booster = 27')).toBeInTheDocument();
+    // Intelligence, memory, willpower: no implant, only the booster — same
+    // two-term form as an implant-only bonus, applied uniformly.
+    expect(screen.getAllByText('20 + 4 = 24')).toHaveLength(3);
+  });
+
   it('shows the level from a finished queue entry that /skills has not caught up to', async () => {
     // ESI: "/skills is not updated until the character logs in ... entries
     // that are in the past need to be applied on top of this list."

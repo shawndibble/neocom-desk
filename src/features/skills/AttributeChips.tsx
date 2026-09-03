@@ -11,6 +11,16 @@ interface AttributeChipsProps {
   attributes: CharacterAttributes | null;
   implantBonuses: Implants;
   /**
+   * The uniform per-attribute bonus a detected cerebral accelerator adds
+   * (`engine/attributeBaseline.ts`'s `acceleratorBonus`, when its baseline is
+   * `accelerated`) — one number, not per-attribute, since the detection
+   * arithmetic only works because the bonus is the same on all five. Omit or
+   * pass 0 when no booster was detected (including an `impossible` sheet,
+   * where nothing explains the excess and inventing a figure would be worse
+   * than showing none).
+   */
+  boosterBonus?: number;
+  /**
    * Tighter gaps, for the plan editor's 20rem sidebar. Five chips whose
    * labels are whole words ("INTELLIGENCE") wrap to four or five rows in a
    * column that narrow, and the roomy `gap-4` that reads well across a
@@ -33,21 +43,41 @@ interface AttributeChipsProps {
  * sheet: a character's attributes are the input every training estimate is
  * built on, so inventing them would be worse than showing nothing.
  */
-export function AttributeChips({ attributes, implantBonuses, dense = false }: AttributeChipsProps) {
+export function AttributeChips({
+  attributes,
+  implantBonuses,
+  boosterBonus = 0,
+  dense = false,
+}: AttributeChipsProps) {
   const { t } = useTranslation();
   return (
     <div className={cx('flex flex-wrap', dense ? 'gap-x-2 gap-y-1.5' : 'gap-4')}>
       {attributes ? (
         ATTRIBUTE_ORDER.map((name) => {
           const effective = attributes[name];
-          const bonus = implantBonuses[name] ?? 0;
-          const base = effective - bonus;
+          const implant = implantBonuses[name] ?? 0;
+          const base = effective - implant - boosterBonus;
+          let value: number | string = base;
+          if (implant && boosterBonus) {
+            value = t('skills.attributeEffectiveBoth', {
+              base,
+              implant,
+              booster: boosterBonus,
+              effective,
+            });
+          } else if (implant || boosterBonus) {
+            value = t('skills.attributeEffective', {
+              base,
+              bonus: implant || boosterBonus,
+              effective,
+            });
+          }
           return (
             <StatChip
               key={name}
               label={t(`skills.attr.${name}`)}
-              value={bonus ? t('skills.attributeEffective', { base, bonus, effective }) : base}
-              tone={bonus ? 'accent' : 'default'}
+              value={value}
+              tone={implant || boosterBonus ? 'accent' : 'default'}
             />
           );
         })

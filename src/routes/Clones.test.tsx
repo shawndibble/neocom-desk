@@ -142,6 +142,31 @@ describe('Clones', () => {
     expect(screen.getByText(/On cooldown until/)).toBeInTheDocument();
   });
 
+  it('still resolves implant names via the per-id fallback when the names batch is rate-limited', async () => {
+    // A large jump-clone implant batch is more likely to hit ESI's
+    // error-limit throttling than a small one; before this fix, anything
+    // other than a 404 skipped the per-id fallback entirely and left every
+    // implant on the "Type #id" placeholder forever (a bare 429 has no
+    // Retry-After header, so esiFetch's one internal retry also fails fast).
+    server.use(
+      http.post(`${ESI}/universe/names`, () => new HttpResponse(null, { status: 429 })),
+      http.get(`${ESI}/universe/types/19540`, () =>
+        HttpResponse.json({
+          type_id: 19540,
+          name: 'High-grade Ascendancy Alpha',
+          description: '',
+          group_id: 300,
+          published: true,
+        })
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('High-grade Ascendancy Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Type #19540')).not.toBeInTheDocument();
+  });
+
   it('renders a clone in an inaccessible structure as an id fallback, without a re-auth banner', async () => {
     render(<App />);
     await screen.findByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant');

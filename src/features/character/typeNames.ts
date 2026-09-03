@@ -11,9 +11,16 @@
  * ESI's POST /universe/names rejects the WHOLE batch with 404 if even one id
  * in it is unresolvable (not spelled out in the OpenAPI spec's generic
  * "default" error, but reproducible in practice and long tracked upstream,
- * e.g. esi-issues #600 "universe/names 404'ing on type ids"). On a 404 we
- * fall back to resolving that chunk's ids one at a time via
- * GET /universe/types/{id}, skipping whichever of those also fail.
+ * e.g. esi-issues #600 "universe/names 404'ing on type ids"). A large batch
+ * (e.g. every implant across every jump clone, not just one clone's) is also
+ * more likely to hit ESI's error-limit throttling (429/420) than a small one,
+ * and by the time that reaches this catch, esiFetch has already retried once
+ * internally and it is still failing. Either way — a bad id in the batch or
+ * the batch itself being throttled — we fall back to resolving that chunk's
+ * ids one at a time via GET /universe/types/{id}, skipping whichever of those
+ * also fail. Any other ESI failure (5xx, 401/403) or a non-ESI failure
+ * (offline, DNS) skips the per-id fallback instead: those calls would either
+ * fail identically or pile more load onto an ESI that's already struggling.
  */
 import { EsiError } from '@/esi/client';
 import { getUniverseType, postUniverseNames } from '@/esi/endpoints';
@@ -49,9 +56,21 @@ async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
       }
       unresolved = ids.filter((id) => !map.has(id));
     } catch (err) {
-      if (err instanceof EsiError && err.status === 404) {
-        // One or more ids in this chunk are unresolvable; ESI won't return
-        // partial results for the batch, so resolve what we can one at a time.
+      // A 404 means one or more ids in the chunk are unresolvable and ESI
+      // won't return partial results for the batch; a sustained 429/420
+      // (esiFetch already retried once before this throws) means the same
+      // thing in practice — the chunk never got resolved, not that its ids
+      // are bad. Either way the per-id fallback below is worth firing.
+      // Deliberately NOT widened to every EsiError: a 5xx means ESI itself is
+      // struggling, and fanning out ESI_FANOUT_CONCURRENCY per-id calls into
+      // that instead of falling straight to cache would make it worse, not
+      // better; a 401/403 fallback would just fail identically per id. A
+      // non-EsiError (a genuine network failure — offline, DNS, etc.) skips
+      // this too: the per-id calls would fail the exact same way.
+      if (
+        err instanceof EsiError &&
+        (err.status === 404 || err.status === 429 || err.status === 420)
+      ) {
         const fetchedAt = Date.now();
         await mapWithConcurrencyLimit(ids, ESI_FANOUT_CONCURRENCY, async (id) => {
           try {
@@ -66,8 +85,8 @@ async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
         });
         unresolved = ids.filter((id) => !map.has(id));
       }
-      // Any other failure (offline, 5xx, etc.): fall through to whatever is
-      // cached below for every id in this chunk.
+      // A genuine network failure: fall through to whatever is cached below
+      // for every id in this chunk.
     }
     for (const id of unresolved) {
       const cached = await readCached<string>(GLOBAL_CACHE_CHARACTER_ID, cacheKey(id));
