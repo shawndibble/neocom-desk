@@ -12,16 +12,14 @@ const SECTIONS = [
 
 describe('PlanToolsPane', () => {
   it('groups every tool into one panel of labelled sections, not one panel each', () => {
-    render(<PlanToolsPane sections={SECTIONS} collapsible={false} />);
+    render(<PlanToolsPane sections={SECTIONS} asDisclosure={false} />);
 
     // One Panel: its title, plus a heading per section inside it.
     const pane = screen.getByRole('heading', { name: 'Plan tools' }).closest('section');
     if (!pane) throw new Error('expected the tools panel');
 
-    for (const { title, content } of SECTIONS.map((s) => ({ ...s }))) {
-      const heading = within(pane).getByRole('heading', { name: title });
-      expect(heading).toBeInTheDocument();
-      void content;
+    for (const { title } of SECTIONS) {
+      expect(within(pane).getByRole('heading', { name: title })).toBeInTheDocument();
     }
 
     // The controls themselves live inside that same single panel.
@@ -31,7 +29,7 @@ describe('PlanToolsPane', () => {
   });
 
   it('separates sections with a single hairline, never two stacked borders', () => {
-    render(<PlanToolsPane sections={SECTIONS} collapsible={false} />);
+    render(<PlanToolsPane sections={SECTIONS} asDisclosure={false} />);
 
     const sections = SECTIONS.map(
       (s) => screen.getByRole('heading', { name: s.title }).parentElement as HTMLElement
@@ -46,7 +44,7 @@ describe('PlanToolsPane', () => {
 
   it('folds to a single collapsed disclosure row below `lg`, so the tools cost one row instead of three panels', async () => {
     const user = userEvent.setup();
-    render(<PlanToolsPane sections={SECTIONS} collapsible />);
+    render(<PlanToolsPane sections={SECTIONS} asDisclosure />);
 
     const toggle = screen.getByRole('button', { name: /plan tools/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -62,9 +60,9 @@ describe('PlanToolsPane', () => {
     expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
   });
 
-  it('lets the disclosure own the separators when collapsible, so they are not drawn twice', async () => {
+  it('lets the disclosure own the separators in disclosure mode, so they are not drawn twice', async () => {
     const user = userEvent.setup();
-    render(<PlanToolsPane sections={SECTIONS} collapsible />);
+    render(<PlanToolsPane sections={SECTIONS} asDisclosure />);
     await user.click(screen.getByRole('button', { name: /plan tools/i }));
 
     for (const { title } of SECTIONS) {

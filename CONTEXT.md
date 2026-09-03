@@ -362,11 +362,13 @@
     tool set costs one row rather than three panels, and the plan leads the
     page. This supersedes #224's icon-only, sideways-scrolling toolbar — a
     full-width labelled row is a bigger touch target and self-describing.
-  - Only the entry list scrolls, capped against the live viewport. Nothing is
-    `position: sticky` any more: the summary strip and the sidebar stay in
-    view by sitting outside that scroller, which retires the pair of stacked
-    sticky panels whose offsets had to be derived from each other's rendered
-    height (#221/#229).
+  - The entry list is capped against the live viewport and scrolls inside its
+    own box. The summary strip is the one remaining `position: sticky`
+    element, pinned at a plain `top-0` — the window can still scroll when the
+    sidebar outgrows the viewport, and the plan's headline numbers should
+    survive that. What retires #221/#229 is that there is no second sticky
+    panel below it needing its rendered height, so no offset has to be
+    measured or kept in sync.
   - "Optimize remaps" and "Optimize at markers" results render inline in the
     Actions section, under the button that produced them, rather than as
     extra panels at the bottom of the page. Still read-only findings to

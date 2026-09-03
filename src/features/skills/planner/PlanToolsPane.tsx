@@ -14,11 +14,11 @@ export interface PlanToolSection {
 interface PlanToolsPaneProps {
   sections: readonly PlanToolSection[];
   /**
-   * Fold the whole pane into a single disclosure row. True below `lg`, where
-   * the pane sits in the one scrolling column above the entry list rather
-   * than in its own sidebar.
+   * Render as a single collapsed disclosure row instead of an open panel.
+   * True below `lg`, where the pane sits in the one scrolling column above
+   * the entry list rather than in its own sidebar.
    */
-  collapsible: boolean;
+  asDisclosure: boolean;
   className?: string;
 }
 
@@ -37,7 +37,7 @@ interface PlanToolsPaneProps {
  * Passing them in as `content` nodes keeps that state where it is rather
  * than lifting a dozen handlers into a props interface for this component.
  */
-export function PlanToolsPane({ sections, collapsible, className }: PlanToolsPaneProps) {
+export function PlanToolsPane({ sections, asDisclosure, className }: PlanToolsPaneProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
@@ -46,11 +46,11 @@ export function PlanToolsPane({ sections, collapsible, className }: PlanToolsPan
       key={section.id}
       className={cx(
         'space-y-2 p-3',
-        // Collapsed mode nests these in a `Disclosure`, whose `divide-y`
+        // Disclosure mode nests these in a `Disclosure`, whose `divide-y`
         // already draws a line between adjacent children — adding our own
         // bottom border there would stack two 1px hairlines into a 2px one,
         // against DESIGN.md §3's "always 1px".
-        !collapsible && index < sections.length - 1 && 'border-b border-line'
+        !asDisclosure && index < sections.length - 1 && 'border-b border-line'
       )}
     >
       <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -60,7 +60,7 @@ export function PlanToolsPane({ sections, collapsible, className }: PlanToolsPan
     </section>
   ));
 
-  if (collapsible) {
+  if (asDisclosure) {
     return (
       <Panel className={className} padded={false}>
         <Disclosure

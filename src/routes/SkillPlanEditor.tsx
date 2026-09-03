@@ -8,6 +8,7 @@ import { scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { PlanEditor } from '@/features/skills/planner/PlanEditor';
+import { PlanEditorLayout } from '@/features/skills/planner/PlanEditorLayout';
 import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -80,9 +81,20 @@ export function SkillPlanEditor() {
       )}
 
       {!catalog ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
+        // Same two-column shape while the skill catalog loads, so the plan
+        // list stays put in the sidebar instead of vanishing behind a
+        // full-page spinner and snapping back once the catalog arrives.
+        <PlanEditorLayout
+          sidebar={
+            isDesktop ? (
+              <PlanListPane activeCharacterId={activeCharacterId} remapInfo={remapInfo} />
+            ) : undefined
+          }
+        >
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        </PlanEditorLayout>
       ) : (
         <PlanEditor
           characterId={activeCharacterId}

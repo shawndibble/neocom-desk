@@ -138,9 +138,15 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   await expect(page.getByRole('heading', { name: 'Plan tools' })).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Optimize remaps' })).toBeInViewport();
 
-  // And the summary strip never ends up overlapped by what follows it.
+  // And the summary strip stays pinned when the *window* scrolls, not just
+  // when the capped list does — the sidebar beside it is uncapped, so a long
+  // plan list or an expanded optimize result can still push the page taller
+  // than the viewport. Asserting only the list-scroll case would pass whether
+  // or not the strip is sticky at all.
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.waitForTimeout(100);
+  await expect(summaryPanel).toBeInViewport();
   const summaryBox = await summaryPanel.boundingBox();
-  const entriesBox = await entriesHeading.boundingBox();
-  if (!summaryBox || !entriesBox) throw new Error('expected both to have a layout box');
-  expect(entriesBox.y).toBeGreaterThanOrEqual(summaryBox.y + summaryBox.height - 1);
+  if (!summaryBox) throw new Error('expected the summary strip to have a layout box');
+  expect(summaryBox.y).toBeLessThan(200);
 });

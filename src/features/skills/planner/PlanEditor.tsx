@@ -54,6 +54,7 @@ import { useColumnVisibility } from './columnPreference';
 import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMode';
 import { attributePairBandStarts } from './attributePairBands';
 import { PlanHeader } from './PlanHeader';
+import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import {
   evaluateOptimizationBadge,
@@ -537,31 +538,35 @@ export function PlanEditor({
   }
 
   /**
-   * One action in the tools pane: a full-width row with its glyph on the
-   * left and its label beside it.
+   * One action in the tools pane: a full-width row, glyph left, label beside
+   * it. `size="md"` is deliberate — these are the pane's primary targets, so
+   * they take the `h-11 md:h-9` touch tier (DESIGN.md §3) rather than `sm`,
+   * which is for controls nested inside an already-dense row and would hand
+   * a phone a 36px target.
    *
    * This replaces #224's two renderings of every action (full-text `Button`
    * at `lg`+, icon-only `IconButton` below it). That split existed because
    * centred pills wrapped badly in a wide row; stacked in a narrow column
-   * the problem is gone, and one labelled row is both a larger touch target
-   * than a 44px square and self-describing, which an icon-only strip that
-   * scrolled sideways was not.
+   * the problem is gone, and a labelled row is self-describing where an
+   * icon-only strip that scrolled sideways was not.
+   *
+   * Returned as a bare `Button` by `toolButton` so the Export dropdown can
+   * hand the same element to its Radix trigger's `asChild`, which needs a
+   * single element to clone props onto and so cannot take a Tooltip wrapper.
    */
-  function toolAction({
+  function toolButton({
     icon,
     label,
     onClick,
     disabled,
-    tooltip,
   }: {
     icon: ReactNode;
     label: string;
     onClick?: () => void;
     disabled?: boolean;
-    tooltip?: string;
-  }): ReactNode {
-    const button = (
-      <Button size="sm" align="start" className="w-full" onClick={onClick} disabled={disabled}>
+  }) {
+    return (
+      <Button size="md" align="start" className="w-full" onClick={onClick} disabled={disabled}>
         {/* Decorative: the label beside it is the accessible name (DESIGN.md §5). */}
         <span aria-hidden="true" className="shrink-0 text-text-dim">
           {icon}
@@ -569,7 +574,11 @@ export function PlanEditor({
         {label}
       </Button>
     );
-    return tooltip ? <Tooltip content={tooltip}>{button}</Tooltip> : button;
+  }
+
+  function toolAction(args: Parameters<typeof toolButton>[0] & { tooltip?: string }): ReactNode {
+    const button = toolButton(args);
+    return args.tooltip ? <Tooltip content={args.tooltip}>{button}</Tooltip> : button;
   }
 
   /** Transient "it worked" note, under the action that produced it. */
@@ -598,7 +607,7 @@ export function PlanEditor({
             />
             <TextInput
               id="plan-remap-count"
-              size="sm"
+              size="md"
               type="number"
               min={0}
               max={5}
@@ -697,7 +706,7 @@ export function PlanEditor({
           <label className="flex items-center justify-between gap-2">
             {t('plans.whatIfImplants')}
             <NativeSelect
-              size="sm"
+              size="md"
               value={whatIfMode}
               onChange={(e) => setWhatIfMode(e.target.value as WhatIfImplantMode)}
             >
@@ -728,7 +737,7 @@ export function PlanEditor({
               <label className="flex items-center justify-between gap-2">
                 {t('plans.boosterBonus')}
                 <TextInput
-                  size="sm"
+                  size="md"
                   type="number"
                   min={1}
                   max={9}
@@ -742,7 +751,7 @@ export function PlanEditor({
                 {/* `min-w-0` so a datetime field can shrink inside the
                     sidebar instead of forcing the column wider. */}
                 <TextInput
-                  size="sm"
+                  size="md"
                   type="datetime-local"
                   value={boosterExpiresAt}
                   onChange={(e) => setBoosterExpiresAt(e.target.value)}
@@ -772,12 +781,10 @@ export function PlanEditor({
           })}
           <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" align="start" className="w-full">
-                <span aria-hidden="true" className="shrink-0 text-text-dim">
-                  <Icon.Export size={Icon.ICON_SIZE.sm} />
-                </span>
-                {t('plans.export')}
-              </Button>
+              {toolButton({
+                icon: <Icon.Export size={Icon.ICON_SIZE.sm} />,
+                label: t('plans.export'),
+              })}
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem
@@ -814,21 +821,20 @@ export function PlanEditor({
   // homes are genuinely different boxes in the layout (a sidebar column vs.
   // the single scrolling column), which no CSS reordering can bridge without
   // coupling the grid's row heights to each other.
-  const toolsPane = <PlanToolsPane sections={toolSections} collapsible={!isDesktop} />;
+  const toolsPane = <PlanToolsPane sections={toolSections} asDisclosure={!isDesktop} />;
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
-      {/* Everything you act *with*. `lg:items-start` on the grid keeps this
-          column its own height instead of stretching to the entry list's. */}
-      {isDesktop && (
-        <aside className="space-y-4">
-          {listPane}
-          {toolsPane}
-        </aside>
-      )}
-
-      {/* Everything you look *at*. */}
-      <div className="space-y-4">
+    <>
+      <PlanEditorLayout
+        sidebar={
+          isDesktop ? (
+            <>
+              {listPane}
+              {toolsPane}
+            </>
+          ) : undefined
+        }
+      >
         <PlanHeader
           totalSeconds={totalSeconds}
           skillCount={scheduledSkillCount}
@@ -957,7 +963,7 @@ export function PlanEditor({
             </div>
           </div>
         </Panel>
-      </div>
+      </PlanEditorLayout>
 
       {importOpen && (
         <ImportClipboardDialog
@@ -1006,6 +1012,6 @@ export function PlanEditor({
           </Button>
         </div>
       </Modal>
-    </div>
+    </>
   );
 }

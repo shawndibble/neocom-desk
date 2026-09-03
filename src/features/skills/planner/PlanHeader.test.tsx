@@ -18,13 +18,16 @@ describe('PlanHeader', () => {
     expect(screen.getByText('4')).toBeInTheDocument();
   });
 
-  it('does not pin itself: only the entry list scrolls, so the strip above it stays in view anyway', () => {
+  it('pins itself at a plain top-0, with no offset measured off a neighbouring panel', () => {
     render(<PlanHeader totalSeconds={0} skillCount={0} projectedFinish={null} badge={null} />);
 
-    // Two stacked sticky panels needed each other's rendered height to stay
-    // clear (#221/#229). Capping the list alone removes the whole class.
+    // It stays pinned because the window can still scroll when the sidebar
+    // outgrows the viewport. What retires #221/#229 is that it is now the
+    // only pinned panel, so `top` is a static class rather than a number
+    // measured off the panel above it and kept in sync.
     const section = screen.getByRole('heading', { name: 'Plan summary' }).closest('section');
-    expect(section?.className).not.toMatch(/sticky/);
+    expect(section).toHaveClass('lg:sticky', 'lg:top-0');
+    expect(section?.getAttribute('style') ?? '').not.toMatch(/top/);
   });
 
   it('shows an empty finish rather than inventing a date for an empty plan', () => {

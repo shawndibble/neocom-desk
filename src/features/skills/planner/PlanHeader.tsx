@@ -21,12 +21,15 @@ export function PlanHeader({ totalSeconds, skillCount, projectedFinish, badge }:
   const showsSavings = badge !== null && savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
 
   return (
-    // Not sticky any more, and no longer measured: only the entry list
-    // scrolls now (PlanEditor caps that list alone), so this strip stays in
-    // view by simply sitting above it. That retires the pair of stacked
-    // sticky panels whose offsets had to be derived from each other's
-    // rendered height and drifted apart whenever either changed (#221/#229).
-    <Panel title={t('plans.headerTitle')}>
+    // Still pinned, but now the *only* pinned thing on the page, so its
+    // offset is a plain `top-0` rather than a number measured off a
+    // neighbour. The entry list has its own cap, yet the window can still
+    // scroll when the sidebar beside it outgrows the viewport (a long plan
+    // list plus an expanded optimize result) — and this strip is the plan's
+    // headline numbers, which should survive that. What retires #221/#229 is
+    // that there is no second sticky panel below needing this one's rendered
+    // height; nothing here has to stay in sync with anything.
+    <Panel title={t('plans.headerTitle')} className="lg:sticky lg:top-0 lg:z-10">
       {/* `lg:flex-nowrap` keeps this row one line at `lg`+, where the sidebar
           leaves it less width than the page; `lg:overflow-x-auto` keeps any
           overflow reachable at the narrow end of that range. */}
