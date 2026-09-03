@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
-import { expandChain, type PiChain, type PiTier } from '@/engine/pi/chain';
+import { expandChain, piTier, type PiChain, type PiTier } from '@/engine/pi/chain';
 import {
   costPlan,
   factoryPinsAbove,
@@ -213,6 +213,50 @@ describe('taxSplit', () => {
 
   it('charges nothing between planets when every made tier shares one', () => {
     expect(taxSplit(costed('single-planet'), 4).betweenPlanetsBase).toBeCloseTo(0, 6);
+  });
+
+  /**
+   * The discriminating guard, and the reason it is a sweep.
+   *
+   * `betweenPlanetsBase` is defined by subtraction, so the sum-reconciles test
+   * above passes even if `exportBase` is wrong — the error just moves into the
+   * remainder. This is the assertion that actually pins `exportBase`: on one
+   * planet there is no made-to-made boundary anywhere in the graph, so the
+   * remainder must be exactly zero for every product at every legal floor. It
+   * holds because a chain's target is never an input to one of its own
+   * descendants (that would be a cycle, which `expandChain` rejects), so the
+   * engine charges exactly one full target export per unit. A schematic graph
+   * that broke that assumption would fail here rather than quietly misreport
+   * which row the layout penalty sits in.
+   */
+  it('leaves no remainder on one planet, for every product at every legal floor', () => {
+    // Float drift only, not tolerance for a real remainder: the largest honest
+    // between-planets base in the graph is thousands of ISK of taxable value.
+    const DRIFT = 1e-6;
+    const offenders: string[] = [];
+    for (const [key, schematic] of Object.entries(pi.schematics)) {
+      const productId = Number(key);
+      const tier = piTier(productId, pi);
+      const productChain = expandChain(productId, pi, { unitsPerHour: 7 });
+      const productPrices = pricesFor(productChain);
+      for (const floor of validFloors(tier)) {
+        const result = costPlan(productChain, {
+          prices: productPrices,
+          sourcingFloor: floor,
+          layout: 'single-planet',
+          taxRate: 0.15,
+          extractionRate: 1_000,
+        });
+        if (result.status !== 'costed') {
+          throw new Error(`${schematic.name} at ${floor} was ${result.status}`);
+        }
+        const remainder = taxSplit(result.breakdown, tier).betweenPlanetsBase;
+        if (Math.abs(remainder) > DRIFT) {
+          offenders.push(`${schematic.name} at ${floor}: ${remainder}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 
   it('is where the planet-per-tier penalty lands', () => {

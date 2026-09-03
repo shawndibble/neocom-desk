@@ -319,12 +319,13 @@ export interface SensitivityOptions {
  * `DataTable`'s stacking on a phone, where a matrix does not.
  */
 export function sensitivityGrid(chain: PiChain, opts: SensitivityOptions): SensitivityRow[] {
-  const rows: SensitivityRow[] = opts.floors.map((floor) => ({
-    floor,
-    factoryPins: factoryPinsAbove(chain, floor),
-    planetCount: planetCountFor(chain, floor, opts.layout),
-    extractors: null,
-    cells: opts.rates.map((rate) => {
+  // Per-row extractor counts, kept beside the rows rather than on them: the
+  // count does not vary with the tax rate, so it is collapsed to one figure
+  // below and never reaches a caller per rate.
+  const extractorsPerRow: (number | null)[][] = [];
+  const rows: SensitivityRow[] = opts.floors.map((floor) => {
+    const extractorsByRate: (number | null)[] = [];
+    const cells = opts.rates.map((rate): SensitivityCell => {
       const result = costPlan(chain, {
         prices: opts.prices,
         sourcingFloor: floor,
@@ -333,30 +334,34 @@ export function sensitivityGrid(chain: PiChain, opts: SensitivityOptions): Sensi
         extractionRate: opts.extractionRate,
       });
       if (result.status === 'costed') {
-        return { rate, status: 'costed' as const, margin: result.breakdown.margin, best: false };
+        extractorsByRate.push(result.breakdown.extraction?.totalExtractors ?? null);
+        return { rate, status: 'costed', margin: result.breakdown.margin, best: false };
       }
+      extractorsByRate.push(null);
       return {
         rate,
         status:
           result.status === 'needs-extraction-rate' ? 'needs-extraction-rate' : 'not-priceable',
-        best: false as const,
+        best: false,
       };
-    }),
-  }));
-
-  for (const row of rows) {
-    if (row.floor !== 'P0') continue;
-    const costed = costPlan(chain, {
-      prices: opts.prices,
-      sourcingFloor: 'P0',
-      layout: opts.layout,
-      taxRate: opts.rates[0] ?? 0,
-      extractionRate: opts.extractionRate,
     });
-    if (costed.status === 'costed') {
-      row.extractors = costed.breakdown.extraction?.totalExtractors ?? null;
-    }
-  }
+    extractorsPerRow.push(extractorsByRate);
+    return {
+      floor,
+      factoryPins: factoryPinsAbove(chain, floor),
+      planetCount: planetCountFor(chain, floor, opts.layout),
+      extractors: null,
+      cells,
+    };
+  });
+
+  // Extractor count does not vary with the tax rate, so it is read off
+  // whichever rate on the P0 row actually costed rather than re-costing at a
+  // fixed rate that might itself be the unpriceable one.
+  rows.forEach((row, index) => {
+    if (row.floor !== 'P0') return;
+    row.extractors = extractorsPerRow[index]?.find((count) => count != null) ?? null;
+  });
 
   opts.rates.forEach((_rate, index) => {
     let bestRow: SensitivityRow | null = null;
