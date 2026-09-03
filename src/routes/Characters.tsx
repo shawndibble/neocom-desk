@@ -22,7 +22,7 @@ import {
   type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
+import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -452,7 +452,12 @@ export function Characters() {
         title={t('characters.title')}
         actions={
           <>
-            <Button variant="primary" size="sm" onClick={() => void beginEveLogin()}>
+            {/*
+              The add-a-character branch, not a re-auth: SSO decides who comes
+              back, so unioning with the *active* Character's grant would ask
+              the newcomer to consent to scopes aimed at somebody else (#295).
+            */}
+            <Button variant="primary" size="sm" onClick={() => void beginAddCharacterLogin()}>
               {t('characters.add')}
             </Button>
           </>

@@ -24,6 +24,7 @@ import { useLockedRoutes } from './useGrantedScopes';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
+import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
 import type { AppRoutePath } from './routeScopes';
 
 /**
@@ -477,6 +478,12 @@ export function Layout() {
       </nav>
 
       <NotificationPermissionPrompt />
+      {/*
+        In the shell rather than in `App`, unlike the install and reload
+        prompts: it is about the *active Character*, so it belongs inside
+        `RequireCharacter`, where there is always one.
+      */}
+      <CorpGrantPrompt />
       <ForegroundNotificationPoller />
 
       {!isDesktop && (

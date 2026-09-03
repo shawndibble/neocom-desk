@@ -30,10 +30,35 @@ export type EsiScopeName = `esi-${string}.v${number}`;
 
 export type ScopeRequirement = EsiScopeName | PublicAccess;
 
+/**
+ * Named, opt-in scope groups: scopes a Character is asked for only when they
+ * ask for the feature, rather than at sign-in with everyone else.
+ *
+ * `corp` exists because the corp section needs seven scopes that ~95% of users
+ * can never use — CCP role-gates the endpoints server-side, so a line member
+ * granting them gains nothing but a longer consent screen (CONTEXT.md round
+ * 35). Adding a group here is a product decision, not a mechanical one: the
+ * default is the base grant, and a scope leaves it only when most users would
+ * be consenting to something they will never exercise.
+ */
+export const SCOPE_GROUPS = ['corp'] as const;
+export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
+
 export interface EsiEndpointSpec {
   /** ESI route with `{snake_case}` placeholders — never an interpolated URL. */
   readonly route: string;
   readonly scope: ScopeRequirement;
+  /**
+   * The opt-in group this endpoint's scope belongs to. **Absent means the base
+   * grant** — the set every Character is asked for at sign-in — so leaving it
+   * off is the ordinary case and grouping is the deliberate one.
+   *
+   * Declared per endpoint rather than per scope, which is why
+   * `scopes.test.ts` asserts the base and grouped sets never overlap: one
+   * ungrouped endpoint declaring a grouped scope would quietly put it back on
+   * everyone's consent screen.
+   */
+  readonly group?: ScopeGroup;
 }
 
 /**
@@ -235,6 +260,66 @@ export const ESI_REGISTRY = {
   getIndustrySystemCostIndices: {
     route: '/industry/systems',
     scope: PUBLIC,
+  },
+
+  // --- The `corp` group (issue #295) ---
+  //
+  // Every entry below is corp-owned data behind a server-side role gate, so
+  // none of it reaches the base consent screen. `engine/corpRoles.ts` holds
+  // which in-game role opens which of these; the scope is only half the gate.
+  getCorporationStructures: {
+    route: '/corporations/{corporation_id}/structures',
+    scope: 'esi-corporations.read_structures.v1',
+    group: 'corp',
+  },
+  getCorporationWallets: {
+    route: '/corporations/{corporation_id}/wallets',
+    scope: 'esi-wallet.read_corporation_wallets.v1',
+    group: 'corp',
+  },
+  getCorporationWalletJournal: {
+    route: '/corporations/{corporation_id}/wallets/{division}/journal',
+    scope: 'esi-wallet.read_corporation_wallets.v1',
+    group: 'corp',
+  },
+  /**
+   * A scope of its own, deliberately: without it the wallet and hangar
+   * divisions render as "Division 3" rather than the names the corp gave them
+   * ("SRP"), which is most of what makes a corp wallet readable.
+   */
+  getCorporationDivisions: {
+    route: '/corporations/{corporation_id}/divisions',
+    scope: 'esi-corporations.read_divisions.v1',
+    group: 'corp',
+  },
+  getCorporationMembers: {
+    route: '/corporations/{corporation_id}/members',
+    scope: 'esi-corporations.read_corporation_membership.v1',
+    group: 'corp',
+  },
+  getCorporationMemberRoles: {
+    route: '/corporations/{corporation_id}/roles',
+    scope: 'esi-corporations.read_corporation_membership.v1',
+    group: 'corp',
+  },
+  getCorporationMemberTracking: {
+    route: '/corporations/{corporation_id}/membertracking',
+    scope: 'esi-corporations.track_members.v1',
+    group: 'corp',
+  },
+  /**
+   * Singular `/corporation/` — CCP's own inconsistency in the live spec, not a
+   * typo here. Every other corp route in this table is plural.
+   */
+  getCorporationMiningExtractions: {
+    route: '/corporation/{corporation_id}/mining/extractions',
+    scope: 'esi-industry.read_corporation_mining.v1',
+    group: 'corp',
+  },
+  getCorporationIndustryJobs: {
+    route: '/corporations/{corporation_id}/industry/jobs',
+    scope: 'esi-industry.read_corporation_jobs.v1',
+    group: 'corp',
   },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 

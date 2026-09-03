@@ -13,7 +13,7 @@ import {
   NO_CORP_CAPABILITIES,
   type CorpCapabilities,
 } from '@/engine/corpRoles';
-import type { EsiScopeName } from '@/esi/registry';
+import type { Scope } from '@/esi/registry';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { corpWideRoles, loadCharacterRoles } from './roles';
@@ -38,13 +38,25 @@ export interface CorpAccess {
   /** What this Character can see. All false unless `state` is `roles-without-grant` or `ready`. */
   capabilities: CorpCapabilities;
   /** Scopes to ask for, for the capabilities this Character actually holds. Empty unless `roles-without-grant`. */
-  missingScopes: readonly EsiScopeName[];
+  missingScopes: readonly Scope[];
+  /**
+   * The corporation-wide roles ESI reported, raw. Empty while `unknown`, and
+   * empty for a Character that genuinely holds none — but *not* empty merely
+   * because the state is `none`: a member with only office-scoped or cosmetic
+   * roles resolves to `none` and still has roles to name.
+   *
+   * Exists for the Settings Corp access row, which explains *why* a Character
+   * can read what it can. Capabilities cannot say that on their own, and
+   * nothing here should compare a role string — that is `engine/corpRoles.ts`.
+   */
+  roles: readonly string[];
 }
 
 const UNKNOWN_CORP_ACCESS: CorpAccess = {
   state: 'unknown',
   capabilities: NO_CORP_CAPABILITIES,
   missingScopes: [],
+  roles: [],
 };
 
 const NO_CORP_ACCESS: CorpAccess = { ...UNKNOWN_CORP_ACCESS, state: 'none' };
@@ -96,13 +108,15 @@ export function useCorpAccess(): CorpAccess {
     if (granted === undefined) return UNKNOWN_CORP_ACCESS;
 
     const capabilities = corpCapabilities(snapshot.roles);
-    if (!hasAnyCorpCapability(capabilities)) return NO_CORP_ACCESS;
+    const roles = snapshot.roles;
+    if (!hasAnyCorpCapability(capabilities)) return { ...NO_CORP_ACCESS, roles };
 
     const missingScopes = missingCorpScopes(capabilities, granted);
     return {
       state: missingScopes.length === 0 ? 'ready' : 'roles-without-grant',
       capabilities,
       missingScopes,
+      roles,
     };
   }, [snapshot, activeCharacterId, granted]);
 }

@@ -45,3 +45,16 @@ export function corpWideRoles(
 ): readonly string[] {
   return payload?.roles ?? [];
 }
+
+/**
+ * Display form of a role: `Junior_Accountant` -> `Junior Accountant`.
+ *
+ * Not routed through i18next, and deliberately so — this is ESI data, like a
+ * character or corporation name, not a string the app authored. CCP extends
+ * the role enum without notice, so a lookup table would render tomorrow's role
+ * as a blank or a raw key in front of the one user who has it; unwrapping the
+ * enum's own spelling always says something true.
+ */
+export function corpRoleLabel(role: string): string {
+  return role.replace(/_/g, ' ');
+}

@@ -1342,5 +1342,28 @@
     "publicCall": "Public",
     "emptyTitle": "No activity yet",
     "emptyHint": "Requests the app makes will appear here as you use it."
+  },
+  "corp": {
+    "grantPromptTitle": "Corporation access",
+    "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so NeoCom Desk can show your corporation's data?",
+    "grantPromptUnnamedCorporation": "your corporation",
+    "grantPromptGrant": "Grant access",
+    "grantPromptDismiss": "Not now",
+    "grantPromptHint": "Either way, this is the last time you'll be asked — Settings has a Corp access row whenever you want it.",
+    "accessTitle": "Corp access",
+    "accessHint": "Corp data needs two things: a corporation role, granted in game, and access to the corp endpoints, granted here. Roles are read from EVE and can only be changed in game.",
+    "accessCharacterUnknown": "Select a character to see its corp access.",
+    "accessRolesLabel": "Roles",
+    "accessRolesNone": "None",
+    "accessGrantLabel": "Access",
+    "accessGrantChecking": "Checking…",
+    "accessGrantGranted": "Granted",
+    "accessGrantMissing": "Not granted",
+    "accessGrantNotApplicable": "Not applicable",
+    "accessGrantButton": "Grant access",
+    "accessUnknownHint": "Reading this character's corporation roles.",
+    "accessNoneHint": "This character holds no corporation role that opens corp data, so granting access would unlock nothing.",
+    "accessMissingHint": "Corp data stays hidden until this character grants access.",
+    "accessReadyHint": "This character can see the corp data its roles allow."
   }
 }

@@ -349,10 +349,22 @@ async function seedPriorLogin(options: {
   await db.tokens.put(record as TokenRecord);
 }
 
-/** Drive a fresh interactive login whose JWT carries `claims`. */
-async function login(claims: { scp?: string[]; owner?: string }): Promise<void> {
+/**
+ * Drive a fresh interactive login whose JWT carries `claims`.
+ *
+ * `requested` is what the authorize URL asked SSO for, and it is now load
+ * bearing rather than decoration: the login path judges revocation as
+ * *requested* vs granted (issue #295). It defaults to the widest set these
+ * tests use, which is what a re-auth from a character context sends —
+ * `union(SCOPES, that character's grant)` — so a scope missing from the JWT
+ * is a genuine denial unless a test says otherwise.
+ */
+async function login(
+  claims: { scp?: string[]; owner?: string },
+  requested: string[] = [SKILLS, MAIL, WALLET]
+): Promise<void> {
   respondWith(claims);
-  const url = new URL(await startLogin([SKILLS], cfg));
+  const url = new URL(await startLogin(requested, cfg));
   await completeLogin({ code: 'good-code', state: url.searchParams.get('state')! }, cfg);
 }
 
@@ -414,6 +426,84 @@ describe('persistTokens: cache purge on scope revoke', () => {
 
     expect(await cachedKeys(CHAR_ID)).toEqual(['skills']);
     expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual([SKILLS]);
+  });
+
+  // -------------------------------------------------------------------------
+  // Requested vs granted (issue #295). The login path asks SSO for a specific
+  // set and compares the answer against *that*, not against what the character
+  // happened to hold before. Two things turn on it: an add-a-character login
+  // asking for the base set alone must not read a wider stored grant as a
+  // revocation, and a scope the app asks for but never gets — a retired scope,
+  // or one the EVE application is not registered for — must not purge the
+  // cache on every login forever.
+  // -------------------------------------------------------------------------
+
+  it('does NOT purge when the login asked for LESS than the character already held', async () => {
+    // Add-a-character: SSO decides who comes back, so the request is the base
+    // set alone. The grant genuinely narrows — that is the accepted trade —
+    // but a scope the app never asked for is no evidence of revocation, and
+    // purging on it is exactly the bug #293 was fixing.
+    await seedPriorLogin({ scopes: [SKILLS, MAIL, WALLET] });
+    await seedCache(CHAR_ID, 'skills');
+    await seedCache(CHAR_ID, 'mail:headers');
+
+    await login({ scp: [SKILLS] }, [SKILLS]);
+
+    expect(await cachedKeys(CHAR_ID)).toEqual(['mail:headers', 'skills']);
+    expect(await isCachePurgePending(CHAR_ID)).toBe(false);
+  });
+
+  it('DOES purge when a scope the login asked for came back denied', async () => {
+    // The other half: re-auth from a character context asks for the union, so
+    // a scope missing from the answer is a real denial. Revocation detection
+    // is not weakened by the rule above.
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'mail:headers');
+
+    await login({ scp: [SKILLS] }, [SKILLS, MAIL]);
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+  });
+
+  it('never purges over a requested scope the character never held', async () => {
+    // The trap in a plain `requested \ granted` diff: `SCOPES` keeps asking, so
+    // a scope SSO will never return — retired upstream, or not registered on
+    // the EVE application — would wipe the cache on every login, forever. Run
+    // twice: the second pass is the "forever" half.
+    const UNREGISTERED = 'esi-corporations.read_structures.v1';
+    await seedPriorLogin({ scopes: [SKILLS] });
+    await seedCache(CHAR_ID, 'skills');
+
+    await login({ scp: [SKILLS] }, [SKILLS, UNREGISTERED]);
+    await login({ scp: [SKILLS] }, [SKILLS, UNREGISTERED]);
+
+    expect(await cachedKeys(CHAR_ID)).toEqual(['skills']);
+    expect(await isCachePurgePending(CHAR_ID)).toBe(false);
+  });
+
+  it('falls back to previous-vs-granted when the requested set was not stashed', async () => {
+    // A callback completed without this tab's `startLogin` having run. The
+    // conservative reading wins: with no record of what was asked for, a
+    // narrower grant is treated as a revocation exactly as it was before #295.
+    await seedPriorLogin({ scopes: [SKILLS, MAIL] });
+    await seedCache(CHAR_ID, 'mail:headers');
+    respondWith({ scp: [SKILLS] });
+    const url = new URL(await startLogin([SKILLS, MAIL], cfg));
+    const state = url.searchParams.get('state')!;
+    sessionStorage.removeItem('neocom.sso.scopes');
+
+    await completeLogin({ code: 'good-code', state }, cfg);
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+  });
+
+  it('clears the stashed request, so a later refresh judges on the stored grant', async () => {
+    // The stash belongs to one authorize round trip. Left behind, it would go
+    // on standing in for "what we asked for" on every later refresh — where
+    // nothing is requested at all and the stored grant is the only baseline.
+    await login({ scp: [SKILLS] }, [SKILLS, MAIL]);
+
+    expect(sessionStorage.getItem('neocom.sso.scopes')).toBeNull();
   });
 
   it('purges on a token REFRESH whose JWT carries fewer scopes (portal revocation)', async () => {

@@ -1256,3 +1256,292 @@ export function getRoute(
     query: { flag },
   });
 }
+
+// ---------------------------------------------------------------------------
+// The `corp` scope group (issue #295).
+//
+// Corp-owned reads, all behind an opt-in grant and a server-side role gate.
+// Each takes the *Character* making the call as well as the corporation id:
+// ESI authorises these against that Character's own in-game roles, and
+// `characterId` is what selects the access token (and the cache/activity-log
+// owner) — the corporation id only shapes the path.
+// ---------------------------------------------------------------------------
+
+// --- GET /corporations/{corporation_id}/structures (esi-corporations.read_structures.v1) ---
+
+export interface CorporationStructureService {
+  name: string;
+  state: 'online' | 'offline' | 'cleanup';
+}
+
+export interface CorporationStructure {
+  structure_id: number;
+  corporation_id: number;
+  system_id: number;
+  type_id: number;
+  profile_id: number;
+  /** Absent once the structure has run dry — which is exactly when it matters. */
+  fuel_expires?: string;
+  name?: string;
+  reinforce_hour?: number;
+  next_reinforce_hour?: number;
+  next_reinforce_apply?: string;
+  services?: CorporationStructureService[];
+  state?:
+    | 'anchor_vulnerable'
+    | 'anchoring'
+    | 'armor_reinforce'
+    | 'armor_vulnerable'
+    | 'deploy_vulnerable'
+    | 'fitting_invulnerable'
+    | 'hull_reinforce'
+    | 'hull_vulnerable'
+    | 'online_deprecated'
+    | 'onlining_vulnerable'
+    | 'shield_vulnerable'
+    | 'unanchored'
+    | 'unknown';
+  state_timer_start?: string;
+  state_timer_end?: string;
+  unanchors_at?: string;
+}
+
+/** Paginated (X-Pages); see fetchAllPagesStatus. */
+export function getCorporationStructures(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationStructure>> {
+  return fetchAllPagesStatus<CorporationStructure>(`/corporations/${corporationId}/structures`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationStructures',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/wallets (esi-wallet.read_corporation_wallets.v1) ---
+
+/** One of the corporation's seven wallet divisions; `division` is 1-7. */
+export interface CorporationWalletDivision {
+  division: number;
+  balance: number;
+}
+
+export function getCorporationWallets(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationWalletDivision[]>> {
+  return esiFetch<CorporationWalletDivision[]>(`/corporations/${corporationId}/wallets`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationWallets',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/wallets/{division}/journal (esi-wallet.read_corporation_wallets.v1) ---
+
+/**
+ * One division at a time: ESI publishes no all-divisions journal, and the
+ * seven are separately role-gated in game. Paginated (X-Pages), returning the
+ * completeness flag for the same reason the character journal does — a short
+ * journal must not reach the view looking whole.
+ *
+ * Reuses `WalletJournalEntry`: ESI returns the same schema for both.
+ */
+export function getCorporationWalletJournal(
+  characterId: number,
+  corporationId: number,
+  division: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<WalletJournalEntry>> {
+  return fetchAllPagesStatus<WalletJournalEntry>(
+    `/corporations/${corporationId}/wallets/${division}/journal`,
+    {
+      ...options,
+      characterId,
+      endpointId: 'getCorporationWalletJournal',
+    }
+  );
+}
+
+// --- GET /corporations/{corporation_id}/divisions (esi-corporations.read_divisions.v1) ---
+
+/** Both fields optional: ESI omits `name` for a division still on its default. */
+export interface CorporationDivision {
+  division?: number;
+  name?: string;
+}
+
+export interface CorporationDivisions {
+  hangar?: CorporationDivision[];
+  wallet?: CorporationDivision[];
+}
+
+export function getCorporationDivisions(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationDivisions>> {
+  return esiFetch<CorporationDivisions>(`/corporations/${corporationId}/divisions`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationDivisions',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/members (esi-corporations.read_corporation_membership.v1) ---
+
+/** Character ids only — names come from `postUniverseNames`. Paginated (X-Pages). */
+export function getCorporationMembers(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<number>> {
+  return fetchAllPagesStatus<number>(`/corporations/${corporationId}/members`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationMembers',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/roles (esi-corporations.read_corporation_membership.v1) ---
+
+/**
+ * Every member's roles. Optional exactly as `CharacterCorporationRoles` is —
+ * ESI omits an array rather than sending `[]` — and to be read the same way:
+ * `roles` is the corporation-wide grant, the `roles_at_*` variants are scoped
+ * to one office and open none of the corporation-wide endpoints
+ * (`engine/corpRoles.ts`).
+ */
+export interface CorporationMemberRoles {
+  character_id: number;
+  roles?: string[];
+  roles_at_hq?: string[];
+  roles_at_base?: string[];
+  roles_at_other?: string[];
+  grantable_roles?: string[];
+  grantable_roles_at_hq?: string[];
+  grantable_roles_at_base?: string[];
+  grantable_roles_at_other?: string[];
+}
+
+export function getCorporationMemberRoles(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationMemberRoles[]>> {
+  return esiFetch<CorporationMemberRoles[]>(`/corporations/${corporationId}/roles`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationMemberRoles',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/membertracking (esi-corporations.track_members.v1) ---
+
+/** Only `character_id` is guaranteed; a member who never logged in has little else. */
+export interface CorporationMemberTracking {
+  character_id: number;
+  base_id?: number;
+  location_id?: number;
+  logon_date?: string;
+  logoff_date?: string;
+  ship_type_id?: number;
+  start_date?: string;
+}
+
+export function getCorporationMemberTracking(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationMemberTracking[]>> {
+  return esiFetch<CorporationMemberTracking[]>(`/corporations/${corporationId}/membertracking`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationMemberTracking',
+  });
+}
+
+// --- GET /corporation/{corporation_id}/mining/extractions (esi-industry.read_corporation_mining.v1) ---
+
+export interface CorporationMiningExtraction {
+  structure_id: number;
+  moon_id: number;
+  /** When the drill was started. */
+  extraction_start_time: string;
+  /** When the chunk is ready to fracture — the date a moon op is planned around. */
+  chunk_arrival_time: string;
+  /** When an unfractured chunk breaks up on its own. */
+  natural_decay_time: string;
+}
+
+/**
+ * Singular `/corporation/` in the path, unlike every other corp endpoint here.
+ * CCP's own inconsistency in the live spec, not a typo — see the matching note
+ * in `registry.ts`. Paginated (X-Pages).
+ */
+export function getCorporationMiningExtractions(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationMiningExtraction>> {
+  return fetchAllPagesStatus<CorporationMiningExtraction>(
+    `/corporation/${corporationId}/mining/extractions`,
+    {
+      ...options,
+      characterId,
+      endpointId: 'getCorporationMiningExtractions',
+    }
+  );
+}
+
+// --- GET /corporations/{corporation_id}/industry/jobs (esi-industry.read_corporation_jobs.v1) ---
+
+/**
+ * The corp variant of `IndustryJob`. Two real differences from the character
+ * one, both from the live schema: `location_id` in place of `station_id`, and
+ * this endpoint *is* X-Pages paginated.
+ */
+export interface CorporationIndustryJob {
+  job_id: number;
+  installer_id: number;
+  activity_id: number;
+  blueprint_id: number;
+  blueprint_type_id: number;
+  blueprint_location_id: number;
+  output_location_id: number;
+  facility_id: number;
+  location_id: number;
+  runs: number;
+  start_date: string;
+  end_date: string;
+  status: 'active' | 'cancelled' | 'delivered' | 'paused' | 'ready' | 'reverted';
+  cost?: number;
+  duration?: number;
+  licensed_runs?: number;
+  probability?: number;
+  product_type_id?: number;
+}
+
+/**
+ * Paginated (X-Pages), unlike the character variant. `include_completed` is
+ * sent explicitly for the same reason as there: no documented server-side
+ * default.
+ */
+export function getCorporationIndustryJobs(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions & { includeCompleted?: boolean } = {}
+): Promise<PaginatedResult<CorporationIndustryJob>> {
+  const { includeCompleted, ...rest } = options;
+  return fetchAllPagesStatus<CorporationIndustryJob>(
+    `/corporations/${corporationId}/industry/jobs`,
+    {
+      ...rest,
+      characterId,
+      endpointId: 'getCorporationIndustryJobs',
+      query: { include_completed: includeCompleted ?? false },
+    }
+  );
+}

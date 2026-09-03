@@ -4,6 +4,8 @@ import type { StatusResult } from '@/esi/cache';
 import type { CharacterCorporationRoles } from '@/esi/endpoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
+import { scopesForGroup } from '@/esi/scopes';
+import { CORP_SCOPES_FOR_CAPABILITY } from './corpScopes';
 import { loadCharacterRoles } from './roles';
 import { useCorpAccess } from './useCorpAccess';
 
@@ -17,12 +19,12 @@ const mockedLoadRoles = vi.mocked(loadCharacterRoles);
 const mockedGrantedScopes = vi.mocked(useGrantedScopes);
 
 const CHARACTER_ID = 42;
-const ALL_CORP_SCOPES = [
-  'esi-wallet.read_corporation_wallets.v1',
-  'esi-corporations.read_structures.v1',
-  'esi-corporations.track_members.v1',
-  'esi-industry.read_corporation_jobs.v1',
-];
+/**
+ * Derived, not listed: this stands for "the Character granted corp access",
+ * and the Grant button asks for the whole group. A hand-written copy went
+ * stale the moment a capability grew a second scope requirement.
+ */
+const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
 
 function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorporationRoles> {
   return {
@@ -159,8 +161,11 @@ describe('useCorpAccess — ready', () => {
     });
   });
 
-  it('is ready for a partial role holding only the scope that role needs', async () => {
-    mockedGrantedScopes.mockReturnValue(['esi-wallet.read_corporation_wallets.v1']);
+  it('is ready for a partial role holding only the scopes that role needs', async () => {
+    // Derived from the capability, not listed: the point is that the *other*
+    // capabilities' scopes are absent and it is `ready` anyway — not how many
+    // scopes this one happens to need today.
+    mockedGrantedScopes.mockReturnValue([...CORP_SCOPES_FOR_CAPABILITY.canReadWallet]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Junior_Accountant']));
     const { result } = renderHook(() => useCorpAccess());
     await waitFor(() => expect(result.current.state).toBe('ready'));
@@ -187,6 +192,27 @@ describe('useCorpAccess — switching Character', () => {
     expect(result.current.state).toBe('unknown');
   });
 
+  /**
+   * AC 3: two Characters on one device hold different grants, and each renders
+   * according to its own. Same roles on both sides, so only the *grant* can
+   * move the state — a Director who granted corp access does not lend it to
+   * the alt beside them.
+   */
+  it('answers per Character when one has granted corp access and the other has not', async () => {
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Director']));
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    const { result, rerender } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+
+    // The alt: same roles, no corp grant of its own.
+    mockedGrantedScopes.mockReturnValue([]);
+    useActiveCharacter.setState({ activeCharacterId: 77, hydrated: true });
+    rerender();
+
+    await waitFor(() => expect(result.current.state).toBe('roles-without-grant'));
+    expect(result.current.missingScopes.length).toBeGreaterThan(0);
+  });
+
   it('re-reads roles for the newly active Character', async () => {
     mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo([]));
@@ -196,5 +222,42 @@ describe('useCorpAccess — switching Character', () => {
     useActiveCharacter.setState({ activeCharacterId: 77, hydrated: true });
     rerender();
     await waitFor(() => expect(mockedLoadRoles).toHaveBeenCalledWith(77));
+  });
+});
+
+/**
+ * The Settings Corp access row (#295) reports the roles themselves, not just
+ * the capabilities they imply: "you hold Station_Manager" is the sentence that
+ * explains why only structures are readable, and a capability list cannot say
+ * it. Raw ESI strings, for the same reason `corpCapabilities` tolerates
+ * unrecognised ones — CCP extends the enum without notice.
+ */
+describe('useCorpAccess — the roles held', () => {
+  it('reports the corporation-wide roles once they have resolved', async () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Station_Manager', 'Hangar_Take_1']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+    expect(result.current.roles).toEqual(['Station_Manager', 'Hangar_Take_1']);
+  });
+
+  it('reports no roles while the state is still unknown', () => {
+    mockedLoadRoles.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useCorpAccess());
+    expect(result.current.state).toBe('unknown');
+    expect(result.current.roles).toEqual([]);
+  });
+
+  /**
+   * `none` means "resolved, and holds no capability" — which a member with only
+   * office-scoped or cosmetic roles still is. The row says so honestly rather
+   * than claiming an empty role list.
+   */
+  it('reports roles that grant no capability, alongside the none state', async () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Hangar_Take_1']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.state).toBe('none'));
+    expect(result.current.roles).toEqual(['Hangar_Take_1']);
   });
 });

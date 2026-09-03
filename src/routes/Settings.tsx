@@ -13,6 +13,7 @@ import {
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
+import { CorpAccessPanel } from '@/features/corp/CorpAccessPanel';
 import { db } from '@/db';
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
@@ -161,6 +162,14 @@ export function Settings() {
       */}
       <div id="notifications" className="scroll-mt-4">
         <NotificationsPanel />
+      </div>
+      {/*
+        Anchor for anything that needs to send a Character here to grant corp
+        access — with corp UI hidden rather than locked, this row is the only
+        way in for a Character that dismissed the one-time prompt.
+      */}
+      <div id="corp-access" className="scroll-mt-4">
+        <CorpAccessPanel />
       </div>
       <ActivityLogPanel />
     </div>

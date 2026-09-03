@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { SCOPES, SCOPES_STRING, revokedScopes } from './scopes';
-import { ESI_REGISTRY, PUBLIC, isScopeRequired } from './registry';
+import { SCOPES, SCOPES_STRING, revokedScopes, scopesForGroup } from './scopes';
+import {
+  ESI_REGISTRY,
+  PUBLIC,
+  SCOPE_GROUPS,
+  isScopeRequired,
+  type EsiEndpointSpec,
+} from './registry';
+
+const specs: readonly EsiEndpointSpec[] = Object.values(ESI_REGISTRY);
 
 describe('SCOPES', () => {
   // Hand-written, not derived: SCOPES is computed from registry.ts, so a
@@ -39,8 +47,9 @@ describe('SCOPES', () => {
     expect(SCOPES).not.toContain(PUBLIC);
   });
 
-  it('covers every scope some registry endpoint requires', () => {
-    const required = Object.values(ESI_REGISTRY)
+  it('covers every scope an UNGROUPED registry endpoint requires', () => {
+    const required = specs
+      .filter((endpoint) => endpoint.group === undefined)
       .map((endpoint) => endpoint.scope)
       .filter(isScopeRequired);
     expect([...new Set(required)].sort()).toEqual([...SCOPES].sort());
@@ -49,6 +58,64 @@ describe('SCOPES', () => {
   it('exposes a space-joined string for the SSO scope parameter', () => {
     expect(SCOPES_STRING).toBe(SCOPES.join(' '));
     expect(SCOPES_STRING.split(' ')).toHaveLength(SCOPES.length);
+  });
+});
+
+describe('scopesForGroup', () => {
+  // Hand-written for the same reason as the SCOPES list above: the spelling
+  // backstop for the opt-in group, which no derived expectation can provide.
+  it("lists exactly the corp group's scopes", () => {
+    expect([...scopesForGroup('corp')].sort()).toEqual(
+      [
+        'esi-corporations.read_structures.v1',
+        'esi-wallet.read_corporation_wallets.v1',
+        'esi-corporations.read_divisions.v1',
+        'esi-corporations.read_corporation_membership.v1',
+        'esi-corporations.track_members.v1',
+        'esi-industry.read_corporation_mining.v1',
+        'esi-industry.read_corporation_jobs.v1',
+      ].sort()
+    );
+  });
+
+  /**
+   * Acceptance criterion 1, with teeth. The base/group split is decided per
+   * *endpoint*, so one ungrouped endpoint declaring a corp scope would put it
+   * back on every user's consent screen with nothing else failing. Overlap is
+   * an error to fix at the declaration, never something to subtract here.
+   */
+  it('shares no scope with the base SCOPES set', () => {
+    const base = new Set<string>(SCOPES);
+    for (const group of SCOPE_GROUPS) {
+      expect(
+        scopesForGroup(group).filter((scope) => base.has(scope)),
+        group
+      ).toEqual([]);
+    }
+  });
+
+  it('has no duplicates and contains no PUBLIC marker', () => {
+    for (const group of SCOPE_GROUPS) {
+      const scopes = scopesForGroup(group);
+      expect(new Set(scopes).size, group).toBe(scopes.length);
+      expect(scopes, group).not.toContain(PUBLIC);
+    }
+  });
+
+  it('covers every scope the group’s endpoints require', () => {
+    for (const group of SCOPE_GROUPS) {
+      const required = specs
+        .filter((endpoint) => endpoint.group === group)
+        .map((endpoint) => endpoint.scope)
+        .filter(isScopeRequired);
+      expect([...new Set(required)].sort(), group).toEqual([...scopesForGroup(group)].sort());
+    }
+  });
+
+  it('leaves every declared group non-empty — an empty group is a dead declaration', () => {
+    for (const group of SCOPE_GROUPS) {
+      expect(scopesForGroup(group).length, group).toBeGreaterThan(0);
+    }
   });
 });
 
