@@ -53,6 +53,7 @@ import {
   type NotificationChannel,
 } from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
+import { refreshAppBadge } from './appBadge';
 import {
   useNotificationPermission,
   useNotificationPromptState,
@@ -81,6 +82,14 @@ export function NotificationsPanel() {
   useEffect(() => {
     void hydratePrefs();
   }, [hydratePrefs]);
+
+  // The Overview panel refreshes the app-icon badge when preferences change,
+  // but it is unmounted while the user is on Settings — which is the only
+  // place these toggles live. Without this the badge keeps a count the feed
+  // no longer shows until the next Overview visit or app restart.
+  useEffect(() => {
+    void refreshAppBadge();
+  }, [prefsValue]);
 
   const { permission, refresh: refreshPermission } = useNotificationPermission();
   const setPromptState = useNotificationPromptState((state) => state.setValue);
@@ -131,29 +140,27 @@ export function NotificationsPanel() {
   // same as "no characters yet" rather than blanking the whole section.
   const characterList = characters ?? [];
 
-  // JS cannot re-request a denied grant, so the toggle UI would be a set of
-  // controls that can never take effect — the notice stands in for all of it
-  // until the user unblocks the site (issue #171).
-  if (notificationsBlocked(permission)) {
-    return (
-      <Panel title={t('settings.notificationsTitle')}>
-        <div className="space-y-3">
-          <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
+  // A denied grant disables the *browser* column and its Enable button — JS
+  // cannot re-request one, so those controls could never take effect. It no
+  // longer stands in for the whole panel: the Overview feed is designed to
+  // work with no grant at all (`foregroundPoller` keeps filing it when
+  // permission is 'denied'), so blanking this section left exactly the user
+  // whose only channel is the feed with no way to configure it — and the
+  // Overview's own "Settings" link landing on a dead end.
+  const browserBlocked = notificationsBlocked(permission);
+
+  return (
+    <Panel title={t('settings.notificationsTitle')}>
+      <div className="space-y-3">
+        <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
+        {browserBlocked && (
           <p
             role="status"
             className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-text"
           >
             {t('settings.notifications.blockedNotice')}
           </p>
-        </div>
-      </Panel>
-    );
-  }
-
-  return (
-    <Panel title={t('settings.notificationsTitle')}>
-      <div className="space-y-3">
-        <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
+        )}
         {permission === 'default' && (
           <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
             <p className="min-w-0 flex-1 text-xs text-text-dim">
@@ -189,13 +196,14 @@ export function NotificationsPanel() {
           <label className="flex items-center gap-2 text-xs text-text">
             <input
               type="checkbox"
-              checked={isBrowserChannelEnabled(prefsValue)}
+              checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
+              disabled={browserBlocked}
               onChange={() =>
                 void setPrefsValue(
                   withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
                 )
               }
-              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
+              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
             />
             {t('settings.notifications.browserChannelLabel')}
           </label>
@@ -305,7 +313,7 @@ export function NotificationsPanel() {
                             {NOTIFICATION_CHANNELS.map((channel) => (
                               <span
                                 key={channel}
-                                className="w-4 text-[0.5625rem] leading-tight tracking-widest text-text-dim uppercase"
+                                className="w-4 text-[0.6875rem] leading-tight text-text-dim"
                               >
                                 {t(`settings.notifications.column.${channel}`)}
                               </span>
@@ -331,7 +339,9 @@ export function NotificationsPanel() {
                                       key={channel}
                                       channel={channel}
                                       eventLabel={eventLabel}
-                                      hasScope={hasScope}
+                                      hasScope={
+                                        hasScope && !(channel === 'browser' && browserBlocked)
+                                      }
                                       checked={isEventEnabledFor(prefs, eventId, channel)}
                                       onToggle={() =>
                                         void setPrefsValue(

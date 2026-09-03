@@ -14,7 +14,19 @@
  * window get opened.
  */
 
-export { NOTIFICATION_FALLBACK_ROUTE } from './notificationOptions';
+import { NOTIFICATION_FALLBACK_ROUTE } from './notificationOptions';
+
+/**
+ * The `data` a notification was fired with, narrowed to the route to open.
+ * Lives here rather than inline in `sw.ts` so the malformed cases are
+ * testable: a notification fired by an older build carries no `data` at all,
+ * and one is not worth dropping the click for.
+ */
+export function urlFromNotificationData(data: unknown): string {
+  if (typeof data !== 'object' || data === null) return NOTIFICATION_FALLBACK_ROUTE;
+  const url = (data as { url?: unknown }).url;
+  return typeof url === 'string' && url.length > 0 ? url : NOTIFICATION_FALLBACK_ROUTE;
+}
 
 /** The slice of `WindowClient` this needs; `navigate` is optional because not every browser exposes it. */
 export interface WindowClientLike {

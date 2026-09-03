@@ -31,7 +31,7 @@ import { getValidAccessToken } from '@/auth/session';
 import { PERIODIC_SYNC_TAG } from '@/app/backgroundSync';
 import {
   handleNotificationClick,
-  NOTIFICATION_FALLBACK_ROUTE,
+  urlFromNotificationData,
 } from '@/features/notifications/notificationClick';
 
 declare let self: ServiceWorkerGlobalScope;
@@ -87,12 +87,6 @@ self.addEventListener('periodicsync', (event) => {
 // this file stays orchestration-only per ADR 0007.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const data: unknown = event.notification.data;
-  const url =
-    typeof data === 'object' && data !== null && typeof (data as { url?: unknown }).url === 'string'
-      ? (data as { url: string }).url
-      : NOTIFICATION_FALLBACK_ROUTE;
-
   event.waitUntil(
     handleNotificationClick(
       {
@@ -100,7 +94,7 @@ self.addEventListener('notificationclick', (event) => {
         openWindow: (target) => self.clients.openWindow(target),
         origin: self.location.origin,
       },
-      url
+      urlFromNotificationData(event.notification.data)
     )
   );
 });

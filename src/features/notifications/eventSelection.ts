@@ -39,14 +39,6 @@ export function isEventEnabledFor(
   return state[channel] ?? true;
 }
 
-/** Enabled on at least one channel — i.e. worth fetching this event's data at all. */
-export function isEventEnabledOnAnyChannel(
-  map: EventEnabledMap,
-  eventId: NotificationEventId
-): boolean {
-  return NOTIFICATION_CHANNELS.some((channel) => isEventEnabledFor(map, eventId, channel));
-}
-
 export function selectionStateForEvents(
   eventIds: readonly NotificationEventId[],
   map: EventEnabledMap,

@@ -55,7 +55,7 @@ export interface AppNotificationOptions extends NotificationOptions {
 
 /** Minimal shape of a fire — deliberately not `AnyNotificationFire`, so this module stays free of a cycle back through the poller. */
 export interface NotificationTarget {
-  eventId: string;
+  eventId: NotificationEventId;
   characterId: number;
 }
 

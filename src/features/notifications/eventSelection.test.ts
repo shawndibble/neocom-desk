@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type { NotificationEventId } from './events';
 import {
   isEventEnabledFor,
-  isEventEnabledOnAnyChannel,
   selectionStateForEvents,
   toggleEventChannel,
   toggleAllEventsOnChannel,
@@ -28,16 +27,6 @@ describe('isEventEnabledFor', () => {
     const map: EventEnabledMap = { [A]: { browser: false } };
     expect(isEventEnabledFor(map, A, 'browser')).toBe(false);
     expect(isEventEnabledFor(map, A, 'feed')).toBe(true);
-  });
-});
-
-describe('isEventEnabledOnAnyChannel', () => {
-  it('is true while either channel wants it', () => {
-    expect(isEventEnabledOnAnyChannel({ [A]: { browser: false } }, A)).toBe(true);
-  });
-
-  it('is false only when both are off', () => {
-    expect(isEventEnabledOnAnyChannel({ [A]: { browser: false, feed: false } }, A)).toBe(false);
   });
 });
 

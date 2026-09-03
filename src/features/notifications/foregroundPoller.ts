@@ -595,7 +595,10 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
     const character = charactersById.get(update.characterId);
     if (!character) continue;
     for (const fire of update.fires) {
-      const eventId = fire.eventId as NotificationEventId;
+      // No cast: every AnyNotificationFire's eventId is already the literal
+      // union, so a genuinely new engine fire type must fail here rather than
+      // be waved through.
+      const eventId = fire.eventId;
       // Feed first: it is the channel that cannot fail for platform reasons,
       // so a fire is recorded before anything that might silently no-op.
       if (feedEnabled && isEventEnabledFor(update.eventPrefs, eventId, 'feed')) {

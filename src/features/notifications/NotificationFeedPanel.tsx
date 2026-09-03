@@ -25,7 +25,8 @@ import { Button, EmptyState, IconButton, Panel } from '@/components/ui';
 import { Close } from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { readFeed, dismissFeedEntry, dismissFeedEntries, refreshAppBadge } from './feed';
+import { readFeed, dismissFeedEntry, dismissFeedEntries } from './feed';
+import { refreshAppBadge } from './appBadge';
 import { useNotificationPreferences, isFeedChannelEnabled } from './preferences';
 import { visibleFeedEntries, entriesForCharacter, otherCharacterAlerts } from './feedSelection';
 

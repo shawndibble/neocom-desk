@@ -14,9 +14,7 @@
  * rather than derived from the fire's contents.
  */
 import { db, type NotificationFeedRecord } from '@/db';
-import { setAppBadgeCount } from './badge';
-import { visibleFeedEntries } from './feedSelection';
-import { useNotificationPreferences, isFeedChannelEnabled } from './preferences';
+import { refreshAppBadge } from './appBadge';
 
 /**
  * How many entries the feed keeps. Chosen to be comfortably more than a
@@ -42,24 +40,6 @@ export function idsBeyondLimit(newestFirst: readonly { id: string }[], limit: nu
 /** Newest first. */
 export async function readFeed(): Promise<NotificationFeedEntry[]> {
   return db.notificationFeed.orderBy('firedAt').reverse().toArray();
-}
-
-/**
- * Re-derives the app-icon badge from what the Overview would actually show:
- * the same visibility filter the panel applies, across every Character, and
- * nothing at all when the feed channel (or the master switch) is off. Called
- * after every mutation below so the badge cannot drift from the feed, and
- * exported for the panel to call when a *preference* changes rather than an
- * entry.
- */
-export async function refreshAppBadge(): Promise<void> {
-  await useNotificationPreferences.getState().hydrate();
-  const prefs = useNotificationPreferences.getState().value;
-  if (!prefs.masterEnabled || !isFeedChannelEnabled(prefs)) {
-    await setAppBadgeCount(0);
-    return;
-  }
-  await setAppBadgeCount(visibleFeedEntries(await readFeed(), prefs).length);
 }
 
 export async function recordFeedEntry(entry: NewNotificationFeedEntry): Promise<void> {

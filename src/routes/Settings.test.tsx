@@ -278,18 +278,30 @@ describe('Settings — Notifications (issue #170)', () => {
     });
   });
 
-  it('replaces the toggle UI with a persistent blocked notice while permission is denied', async () => {
+  it('shows a blocked notice and disables only the browser controls while permission is denied', async () => {
+    const user = userEvent.setup();
     stubNotification('denied');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+    // JS cannot re-request a denied grant, so nothing that would need one is offered.
     expect(
-      screen.queryByRole('checkbox', { name: /enable notifications/i })
+      screen.queryByRole('button', { name: /turn on browser notifications/i })
     ).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Browser notifications' })).toBeDisabled();
+
+    // ...but the Overview feed works with no grant at all, so its controls stay live.
+    expect(screen.getByRole('checkbox', { name: 'Enable notifications' })).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: 'Overview notifications' })).toBeEnabled();
+
+    await user.click(
+      await within(await notificationsPanel()).findByRole('button', { name: /pilot one/i })
+    );
+    expect(screen.getByRole('checkbox', { name: 'New Mail, Overview list' })).toBeEnabled();
     expect(
-      within(await notificationsPanel()).queryByRole('button', { name: /pilot one/i })
-    ).not.toBeInTheDocument();
+      screen.getByRole('checkbox', { name: 'New Mail, browser notifications' })
+    ).toBeDisabled();
   });
 
   it('offers an Enable button that makes the browser request, and no request without it', async () => {

@@ -11,7 +11,7 @@
 import { isEventEnabledFor } from './eventSelection';
 import { characterEventPrefs, type NotificationPreferencesValue } from './preferences';
 import type { NotificationEventId } from './events';
-import type { NotificationFeedEntry } from './feed';
+import type { NotificationFeedRecord as NotificationFeedEntry } from '@/db';
 
 export interface OtherCharacterAlerts {
   characterId: number;

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { NOTIFICATION_EVENT_IDS } from './events';
+import { ROUTE_REQUIREMENTS } from '@/app/routeScopes';
 import {
   NOTIFICATION_ROUTES,
   NOTIFICATION_FALLBACK_ROUTE,
@@ -63,5 +64,23 @@ describe('notificationOptionsFor', () => {
     const options = notificationOptionsFor({ characterId: 1, eventId: 'newMail' }, 'b');
     expect(options.renotify).toBe(true);
     expect(options.tag).toBeTruthy();
+  });
+});
+
+describe('NOTIFICATION_ROUTES against the real route table', () => {
+  // Hand-copied from App.tsx's route list, which `events.ts` deliberately
+  // avoids doing for scopes ("derived from ESI_REGISTRY, never hand-copied").
+  // A renamed route would still compile here and silently send every
+  // notification of that type to the fallback — a dead deep link that looks
+  // like a working one. This is the check that makes that fail loudly.
+  it('routes every event to a path the app actually serves', () => {
+    const realRoutes = new Set<string>(Object.keys(ROUTE_REQUIREMENTS));
+    for (const [eventId, route] of Object.entries(NOTIFICATION_ROUTES)) {
+      expect(realRoutes, `${eventId} -> ${route}`).toContain(route);
+    }
+  });
+
+  it('falls back to a path the app actually serves', () => {
+    expect(Object.keys(ROUTE_REQUIREMENTS)).toContain(NOTIFICATION_FALLBACK_ROUTE);
   });
 });

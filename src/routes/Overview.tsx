@@ -200,15 +200,17 @@ export function Overview() {
               </p>
             )}
           </Panel>
-
-          {/*
-            Below the queue: the feed grows with however many event types are
-            enabled, so it sits under the two fixed-height panels rather than
-            pushing them off the first screen.
-          */}
-          <NotificationFeedPanel />
         </>
       )}
+
+      {/*
+        Below the queue, and deliberately outside the loading/error branch
+        above: the feed is device-local Dexie data with no ESI dependency, and
+        a failed or still-loading snapshot is exactly when someone wants to
+        see what they missed. CONTEXT.md round 4 asks Overview to degrade per
+        panel rather than gating the whole page.
+      */}
+      <NotificationFeedPanel />
     </div>
   );
 }

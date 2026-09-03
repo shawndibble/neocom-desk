@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { runForegroundPoll, liveDependencies, POLL_INTERVAL_MS } from './foregroundPoller';
-import { refreshAppBadge } from './feed';
+import { refreshAppBadge } from './appBadge';
 
 /**
  * Mounts the Foreground Poller (CONTEXT.md round 20): renders nothing, just

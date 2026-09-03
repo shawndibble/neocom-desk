@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   handleNotificationClick,
+  urlFromNotificationData,
   type NotificationClickEnv,
   type WindowClientLike,
 } from './notificationClick';
@@ -89,5 +90,22 @@ describe('handleNotificationClick', () => {
       }),
     });
     await expect(handleNotificationClick(env([open]), '/wallet')).resolves.toBeUndefined();
+  });
+});
+
+describe('urlFromNotificationData', () => {
+  it('reads the url a notification was fired with', () => {
+    expect(urlFromNotificationData({ url: '/wallet' })).toBe('/wallet');
+  });
+
+  it('falls back for a notification fired before data carried a url', () => {
+    expect(urlFromNotificationData(undefined)).toBe('/overview');
+    expect(urlFromNotificationData(null)).toBe('/overview');
+    expect(urlFromNotificationData({})).toBe('/overview');
+  });
+
+  it('falls back for a url that is not a usable string', () => {
+    expect(urlFromNotificationData({ url: 42 })).toBe('/overview');
+    expect(urlFromNotificationData({ url: '' })).toBe('/overview');
   });
 });
