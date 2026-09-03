@@ -768,8 +768,8 @@ describe('SkillPlans editor: import / export', () => {
     const entriesPanel = screen.getByText('Your entries').closest('section')!;
     // The entry row's name and level render as separate text nodes ("Gunnery"
     // " " "III"), so match by regex rather than the exact string "Gunnery".
-    // Anchored: an unanchored /Gunnery/ also matches the below-desktop "Move
-    // Gunnery up/down" reorder-control tooltip text elsewhere in the row (#223).
+    // Anchored so it matches the name cell itself rather than any other
+    // occurrence of the skill's name in the row.
     expect(await within(entriesPanel).findByText(/^Gunnery\b/)).toBeInTheDocument();
     const stored = await db.skillPlans.get('plan-1');
     expect(stored?.entries).toEqual([
