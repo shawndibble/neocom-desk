@@ -161,11 +161,33 @@ function eveTypeAllowsChannel(
 }
 
 /**
+ * Guards against overlapping polls: `ForegroundNotificationPoller` can call
+ * this from mount, its interval, and a visibility-change handler in close
+ * succession (e.g. a tab flip landing right on an interval tick), and with
+ * no guard two runs would both diff against the same unsaved baseline and
+ * each record the same fire — duplicate feed entries whose write order (not
+ * the underlying event order) then decided their `firedAt`, so the feed
+ * looked misordered too. A poll already running is left to finish rather
+ * than started twice; the caller's `void runForegroundPoll(...)` doesn't
+ * need the result.
+ */
+let inFlightPoll: Promise<void> | null = null;
+
+export function runForegroundPoll(deps: PollDependencies): Promise<void> {
+  if (inFlightPoll) return inFlightPoll;
+  const run = runForegroundPollOnce(deps).finally(() => {
+    if (inFlightPoll === run) inFlightPoll = null;
+  });
+  inFlightPoll = run;
+  return run;
+}
+
+/**
  * One poll across every character, respecting the master switch and live
  * browser permission up front — no ESI calls at all when neither could ever
  * result in a fired notification (AC5).
  */
-export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
+async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   if (!(await deps.masterEnabled())) return;
 
   // Each channel decides for itself. The browser channel additionally needs a

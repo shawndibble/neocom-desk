@@ -2,6 +2,7 @@ export { Panel } from './Panel';
 export { PageHeader } from './PageHeader';
 export { Button } from './Button';
 export type { ButtonVariant, ButtonSize } from './Button';
+export { buttonClassName } from './buttonClassName';
 export { StatChip } from './StatChip';
 export type { StatChipTone } from './StatChip';
 export { DataAgeBadge } from './DataAgeBadge';
