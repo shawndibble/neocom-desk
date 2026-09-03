@@ -652,7 +652,7 @@ export function PlanEditor({
               onChange={(e) =>
                 onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
               }
-              className="w-14 text-center"
+              className="field-no-spinner w-14 text-center"
             />
           </div>
           {remapInfo && (
@@ -811,7 +811,12 @@ export function PlanEditor({
                   onChange={(e) =>
                     setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
                   }
-                  className="w-full text-center"
+                  // `field-no-spinner` (src/styles/index.css): Chrome draws
+                  // the spin buttons on hover and focus into a 29.6px content
+                  // box, taking about half of it and shoving the digit left —
+                  // so the cell under the cursor would break the row's
+                  // alignment with the other four.
+                  className="field-no-spinner w-full text-center"
                 />
               </label>
             ))}
@@ -838,7 +843,7 @@ export function PlanEditor({
                   max={9}
                   value={boosterBonus}
                   onChange={(e) => setBoosterBonus(Number(e.target.value) || 0)}
-                  className="w-16 text-center"
+                  className="field-no-spinner w-16 text-center"
                 />
               </label>
               <label className="flex items-center justify-between gap-2">
