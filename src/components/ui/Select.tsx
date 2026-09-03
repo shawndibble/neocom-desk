@@ -28,6 +28,14 @@ export function SelectTrigger({ className, children, size = 'md', ...props }: Se
         fieldBaseClassName,
         fieldSizeClassName[size],
         'flex items-center justify-between gap-2 outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[placeholder]:text-text-dim',
+        // The trigger is a fixed-height control, so a label a few pixels wider
+        // than the box must not wrap — two lines of text overflow the height
+        // rather than growing it. Callers size these to their known options, but
+        // the widest label is not always knowable (a character's group name, a
+        // future translation), so the value ellipsizes instead. `min-w-0` is
+        // what lets the value shrink at all: a flex child defaults to
+        // `min-width: auto` and would otherwise refuse to go below its text.
+        'overflow-hidden whitespace-nowrap [&>span]:min-w-0 [&>span]:truncate',
         className
       )}
       {...props}
