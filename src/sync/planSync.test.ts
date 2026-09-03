@@ -473,6 +473,103 @@ describe('triggerSync: deferred remote purge retry', () => {
   });
 });
 
+/**
+ * The class of bug this pins: a field the UI writes onto a record, that the
+ * collection spec then forgets to map, so the value is saved locally and
+ * quietly never leaves the device (What-If Implants and the Booster were
+ * exactly that, one layer up).
+ *
+ * A `CollectionSpec` lists its fields explicitly — never a spread, because
+ * Firestore rejects `undefined` and a record carries local-only shapes — so
+ * nothing but a test can notice the omission. The pinned key lists make
+ * adding a field to a record fail here until its round trip is decided.
+ */
+describe('every stored field of a plan reaches the remote doc and comes back', () => {
+  const fullSkillPlan: Required<SkillPlanRecord> = {
+    id: 'p1',
+    characterId: 1,
+    name: 'Frigates V',
+    entries: [{ skillTypeID: 3327, targetLevel: 5, priority: 'high' }],
+    remapCount: 2,
+    markers: [1],
+    whatIfImplants: { kind: 'preset', preset: '+4' },
+    booster: { enabled: true, bonus: 6, expiresAt: 4_102_444_800_000 },
+    updatedAt: Date.now() - 1000,
+  };
+
+  const fullBuildPlan: Required<BuildPlanRecord> = {
+    id: 'b1',
+    characterId: 1,
+    name: 'Rifter run',
+    blueprintTypeID: 638,
+    runs: 10,
+    me: 10,
+    te: 20,
+    facility: 'raitaru',
+    rigLevel: 't1',
+    security: 'highsec',
+    hubId: 'jita',
+    facilityTaxPct: 1.5,
+    materialSourcing: { 34: { ownedQuantity: 500, overridePrice: 6.5 } },
+    updatedAt: Date.now() - 1000,
+  };
+
+  it('pins the Skill Plan fields, so a new one has to be routed deliberately', () => {
+    expect(Object.keys(fullSkillPlan).sort()).toEqual([
+      'booster',
+      'characterId',
+      'entries',
+      'id',
+      'markers',
+      'name',
+      'remapCount',
+      'updatedAt',
+      'whatIfImplants',
+    ]);
+  });
+
+  it('pins the Build Plan fields, so a new one has to be routed deliberately', () => {
+    expect(Object.keys(fullBuildPlan).sort()).toEqual([
+      'blueprintTypeID',
+      'characterId',
+      'facility',
+      'facilityTaxPct',
+      'hubId',
+      'id',
+      'materialSourcing',
+      'me',
+      'name',
+      'rigLevel',
+      'runs',
+      'security',
+      'te',
+      'updatedAt',
+    ]);
+  });
+
+  it.each([
+    ['skill plan', PLANS_PATH, () => db.skillPlans.put(fullSkillPlan), fullSkillPlan],
+    ['build plan', BUILD_PLANS_PATH, () => db.buildPlans.put(fullBuildPlan), fullBuildPlan],
+  ])('pushes every %s field', async (_label, path, put, record) => {
+    await put();
+    await triggerSync(1);
+    const remote = remoteStore.get(path)?.get(record.id);
+    expect(remote).toBeDefined();
+    for (const [key, value] of Object.entries(record)) {
+      expect({ [key]: remote?.[key] }).toEqual({ [key]: value });
+    }
+  });
+
+  it.each([
+    ['skill plan', PLANS_PATH, () => db.skillPlans.get('p1'), fullSkillPlan],
+    ['build plan', BUILD_PLANS_PATH, () => db.buildPlans.get('b1'), fullBuildPlan],
+  ])('pulls every %s field back', async (_label, path, get, record) => {
+    seedRemote(path, [{ ...record, ownerHash: HASH, deleted: false }]);
+    await triggerSync(1);
+    expect(await get()).toEqual(record);
+  });
+});
+
 describe('triggerSync: build plans', () => {
   it('pushes a local-only build plan with ownerHash and deleted: false', async () => {
     const p = buildPlan({ facilityTaxPct: 1.5 });
