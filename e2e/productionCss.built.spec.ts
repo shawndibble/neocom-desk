@@ -59,11 +59,34 @@ test.describe('production bundle — phone width', () => {
     // assertion — spelled as an inequality rather than equality because a
     // fractional layout can report the two a hair apart while nothing
     // actually overflows.
-    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-    }));
-    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    //
+    // The offender list is not decoration: this assertion is page-wide, and
+    // CI is the first place it ever runs against real production CSS. Without
+    // it a failure says only "something is too wide", leaving "`.dt-stack`
+    // regressed" and "an unrelated styleguide sample got wider" impossible to
+    // tell apart from the log.
+    const { scrollWidth, clientWidth, offenders } = await page.evaluate(() => {
+      const root = document.documentElement;
+      const limit = root.clientWidth;
+      const offenders = Array.from(document.body.querySelectorAll('*'))
+        .map((element) => ({ element, right: element.getBoundingClientRect().right }))
+        // 1px of slack: a fractional right edge on an element that fits
+        // exactly is not an overflow.
+        .filter((entry) => entry.right > limit + 1)
+        .sort((a, b) => b.right - a.right)
+        .slice(0, 5)
+        .map(({ element, right }) => {
+          const name = element.getAttribute('aria-label') ?? element.id;
+          return `${element.tagName.toLowerCase()}${name ? `[${name}]` : ''} @ ${Math.round(right)}px`;
+        });
+      return { scrollWidth: root.scrollWidth, clientWidth: limit, offenders };
+    });
+    expect(
+      scrollWidth,
+      `Page is ${scrollWidth}px wide in a ${clientWidth}px viewport. Widest elements: ${
+        offenders.join(', ') || '(none individually past the edge)'
+      }`
+    ).toBeLessThanOrEqual(clientWidth);
 
     // Collapsed: each cell is its own block in a column flexbox, so the
     // second cell sits a line below the first rather than beside it.

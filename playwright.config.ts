@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
 const DEV_PORT = 5199;
 const PREVIEW_PORT = 5200;
@@ -11,6 +11,19 @@ const PREVIEW_BASE_URL = `http://localhost:${PREVIEW_PORT}/`;
  * project claims, so a spec belongs to one or the other and never both.
  */
 const BUILT_SPECS = /\.built\.spec\.ts$/;
+
+/**
+ * Escape hatch for a local dev-server-only run.
+ *
+ * Playwright starts every `webServer` entry whatever `--project` or a file
+ * filter says, so the preview server below otherwise makes a production
+ * build a precondition of running *any* spec — and CLAUDE.md forbids
+ * building locally. Left unset (the default, and what CI runs) both projects
+ * run and a missing `dist/` fails loudly, which is the whole point of #205.
+ * This exists only so someone iterating on a dev-server spec isn't forced
+ * into a build they aren't allowed to do.
+ */
+const skipBuilt = process.env.E2E_SKIP_BUILT === '1';
 
 /**
  * Build-time and dev-time env must agree, or the two projects render
@@ -26,6 +39,36 @@ const E2E_ENV = {
   VITE_FIREBASE_AUTH_DOMAIN: '',
   VITE_FIREBASE_PROJECT_ID: '',
   VITE_FIREBASE_APP_ID: '',
+};
+
+const BUILT_PROJECT: NonNullable<PlaywrightTestConfig['projects']>[number] = {
+  name: 'built',
+  testMatch: BUILT_SPECS,
+  use: {
+    ...devices['Desktop Chrome'],
+    baseURL: PREVIEW_BASE_URL,
+    // The built output registers a service worker (vite-plugin-pwa), which
+    // would serve these specs their assets from its own precache — the
+    // stale-bundle failure mode this repo already knows. Blocking it leaves
+    // the CSS path untouched (the stylesheet still comes from `dist/`) while
+    // removing a race that has nothing to do with what this project asserts.
+    serviceWorkers: 'block',
+  },
+};
+
+const PREVIEW_SERVER: NonNullable<PlaywrightTestConfig['webServer']> = {
+  // Not `vite preview` directly: the wrapper refuses to start on a missing
+  // or stale `dist/`, so a run without a build fails here and says why,
+  // instead of asserting against yesterday's bundle and passing for the
+  // wrong reason.
+  command: `node scripts/e2e-preview.mjs --port ${PREVIEW_PORT} --strictPort`,
+  url: PREVIEW_BASE_URL,
+  // Deliberately not `!process.env.CI`, unlike the dev server. Reuse would
+  // skip the wrapper — and with it the staleness guard — handing these specs
+  // whatever is already on 5200. Concurrent worktrees make that a real
+  // wrong-bundle hazard rather than a theoretical one, and a loud port
+  // collision is the better failure.
+  reuseExistingServer: false,
 };
 
 /**
@@ -58,21 +101,7 @@ export default defineConfig({
       testIgnore: BUILT_SPECS,
       use: { ...devices['Desktop Chrome'], baseURL: DEV_BASE_URL },
     },
-    {
-      name: 'built',
-      testMatch: BUILT_SPECS,
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: PREVIEW_BASE_URL,
-        // The built output registers a service worker (vite-plugin-pwa),
-        // which would serve these specs their assets from its own precache
-        // — the stale-bundle failure mode this repo already knows. Blocking
-        // it leaves the CSS path untouched (the stylesheet still comes from
-        // `dist/`) while removing a race that has nothing to do with what
-        // this project asserts.
-        serviceWorkers: 'block',
-      },
-    },
+    ...(skipBuilt ? [] : [BUILT_PROJECT]),
   ],
   webServer: [
     {
@@ -82,14 +111,6 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       env: E2E_ENV,
     },
-    {
-      // Not `vite preview` directly: the wrapper refuses to start on a
-      // missing or stale `dist/`, so a run without a build fails here and
-      // says why, instead of asserting against yesterday's bundle and
-      // passing for the wrong reason.
-      command: `node scripts/e2e-preview.mjs --port ${PREVIEW_PORT} --strictPort`,
-      url: PREVIEW_BASE_URL,
-      reuseExistingServer: !process.env.CI,
-    },
+    ...(skipBuilt ? [] : [PREVIEW_SERVER]),
   ],
 });
