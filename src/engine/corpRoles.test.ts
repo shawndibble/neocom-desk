@@ -29,9 +29,18 @@ describe('corpCapabilities', () => {
     expect(held(['Junior_Accountant'])).toEqual(['canReadWallet']);
   });
 
-  // GET /corporations/{id}/structures declares ["Station_Manager"].
-  it('grants structure access to a Station_Manager', () => {
-    expect(held(['Station_Manager'])).toEqual(['canReadStructures']);
+  /**
+   * GET /corporations/{id}/structures declares ["Station_Manager"] — and so
+   * does GET /corporation/{id}/mining/extractions, verified against the same
+   * `x-required-roles` source the table cites. One role, two capabilities:
+   * they stay separate because they are separate *reads* behind separate
+   * scopes, and the moon panel needs something of its own to gate on.
+   *
+   * Note for anyone re-reading issue #296: its comment names the moon role
+   * `Structure_manager`. That spelling appears nowhere in ESI's spec.
+   */
+  it('grants structure and moon-extraction access to a Station_Manager', () => {
+    expect(held(['Station_Manager'])).toEqual(['canReadStructures', 'canReadMoonExtractions']);
   });
 
   // GET /corporations/{id}/membertracking declares ["Director"].
@@ -65,7 +74,10 @@ describe('corpCapabilities', () => {
 
   it('ignores a role string this app has never heard of (CCP adds roles without notice)', () => {
     expect(held(['Chief_Vibes_Officer'])).toEqual([]);
-    expect(held(['Chief_Vibes_Officer', 'Station_Manager'])).toEqual(['canReadStructures']);
+    expect(held(['Chief_Vibes_Officer', 'Station_Manager'])).toEqual([
+      'canReadStructures',
+      'canReadMoonExtractions',
+    ]);
   });
 
   it('is case-sensitive: ESI role strings are exact, and a near-miss must not grant access', () => {

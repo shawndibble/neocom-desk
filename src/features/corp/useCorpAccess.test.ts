@@ -134,7 +134,12 @@ describe('useCorpAccess — roles-without-grant', () => {
     const { result } = renderHook(() => useCorpAccess());
     await waitFor(() => expect(result.current.state).toBe('roles-without-grant'));
     expect(result.current.capabilities.canReadStructures).toBe(true);
-    expect(result.current.missingScopes).toEqual(['esi-corporations.read_structures.v1']);
+    // Two scopes, one role: `Station_Manager` opens the structure list and the
+    // moon-extraction schedule, and each sits behind a scope of its own.
+    expect(result.current.missingScopes).toEqual([
+      'esi-corporations.read_structures.v1',
+      'esi-industry.read_corporation_mining.v1',
+    ]);
   });
 
   it('does not ask a Factory_Manager for scopes only an Accountant could use', async () => {
@@ -156,6 +161,7 @@ describe('useCorpAccess — ready', () => {
     expect(result.current.capabilities).toEqual({
       canReadWallet: true,
       canReadStructures: true,
+      canReadMoonExtractions: true,
       canReadMembers: true,
       canReadIndustry: true,
     });
