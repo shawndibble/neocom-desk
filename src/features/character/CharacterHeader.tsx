@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -11,13 +11,6 @@ interface CharacterHeaderProps {
   totalSp: number | null;
   /** ESI's unallocated_sp; null while loading, or when unavailable. */
   unallocatedSp: number | null;
-  /**
-   * The one slot that may differ between the section's tabs: this view's
-   * `DataAgeBadge` and its controls (Refresh, Export). Everything else is
-   * identical on all three by construction — that is the point of the
-   * component.
-   */
-  actions?: ReactNode;
 }
 
 /**
@@ -30,18 +23,18 @@ interface CharacterHeaderProps {
  * block jumping in and out as you moved between tabs was the actual complaint.
  * The character's name is the `<h1>` — one per route, as before.
  *
+ * It takes no controls slot on purpose. Everything above the tab strip is the
+ * same on every tab, full stop; a view's `DataAgeBadge` and its Refresh belong
+ * to the data they describe, so they sit in that view's `Panel` toolbar below
+ * the tabs — which is where Overview's own panel badges already were.
+ *
  * Identity is read here rather than passed in: it is the same on every tab and
  * comes from local state (Dexie) plus a session store, so threading it through
  * three route loaders would buy nothing. The SP pair is a prop because it is
  * an ESI read whose freshness belongs to the view's own load/refresh cycle —
  * see `characterSp.ts` for what the two scope-light tabs feed it.
  */
-export function CharacterHeader({
-  characterId,
-  totalSp,
-  unallocatedSp,
-  actions,
-}: CharacterHeaderProps) {
+export function CharacterHeader({ characterId, totalSp, unallocatedSp }: CharacterHeaderProps) {
   const { t } = useTranslation();
   const character = useLiveQuery(() => db.characters.get(characterId), [characterId]);
   const publicInfo = usePublicInfo((state) => state.byCharacterId[characterId]);
@@ -84,7 +77,6 @@ export function CharacterHeader({
         <StatChip label={t('skills.totalSp')} value={sp(totalSp)} />
         <StatChip label={t('skills.unallocatedSp')} value={sp(unallocatedSp)} />
       </div>
-      {actions && <div className="ml-auto flex items-center gap-1.5">{actions}</div>}
     </header>
   );
 }

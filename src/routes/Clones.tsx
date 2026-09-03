@@ -163,39 +163,54 @@ export function Clones() {
         characterId={activeCharacterId}
         totalSp={sp.totalSp}
         unallocatedSp={sp.unallocatedSp}
+      />
+      <OverviewSubNav />
+
+      {/*
+        Data age and Refresh ride on the panel's own toolbar rather than up
+        beside the character's name: they describe *this* tab's data, and above
+        the tabs is the block every tab shares. One panel wraps every branch so
+        that toolbar — the only way back from a failed or empty load — is there
+        in all of them, not just when there are rows to show.
+      */}
+      <Panel
+        title={t('clones.title')}
         actions={
-          <>
+          <span className="flex items-center gap-2">
             {clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
             <IconButton
+              size="sm"
               icon={<Icon.Refresh />}
               label={t('clones.refresh')}
               onClick={refresh}
               disabled={loading}
             />
-          </>
+          </span>
         }
-      />
-      <OverviewSubNav />
-
-      {loading ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : clonesNeedsReauth ? (
-        <ReauthBanner
-          title={t('clones.reauthTitle')}
-          hint={t('clones.reauthHint')}
-          actionLabel={t('clones.reauthAction')}
-          onLogin={() => void beginEveLogin()}
-        />
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : !clonesResult || clones.length === 0 ? (
-        <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
-      ) : (
-        <>
-          <Panel>
-            <p className="text-sm">
+        padded={false}
+      >
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : clonesNeedsReauth ? (
+          <div className="p-3">
+            <ReauthBanner
+              title={t('clones.reauthTitle')}
+              hint={t('clones.reauthHint')}
+              actionLabel={t('clones.reauthAction')}
+              onLogin={() => void beginEveLogin()}
+            />
+          </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : !clonesResult || clones.length === 0 ? (
+          <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
+        ) : (
+          <>
+            {/* The cooldown was its own Panel; panels don't nest, so it becomes
+                this one's first row, hairline-separated from the table. */}
+            <p className="border-b border-line px-3 py-2 text-sm">
               {cooldown.onCooldown && cooldown.readyAt
                 ? t('clones.cooldownOnCooldown', {
                     date: cooldown.readyAt.toLocaleString(),
@@ -203,8 +218,6 @@ export function Clones() {
                   })
                 : t('clones.cooldownReady')}
             </p>
-          </Panel>
-          <Panel padded={false}>
             {clonesResult.fromCache && (
               <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                 {t('common.offlineTitle')}
@@ -216,9 +229,9 @@ export function Clones() {
               rows={clones}
               rowKey={(clone) => clone.jump_clone_id}
             />
-          </Panel>
-        </>
-      )}
+          </>
+        )}
+      </Panel>
     </div>
   );
 }

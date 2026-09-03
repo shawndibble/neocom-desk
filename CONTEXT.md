@@ -677,8 +677,12 @@
 - **The three tabs also share one header.** Everything above the tab strip is
   the same on all three: portrait, character name (the `<h1>`), corporation /
   alliance and the two SP chips — `features/character/CharacterHeader.tsx`.
-  Only the per-view slot beside it differs (that view's `DataAgeBadge` and its
-  Refresh). Clones and Employment History previously opened with a `PageHeader`
+  Nothing else — the header takes no controls slot, so the block above the
+  tabs is the same on every tab down to the last pixel. A view's
+  `DataAgeBadge` and its Refresh live on that view's `Panel` toolbar below the
+  tabs, where Overview's panel badges already were; the panel wraps the
+  loading, empty and failed branches too, since those are the states a
+  Refresh exists for. Clones and Employment History previously opened with a `PageHeader`
   whose title merely restated the tab directly beneath it, so switching tabs
   swapped the identity block in and out — the same page visibly rebuilding, the
   width rule above in a different guise. The two scope-light tabs feed the SP

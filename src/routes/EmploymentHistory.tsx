@@ -119,46 +119,59 @@ export function EmploymentHistory() {
         characterId={activeCharacterId}
         totalSp={sp.totalSp}
         unallocatedSp={sp.unallocatedSp}
+      />
+      <OverviewSubNav />
+
+      {/*
+        Data age and Refresh sit on the panel's own toolbar, not up beside the
+        character's name: above the tabs is the block every tab shares, and
+        these describe this tab's data. The panel wraps every branch so that
+        toolbar is present in the empty and failed states too — those are the
+        ones a Refresh is for.
+      */}
+      <Panel
+        title={t('employmentHistory.title')}
         actions={
-          <>
+          <span className="flex items-center gap-2">
             {historyResult && <DataAgeBadge date={historyResult.fetchedAt} />}
             <IconButton
+              size="sm"
               icon={<Icon.Refresh />}
               label={t('employmentHistory.refresh')}
               onClick={refresh}
               disabled={loading}
             />
-          </>
+          </span>
         }
-      />
-      <OverviewSubNav />
-
-      {loading ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : !historyResult || rows.length === 0 ? (
-        <EmptyState
-          title={t('employmentHistory.emptyTitle')}
-          hint={t('employmentHistory.emptyHint')}
-        />
-      ) : (
-        <Panel padded={false}>
-          {historyResult.fromCache && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.offlineTitle')}
-            </p>
-          )}
-          <DataTable
-            label={t('employmentHistory.title')}
-            columns={columns}
-            rows={rows}
-            rowKey={(row) => row.recordId}
+        padded={false}
+      >
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : !historyResult || rows.length === 0 ? (
+          <EmptyState
+            title={t('employmentHistory.emptyTitle')}
+            hint={t('employmentHistory.emptyHint')}
           />
-        </Panel>
-      )}
+        ) : (
+          <>
+            {historyResult.fromCache && (
+              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                {t('common.offlineTitle')}
+              </p>
+            )}
+            <DataTable
+              label={t('employmentHistory.title')}
+              columns={columns}
+              rows={rows}
+              rowKey={(row) => row.recordId}
+            />
+          </>
+        )}
+      </Panel>
     </div>
   );
 }

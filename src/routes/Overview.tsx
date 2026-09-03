@@ -1,14 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  DataAgeBadge,
-  EmptyState,
-  IconButton,
-  Panel,
-  ReauthBanner,
-  Spinner,
-} from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import type { CachedResult } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
@@ -54,7 +46,7 @@ async function loadOverviewSnapshot(characterId: number): Promise<Snapshot> {
 /** Dashboard for the active character: identity, SP, wallet, training queue snippet. */
 export function Overview() {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
+  const { data, error, loading, hydrated, activeCharacterId } =
     useRouteSnapshot(loadOverviewSnapshot);
 
   if (!hydrated) {
@@ -89,14 +81,6 @@ export function Overview() {
         characterId={activeCharacterId}
         totalSp={totalSp}
         unallocatedSp={skillsResult?.data?.unallocated_sp ?? null}
-        actions={
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('overview.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        }
       />
       <OverviewSubNav />
 
