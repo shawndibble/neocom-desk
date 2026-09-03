@@ -297,7 +297,27 @@ export function MaterialsTable({
                 ? { text: t('industry.priceSourceOwned'), tone: 'text-text-dim' }
                 : { text: t('industry.unpriced'), tone: 'text-warning' };
           return (
-            <span className="inline-flex items-center justify-start gap-1 sm:justify-end">
+            /*
+             * Mirrored from `sm` up rather than just right-aligned. The header
+             * is right-aligned to the cell, so PRICE sits over whatever the
+             * cell's last element is — and with the field first, that was the
+             * tag and the revert control, leaving the header floating a
+             * `Hub ↺` away from the digits it names. Reversing the row puts
+             * the field back on the cell's right edge, where the header is,
+             * and hands the trailing elements the leftward room instead.
+             *
+             * The card keeps the DOM order (field, then what it is, then what
+             * to do about it), which is why this is `flex-row-reverse` at one
+             * width and not a reordering of the markup. `justify-start` packs
+             * to main-start, which reversing moves to the right — so it is the
+             * right-edge rule at both widths, and there is no `sm:justify-end`
+             * to contradict it.
+             *
+             * The field's own edges no longer depend on what sits beside it:
+             * fixed width against a fixed right edge pins both. That is what
+             * the reserved slot used to buy, so it is gone.
+             */
+            <span className="inline-flex items-center justify-start gap-1 sm:flex-row-reverse">
               <SourcingInput
                 value={state.unitPrice ?? undefined}
                 label={t('industry.priceFor', { material: name })}
@@ -307,22 +327,15 @@ export function MaterialsTable({
                 onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
               />
               <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>
-              {/*
-               * The slot is held open on every row, so the fields down the
-               * column keep one edge whether or not a row is overridden —
-               * only the button inside it comes and goes.
-               */}
-              <span className="flex w-9 shrink-0 justify-start sm:justify-end md:w-7">
-                {overridden && (
-                  <IconButton
-                    size="sm"
-                    variant="plain"
-                    icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
-                    label={t('industry.resetPriceFor', { material: name })}
-                    onClick={() => onSourcingChange(material.typeID, { overridePrice: undefined })}
-                  />
-                )}
-              </span>
+              {overridden && (
+                <IconButton
+                  size="sm"
+                  variant="plain"
+                  icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
+                  label={t('industry.resetPriceFor', { material: name })}
+                  onClick={() => onSourcingChange(material.typeID, { overridePrice: undefined })}
+                />
+              )}
             </span>
           );
         },
