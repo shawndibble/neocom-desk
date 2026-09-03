@@ -159,9 +159,12 @@ describe('deriveMarketOrderEntries', () => {
 /**
  * Three separate bug fixes from the #174/#175 reviews, now testable because
  * each domain's loader sits on its registry entry rather than inside
- * `liveDependencies()`'s object literal. A truncated page set must skip the
- * poll — persisting a partial baseline is what makes the next complete poll
- * false-fire.
+ * `liveDependencies()`'s object literal. This only covers the loader half —
+ * that a truncated page set returns `null`. That a `null` load then actually
+ * skips the poll (no snapshot saved, nothing fired) is a property of
+ * `runForegroundPoll` itself, proven once per domain by the
+ * "leaves the ... baseline untouched ... when the load is truncated" cases
+ * in `foregroundPoller.test.ts`.
  */
 describe('truncation guards', () => {
   beforeEach(() => {

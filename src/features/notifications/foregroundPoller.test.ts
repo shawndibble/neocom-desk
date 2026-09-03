@@ -693,6 +693,29 @@ describe('runForegroundPoll', () => {
     expect(loadContracts).not.toHaveBeenCalled();
   });
 
+  it('leaves the contract baseline untouched and fires nothing when the load is truncated', async () => {
+    // The truncation guard itself (loadContracts returning null on a short
+    // page set) is pollDomains.test.ts's job; this is the other half of
+    // AC4 — that a null load actually skips the poll end to end, the same
+    // property the skill-queue "ESI fetch fails" case above proves for its
+    // own domain.
+    const initial: ContractPollerState = {
+      [CHAR.characterId]: { entries: [{ contractId: 1, status: 'outstanding' }], nowMs: 500 },
+    };
+    const saveContractState = vi.fn(async () => {});
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([CONTRACTS_SCOPE]),
+      prevContractState: async () => initial,
+      saveContractState,
+      loadContracts: async () => null,
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(saveContractState).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
   it('persists a contract snapshot on the first poll but fires nothing (no baseline yet)', async () => {
     let savedContracts: ContractPollerState | null = null;
     const deps = baseDeps({
@@ -756,6 +779,24 @@ describe('runForegroundPoll', () => {
     expect(loadWalletJournal).not.toHaveBeenCalled();
   });
 
+  it('leaves the wallet high-water mark untouched and fires nothing when the load is truncated', async () => {
+    const initial: WalletPollerState = {
+      [CHAR.characterId]: { entries: [{ id: 5, amount: 100 }], nowMs: 500 },
+    };
+    const saveWalletState = vi.fn(async () => {});
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([WALLET_SCOPE]),
+      prevWalletState: async () => initial,
+      saveWalletState,
+      loadWalletJournal: async () => null,
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(saveWalletState).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+  });
+
   it('persists a wallet snapshot on the first poll but fires nothing (no baseline yet)', async () => {
     let savedWallet: WalletPollerState | null = null;
     const deps = baseDeps({
@@ -815,6 +856,24 @@ describe('runForegroundPoll', () => {
     });
     await runForegroundPoll(deps);
     expect(loadMarketOrders).not.toHaveBeenCalled();
+  });
+
+  it('leaves the market-order baseline untouched and fires nothing when the load is truncated', async () => {
+    const initial: MarketOrderPollerState = {
+      [CHAR.characterId]: { entries: [{ orderId: 1, filled: false }], nowMs: 500 },
+    };
+    const saveMarketOrderState = vi.fn(async () => {});
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([MARKET_ORDERS_SCOPE]),
+      prevMarketOrderState: async () => initial,
+      saveMarketOrderState,
+      loadMarketOrders: async () => null,
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(saveMarketOrderState).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it('persists a market-order snapshot on the first poll but fires nothing (no baseline yet)', async () => {
