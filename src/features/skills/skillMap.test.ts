@@ -28,7 +28,7 @@ const FIXTURE: SkillType[] = [
 
 vi.mock('@/sde/loadSde', () => ({ loadSkills: vi.fn(async () => FIXTURE) }));
 
-const { loadSkillCatalog, toTrainedSkillsMap, toEngineAttributes } = await import('./skillMap');
+const { loadSkillCatalog, toTrainedSkillsMap, toAttributeBaseline } = await import('./skillMap');
 
 describe('loadSkillCatalog', () => {
   it('adapts SDE skill rows to engine shape, remapping prereq field names', async () => {
@@ -60,18 +60,21 @@ describe('toTrainedSkillsMap', () => {
   });
 });
 
-describe('toEngineAttributes', () => {
+describe('toAttributeBaseline', () => {
   it('drops remap-metadata fields', () => {
     expect(
-      toEngineAttributes({
+      toAttributeBaseline({
         charisma: 19,
         intelligence: 20,
         memory: 20,
         perception: 20,
-        willpower: 21,
+        willpower: 20,
         bonus_remaps: 1,
       })
-    ).toEqual({ charisma: 19, intelligence: 20, memory: 20, perception: 20, willpower: 21 });
+    ).toEqual({
+      kind: 'legal',
+      attributes: { charisma: 19, intelligence: 20, memory: 20, perception: 20, willpower: 20 },
+    });
   });
 
   // ESI attribute values already include implant bonuses; the engine expects
@@ -79,31 +82,88 @@ describe('toEngineAttributes', () => {
   // the optimizer). Regression for UX-REVIEW #2's "Savings: 0m" contradiction.
   it('subtracts implant bonuses so the engine gets base attributes', () => {
     expect(
-      toEngineAttributes(
+      toAttributeBaseline(
         {
           charisma: 21,
           intelligence: 24,
           memory: 20,
           perception: 25,
-          willpower: 21,
+          willpower: 20,
         },
         { charisma: 2, intelligence: 4, perception: 5 }
       )
-    ).toEqual({ charisma: 19, intelligence: 20, memory: 20, perception: 20, willpower: 21 });
+    ).toEqual({
+      kind: 'legal',
+      attributes: { charisma: 19, intelligence: 20, memory: 20, perception: 20, willpower: 20 },
+    });
   });
 
-  it('never returns a base attribute below the EVE minimum of 17', () => {
+  // The reported bug. ESI bakes an in-game cerebral accelerator into the same
+  // values it bakes implants into, and nothing took it back out: the derived
+  // "base" sheet totalled 159 against EVE's 99-point budget, so no legal remap
+  // could beat it and the optimizer reported zero savings without saying why.
+  it('recovers a cerebral accelerator baked into the ESI values', () => {
     expect(
-      toEngineAttributes(
+      toAttributeBaseline(
         {
-          charisma: 19,
-          intelligence: 18,
-          memory: 20,
-          perception: 20,
-          willpower: 20,
+          intelligence: 29,
+          memory: 42,
+          perception: 38,
+          willpower: 29,
+          charisma: 31,
         },
-        { intelligence: 5 }
-      ).intelligence
-    ).toBe(17);
+        { memory: 4, perception: 4, charisma: 2 }
+      )
+    ).toEqual({
+      kind: 'accelerated',
+      acceleratorBonus: 12,
+      attributes: {
+        intelligence: 17,
+        memory: 26,
+        perception: 22,
+        willpower: 17,
+        charisma: 17,
+      },
+    });
+  });
+
+  it('recovers a smaller accelerator tier from the same sheet', () => {
+    const result = toAttributeBaseline(
+      {
+        intelligence: 21,
+        memory: 34,
+        perception: 30,
+        willpower: 21,
+        charisma: 23,
+      },
+      { memory: 4, perception: 4, charisma: 2 }
+    );
+    expect(result).toEqual({
+      kind: 'accelerated',
+      acceleratorBonus: 4,
+      attributes: {
+        intelligence: 17,
+        memory: 26,
+        perception: 22,
+        willpower: 17,
+        charisma: 17,
+      },
+    });
+  });
+
+  // The floor clamp this function used to apply turned an implant misread into
+  // a plausible-looking sheet. Reporting it is the point.
+  it('reports a sheet it cannot explain rather than clamping it into range', () => {
+    const result = toAttributeBaseline(
+      {
+        charisma: 19,
+        intelligence: 18,
+        memory: 20,
+        perception: 20,
+        willpower: 20,
+      },
+      { intelligence: 5 }
+    );
+    expect(result.kind).toBe('impossible');
   });
 });

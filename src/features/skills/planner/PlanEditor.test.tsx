@@ -611,3 +611,107 @@ describe('PlanEditor what-if implants', () => {
     expect(bonusInputs()).toEqual(['0', '3', '4', '0', '0']);
   });
 });
+
+/**
+ * A cerebral accelerator is baked into the attributes ESI reports and comes
+ * back out arithmetically (`engine/attributeBaseline.ts`). What the editor
+ * owes the user is legibility: the correction is prefilled into the Booster
+ * control they already know, editable, and the one field the app cannot read —
+ * the expiry — is called out rather than invented.
+ */
+describe('a cerebral accelerator detected in the ESI sheet', () => {
+  const ACCELERATED = {
+    kind: 'accelerated' as const,
+    acceleratorBonus: 12,
+    attributes: { intelligence: 17, memory: 26, perception: 22, willpower: 17, charisma: 17 },
+  };
+
+  it('prefills the Booster control with the detected bonus and says where it came from', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
+    await openTools(user);
+
+    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(true);
+    expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('12');
+    expect(screen.getByText(/\+12 cerebral accelerator/i)).toBeInTheDocument();
+  });
+
+  it('leaves the expiry blank and warns that nothing is applied until it is set', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
+    await openTools(user);
+
+    expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('');
+    expect(screen.getByText(/costed as if you had none/i)).toBeInTheDocument();
+  });
+
+  it('keeps the prefilled bonus editable, and does not stomp the edit back', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
+    await openTools(user);
+
+    const bonus = screen.getByLabelText('Bonus');
+    await user.clear(bonus);
+    await user.type(bonus, '8');
+
+    expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('8');
+  });
+
+  it('prefills whatever tier was detected, not a fixed number', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), {
+      attributeBaseline: { ...ACCELERATED, acceleratorBonus: 4 },
+    });
+    await openTools(user);
+
+    expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('4');
+  });
+
+  it('still applies the accelerator once an expiry is given', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
+    await openTools(user);
+
+    await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
+
+    expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
+  });
+});
+
+describe('a character with no accelerator', () => {
+  // The normal state, and a total no-op: same control, same defaults, nothing
+  // said. Asserted on its own rather than as a corollary of the case above,
+  // because "detection fires on a clean sheet" is the way this fix breaks.
+  it.each([
+    ['a legal sheet', { kind: 'legal' as const, attributes: ATTRIBUTES }],
+    ['ESI not read yet', null],
+    ['no baseline passed at all', undefined],
+  ])('says nothing and changes nothing for %s', async (_label, attributeBaseline) => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), attributeBaseline === undefined ? {} : { attributeBaseline });
+    await openTools(user);
+
+    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(false);
+    expect(screen.queryByText(/cerebral accelerator/i)).toBeNull();
+    expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
+    expect(screen.queryByText(/cannot be read/i)).toBeNull();
+  });
+});
+
+describe('an attribute sheet nothing explains', () => {
+  it('says the sheet could not be read instead of quietly estimating from it', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), {
+      attributeBaseline: {
+        kind: 'impossible',
+        reported: { intelligence: 29, memory: 38, perception: 34, willpower: 29, charisma: 30 },
+        reportedTotal: 160,
+      },
+    });
+    await openTools(user);
+
+    expect(screen.getByText(/totalling 160/i)).toBeInTheDocument();
+    // No accelerator was recovered, so nothing is prefilled either.
+    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(false);
+  });
+});

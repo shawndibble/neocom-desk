@@ -27,8 +27,15 @@ export function SkillPlanEditor() {
   const { planId } = useParams<{ planId: string }>();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
-  const { catalog, trainedSkills, attributes, attributesResult, implants, remapInfo } =
-    usePlanEditorData(activeCharacterId);
+  const {
+    catalog,
+    trainedSkills,
+    attributes,
+    attributesResult,
+    attributeBaseline,
+    implants,
+    remapInfo,
+  } = usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
 
   // Wrapped so `undefined` (still loading) is distinguishable from a plan
@@ -108,6 +115,7 @@ export function SkillPlanEditor() {
           attributes={attributes}
           implants={implants}
           attributesResult={attributesResult}
+          attributeBaseline={attributeBaseline}
           remapInfo={remapInfo}
           listPane={
             <PlanListPane
