@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatAge, HOUR_MS, DAY_MS } from '@/lib/age';
 
 interface DataAgeBadgeProps {
   /** When the data was last fetched. */
@@ -7,21 +8,13 @@ interface DataAgeBadgeProps {
   className?: string;
 }
 
-const MIN = 60_000;
-const HOUR = 3_600_000;
-const DAY = 86_400_000;
-
-/** BUG #8: age text was hardcoded English; routed through i18next (common.age.*). */
-function formatAge(ms: number, t: (key: string, opts?: Record<string, unknown>) => string): string {
-  if (ms < MIN) return t('common.age.justNow');
-  if (ms < HOUR) return t('common.age.minutes', { count: Math.floor(ms / MIN) });
-  if (ms < DAY) return t('common.age.hours', { count: Math.floor(ms / HOUR) });
-  return t('common.age.days', { count: Math.floor(ms / DAY) });
-}
-
+/**
+ * The staleness tone is this badge's own concern; the age *text* comes from
+ * the shared ladder in `lib/age.ts` (BUG #8 routed it through i18next).
+ */
 function toneFor(ms: number): string {
-  if (ms < HOUR) return 'text-text-dim';
-  if (ms < DAY) return 'text-warning';
+  if (ms < HOUR_MS) return 'text-text-dim';
+  if (ms < DAY_MS) return 'text-warning';
   return 'text-danger';
 }
 

@@ -9,6 +9,10 @@ import {
   withMasterEnabled,
   withEventToggled,
   withAllEventsToggledForCharacter,
+  isBrowserChannelEnabled,
+  isFeedChannelEnabled,
+  withBrowserEnabled,
+  withFeedEnabled,
 } from './preferences';
 
 const EVENT_A = 'skillLevelComplete' satisfies NotificationEventId;
@@ -117,5 +121,47 @@ describe('withAllEventsToggledForCharacter', () => {
     const value = { masterEnabled: true, perCharacter: { 2: { [EVENT_B]: false } } };
     const next = withAllEventsToggledForCharacter(value, 1, [EVENT_A]);
     expect(characterEventPrefs(next, 2)).toEqual({ [EVENT_B]: false });
+  });
+});
+
+describe('delivery channels', () => {
+  it('treats an absent channel flag as enabled, so pre-channel prefs keep working', () => {
+    const stored = { masterEnabled: true, perCharacter: {} };
+    expect(isBrowserChannelEnabled(stored)).toBe(true);
+    expect(isFeedChannelEnabled(stored)).toBe(true);
+  });
+
+  it('reads an explicit false', () => {
+    expect(
+      isBrowserChannelEnabled({ masterEnabled: true, browserEnabled: false, perCharacter: {} })
+    ).toBe(false);
+    expect(
+      isFeedChannelEnabled({ masterEnabled: true, feedEnabled: false, perCharacter: {} })
+    ).toBe(false);
+  });
+
+  it('toggles each channel independently of the other and of the master switch', () => {
+    const base = { masterEnabled: true, perCharacter: { 1: { [EVENT_A]: false } } };
+    const noBrowser = withBrowserEnabled(base, false);
+    expect(isBrowserChannelEnabled(noBrowser)).toBe(false);
+    expect(isFeedChannelEnabled(noBrowser)).toBe(true);
+    expect(noBrowser.masterEnabled).toBe(true);
+    expect(noBrowser.perCharacter).toEqual(base.perCharacter);
+
+    const neither = withFeedEnabled(noBrowser, false);
+    expect(isBrowserChannelEnabled(neither)).toBe(false);
+    expect(isFeedChannelEnabled(neither)).toBe(false);
+  });
+
+  it('hydrates a stored value that predates channels without dropping per-character toggles', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: { masterEnabled: true, perCharacter: { 7: { [EVENT_B]: false } } },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    const value = useNotificationPreferences.getState().value;
+    expect(value.perCharacter).toEqual({ 7: { [EVENT_B]: false } });
+    expect(isBrowserChannelEnabled(value)).toBe(true);
+    expect(isFeedChannelEnabled(value)).toBe(true);
   });
 });

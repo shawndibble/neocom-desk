@@ -19,6 +19,7 @@ import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
+import { NotificationFeedPanel } from '@/features/notifications/NotificationFeedPanel';
 import { formatIsk } from '@/lib/isk';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { selectActiveQueueEntry } from './overviewQueue';
@@ -199,6 +200,13 @@ export function Overview() {
               </p>
             )}
           </Panel>
+
+          {/*
+            Below the queue: the feed grows with however many event types are
+            enabled, so it sits under the two fixed-height panels rather than
+            pushing them off the first screen.
+          */}
+          <NotificationFeedPanel />
         </>
       )}
     </div>
