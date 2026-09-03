@@ -790,6 +790,7 @@
     "attention": {
       "idle": "Idle",
       "expiring-soon": "Expiring soon",
+      "decayed": "Decayed",
       "healthy": "Healthy",
       "unknown": "Unknown"
     },
@@ -831,7 +832,14 @@
     "unknownProduct": "Unknown product",
     "unknownSchematic": "Unknown schematic",
     "expired": "Expired",
-    "expiresIn": "in {{duration}}"
+    "expiresIn": "in {{duration}}",
+    "yield": {
+      "bankedColumn": "Banked",
+      "bankedValue": "{{amount}} ({{percent}}%)",
+      "resetGainColumn": "Reset now",
+      "resetGainValue": "+{{amount}}/day",
+      "decayedTooltip": "Every extractor here is producing under half what it did on its first cycle. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows what a day of that is worth."
+    }
   },
   "employmentHistory": {
     "title": "Employment",
