@@ -34,7 +34,14 @@ test('exports the computed queue to the clipboard', async ({ page, context }) =>
   await page.getByRole('menuitem', { name: 'Export to clipboard' }).click();
   await expect(page.getByText('Copied to clipboard')).toBeVisible();
 
-  const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  // Chromium rewrites the LF the app writes as CRLF on the Windows
+  // system-clipboard round trip, so readText() hands back CRLF-separated text
+  // there and LF-separated text on the Linux CI runner. Normalize here rather
+  // than in the app: the export engine emits LF by contract, pinned by
+  // src/engine/clipboardExport.test.ts.
+  const rawClipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  const clipboardText = rawClipboardText.replace(/\r\n/g, '\n');
+
   expect(clipboardText).toBe(
     [
       'Spaceship Command I',
