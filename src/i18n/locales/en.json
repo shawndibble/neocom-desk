@@ -424,7 +424,7 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Grants read-only access to your skills, assets, wallet, mail, calendar, contracts, market orders, industry, clones, player structure names, planetary colonies, contacts and loyalty points. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — NeoCom Desk only reads that data and never writes to it. Log in again after an update to pick up newly requested permissions.",
+    "permissionsHint": "Grants read-only access to your skills, assets, wallet, mail, calendar, contracts, market orders, industry, clones, player structure names, planetary colonies, contacts, loyalty points and notifications. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — NeoCom Desk only reads that data and never writes to it. Log in again after an update to pick up newly requested permissions.",
     "eyebrow": "Read-only · Free · Open source",
     "heading": "Command deck for every character you fly.",
     "trustLine": "Refresh tokens never leave this device.",
@@ -1013,6 +1013,10 @@
       "marketOrderFilled": {
         "title": "Market order filled",
         "body": "{{character}}'s market order was filled."
+      },
+      "eveNotification": {
+        "title": "EVE notification",
+        "body": "{{character}} received a new EVE notification ({{type}})."
       }
     }
   },
@@ -1182,7 +1186,8 @@
         "newCalendarEvent": "New Calendar Event",
         "calendarEventStarting": "Calendar Event Starting",
         "contractAccepted": "Contract Accepted",
-        "walletBalanceChanged": "Wallet Balance Changed"
+        "walletBalanceChanged": "Wallet Balance Changed",
+        "eveNotification": "EVE Notifications"
       },
       "browserChannelLabel": "Browser notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission, and only appears while the app is open on iPhone and iPad.",
@@ -1200,7 +1205,9 @@
         "browser": "{{event}}, browser notifications",
         "feed": "{{event}}, Overview list"
       },
-      "columnEvent": "Event"
+      "columnEvent": "Event",
+      "eveTypesHint": "EVE sends about a hundred kinds of these. Each appears below the first time it fires, defaulting to the Overview list only — flip one up to a browser notification if it matters enough to interrupt you.",
+      "eveTypesEmpty": "None received yet for this character."
     }
   },
   "shortcuts": {

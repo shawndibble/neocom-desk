@@ -83,3 +83,46 @@ export function toggleAllEventsOnChannel(
   }
   return next;
 }
+
+/**
+ * Per-`type` opt-out underneath the single `eveNotification` event (issue
+ * #274) — keyed by ESI's raw open-ended type string, not `NotificationEventId`,
+ * since the catalog can't enumerate the ~100 types as a closed union
+ * (esi/esi-issues#1380).
+ *
+ * Default is **feed-on / browser-off**, the opposite of every other event's
+ * default-on-both above: these are far more numerous and mostly
+ * informational, so a type has to be opted *up* to a browser notification
+ * rather than opted down from one. Because the default itself differs from
+ * `isEventEnabledFor`'s, it must be expressed here explicitly per channel
+ * rather than reused from the "absence means enabled" idiom.
+ */
+export const EVE_TYPE_DEFAULT: Readonly<Record<NotificationChannel, boolean>> = {
+  browser: false,
+  feed: true,
+};
+
+export type EveTypeChannelState = Partial<Record<NotificationChannel, boolean>>;
+export type EveTypeEnabledMap = Record<string, EveTypeChannelState>;
+
+export function isEveTypeEnabledFor(
+  map: EveTypeEnabledMap,
+  type: string,
+  channel: NotificationChannel
+): boolean {
+  const state = map[type];
+  if (state === undefined) return EVE_TYPE_DEFAULT[channel];
+  return state[channel] ?? EVE_TYPE_DEFAULT[channel];
+}
+
+/** Flips one type on one channel, preserving whatever the other channel said. */
+export function toggleEveTypeChannel(
+  map: EveTypeEnabledMap,
+  type: string,
+  channel: NotificationChannel
+): EveTypeEnabledMap {
+  const next: EveTypeChannelState = {};
+  for (const c of NOTIFICATION_CHANNELS) next[c] = isEveTypeEnabledFor(map, type, c);
+  next[channel] = !next[channel];
+  return { ...map, [type]: next };
+}

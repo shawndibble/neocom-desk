@@ -25,14 +25,22 @@ import { withCharacterSnapshot, type PollerState } from './pollerState';
 import {
   useNotificationPreferences,
   characterEventPrefs,
+  characterEveTypePrefs,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
 } from './preferences';
 import { recordFeedEntry } from './feed';
-import { isEventEnabledFor, type EventEnabledMap } from './eventSelection';
+import {
+  isEventEnabledFor,
+  isEveTypeEnabledFor,
+  type EventEnabledMap,
+  type EveTypeEnabledMap,
+  type NotificationChannel,
+} from './eventSelection';
 import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
 import { notificationOptionsFor } from './notificationOptions';
+import { eveNotificationText } from './eveNotificationText';
 
 export type { AnyNotificationFire } from './pollDomains';
 
@@ -71,6 +79,8 @@ export interface PollDependencies {
   browserChannelEnabled: () => Promise<boolean>;
   feedChannelEnabled: () => Promise<boolean>;
   eventPrefsFor: (characterId: number) => Promise<EventEnabledMap>;
+  /** Per-`type` opt-out underneath the single `eveNotification` event (issue #274). */
+  eveTypePrefsFor: (characterId: number) => Promise<EveTypeEnabledMap>;
   permission: () => NotificationPermission | 'unsupported' | 'default' | 'denied';
   notify: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
   recordToFeed: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
@@ -128,9 +138,26 @@ interface CharacterUpdate {
   characterId: number;
   /** Carried through so the delivery loop can honour each event's per-channel columns. */
   eventPrefs: EventEnabledMap;
+  /** Carried through so the delivery loop can honour each eveNotification type's per-channel columns. */
+  eveTypePrefs: EveTypeEnabledMap;
   /** The snapshot this poll built per domain — absent for a domain it skipped. */
   snapshots: Map<DomainRun, unknown>;
   fires: AnyNotificationFire[];
+}
+
+/**
+ * A layer underneath `isEventEnabledFor` for `eveNotification` fires only
+ * (issue #274): every other event's channel gate is the single check above,
+ * but this one event covers ~100 underlying types, each independently
+ * opt-out-able. Non-`eveNotification` fires pass through unchanged.
+ */
+function eveTypeAllowsChannel(
+  fire: AnyNotificationFire,
+  eveTypePrefs: EveTypeEnabledMap,
+  channel: NotificationChannel
+): boolean {
+  if (fire.eventId !== 'eveNotification') return true;
+  return isEveTypeEnabledFor(eveTypePrefs, fire.type, channel);
 }
 
 /**
@@ -168,9 +195,10 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
   const updates: CharacterUpdate[] = [];
 
   await mapWithConcurrencyLimit(characters, ESI_FANOUT_CONCURRENCY, async (character) => {
-    const [scopes, eventPrefs] = await Promise.all([
+    const [scopes, eventPrefs, eveTypePrefs] = await Promise.all([
       deps.grantedScopes(character.characterId),
       deps.eventPrefsFor(character.characterId),
+      deps.eveTypePrefsFor(character.characterId),
     ]);
 
     const fires: AnyNotificationFire[] = [];
@@ -199,7 +227,13 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
     }
 
     if (snapshots.size > 0) {
-      updates.push({ characterId: character.characterId, eventPrefs, snapshots, fires });
+      updates.push({
+        characterId: character.characterId,
+        eventPrefs,
+        eveTypePrefs,
+        snapshots,
+        fires,
+      });
     }
   });
 
@@ -225,10 +259,18 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
       const eventId = fire.eventId;
       // Feed first: it is the channel that cannot fail for platform reasons,
       // so a fire is recorded before anything that might silently no-op.
-      if (feedEnabled && isEventEnabledFor(update.eventPrefs, eventId, 'feed')) {
+      if (
+        feedEnabled &&
+        isEventEnabledFor(update.eventPrefs, eventId, 'feed') &&
+        eveTypeAllowsChannel(fire, update.eveTypePrefs, 'feed')
+      ) {
         await deps.recordToFeed(fire, character);
       }
-      if (browserEnabled && isEventEnabledFor(update.eventPrefs, eventId, 'browser')) {
+      if (
+        browserEnabled &&
+        isEventEnabledFor(update.eventPrefs, eventId, 'browser') &&
+        eveTypeAllowsChannel(fire, update.eveTypePrefs, 'browser')
+      ) {
         await deps.notify(fire, character);
       }
     }
@@ -310,6 +352,9 @@ export async function notificationText(
       body: i18n.t('notifications.fired.marketOrderFilled.body', { character: character.name }),
     };
   }
+  if (fire.eventId === 'eveNotification') {
+    return eveNotificationText(fire, character);
+  }
   if (fire.eventId === 'characterNotTraining') {
     return {
       title: i18n.t('notifications.fired.characterNotTraining.title'),
@@ -369,6 +414,7 @@ async function recordFeedNotification(
     await recordFeedEntry({
       characterId: character.characterId,
       eventId: fire.eventId,
+      eveType: fire.eventId === 'eveNotification' ? fire.type : undefined,
       title,
       body,
       firedAt: Date.now(),
@@ -410,6 +456,8 @@ export function liveDependencies(): PollDependencies {
       isFeedChannelEnabled(await hydratedValue(useNotificationPreferences)),
     eventPrefsFor: async (characterId) =>
       characterEventPrefs(await hydratedValue(useNotificationPreferences), characterId),
+    eveTypePrefsFor: async (characterId) =>
+      characterEveTypePrefs(await hydratedValue(useNotificationPreferences), characterId),
     permission: () => readNotificationPermission(),
     notify: sendBrowserNotification,
     recordToFeed: recordFeedNotification,
