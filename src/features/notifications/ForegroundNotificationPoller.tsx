@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { runForegroundPoll, liveDependencies, POLL_INTERVAL_MS } from './foregroundPoller';
+import { refreshAppBadge } from './feed';
 
 /**
  * Mounts the Foreground Poller (CONTEXT.md round 20): renders nothing, just
@@ -11,6 +12,13 @@ import { runForegroundPoll, liveDependencies, POLL_INTERVAL_MS } from './foregro
  * decision about whether a poll actually does anything.
  */
 export function ForegroundNotificationPoller() {
+  // App-icon badge on open. Feed writes and dismissals keep it current from
+  // then on (`feed.ts`), but a cold start needs it restored once — and the
+  // Overview panel cannot do it, since the app may open on any route.
+  useEffect(() => {
+    void refreshAppBadge();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 

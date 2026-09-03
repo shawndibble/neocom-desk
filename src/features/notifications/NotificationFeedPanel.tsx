@@ -25,7 +25,7 @@ import { Button, EmptyState, IconButton, Panel } from '@/components/ui';
 import { Close } from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { readFeed, dismissFeedEntry, dismissFeedEntries } from './feed';
+import { readFeed, dismissFeedEntry, dismissFeedEntries, refreshAppBadge } from './feed';
 import { useNotificationPreferences, isFeedChannelEnabled } from './preferences';
 import { visibleFeedEntries, entriesForCharacter, otherCharacterAlerts } from './feedSelection';
 
@@ -40,6 +40,13 @@ export function NotificationFeedPanel() {
   useEffect(() => {
     void hydratePrefs();
   }, [hydratePrefs]);
+
+  // Entry writes refresh the badge themselves (`feed.ts`); this covers the
+  // other direction — a channel or event toggle changing what counts as
+  // visible without any entry being added or dismissed.
+  useEffect(() => {
+    void refreshAppBadge();
+  }, [prefsValue]);
 
   const stored = useLiveQuery(() => readFeed(), [], []);
   const characters = useLiveQuery(() => db.characters.toArray(), [], []);

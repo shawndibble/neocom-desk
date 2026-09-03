@@ -86,6 +86,7 @@ import { recordFeedEntry } from './feed';
 import { isEventEnabled, type EventEnabledMap } from './eventSelection';
 import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
+import { notificationOptionsFor } from './notificationOptions';
 import {
   useSkillQueuePollerState,
   withCharacterSnapshot,
@@ -674,7 +675,11 @@ async function sendBrowserNotification(
   character: CharacterRef
 ): Promise<void> {
   const { title, body } = await notificationText(fire, character);
-  await displayPageNotification(livePageDisplayEnv(), title, body);
+  await displayPageNotification(
+    livePageDisplayEnv(),
+    title,
+    notificationOptionsFor({ eventId: fire.eventId, characterId: character.characterId }, body)
+  );
 }
 
 /**
