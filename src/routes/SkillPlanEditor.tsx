@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -37,6 +38,13 @@ export function SkillPlanEditor() {
     remapInfo,
   } = usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
+  // The page header's actions slot, as a live DOM node: PlanEditor portals
+  // Import/Export into it, so they land in the page's one top-right actions
+  // cluster (every other route's pattern) rather than in PlanEditor's own
+  // tree, which this route doesn't otherwise reach into. A callback ref
+  // (not a plain ref) because the portal target has to be in state to
+  // trigger the re-render that lets PlanEditor's portal find it.
+  const [headerActionsEl, setHeaderActionsEl] = useState<HTMLDivElement | null>(null);
 
   // Wrapped so `undefined` (still loading) is distinguishable from a plan
   // genuinely not found: db.skillPlans.get() resolves to undefined either
@@ -78,7 +86,10 @@ export function SkillPlanEditor() {
       {/* Same title as the other two Skills views: the editor is a third view
           of the same section, and dropping the <h1> when a plan opens made the
           page look like it had navigated somewhere else. */}
-      <PageHeader title={t('nav.skills')} />
+      <PageHeader
+        title={t('nav.skills')}
+        actions={<div ref={setHeaderActionsEl} className="flex items-center gap-1.5" />}
+      />
       <SkillsSubNav />
 
       {/* Below `lg` the list is not on screen at all, so this is the only way
@@ -126,6 +137,7 @@ export function SkillPlanEditor() {
               height="sidebar"
             />
           }
+          headerActionsContainer={headerActionsEl}
           onUpdate={(patch) => void handleUpdate(patch)}
         />
       )}
