@@ -137,6 +137,36 @@ describe('ContractDetailModal', () => {
     expect(within(requested).getByText('1')).toBeInTheDocument();
   });
 
+  /*
+   * Two short columns (icon + name, quantity) fit a 390px screen unaided, so
+   * the stacked card layout would only add a "QUANTITY" gutter label to a
+   * one-word value. `.dt-stack` is CSS, so the class is what there is to
+   * assert — same check as `DataTable.test.tsx`'s responsive suite.
+   */
+  it('keeps the item tables as real tables on mobile', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () =>
+        HttpResponse.json({ station_id: 60003760, name: 'Jita', type_id: 1, system_id: 2 })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([
+          { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+          { record_id: 2, type_id: 35, quantity: 1, is_included: false, is_singleton: false },
+        ])
+      )
+    );
+    render(
+      <ContractDetailModal
+        characterId={CHAR_ID}
+        contract={ITEM_EXCHANGE}
+        issuerName="Mero Otichoda"
+        onClose={() => {}}
+      />
+    );
+    expect(await screen.findByRole('table', { name: 'Included' })).not.toHaveClass('dt-stack');
+    expect(screen.getByRole('table', { name: 'Requested' })).not.toHaveClass('dt-stack');
+  });
+
   it('never fetches items for a courier contract, and shows its own fields', () => {
     render(
       <ContractDetailModal

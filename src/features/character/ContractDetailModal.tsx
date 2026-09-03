@@ -96,6 +96,10 @@ export function ContractDetailModal({
   const included = items?.list.filter((item) => item.is_included) ?? [];
   const requested = items?.list.filter((item) => !item.is_included) ?? [];
   // Built once per render (not once per table) — both Included and Requested share it.
+  // Two columns, one of them a bare number: this is the narrow case
+  // `responsive="table"` exists for. Stacking would title each card with the
+  // item name and then spend a 6.5rem gutter label on "QUANTITY: 744",
+  // turning a scannable list into one card per item for no gain.
   const itemColumns: DataTableColumn<ContractItem>[] | undefined = items && [
     {
       id: 'name',
@@ -242,6 +246,7 @@ export function ContractDetailModal({
                       rows={included}
                       rowKey={(item) => item.record_id}
                       density="compact"
+                      responsive="table"
                     />
                   </div>
                 </div>
@@ -258,6 +263,7 @@ export function ContractDetailModal({
                       rows={requested}
                       rowKey={(item) => item.record_id}
                       density="compact"
+                      responsive="table"
                     />
                   </div>
                 </div>

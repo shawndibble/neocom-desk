@@ -212,10 +212,14 @@ Three rules hold this together:
   roles in real browsers, so `DataTable` writes `role="table"`/`rowgroup`/
   `row`/`columnheader`/`cell` itself.
 
-Opt out with `responsive="table"` only when the columns _are_ the content.
-`SkillCompare` is the one case in the app: it's a character-by-skill matrix,
-where a card per skill would make "who is ahead" unscannable. A matrix earns
-its sideways scroll; a list of records does not.
+Opt out with `responsive="table"` in two cases, and no others. Either the
+columns _are_ the content — `SkillCompare` is a character-by-skill matrix,
+where a card per skill would make "who is ahead" unscannable; a matrix earns
+its sideways scroll, a list of records does not — or the row is already narrow
+enough to fit a 390px screen unaided, roughly two short columns. The contract
+detail modal's Included/Requested item tables are that second case: an icon +
+name and a quantity fit as they are, so stacking would only spend a 6.5rem
+gutter on "QUANTITY: 744" and turn a scannable list into one card per item.
 
 ## 5. Icons
 
