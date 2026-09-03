@@ -198,6 +198,8 @@
     "importError": "Couldn't import the skill queue: {{message}}",
     "addMarker": "Add remap marker",
     "markerAdded": "Marker added",
+    "applyAsMarkers": "Apply as markers",
+    "markersApplied": "Markers applied",
     "optimizeAtMarkers": "Optimize at my markers",
     "markerRow": "Remap marker",
     "removeMarker": "Remove marker",
