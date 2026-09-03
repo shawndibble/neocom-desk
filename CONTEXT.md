@@ -1588,6 +1588,7 @@
   a client clock ahead of ESI's would otherwise collapse every skewed member
   into a tie at zero. The clamp is at display, where a negative span renders as
   "just now".
+
 ## Scope decisions (round 41) — corp assets are registered, and Assets gets no switch
 
 - **The corp assets endpoint was an omission, and it is now registered.**
