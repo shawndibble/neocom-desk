@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useCallback, useMemo } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -12,12 +12,14 @@ import {
   ReauthBanner,
   Spinner,
   StatChip,
+  Tabs,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { ExtractorTimeline } from '@/features/pi/ExtractorTimeline';
+import { PlanPanel } from '@/features/pi/PlanPanel';
 import { loadPiRosterSnapshot, type PiRosterSnapshot } from '@/features/pi/roster';
 import { loadPlanetName, loadSchematicName } from '@/features/pi/names';
 import { resolveNames } from '@/features/character/names';
@@ -406,11 +408,53 @@ function ColonyPanel({
   );
 }
 
-/** Planetary Industry: colony health from extractor expiry, the one PI field ESI keeps current without opening the colony in-client. */
+/** Which peer view is showing. `colonies` is the default and needs no URL param. */
+type PiTab = 'colonies' | 'plan';
+
+/**
+ * Planetary Industry: colony health from extractor expiry — the one PI field
+ * ESI keeps current without opening the colony in-client — and the chain
+ * planner, as peer tabs rather than two routes.
+ *
+ * They are one page because the plan's inputs come from the colonies and
+ * because a user with no colonies at all should land on the empty state and
+ * be able to step straight to a plan: buying P1 needs no extractors, so the
+ * planner answers on day one. A second nav entry would also cost a row in the
+ * mobile nav sheet, which is the surface that can least afford one.
+ *
+ * The tab and the planned commodity live in the URL (`?tab=plan&type=2867`)
+ * so a plan survives a reload and can be deep-linked into later. Both fall
+ * back silently: an unknown tab is `colonies`, and an unknown type is handled
+ * by the planner picking its own default rather than rendering nothing.
+ */
 export function PlanetaryIndustry() {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadPiSnapshot);
+
+  const tab: PiTab = searchParams.get('tab') === 'plan' ? 'plan' : 'colonies';
+  const typeParam = Number(searchParams.get('type'));
+  const plannedTypeId = Number.isInteger(typeParam) && typeParam > 0 ? typeParam : null;
+
+  const setTab = useCallback(
+    (next: string) => {
+      const params = new URLSearchParams(searchParams);
+      if (next === 'plan') params.set('tab', 'plan');
+      else params.delete('tab');
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
+
+  const setPlannedTypeId = useCallback(
+    (next: number) => {
+      const params = new URLSearchParams(searchParams);
+      params.set('type', String(next));
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
 
   const planetsResult = data?.planetsResult ?? null;
   const planetsNeedsReauth = data?.planetsNeedsReauth ?? false;
@@ -470,57 +514,79 @@ export function PlanetaryIndustry() {
         }
       />
 
-      {/*
+      <Tabs
+        label={t('piPlan.tabsLabel')}
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'colonies', label: t('piPlan.coloniesTab') },
+          { id: 'plan', label: t('piPlan.planTab') },
+        ]}
+      />
+
+      {tab === 'plan' ? (
+        <PlanPanel
+          characterId={activeCharacterId}
+          typeId={plannedTypeId}
+          onTypeIdChange={setPlannedTypeId}
+        />
+      ) : (
+        <>
+          {/*
         Above the per-colony panels, and above the branch below rather than
         inside it: the active Character losing the planets scope, or simply
         having no colonies, says nothing about the alts whose programs are
         already cached — and answering "which character do I log in next" for
         exactly that case is what a cross-character panel is for.
       */}
-      {!loading && data && <ExtractorTimeline snapshot={data.roster} nowMs={loadedAt} />}
+          {!loading && data && <ExtractorTimeline snapshot={data.roster} nowMs={loadedAt} />}
 
-      {loading ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : planetsNeedsReauth ? (
-        <ReauthBanner
-          title={t('pi.reauthTitle')}
-          hint={t('pi.reauthHint')}
-          actionLabel={t('pi.reauthAction')}
-          onLogin={() => void beginEveLogin()}
-        />
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : !planetsResult || planets.length === 0 ? (
-        <EmptyState title={t('pi.emptyTitle')} hint={t('pi.emptyHint')} />
-      ) : (
-        <>
-          <Panel>
-            <p className="flex items-start gap-1.5 text-xs text-text-dim">
-              {t('pi.stalenessHint')}
-              <InfoTooltip label={t('pi.stalenessLabel')} content={t('pi.stalenessTooltip')} />
-            </p>
-          </Panel>
-          {planetsResult.fromCache && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <Spinner label={t('common.loading')} />
+            </div>
+          ) : planetsNeedsReauth ? (
+            <ReauthBanner
+              title={t('pi.reauthTitle')}
+              hint={t('pi.reauthHint')}
+              actionLabel={t('pi.reauthAction')}
+              onLogin={() => void beginEveLogin()}
+            />
+          ) : error ? (
+            <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+          ) : !planetsResult || planets.length === 0 ? (
+            <EmptyState title={t('pi.emptyTitle')} hint={t('pi.emptyHint')} />
+          ) : (
+            <>
+              <Panel>
+                <p className="flex items-start gap-1.5 text-xs text-text-dim">
+                  {t('pi.stalenessHint')}
+                  <InfoTooltip label={t('pi.stalenessLabel')} content={t('pi.stalenessTooltip')} />
+                </p>
+              </Panel>
+              {planetsResult.fromCache && (
+                <p className="text-[0.6875rem] text-warning uppercase">
+                  {t('common.offlineTitle')}
+                </p>
+              )}
+              <div className="space-y-3">
+                {sortedPlanets.map((planet) => (
+                  <ColonyPanel
+                    key={planet.planet_id}
+                    planet={planet}
+                    detail={details.get(planet.planet_id)?.cached?.data ?? null}
+                    status={statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS}
+                    planetNames={planetNames}
+                    systemNames={systemNames}
+                    pinTypeNames={pinTypeNames}
+                    productNames={productNames}
+                    schematicNames={schematicNames}
+                    loadedAt={loadedAt}
+                  />
+                ))}
+              </div>
+            </>
           )}
-          <div className="space-y-3">
-            {sortedPlanets.map((planet) => (
-              <ColonyPanel
-                key={planet.planet_id}
-                planet={planet}
-                detail={details.get(planet.planet_id)?.cached?.data ?? null}
-                status={statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS}
-                planetNames={planetNames}
-                systemNames={systemNames}
-                pinTypeNames={pinTypeNames}
-                productNames={productNames}
-                schematicNames={schematicNames}
-                loadedAt={loadedAt}
-              />
-            ))}
-          </div>
         </>
       )}
     </div>
