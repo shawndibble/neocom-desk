@@ -41,6 +41,7 @@ import {
   SKILL_QUEUE_NOTIFICATION_DIFFS,
   diffIndustryJobComplete,
   diffPlanetaryExtractionDone,
+  diffPlanetaryExtractorExpiring,
   diffNewMail,
   diffNewCalendarEvent,
   diffCalendarEventStarting,
@@ -59,6 +60,7 @@ import {
   type ColonySnapshotEntry,
   type PlanetarySnapshot,
   type PlanetaryNotificationFire,
+  type ExtractorExpiringFire,
   type MailHeaderSnapshot,
   type MailSnapshot,
   type MailNotificationFire,
@@ -92,6 +94,7 @@ export type AnyNotificationFire =
   | MailNotificationFire
   | NewCalendarEventFire
   | CalendarEventStartingFire
+  | ExtractorExpiringFire
   | ContractNotificationFire
   | WalletNotificationFire
   | MarketOrderNotificationFire
@@ -320,10 +323,10 @@ function isColonySnapshotEntry(raw: unknown): raw is ColonySnapshotEntry {
 export const colonyDomain = defineDomain<
   ColonySnapshotEntry,
   PlanetarySnapshot,
-  PlanetaryNotificationFire
+  PlanetaryNotificationFire | ExtractorExpiringFire
 >({
   id: 'colonies',
-  eventIds: ['planetaryExtractionDone'],
+  eventIds: ['planetaryExtractionDone', 'planetaryExtractorExpiring'],
   stateKey: 'notifications.pollerState.colonies',
   entriesKey: 'colonies',
   isEntry: isColonySnapshotEntry,
@@ -348,7 +351,12 @@ export const colonyDomain = defineDomain<
     return colonies;
   },
   toSnapshot: (colonies, nowMs) => ({ colonies: [...colonies], nowMs }),
-  diffs: [gatedOn('planetaryExtractionDone', diffPlanetaryExtractionDone)],
+  // Both gates are load-bearing now that one snapshot answers for two events:
+  // the fetch is skipped only when every event of the domain is off.
+  diffs: [
+    gatedOn('planetaryExtractionDone', diffPlanetaryExtractionDone),
+    gatedOn('planetaryExtractorExpiring', diffPlanetaryExtractorExpiring),
+  ],
 });
 
 /* -------------------------------------------------------------------------- */

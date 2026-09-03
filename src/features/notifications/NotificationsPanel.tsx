@@ -371,6 +371,19 @@ export function NotificationsPanel() {
                                   </div>
                                 </div>
                                 {/*
+                                  Delivery disclosure for the lead-time
+                                  warning (issue #310, AC5). Not gated on
+                                  `hasScope`: what limits this one is the
+                                  poll cadence and Periodic Background Sync
+                                  (ADR 0007), not the character's grants, so
+                                  the caveat is true before authorization too.
+                                */}
+                                {eventId === 'planetaryExtractorExpiring' && (
+                                  <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
+                                    {t('settings.notifications.extractorExpiringHint')}
+                                  </p>
+                                )}
+                                {/*
                                   Per-type opt-out underneath the single
                                   eveNotification event (issue #274, AC3):
                                   types appear here only once seen, since

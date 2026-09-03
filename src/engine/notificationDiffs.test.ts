@@ -6,6 +6,7 @@ import {
   SKILL_QUEUE_NOTIFICATION_DIFFS,
   diffIndustryJobComplete,
   diffPlanetaryExtractionDone,
+  diffPlanetaryExtractorExpiring,
   diffNewMail,
   diffNewCalendarEvent,
   diffCalendarEventStarting,
@@ -18,6 +19,7 @@ import {
   type IndustryJobEntrySnapshot,
   type IndustryJobSnapshot,
   type ColonySnapshotEntry,
+  type ExtractorExpiringFire,
   type PlanetarySnapshot,
   type MailHeaderSnapshot,
   type MailSnapshot,
@@ -364,6 +366,180 @@ describe('diffPlanetaryExtractionDone', () => {
     expect(diffPlanetaryExtractionDone(7, prev, next)).toEqual([
       { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1 },
       { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 2 },
+    ]);
+  });
+});
+
+const HOUR = 3_600_000;
+
+/** A colony whose extractor pin ids are given explicitly, so a restart on the same pin is expressible. */
+function colonyWithPins(
+  planetId: number,
+  extractors: readonly { pinId: number; expiryTimeMs: number }[]
+): ColonySnapshotEntry {
+  return { planetId, extractors };
+}
+
+function expiringFire(
+  characterId: number,
+  planetId: number,
+  pinId: number,
+  thresholdMs: number
+): ExtractorExpiringFire {
+  return { eventId: 'planetaryExtractorExpiring', characterId, planetId, pinId, thresholdMs };
+}
+
+describe('diffPlanetaryExtractorExpiring', () => {
+  it('fires nothing on the first-ever poll', () => {
+    const next = planetarySnapshot([colonyEntry(1, [T0 + 10 * HOUR])], T0);
+    expect(diffPlanetaryExtractorExpiring(7, undefined, next)).toEqual([]);
+  });
+
+  it('never fires for a program that has already expired, even across a closed-app gap', () => {
+    // The regression this event exists to avoid (issue #310, AC2): the naive
+    // `expiry - now <= 24h` predicate stays true forever after expiry, so a
+    // user who closed the app at T-30h and reopened at T+5h would be told a
+    // program that died five hours ago is "expiring soon". Expired is
+    // `planetaryExtractionDone`'s to report, never this event's.
+    const expiryMs = T0 + 30 * HOUR;
+    const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
+    const next = planetarySnapshot([colonyEntry(1, [expiryMs])], expiryMs + 5 * HOUR);
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([]);
+  });
+
+  it('fires nothing at the instant of expiry, handing the colony to planetaryExtractionDone', () => {
+    const expiryMs = T0 + 30 * HOUR;
+    const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
+    const next = planetarySnapshot([colonyEntry(1, [expiryMs])], expiryMs);
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([]);
+  });
+
+  it('does not fire while the program is outside both windows', () => {
+    const expiryMs = T0 + 40 * HOUR;
+    const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
+    const next = planetarySnapshot([colonyEntry(1, [expiryMs])], T0 + FIVE_MIN);
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([]);
+  });
+
+  it('fires once as the program crosses into the 24-hour window', () => {
+    const expiryMs = T0 + 24 * HOUR + FIVE_MIN;
+    const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
+    const next = planetarySnapshot([colonyEntry(1, [expiryMs])], T0 + FIVE_MIN);
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
+      expiringFire(7, 1, 1, 24 * HOUR),
+    ]);
+  });
+
+  it('fires when the remaining time lands exactly on a threshold', () => {
+    const expiryMs = T0 + 24 * HOUR + 1;
+    const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
+    const next = planetarySnapshot([colonyEntry(1, [expiryMs])], T0 + 1);
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
+      expiringFire(7, 1, 1, 24 * HOUR),
+    ]);
+  });
+
+  it('does not re-fire on later polls still inside the 24-hour window', () => {
+    const expiryMs = T0 + 24 * HOUR;
+    const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0 + FIVE_MIN);
+    const next = planetarySnapshot([colonyEntry(1, [expiryMs])], T0 + 2 * FIVE_MIN);
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([]);
+  });
+
+  it('fires once as the program crosses into the 12-hour window, and not again after', () => {
+    const expiryMs = T0 + 24 * HOUR;
+    const crossing = planetarySnapshot([colonyEntry(1, [expiryMs])], expiryMs - 12 * HOUR);
+    const beforeCrossing = planetarySnapshot(
+      [colonyEntry(1, [expiryMs])],
+      expiryMs - 12 * HOUR - FIVE_MIN
+    );
+    expect(diffPlanetaryExtractorExpiring(7, beforeCrossing, crossing)).toEqual([
+      expiringFire(7, 1, 1, 12 * HOUR),
+    ]);
+
+    const after = planetarySnapshot([colonyEntry(1, [expiryMs])], expiryMs - 12 * HOUR + FIVE_MIN);
+    expect(diffPlanetaryExtractorExpiring(7, crossing, after)).toEqual([]);
+  });
+
+  it('fires both edges in one poll when a gap crosses both while the program is still alive', () => {
+    // Two independent edges per program: a poll that skips over both reports
+    // both, most-distant threshold first so the 12-hour copy is the one that
+    // wins the shared browser notification tag.
+    const expiryMs = T0 + 30 * HOUR;
+    const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
+    const next = planetarySnapshot([colonyEntry(1, [expiryMs])], expiryMs - HOUR);
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
+      expiringFire(7, 1, 1, 24 * HOUR),
+      expiringFire(7, 1, 1, 12 * HOUR),
+    ]);
+  });
+
+  it('fires once for a program first observed already inside a window', () => {
+    const expiryMs = T0 + 20 * HOUR;
+    const prev = planetarySnapshot([colonyWithPins(1, [])], T0);
+    const next = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 42, expiryTimeMs: expiryMs }])],
+      T0 + FIVE_MIN
+    );
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
+      expiringFire(7, 1, 42, 24 * HOUR),
+    ]);
+  });
+
+  it('fires for a colony absent from a defined prev', () => {
+    const expiryMs = T0 + 20 * HOUR;
+    const prev = planetarySnapshot([colonyEntry(2, [T0 + 40 * HOUR])], T0);
+    const next = planetarySnapshot(
+      [colonyEntry(1, [expiryMs]), colonyEntry(2, [T0 + 40 * HOUR])],
+      T0 + FIVE_MIN
+    );
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
+      expiringFire(7, 1, 1, 24 * HOUR),
+    ]);
+  });
+
+  it('fires for a program restarted on a pin whose previous program was already inside the window', () => {
+    // Identity is (pinId, expiryTimeMs): `expiry_time` is fixed for a
+    // program's life, so a changed expiry on the same pin is a new program,
+    // and the dead one's position inside the window must not swallow the new
+    // one's first crossing.
+    const prev = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 5, expiryTimeMs: T0 - 2 * HOUR }])],
+      T0
+    );
+    const next = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 5, expiryTimeMs: T0 + 20 * HOUR }])],
+      T0 + FIVE_MIN
+    );
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
+      expiringFire(7, 1, 5, 24 * HOUR),
+    ]);
+  });
+
+  it('fires per extractor program across colonies', () => {
+    const prev = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: T0 + 24 * HOUR + FIVE_MIN },
+          { pinId: 2, expiryTimeMs: T0 + 24 * HOUR + FIVE_MIN },
+        ]),
+        colonyWithPins(2, [{ pinId: 3, expiryTimeMs: T0 + 40 * HOUR }]),
+      ],
+      T0
+    );
+    const next = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: T0 + 24 * HOUR + FIVE_MIN },
+          { pinId: 2, expiryTimeMs: T0 + 24 * HOUR + FIVE_MIN },
+        ]),
+        colonyWithPins(2, [{ pinId: 3, expiryTimeMs: T0 + 40 * HOUR }]),
+      ],
+      T0 + FIVE_MIN
+    );
+    expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
+      expiringFire(7, 1, 1, 24 * HOUR),
+      expiringFire(7, 1, 2, 24 * HOUR),
     ]);
   });
 });
