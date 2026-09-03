@@ -105,27 +105,36 @@ function renderEditor(
 
   function Harness() {
     const [plan, setPlan] = useState(initialPlan);
+    // Stands in for the route's PageHeader actions slot: PlanEditor portals
+    // Import/Export into it, so a test needs a mounted node to portal into
+    // (queries still find the portaled content — Testing Library's `screen`
+    // queries `document.body`, not this component's own subtree).
+    const [headerActionsEl, setHeaderActionsEl] = useState<HTMLDivElement | null>(null);
     return (
-      <PlanEditor
-        characterId={1}
-        plan={plan}
-        catalog={CATALOG}
-        trainedSkills={NO_TRAINED}
-        attributes={ATTRIBUTES}
-        implants={IMPLANTS}
-        attributesResult={ATTRIBUTES_RESULT}
-        remapInfo={null}
-        listPane={<div data-testid="plan-list-pane" />}
-        {...rest}
-        // After the spread, not before: the write-back is this harness's
-        // whole point, and an `overrides.onUpdate` would otherwise turn it
-        // off silently. Tests observe the patches through the `onUpdate` spy
-        // this closes over instead.
-        onUpdate={(patch) => {
-          onUpdate(patch);
-          setPlan((current) => ({ ...current, ...patch, updatedAt: current.updatedAt + 1 }));
-        }}
-      />
+      <>
+        <div ref={setHeaderActionsEl} />
+        <PlanEditor
+          characterId={1}
+          plan={plan}
+          catalog={CATALOG}
+          trainedSkills={NO_TRAINED}
+          attributes={ATTRIBUTES}
+          implants={IMPLANTS}
+          attributesResult={ATTRIBUTES_RESULT}
+          remapInfo={null}
+          listPane={<div data-testid="plan-list-pane" />}
+          headerActionsContainer={headerActionsEl}
+          {...rest}
+          // After the spread, not before: the write-back is this harness's
+          // whole point, and an `overrides.onUpdate` would otherwise turn it
+          // off silently. Tests observe the patches through the `onUpdate` spy
+          // this closes over instead.
+          onUpdate={(patch) => {
+            onUpdate(patch);
+            setPlan((current) => ({ ...current, ...patch, updatedAt: current.updatedAt + 1 }));
+          }}
+        />
+      </>
     );
   }
 
@@ -220,8 +229,8 @@ describe('PlanEditor tools pane', () => {
     expect(within(attributesSection).getByLabelText('What-if implants')).toBeInTheDocument();
     expect(within(attributesSection).getByLabelText('Booster')).toBeInTheDocument();
 
-    // Import/Export: plan-level file operations, now icon buttons in the
-    // "Your entries" panel header rather than their own tools-pane section.
+    // Import/Export: plan-level file operations, now icon buttons portaled
+    // into the route's page header rather than a tools-pane section.
     for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
       expect(within(actions).queryByRole('button', { name })).toBeNull();
@@ -249,7 +258,7 @@ describe('PlanEditor tools pane', () => {
     }
   });
 
-  it('renders Import/Export as icon-only controls in the entries panel header', () => {
+  it('renders Import/Export as icon-only controls (portaled to the page header)', () => {
     renderEditor();
 
     for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
@@ -258,6 +267,14 @@ describe('PlanEditor tools pane', () => {
       expect(button).toHaveAttribute('aria-label', name);
       expect(button.textContent).toBe('');
     }
+  });
+
+  it("doesn't render Import/Export when the caller has no header-actions slot to portal into", () => {
+    renderEditor(vi.fn(), { headerActionsContainer: null });
+
+    expect(screen.queryByRole('button', { name: 'Import from skill queue' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Import from clipboard' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
   });
 
   it('keeps the entry list out of the tools pane, so the plan itself stays the main column', () => {
@@ -435,8 +452,8 @@ describe('PlanEditor tools pane placement', () => {
     // tool set costs one row, where it used to cost three panels.
     expect(screen.queryByRole('button', { name: 'Optimize remaps' })).toBeNull();
     expect(screen.queryByLabelText('What-if implants')).toBeNull();
-    // Import/Export lives in the entries panel header, not the tools pane —
-    // on screen regardless of the disclosure's state.
+    // Import/Export portals to the page header, not the tools pane — on
+    // screen regardless of the disclosure's state.
     expect(screen.getByRole('button', { name: 'Import from skill queue' })).toBeInTheDocument();
   });
 

@@ -1,6 +1,5 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { IndustryJob } from '@/esi/endpoints';
-import { activityI18nKey } from './jobs';
+import { activityI18nKey, type ActiveJob } from './jobs';
 
 /**
  * CSV columns for the active-jobs list: activity, blueprint, blueprint type
@@ -10,11 +9,14 @@ import { activityI18nKey } from './jobs';
  * export. `cost` is blank (not 0, not a placeholder string) when the job has
  * none, matching ESI's optional field; an actual 0 cost stays 0 (`??`, not
  * `||`).
+ *
+ * Typed on `ActiveJob`, the structural subset the panel renders, so the same
+ * export serves both a Character's jobs and its corporation's (issue #298).
  */
 export function jobsCsvColumns(
   t: CsvTranslate,
   nameFor: (blueprintTypeId: number) => string
-): CsvColumn<IndustryJob>[] {
+): CsvColumn<ActiveJob>[] {
   return [
     {
       header: t('industry.csvJobActivity'),
