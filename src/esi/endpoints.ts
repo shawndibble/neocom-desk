@@ -237,6 +237,32 @@ export function getUniverseType(
   });
 }
 
+// --- GET /universe/groups/{group_id} (public) ---
+
+/**
+ * An item **Group** (`invGroups`) — the taxonomy node a type belongs to, not
+ * a Market Group (CONTEXT.md). The build-time SDE snapshot carries no
+ * groupID->name map, so the dogma attributes that reference a Group by id
+ * ("Used with (Charge Group)", "Can be fitted to") resolve through here.
+ */
+export interface UniverseGroup {
+  group_id: number;
+  name: string;
+  category_id: number;
+  published: boolean;
+  types: number[];
+}
+
+export function getUniverseGroup(
+  groupId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<UniverseGroup>> {
+  return esiFetch<UniverseGroup>(`/universe/groups/${groupId}`, {
+    ...options,
+    endpointId: 'getUniverseGroup',
+  });
+}
+
 // --- GET /alliances/{alliance_id} (public) ---
 
 export interface AlliancePublicInfo {

@@ -6,9 +6,11 @@
  * every item's attributes into the snapshot would ship a slice of a 16 MB
  * table for a panel that is rarely opened. The snapshot instead carries the
  * small attribute dictionary that turns attribute ids into names/units/categories.
- * Required-skill rows resolve their skill name from `skills.json`
- * (public/data, PWA-precached — not the market snapshot vite.config.ts
- * excludes from precache) rather than from anything item-specific. A
+ * Rows whose value is an id rather than a measurement — a required skill, a
+ * Group a module can be fitted to — resolve to names through
+ * `attributeNames.ts`, which starts from `skills.json` (public/data,
+ * PWA-precached — not the market snapshot vite.config.ts excludes from
+ * precache) and only reaches for ESI for ids no local payload covers. A
  * planetary commodity also gets its schematic (pi.json, precached the same
  * way): for those, "how is this made" is the question the modal is opened to
  * answer, and no dogma attribute carries it.
@@ -20,10 +22,11 @@ import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAt
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
 import { getUniverseType, type UniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
-import { loadPi, loadSkills } from '@/sde/loadSde';
+import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
 import { typeIconUrl } from '@/lib/eveImages';
+import { loadAttributeNames } from './attributeNames';
 import { formatAttributeValue, formatVolume } from './format';
 
 export interface ItemDetailModalProps {
@@ -53,10 +56,9 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
       setData(null);
       setError(false);
       try {
-        const [{ data: type }, dictionary, skills, pi] = await Promise.all([
+        const [{ data: type }, dictionary, pi] = await Promise.all([
           getUniverseType(typeId),
           loadAttributeDictionary(),
-          loadSkills(),
           // Caught here, not by the shared handler below: only planetary
           // commodities have anything to lose if this payload is missing, and
           // a rejection inside the Promise.all would blank the whole modal.
@@ -64,10 +66,13 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
         ]);
         if (cancelled) return;
         if (!type) throw new Error(`No type data for ${typeId}`);
-        const skillNames = Object.fromEntries(skills.map((s) => [s.typeID, s.name]));
+        // Needs the dictionary to know which values are ids, so it can't join
+        // the fetch above; it never rejects, so it can't blank the modal.
+        const names = await loadAttributeNames([type.dogma_attributes], dictionary);
+        if (cancelled) return;
         setData({
           type,
-          groups: groupItemAttributes(type.dogma_attributes, dictionary, skillNames),
+          groups: groupItemAttributes(type.dogma_attributes, dictionary, names),
           pi,
         });
       } catch {

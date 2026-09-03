@@ -1,0 +1,58 @@
+/**
+ * Resolves the ids an item's dogma attributes reference into names, for
+ * `groupItemAttributes` / `buildCompareMatrix` (see
+ * `engine/market/itemAttributes`). Three sources, cheapest first:
+ *
+ * - **attributeID** references need nothing here — the attribute dictionary
+ *   the engine already holds names every attribute.
+ * - **typeID** references start from `skills.json` (precached, offline, and
+ *   what the required-skill rows have always used), and only the ids it
+ *   doesn't cover go to `loadTypeNames` — which reads the local snapshot
+ *   before it reaches for ESI. So the common item pays nothing new.
+ * - **groupID** references have no local source at all (the snapshot carries
+ *   the market tree, not `invGroups`), so they go to `loadGroupNames`.
+ *
+ * Never rejects: a lookup that fails contributes no names, and the engine
+ * then leaves those rows rendering the raw ids they render today. Both
+ * modals call this rather than each assembling skill names themselves.
+ */
+import {
+  collectAttributeIdReferences,
+  type AttributeDictionary,
+  type AttributeNames,
+  type RawDogmaAttribute,
+} from '@/engine/market/itemAttributes';
+import { loadTypeNames } from '@/features/character/typeNames';
+import { loadSkills } from '@/sde/loadSde';
+import { loadGroupNames } from './groupNames';
+
+/** Names for every id referenced across `items`, resolved in one round per kind. */
+export async function loadAttributeNames(
+  items: readonly (readonly RawDogmaAttribute[] | undefined)[],
+  dictionary: AttributeDictionary
+): Promise<AttributeNames> {
+  const typeIds = new Set<number>();
+  const groupIds = new Set<number>();
+  for (const dogmaAttributes of items) {
+    const refs = collectAttributeIdReferences(dogmaAttributes, dictionary);
+    for (const id of refs.typeIds) typeIds.add(id);
+    for (const id of refs.groupIds) groupIds.add(id);
+  }
+
+  const [skills, groups] = await Promise.all([
+    loadSkills().catch(() => []),
+    groupIds.size === 0
+      ? new Map<number, string>()
+      : loadGroupNames([...groupIds]).catch(() => new Map<number, string>()),
+  ]);
+
+  const types: Record<number, string> = {};
+  for (const skill of skills) types[skill.typeID] = skill.name;
+  const missing = [...typeIds].filter((id) => !(id in types));
+  if (missing.length > 0) {
+    const resolved = await loadTypeNames(missing).catch(() => new Map<number, string>());
+    for (const [id, name] of resolved) types[id] = name;
+  }
+
+  return { types, groups: Object.fromEntries(groups) };
+}

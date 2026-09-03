@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { enumUnitLabel, isEnumUnit } from './attributeUnits';
+import { enumUnitLabel, idReferenceKind, isEnumUnit } from './attributeUnits';
 
 describe('isEnumUnit', () => {
   it('recognises a legend regardless of how many members it lists', () => {
@@ -65,5 +65,33 @@ describe('enumUnitLabel', () => {
   it('returns null for a real unit', () => {
     expect(enumUnitLabel('HP', 1)).toBeNull();
     expect(enumUnitLabel(null, 1)).toBeNull();
+  });
+});
+
+describe('idReferenceKind', () => {
+  it('classifies each of the three id-reference units', () => {
+    expect(idReferenceKind('typeID')).toBe('type');
+    expect(idReferenceKind('groupID')).toBe('group');
+    expect(idReferenceKind('attributeID')).toBe('attribute');
+  });
+
+  it('leaves real units alone', () => {
+    for (const unit of ['HP', 'm/sec', 'm3', 'points', 'Level', 'Slot', 'x', '%', '']) {
+      expect(idReferenceKind(unit), unit).toBeNull();
+    }
+  });
+
+  it('treats a missing unit as no reference', () => {
+    expect(idReferenceKind(null)).toBeNull();
+    expect(idReferenceKind(undefined)).toBeNull();
+  });
+
+  it('stays disjoint from the enum-legend units, so neither path claims the other', () => {
+    for (const unit of ['typeID', 'groupID', 'attributeID']) {
+      expect(isEnumUnit(unit), unit).toBe(false);
+    }
+    for (const legend of ['1=True 0=False', '1=small 2=medium 3=l', '1=Male 2=Unisex 3=Female']) {
+      expect(idReferenceKind(legend), legend).toBeNull();
+    }
   });
 });

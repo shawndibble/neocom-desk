@@ -19,13 +19,17 @@ import {
   type CompareAttributeGroup,
   type CompareCell,
 } from '@/engine/market/attributeCompareMatrix';
-import type { AttributeDictionary, RawDogmaAttribute } from '@/engine/market/itemAttributes';
+import type {
+  AttributeDictionary,
+  AttributeNames,
+  RawDogmaAttribute,
+} from '@/engine/market/itemAttributes';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import { getUniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
-import { loadSkills } from '@/sde/loadSde';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
+import { loadAttributeNames } from './attributeNames';
 import { formatAttributeValue } from './format';
 
 export interface VariationsCompareModalItem {
@@ -42,7 +46,7 @@ export interface VariationsCompareModalProps {
 interface FetchedData {
   dogmaByTypeId: ReadonlyMap<number, readonly RawDogmaAttribute[] | undefined>;
   dictionary: AttributeDictionary;
-  skillNames: Readonly<Record<number, string>>;
+  names: AttributeNames;
 }
 
 function formatCell(kind: 'price' | 'attribute', cell: CompareCell): string {
@@ -91,18 +95,20 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
       setData(null);
       setError(false);
       try {
-        const [types, dictionary, skills] = await Promise.all([
+        const [types, dictionary] = await Promise.all([
           Promise.all(currentItems.map((item) => getUniverseType(item.typeId))),
           loadAttributeDictionary(),
-          loadSkills(),
         ]);
         if (cancelled) return;
         if (types.some((result) => !result.data)) throw new Error('Missing type data');
-        const skillNames = Object.fromEntries(skills.map((s) => [s.typeID, s.name]));
         const dogmaByTypeId = new Map(
           currentItems.map((item, index) => [item.typeId, types[index].data?.dogma_attributes])
         );
-        setData({ dogmaByTypeId, dictionary, skillNames });
+        // One resolve for the whole matrix: ids repeat hard across variations,
+        // so every column shares the lookups the first one paid for.
+        const names = await loadAttributeNames([...dogmaByTypeId.values()], dictionary);
+        if (cancelled) return;
+        setData({ dogmaByTypeId, dictionary, names });
       } catch {
         if (!cancelled) setError(true);
       } finally {
@@ -128,7 +134,7 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
         worth: t('market.variationsCompare.worth'),
         estimatedPrice: t('market.variationsCompare.estimatedPrice'),
       },
-      data.skillNames
+      data.names
     );
   }, [data, items, prices, t]);
 

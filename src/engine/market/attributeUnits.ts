@@ -53,3 +53,34 @@ export function enumUnitLabel(unit: string | null | undefined, value: number): s
   }
   return null;
 }
+
+/** What an id-reference "unit" points at. */
+export type IdReferenceKind = 'type' | 'group' | 'attribute';
+
+/**
+ * The units that are an id in disguise. `groupID` names an item **Group**
+ * (`invGroups`), never a Market Group — CONTEXT.md keeps those distinct.
+ */
+const ID_REFERENCE_UNITS: Readonly<Record<string, IdReferenceKind>> = {
+  typeID: 'type',
+  groupID: 'group',
+  attributeID: 'attribute',
+};
+
+/**
+ * What `unit` references, or null for a real unit. Disjoint from
+ * `isEnumUnit` by construction: an enum legend always carries a "<int>=",
+ * which none of these three do.
+ */
+export function idReferenceKind(unit: string | null | undefined): IdReferenceKind | null {
+  return unit == null ? null : (ID_REFERENCE_UNITS[unit] ?? null);
+}
+
+/**
+ * Whether `value` could name anything. Dogma leaves unused reference slots at
+ * 0, and ESI sends every value as a float — neither 0, a negative, nor 1.5 is
+ * an id, and asking a lookup for one only wastes the call.
+ */
+export function isResolvableId(value: number): boolean {
+  return Number.isInteger(value) && value > 0;
+}
