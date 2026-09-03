@@ -6,7 +6,6 @@ import {
   DataTable,
   EmptyState,
   IconButton,
-  PageHeader,
   Panel,
   ReauthBanner,
   Spinner,
@@ -14,7 +13,13 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { loadCharacterClones } from '@/features/character/clones';
+import {
+  loadCharacterSpSummary,
+  NO_SP_SUMMARY,
+  type CharacterSpSummary,
+} from '@/features/character/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { loadCharacterSkills } from '@/features/skills/data';
 import { loadStationName } from '@/features/character/stations';
@@ -37,6 +42,8 @@ interface Snapshot {
   infomorphLevel: number;
   implantNames: Map<number, string>;
   locationNames: Map<number, string>;
+  /** Total/unallocated SP for the shared Character-overview header. */
+  sp: CharacterSpSummary;
   /** Captured in the loader, not at render: `Date.now()` is impure and React forbids it in render/useMemo. */
   loadedAt: number;
 }
@@ -45,8 +52,12 @@ async function loadClonesSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [{ cached: clonesResult, needsReauth: clonesNeedsReauth }, skillsResult] =
-    await Promise.all([loadCharacterClones(characterId), loadCharacterSkills(characterId)]);
+  const [{ cached: clonesResult, needsReauth: clonesNeedsReauth }, skillsResult, sp] =
+    await Promise.all([
+      loadCharacterClones(characterId),
+      loadCharacterSkills(characterId),
+      loadCharacterSpSummary(characterId, Date.now()),
+    ]);
   const loadedAt = Date.now();
   const infomorphLevel =
     skillsResult?.data.skills.find((skill) => skill.skill_id === INFOMORPH_SYNCHRONIZING_SKILL_ID)
@@ -81,7 +92,15 @@ async function loadClonesSnapshot(
     if (name) locationNames.set(id, name);
   });
 
-  return { clonesResult, clonesNeedsReauth, infomorphLevel, implantNames, locationNames, loadedAt };
+  return {
+    clonesResult,
+    clonesNeedsReauth,
+    infomorphLevel,
+    implantNames,
+    locationNames,
+    sp,
+    loadedAt,
+  };
 }
 
 /** Clones: jump clones, their locations and implants, plus the current jump cooldown. */
@@ -95,6 +114,7 @@ export function Clones() {
   const infomorphLevel = data?.infomorphLevel ?? 0;
   const implantNames = data?.implantNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
+  const sp = data?.sp ?? NO_SP_SUMMARY;
   const loadedAt = data?.loadedAt ?? 0;
 
   const clones = clonesResult?.data.jump_clones ?? [];
@@ -139,41 +159,58 @@ export function Clones() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
+      <CharacterHeader
+        characterId={activeCharacterId}
+        totalSp={sp.totalSp}
+        unallocatedSp={sp.unallocatedSp}
+      />
+      <OverviewSubNav />
+
+      {/*
+        Data age and Refresh ride on the panel's own toolbar rather than up
+        beside the character's name: they describe *this* tab's data, and above
+        the tabs is the block every tab shares. One panel wraps every branch so
+        that toolbar — the only way back from a failed or empty load — is there
+        in all of them, not just when there are rows to show.
+      */}
+      <Panel
         title={t('clones.title')}
-        meta={clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
         actions={
-          <>
+          <span className="flex items-center gap-2">
+            {clonesResult && <DataAgeBadge date={clonesResult.fetchedAt} />}
             <IconButton
+              size="sm"
               icon={<Icon.Refresh />}
               label={t('clones.refresh')}
               onClick={refresh}
               disabled={loading}
             />
-          </>
+          </span>
         }
-      />
-      <OverviewSubNav />
-
-      {loading ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : clonesNeedsReauth ? (
-        <ReauthBanner
-          title={t('clones.reauthTitle')}
-          hint={t('clones.reauthHint')}
-          actionLabel={t('clones.reauthAction')}
-          onLogin={() => void beginEveLogin()}
-        />
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : !clonesResult || clones.length === 0 ? (
-        <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
-      ) : (
-        <>
-          <Panel>
-            <p className="text-sm">
+        padded={false}
+      >
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : clonesNeedsReauth ? (
+          <div className="p-3">
+            <ReauthBanner
+              title={t('clones.reauthTitle')}
+              hint={t('clones.reauthHint')}
+              actionLabel={t('clones.reauthAction')}
+              onLogin={() => void beginEveLogin()}
+            />
+          </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : !clonesResult || clones.length === 0 ? (
+          <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
+        ) : (
+          <>
+            {/* The cooldown was its own Panel; panels don't nest, so it becomes
+                this one's first row, hairline-separated from the table. */}
+            <p className="border-b border-line px-3 py-2 text-sm">
               {cooldown.onCooldown && cooldown.readyAt
                 ? t('clones.cooldownOnCooldown', {
                     date: cooldown.readyAt.toLocaleString(),
@@ -181,8 +218,6 @@ export function Clones() {
                   })
                 : t('clones.cooldownReady')}
             </p>
-          </Panel>
-          <Panel padded={false}>
             {clonesResult.fromCache && (
               <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                 {t('common.offlineTitle')}
@@ -194,9 +229,9 @@ export function Clones() {
               rows={clones}
               rowKey={(clone) => clone.jump_clone_id}
             />
-          </Panel>
-        </>
-      )}
+          </>
+        )}
+      </Panel>
     </div>
   );
 }

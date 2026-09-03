@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, TextInput, type DataTableColumn } from '@/components/ui';
+import { DataTable, IconButton, TextInput, type DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import type {
@@ -49,6 +49,14 @@ interface SourcingInputProps {
   label: string;
   step: number | 'any';
   widthClassName: string;
+  /**
+   * Shown while the field is empty. Only right where empty means a known
+   * default — "0" on a quantity nobody has claimed to own. The price field
+   * passes none: empty there means the market has no number for this
+   * material, which the tag beside it spells out, and a ghost 0 would read as
+   * a price of nothing.
+   */
+  placeholder?: string;
   parse: (raw: string) => number | undefined;
   onCommit: (value: number | undefined) => void;
 }
@@ -66,6 +74,7 @@ function SourcingInput({
   label,
   step,
   widthClassName,
+  placeholder,
   parse,
   onCommit,
 }: SourcingInputProps) {
@@ -78,12 +87,7 @@ function SourcingInput({
       step={step}
       inputMode="decimal"
       aria-label={label}
-      // An empty box beside a bare label says nothing about what belongs in
-      // it, which is most of why the stacked card read as noise. The dimmed
-      // zero is a placeholder and never a value: an untouched field still
-      // commits nothing, and a stored 0 override price would price the
-      // material at nothing rather than at the hub.
-      placeholder="0"
+      placeholder={placeholder}
       // Digits sit right in the table, where they line up with the numeric
       // columns around them; in the stacked card there is no column to line
       // up with, and right-aligned digits would float a width away from the
@@ -95,6 +99,10 @@ function SourcingInput({
         const next = parse(event.target.value);
         setDraft(null);
         // Tabbing through an untouched field must not rewrite the record.
+        // This is also what keeps the price field's market default a default:
+        // its `value` is the hub price when nothing is stored, so a field
+        // blurred as it was found commits nothing and the row keeps tracking
+        // the market.
         if (next !== value) onCommit(next);
       }}
       onKeyDown={(event) => {
@@ -151,13 +159,23 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
 }
 
 /**
- * Materials table: name, effective quantity, the two sourcing overrides (units
- * already owned, manual unit price), unit price and line total.
+ * Materials table: name, effective quantity, units already owned, price, and
+ * line total.
+ *
+ * Price is one field, not a market column beside an override column. The two
+ * said the same thing twice — a row's price is a single number, and which of
+ * the two boxes it came from is a detail — while leaving an empty box on every
+ * row with nothing to say about what belonged in it. So the field carries the
+ * hub price as its value and typing over it is the override: the market number
+ * is the default, editing it is the exception, and the revert control beside a
+ * changed field puts the market back. `SourcingInput`'s commit rule is what
+ * makes that safe — a field blurred as it was found writes nothing, so merely
+ * tabbing across a row cannot freeze today's hub price into the plan.
  *
  * Three pricing states have to be told apart — hub-priced, owned-free, manually
  * overridden — and they are not mutually exclusive: a row can be half owned and
  * overridden at once. So every cue is text, never colour alone (WCAG 1.4.1, and
- * docs/DESIGN.md §7): a Hub/Override tag beside the unit price, and an
+ * docs/DESIGN.md §7): a Hub/Override tag beside the price field, and an
  * owned/bought split spelled out beneath a partly-owned row's blended total.
  * `materialRow.ts` decides what each row shows, so the CSV export can't drift
  * from it.
@@ -165,8 +183,8 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
  * Every cell's own alignment is held behind `sm:`. Below that the row is a
  * stacked card (docs/DESIGN.md §4a) where the header prints into a left gutter
  * and the value starts at a fixed offset — a cell that right-aligns itself
- * escapes that offset, and with five of the six columns right-aligned the card
- * came out as a zigzag of labels and values rather than two columns.
+ * escapes that offset, and with every column but the name right-aligned the
+ * card came out as a zigzag of labels and values rather than two columns.
  */
 export function MaterialsTable({
   materials,
@@ -221,6 +239,7 @@ export function MaterialsTable({
                 label={t('industry.ownedQuantityFor', { material: nameFor(material.typeID) })}
                 step={1}
                 widthClassName="w-20"
+                placeholder="0"
                 parse={parseCount}
                 onCommit={(ownedQuantity) => onSourcingChange(material.typeID, { ownedQuantity })}
               />
@@ -239,44 +258,49 @@ export function MaterialsTable({
         },
       },
       {
-        id: 'overridePrice',
-        header: t('industry.overridePrice'),
+        id: 'price',
+        header: t('industry.price'),
         align: 'right',
-        render: (material) => (
-          <SourcingInput
-            value={sourcing?.[material.typeID]?.overridePrice}
-            label={t('industry.overridePriceFor', { material: nameFor(material.typeID) })}
-            step="any"
-            widthClassName="w-24"
-            parse={parsePrice}
-            onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
-          />
-        ),
-      },
-      {
-        id: 'unitPrice',
-        header: t('industry.unitPrice'),
-        align: 'right',
-        className: 'tabular-nums',
         render: (material) => {
           const state = materialRowState(material, sourcing, pricesReady);
-          if (state.unitPrice === null) {
-            // A fully owned material costs nothing, so a missing price for it
-            // is not a problem worth a warning — only a real remainder is.
-            return state.fullyOwned ? (
-              <span className="text-text-dim">{t('industry.priceSourceOwned')}</span>
-            ) : (
-              <span className="text-warning">{t('industry.unpriced')}</span>
-            );
-          }
           const overridden = state.priceSource === 'override';
+          const name = nameFor(material.typeID);
+          // Nothing to price a fully owned material at, so a row with no
+          // number is not a problem worth a warning — only a real remainder
+          // is.
+          const tag = overridden
+            ? { text: t('industry.priceSourceOverride'), tone: 'text-accent' }
+            : state.unitPrice !== null
+              ? { text: t('industry.priceSourceHub'), tone: 'text-text-dim' }
+              : state.fullyOwned
+                ? { text: t('industry.priceSourceOwned'), tone: 'text-text-dim' }
+                : { text: t('industry.unpriced'), tone: 'text-warning' };
           return (
-            <span className="inline-flex items-baseline justify-start gap-1 sm:justify-end">
-              {formatIsk(state.unitPrice)}
-              <span
-                className={cx('text-[0.6875rem]', overridden ? 'text-accent' : 'text-text-dim')}
-              >
-                {overridden ? t('industry.priceSourceOverride') : t('industry.priceSourceHub')}
+            <span className="inline-flex items-center justify-start gap-1 sm:justify-end">
+              <SourcingInput
+                value={state.unitPrice ?? undefined}
+                label={t('industry.priceFor', { material: name })}
+                step="any"
+                widthClassName="w-24"
+                parse={parsePrice}
+                onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
+              />
+              <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>
+              {/*
+               * The slot is held open on every row, so the fields down the
+               * column keep one edge whether or not a row is overridden —
+               * only the button inside it comes and goes.
+               */}
+              <span className="flex w-9 shrink-0 justify-start sm:justify-end md:w-7">
+                {overridden && (
+                  <IconButton
+                    size="sm"
+                    variant="plain"
+                    icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
+                    label={t('industry.resetPriceFor', { material: name })}
+                    onClick={() => onSourcingChange(material.typeID, { overridePrice: undefined })}
+                  />
+                )}
               </span>
             </span>
           );

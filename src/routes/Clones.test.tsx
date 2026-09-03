@@ -71,6 +71,36 @@ const server = setupServer(
   http.get(`${ESI}/universe/structures/1000000000002`, () =>
     HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
   ),
+  http.get(`${ESI}/characters/${CHAR_ID}`, () =>
+    HttpResponse.json({
+      name: 'Pilot One',
+      corporation_id: 1001,
+      alliance_id: 2001,
+      birthday: '2015-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'female',
+      race_id: 1,
+    })
+  ),
+  http.get(`${ESI}/corporations/1001`, () =>
+    HttpResponse.json({
+      name: 'Test Corp',
+      ticker: 'TC',
+      ceo_id: 1,
+      creator_id: 1,
+      member_count: 5,
+      tax_rate: 0.1,
+    })
+  ),
+  http.get(`${ESI}/alliances/2001`, () =>
+    HttpResponse.json({
+      name: 'Test Alliance',
+      ticker: 'TA',
+      creator_corporation_id: 1,
+      creator_id: 1,
+      date_founded: '2016-01-01T00:00:00Z',
+    })
+  ),
   http.post(`${ESI}/universe/names`, () =>
     HttpResponse.json([
       { id: 19540, name: 'High-grade Ascendancy Alpha', category: 'inventory_type' },
@@ -125,6 +155,39 @@ describe('Clones', () => {
     );
     render(<App />);
     expect(await screen.findByText('No jump clones cached')).toBeInTheDocument();
+  });
+
+  it('carries the same character header the Overview tab shows, not a page title', async () => {
+    render(<App />);
+
+    // Identity, corp/alliance and SP: identical to /overview, so nothing above
+    // the tabs moves as you switch between them.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).toBeInTheDocument();
+    expect(await screen.findByText('Test Corp / Test Alliance')).toBeInTheDocument();
+    expect(await screen.findByText('135,765')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Clones' })).not.toBeInTheDocument();
+  });
+
+  it("keeps this view's data age and Refresh below the tabs, not in the shared header", async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: 'Pilot One' });
+
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
+    expect(header?.contains(refresh)).toBe(false);
+    expect(await screen.findByText('just now')).toBeInTheDocument();
+  });
+
+  it('offers Refresh even when there is nothing to show', async () => {
+    // The empty and failed states are the ones a Refresh exists for, so the
+    // panel's toolbar has to outlive its rows.
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json({ jump_clones: [] }))
+    );
+    render(<App />);
+    await screen.findByText('No jump clones cached');
+
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 
   it('shows a re-login prompt when the clones scope itself was revoked', async () => {

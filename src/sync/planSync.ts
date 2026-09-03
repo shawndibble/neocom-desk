@@ -441,6 +441,12 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
     remapCount: p.remapCount,
     // Firestore rejects undefined values, so optional fields are omitted.
     ...(p.markers !== undefined ? { markers: p.markers } : {}),
+    // The lenses the plan is costed under (What-If Implants, Booster) are
+    // part of the plan, not a per-device view preference, so they travel
+    // with it. Same omit-when-absent rule; a Booster's own `expiresAt` is
+    // `number | null`, and null is a value Firestore stores happily.
+    ...(p.whatIfImplants !== undefined ? { whatIfImplants: p.whatIfImplants } : {}),
+    ...(p.booster !== undefined ? { booster: p.booster } : {}),
     updatedAt: p.updatedAt,
     ownerHash,
     deleted: false,
@@ -452,6 +458,8 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
     entries: r.entries,
     remapCount: r.remapCount,
     ...(r.markers !== undefined ? { markers: r.markers } : {}),
+    ...(r.whatIfImplants !== undefined ? { whatIfImplants: r.whatIfImplants } : {}),
+    ...(r.booster !== undefined ? { booster: r.booster } : {}),
     updatedAt: r.updatedAt,
   }),
   bulkPutLocal: (records) => db.skillPlans.bulkPut(records),

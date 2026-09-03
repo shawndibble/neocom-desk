@@ -43,6 +43,12 @@ export interface LocalSettingState<T> {
   /** True once the Dexie read has settled — successfully or not. */
   hydrated: boolean;
   hydrate: () => Promise<void>;
+  /**
+   * Applies the value first and persists it second, so subscribers see the
+   * new choice in the same tick and a control repaints on the press. The
+   * returned promise settles when the write does — await it only when you
+   * need the row on disk, never to read the value back.
+   */
   setValue: (value: T) => Promise<void>;
 }
 
@@ -64,7 +70,7 @@ export function createLocalSetting<T>(options: LocalSettingOptions<T>): LocalSet
 
   return create<LocalSettingState<T>>((set, get) => {
     // Counts applied values, so a slow hydrate landing after a set cannot
-    // overwrite the newer value with the row it read before the write.
+    // overwrite the newer choice with the row it read before that set.
     let generation = 0;
 
     const apply = (value: T, forGeneration: number) => {
@@ -90,8 +96,22 @@ export function createLocalSetting<T>(options: LocalSettingOptions<T>): LocalSet
         }
       },
       setValue: async (value) => {
-        await db.settings.put({ key, value });
+        // Applied first, persisted second. A preference is the user's own
+        // choice, already made — nothing about it needs IndexedDB's blessing
+        // to be shown, and waiting for one leaves the control looking dead
+        // for a round-trip. It also closes the window this used to leave
+        // open: a hydrate settling between the click and the write would
+        // apply the *stored* value on top of the newer choice, flicking the
+        // control back before it flicked forward. Applying now takes the
+        // generation, so that late hydrate is discarded instead.
+        //
+        // The cost is that a write which then fails (private browsing, over
+        // quota) leaves a choice that won't survive a reload. That is the
+        // better half of the trade: the alternative is a control that
+        // ignores the press, and `hydrate` already takes the same view of a
+        // broken store.
         apply(value, generation);
+        await db.settings.put({ key, value });
       },
     };
   });

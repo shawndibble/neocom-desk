@@ -242,6 +242,47 @@ describe('markers field mapping', () => {
   });
 });
 
+describe('plan lens field mapping (What-If Implants + Booster)', () => {
+  // The two lenses a plan is costed under are Editable Data like the entries
+  // themselves — a plan that synced without them would quote different
+  // training times on the other device.
+  const whatIfImplants = { kind: 'custom' as const, bonuses: { memory: 5, perception: 4 } };
+  const booster = { enabled: true, bonus: 12, expiresAt: 4_102_444_800_000 };
+
+  it('round-trips both through push and pull', async () => {
+    await db.skillPlans.add(plan({ whatIfImplants, booster }));
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote?.whatIfImplants).toEqual(whatIfImplants);
+    expect(remote?.booster).toEqual(booster);
+
+    await db.skillPlans.delete('p1');
+    seedRemote(PLANS_PATH, [remoteDoc({ whatIfImplants, booster, updatedAt: Date.now() + 1000 })]);
+    await triggerSync(1);
+    const local = await db.skillPlans.get('p1');
+    expect(local?.whatIfImplants).toEqual(whatIfImplants);
+    expect(local?.booster).toEqual(booster);
+  });
+
+  it('carries a Booster with no expiry set — null is a value, undefined is not', async () => {
+    await db.skillPlans.add(plan({ booster: { enabled: false, bonus: 3, expiresAt: null } }));
+    await triggerSync(1);
+    expect(remoteStore.get(PLANS_PATH)?.get('p1')?.booster).toEqual({
+      enabled: false,
+      bonus: 3,
+      expiresAt: null,
+    });
+  });
+
+  it('omits both keys entirely when undefined (Firestore rejects undefined)', async () => {
+    await db.skillPlans.add(plan());
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote && 'whatIfImplants' in remote).toBe(false);
+    expect(remote && 'booster' in remote).toBe(false);
+  });
+});
+
 describe('triggerSync: plans', () => {
   it('pushes a local-only plan with ownerHash and deleted: false', async () => {
     const p = plan();
@@ -429,6 +470,106 @@ describe('triggerSync: deferred remote purge retry', () => {
     await triggerSync(1);
 
     expect(remoteStore.get(PLANS_PATH)?.has('kept')).toBe(true);
+  });
+});
+
+/**
+ * The class of bug this pins: a field the UI writes onto a record, that the
+ * collection spec then forgets to map, so the value is saved locally and
+ * quietly never leaves the device (What-If Implants and the Booster were
+ * exactly that, one layer up).
+ *
+ * A `CollectionSpec` lists its fields explicitly — never a spread, because
+ * Firestore rejects `undefined` and a record carries local-only shapes — so
+ * nothing but a test can notice the omission. The pinned key lists make
+ * adding a field to a record fail here until its round trip is decided.
+ */
+describe('every stored field of a plan reaches the remote doc and comes back', () => {
+  const fullSkillPlan: Required<SkillPlanRecord> = {
+    id: 'p1',
+    characterId: 1,
+    name: 'Frigates V',
+    entries: [{ skillTypeID: 3327, targetLevel: 5, priority: 'high' }],
+    remapCount: 2,
+    markers: [1],
+    whatIfImplants: { kind: 'preset', preset: '+4' },
+    booster: { enabled: true, bonus: 6, expiresAt: 4_102_444_800_000 },
+    updatedAt: Date.now() - 1000,
+  };
+
+  const fullBuildPlan: Required<BuildPlanRecord> = {
+    id: 'b1',
+    characterId: 1,
+    name: 'Rifter run',
+    blueprintTypeID: 638,
+    runs: 10,
+    me: 10,
+    te: 20,
+    facility: 'raitaru',
+    rigLevel: 't1',
+    security: 'highsec',
+    hubId: 'jita',
+    facilityTaxPct: 1.5,
+    materialSourcing: { 34: { ownedQuantity: 500, overridePrice: 6.5 } },
+    updatedAt: Date.now() - 1000,
+  };
+
+  it('pins the Skill Plan fields, so a new one has to be routed deliberately', () => {
+    expect(Object.keys(fullSkillPlan).sort()).toEqual([
+      'booster',
+      'characterId',
+      'entries',
+      'id',
+      'markers',
+      'name',
+      'remapCount',
+      'updatedAt',
+      'whatIfImplants',
+    ]);
+  });
+
+  it('pins the Build Plan fields, so a new one has to be routed deliberately', () => {
+    expect(Object.keys(fullBuildPlan).sort()).toEqual([
+      'blueprintTypeID',
+      'characterId',
+      'facility',
+      'facilityTaxPct',
+      'hubId',
+      'id',
+      'materialSourcing',
+      'me',
+      'name',
+      'rigLevel',
+      'runs',
+      'security',
+      'te',
+      'updatedAt',
+    ]);
+  });
+
+  it.each([
+    ['skill plan', PLANS_PATH, () => db.skillPlans.put(fullSkillPlan), fullSkillPlan],
+    ['build plan', BUILD_PLANS_PATH, () => db.buildPlans.put(fullBuildPlan), fullBuildPlan],
+  ])('pushes every %s field', async (_label, path, put, record) => {
+    await put();
+    await triggerSync(1);
+    const remote = remoteStore.get(path)?.get(record.id);
+    expect(remote).toBeDefined();
+    // Asserted key by key, and each wrapped back into a one-key object, so a
+    // missing field fails naming itself rather than as one line of a
+    // whole-document diff.
+    for (const [key, value] of Object.entries(record)) {
+      expect({ [key]: remote?.[key] }).toEqual({ [key]: value });
+    }
+  });
+
+  it.each([
+    ['skill plan', PLANS_PATH, () => db.skillPlans.get('p1'), fullSkillPlan],
+    ['build plan', BUILD_PLANS_PATH, () => db.buildPlans.get('b1'), fullBuildPlan],
+  ])('pulls every %s field back', async (_label, path, get, record) => {
+    seedRemote(path, [{ ...record, ownerHash: HASH, deleted: false }]);
+    await triggerSync(1);
+    expect(await get()).toEqual(record);
   });
 });
 

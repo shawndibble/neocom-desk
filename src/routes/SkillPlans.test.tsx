@@ -1316,7 +1316,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
-    await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
+    await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
 
     await waitFor(() => {
       expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
@@ -1502,7 +1502,9 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     expect(screen.queryByLabelText('Expires')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
-    const expiresInput = screen.getByLabelText('Expires');
+    // `find`, not `get`: the Booster is saved on the plan now, so the tick
+    // travels through Dexie and back before the expiry row exists.
+    const expiresInput = await screen.findByLabelText('Expires');
     expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
     await user.type(expiresInput, '2000-01-01T00:00');
@@ -1523,12 +1525,44 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const durationBefore = durationHeader().textContent;
 
     await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
-    await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
+    await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
     expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
     await waitFor(() => {
       expect(durationHeader().textContent).not.toBe(durationBefore);
     });
+  });
+
+  it('saves both lenses on the plan, so they survive a reload instead of resetting', async () => {
+    const user = userEvent.setup();
+    await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
+    goToPlanEditor();
+    const first = render(<App />);
+    await openPlanTools();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'What-if implants' }), '+5');
+    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
+
+    await waitFor(async () => {
+      const stored = await db.skillPlans.get('plan-1');
+      expect(stored?.whatIfImplants).toEqual({ kind: 'preset', preset: '+5' });
+      expect(stored?.booster).toEqual({
+        enabled: true,
+        bonus: 3,
+        expiresAt: new Date(2099, 0, 1, 0, 0).getTime(),
+      });
+    });
+
+    // The reported bug: reopening the page put every control back to its
+    // default and quietly re-costed the plan.
+    first.unmount();
+    render(<App />);
+    await openPlanTools();
+
+    expect(await screen.findByLabelText('Expires')).toHaveValue('2099-01-01T00:00');
+    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveValue('+5');
+    expect(screen.getByRole('checkbox', { name: 'Booster' })).toBeChecked();
   });
 });
 

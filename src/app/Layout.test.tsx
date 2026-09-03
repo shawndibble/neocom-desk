@@ -123,9 +123,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(sheet).queryByRole('link', { name: 'Styleguide' })).not.toBeInTheDocument();
     // Overview tabs now, reached from the Overview page rather than the sheet.
     expect(within(sheet).queryByRole('link', { name: 'Clones' })).not.toBeInTheDocument();
-    expect(
-      within(sheet).queryByRole('link', { name: 'Employment History' })
-    ).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole('link', { name: 'Employment' })).not.toBeInTheDocument();
   });
 
   it('leads with a Character disclosure holding Characters and Settings', async () => {

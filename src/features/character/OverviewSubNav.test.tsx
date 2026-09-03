@@ -38,11 +38,7 @@ describe('OverviewSubNav', () => {
 
     const nav = screen.getByRole('navigation', { name: 'Overview' });
     const links = within(nav).getAllByRole('link');
-    expect(links.map((link) => link.textContent)).toEqual([
-      'Overview',
-      'Clones',
-      'Employment History',
-    ]);
+    expect(links.map((link) => link.textContent)).toEqual(['Overview', 'Clones', 'Employment']);
     // The tabs group these views visually; they are not re-parented under
     // /overview, so every existing bookmark and shortcut still resolves.
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
@@ -88,8 +84,6 @@ describe('OverviewSubNav', () => {
       expect(within(nav).getByRole('link', { name: 'Clones' })).not.toHaveAttribute('title')
     );
     expect(within(nav).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('title');
-    expect(within(nav).getByRole('link', { name: 'Employment History' })).not.toHaveAttribute(
-      'title'
-    );
+    expect(within(nav).getByRole('link', { name: 'Employment' })).not.toHaveAttribute('title');
   });
 });

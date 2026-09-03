@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -170,6 +170,18 @@ describe('Overview', () => {
 
     expect(await screen.findByText('5,422,000')).toBeInTheDocument(); // + (512,000 - 90,000)
     expect(screen.queryByText('5,000,000')).not.toBeInTheDocument();
+  });
+
+  it('keeps the block above the tabs to identity and SP alone', async () => {
+    render(<App />);
+    await screen.findByText(/1,234,567\.89/);
+
+    // No page title restating the tab, and no controls: the wallet and queue
+    // panels below carry their own data age.
+    const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
+    expect(header).not.toBeNull();
+    expect(within(header as HTMLElement).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).toBeNull();
   });
 
   it('falls back gracefully when the wallet fetch fails offline', async () => {

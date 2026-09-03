@@ -1,23 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
-import {
-  CharacterAvatar,
-  DataAgeBadge,
-  EmptyState,
-  Panel,
-  ReauthBanner,
-  Spinner,
-  StatChip,
-} from '@/components/ui';
-import { usePublicInfo } from '@/stores/publicInfo';
+import { DataAgeBadge, EmptyState, Panel, ReauthBanner, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import type { CachedResult } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { NotificationFeedPanel } from '@/features/notifications/NotificationFeedPanel';
 import { formatIsk } from '@/lib/isk';
@@ -37,9 +27,6 @@ interface Snapshot {
 }
 
 async function loadOverviewSnapshot(characterId: number): Promise<Snapshot> {
-  // Fire-and-forget: the header reads corp/alliance from the store as they
-  // arrive, so the panels below must not wait on that chain of public fetches.
-  void usePublicInfo.getState().load(characterId);
   const [wallet, corrected, catalog] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
     loadCorrectedSkills(characterId, Date.now()),
@@ -61,13 +48,6 @@ export function Overview() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId } =
     useRouteSnapshot(loadOverviewSnapshot);
-  const character = useLiveQuery(
-    () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
-    [activeCharacterId]
-  );
-  const publicInfo = usePublicInfo((state) =>
-    activeCharacterId === null ? undefined : state.byCharacterId[activeCharacterId]
-  );
 
   if (!hydrated) {
     return (
@@ -97,43 +77,11 @@ export function Overview() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <header className="flex flex-wrap items-center gap-3">
-        <CharacterAvatar
-          characterId={activeCharacterId}
-          size="lg"
-          alt={t('characters.portraitAlt', { name: character?.name ?? '' })}
-        />
-        {/*
-          `basis-48` is what makes the header actually wrap on a phone. With a
-          bare `flex-1` (basis 0) this block is infinitely shrinkable, so the
-          chips below stayed on line one and truncated the character name down
-          to a single letter instead. Given a real basis, the chips wrap to
-          their own line and the name gets the full width.
-        */}
-        <div className="min-w-0 flex-1 basis-48">
-          <h1 className="truncate text-xl font-semibold tracking-widest uppercase">
-            {character?.name ?? t('common.unknown')}
-          </h1>
-          <p className="truncate text-xs text-text-dim">
-            {publicInfo?.corporationName ?? t('common.unknown')}
-            {publicInfo?.allianceName ? ` / ${publicInfo.allianceName}` : ''}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <StatChip
-            label={t('skills.totalSp')}
-            value={totalSp !== null ? totalSp.toLocaleString() : t('common.unknown')}
-          />
-          <StatChip
-            label={t('skills.unallocatedSp')}
-            value={
-              skillsResult?.data?.unallocated_sp !== undefined
-                ? skillsResult.data.unallocated_sp.toLocaleString()
-                : t('common.unknown')
-            }
-          />
-        </div>
-      </header>
+      <CharacterHeader
+        characterId={activeCharacterId}
+        totalSp={totalSp}
+        unallocatedSp={skillsResult?.data?.unallocated_sp ?? null}
+      />
       <OverviewSubNav />
 
       {loading ? (
