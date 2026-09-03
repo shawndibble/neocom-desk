@@ -321,6 +321,17 @@ export const ESI_REGISTRY = {
     scope: 'esi-industry.read_corporation_jobs.v1',
     group: 'corp',
   },
+  /**
+   * The corp assets list #295 meant to register and did not (issue #327). Its
+   * scope is the corp twin of the base grant's `esi-assets.read_assets.v1` and
+   * still belongs in the group: a line member can no more read their corp's
+   * hangars than its wallet.
+   */
+  getCorporationAssets: {
+    route: '/corporations/{corporation_id}/assets',
+    scope: 'esi-assets.read_corporation_assets.v1',
+    group: 'corp',
+  },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 
 export type EsiEndpointId = keyof typeof ESI_REGISTRY;

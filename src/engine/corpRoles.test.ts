@@ -54,6 +54,20 @@ describe('corpCapabilities', () => {
   });
 
   /**
+   * GET /corporations/{id}/assets declares ["Director"] and nothing else,
+   * verified against `x-required-roles` rather than taken from issue #327's
+   * prose. So it joins `canReadMembers` as a capability with no ordinary role
+   * of its own — the Director clause below is the whole of its gate, and a
+   * Hangar_Take/Hangar_Query holder (who can open a corp hangar in the client)
+   * gets nothing from ESI.
+   */
+  it('grants asset access only to a Director', () => {
+    expect(corpCapabilities(['Hangar_Take_1']).canReadAssets).toBe(false);
+    expect(corpCapabilities(['Factory_Manager']).canReadAssets).toBe(false);
+    expect(corpCapabilities(['Director']).canReadAssets).toBe(true);
+  });
+
+  /**
    * The case a naive `roles.includes('Accountant')` gets wrong for the most
    * important user. In EVE a Director implicitly holds every other role, and
    * ESI does *not* expand that in the response — a Director's `roles` array is
