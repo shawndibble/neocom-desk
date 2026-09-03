@@ -79,6 +79,7 @@ import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
 import { useNotificationPreferences, characterEventPrefs } from './preferences';
 import { isEventEnabled, type EventEnabledMap } from './eventSelection';
 import { readNotificationPermission } from './permission';
+import { displayPageNotification, livePageDisplayEnv } from './display';
 import {
   useSkillQueuePollerState,
   withCharacterSnapshot,
@@ -635,20 +636,20 @@ export async function notificationText(
   };
 }
 
+/**
+ * Delivery goes through `display.ts`, which prefers the Service Worker
+ * registration's `showNotification` over `new Notification(...)` — the
+ * constructor throws on Android Chrome and does not exist on iOS, so it is
+ * the one path that reaches a phone at all. A failure on every path is
+ * swallowed there: pollerState.ts is what prevents a re-fire, not this call
+ * succeeding.
+ */
 async function sendBrowserNotification(
   fire: AnyNotificationFire,
   character: CharacterRef
 ): Promise<void> {
-  if (typeof Notification === 'undefined') return;
   const { title, body } = await notificationText(fire, character);
-  try {
-    new Notification(title, { body });
-  } catch {
-    // A denied/changed permission mid-poll, or a platform that rejects
-    // construction outright, must not abort the rest of this poll's
-    // already-persisted fires (pollerState.ts is what prevents a re-fire,
-    // not this call succeeding).
-  }
+  await displayPageNotification(livePageDisplayEnv(), title, body);
 }
 
 /** Hydrates a `createLocalSetting` store (a no-op once already hydrated) and returns its current value. */
