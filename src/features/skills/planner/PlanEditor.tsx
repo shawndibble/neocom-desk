@@ -56,11 +56,8 @@ import { attributePairBandStarts } from './attributePairBands';
 import { PlanHeader } from './PlanHeader';
 import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
-import {
-  evaluateOptimizationBadge,
-  toOptimizationBadge,
-  MIN_MEANINGFUL_SAVINGS_SECONDS,
-} from './planHeaderStats';
+import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
+import { markerVerdict, remapVerdict, type OptimizeVerdict } from './optimizeVerdict';
 import { boostedStepIndices } from '@/engine/boosterImpact';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -183,6 +180,12 @@ export function PlanEditor({
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<PlaceRemapsResult | null>(null);
   const [markersResult, setMarkersResult] = useState<PlaceRemapsResult | null>(null);
+  // Why each result came out the way it did (optimizeVerdict.ts). Held
+  // beside the result rather than derived at render: the verdict depends on
+  // the Remaps Available the run actually used, and the user can edit that
+  // input afterwards without invalidating the result itself.
+  const [optimizeVerdict, setOptimizeVerdict] = useState<OptimizeVerdict | null>(null);
+  const [markersVerdict, setMarkersVerdict] = useState<OptimizeVerdict | null>(null);
   const [reorderPreview, setReorderPreview] = useState<PlanStep[] | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
@@ -302,6 +305,8 @@ export function PlanEditor({
     setPrevMarkers(plan.markers);
     setOptimizeResult(null);
     setMarkersResult(null);
+    setOptimizeVerdict(null);
+    setMarkersVerdict(null);
     setReorderPreview(null);
     setOptimizeConfirm(null);
     setMarkersOptimizeConfirm(null);
@@ -448,12 +453,24 @@ export function PlanEditor({
     downloadCsv('skill-queue', scheduled, queueCsvColumns(t, nameFor, userSkillTypeIDs));
   }
 
-  // Same beside-the-button confirmation for both remap-optimizing actions:
-  // the savings figure when meaningful, a short "no gain" note otherwise.
-  function confirmRemapOutcome(result: PlaceRemapsResult): string {
-    return result.savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS
-      ? t('plans.optimizeConfirmSaves', { duration: formatDuration(result.savingsSeconds) })
-      : t('plans.optimizeConfirmNoGain');
+  // Same beside-the-button confirmation for both Optimize Modes: the savings
+  // figure when meaningful, otherwise *why* there is none. A run that placed
+  // no remap at all — nothing to spend, or every marker at the plan's end —
+  // is a no-op, not a finding about the plan, and saying "no meaningful
+  // savings" for it sends the user off fixing the wrong thing.
+  function confirmRemapOutcome(verdict: OptimizeVerdict): string {
+    switch (verdict.kind) {
+      case 'saves':
+        return t('plans.optimizeConfirmSaves', {
+          duration: formatDuration(verdict.savingsSeconds),
+        });
+      case 'noRemapsAvailable':
+        return t('plans.optimizeConfirmNoRemaps');
+      case 'markersAtEnd':
+        return t('plans.optimizeConfirmMarkersAtEnd');
+      case 'noGain':
+        return t('plans.optimizeConfirmNoGain');
+    }
   }
 
   function handleOptimizeRemaps() {
@@ -467,8 +484,10 @@ export function PlanEditor({
       booster:
         activeBoosters.length > 0 ? { boosters: activeBoosters, startDate: new Date() } : undefined,
     });
+    const verdict = remapVerdict(result, remapCount);
     setOptimizeResult(result);
-    setOptimizeConfirm(confirmRemapOutcome(result));
+    setOptimizeVerdict(verdict);
+    setOptimizeConfirm(confirmRemapOutcome(verdict));
     setTimeout(() => setOptimizeConfirm(null), 2000);
   }
 
@@ -479,8 +498,10 @@ export function PlanEditor({
       currentAttributes: attributes,
       implants: effectiveImplants,
     });
+    const verdict = markerVerdict(result);
     setMarkersResult(result);
-    setMarkersOptimizeConfirm(confirmRemapOutcome(result));
+    setMarkersVerdict(verdict);
+    setMarkersOptimizeConfirm(confirmRemapOutcome(verdict));
     setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
   }
 
@@ -662,35 +683,46 @@ export function PlanEditor({
           {/* Read-only findings from the two optimize actions, under the
               buttons that produced them. They used to be two more panels at
               the bottom of the page, far from their own triggers. */}
-          {optimizeResult && (
+          {optimizeResult && optimizeVerdict && (
             <div className="border-t border-line pt-2 text-xs">
               {/* The summary badge already discloses a capped evaluation
                   live, before any click — repeating it here would show the
                   same warning twice. */}
-              {optimizeResult.savingsSeconds < MIN_MEANINGFUL_SAVINGS_SECONDS ? (
-                <p className="text-text-dim">{t('plans.remapNoGain')}</p>
-              ) : (
+              {optimizeVerdict.kind === 'saves' ? (
                 <div className="space-y-2">
                   <p className="font-semibold text-success">
                     {t('plans.remapSaves', {
-                      duration: formatDuration(optimizeResult.savingsSeconds),
+                      duration: formatDuration(optimizeVerdict.savingsSeconds),
                     })}
                   </p>
                   {renderSegments(optimizeResult.segments)}
                 </div>
+              ) : (
+                // `remapNoGain` blames the entry order and points at
+                // "Suggest reorder" — true only when a remap was actually
+                // weighed and lost, never when there was none to spend.
+                <p className="text-text-dim">
+                  {optimizeVerdict.kind === 'noRemapsAvailable'
+                    ? t('plans.remapNoneAvailable')
+                    : t('plans.remapNoGain')}
+                </p>
               )}
             </div>
           )}
-          {markersResult && (
+          {markersResult && markersVerdict && (
             <div className="space-y-2 border-t border-line pt-2 text-xs">
-              {markersResult.savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS ? (
+              {markersVerdict.kind === 'saves' ? (
                 <p className="font-semibold text-success">
                   {t('plans.remapSaves', {
-                    duration: formatDuration(markersResult.savingsSeconds),
+                    duration: formatDuration(markersVerdict.savingsSeconds),
                   })}
                 </p>
               ) : (
-                <p className="text-text-dim">{t('plans.markersNoGain')}</p>
+                <p className="text-text-dim">
+                  {markersVerdict.kind === 'markersAtEnd'
+                    ? t('plans.markersAtEnd')
+                    : t('plans.markersNoGain')}
+                </p>
               )}
               {renderSegments(markersResult.segments)}
             </div>
