@@ -139,12 +139,21 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   await expect(page.getByRole('button', { name: 'Optimize remaps' })).toBeInViewport();
 
   // And the summary strip stays pinned when the *window* scrolls, not just
-  // when the capped list does — the sidebar beside it is uncapped, so a long
-  // plan list or an expanded optimize result can still push the page taller
-  // than the viewport. Asserting only the list-scroll case would pass whether
-  // or not the strip is sticky at all.
+  // when the capped list does. The entry list has its own cap, so what makes
+  // the page taller than the viewport is the sidebar: expanding an optimize
+  // result grows the Actions section, which is the real case the sticky
+  // exists for.
+  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  await page.getByRole('button', { name: 'Optimize remaps' }).click();
+  await expect(page.getByText(/^Remapping saves|^No remap improves/)).toBeVisible();
+
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(100);
+
+  // Guard against a vacuous pass: if the page cannot actually scroll, the
+  // assertions below hold whether or not the strip is sticky at all.
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
   await expect(summaryPanel).toBeInViewport();
   const summaryBox = await summaryPanel.boundingBox();
   if (!summaryBox) throw new Error('expected the summary strip to have a layout box');

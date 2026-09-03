@@ -15,6 +15,17 @@ import type { RemapAvailability } from './remapAvailability';
 interface PlanListPaneProps {
   activeCharacterId: number;
   remapInfo: RemapAvailability | null;
+  /**
+   * How tall the list may grow.
+   *
+   * `viewport` (default) lets it fill whatever room is left below it, which
+   * is right when it is the only thing in its column (the plan-list route).
+   * `sidebar` caps it at a share of the viewport instead, because on the
+   * editor route the plan tools sit underneath it in the same column — an
+   * unbounded list there takes the entire sidebar the moment a character has
+   * more than a handful of plans, and pushes the tools off screen.
+   */
+  height?: 'viewport' | 'sidebar';
   className?: string;
 }
 
@@ -38,7 +49,12 @@ function newPlan(characterId: number, name: string, remapCount = 0): SkillPlanRe
  * between the list route and the editor route still unmounts/remounts it
  * like any other route change (round 17's route split is unchanged).
  */
-export function PlanListPane({ activeCharacterId, remapInfo, className }: PlanListPaneProps) {
+export function PlanListPane({
+  activeCharacterId,
+  remapInfo,
+  height = 'viewport',
+  className,
+}: PlanListPaneProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -89,8 +105,15 @@ export function PlanListPane({ activeCharacterId, remapInfo, className }: PlanLi
     <Panel className={className}>
       <div
         ref={scrollerRef}
-        className="overflow-y-auto"
-        style={scrollerMaxHeight !== null ? { maxHeight: scrollerMaxHeight } : undefined}
+        // `40vh` rather than a rem constant: it has to leave room for the
+        // tools below it on a short viewport too, and that is a proportion of
+        // the window, not a fixed number of rows.
+        className={height === 'sidebar' ? 'max-h-[40vh] overflow-y-auto' : 'overflow-y-auto'}
+        style={
+          height === 'viewport' && scrollerMaxHeight !== null
+            ? { maxHeight: scrollerMaxHeight }
+            : undefined
+        }
       >
         {!plans ? (
           <div className="flex justify-center py-8">

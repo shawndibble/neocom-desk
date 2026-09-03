@@ -87,7 +87,11 @@ export function SkillPlanEditor() {
         <PlanEditorLayout
           sidebar={
             isDesktop ? (
-              <PlanListPane activeCharacterId={activeCharacterId} remapInfo={remapInfo} />
+              <PlanListPane
+                activeCharacterId={activeCharacterId}
+                remapInfo={remapInfo}
+                height="sidebar"
+              />
             ) : undefined
           }
         >
@@ -104,7 +108,13 @@ export function SkillPlanEditor() {
           attributes={attributes}
           implants={implants}
           remapInfo={remapInfo}
-          listPane={<PlanListPane activeCharacterId={activeCharacterId} remapInfo={remapInfo} />}
+          listPane={
+            <PlanListPane
+              activeCharacterId={activeCharacterId}
+              remapInfo={remapInfo}
+              height="sidebar"
+            />
+          }
           onUpdate={(patch) => void handleUpdate(patch)}
         />
       )}
