@@ -171,7 +171,13 @@ function computeQueue(
     );
     const scheduled = computeSchedule(
       steps,
-      { attributes, implants, boosters, startDate },
+      // `trainedSkills` is read twice, for two different things:
+      // normalizePlanWithBoundaries takes the levels (which steps to emit),
+      // computeSchedule takes the SP (how much of the first such step is
+      // already paid for). Without the second, a plan that opens on the skill
+      // the character is currently training re-charges the whole level and
+      // reads hours longer than the in-game queue for it.
+      { attributes, implants, boosters, startDate, trainedSkills },
       catalog.engineSkills
     );
     return { scheduled, entryBoundaries, error: null, startDate };
@@ -1002,6 +1008,24 @@ export function PlanEditor({
           skillCount={scheduledSkillCount}
           projectedFinish={planFinish}
           badge={headerBadge}
+          // Only when it actually shortened these totals: an expired Booster
+          // is ignored by computeSchedule, so disclosing one would be its own
+          // small lie. The tools pane keeps the "Expired" hint for that case.
+          //
+          // Read off `booster.bonus` — the map computeSchedule costed with —
+          // rather than the `boosterBonus` input beside it. They agree while
+          // the input writes one figure into all five attributes, but a
+          // per-attribute Booster would desync them, and a chip stating a
+          // bonus the arithmetic did not apply is the very thing it exists
+          // to prevent.
+          booster={
+            booster && !boosterExpired
+              ? {
+                  bonus: Math.max(...ATTRIBUTE_NAMES.map((name) => booster.bonus[name] ?? 0)),
+                  expiresAt: booster.expiresAt,
+                }
+              : null
+          }
         />
 
         {!isDesktop && toolsPane}

@@ -9,13 +9,29 @@ interface PlanHeaderProps {
   projectedFinish: Date | null;
   /** null when the plan has no valid entries to optimize. */
   badge: OptimizationBadge | null;
+  /**
+   * The What-If Booster these totals were computed under, or null when they
+   * were not. A Booster is a hypothesis the user types into the tools pane,
+   * not something the game reports, and a large one knocks a third off every
+   * number in this strip — so the strip has to say so. `EntryList` already
+   * marks the individual rows a Booster speeds up; this says the same thing
+   * about the one figure a user actually compares against the in-game queue.
+   */
+  booster?: { bonus: number; expiresAt: Date } | null;
 }
 
 /**
- * Plan-at-a-glance header: total time, skill count, projected finish, and a
- * live remap-savings badge.
+ * Plan-at-a-glance header: total time, skill count, projected finish, a live
+ * remap-savings badge, and — when one is assumed — the Booster the totals
+ * were computed under.
  */
-export function PlanHeader({ totalSeconds, skillCount, projectedFinish, badge }: PlanHeaderProps) {
+export function PlanHeader({
+  totalSeconds,
+  skillCount,
+  projectedFinish,
+  badge,
+  booster = null,
+}: PlanHeaderProps) {
   const { t } = useTranslation();
   const savingsSeconds = badge?.savingsSeconds ?? 0;
   const showsSavings = badge !== null && savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
@@ -35,6 +51,19 @@ export function PlanHeader({ totalSeconds, skillCount, projectedFinish, badge }:
           overflow reachable at the narrow end of that range. */}
       <div className="flex flex-wrap gap-2 lg:flex-nowrap lg:overflow-x-auto">
         <StatChip label={t('plans.headerTrainingTime')} value={formatDuration(totalSeconds)} />
+        {booster && (
+          // Immediately after the total, because it is a caveat on that
+          // number rather than a statistic of its own.
+          <StatChip
+            label={t('plans.headerBoosterLabel')}
+            tone="warning"
+            tooltip={t('plans.headerBoosterTooltip')}
+            value={t('plans.headerBoosterValue', {
+              bonus: booster.bonus,
+              date: booster.expiresAt.toLocaleDateString(),
+            })}
+          />
+        )}
         <StatChip label={t('plans.headerSkillCount')} value={skillCount} />
         <StatChip
           label={t('plans.headerProjectedFinish')}

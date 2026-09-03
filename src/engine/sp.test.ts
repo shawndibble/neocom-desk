@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { spForLevel, spBetween, trainingRate, timeToTrain } from '@/engine/sp';
+import { spForLevel, spBetween, remainingSpForLevel, trainingRate, timeToTrain } from '@/engine/sp';
 
 // Canonical cumulative SP totals for rank 1 (EVE University wiki, in-game values)
 describe('spForLevel', () => {
@@ -48,6 +48,64 @@ describe('spBetween', () => {
 
   it('rejects fromLevel > toLevel', () => {
     expect(() => spBetween(1, 4, 2)).toThrow(RangeError);
+  });
+});
+
+describe('remainingSpForLevel', () => {
+  it('is the whole level when the skill sits exactly at the level below', () => {
+    // A skill at exactly its boundary has banked nothing toward the next
+    // level. `spForLevel` rounds up, so an off-by-one here would invent a
+    // phantom credit on every skill in every plan.
+    //
+    // Anchored on literals, not on `spForLevel`/`spBetween`: expressing both
+    // sides in terms of the same function passes for any monotone
+    // implementation, including one crediting `currentSp - start + 1`, since
+    // the expected value would move with the bug.
+    expect(remainingSpForLevel(1, 4, 8_000)).toBe(37_255);
+    expect(remainingSpForLevel(1, 1, 0)).toBe(250);
+    expect(remainingSpForLevel(6, 4, spForLevel(6, 3))).toBe(spBetween(6, 3, 4));
+  });
+
+  it('is the whole level when the skill is untrained', () => {
+    // One level's cost, not the cumulative to it: a level-3 step for an
+    // untrained skill still costs only level 3, since levels 1 and 2 are
+    // steps of their own.
+    expect(remainingSpForLevel(1, 1, 0)).toBe(250);
+    expect(remainingSpForLevel(2, 3, 0)).toBe(spBetween(2, 2, 3));
+  });
+
+  it('credits SP already banked inside the level in progress', () => {
+    // The user's Coherent Ore Processing IV: rank 6, memory/intelligence.
+    // L3 = 48,000 SP, L4 = 271,530 SP, so the level costs 223,530 SP. Their
+    // in-game queue reported 1d 9h left at 56.5 SP/min = 111,870 SP still to
+    // go, which is 159,660 SP already banked — a level half paid for that the
+    // plan was charging in full.
+    expect(spForLevel(6, 3)).toBe(48_000);
+    expect(spForLevel(6, 4)).toBe(271_530);
+    expect(spBetween(6, 3, 4)).toBe(223_530);
+    expect(remainingSpForLevel(6, 4, 159_660)).toBe(111_870);
+  });
+
+  it('clamps to zero once the level is already paid for, never negative', () => {
+    expect(remainingSpForLevel(1, 4, spForLevel(1, 4))).toBe(0);
+    expect(remainingSpForLevel(1, 4, spForLevel(1, 5))).toBe(0);
+    expect(remainingSpForLevel(1, 4, 10_000_000)).toBe(0);
+  });
+
+  it('ignores SP below the level in progress rather than double-counting it', () => {
+    // Costing level 5 for a skill whose SP only reaches level 3 must not
+    // subtract that level-3 SP from level 5's own cost.
+    expect(remainingSpForLevel(1, 5, spForLevel(1, 3))).toBe(spBetween(1, 4, 5));
+  });
+
+  it('treats a negative currentSp as untrained rather than inflating the cost', () => {
+    expect(remainingSpForLevel(1, 2, -500)).toBe(spBetween(1, 1, 2));
+  });
+
+  it('rejects invalid level or rank, like the rest of this module', () => {
+    expect(() => remainingSpForLevel(1, 0, 0)).toThrow(RangeError);
+    expect(() => remainingSpForLevel(1, 6, 0)).toThrow(RangeError);
+    expect(() => remainingSpForLevel(0, 3, 0)).toThrow(RangeError);
   });
 });
 

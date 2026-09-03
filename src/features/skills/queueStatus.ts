@@ -110,9 +110,10 @@ export function completedQueueLevels(
  * Trained skills as of now, with completed-but-unapplied queue entries folded
  * in.
  *
- * SP only rises when ESI supplies `level_end_sp` — it is optional. The engine
- * schedules from `level` alone, so a raised level beside a stale `sp` costs
- * display precision, not a wrong plan.
+ * SP only rises when ESI supplies `level_end_sp` — it is optional. A raised
+ * level beside a stale `sp` only understates how far into the *next* level
+ * the character is, which `applyTrainingProgress` then corrects for the one
+ * level actually training; every other level is costed in full either way.
  */
 export function applyCompletedQueueEntries(
   trained: ReadonlyMap<number, TrainedSkill>,
@@ -125,6 +126,90 @@ export function applyCompletedQueueEntries(
     if (known && known.level >= done.level) continue;
     merged.set(skillId, { level: done.level, sp: done.sp ?? known?.sp ?? 0 });
   }
+  return merged;
+}
+
+/** A usable, non-negative SP figure, or null — ESI's SP fields are all optional. */
+function finiteSpOrNull(value: number | undefined): number | null {
+  return value !== undefined && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+/**
+ * The SP the character holds in the skill it is training *right now*.
+ *
+ * `/skills`' `skillpoints_in_skill` is the figure as of the last time the
+ * game applied SP, so for the one skill actually training it reads low —
+ * frozen near where training began. The queue carries what is needed to do
+ * better: `training_start_sp`, `level_end_sp`, and the window the level
+ * trains across. Interpolating between them is what the in-game queue itself
+ * shows, and it is linear because the training rate is constant within a level.
+ *
+ * Returns null unless there is a row to read. A paused queue has no window to
+ * interpolate across, so it yields `training_start_sp` alone — a floor, not
+ * an estimate.
+ */
+function trainingProgressSp(
+  entries: readonly SkillQueueEntry[],
+  nowMs: number
+): { skillId: number; sp: number } | null {
+  const rows = classifySkillQueue(entries, nowMs);
+  // A paused queue has no 'training' row at all (its dates are absent), so
+  // fall back to the head of the queue: that is the level that was training
+  // when the queue stopped, and its banked SP is still a lower bound.
+  const head = rows[0]?.status === 'paused' ? rows[0] : undefined;
+  const row = rows.find((r) => r.status === 'training') ?? head;
+  if (!row) return null;
+
+  const { skill_id, start_date, finish_date, training_start_sp, level_end_sp } = row.entry;
+  const startSp = finiteSpOrNull(training_start_sp);
+  if (startSp === null) return null;
+  const endSp = finiteSpOrNull(level_end_sp);
+
+  const startMs = start_date ? Date.parse(start_date) : NaN;
+  const finishMs = finish_date ? Date.parse(finish_date) : NaN;
+  const window = finishMs - startMs;
+  // A missing, malformed or zero-length window, or an end SP not above the
+  // start, leaves nothing to interpolate across. The banked SP is still true,
+  // so report that rather than nothing.
+  if (endSp === null || endSp <= startSp || !Number.isFinite(window) || window <= 0) {
+    return { skillId: skill_id, sp: startSp };
+  }
+
+  // Clamped both ways: a finished row classifies as `completed` rather than
+  // `training`, but clock skew can still put `now` outside the window, and
+  // extrapolating would claim SP the character does not have.
+  const fraction = Math.min(Math.max((nowMs - startMs) / window, 0), 1);
+  // Floored, so the credit never exceeds what has actually been earned.
+  return { skillId: skill_id, sp: Math.floor(startSp + (endSp - startSp) * fraction) };
+}
+
+/**
+ * Trained skills with the in-progress level's SP brought up to date.
+ *
+ * Composes with `applyCompletedQueueEntries` rather than widening it: that
+ * pass raises the *levels* the queue has finished, this one raises the *SP*
+ * banked inside the level still running. It only ever raises, so a `/skills`
+ * read somehow ahead of the queue wins.
+ *
+ * Without it the planner charges a part-trained level in full, and a plan's
+ * first row disagrees with the in-game queue by however much of that level
+ * is already paid for — the whole of the "Coherent Ore Processing IV says
+ * 2d 2h, the game says 1d 9h" report.
+ */
+export function applyTrainingProgress(
+  trained: ReadonlyMap<number, TrainedSkill>,
+  entries: readonly SkillQueueEntry[],
+  nowMs: number
+): Map<number, TrainedSkill> {
+  const merged = new Map(trained);
+  const progress = trainingProgressSp(entries, nowMs);
+  if (progress === null) return merged;
+  const known = merged.get(progress.skillId);
+  if (known && known.sp >= progress.sp) return merged;
+  // The level is left exactly as found: a skill training toward IV still
+  // *has* level III until its queue entry completes, which is the other
+  // pass's business.
+  merged.set(progress.skillId, { level: known?.level ?? 0, sp: progress.sp });
   return merged;
 }
 
