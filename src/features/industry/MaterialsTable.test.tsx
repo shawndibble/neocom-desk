@@ -224,6 +224,67 @@ describe('MaterialsTable sourcing', () => {
   });
 });
 
+/**
+ * Below `sm` a `DataTable` row is not a row but a stacked card: each column
+ * header prints into a left gutter and its value starts where every other
+ * value on the card starts (docs/DESIGN.md §4a). A cell that right-aligns its
+ * own content opts out of that column, which is what made the materials card
+ * on a phone read as a zigzag — the quantity at the gutter, an input hard
+ * against the card's right edge, the line total somewhere between the two. So
+ * every wrapper here holds its end-alignment behind `sm:`.
+ */
+describe('MaterialsTable stacked card', () => {
+  function cell(material: string, label: string): HTMLElement {
+    const found = row(material).querySelector(`[data-label="${label}"]`);
+    if (!found) throw new Error(`no ${label} cell for ${material}`);
+    return found as HTMLElement;
+  }
+
+  it('starts every value at the card gutter below sm and right-aligns it from sm up', () => {
+    render(<Harness />);
+    const tritanium = within(row('Tritanium'));
+
+    expect(ownedInput('Tritanium').parentElement).toHaveClass('items-start', 'sm:items-end');
+    expect(cell('Tritanium', 'Line total').firstElementChild).toHaveClass(
+      'items-start',
+      'sm:items-end'
+    );
+    expect(tritanium.getByText('Hub').parentElement).toHaveClass('justify-start', 'sm:justify-end');
+  });
+
+  it('left-aligns the digits inside a sourcing field below sm, so they sit in the value column too', () => {
+    render(<Harness />);
+
+    for (const input of [ownedInput('Tritanium'), overrideInput('Tritanium')]) {
+      expect(input).toHaveClass('text-left', 'sm:text-right');
+    }
+  });
+
+  it('shows 0 in an empty sourcing field instead of an unexplained empty box', () => {
+    render(<Harness />);
+
+    for (const input of [ownedInput('Tritanium'), overrideInput('Tritanium')]) {
+      expect(input).toHaveAttribute('placeholder', '0');
+      // Placeholder only. An empty field still means "not set": a stored 0
+      // owned is the same as none, but a stored 0 override price would value
+      // the material at nothing, and neither may be written by rendering.
+      expect((input as HTMLInputElement).value).toBe('');
+    }
+  });
+
+  it('writes nothing to the plan for a field left at its placeholder', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+
+    await user.tab();
+    await user.tab();
+    await user.tab();
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
 const MENU_MATERIALS: readonly EffectiveMaterial[] = [
   { typeID: 34, baseQuantity: 100, quantity: 100 },
   { typeID: 9840, baseQuantity: 10, quantity: 10 },

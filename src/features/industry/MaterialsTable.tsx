@@ -78,7 +78,17 @@ function SourcingInput({
       step={step}
       inputMode="decimal"
       aria-label={label}
-      className={cx(widthClassName, 'text-right tabular-nums')}
+      // An empty box beside a bare label says nothing about what belongs in
+      // it, which is most of why the stacked card read as noise. The dimmed
+      // zero is a placeholder and never a value: an untouched field still
+      // commits nothing, and a stored 0 override price would price the
+      // material at nothing rather than at the hub.
+      placeholder="0"
+      // Digits sit right in the table, where they line up with the numeric
+      // columns around them; in the stacked card there is no column to line
+      // up with, and right-aligned digits would float a width away from the
+      // label that names them.
+      className={cx(widthClassName, 'text-left tabular-nums sm:text-right')}
       value={draft ?? value ?? ''}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={(event) => {
@@ -151,6 +161,12 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
  * owned/bought split spelled out beneath a partly-owned row's blended total.
  * `materialRow.ts` decides what each row shows, so the CSV export can't drift
  * from it.
+ *
+ * Every cell's own alignment is held behind `sm:`. Below that the row is a
+ * stacked card (docs/DESIGN.md §4a) where the header prints into a left gutter
+ * and the value starts at a fixed offset — a cell that right-aligns itself
+ * escapes that offset, and with five of the six columns right-aligned the card
+ * came out as a zigzag of labels and values rather than two columns.
  */
 export function MaterialsTable({
   materials,
@@ -199,7 +215,7 @@ export function MaterialsTable({
           // requirement is smaller than the stock behind it.
           const suggestion = stock ? suggestedOwnedQuantity(stock.quantity, material.quantity) : 0;
           return (
-            <span className="flex flex-col items-end gap-0.5">
+            <span className="flex flex-col items-start gap-0.5 sm:items-end">
               <SourcingInput
                 value={owned}
                 label={t('industry.ownedQuantityFor', { material: nameFor(material.typeID) })}
@@ -255,7 +271,7 @@ export function MaterialsTable({
           }
           const overridden = state.priceSource === 'override';
           return (
-            <span className="inline-flex items-baseline justify-end gap-1">
+            <span className="inline-flex items-baseline justify-start gap-1 sm:justify-end">
               {formatIsk(state.unitPrice)}
               <span
                 className={cx('text-[0.6875rem]', overridden ? 'text-accent' : 'text-text-dim')}
@@ -275,7 +291,7 @@ export function MaterialsTable({
           const state = materialRowState(material, sourcing, pricesReady);
           const owned = material.ownedQuantity;
           return (
-            <span className="flex flex-col items-end">
+            <span className="flex flex-col items-start sm:items-end">
               <span>
                 {state.lineCost === null ? t('common.unknown') : formatIsk(state.lineCost)}
               </span>
