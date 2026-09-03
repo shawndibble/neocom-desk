@@ -11,7 +11,13 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
-import type { FacilityKind, RigLevel, SecurityBand, SkillLevels } from '@/engine/industry/types';
+import type {
+  FacilityKind,
+  MaterialSourcing,
+  RigLevel,
+  SecurityBand,
+  SkillLevels,
+} from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -23,12 +29,22 @@ import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { MaterialsTable } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
+import { applySourcingPatch } from './sourcingEdits';
 import { ResultsSummary } from './ResultsSummary';
 
-type PlanPatch = Partial<
+/** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
+export type PlanPatch = Partial<
   Pick<
     BuildPlanRecord,
-    'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'hubId' | 'facilityTaxPct'
+    | 'runs'
+    | 'me'
+    | 'te'
+    | 'facility'
+    | 'rigLevel'
+    | 'security'
+    | 'hubId'
+    | 'facilityTaxPct'
+    | 'materialSourcing'
   >
 >;
 
@@ -116,17 +132,19 @@ export function BuildPlanDetail({
     onUpdate(patch);
   }
 
+  function updateSourcing(typeID: number, patch: MaterialSourcing) {
+    // The key is sent even when the result is `undefined`: the patch is spread
+    // over the record, so omitting it would keep the stale map and clearing the
+    // last override would silently do nothing.
+    update({ materialSourcing: applySourcingPatch(plan.materialSourcing, typeID, patch) });
+  }
+
   function exportMaterialsCsv() {
     if (!result) return;
     downloadCsv(
       'build-materials',
       result.materials,
-      materialsCsvColumns(
-        t,
-        (typeID) => nameForType(catalog, typeID),
-        snapshot?.hubPrices ?? {},
-        pricesReady
-      )
+      materialsCsvColumns(t, (typeID) => nameForType(catalog, typeID), pricesReady)
     );
   }
 
@@ -323,8 +341,9 @@ export function BuildPlanDetail({
           <MaterialsTable
             materials={result.materials}
             nameFor={(typeID) => nameForType(catalog, typeID)}
-            hubPrices={snapshot?.hubPrices ?? {}}
+            sourcing={plan.materialSourcing}
             pricesReady={pricesReady}
+            onSourcingChange={updateSourcing}
           />
         )}
       </Panel>

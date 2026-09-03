@@ -24,7 +24,7 @@ import {
 import { findOwnedBlueprint, loadCharacterBlueprints } from '@/features/industry/data';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
-import { BuildPlanDetail } from '@/features/industry/BuildPlanDetail';
+import { BuildPlanDetail, type PlanPatch } from '@/features/industry/BuildPlanDetail';
 
 function newBuildPlan(
   characterId: number,
@@ -219,14 +219,7 @@ export function Industry() {
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
-  async function handleUpdate(
-    patch: Partial<
-      Pick<
-        BuildPlanRecord,
-        'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'hubId' | 'facilityTaxPct'
-      >
-    >
-  ) {
+  async function handleUpdate(patch: PlanPatch) {
     if (!selectedPlan) return;
     await db.buildPlans.put({ ...selectedPlan, ...patch, updatedAt: Date.now() });
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
