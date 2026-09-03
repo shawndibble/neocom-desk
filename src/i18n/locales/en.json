@@ -1014,6 +1014,10 @@
         "title": "Extraction done",
         "body": "{{character}}'s extraction on {{planet}} has stopped."
       },
+      "planetaryExtractorExpiring": {
+        "title": "Extractor expiring",
+        "body": "{{character}}'s extractor on {{planet}} expires in under {{hours}} hours."
+      },
       "newMail": {
         "title": "New mail",
         "body": "{{character}} has new mail."
@@ -1288,6 +1292,7 @@
         "industryJobComplete": "Industry Job Complete",
         "newMail": "New Mail",
         "planetaryExtractionDone": "Planetary Extraction Done",
+        "planetaryExtractorExpiring": "Planetary Extractor Expiring",
         "marketOrderFilled": "Market Order Filled",
         "newCalendarEvent": "New Calendar Event",
         "calendarEventStarting": "Calendar Event Starting",
@@ -1295,6 +1300,7 @@
         "walletBalanceChanged": "Wallet Balance Changed",
         "eveNotification": "EVE Notifications"
       },
+      "extractorExpiringHint": "Checked every five minutes while the app is open. With the app closed, this warning rides on background sync: the installed app on Chrome or Edge only, on a schedule the browser decides, and not at all on iPhone, iPad, or Firefox — so it can arrive late or not at all. The Planetary Industry page always shows the real expiry.",
       "browserChannelLabel": "Browser notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission, and only appears while the app is open on iPhone and iPad.",
       "feedChannelLabel": "Overview notifications",

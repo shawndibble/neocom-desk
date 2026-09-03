@@ -13,6 +13,7 @@ export type NotificationEventId =
   | 'industryJobComplete'
   | 'newMail'
   | 'planetaryExtractionDone'
+  | 'planetaryExtractorExpiring'
   | 'marketOrderFilled'
   | 'newCalendarEvent'
   | 'calendarEventStarting'
@@ -59,6 +60,11 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
   {
     id: 'planetaryExtractionDone',
     labelKey: 'settings.notifications.event.planetaryExtractionDone',
+    scope: requiredScope('getCharacterPlanets'),
+  },
+  {
+    id: 'planetaryExtractorExpiring',
+    labelKey: 'settings.notifications.event.planetaryExtractorExpiring',
     scope: requiredScope('getCharacterPlanets'),
   },
   {
