@@ -3,19 +3,25 @@
  *
  * Corp UI hides rather than locks (CONTEXT.md round 35), which leaves a
  * Character who has just made Director with no sign that there is anything to
- * turn on. This is that sign — offered once, at the moment the state actually
- * becomes `roles-without-grant`, and then never again on its own.
+ * turn on. This is that sign — offered once per scope set, at the moment the
+ * state actually becomes `roles-without-grant`, and then never again for that
+ * same set on its own.
  *
- * "Never again" is the whole design. A prompt that keeps returning is the
- * consent-screen bloat this ticket exists to prevent, wearing a different hat,
- * so both buttons record the dismissal: granting makes the prompt moot, and
- * declining must not be re-litigated on the next boot. The Settings Corp
- * access row is the durable path back, and the hint says so.
+ * "Never again for the same offer" is the whole design (CONTEXT.md round 42).
+ * A prompt that keeps returning for a group it has already asked about is the
+ * consent-screen bloat this ticket exists to prevent, wearing a different
+ * hat, so both buttons record the dismissal against `CORP_GROUP_SCOPES`:
+ * granting makes the prompt moot for the current group, and declining must
+ * not be re-litigated on the next boot for that same group. If the group
+ * grows later (round 41), the recorded offer no longer covers it and the
+ * prompt is eligible again — the Settings Corp access row is the durable path
+ * back regardless.
  */
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
+import { scopesForGroup } from '@/esi/scopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useCorpAccess } from './useCorpAccess';
@@ -25,6 +31,12 @@ import {
   useGrantPromptDismissals,
   withGrantPromptDismissed,
 } from './grantPromptDismissal';
+
+// Derived from the registry, exactly as `useCorpAccess`/`corpScopes.ts` do —
+// this file stays hand-edit-free. A module-level constant rather than a
+// per-render call: the derivation is pure and static, so recomputing it on
+// every render would buy nothing.
+const CORP_GROUP_SCOPES = scopesForGroup('corp');
 
 export function CorpGrantPrompt() {
   const { t } = useTranslation();
@@ -50,9 +62,10 @@ export function CorpGrantPrompt() {
   // read: a banner that flickers in on a cold load is worse than one a beat
   // late, and `none`/`ready` have nothing to offer.
   if (access.state !== 'roles-without-grant') return null;
-  if (isGrantPromptDismissed(dismissals, activeCharacterId)) return null;
+  if (isGrantPromptDismissed(dismissals, activeCharacterId, CORP_GROUP_SCOPES)) return null;
 
-  const remember = () => setDismissals(withGrantPromptDismissed(dismissals, activeCharacterId));
+  const remember = () =>
+    setDismissals(withGrantPromptDismissed(dismissals, activeCharacterId, CORP_GROUP_SCOPES));
 
   const grant = async () => {
     // Awaited before leaving the page: `beginEveLogin` navigates away, and a

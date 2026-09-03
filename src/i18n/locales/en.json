@@ -1509,7 +1509,7 @@
     "grantPromptUnnamedCorporation": "your corporation",
     "grantPromptGrant": "Grant access",
     "grantPromptDismiss": "Not now",
-    "grantPromptHint": "Either way, this is the last time you'll be asked — Settings has a Corp access row whenever you want it.",
+    "grantPromptHint": "Either way, Settings has a Corp access row whenever you want it.",
     "accessTitle": "Corp access",
     "accessHint": "Corp data needs two things: a corporation role, granted in game, and access to the corp endpoints, granted here. Roles are read from EVE and can only be changed in game.",
     "accessCharacterUnknown": "Select a character to see its corp access.",
