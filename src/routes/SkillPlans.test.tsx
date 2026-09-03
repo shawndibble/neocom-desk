@@ -373,7 +373,12 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
 
     expect(await screen.findByText('Attributes')).toBeInTheDocument();
-    const listPanelBack = screen.getByText('New plan').closest('section');
+    // `find`, not `get`: crossing back to the list route remounts
+    // `PlanListPane`, whose own `useLiveQuery` starts at `undefined` and
+    // renders a spinner in place of the list. Its plans resolve independently
+    // of the pane beside it, so 'Attributes' being on screen says nothing
+    // about whether 'New plan' is yet.
+    const listPanelBack = (await screen.findByText('New plan')).closest('section');
     expect(listPanelBack).not.toHaveClass('hidden');
   });
 
@@ -399,7 +404,11 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
       await user.click(await screen.findByText('Test plan'));
       await screen.findByText('Your entries');
 
-      const listPanel = screen.getByText('Test plan').closest('section');
+      // `find`, not `get`: 'Your entries' first renders on the very tick the
+      // catalog arrives and `PlanEditor` replaces the loading layout, which
+      // remounts `PlanListPane` in that slot — so the list is momentarily a
+      // spinner at exactly the moment the editor appears.
+      const listPanel = (await screen.findByText('Test plan')).closest('section');
       expect(listPanel).not.toHaveClass('hidden');
       expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
     } finally {
