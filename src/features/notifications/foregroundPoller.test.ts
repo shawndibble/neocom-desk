@@ -937,3 +937,61 @@ describe('runForegroundPoll delivery channels', () => {
     expect(characters).not.toHaveBeenCalled();
   });
 });
+
+describe('runForegroundPoll per-event channel columns', () => {
+  function firingDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
+    return baseDeps({
+      now: () => 3000,
+      feedChannelEnabled: async () => true,
+      prevState: async () => ({
+        [CHAR.characterId]: {
+          entries: [{ skillId: 100, finishedLevel: 1, queuePosition: 0, finishMs: 2000 }],
+          nowMs: 1000,
+        },
+      }),
+      loadSkillQueue: async () => [],
+      ...overrides,
+    });
+  }
+
+  it('records to the feed only, for an event switched off in the browser column', async () => {
+    const deps = firingDeps({
+      eventPrefsFor: async () => ({ characterNotTraining: { browser: false } }),
+    });
+    await runForegroundPoll(deps);
+    expect(deps.recordToFeed).toHaveBeenCalledTimes(1);
+    expect(deps.notify).not.toHaveBeenCalled();
+  });
+
+  it('notifies only, for an event switched off in the list column', async () => {
+    const deps = firingDeps({
+      eventPrefsFor: async () => ({ characterNotTraining: { feed: false } }),
+    });
+    await runForegroundPoll(deps);
+    expect(deps.notify).toHaveBeenCalledTimes(1);
+    expect(deps.recordToFeed).not.toHaveBeenCalled();
+  });
+
+  it('makes no ESI call for an event switched off in both columns', async () => {
+    const loadSkillQueue = vi.fn(async () => []);
+    const deps = firingDeps({
+      loadSkillQueue,
+      eventPrefsFor: async () => ({
+        skillLevelComplete: { browser: false, feed: false },
+        characterNotTraining: { browser: false, feed: false },
+      }),
+    });
+    await runForegroundPoll(deps);
+    expect(loadSkillQueue).not.toHaveBeenCalled();
+  });
+
+  it('honours a legacy bare-boolean pref as off on both columns', async () => {
+    const loadSkillQueue = vi.fn(async () => []);
+    const deps = firingDeps({
+      loadSkillQueue,
+      eventPrefsFor: async () => ({ skillLevelComplete: false, characterNotTraining: false }),
+    });
+    await runForegroundPoll(deps);
+    expect(loadSkillQueue).not.toHaveBeenCalled();
+  });
+});

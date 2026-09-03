@@ -208,8 +208,12 @@ describe('Settings — Notifications (issue #170)', () => {
 
     await user.click(pilotOneButton);
 
-    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Wallet Balance Changed' })).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+    ).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+    ).toBeChecked();
   });
 
   it('flips a single event off, then back on, persisting to Dexie', async () => {
@@ -220,13 +224,16 @@ describe('Settings — Notifications (issue #170)', () => {
       await within(await notificationsPanel()).findByRole('button', { name: /pilot one/i })
     );
 
-    const mailCheckbox = screen.getByRole('checkbox', { name: 'New Mail' });
+    const mailCheckbox = screen.getByRole('checkbox', { name: 'New Mail, browser notifications' });
     await user.click(mailCheckbox);
     expect(mailCheckbox).not.toBeChecked();
     expect(
       (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
         ?.value as typeof DEFAULT_NOTIFICATION_PREFERENCES
-    ).toEqual({ masterEnabled: true, perCharacter: { [CHAR_ID]: { newMail: false } } });
+    ).toEqual({
+      masterEnabled: true,
+      perCharacter: { [CHAR_ID]: { newMail: { browser: false, feed: true } } },
+    });
 
     await user.click(mailCheckbox);
     expect(mailCheckbox).toBeChecked();
@@ -241,16 +248,22 @@ describe('Settings — Notifications (issue #170)', () => {
     );
 
     await user.click(
-      screen.getByRole('checkbox', { name: /toggle all notifications for pilot one/i })
+      screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
     );
 
-    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Wallet Balance Changed' })).not.toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+    ).not.toBeChecked();
 
     await user.click(
-      screen.getByRole('checkbox', { name: /toggle all notifications for pilot one/i })
+      screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
     );
-    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+    ).toBeChecked();
   });
 
   it('the master switch persists independently of any per-character state', async () => {
@@ -311,7 +324,9 @@ describe('Settings — Notifications (issue #170)', () => {
       await within(await notificationsPanel()).findByRole('button', { name: /pilot one/i })
     );
 
-    expect(screen.getByRole('checkbox', { name: 'New Mail' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: 'New Mail, browser notifications' })
+    ).toBeInTheDocument();
     expect(screen.queryByText(/notifications are blocked/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /turn on browser notifications/i })
@@ -327,14 +342,16 @@ describe('Settings — Notifications (issue #170)', () => {
       await within(await notificationsPanel()).findByRole('button', { name: /pilot two/i })
     );
 
-    const mailCheckbox = screen.getByRole('checkbox', { name: 'New Mail' });
+    const mailCheckbox = screen.getByRole('checkbox', { name: 'New Mail, browser notifications' });
     expect(mailCheckbox).toBeDisabled();
     // A disabled control can't take focus, so the tooltip only reveals on
     // hover — a real pointermove, not the click above.
     fireEvent.pointerMove(mailCheckbox);
     expect(await screen.findByText(/re-authorize the character/i)).toBeInTheDocument();
 
-    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).not.toBeDisabled();
+    expect(
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+    ).not.toBeDisabled();
   });
 
   it('search filters rows by event-type name across every character section', async () => {
@@ -350,9 +367,13 @@ describe('Settings — Notifications (issue #170)', () => {
     const pilotOneSection = within(await notificationsPanel())
       .getByRole('button', { name: /pilot one/i })
       .closest('div')!.parentElement!;
-    expect(within(pilotOneSection).getByRole('checkbox', { name: 'New Mail' })).toBeInTheDocument();
     expect(
-      within(pilotOneSection).queryByRole('checkbox', { name: 'Skill Level Complete' })
+      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, browser notifications' })
+    ).toBeInTheDocument();
+    expect(
+      within(pilotOneSection).queryByRole('checkbox', {
+        name: 'Skill Level Complete, browser notifications',
+      })
     ).not.toBeInTheDocument();
   });
 
@@ -369,6 +390,8 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(
       within(await notificationsPanel()).getByRole('button', { name: /pilot two/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Skill Level Complete' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+    ).toBeInTheDocument();
   });
 });

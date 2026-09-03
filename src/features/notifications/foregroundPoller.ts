@@ -83,7 +83,7 @@ import {
   isFeedChannelEnabled,
 } from './preferences';
 import { recordFeedEntry } from './feed';
-import { isEventEnabled, type EventEnabledMap } from './eventSelection';
+import { isEventEnabledFor, type EventEnabledMap } from './eventSelection';
 import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
 import { notificationOptionsFor } from './notificationOptions';
@@ -246,16 +246,40 @@ export interface PollDependencies {
   recordToFeed: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
 }
 
-/** Which of a set of candidate events this character is eligible for right now: has the scope, and the event isn't toggled off. */
+/** Which delivery channels are live for this poll, before per-event opinions. */
+interface LiveChannels {
+  browser: boolean;
+  feed: boolean;
+}
+
+/**
+ * Whether this event would reach *somewhere* — a live channel that the event
+ * is also switched on for. An event set to feed-only still has its data
+ * fetched when the feed is on and browser notifications are off; one switched
+ * off on both columns is not fetched at all.
+ */
+function reachesAnyChannel(
+  eventPrefs: EventEnabledMap,
+  eventId: NotificationEventId,
+  channels: LiveChannels
+): boolean {
+  return (
+    (channels.browser && isEventEnabledFor(eventPrefs, eventId, 'browser')) ||
+    (channels.feed && isEventEnabledFor(eventPrefs, eventId, 'feed'))
+  );
+}
+
+/** Which of a set of candidate events this character is eligible for right now: has the scope, and reaches at least one live channel. */
 function enabledEventsFor<T extends NotificationEventId>(
   eventIds: readonly T[],
   scopes: ReadonlySet<string>,
-  eventPrefs: EventEnabledMap
+  eventPrefs: EventEnabledMap,
+  channels: LiveChannels
 ): ReadonlySet<T> {
   const enabled = new Set<T>();
   for (const eventId of eventIds) {
     const scope = SCOPE_BY_EVENT.get(eventId);
-    if (scope && scopes.has(scope) && isEventEnabled(eventPrefs, eventId)) {
+    if (scope && scopes.has(scope) && reachesAnyChannel(eventPrefs, eventId, channels)) {
       enabled.add(eventId);
     }
   }
@@ -264,6 +288,8 @@ function enabledEventsFor<T extends NotificationEventId>(
 
 interface CharacterUpdate {
   characterId: number;
+  /** Carried through so the delivery loop can honour each event's per-channel columns. */
+  eventPrefs: EventEnabledMap;
   skillQueue?: SkillQueueSnapshot;
   industryJobs?: IndustryJobSnapshot;
   colonies?: PlanetarySnapshot;
@@ -295,6 +321,7 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
   ]);
   const browserEnabled = browserAllowed && deps.permission() === 'granted';
   if (!browserEnabled && !feedEnabled) return;
+  const channels: LiveChannels = { browser: browserEnabled, feed: feedEnabled };
 
   const characters = await deps.characters();
   if (characters.length === 0) return;
@@ -328,9 +355,9 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
     ]);
 
     const fires: AnyNotificationFire[] = [];
-    const update: CharacterUpdate = { characterId: character.characterId, fires };
+    const update: CharacterUpdate = { characterId: character.characterId, eventPrefs, fires };
 
-    const skillQueueEvents = enabledEventsFor(SKILL_QUEUE_EVENT_IDS, scopes, eventPrefs);
+    const skillQueueEvents = enabledEventsFor(SKILL_QUEUE_EVENT_IDS, scopes, eventPrefs, channels);
     if (skillQueueEvents.size > 0) {
       const entries = await deps.loadSkillQueue(character.characterId);
       if (entries !== null) {
@@ -350,7 +377,12 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
       }
     }
 
-    const industryJobEvents = enabledEventsFor(INDUSTRY_JOB_EVENT_IDS, scopes, eventPrefs);
+    const industryJobEvents = enabledEventsFor(
+      INDUSTRY_JOB_EVENT_IDS,
+      scopes,
+      eventPrefs,
+      channels
+    );
     if (industryJobEvents.size > 0) {
       const jobs = await deps.loadIndustryJobs(character.characterId);
       if (jobs !== null) {
@@ -369,7 +401,7 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
       }
     }
 
-    const planetaryEvents = enabledEventsFor(PLANETARY_EVENT_IDS, scopes, eventPrefs);
+    const planetaryEvents = enabledEventsFor(PLANETARY_EVENT_IDS, scopes, eventPrefs, channels);
     if (planetaryEvents.size > 0) {
       const colonies = await deps.loadColonyExtractors(character.characterId);
       if (colonies !== null) {
@@ -385,7 +417,7 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
       }
     }
 
-    const mailEvents = enabledEventsFor(MAIL_EVENT_IDS, scopes, eventPrefs);
+    const mailEvents = enabledEventsFor(MAIL_EVENT_IDS, scopes, eventPrefs, channels);
     if (mailEvents.size > 0) {
       const headers = await deps.loadMail(character.characterId);
       if (headers !== null) {
@@ -395,7 +427,7 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
       }
     }
 
-    const calendarEvents = enabledEventsFor(CALENDAR_EVENT_IDS, scopes, eventPrefs);
+    const calendarEvents = enabledEventsFor(CALENDAR_EVENT_IDS, scopes, eventPrefs, channels);
     if (calendarEvents.size > 0) {
       const events = await deps.loadCalendarEvents(character.characterId);
       if (events !== null) {
@@ -414,7 +446,7 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
       }
     }
 
-    const contractEvents = enabledEventsFor(CONTRACT_EVENT_IDS, scopes, eventPrefs);
+    const contractEvents = enabledEventsFor(CONTRACT_EVENT_IDS, scopes, eventPrefs, channels);
     if (contractEvents.size > 0) {
       const contracts = await deps.loadContracts(character.characterId);
       if (contracts !== null) {
@@ -433,7 +465,7 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
       }
     }
 
-    const walletEvents = enabledEventsFor(WALLET_EVENT_IDS, scopes, eventPrefs);
+    const walletEvents = enabledEventsFor(WALLET_EVENT_IDS, scopes, eventPrefs, channels);
     if (walletEvents.size > 0) {
       const entries = await deps.loadWalletJournal(character.characterId);
       if (entries !== null) {
@@ -452,7 +484,12 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
       }
     }
 
-    const marketOrderEvents = enabledEventsFor(MARKET_ORDER_EVENT_IDS, scopes, eventPrefs);
+    const marketOrderEvents = enabledEventsFor(
+      MARKET_ORDER_EVENT_IDS,
+      scopes,
+      eventPrefs,
+      channels
+    );
     if (marketOrderEvents.size > 0) {
       const entries = await deps.loadMarketOrders(character.characterId);
       if (entries !== null) {
@@ -558,10 +595,15 @@ export async function runForegroundPoll(deps: PollDependencies): Promise<void> {
     const character = charactersById.get(update.characterId);
     if (!character) continue;
     for (const fire of update.fires) {
+      const eventId = fire.eventId as NotificationEventId;
       // Feed first: it is the channel that cannot fail for platform reasons,
       // so a fire is recorded before anything that might silently no-op.
-      if (feedEnabled) await deps.recordToFeed(fire, character);
-      if (browserEnabled) await deps.notify(fire, character);
+      if (feedEnabled && isEventEnabledFor(update.eventPrefs, eventId, 'feed')) {
+        await deps.recordToFeed(fire, character);
+      }
+      if (browserEnabled && isEventEnabledFor(update.eventPrefs, eventId, 'browser')) {
+        await deps.notify(fire, character);
+      }
     }
   }
 }

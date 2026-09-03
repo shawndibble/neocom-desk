@@ -43,10 +43,15 @@ import {
   withFeedEnabled,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
-  withEventToggled,
+  withEventChannelToggled,
   withAllEventsToggledForCharacter,
 } from './preferences';
-import { isEventEnabled, selectionStateForEvents } from './eventSelection';
+import {
+  isEventEnabledFor,
+  selectionStateForEvents,
+  NOTIFICATION_CHANNELS,
+  type NotificationChannel,
+} from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
 import {
   useNotificationPermission,
@@ -240,7 +245,6 @@ export function NotificationsPanel() {
                   grantedScopes.has(eventDef(eventId).scope)
                 );
                 const prefs = characterEventPrefs(prefsValue, character.characterId);
-                const selectionState = selectionStateForEvents(togglableEventIds, prefs);
 
                 return (
                   <div
@@ -264,62 +268,89 @@ export function NotificationsPanel() {
                         </span>
                         <span className="min-w-0 truncate normal-case">{character.name}</span>
                       </button>
-                      <SelectionCheckbox
-                        state={selectionState}
-                        onToggle={() =>
-                          void setPrefsValue(
-                            withAllEventsToggledForCharacter(
-                              prefsValue,
-                              character.characterId,
-                              togglableEventIds
-                            )
-                          )
-                        }
-                        label={t('settings.notifications.selectAllLabel', {
-                          character: character.name,
-                        })}
-                      />
+                      {/* One select-all per column, in the same grid track as
+                          the checkboxes below so each sits over its own column. */}
+                      <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                        {NOTIFICATION_CHANNELS.map((channel) => (
+                          <SelectionCheckbox
+                            key={channel}
+                            state={selectionStateForEvents(togglableEventIds, prefs, channel)}
+                            onToggle={() =>
+                              void setPrefsValue(
+                                withAllEventsToggledForCharacter(
+                                  prefsValue,
+                                  character.characterId,
+                                  togglableEventIds,
+                                  channel
+                                )
+                              )
+                            }
+                            label={t(`settings.notifications.selectAll.${channel}`, {
+                              character: character.name,
+                            })}
+                          />
+                        ))}
+                      </div>
                     </div>
                     {expanded && (
-                      <ul className="divide-y divide-line bg-panel-2">
-                        {visibleEventIds.map((eventId) => {
-                          const def = eventDef(eventId);
-                          const hasScope = grantedScopes.has(def.scope);
-                          const enabled = isEventEnabled(prefs, eventId);
-                          const eventLabel = t(def.labelKey);
-                          const checkbox = (
-                            <input
-                              type="checkbox"
-                              checked={hasScope && enabled}
-                              disabled={!hasScope}
-                              onChange={() =>
-                                void setPrefsValue(
-                                  withEventToggled(prefsValue, character.characterId, eventId)
-                                )
-                              }
-                              aria-label={eventLabel}
-                              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            />
-                          );
-                          return (
-                            <li
-                              key={eventId}
-                              className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
-                            >
-                              <span className={hasScope ? 'text-text' : 'text-text-faint'}>
-                                {eventLabel}
+                      <div className="bg-panel-2">
+                        {/* Column captions, aligned to the same two tracks the
+                            rows below use — an event can raise a browser
+                            notification without joining the Overview list, or
+                            the reverse. */}
+                        <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5">
+                          <span className="sr-only">{t('settings.notifications.columnEvent')}</span>
+                          <span aria-hidden="true" className="flex-1" />
+                          <div className="grid shrink-0 grid-cols-2 gap-x-6 text-center">
+                            {NOTIFICATION_CHANNELS.map((channel) => (
+                              <span
+                                key={channel}
+                                className="w-4 text-[0.5625rem] leading-tight tracking-widest text-text-dim uppercase"
+                              >
+                                {t(`settings.notifications.column.${channel}`)}
                               </span>
-                              {hasScope ? (
-                                checkbox
-                              ) : (
-                                <Tooltip content={t('settings.notifications.reauthHint')}>
-                                  {checkbox}
-                                </Tooltip>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
+                            ))}
+                          </div>
+                        </div>
+                        <ul className="divide-y divide-line">
+                          {visibleEventIds.map((eventId) => {
+                            const def = eventDef(eventId);
+                            const hasScope = grantedScopes.has(def.scope);
+                            const eventLabel = t(def.labelKey);
+                            return (
+                              <li
+                                key={eventId}
+                                className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                              >
+                                <span className={hasScope ? 'text-text' : 'text-text-faint'}>
+                                  {eventLabel}
+                                </span>
+                                <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                                  {NOTIFICATION_CHANNELS.map((channel) => (
+                                    <ChannelCheckbox
+                                      key={channel}
+                                      channel={channel}
+                                      eventLabel={eventLabel}
+                                      hasScope={hasScope}
+                                      checked={isEventEnabledFor(prefs, eventId, channel)}
+                                      onToggle={() =>
+                                        void setPrefsValue(
+                                          withEventChannelToggled(
+                                            prefsValue,
+                                            character.characterId,
+                                            eventId,
+                                            channel
+                                          )
+                                        )
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 );
@@ -330,4 +361,39 @@ export function NotificationsPanel() {
       </div>
     </Panel>
   );
+}
+
+/**
+ * One event's checkbox for one delivery channel. Its accessible name names
+ * both — "New Mail, browser notifications" — because two visually adjacent
+ * checkboxes on a row are indistinguishable to a screen reader otherwise, and
+ * the column caption above is not associated with them.
+ */
+function ChannelCheckbox({
+  channel,
+  eventLabel,
+  hasScope,
+  checked,
+  onToggle,
+}: {
+  channel: NotificationChannel;
+  eventLabel: string;
+  hasScope: boolean;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const label = t(`settings.notifications.toggleLabel.${channel}`, { event: eventLabel });
+  const checkbox = (
+    <input
+      type="checkbox"
+      checked={hasScope && checked}
+      disabled={!hasScope}
+      onChange={onToggle}
+      aria-label={label}
+      className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
+    />
+  );
+  if (hasScope) return checkbox;
+  return <Tooltip content={t('settings.notifications.reauthHint')}>{checkbox}</Tooltip>;
 }
