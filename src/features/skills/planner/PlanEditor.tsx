@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -150,6 +151,19 @@ interface PlanEditorProps {
    * callbacks crossing the boundary for no gain.
    */
   listPane: ReactNode;
+  /**
+   * The route's `PageHeader` actions slot, handed down as a live DOM node so
+   * Import/Export can render there via a portal instead of in this
+   * component's own tree — the route owns the page's one `<h1>` and its
+   * "far top right corner" actions cluster (every other route's pattern),
+   * but the import/export handlers and the data they act on (the computed
+   * queue, catalog, What-If/Booster-costed `scheduled`) live here and would
+   * duplicate awkwardly if lifted to the route instead. `null`/undefined
+   * (route hasn't mounted the slot yet, or a caller with no such slot, e.g.
+   * a future embed) means nothing portals — Import/Export simply don't
+   * render rather than throwing.
+   */
+  headerActionsContainer?: HTMLElement | null;
   onUpdate: (patch: PlanPatch) => void;
 }
 
@@ -216,6 +230,7 @@ export function PlanEditor({
   attributeBaseline = null,
   remapInfo,
   listPane,
+  headerActionsContainer = null,
   onUpdate,
 }: PlanEditorProps) {
   const { t } = useTranslation();
@@ -1219,73 +1234,9 @@ export function PlanEditor({
         <Panel
           title={t('plans.yourEntries')}
           actions={
-            // Import/Export used to be a whole tools-pane section, buried
-            // below Actions and Attributes. Icon buttons in the panel header
-            // (Wallet.tsx's export-in-a-Panel-header pattern) put them one
-            // tap away instead — wraps under the stats on a narrow phone, the
-            // same way the group-by/columns row below it does.
+            // Group-by and Columns are this list's own view controls — they
+            // took the room Import/Export left for the page header (below).
             <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
-              <span className="flex items-center gap-1">
-                <IconButton
-                  size="sm"
-                  icon={<Icon.ImportQueue size={Icon.ICON_SIZE.sm} />}
-                  label={t('plans.importQueue')}
-                  onClick={() => void handleImport()}
-                />
-                <IconButton
-                  size="sm"
-                  icon={<Icon.ImportClipboard size={Icon.ICON_SIZE.sm} />}
-                  label={t('plans.importClipboard')}
-                  onClick={() => setImportOpen(true)}
-                />
-                <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <IconButton
-                      size="sm"
-                      icon={<Icon.Export size={Icon.ICON_SIZE.sm} />}
-                      label={t('plans.export')}
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onSelect={(event) => {
-                        // Keep the menu open (skip Radix's default auto-close)
-                        // until the write settles, then close it ourselves:
-                        // closing first moves focus back to the trigger as
-                        // part of the same transition, and writeText() called
-                        // mid-transition can throw "Document is not focused"
-                        // (NotAllowedError).
-                        event.preventDefault();
-                        void handleExport().finally(() => setExportMenuOpen(false));
-                      }}
-                    >
-                      {t('plans.exportClipboard')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={handleExportCsv} disabled={scheduled.length === 0}>
-                      {t('plans.exportCsvQueue')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </span>
-              <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
-              {planFinish && (
-                <span>{t('plans.projectedFinish', { date: formatLocalDate(planFinish) })}</span>
-              )}
-            </div>
-          }
-        >
-          <div className="space-y-3">
-            {copyConfirm && confirmation(t('plans.exportCopied'))}
-            {importConfirm && confirmation(importConfirm)}
-            {importError && (
-              <p role="alert" className="text-xs text-danger">
-                {importError}
-              </p>
-            )}
-            {/* Group-by and Columns are view controls for the list below, and
-                they were the two widest things in the panel header. Sat there
-                with the two stats, the row could not fit a phone. */}
-            <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] text-text-dim">
               <label className="flex items-center gap-1">
                 {t('plans.groupBy')}
                 <NativeSelect
@@ -1329,7 +1280,14 @@ export function PlanEditor({
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
+              {planFinish && (
+                <span>{t('plans.projectedFinish', { date: formatLocalDate(planFinish) })}</span>
+              )}
             </div>
+          }
+        >
+          <div className="space-y-3">
             <SkillPicker
               skills={pickerSkills}
               catalog={catalog}
@@ -1398,6 +1356,67 @@ export function PlanEditor({
           </div>
         </Panel>
       </PlanEditorLayout>
+
+      {/* Import/Export: the route's page-level actions cluster, "far top
+          right corner" like every other route (Wallet.tsx, Assets.tsx) —
+          portaled in because the route owns that DOM slot but the handlers
+          and the data they act on (scheduled, catalog) live here. */}
+      {headerActionsContainer &&
+        createPortal(
+          <>
+            <IconButton
+              size="sm"
+              icon={<Icon.ImportQueue size={Icon.ICON_SIZE.sm} />}
+              label={t('plans.importQueue')}
+              onClick={() => void handleImport()}
+            />
+            <IconButton
+              size="sm"
+              icon={<Icon.ImportClipboard size={Icon.ICON_SIZE.sm} />}
+              label={t('plans.importClipboard')}
+              onClick={() => setImportOpen(true)}
+            />
+            <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <IconButton
+                  size="sm"
+                  icon={<Icon.Export size={Icon.ICON_SIZE.sm} />}
+                  label={t('plans.export')}
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    // Keep the menu open (skip Radix's default auto-close)
+                    // until the write settles, then close it ourselves:
+                    // closing first moves focus back to the trigger as part
+                    // of the same transition, and writeText() called
+                    // mid-transition can throw "Document is not focused"
+                    // (NotAllowedError).
+                    event.preventDefault();
+                    void handleExport().finally(() => setExportMenuOpen(false));
+                  }}
+                >
+                  {t('plans.exportClipboard')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleExportCsv} disabled={scheduled.length === 0}>
+                  {t('plans.exportCsvQueue')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Beside the buttons that produced them, not down in the entries
+                panel — a confirmation/error disconnected from its trigger
+                reads as belonging to something else. */}
+            {copyConfirm && confirmation(t('plans.exportCopied'))}
+            {importConfirm && confirmation(importConfirm)}
+            {importError && (
+              <p role="alert" className="text-xs text-danger">
+                {importError}
+              </p>
+            )}
+          </>,
+          headerActionsContainer
+        )}
 
       {importOpen && (
         <ImportClipboardDialog

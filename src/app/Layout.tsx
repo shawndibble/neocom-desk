@@ -26,6 +26,7 @@ import { NotificationPermissionPrompt } from '@/features/notifications/Notificat
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { useActiveCorporationId } from '@/features/corp/owner';
 import type { AppRoutePath } from './routeScopes';
 
 /**
@@ -142,13 +143,20 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
 
 /**
  * The Corp section's entry, present only for a Character whose Corp Access is
- * `ready`.
+ * `ready` *and* whose corporation is known.
  *
- * Hidden, never locked, in all three other states — including `unknown`, which
+ * Hidden, never locked, in every other case — including `unknown`, which
  * renders as `none` here on purpose: a nav item that flickers into existence
  * mid-load is worse than one that appears a beat late (CONTEXT.md round 35).
  * The route itself takes the opposite view of `unknown` and waits, so a
  * deep-linked Director is not bounced (`routes/Corp.tsx`).
+ *
+ * The corporation id is part of the gate rather than an extra, the same
+ * composition `owner.ts` makes for the Personal / Corporation switch: it is
+ * written by the public-info read, so on a cold device it is simply absent, and
+ * an entry into a section with no corporation behind it is one that must not be
+ * on screen yet. It is self-healing — the first visit to `/corp` learns and
+ * records the id, and this is a `useLiveQuery`.
  *
  * `locked` is hard-wired false rather than read from `useLockedRoutes`: there
  * is no state in which this renders and is unusable, and the amber dot would
@@ -157,7 +165,8 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
 function CorpNavItem({ onClick }: { onClick?: () => void }) {
   const { t } = useTranslation();
   const { state } = useCorpAccess();
-  if (state !== 'ready') return null;
+  const corporationId = useActiveCorporationId();
+  if (state !== 'ready' || corporationId === null) return null;
   return <NavItem to="/corp" label={t('nav.corp')} locked={false} onClick={onClick} />;
 }
 

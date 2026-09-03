@@ -7,7 +7,6 @@ import {
   toBoardJobs,
   toBoardStructures,
   toVitalsJournal,
-  walletDivisionNames,
 } from './boardSources';
 import type { CorporationIndustryJob, CorporationStructure } from '@/esi/endpoints';
 
@@ -192,19 +191,5 @@ describe('toVitalsJournal', () => {
   });
 });
 
-describe('walletDivisionNames', () => {
-  /**
-   * The whole reason `read_divisions` is its own scope: without a name the rail
-   * says "Division 3" where the corporation says "SRP".
-   */
-  it('maps each named division to the name the corporation gave it', () => {
-    expect(
-      walletDivisionNames({ wallet: [{ division: 3, name: 'SRP' }, { division: 1 }] })
-    ).toEqual(new Map([[3, 'SRP']]));
-  });
-
-  it('is empty rather than throwing when divisions could not be read', () => {
-    expect(walletDivisionNames(null)).toEqual(new Map());
-    expect(walletDivisionNames({})).toEqual(new Map());
-  });
-});
+// The wallet-division join is `divisions.test.ts` (#298); the board reads that
+// module rather than a second one of its own.

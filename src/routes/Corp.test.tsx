@@ -11,10 +11,20 @@ import {
   type CorpAccessState,
 } from '@/features/corp/useCorpAccess';
 import * as boardData from '@/features/corp/boardData';
+import * as corpWallet from '@/features/corp/wallet';
+import * as corpJobs from '@/features/corp/jobs';
 import { Corp } from './Corp';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
-vi.mock('@/features/corp/boardData');
+vi.mock('@/features/corp/boardData', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/corp/boardData')>()),
+  loadCorporationId: vi.fn(),
+  loadCorporationStructures: vi.fn(),
+  loadCorporationMiningExtractions: vi.fn(),
+}));
+// The wallet and jobs reads belong to #298's modules; the board is a consumer.
+vi.mock('@/features/corp/wallet');
+vi.mock('@/features/corp/jobs');
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(
     async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Type ${id}`]))
@@ -22,7 +32,12 @@ vi.mock('@/features/character/typeNames', () => ({
 }));
 
 const mockedAccess = vi.mocked(useCorpAccess);
-const mocked = vi.mocked(boardData);
+/** Every loader the route calls, wherever it lives, under one name. */
+const mocked = {
+  ...vi.mocked(boardData),
+  ...vi.mocked(corpWallet),
+  ...vi.mocked(corpJobs),
+};
 
 const CHARACTER_ID = 42;
 const CORPORATION_ID = 98000001;

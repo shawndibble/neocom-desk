@@ -21,12 +21,11 @@ import {
   totalBalance,
   type VitalsJournalEntry,
 } from '@/engine/corp/vitals';
-import type { CorporationWalletDivision } from '@/esi/endpoints';
+import type { WalletDivision } from './divisions';
 
 interface CorpVitalsRailProps {
-  divisions: readonly CorporationWalletDivision[];
-  /** The corporation's own names for its divisions, from `read_divisions`. */
-  divisionNames: ReadonlyMap<number, string>;
+  /** Balances joined to the corporation's own names — `divisions.ts` (#298). */
+  divisions: readonly WalletDivision[];
   /** The journal, already reduced. Empty when it could not be read. */
   journal: readonly VitalsJournalEntry[];
   /**
@@ -41,7 +40,6 @@ interface CorpVitalsRailProps {
 
 export function CorpVitalsRail({
   divisions,
-  divisionNames,
   journal,
   journalDivision,
   nowMs,
@@ -77,8 +75,7 @@ export function CorpVitalsRail({
                 client calls it too.
               */}
               <dt className="min-w-0 truncate text-text-dim">
-                {divisionNames.get(division.division) ??
-                  t('corp.vitals.division', { division: division.division })}
+                {division.name ?? t('corp.vitals.division', { division: division.division })}
               </dt>
               <dd className="shrink-0 tabular-nums">{formatIsk(division.balance, 2)}</dd>
             </div>
@@ -95,7 +92,9 @@ export function CorpVitalsRail({
             label={t('corp.vitals.runway')}
             tooltip={t('corp.vitals.runwayHint', {
               days: VITALS_WINDOW_DAYS,
-              division: divisionNames.get(journalDivision) ?? journalDivision,
+              division:
+                divisions.find((division) => division.division === journalDivision)?.name ??
+                journalDivision,
             })}
             // `null` is not "zero days" — it is a corporation that has spent
             // nothing, or has nothing left, and either way the journal cannot

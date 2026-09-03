@@ -9,7 +9,6 @@
  * Pure itself — no fetch, no Dexie. The loaders are `boardData.ts`.
  */
 import type {
-  CorporationDivisions,
   CorporationIndustryJob,
   CorporationMiningExtraction,
   CorporationStructure,
@@ -165,20 +164,6 @@ export function toVitalsJournal(entries: readonly WalletJournalEntry[]): VitalsJ
   return reduced;
 }
 
-/**
- * The corporation's own names for its wallet divisions.
- *
- * `read_divisions` is what makes a corp wallet readable at all: without it the
- * rail says "Division 3" where the corp says "SRP". ESI omits `name` for a
- * division still on its default, and omits `division` on a malformed entry —
- * both are skipped rather than guessed at, and the view falls back to the
- * numbered label.
- */
-export function walletDivisionNames(divisions: CorporationDivisions | null): Map<number, string> {
-  const names = new Map<number, string>();
-  for (const division of divisions?.wallet ?? []) {
-    if (division.division === undefined || division.name === undefined) continue;
-    names.set(division.division, division.name);
-  }
-  return names;
-}
+// The wallet-division join — balances from `/wallets`, names from `/divisions`
+// — is `divisions.ts`'s `walletDivisions` (#298). The board reads it as it is
+// rather than growing a second one here.

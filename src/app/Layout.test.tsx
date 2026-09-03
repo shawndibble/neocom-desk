@@ -540,11 +540,36 @@ describe('Layout corp nav entry', () => {
     }
   );
 
-  it('renders the entry once corp access is ready', () => {
+  /**
+   * The corporation id is part of the gate, not an extra — the same
+   * composition `owner.ts` makes for the Personal / Corporation switch. It is
+   * written by the public-info read, so on a cold device it is simply absent,
+   * and an entry into a section with no corporation behind it must not be on
+   * screen yet.
+   */
+  it('renders nothing for a ready character whose corporation is not yet known', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     mockedCorpAccess.mockReturnValue(corpAccess('ready'));
+    useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
+    await db.characters.put({ characterId: 42, name: 'Pilot', ownerHash: 'h', addedAt: 0 });
     renderLayout();
-    const link = screen.getByRole('link', { name: 'Corporation' });
+    await waitFor(() => expect(screen.getByText('page content')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: 'Corporation' })).not.toBeInTheDocument();
+  });
+
+  it('renders the entry once corp access is ready and the corporation is known', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    mockedCorpAccess.mockReturnValue(corpAccess('ready'));
+    useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
+    await db.characters.put({
+      characterId: 42,
+      name: 'Pilot',
+      ownerHash: 'h',
+      addedAt: 0,
+      corporationId: 98000001,
+    });
+    renderLayout();
+    const link = await screen.findByRole('link', { name: 'Corporation' });
     expect(link).toHaveAttribute('href', '/corp');
     // No lock marker: there is no state in which this renders and is unusable,
     // so the amber dot would offer a re-login for a role nobody can grant here.

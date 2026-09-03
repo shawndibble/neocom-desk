@@ -31,14 +31,20 @@ import { CorpBoard } from '@/features/corp/CorpBoard';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
 import {
   MASTER_WALLET_DIVISION,
-  loadCorporationDivisions,
   loadCorporationId,
-  loadCorporationIndustryJobs,
   loadCorporationMiningExtractions,
   loadCorporationStructures,
+} from '@/features/corp/boardData';
+// The wallet, divisions, journal and industry-jobs reads already exist (#298)
+// and are used as they are: the board is a second consumer of those modules,
+// not a second copy of them.
+import {
+  loadCorporationDivisions,
   loadCorporationWalletJournal,
   loadCorporationWallets,
-} from '@/features/corp/boardData';
+} from '@/features/corp/wallet';
+import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
+import { walletDivisions, type WalletDivision } from '@/features/corp/divisions';
 import {
   jobTypeIds,
   structureName,
@@ -46,7 +52,6 @@ import {
   toBoardJobs,
   toBoardStructures,
   toVitalsJournal,
-  walletDivisionNames,
 } from '@/features/corp/boardSources';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { buildCorpBoard } from '@/engine/corp/board';
@@ -56,7 +61,6 @@ import type {
   CorporationIndustryJob,
   CorporationMiningExtraction,
   CorporationStructure,
-  CorporationWalletDivision,
 } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 
@@ -82,8 +86,8 @@ interface CorpSnapshot {
   structures: CorporationStructure[] | null;
   extractions: CorporationMiningExtraction[] | null;
   jobs: CorporationIndustryJob[] | null;
-  wallets: CorporationWalletDivision[] | null;
-  divisionNames: ReadonlyMap<number, string>;
+  /** Balances joined to the corporation's own division names (#298). */
+  wallets: WalletDivision[] | null;
   journal: VitalsJournalEntry[];
   typeNames: ReadonlyMap<number, string>;
   /** Oldest `fetchedAt` across the panels actually read — see `Corp` below. */
@@ -98,7 +102,6 @@ const EMPTY_SNAPSHOT: CorpSnapshot = {
   extractions: null,
   jobs: null,
   wallets: null,
-  divisionNames: new Map(),
   journal: [],
   typeNames: new Map(),
   oldestFetchedAt: null,
@@ -163,8 +166,13 @@ async function loadCorpSnapshot(
     structures: structures?.cached?.data ?? null,
     extractions: extractions?.cached?.data ?? null,
     jobs: jobRows,
-    wallets: wallets?.cached?.data ?? null,
-    divisionNames: walletDivisionNames(divisions?.cached?.data ?? null),
+    // Driven by the wallet read, not the divisions one: the balances are the
+    // data, and `read_divisions` can fail on its own — a missing name degrades
+    // one label, a missing division would hide a wallet (`divisions.ts`).
+    wallets:
+      wallets?.cached === undefined || wallets.cached === null
+        ? null
+        : walletDivisions(wallets.cached.data, divisions?.cached?.data ?? null),
     journal: toVitalsJournal(journal?.cached?.data ?? []),
     typeNames,
     oldestFetchedAt,
@@ -265,7 +273,6 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
           {capabilities.canReadWallet && data !== null && (
             <CorpVitalsRail
               divisions={data.wallets ?? []}
-              divisionNames={data.divisionNames}
               journal={data.journal}
               journalDivision={MASTER_WALLET_DIVISION}
               nowMs={data.loadedAt}
