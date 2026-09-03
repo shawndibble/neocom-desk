@@ -14,6 +14,7 @@ import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type {
   EffectiveMaterial,
   FacilityKind,
+  MaterialSourcing,
   RigLevel,
   SecurityBand,
   SkillLevels,
@@ -32,7 +33,8 @@ import { MaterialsTable } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
 import { ResultsSummary } from './ResultsSummary';
 
-type PlanPatch = Partial<
+/** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
+export type PlanPatch = Partial<
   Pick<
     BuildPlanRecord,
     'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'hubId' | 'facilityTaxPct'
@@ -45,6 +47,12 @@ interface BuildPlanDetailProps {
   ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
   onUpdate: (patch: PlanPatch) => void;
+  /**
+   * One material row’s sourcing edit. Separate from `onUpdate` because it is a
+   * read-modify-write of a nested map rather than a whole field, so it has to
+   * merge against the stored record, not against this render’s `plan`.
+   */
+  onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
   /** Materials-row context menu (CONTEXT.md round 26) — the same actions the Market and Assets rows offer. */
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   /** False with no active character — the Quickbar has nobody to save the material under. */
@@ -64,6 +72,7 @@ export function BuildPlanDetail({
   ownedBlueprints,
   skills,
   onUpdate,
+  onSourcingChange,
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
@@ -163,7 +172,7 @@ export function BuildPlanDetail({
       materialsCsvColumns(
         t,
         (typeID) => nameForType(catalog, typeID),
-        snapshot?.hubPrices ?? {},
+        plan.materialSourcing,
         pricesReady
       )
     );
@@ -362,8 +371,9 @@ export function BuildPlanDetail({
           <MaterialsTable
             materials={result.materials}
             nameFor={(typeID) => nameForType(catalog, typeID)}
-            hubPrices={snapshot?.hubPrices ?? {}}
+            sourcing={plan.materialSourcing}
             pricesReady={pricesReady}
+            onSourcingChange={onSourcingChange}
             rowContextMenu={materialContextMenu}
           />
         )}

@@ -1,27 +1,25 @@
 import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { EffectiveMaterial, HubPrices } from '@/engine/industry/types';
+import type { MaterialCostLine, MaterialSourcingMap } from '@/engine/industry/types';
+import { materialRowState } from './materialRow';
 
 /**
  * CSV columns for the materials list: name, effective (post-ME) quantity,
- * unit price, line total. Mirrors MaterialsTable's priced predicate exactly
- * — `pricesReady && hubPrices[typeID] !== undefined` — so a material with no
- * hub price, or any material at all when prices failed to load, emits a
- * blank cell (not a display string like "No price") for both price columns.
- * A blank lets a spreadsheet SUM() skip the row; a string would poison the
- * column into text.
+ * unit price, line total. The price columns come from `materialRowState`, the
+ * same decision MaterialsTable renders, so an export can't disagree with the
+ * table it was taken from — an override price exports as the unit price, and
+ * an owned portion is already out of the line total.
+ *
+ * A cell with nothing to say is blank (not a display string like "No price"):
+ * a blank lets a spreadsheet SUM() skip the row, a string would poison the
+ * column into text. A fully owned row is the exception — it costs zero whether
+ * or not anything is priced, so it exports a real 0.
  */
 export function materialsCsvColumns(
   t: CsvTranslate,
   nameFor: (typeID: number) => string,
-  hubPrices: HubPrices,
+  sourcing: MaterialSourcingMap | undefined,
   pricesReady: boolean
-): CsvColumn<EffectiveMaterial>[] {
-  function unitPrice(material: EffectiveMaterial): number | null {
-    const price = hubPrices[material.typeID];
-    const priced = pricesReady && price !== undefined;
-    return priced ? price : null;
-  }
-
+): CsvColumn<MaterialCostLine>[] {
   return [
     {
       header: t('industry.csvMaterial'),
@@ -33,14 +31,11 @@ export function materialsCsvColumns(
     },
     {
       header: t('industry.csvUnitPriceIsk'),
-      value: (material) => unitPrice(material),
+      value: (material) => materialRowState(material, sourcing, pricesReady).unitPrice,
     },
     {
       header: t('industry.csvLineTotalIsk'),
-      value: (material) => {
-        const price = unitPrice(material);
-        return price === null ? null : price * material.quantity;
-      },
+      value: (material) => materialRowState(material, sourcing, pricesReady).lineCost,
     },
   ];
 }

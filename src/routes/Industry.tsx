@@ -13,7 +13,7 @@ import {
   VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
 } from '@/lib/useViewportBoundedHeight';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import type { SkillLevels } from '@/engine/industry/types';
+import type { MaterialSourcing, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import {
@@ -26,7 +26,8 @@ import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
-import { BuildPlanDetail } from '@/features/industry/BuildPlanDetail';
+import { BuildPlanDetail, type PlanPatch } from '@/features/industry/BuildPlanDetail';
+import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
 
 function newBuildPlan(
   characterId: number,
@@ -230,16 +231,15 @@ export function Industry() {
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
-  async function handleUpdate(
-    patch: Partial<
-      Pick<
-        BuildPlanRecord,
-        'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'hubId' | 'facilityTaxPct'
-      >
-    >
-  ) {
+  async function handleUpdate(patch: PlanPatch) {
     if (!selectedPlan) return;
     await db.buildPlans.put({ ...selectedPlan, ...patch, updatedAt: Date.now() });
+    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
+  }
+
+  async function handleSourcingChange(typeID: number, patch: MaterialSourcing) {
+    if (!selectedPlan) return;
+    await saveSourcingEdit(selectedPlan.id, typeID, patch);
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
@@ -312,6 +312,7 @@ export function Industry() {
                   ownedBlueprints={ownedBlueprints}
                   skills={skills}
                   onUpdate={(patch) => void handleUpdate(patch)}
+                  onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
                   onAddToQuickbar={quickbar.add}
                   quickbarAvailable={quickbar.available}
                   onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
