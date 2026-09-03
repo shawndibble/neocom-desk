@@ -1024,3 +1024,142 @@ describe('placeRemaps with Boosters', () => {
     expect(expired.totalSeconds).toBeCloseTo(blind.totalSeconds, 9);
   });
 });
+
+/**
+ * Characterization, not a fail-first regression: `placeRemaps` is CORRECT in
+ * every row below and no production file in `src/engine/optimizer/` changes
+ * for this bug. What the table pins down is the *consequence* of handing it a
+ * baseline outside EVE's 17..27 / total-99 space — it keeps the current
+ * attributes and reports zero savings, exactly as its contract says it must,
+ * and there is nothing in its inputs left that could explain why. That is the
+ * reason the fix lives in `engine/attributeBaseline.ts`, at the point the
+ * baseline is derived, and the reason this block must keep passing unchanged:
+ * if it ever stops, someone has taught the optimizer to prefer an allocation
+ * it cannot reach.
+ *
+ * The plan is the reported one — Complex Ore Processing V + Amarr Dreadnought V,
+ * ranks and attribute pairs as the SDE snapshot has them — with the prereq
+ * expansion left out, so the savings here are smaller than the 21.9 days the
+ * user's full plan showed. The four rows' structure is the content.
+ */
+describe('a baseline outside EVE’s legal attribute space', () => {
+  // public/data/skills.json: rank 11 memory/intelligence, rank 12 perception/willpower.
+  const COMPLEX_ORE_PROCESSING = skill(60380, 'memory', 'intelligence', 11);
+  const AMARR_DREADNOUGHT = skill(20525, 'perception', 'willpower', 12);
+  const planSkills = skillMap(COMPLEX_ORE_PROCESSING, AMARR_DREADNOUGHT);
+  const planSteps = [...levels(60380, 5), ...levels(20525, 5)];
+
+  /** The user's real sheet: 17 + 26 + 22 + 17 + 17 = 99. */
+  const LEGAL_BASE: Attributes = {
+    intelligence: 17,
+    memory: 26,
+    perception: 22,
+    willpower: 17,
+    charisma: 17,
+  };
+  /** The same sheet as ESI reported it, once a +12 accelerator is baked in: 159. */
+  const ACCELERATED_BASE: Attributes = {
+    intelligence: 29,
+    memory: 38,
+    perception: 34,
+    willpower: 29,
+    charisma: 29,
+  };
+  const FITTED: Implants = { memory: 4, perception: 4, charisma: 2 };
+  const ACCELERATOR = {
+    bonus: {
+      intelligence: 12,
+      memory: 12,
+      perception: 12,
+      willpower: 12,
+      charisma: 12,
+    },
+    expiresAt: new Date('2026-09-15T17:45:00Z'),
+  };
+  const PLAN_START = new Date('2026-09-02T00:00:00Z');
+
+  const run = (currentAttributes: Attributes, withBooster: boolean) =>
+    placeRemaps(planSteps, planSkills, {
+      remapCount: 1,
+      currentAttributes,
+      implants: FITTED,
+      booster: withBooster ? { boosters: [ACCELERATOR], startDate: PLAN_START } : undefined,
+    });
+
+  it('saves real time on the legal baseline, and places one remap', () => {
+    const result = run(LEGAL_BASE, false);
+    expect(result.savingsSeconds).toBeGreaterThan(0);
+    expect(result.segments.some((segment) => segment.remap)).toBe(true);
+  });
+
+  it('reports zero savings and places no remap once the accelerator is baked in', () => {
+    const result = run(ACCELERATED_BASE, false);
+    expect(result.savingsSeconds).toBe(0);
+    expect(result.segments.some((segment) => segment.remap)).toBe(false);
+  });
+
+  // The user's own observation, and the one that proves the asymmetry: a
+  // bonus added to every attribute alike cannot change WHERE a remap belongs,
+  // because it shifts every candidate by the same amount. It only looks like
+  // it does when it is added to the baseline and not to the candidates.
+  it('places the remap in the same place whether or not the accelerator is modelled', () => {
+    const blind = run(LEGAL_BASE, false);
+    const modelled = run(LEGAL_BASE, true);
+    const boundary = (result: ReturnType<typeof run>) =>
+      result.segments.find((segment) => segment.remap)?.startIndex;
+    expect(boundary(modelled)).toBe(boundary(blind));
+    expect(modelled.savingsSeconds).toBeGreaterThan(0);
+  });
+
+  it('still reports zero when the accelerator is counted in the baseline AND modelled', () => {
+    // The pre-fix state of the app: ESI's inflated sheet plus the What-If
+    // Booster control, i.e. the +12 applied twice.
+    expect(run(ACCELERATED_BASE, true).savingsSeconds).toBe(0);
+  });
+
+  it('trains a memory/intelligence skill at the rate the game shows', () => {
+    // MEM 26 base + 4 implant + 12 accelerator = 42; INT 17 + 0 + 12 = 29.
+    // 42 + 29/2 = 56.5 SP/min, pinned against the live client. The whole
+    // chain has to produce it, not just `trainingRate`: the accelerator must
+    // reach the schedule through the Booster mechanism and the baseline must
+    // stay at 26/17.
+    const [step] = computeSchedule(
+      [{ skillTypeID: 60380, level: 1 }],
+      {
+        attributes: LEGAL_BASE,
+        implants: FITTED,
+        boosters: [ACCELERATOR],
+        startDate: PLAN_START,
+      },
+      planSkills
+    );
+    expect(step.sp / (step.seconds / 60)).toBeCloseTo(56.5, 9);
+  });
+
+  it('costs the remainder of a plan that outlives the accelerator at the unboosted rate', () => {
+    // 13d17h45m of accelerator against a plan far longer than that: the tail
+    // has to fall back to 26 + 4 / 17, or a bonus with a fortnight left is
+    // priced as if it lasted the whole plan.
+    const scheduled = computeSchedule(
+      planSteps,
+      {
+        attributes: LEGAL_BASE,
+        implants: FITTED,
+        boosters: [ACCELERATOR],
+        startDate: PLAN_START,
+      },
+      planSkills
+    );
+    const last = scheduled[scheduled.length - 1];
+    const unboosted = computeSchedule(
+      planSteps,
+      { attributes: LEGAL_BASE, implants: FITTED },
+      planSkills
+    );
+    const lastUnboosted = unboosted[unboosted.length - 1];
+    // Faster than no accelerator at all, but nowhere near the fully-boosted
+    // rate: the bonus only covers the first ~13 days.
+    expect(last.cumulativeSeconds).toBeLessThan(lastUnboosted.cumulativeSeconds);
+    expect(last.cumulativeSeconds).toBeGreaterThan(lastUnboosted.cumulativeSeconds * 0.9);
+  });
+});

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   loadSkillCatalog,
-  toEngineAttributes,
+  toAttributeBaseline,
   type SkillCatalog,
 } from '@/features/skills/skillMap';
+import { baselineAttributes, type AttributeBaseline } from '@/engine/attributeBaseline';
 import {
   loadCharacterAttributes,
   loadImplantBonuses,
@@ -35,6 +36,13 @@ export interface PlanEditorData {
    * presents that fallback as fact.
    */
   attributesResult: CachedResult<CharacterAttributes> | null;
+  /**
+   * How `attributes` was arrived at: already a legal allocation, an inflated
+   * sheet a cerebral accelerator explains, or one nothing explains. Null until
+   * ESI has been read at all — the placeholder sheet above is not a finding
+   * about the character, so it must not be reported as one.
+   */
+  attributeBaseline: AttributeBaseline | null;
   implants: Implants;
   remapInfo: RemapAvailability | null;
 }
@@ -51,6 +59,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   const [attributes, setAttributes] = useState<Attributes>(DEFAULT_ATTRIBUTES);
   const [attributesResult, setAttributesResult] =
     useState<CachedResult<CharacterAttributes> | null>(null);
+  const [attributeBaseline, setAttributeBaseline] = useState<AttributeBaseline | null>(null);
   const [implants, setImplants] = useState<Implants>({});
   // Remaps Available (CONTEXT.md): ESI bonus remaps + the yearly remap when
   // off cooldown. Prefills new plans' remapCount; user-editable per plan.
@@ -72,7 +81,15 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
       // past-finish_date queue entries on top, or a plan gets normalized and
       // optimized against levels the character already trained past.
       setTrainedSkills(corrected.trained);
-      if (attrs?.data) setAttributes(toEngineAttributes(attrs.data, implantBonuses));
+      if (attrs?.data) {
+        // An `impossible` sheet yields no baseline at all, so the scheduler
+        // falls back to the same placeholder it uses when ESI cannot be read.
+        // Approximating one from the reported numbers is what produced the
+        // silent zero this replaces: see engine/attributeBaseline.ts.
+        const baseline = toAttributeBaseline(attrs.data, implantBonuses);
+        setAttributeBaseline(baseline);
+        setAttributes(baselineAttributes(baseline) ?? DEFAULT_ATTRIBUTES);
+      }
       setAttributesResult(attrs);
       setRemapInfo(remapAvailability(attrs?.data ?? null, new Date()));
       setImplants(implantBonuses);
@@ -82,5 +99,13 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     };
   }, [characterId]);
 
-  return { catalog, trainedSkills, attributes, attributesResult, implants, remapInfo };
+  return {
+    catalog,
+    trainedSkills,
+    attributes,
+    attributesResult,
+    attributeBaseline,
+    implants,
+    remapInfo,
+  };
 }

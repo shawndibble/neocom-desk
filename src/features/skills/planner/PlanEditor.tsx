@@ -62,6 +62,7 @@ import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
 import { markerVerdict, remapVerdict, type OptimizeVerdict } from './optimizeVerdict';
 import { boostedStepIndices } from '@/engine/boosterImpact';
+import type { AttributeBaseline } from '@/engine/attributeBaseline';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { formatDate, formatDuration } from '@/lib/duration';
@@ -125,6 +126,12 @@ interface PlanEditorProps {
    * so showing it would present a fallback as the character's own sheet.
    */
   attributesResult: CachedResult<CharacterAttributes> | null;
+  /**
+   * How the base sheet above was arrived at (`engine/attributeBaseline.ts`).
+   * Optional: omitting it is the `legal` case, which is a no-op — a character
+   * with no accelerator running must see no notice and no prefill.
+   */
+  attributeBaseline?: AttributeBaseline | null;
   /** Remaps Available from ESI (bonus + yearly), for the hint next to the count input. */
   remapInfo: RemapAvailability | null;
   /**
@@ -199,6 +206,7 @@ export function PlanEditor({
   attributes,
   implants,
   attributesResult,
+  attributeBaseline = null,
   remapInfo,
   listPane,
   onUpdate,
@@ -290,6 +298,28 @@ export function PlanEditor({
     return { bonus, expiresAt };
   }, [boosterEnabled, boosterExpiresAt, boosterBonus]);
   const activeBoosters = useMemo<Booster[]>(() => (booster ? [booster] : []), [booster]);
+
+  // An in-game cerebral accelerator is baked into the attributes ESI reports
+  // and cannot be read back out of any endpoint, so `attributeBaseline`
+  // recovers it arithmetically and it is modelled here, through the same
+  // Booster the What-If control drives — one mechanism, applied once. Prefill
+  // is the point: the alternative is correcting the baseline silently, which
+  // leaves the user's plan slower with nothing on screen saying why.
+  //
+  // Seeded during render (React's "adjusting state when a prop changes"),
+  // like the stale-result clear below, so it lands in the same commit as the
+  // data rather than a tick later. Keyed on the detected NUMBER and gated on
+  // a still-pristine control, so a user's own edit is never stomped.
+  const detectedAccelerator =
+    attributeBaseline?.kind === 'accelerated' ? attributeBaseline.acceleratorBonus : null;
+  const [seededAccelerator, setSeededAccelerator] = useState<number | null>(null);
+  if (detectedAccelerator !== null && detectedAccelerator !== seededAccelerator) {
+    setSeededAccelerator(detectedAccelerator);
+    if (!boosterEnabled && boosterExpiresAt === '') {
+      setBoosterEnabled(true);
+      setBoosterBonus(detectedAccelerator);
+    }
+  }
 
   // Display-only "expired" hint: reads the wall clock, which is unavoidably
   // impure (there's no ticking-clock store in this codebase to subscribe to
@@ -885,6 +915,14 @@ export function PlanEditor({
               false the moment the lens leaves "current" — the estimates are
               costed against the lens, not against the chips. */}
           <p className="text-[0.6875rem] text-text-dim">{t('plans.attributesCurrentNote')}</p>
+          {/* An impossible sheet is reported, never quietly approximated: the
+              scheduler below is running on the placeholder spread, and a
+              number presented without that caveat is the bug this fixes. */}
+          {attributeBaseline?.kind === 'impossible' && (
+            <p className="text-warning">
+              {t('plans.attributesImpossible', { total: attributeBaseline.reportedTotal })}
+            </p>
+          )}
 
           <label className="flex items-center justify-between gap-2">
             {t('plans.whatIfImplants')}
@@ -965,6 +1003,14 @@ export function PlanEditor({
             />
             {t('plans.booster')}
           </label>
+          {/* Outside the checkbox's own block on purpose: unticking it is a
+              legitimate answer ("that accelerator is gone"), and the reason
+              the sheet was corrected has to survive that. */}
+          {detectedAccelerator !== null && (
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('plans.boosterDetected', { bonus: detectedAccelerator })}
+            </p>
+          )}
           {boosterEnabled && (
             // Indented under its own checkbox: these only exist while the
             // booster is on, and the rule says so without a second heading.
@@ -975,7 +1021,10 @@ export function PlanEditor({
                   size="md"
                   type="number"
                   min={1}
-                  max={9}
+                  // Accelerator tiers run past the +9 this once allowed: the
+                  // reported case was a +12, and a detected bonus the field
+                  // cannot hold would be prefilled into an invalid input.
+                  max={30}
                   value={boosterBonus}
                   onChange={(e) => setBoosterBonus(Number(e.target.value) || 0)}
                   className="field-no-spinner w-16 text-center"
@@ -993,6 +1042,12 @@ export function PlanEditor({
                   className="min-w-0 flex-1"
                 />
               </label>
+              {/* A blank expiry means no Booster is applied at all, so a
+                  prefilled bonus would otherwise sit there looking active
+                  while every number on the page ignored it. */}
+              {detectedAccelerator !== null && boosterExpiresAt === '' && (
+                <p className="text-warning">{t('plans.boosterDetectedNoExpiry')}</p>
+              )}
               {boosterExpired && <p className="text-warning">{t('plans.boosterExpired')}</p>}
             </div>
           )}
