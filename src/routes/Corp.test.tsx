@@ -197,6 +197,41 @@ describe('per-panel capability gating (AC3)', () => {
   });
 
   /**
+   * The runway's two halves must describe the same wallet: ESI publishes no
+   * all-divisions journal, so putting every division's balance over division
+   * 1's spending would answer a question nobody asked.
+   *
+   * 300 ISK/day out of division 1 over the 30-day window, against its 3,000 —
+   * ten days, regardless of the 1,000,000 sitting untouched in division 3.
+   */
+  it('reports a runway from the journalled division alone', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
+    mocked.loadCorporationWallets.mockResolvedValue(
+      cached([
+        { division: 1, balance: 3_000 },
+        { division: 3, balance: 1_000_000 },
+      ])
+    );
+    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
+    mocked.loadCorporationWalletJournal.mockResolvedValue(
+      cached([
+        {
+          id: 1,
+          date: at(-2 * DAY),
+          ref_type: 'office_rental_fee',
+          description: 'rent',
+          amount: -9_000,
+        },
+      ])
+    );
+
+    renderCorp();
+
+    // The plural key resolving, not the literal `corp.vitals.runwayDays_other`.
+    expect(await screen.findByText('10 days')).toBeInTheDocument();
+  });
+
+  /**
    * The mirror of the case above, and the harder half of AC3: an Accountant
    * holds none of the board's three capabilities, so there is no board — not an
    * empty one saying "Nothing due" about endpoints they were never allowed to

@@ -27,18 +27,42 @@ interface CorpVitalsRailProps {
   divisions: readonly CorporationWalletDivision[];
   /** The corporation's own names for its divisions, from `read_divisions`. */
   divisionNames: ReadonlyMap<number, string>;
-  /** Master-division journal, already reduced. Empty when it could not be read. */
+  /** The journal, already reduced. Empty when it could not be read. */
   journal: readonly VitalsJournalEntry[];
+  /**
+   * Which division `journal` came from. The runway divides that division's own
+   * balance by its own spending — see the chip below for why the two halves
+   * must describe the same wallet.
+   */
+  journalDivision: number;
   /** Captured by the loader — `Date.now()` in render is impure and React forbids it. */
   nowMs: number;
 }
 
-export function CorpVitalsRail({ divisions, divisionNames, journal, nowMs }: CorpVitalsRailProps) {
+export function CorpVitalsRail({
+  divisions,
+  divisionNames,
+  journal,
+  journalDivision,
+  nowMs,
+}: CorpVitalsRailProps) {
   const { t } = useTranslation();
 
   const total = totalBalance(divisions);
   const net = netOverWindow(journal, nowMs);
-  const runway = runwayDays(total, dailyOutgoings(journal, nowMs));
+  /**
+   * Both halves of the runway come from the same wallet, deliberately.
+   *
+   * ESI publishes no all-divisions journal and the seven are separately
+   * role-gated, so the spending figure can only ever be one division's. Putting
+   * *every* division's balance over one division's spending would answer a
+   * question nobody asked — a corporation that pays its bills out of division 3
+   * would read as having years of runway — and the tooltip would be describing
+   * a calculation that never ran.
+   */
+  const journalBalance =
+    divisions.find((division) => division.division === journalDivision)?.balance ?? 0;
+  const runway = runwayDays(journalBalance, dailyOutgoings(journal, nowMs));
 
   return (
     <Panel title={t('corp.vitalsTitle')}>
@@ -69,7 +93,10 @@ export function CorpVitalsRail({ divisions, divisionNames, journal, nowMs }: Cor
           />
           <StatChip
             label={t('corp.vitals.runway')}
-            tooltip={t('corp.vitals.runwayHint', { days: VITALS_WINDOW_DAYS })}
+            tooltip={t('corp.vitals.runwayHint', {
+              days: VITALS_WINDOW_DAYS,
+              division: divisionNames.get(journalDivision) ?? journalDivision,
+            })}
             // `null` is not "zero days" — it is a corporation that has spent
             // nothing, or has nothing left, and either way the journal cannot
             // support a figure. The engine says so and the rail repeats it.

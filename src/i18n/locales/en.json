@@ -1386,7 +1386,7 @@
       "runwayDays_one": "{{count}} day",
       "runwayDays_other": "{{count}} days",
       "runwayUnknown": "Unknown",
-      "runwayHint": "Total balance divided by average daily spending over the last {{days}} days. Income is ignored, so this is what the corporation has already banked."
+      "runwayHint": "How long division {{division}} lasts: its own balance divided by its own average daily spending over the last {{days}} days. EVE publishes no all-divisions journal, so this covers that one wallet. Income is ignored, so this is what is already banked."
     },
     "grantPromptTitle": "Corporation access",
     "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so NeoCom Desk can show your corporation's data?",

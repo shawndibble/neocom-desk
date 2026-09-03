@@ -54,6 +54,13 @@ import { db } from '@/db';
  * the default so a 403 that slips through (a role revoked between the roles
  * read and the panel's) degrades quietly rather than into a re-login banner
  * nobody can act on.
+ *
+ * This also suppresses the app-wide signal, which is the half that matters
+ * most: `esi/cache.ts` calls `emitEsiAuthFailure` *inside* its
+ * `detectAuthFailure(err)` branch, so overriding the predicate keeps a corp 403
+ * from raising `AuthFailureNotice` across the whole shell — which would herd a
+ * Station Manager whose role was just revoked toward a re-login that cannot
+ * help.
  */
 const CORP_LOAD_OPTIONS = { detectAuthFailure: () => false } as const;
 

@@ -267,6 +267,7 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
               divisions={data.wallets ?? []}
               divisionNames={data.divisionNames}
               journal={data.journal}
+              journalDivision={MASTER_WALLET_DIVISION}
               nowMs={data.loadedAt}
             />
           )}
