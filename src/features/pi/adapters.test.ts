@@ -48,6 +48,59 @@ describe('extractorProgramsFromPins', () => {
     ]);
   });
 
+  it('populates the install-time yield baseline, converting cycle_time seconds to ms', () => {
+    const pin: PlanetPin = {
+      pin_id: 1,
+      type_id: 100,
+      latitude: 0,
+      longitude: 0,
+      install_time: '2026-08-22T00:00:00Z',
+      expiry_time: '2026-09-05T00:00:00Z',
+      extractor_details: { heads: extractorHeads, cycle_time: 1800, qty_per_cycle: 6965 },
+    };
+    expect(extractorProgramsFromPins([pin])).toEqual([
+      {
+        pinId: 1,
+        expiryTimeMs: Date.parse('2026-09-05T00:00:00Z'),
+        installTimeMs: Date.parse('2026-08-22T00:00:00Z'),
+        cycleTimeMs: 1_800_000,
+        qtyPerCycle: 6965,
+      },
+    ]);
+  });
+
+  it('still includes a pin with a valid expiry but no yield baseline, so colony health is unaffected', () => {
+    // ESI marks qty_per_cycle/cycle_time/install_time all optional. Dropping
+    // such a pin here would silently remove it from colonyStatus, letting an
+    // idle colony read as healthy.
+    const pin: PlanetPin = {
+      pin_id: 1,
+      type_id: 100,
+      latitude: 0,
+      longitude: 0,
+      expiry_time: '2026-09-05T00:00:00Z',
+      extractor_details: { heads: extractorHeads },
+    };
+    const [program] = extractorProgramsFromPins([pin]);
+    expect(program).toEqual({ pinId: 1, expiryTimeMs: Date.parse('2026-09-05T00:00:00Z') });
+    expect(program.qtyPerCycle).toBeUndefined();
+    expect(program.cycleTimeMs).toBeUndefined();
+    expect(program.installTimeMs).toBeUndefined();
+  });
+
+  it('leaves installTimeMs undefined for an unparseable install_time rather than producing NaN', () => {
+    const pin: PlanetPin = {
+      pin_id: 1,
+      type_id: 100,
+      latitude: 0,
+      longitude: 0,
+      install_time: 'not-a-date',
+      expiry_time: '2026-09-05T00:00:00Z',
+      extractor_details: { heads: extractorHeads, cycle_time: 1800, qty_per_cycle: 6965 },
+    };
+    expect(extractorProgramsFromPins([pin])[0].installTimeMs).toBeUndefined();
+  });
+
   it('excludes a pin with no extractor_details (spec-legal: heads is the only required key elsewhere)', () => {
     const pin: PlanetPin = {
       pin_id: 1,

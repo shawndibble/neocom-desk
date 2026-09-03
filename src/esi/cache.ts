@@ -37,6 +37,41 @@ export interface StatusResult<T> {
 export const GLOBAL_CACHE_CHARACTER_ID = 0;
 
 /**
+ * Marks a cache row as owned by a *corporation* rather than by the character
+ * whose token fetched it. Read by `cachePurge.purgeCorpScopedCache`, which
+ * range-deletes exactly this prefix when a character changes corp — see there
+ * for why the range cannot spill onto a key that merely starts with the same
+ * letters, such as `corporation-history`.
+ */
+export const CORP_CACHE_KEY_PREFIX = 'corp:';
+
+/**
+ * Cache key for corp-owned data (issue #293).
+ *
+ * `esiCache` is keyed `[characterId, key]`, which can express "this
+ * character's skills" but not "this corporation's structures, as read by this
+ * character". Folding the corporation id into the key closes that gap twice
+ * over:
+ *
+ * - **A cross-corp read of a corp key is impossible by construction, not by
+ *   convention.** The corp id is a required argument, so a read after a corp
+ *   change computes a *different* key and misses. There is no window in which
+ *   the old corp's rows can be served under the new one — not even if the
+ *   purge fails. (What stays a convention is that corp-owned endpoints call
+ *   this at all; one that filed corp data under a bare key would simply be
+ *   re-creating the defect. The endpoints land in #294-296.)
+ * - **The rows are identifiable.** A corp change purges the `corp:` prefix and
+ *   leaves skills, mail and wallet exactly where they are.
+ *
+ * The character id stays the row's first key component: consent to read corp
+ * data comes from *that character's* token, so the rows must still vanish when
+ * that character's grant or owner changes.
+ */
+export function corpCacheKey(corporationId: number, key: string): string {
+  return `${CORP_CACHE_KEY_PREFIX}${corporationId}:${key}`;
+}
+
+/**
  * Written by `fetchLive` itself, right after a successful live call, with
  * ESI's raw `Expires` header (or null). `loadWithCacheStatus` and
  * `loadPaginatedWithCacheStatus` both read it back once `fetchLive` resolves

@@ -24,10 +24,18 @@ const PI: PiData = {
       name: 'Reactive Metals',
       cycleTime: 1800,
       quantity: 20,
+      volume: 0.19,
       inputs: [{ typeID: 2267, quantity: 3000, name: 'Base Metals' }],
     },
   },
-  raw: [2267],
+  raw: [
+    {
+      typeID: 2267,
+      name: 'Base Metals',
+      volume: 0.005,
+      planetTypes: ['barren', 'gas', 'lava', 'plasma', 'storm'],
+    },
+  ],
 };
 
 vi.mock('@/sde/loadSde', () => ({

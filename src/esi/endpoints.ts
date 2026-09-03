@@ -1025,10 +1025,19 @@ export function getUniverseStructure(
 
 // --- GET /characters/{character_id}/planets (esi-planets.manage_planets.v1) ---
 
+/**
+ * The eight planet types ESI reports. Named rather than inlined because
+ * public/data/pi.json's P0 table is keyed by these same strings (see
+ * `PiRawResource` in src/sde/types.ts) — one definition is what lets a
+ * character's colony be matched against that table with no translation layer.
+ */
+export type PlanetType =
+  'temperate' | 'barren' | 'oceanic' | 'ice' | 'gas' | 'lava' | 'storm' | 'plasma';
+
 export interface CharacterPlanet {
   solar_system_id: number;
   planet_id: number;
-  planet_type: 'temperate' | 'barren' | 'oceanic' | 'ice' | 'gas' | 'lava' | 'storm' | 'plasma';
+  planet_type: PlanetType;
   owner_id: number;
   last_update: string;
   upgrade_level: number;

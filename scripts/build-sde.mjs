@@ -87,6 +87,52 @@ const CHAR_ATTR_NAMES = {
 const SKILL_CATEGORY_ID = 16;
 const MANUFACTURING_ACTIVITY_ID = 1;
 
+// The eight values ESI reports for CharacterPlanet.planet_type (mirrors
+// `PlanetType` in src/esi/endpoints.ts). P0_PLANET_TYPES is checked against
+// this set so pi.json can never name a planet type a colony won't match.
+const ESI_PLANET_TYPES = [
+  'barren',
+  'gas',
+  'ice',
+  'lava',
+  'oceanic',
+  'plasma',
+  'storm',
+  'temperate',
+];
+
+// Which planet types yield each P0 resource, keyed by invTypes.typeName.
+//
+// UNLIKE EVERYTHING ELSE IN THIS SCRIPT THIS TABLE IS NOT DERIVED FROM THE SDE
+// DUMP — the relationship simply isn't in it, so this is hand-maintained and
+// can drift out from under a `latest` dump without any download noticing.
+// Source: EVE University wiki, "Planetary Commodities"
+// (https://wiki.eveuniversity.org/Planetary_Commodities), read 2026-09-03.
+//
+// It answers "which planet types", never "how much": per-planet resource
+// richness is visible only to a planet scanner, so it is not modelled at all
+// and no payload can carry it. Coverage is asserted
+// in both directions in the sanity checks below — an extracted P0 with no row
+// here, or a row here matching no P0, fails the build instead of quietly
+// emitting an empty list.
+const P0_PLANET_TYPES = {
+  'Aqueous Liquids': ['barren', 'gas', 'ice', 'oceanic', 'storm', 'temperate'],
+  Autotrophs: ['temperate'],
+  'Base Metals': ['barren', 'gas', 'lava', 'plasma', 'storm'],
+  'Carbon Compounds': ['barren', 'oceanic', 'temperate'],
+  'Complex Organisms': ['oceanic', 'temperate'],
+  'Felsic Magma': ['lava'],
+  'Heavy Metals': ['ice', 'lava', 'plasma'],
+  'Ionic Solutions': ['gas', 'storm'],
+  Microorganisms: ['barren', 'ice', 'oceanic', 'temperate'],
+  'Noble Gas': ['gas', 'ice', 'storm'],
+  'Noble Metals': ['barren', 'plasma'],
+  'Non-CS Crystals': ['lava', 'plasma'],
+  'Planktic Colonies': ['ice', 'oceanic'],
+  'Reactive Gas': ['gas'],
+  'Suspended Plasma': ['lava', 'plasma', 'storm'],
+};
+
 async function download(name) {
   const cached = join(CACHE_DIR, name);
   try {
@@ -466,6 +512,9 @@ async function main() {
   const piSchematics = {};
   const piRaw = [];
   let piUnpublished = 0;
+  // Populated while walking the P0s, reported in the sanity checks below.
+  const piUnmappedP0 = [];
+  const piMappedP0Names = new Set();
   {
     const meta = new Map();
     {
@@ -500,6 +549,10 @@ async function main() {
       }
     }
     const piName = (typeID) => types.get(typeID)?.name ?? `#${typeID}`;
+    // invTypes.volume, not packagedVolume: the two are identical for every
+    // planetary commodity (verified against the current dump) and `volume` is
+    // the field the rest of this script already reads.
+    const piVolume = (typeID) => types.get(typeID)?.volume ?? 0;
     for (const [schematicID, output] of schematicOutput) {
       const info = meta.get(schematicID);
       if (!info) continue;
@@ -512,6 +565,7 @@ async function main() {
         name: info.name,
         cycleTime: info.cycleTime,
         quantity: output.quantity,
+        volume: piVolume(output.typeID),
         inputs: (schematicInputs.get(schematicID) ?? [])
           .map((line) => ({ ...line, name: piName(line.typeID) }))
           .sort((a, b) => a.name.localeCompare(b.name)),
@@ -523,8 +577,27 @@ async function main() {
     for (const list of schematicInputs.values()) {
       for (const line of list) if (!(line.typeID in piSchematics)) rawIds.add(line.typeID);
     }
-    piRaw.push(...[...rawIds].sort((a, b) => a - b));
+    for (const typeID of [...rawIds].sort((a, b) => a - b)) {
+      const name = piName(typeID);
+      const planetTypes = P0_PLANET_TYPES[name];
+      if (!planetTypes) {
+        piUnmappedP0.push(`${name} (${typeID})`);
+        continue;
+      }
+      piMappedP0Names.add(name);
+      piRaw.push({ typeID, name, volume: piVolume(typeID), planetTypes: [...planetTypes].sort() });
+    }
   }
+  const piUnusedP0Rows = Object.keys(P0_PLANET_TYPES).filter((n) => !piMappedP0Names.has(n));
+  const piBadPlanetTypes = [
+    ...new Set(piRaw.flatMap((r) => r.planetTypes).filter((p) => !ESI_PLANET_TYPES.includes(p))),
+  ];
+  const piZeroVolume = [
+    ...Object.entries(piSchematics)
+      .filter(([, s]) => !(s.volume > 0))
+      .map(([typeID]) => Number(typeID)),
+    ...piRaw.filter((r) => !(r.volume > 0)).map((r) => r.typeID),
+  ];
   const pi = { schematics: piSchematics, raw: piRaw };
 
   // --- market/groups.json: invMarketGroups -> MarketGroupNode[] ---
@@ -768,6 +841,28 @@ async function main() {
   );
   if (Object.keys(piSchematics).length === 0 || piRaw.length === 0) {
     console.error('  FAIL: the planetary industry payload came out empty');
+    process.exitCode = 1;
+  }
+  if (piUnmappedP0.length) {
+    console.error(
+      `  FAIL: P0 resources missing from P0_PLANET_TYPES: ${piUnmappedP0.join(', ')} — the wiki table this script cites has drifted`
+    );
+    process.exitCode = 1;
+  }
+  if (piUnusedP0Rows.length) {
+    console.error(
+      `  FAIL: P0_PLANET_TYPES rows matching no extracted resource: ${piUnusedP0Rows.join(', ')}`
+    );
+    process.exitCode = 1;
+  }
+  if (piBadPlanetTypes.length) {
+    console.error(
+      `  FAIL: planet types outside ESI's planet_type values: ${piBadPlanetTypes.join(', ')}`
+    );
+    process.exitCode = 1;
+  }
+  if (piZeroVolume.length) {
+    console.error(`  FAIL: planetary types with no volume: ${piZeroVolume.join(', ')}`);
     process.exitCode = 1;
   }
   console.log(`  prereqs pointing outside skills.json: ${badPrereq}`);
