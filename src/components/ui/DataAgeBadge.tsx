@@ -5,6 +5,16 @@ import { formatAge, HOUR_MS, DAY_MS } from '@/lib/age';
 interface DataAgeBadgeProps {
   /** When the data was last fetched. */
   date: Date;
+  /**
+   * A sentence about *this* view's refresh cadence, appended to the tooltip
+   * after the absolute timestamp.
+   *
+   * Off by default, because for most views the age and the app-wide ten-minute
+   * promise say everything. It exists for the surfaces where they do not: CCP
+   * caches corp data for about an hour, and a board of countdowns has to say so
+   * rather than let the amber tone imply something is wrong (issue #296).
+   */
+  note?: string;
   className?: string;
 }
 
@@ -19,7 +29,7 @@ function toneFor(ms: number): string {
 }
 
 /** Relative age of API-derived data. Required on every ESI-backed view. */
-export function DataAgeBadge({ date, className = '' }: DataAgeBadgeProps) {
+export function DataAgeBadge({ date, note, className = '' }: DataAgeBadgeProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
 
@@ -33,7 +43,7 @@ export function DataAgeBadge({ date, className = '' }: DataAgeBadgeProps) {
   return (
     <time
       dateTime={date.toISOString()}
-      title={date.toLocaleString()}
+      title={note ? `${date.toLocaleString()} — ${note}` : date.toLocaleString()}
       className={`inline-flex items-center gap-1.5 text-[0.6875rem] tabular-nums ${toneFor(ms)} ${className}`}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />

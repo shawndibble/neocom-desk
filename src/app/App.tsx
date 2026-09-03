@@ -19,6 +19,7 @@ import { SkillPlans } from '@/routes/SkillPlans';
 import { SkillPlanEditor } from '@/routes/SkillPlanEditor';
 import { SkillCompare } from '@/routes/SkillCompare';
 import { Industry } from '@/routes/Industry';
+import { Corp } from '@/routes/Corp';
 import { Market } from '@/routes/Market';
 import { Wallet } from '@/routes/Wallet';
 import { Clones } from '@/routes/Clones';
@@ -83,6 +84,7 @@ const ROUTE_ELEMENTS = {
   '/clones': <Clones />,
   '/planetary-industry': <PlanetaryIndustry />,
   '/employment-history': <EmploymentHistory />,
+  '/corp': <Corp />,
   '/assets': <Assets />,
   '/assets/*': <Assets />,
   '/mail': <Mail />,

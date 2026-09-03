@@ -6,6 +6,7 @@
   "nav": {
     "characters": "Characters",
     "overview": "Overview",
+    "corp": "Corporation",
     "skills": "Skills",
     "industry": "Industry",
     "market": "Market",
@@ -1459,6 +1460,49 @@
     "emptyHint": "Requests the app makes will appear here as you use it."
   },
   "corp": {
+    "title": "Corporation",
+    "overviewTab": "Overview",
+    "refresh": "Refresh corp data",
+    "boardTitle": "Ops board",
+    "dataAgeNote": "EVE caches corporation data for about an hour, so anything due sooner than that may already have happened — check the game client before acting on a short timer.",
+    "noAccessTitle": "No corporation access",
+    "noAccessHint": "This character's in-game corporation roles do not open any corp data. Settings has a Corp access row that explains what is needed.",
+    "vitalsTitle": "Vitals",
+    "board": {
+      "empty": "Nothing due",
+      "emptyHint": "No fuel, timers, moon chunks or deliveries are waiting on anyone.",
+      "noTimer": "No timer",
+      "dry": "Out of fuel",
+      "overdueFor": "{{duration}} late",
+      "underCacheWindow": "Under 1h",
+      "underCacheWindowHint": "Less time remains than this view's refresh window, so the exact figure cannot be trusted. Check the game client.",
+      "detail": {
+        "fuel": "Fuel runs out",
+        "fuelDry": "Fuel bay is empty",
+        "stateTimer": "Comes out of {{state}}",
+        "unanchoring": "Finishes unanchoring",
+        "moonArrival": "Moon chunk ready to fracture",
+        "moonDecay": "Moon chunk breaks up on its own",
+        "jobReady": "Job finished, waiting on delivery",
+        "serviceOffline": "{{service}} is offline"
+      },
+      "severity": {
+        "critical": "Critical",
+        "warning": "Due soon",
+        "watch": "Worth watching",
+        "clear": "Not urgent"
+      }
+    },
+    "vitals": {
+      "division": "Division {{division}}",
+      "total": "Total",
+      "net": "{{days}}-day net",
+      "runway": "Runway",
+      "runwayDays_one": "{{count}} day",
+      "runwayDays_other": "{{count}} days",
+      "runwayUnknown": "Unknown",
+      "runwayHint": "How long division {{division}} lasts: its own balance divided by its own average daily spending over the last {{days}} days. EVE publishes no all-divisions journal, so this covers that one wallet. Income is ignored, so this is what is already banked."
+    },
     "grantPromptTitle": "Corporation access",
     "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so NeoCom Desk can show your corporation's data?",
     "grantPromptUnnamedCorporation": "your corporation",

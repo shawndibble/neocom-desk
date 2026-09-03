@@ -74,6 +74,21 @@ export const ROUTE_REQUIREMENTS = {
   // to gate on, same reasoning as /market.
   '/employment-history': UNGATED,
 
+  /**
+   * UNGATED, and emphatically not because it needs no scopes — it needs seven.
+   *
+   * Corp data is gated on a second axis this table cannot express: CCP
+   * role-gates the endpoints server-side, so a Character can hold every corp
+   * scope and still take a permanent 403. `useCorpAccess` is that gate, and it
+   * *hides* rather than locks (CONTEXT.md round 35). Declaring the corp
+   * endpoints here would put a `ReauthBanner` in front of a `roles-without-grant`
+   * Character — offering a re-login for a grant the `CorpGrantPrompt` and the
+   * Settings Corp access row exist to ask for properly — and in front of a
+   * `none` Character it would promise that logging in again unlocks something,
+   * which no login ever will.
+   */
+  '/corp': UNGATED,
+
   // One scope each, so a missing grant leaves the page with literally nothing
   // to show.
   //
