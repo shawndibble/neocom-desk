@@ -88,6 +88,13 @@ export const ROUTE_REQUIREMENTS = {
    * which no login ever will.
    */
   '/corp': UNGATED,
+  /**
+   * UNGATED for exactly the reasons above, and one more of its own: this route
+   * is the narrowest gate in the app — `membertracking` answers to `Director`
+   * alone — so a scope declaration here would offer a re-login to every
+   * Character who is merely not a Director, which is almost all of them.
+   */
+  '/corp/members': UNGATED,
 
   // One scope each, so a missing grant leaves the page with literally nothing
   // to show.

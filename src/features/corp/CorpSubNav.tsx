@@ -7,6 +7,7 @@ import {
   tabItemIdleClassName,
   tabListClassName,
 } from '@/components/ui/tabStyles';
+import { useCorpAccess } from './useCorpAccess';
 
 function subNavClass({ isActive }: { isActive: boolean }): string {
   return cx(tabItemClassName, isActive ? tabItemActiveClassName : tabItemIdleClassName);
@@ -15,24 +16,37 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
 /**
  * The Corp section's frame, not the Overview page's chrome.
  *
- * It carries one entry today and is built for more: `/corp/members` (#297)
- * hangs off it next, and the events view (#299) after that. Real navigation
- * (routes) rather than a `Tabs` widget, matching `SkillsSubNav` and
- * `OverviewSubNav` — it sits in the same slot and reads as the same control, so
- * it borrows their classes rather than approximating them.
+ * It carries two entries today and is built for more: the events view (#299)
+ * hangs off it next. Real navigation (routes) rather than a `Tabs` widget,
+ * matching `SkillsSubNav` and `OverviewSubNav` — it sits in the same slot and
+ * reads as the same control, so it borrows their classes rather than
+ * approximating them.
  *
  * No lock markers, unlike `OverviewSubNav`. Corp views hide rather than lock
  * (CONTEXT.md round 35), and this whole nav renders only for a Character whose
  * Corp Access is `ready` — so there is no locked state left for an entry here
  * to mark.
+ *
+ * **Per-entry Corp Capability, not one gate for the section.** `ready` is the
+ * gate on the section; it is not a promise about any particular view inside it.
+ * `membertracking` answers to `Director` alone, so an Accountant who is `ready`
+ * for the wallet rail would follow a Members tab straight into an empty state
+ * about a permission no login can grant. The entry is simply absent for them —
+ * the same hide rule, applied one level down.
  */
 export function CorpSubNav() {
   const { t } = useTranslation();
+  const { capabilities } = useCorpAccess();
   return (
     <nav aria-label={t('nav.corp')} className={tabListClassName}>
       <NavLink to="/corp" end className={subNavClass}>
         {t('corp.overviewTab')}
       </NavLink>
+      {capabilities.canReadMembers && (
+        <NavLink to="/corp/members" end className={subNavClass}>
+          {t('corp.membersTab')}
+        </NavLink>
+      )}
     </nav>
   );
 }
