@@ -359,6 +359,25 @@ describe('PlanEditor what-if implants', () => {
     expect(bonusInputs()).toEqual(['0', '3', '4', '0', '0']);
   });
 
+  it('suppresses the platform spinner, which would break the row on hover', async () => {
+    const user = userEvent.setup();
+    renderWithImplants();
+    await openTools(user);
+
+    // Measured: five fields across a 294px sidebar leaves a 29.6px content
+    // box each, and Chrome's hover/focus spin buttons take about half of it
+    // and shove the digit left — so the hovered cell falls out of alignment
+    // with the other four. jsdom has no layout, so the class is the only
+    // thing a unit test can hold on to; the rule and the reasoning are in
+    // src/styles/index.css.
+    for (const attribute of ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma']) {
+      expect(screen.getByLabelText(`${attribute} implant bonus`)).toHaveClass('field-no-spinner');
+    }
+    // The pane's other two number fields are the same field at the same
+    // size, so they behave the same way on hover.
+    expect(screen.getByLabelText('Remaps available')).toHaveClass('field-no-spinner');
+  });
+
   it('a preset fills all five in one click', async () => {
     const user = userEvent.setup();
     renderWithImplants();
