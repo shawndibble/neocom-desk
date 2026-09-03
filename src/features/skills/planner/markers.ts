@@ -56,8 +56,12 @@ export function buildRows(
   return rows;
 }
 
-/** Derive the persisted shape back out of a (reordered) row list. */
-function rowsToState(rows: readonly PlanRow[]): { entries: PlanEntry[]; markers: number[] } {
+/**
+ * Derive the persisted shape back out of a (reordered) row list. Exported for
+ * planDrop.ts, which builds row lists this module's own drags never produce —
+ * one with a promoted prereq entry spliced in.
+ */
+export function rowsToState(rows: readonly PlanRow[]): { entries: PlanEntry[]; markers: number[] } {
   const entries: PlanEntry[] = [];
   const markers: number[] = [];
   for (const row of rows) {
@@ -71,6 +75,13 @@ function rowsToState(rows: readonly PlanRow[]): { entries: PlanEntry[]; markers:
  * Drag-and-drop over the combined entry+marker list: move the row with
  * sortable id `activeId` to sit at `overId`, then re-derive both the entry
  * order and the marker positions.
+ *
+ * The prereq-blind primitive. The editor's drag now goes through
+ * `planDrop.ts` instead, which also understands prereq rows (dropping onto
+ * one, and dragging one to promote it) and refuses an order the normalizer
+ * would silently undo. This stays because it is the engine-free half of that
+ * — the same reason `reorder.ts`'s helpers stay pure — and because deleting a
+ * shared export while five sibling branches are in flight buys nothing.
  */
 export function reorderRows(
   entries: readonly PlanEntry[],

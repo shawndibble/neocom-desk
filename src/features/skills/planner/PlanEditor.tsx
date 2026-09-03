@@ -78,8 +78,8 @@ import {
   markerStepIndices,
   markersAfterEntryRemoval,
   removeMarker,
-  reorderRows,
 } from './markers';
+import { planDrop, promotePrereq } from './planDrop';
 import { bandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
 import type { RemapAvailability } from './remapAvailability';
@@ -230,6 +230,13 @@ export function PlanEditor({
   const [markerConfirm, setMarkerConfirm] = useState(false);
   const [markersOptimizeConfirm, setMarkersOptimizeConfirm] = useState<string | null>(null);
   const [reorderConfirm, setReorderConfirm] = useState(false);
+  // Outcome of the last drag on the entry list. A drop that would land a
+  // skill after something requiring it is refused rather than silently
+  // re-normalized back (planDrop.ts), so the refusal has to say why; a
+  // promoted prereq row is a quieter change than it looks (a dimmed row turns
+  // into user data), so it says so too.
+  const [dropError, setDropError] = useState<string | null>(null);
+  const [promoteConfirm, setPromoteConfirm] = useState<string | null>(null);
 
   // The entry list is the only thing that scrolls independently: it gets a
   // live-measured cap so it fills the room actually left below it, while the
@@ -344,6 +351,11 @@ export function PlanEditor({
     setReorderPreview(null);
     setOptimizeConfirm(null);
     setMarkersOptimizeConfirm(null);
+    // A refusal describes one drag against one entry order — once the order
+    // moves on it describes nothing. (promoteConfirm is the opposite: a
+    // "that worked" note about the change that just landed, so it clears on
+    // its own timer like markerAdded, not here.)
+    setDropError(null);
   }
 
   const userSkillTypeIDs = useMemo(
@@ -541,6 +553,61 @@ export function PlanEditor({
     setMarkersVerdict(verdict);
     setMarkersOptimizeConfirm(confirmRemapOutcome(verdict));
     setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
+  }
+
+  /** "{Skill} III" — how a promoted prereq is named back to the user. */
+  function levelLabel(skillTypeID: number, level: number): string {
+    return `${nameFor(skillTypeID)} ${ROMAN[level - 1]}`;
+  }
+
+  function confirmPromotion(skillTypeID: number, level: number) {
+    setPromoteConfirm(t('plans.prereqPromoted', { name: levelLabel(skillTypeID, level) }));
+    setTimeout(() => setPromoteConfirm(null), 4000);
+  }
+
+  /**
+   * One drag on the merged list. planDrop decides what it meant — a plain
+   * reorder, a prereq row promoted into a real entry, or a drop the
+   * normalizer would silently undo, which is refused with the entry that
+   * requires the dragged skill named rather than springing back unexplained.
+   */
+  function handleDrop(activeId: string, overId: string) {
+    const result = planDrop({
+      entries: plan.entries,
+      markers: plan.markers,
+      rows: mergedRows,
+      activeId,
+      overId,
+      skills: catalog.engineSkills,
+      trainedSkills,
+    });
+    if (!result.ok) {
+      setDropError(
+        t('plans.dropBlocked', {
+          skill: nameFor(result.skillTypeID),
+          blocker: nameFor(result.blockedBy),
+        })
+      );
+      return;
+    }
+    setDropError(null);
+    onUpdate({ entries: result.entries, markers: result.markers });
+    if (result.promoted) confirmPromotion(result.promoted.skillTypeID, result.promoted.level);
+  }
+
+  /** The "+" on a prereq row: the same promotion, without needing a drag. */
+  function handlePromotePrereq(rowId: string) {
+    const result = promotePrereq({
+      entries: plan.entries,
+      markers: plan.markers,
+      rows: mergedRows,
+      rowId,
+    });
+    if (!result) return;
+    setDropError(null);
+    onUpdate({ entries: result.entries, markers: result.markers });
+    const row = mergedRows.find((r) => r.id === rowId);
+    if (row?.kind === 'prereq') confirmPromotion(row.step.skillTypeID, row.step.level);
   }
 
   function handleAddMarker() {
@@ -1096,6 +1163,14 @@ export function PlanEditor({
               trainedSkills={trainedSkills}
               onAdd={(entry) => update(upsertEntry(plan.entries, entry))}
             />
+            {/* Outside the scroller, so a refusal is on screen wherever in a
+                long queue the drag happened. */}
+            {dropError && (
+              <p role="alert" className="text-xs text-danger">
+                {dropError}
+              </p>
+            )}
+            {promoteConfirm && confirmation(promoteConfirm)}
             {/* Only the list scrolls: the panel header, the view controls and
                 the picker above stay put, so adding a skill never means
                 scrolling back up past a long queue to reach the field. The
@@ -1118,9 +1193,8 @@ export function PlanEditor({
                   columns={columnVisibility}
                   boostedSteps={boostedSteps}
                   startDate={startDate}
-                  onReorder={(activeId, overId) =>
-                    onUpdate(reorderRows(plan.entries, plan.markers, activeId, overId))
-                  }
+                  onReorder={handleDrop}
+                  onPromotePrereq={handlePromotePrereq}
                   onRemove={(skillTypeID) => {
                     const entryIndex = plan.entries.findIndex((e) => e.skillTypeID === skillTypeID);
                     onUpdate({

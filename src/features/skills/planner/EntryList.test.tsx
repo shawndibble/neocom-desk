@@ -48,6 +48,7 @@ const defaultProps = {
   onRemove: noop,
   onRemoveMarker: noop,
   onSetPriority: noop,
+  onPromotePrereq: noop,
 };
 
 /** jsdom's default `window.matchMedia` never matches, so EntryList renders its narrow (below-`md`) layout by default; mock it to exercise the desktop layout. */
@@ -100,21 +101,43 @@ describe('EntryList Booster marks', () => {
 });
 
 describe('EntryList prereq rows', () => {
-  it('renders a dimmed, non-interactive prereq row ahead of the entry it was inserted for', () => {
-    const rows: MergedRow[] = [
-      {
-        kind: 'prereq',
-        id: 'prereq-9-1',
-        step: { skillTypeID: 9, level: 1, sp: 250, seconds: 50, cumulativeSeconds: 50 },
-        stepIndex: 0,
-      },
-      entryRow(1, [1]),
-    ];
-    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+  const prereqRows: MergedRow[] = [
+    {
+      kind: 'prereq',
+      id: 'prereq-9-1',
+      step: { skillTypeID: 9, level: 1, sp: 250, seconds: 50, cumulativeSeconds: 50 },
+      stepIndex: 0,
+    },
+    entryRow(1, [1]),
+  ];
+
+  it('renders a dimmed prereq row ahead of the entry it was inserted for', () => {
+    render(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText(/prereq/i)).toBeInTheDocument();
-    // No drag handle (reorder label) or priority control for the prereq row's skill.
-    expect(screen.queryByRole('button', { name: /reorder skill 9/i })).not.toBeInTheDocument();
+    // Still no priority control — a prereq's priority is inherited (#27), not set.
+    expect(screen.queryByLabelText(/priority for skill 9/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
+  });
+
+  it('offers a drag handle, because dragging a prereq row promotes it into an entry', () => {
+    render(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
+    expect(
+      screen.getByRole('button', { name: /drag skill 9 i into the plan/i })
+    ).toBeInTheDocument();
+  });
+
+  it('offers the same promotion without a drag, for anyone not dragging', () => {
+    const promoted: string[] = [];
+    render(
+      <EntryList
+        rows={prereqRows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        onPromotePrereq={(rowId) => promoted.push(rowId)}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /add skill 9 i to the plan/i }));
+    expect(promoted).toEqual(['prereq-9-1']);
   });
 });
 
