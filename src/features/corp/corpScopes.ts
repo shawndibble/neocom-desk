@@ -32,6 +32,14 @@ import type { Scope } from '@/esi/registry';
  * capability claiming it. The moon-chunk clock is one of the corp board's item
  * kinds (#296), so `canReadMoonExtractions` now claims it — every registered
  * corp scope is spoken for.
+ *
+ * Note what claiming a scope here costs, because #327 is the first entry added
+ * after the group shipped: a Character who granted the corp group when it held
+ * seven scopes is now missing the eighth, so `useCorpAccess` moves them from
+ * `ready` to `roles-without-grant` and every corp surface hides until they
+ * re-grant from the Settings Corp access row. The grant prompt is offered once
+ * per Character per device (round 37) and will not re-offer. Every future
+ * addition to the group carries the same cost.
  */
 export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly Scope[]>> = {
   canReadWallet: ['esi-wallet.read_corporation_wallets.v1', 'esi-corporations.read_divisions.v1'],
@@ -47,6 +55,7 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
     'esi-corporations.read_corporation_membership.v1',
   ],
   canReadIndustry: ['esi-industry.read_corporation_jobs.v1'],
+  canReadAssets: ['esi-assets.read_corporation_assets.v1'],
 };
 
 /**

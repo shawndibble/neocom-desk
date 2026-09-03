@@ -38,6 +38,14 @@ export interface CorpCapabilities {
   canReadMembers: boolean;
   /** GET /corporations/{id}/industry/jobs. */
   canReadIndustry: boolean;
+  /**
+   * GET /corporations/{id}/assets — every item the corporation owns, across its
+   * seven hangar divisions and every office and structure it holds.
+   *
+   * Director-only, like `canReadMembers`: the in-game Hangar_Take/Hangar_Query
+   * roles open a division in the client but open nothing in ESI.
+   */
+  canReadAssets: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -55,6 +63,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadMoonExtractions',
   'canReadMembers',
   'canReadIndustry',
+  'canReadAssets',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -64,6 +73,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadMoonExtractions: false,
   canReadMembers: false,
   canReadIndustry: false,
+  canReadAssets: false,
 };
 
 /**
@@ -84,6 +94,11 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   canReadMoonExtractions: ['Station_Manager'],
   canReadMembers: [],
   canReadIndustry: ['Factory_Manager'],
+  // `x-required-roles` on /corporations/{id}/assets is ["Director"] alone, so
+  // this is empty for the same reason `canReadMembers` is: the Director clause
+  // below already satisfies it, and repeating the string here would say there
+  // is a second way in when there is not.
+  canReadAssets: [],
 };
 
 /**
@@ -92,8 +107,9 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
  * `["Director"]`. Listing it as an ordinary entry against each capability in the
  * table above would deny corp data to precisely the users who have all of it the
  * moment a new capability forgot to repeat it, so it satisfies every capability
- * on its own instead. It is also the only role `membertracking` accepts, which
- * is why `canReadMembers` has no other entry.
+ * on its own instead. It is also the only role `membertracking` and the corp
+ * asset list accept, which is why `canReadMembers` and `canReadAssets` have no
+ * other entry.
  */
 const DIRECTOR = 'Director';
 

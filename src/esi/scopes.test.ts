@@ -74,8 +74,23 @@ describe('scopesForGroup', () => {
         'esi-corporations.track_members.v1',
         'esi-industry.read_corporation_mining.v1',
         'esi-industry.read_corporation_jobs.v1',
+        'esi-assets.read_corporation_assets.v1',
       ].sort()
     );
+  });
+
+  /**
+   * Issue #327's first acceptance criterion, stated as its own case rather than
+   * left implicit in the hand-written `SCOPES` list above: registering the corp
+   * assets endpoint must widen the *group* and leave the base grant alone. The
+   * character assets scope is the one it would be easiest to confuse it with,
+   * and they must end up on opposite sides of the split.
+   */
+  it('keeps the corp assets scope out of the base grant, beside the character one', () => {
+    expect(scopesForGroup('corp')).toContain('esi-assets.read_corporation_assets.v1');
+    expect(SCOPES).not.toContain('esi-assets.read_corporation_assets.v1');
+    expect(SCOPES).toContain('esi-assets.read_assets.v1');
+    expect(scopesForGroup('corp')).not.toContain('esi-assets.read_assets.v1');
   });
 
   /**
