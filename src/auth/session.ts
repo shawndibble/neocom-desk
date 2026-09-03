@@ -20,6 +20,15 @@ export interface SsoConfig {
 
 const VERIFIER_KEY = 'neocom.sso.verifier';
 const STATE_KEY = 'neocom.sso.state';
+/**
+ * What the authorize URL asked SSO for, stashed for the callback to read.
+ *
+ * Alongside the PKCE verifier because it has the same lifetime — one authorize
+ * round trip, this tab only — and the same failure mode if it outlives one:
+ * `purgeCacheIfConsentChangedOrPending` would go on treating a stale request as
+ * the baseline for grants it had nothing to do with.
+ */
+const SCOPES_KEY = 'neocom.sso.scopes';
 
 /** Refresh when less than this remains on the access token. */
 const EXPIRY_BUFFER_MS = 60_000;
@@ -38,6 +47,7 @@ export async function startLogin(scopes: string[], config?: SsoConfig): Promise<
   const state = generateVerifier(); // independent 32-byte random value
   sessionStorage.setItem(VERIFIER_KEY, verifier);
   sessionStorage.setItem(STATE_KEY, state);
+  sessionStorage.setItem(SCOPES_KEY, JSON.stringify(scopes));
   return buildAuthorizeUrl({
     clientId,
     redirectUri,
@@ -62,6 +72,21 @@ export async function startLogin(scopes: string[], config?: SsoConfig): Promise<
  * token record, a legacy record predating `scopes`, and an unseen character
  * all purge nothing.
  *
+ * `requested` narrows the first trigger on the **login** path, where the app
+ * chose what to ask for (issue #295). Incremental auth makes an ordinary
+ * add-a-character login ask for the base set alone while some character on the
+ * device holds more, so a scope the app never asked for is no evidence of
+ * revocation and must not purge — the defect #293 first hit. The refresh path
+ * requests nothing at all and passes `undefined`, keeping the stored grant as
+ * its baseline; that is the only path a portal-side revoke arrives on, so
+ * revocation detection is not weakened by any of this.
+ *
+ * Note what it is NOT: a plain `requested \ granted` diff. `SCOPES` asks for
+ * the same set every login, so a scope SSO never returns — retired upstream,
+ * or absent from the EVE application's own registration — would purge the
+ * cache on every login forever. Only scopes the character actually *held* can
+ * be lost, which is also the only case with a cache to protect.
+ *
  * Runs before the record writes so suppression is in force before anything
  * downstream can read the cache. Neither call can fail the session:
  * `purgeCharacterCacheOrSuppress` degrades instead of throwing (tiers and the
@@ -76,16 +101,26 @@ export async function startLogin(scopes: string[], config?: SsoConfig): Promise<
 async function purgeCacheIfConsentChangedOrPending(
   decoded: DecodedAccessToken,
   existing: CharacterRecord | undefined,
-  previousScopes: string[] | undefined
+  previousScopes: string[] | undefined,
+  requested: string[] | undefined
 ): Promise<void> {
+  const lost = Array.isArray(previousScopes) ? revokedScopes(previousScopes, decoded.scopes) : [];
   const scopeRevoked =
-    Array.isArray(previousScopes) && revokedScopes(previousScopes, decoded.scopes).length > 0;
+    requested === undefined ? lost.length > 0 : lost.some((scope) => requested.includes(scope));
   const ownerChanged = existing !== undefined && existing.ownerHash !== decoded.ownerHash;
   if (!scopeRevoked && !ownerChanged && !(await isCachePurgePending(decoded.characterId))) return;
   await purgeCharacterCacheOrSuppress(decoded.characterId);
 }
 
-async function persistTokens(tokens: TokenResponse): Promise<CharacterRecord> {
+/**
+ * @param requestedScopes What this grant's authorize URL asked SSO for, or
+ * `undefined` on the refresh path, which asks for nothing. See
+ * `purgeCacheIfConsentChangedOrPending`.
+ */
+async function persistTokens(
+  tokens: TokenResponse,
+  requestedScopes?: string[]
+): Promise<CharacterRecord> {
   const decoded = decodeAccessToken(tokens.access_token);
   const existing = await db.characters.get(decoded.characterId);
   const previous = await db.tokens.get(decoded.characterId);
@@ -108,7 +143,7 @@ async function persistTokens(tokens: TokenResponse): Promise<CharacterRecord> {
     ...(existing?.corporationId !== undefined ? { corporationId: existing.corporationId } : {}),
   };
 
-  await purgeCacheIfConsentChangedOrPending(decoded, existing, previous?.scopes);
+  await purgeCacheIfConsentChangedOrPending(decoded, existing, previous?.scopes, requestedScopes);
 
   await db.characters.put(character);
   await db.tokens.put({
@@ -174,6 +209,30 @@ export async function recordCharacterCorporation(
   await db.characters.update(characterId, { corporationId });
 }
 
+/**
+ * What `startLogin` asked for, or `undefined` if this tab has no record of it.
+ *
+ * `undefined` is not "asked for nothing" — it is "unknown", and the purge falls
+ * back to comparing against the stored grant, exactly as it did before #295.
+ * Anything unreadable (cleared storage, a hand-edited or truncated value)
+ * answers `undefined` for the same reason: the conservative reading is the one
+ * that still catches a revocation.
+ */
+function takeRequestedScopes(): string[] | undefined {
+  const raw = sessionStorage.getItem(SCOPES_KEY);
+  sessionStorage.removeItem(SCOPES_KEY);
+  if (raw === null) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every((scope) => typeof scope === 'string')) {
+      return undefined;
+    }
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Handle the SSO callback: validate state, exchange code, persist character + token. */
 export async function completeLogin(
   params: { code: string; state: string },
@@ -186,9 +245,10 @@ export async function completeLogin(
   if (params.state !== expectedState) throw new Error('SSO state mismatch');
   sessionStorage.removeItem(STATE_KEY);
   sessionStorage.removeItem(VERIFIER_KEY);
+  const requestedScopes = takeRequestedScopes();
 
   const tokens = await exchangeCode({ clientId, code: params.code, verifier });
-  return persistTokens(tokens);
+  return persistTokens(tokens, requestedScopes);
 }
 
 // Single-flight per character: EVE rotates refresh tokens, so two concurrent
