@@ -18,11 +18,16 @@ describe('PlanHeader', () => {
     expect(screen.getByText('4')).toBeInTheDocument();
   });
 
-  it('pins the summary strip flush to the top of the scroll box on lg+, alongside the toolbar below it', () => {
+  it('pins itself at a plain top-0, with no offset measured off a neighbouring panel', () => {
     render(<PlanHeader totalSeconds={0} skillCount={0} projectedFinish={null} badge={null} />);
 
+    // It stays pinned because the window can still scroll when the sidebar
+    // outgrows the viewport. What retires #221/#229 is that it is now the
+    // only pinned panel, so `top` is a static class rather than a number
+    // measured off the panel above it and kept in sync.
     const section = screen.getByRole('heading', { name: 'Plan summary' }).closest('section');
     expect(section).toHaveClass('lg:sticky', 'lg:top-0');
+    expect(section?.getAttribute('style') ?? '').not.toMatch(/top/);
   });
 
   it('shows an empty finish rather than inventing a date for an empty plan', () => {

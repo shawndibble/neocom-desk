@@ -7,9 +7,8 @@ export const VIEWPORT_BOUNDED_BOTTOM_GAP_PX = 24;
  * Live-measured `max-height` (px) so a capped, internally-scrolling panel
  * fills whatever room is actually left below it in the viewport, instead of
  * a hand-derived constant (the list/detail panes used a flat `32rem`) that's
- * wrong for most viewport heights and content amounts — see PlanEditor's
- * sticky-toolbar offset fix for the same lesson learned the hard way with a
- * hand-derived constant elsewhere in this pane.
+ * wrong for most viewport heights and content amounts — the same lesson the
+ * plan editor learned the hard way from a hand-derived sticky offset.
  *
  * Returns a callback ref rather than accepting a `useRef` object: the
  * measured element is typically behind a loading gate (the plan/build-plan

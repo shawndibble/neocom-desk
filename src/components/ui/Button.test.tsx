@@ -18,6 +18,19 @@ describe('Button', () => {
     expect(button.className).toContain('border-line');
   });
 
+  it('centres content by default and left-aligns it on request, for a full-width row in a stack', () => {
+    render(
+      <>
+        <Button>Centred</Button>
+        <Button align="start">Row</Button>
+      </>
+    );
+    expect(screen.getByRole('button', { name: 'Centred' }).className).toContain('justify-center');
+    const row = screen.getByRole('button', { name: 'Row' }).className;
+    expect(row).toContain('justify-start');
+    expect(row).not.toContain('justify-center');
+  });
+
   it('applies variant styles', () => {
     render(
       <>

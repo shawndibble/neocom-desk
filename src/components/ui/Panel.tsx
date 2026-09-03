@@ -32,11 +32,11 @@ interface PanelProps {
  * minimum height is the `md` control tier, because what sits in `actions` is
  * usually an `IconButton` at exactly that height.
  *
- * Forwards its ref to the root `<section>` — needed by, e.g., a `sticky`
- * Panel whose stacking offset is measured at runtime (see PlanEditor.tsx).
- * Wrapping a Panel in a plain `<div>` to get a ref instead doesn't work: it
- * silently breaks that Panel's own `position: sticky` (confirmed — a
- * wrapper div, even with no styling of its own, defeats it).
+ * Forwards its ref to the root `<section>`, for a caller that has to measure
+ * or observe the panel's own box. Wrapping a Panel in a plain `<div>` to get
+ * a ref instead doesn't work: it silently breaks that Panel's own
+ * `position: sticky` (confirmed — a wrapper div, even with no styling of its
+ * own, defeats it).
  */
 export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
   { title, actions, children, padded = true, fill = false, className = '', style },
