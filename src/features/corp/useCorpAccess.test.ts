@@ -164,6 +164,7 @@ describe('useCorpAccess — ready', () => {
       canReadMoonExtractions: true,
       canReadMembers: true,
       canReadIndustry: true,
+      canReadAssets: true,
     });
   });
 
