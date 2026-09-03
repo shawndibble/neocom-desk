@@ -121,6 +121,39 @@ describe('detectOwnedStock', () => {
     expect(detectOwnedStock([source(1, [ship, can, inside])], MATERIALS).size).toBe(0);
   });
 
+  it.each(['FleetHangar', 'ShipHangar', 'SpecializedOreHold', 'SpecializedFuelBay'])(
+    'excludes stock in a ship %s, not just its cargo hold',
+    (locationFlag) => {
+      // Otherwise minerals in a docked freighter's fleet hangar would count as
+      // station stock while the same minerals in its cargo hold did not.
+      const ship = asset({ item_id: 45, type_id: 20185, is_singleton: true });
+      const held = asset({
+        item_id: 46,
+        type_id: TRITANIUM,
+        quantity: 1500,
+        location_id: ship.item_id,
+        location_type: 'item',
+        location_flag: locationFlag,
+      });
+      expect(detectOwnedStock([source(1, [ship, held])], MATERIALS).size).toBe(0);
+    }
+  );
+
+  it('still counts a station container whose flag merely looks specialized', () => {
+    const container = asset({ item_id: 47, type_id: 17368, is_singleton: true });
+    const inside = asset({
+      item_id: 48,
+      type_id: TRITANIUM,
+      quantity: 60,
+      location_id: container.item_id,
+      location_type: 'item',
+      location_flag: 'Unlocked',
+    });
+    expect(
+      detectOwnedStock([source(1, [container, inside])], MATERIALS).get(TRITANIUM)?.quantity
+    ).toBe(60);
+  });
+
   it('excludes an assembled (singleton) item', () => {
     const stock = detectOwnedStock(
       [source(1, [asset({ item_id: 50, type_id: TRITANIUM, quantity: 1, is_singleton: true })])],

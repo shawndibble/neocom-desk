@@ -2,7 +2,10 @@
 import { getCharacterAssets, type CharacterAsset } from '@/esi/endpoints';
 import { loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
 import { db } from '@/db';
+import { ESI_REGISTRY } from '@/esi/registry';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+
+const ASSETS_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
 
 const KEY = 'assets';
 
@@ -97,5 +100,27 @@ export async function loadOtherCharactersAssets(
  * summed over an incomplete set must be presented as a lower bound.
  */
 export async function loadAllCharactersAssets(): Promise<FannedOutAssets> {
-  return fanOutCharacterAssets(await db.characters.toArray());
+  const characters = await db.characters.toArray();
+  const granted = await Promise.all(
+    characters.map(async (character) => {
+      const token = await db.tokens.get(character.characterId);
+      return (token?.scopes ?? []).includes(ASSETS_SCOPE);
+    })
+  );
+
+  // Scope is checked up front rather than left to a 403, because this fan-out
+  // runs on every Build Plan open rather than behind an explicit toggle. A live
+  // 403 is an auth failure: it raises the app-wide re-auth banner naming an alt
+  // the player never asked about, and nothing caches it, so the same Character
+  // would trip it again on the next plan opened.
+  const { entries, skipped } = await fanOutCharacterAssets(characters.filter((_, i) => granted[i]));
+  return {
+    entries,
+    skipped: [
+      ...characters
+        .filter((_, i) => !granted[i])
+        .map(({ characterId, name }) => ({ characterId, name })),
+      ...skipped,
+    ],
+  };
 }

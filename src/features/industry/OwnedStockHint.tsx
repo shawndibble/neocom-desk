@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import type { DetectedOwnedStock } from '@/engine/industry/ownedStock';
 import type { OwnedStockDetection } from './ownedStockDetection';
 
@@ -46,22 +46,30 @@ export function OwnedStockHint({
   const shown = stock.placements.slice(0, MAX_BREAKDOWN_ROWS);
   const remaining = stock.placements.length - shown.length;
   const quantity = stock.quantity.toLocaleString();
+  // The lower-bound marker is part of the number, so it has to be part of the
+  // accessible name too: a name that dropped it would announce a floor as an
+  // exact count, and the buy list a player builds on that is wrong low.
+  const detected = detection.lowerBound
+    ? t('industry.detectedOwnedAtLeast', { quantity })
+    : t('industry.detectedOwned', { quantity });
 
   return (
     <span className="flex items-center justify-end gap-2 text-[0.6875rem] text-text-dim">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      <Popover>
+        <PopoverTrigger asChild>
           <button
             type="button"
-            aria-label={t('industry.detectedOwnedFor', { material: materialName })}
+            aria-label={t('industry.detectedOwnedFor', { detected, material: materialName })}
             className="rounded-xs underline decoration-dotted underline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {detection.lowerBound
-              ? t('industry.detectedOwnedAtLeast', { quantity })
-              : t('industry.detectedOwned', { quantity })}
+            {detected}
           </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="max-w-80 p-2 text-left text-xs font-normal">
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          aria-label={t('industry.detectedOwnedTitle', { material: materialName })}
+          className="max-w-80 p-2 text-left text-xs font-normal"
+        >
           <p className="font-semibold text-text">
             {t('industry.detectedOwnedTitle', { material: materialName })}
           </p>
@@ -93,13 +101,16 @@ export function OwnedStockHint({
               })}
             </p>
           )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </PopoverContent>
+      </Popover>
       {canApply && (
         <button
           type="button"
           onClick={onApply}
-          aria-label={t('industry.useDetectedFor', { material: materialName })}
+          aria-label={t('industry.useDetectedFor', {
+            quantity: suggestion.toLocaleString(),
+            material: materialName,
+          })}
           className="rounded-xs font-semibold text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           {t('industry.useDetected', { quantity: suggestion.toLocaleString() })}

@@ -375,10 +375,10 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     render(<Harness detection={detectionOf(TRIT_STOCK)} />);
 
     expect(
-      within(row('Tritanium')).getByRole('button', { name: 'Detected owned stock for Tritanium' })
+      within(row('Tritanium')).getByRole('button', { name: /detected for Tritanium/ })
     ).toHaveTextContent('9,000 owned');
     expect(
-      within(row('Pyerite')).queryByRole('button', { name: /Detected owned stock/ })
+      within(row('Pyerite')).queryByRole('button', { name: /detected for/ })
     ).not.toBeInTheDocument();
   });
 
@@ -394,7 +394,11 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     const onChange = vi.fn();
     render(<Harness detection={detectionOf(TRIT_STOCK)} onChange={onChange} />);
 
-    await user.click(within(row('Tritanium')).getByRole('button', { name: /^Use detected/ }));
+    await user.click(
+      within(row('Tritanium')).getByRole('button', {
+        name: 'Use 1,000 detected owned for Tritanium',
+      })
+    );
 
     // 9,000 detected against a 1,000-unit requirement.
     expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 1000 });
@@ -409,7 +413,9 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     );
 
     expect(
-      within(row('Tritanium')).queryByRole('button', { name: /^Use detected/ })
+      within(row('Tritanium')).queryByRole('button', {
+        name: 'Use 1,000 detected owned for Tritanium',
+      })
     ).not.toBeInTheDocument();
   });
 
@@ -418,10 +424,10 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     render(<Harness detection={detectionOf(TRIT_STOCK)} />);
 
     await user.click(
-      within(row('Tritanium')).getByRole('button', { name: 'Detected owned stock for Tritanium' })
+      within(row('Tritanium')).getByRole('button', { name: /detected for Tritanium/ })
     );
 
-    const menu = screen.getByRole('menu');
+    const menu = screen.getByRole('dialog');
     expect(menu).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
     expect(menu).toHaveTextContent('Alt Pilot — Amarr');
   });
@@ -432,11 +438,11 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     render(<Harness detection={detectionOf({ 34: { quantity: 700, placements } })} />);
 
     await user.click(
-      within(row('Tritanium')).getByRole('button', { name: 'Detected owned stock for Tritanium' })
+      within(row('Tritanium')).getByRole('button', { name: /detected for Tritanium/ })
     );
 
-    expect(within(screen.getByRole('menu')).getAllByRole('listitem')).toHaveLength(6);
-    expect(screen.getByRole('menu')).toHaveTextContent('and 2 more');
+    expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(6);
+    expect(screen.getByRole('dialog')).toHaveTextContent('and 2 more');
   });
 
   it('renders an incomplete detection as a lower bound and names the Characters behind it', async () => {
@@ -451,12 +457,12 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     );
 
     const trigger = within(row('Tritanium')).getByRole('button', {
-      name: 'Detected owned stock for Tritanium',
+      name: /detected for Tritanium/,
     });
     expect(trigger).toHaveTextContent('≥ 9,000 owned');
 
     await user.click(trigger);
-    expect(screen.getByRole('menu')).toHaveTextContent(
+    expect(screen.getByRole('dialog')).toHaveTextContent(
       'Asset data is incomplete for Alt Pilot, No Scope Pilot'
     );
   });

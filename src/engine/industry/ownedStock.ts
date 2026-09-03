@@ -72,7 +72,7 @@ function resolvePlacement(
   let current = asset;
   const seen = new Set<number>([asset.item_id]);
   while (current.location_type === 'item') {
-    if (isShipBayFlag(current.location_flag)) return null;
+    if (isShipHeld(current.location_flag)) return null;
     const parent = byItemId.get(current.location_id);
     if (!parent || seen.has(parent.item_id)) {
       return { locationId: current.location_id, locationType: 'item' };
@@ -81,6 +81,20 @@ function resolvePlacement(
     current = parent;
   }
   return { locationId: current.location_id, locationType: current.location_type };
+}
+
+/**
+ * Ship-only holds beyond the three bays `assetTree` names for rendering. That
+ * module only has to decide what to *draw* as a ship, so Cargo/DroneBay/fitting
+ * is enough for it; counting stock has to answer "is this in a ship" for every
+ * hold a ship has, or minerals in a freighter's fleet hangar would read as
+ * station stock while the same minerals in its cargo hold did not.
+ */
+const SHIP_HOLD_PATTERN =
+  /^(FleetHangar|ShipHangar|SubSystemBay|FighterBay|FighterTube\d+|FrigateEscapeBay|Specialized\w+(Hold|Bay))$/;
+
+function isShipHeld(locationFlag: string): boolean {
+  return isShipBayFlag(locationFlag) || SHIP_HOLD_PATTERN.test(locationFlag);
 }
 
 /** `characterId:locationId` — placements are grouped per Character, so both are part of the key. */
