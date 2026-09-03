@@ -424,7 +424,60 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Grants read-only access to your skills, assets, wallet, mail, calendar, contracts, market orders, industry, clones, player structure names, planetary colonies, contacts, loyalty points and notifications. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — NeoCom Desk only reads that data and never writes to it. Log in again after an update to pick up newly requested permissions."
+    "permissionsHint": "Grants read-only access to your skills, assets, wallet, mail, calendar, contracts, market orders, industry, clones, player structure names, planetary colonies, contacts, loyalty points and notifications. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — NeoCom Desk only reads that data and never writes to it. Log in again after an update to pick up newly requested permissions.",
+    "eyebrow": "Read-only · Free · Open source",
+    "heading": "Command deck for every character you fly.",
+    "trustLine": "Refresh tokens never leave this device.",
+    "previewLabel": "Example — signed-in view",
+    "previewCharacterName": "Aurelia Vex",
+    "previewCorp": "Deep Space Transport",
+    "featuresHeading": "Everything outside the client",
+    "features": {
+      "skills": {
+        "name": "Skills",
+        "desc": "Drag-and-drop skill plans, remap & implant-aware optimizer, live in-game queue import.",
+        "tag": "Planning"
+      },
+      "industry": {
+        "name": "Industry",
+        "desc": "Build plans price out blueprints, materials, job fees and taxes against live trade-hub prices.",
+        "tag": "Manufacturing"
+      },
+      "market": {
+        "name": "Market",
+        "desc": "Live order books across Jita, Amarr, Dodixie, Rens and Hek.",
+        "tag": "No login needed"
+      },
+      "walletOrders": {
+        "name": "Wallet & Orders",
+        "desc": "Balance, transaction history and every open market order in one place.",
+        "tag": "Read-only"
+      },
+      "assets": {
+        "name": "Assets",
+        "desc": "Every hangar, station and structure your characters hold, searchable.",
+        "tag": "Read-only"
+      },
+      "planetary": {
+        "name": "Planetary Industry",
+        "desc": "Colonies, extraction timers and factory chains at a glance.",
+        "tag": "Read-only"
+      },
+      "social": {
+        "name": "Mail, Calendar & Contacts",
+        "desc": "Read your in-game mail, upcoming events and standings without logging in.",
+        "tag": "Read-only"
+      },
+      "clones": {
+        "name": "Clones",
+        "desc": "Jump clones and fitted implants for every character.",
+        "tag": "Read-only"
+      }
+    },
+    "bottomCtaHeading": "Undock into your dashboard.",
+    "footerMultiChar": "Multi-character from day one",
+    "footerOffline": "Offline-capable PWA",
+    "footerOpenSource": "Free & open source"
   },
   "callback": {
     "completing": "Completing login…",

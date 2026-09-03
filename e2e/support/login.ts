@@ -4,7 +4,9 @@ import { CHARACTER_NAME } from './fixtureData';
 
 export async function loginAndSelectCharacter(page: Page): Promise<void> {
   await page.goto('./');
-  await page.getByRole('button', { name: 'Log in with EVE Online' }).click();
+  // The landing page repeats this CTA (hero + closing band) — .first() is the
+  // hero button, the one actually in view on load.
+  await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
   await page.waitForURL(/\/characters$/);
   await page.getByRole('button', { name: `Select ${CHARACTER_NAME}` }).click();
   await page.waitForURL(/\/overview$/);

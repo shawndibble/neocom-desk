@@ -25,24 +25,31 @@ import {
   CaretLeft,
   CaretRight,
   CaretUpDown,
+  ChartLineUp,
   Check,
   ClipboardText,
   Copy,
   DotsThreeVertical,
   DownloadSimple,
+  EnvelopeSimple,
   Export as ExportIcon,
+  Factory,
   Flag,
+  GraduationCap,
   Hammer,
   MagnifyingGlass,
   Package,
   PencilSimple,
+  Planet,
   Plus,
   Queue,
   ShoppingCart,
   Sliders,
+  Stack,
   Star,
   Target,
   UsersThree,
+  Wallet as WalletGlyph,
   Warning,
   X,
   type Icon as PhosphorIcon,
@@ -136,3 +143,20 @@ export const Build = withWeight(Hammer);
 export const Buy = withWeight(ShoppingCart);
 /** Promote a derived prereq row into a real Skill Plan entry (CONTEXT.md "Prereq Promotion"). */
 export const AddToPlan = withWeight(Plus);
+
+// The Login page's feature list (src/routes/Login.tsx) is the one caller for
+// the seven below — grouped here so a reader can see they're a set.
+/** Skill training and progression. */
+export const Skills = withWeight(GraduationCap);
+/** Manufacturing build plans. */
+export const Industry = withWeight(Factory);
+/** Live order books. */
+export const Market = withWeight(ChartLineUp);
+/** Balance and open orders. */
+export const Wallet = withWeight(WalletGlyph);
+/** Colonies and extraction timers. */
+export const Planetary = withWeight(Planet);
+/** Mail, calendar and contacts, grouped as one row. */
+export const Social = withWeight(EnvelopeSimple);
+/** Jump clones and implants. */
+export const Clones = withWeight(Stack);
