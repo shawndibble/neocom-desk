@@ -16,8 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, IconButton, NativeSelect, Tooltip } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { Button, EmptyState, NativeSelect, Tooltip } from '@/components/ui';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { AttributeName, PlanPriority } from '@/engine/types';
 import { formatDate, formatDuration, stepTimeline } from '@/lib/duration';
@@ -194,11 +193,6 @@ interface EntryRowProps {
   timeline: { start: Date; finish: Date } | null;
   columns: ColumnVisibility;
   isDesktop: boolean;
-  /** Below-desktop reorder controls (#223): dnd-kit drag stays desktop-only, so narrow screens need an Up/Down affordance instead. */
-  isFirst: boolean;
-  isLast: boolean;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
   onRemove: (skillTypeID: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
 }
@@ -211,10 +205,6 @@ function EntryRow({
   timeline,
   columns,
   isDesktop,
-  isFirst,
-  isLast,
-  onMoveUp,
-  onMoveDown,
   onRemove,
   onSetPriority,
 }: EntryRowProps) {
@@ -278,29 +268,6 @@ function EntryRow({
 
   const hasSecondLine = Boolean(attributeBadge) || Boolean(priorityControl) || columns.perLevelTime;
 
-  // Below the desktop breakpoint dnd-kit's pointer drag is unreliable
-  // (mobile browsers don't deliver pointer-drag events consistently), so
-  // narrow screens get explicit Up/Down controls alongside the drag handle
-  // instead (#223). Desktop's drag-and-drop is untouched.
-  const moveControls = !isDesktop && (
-    <>
-      <IconButton
-        size="sm"
-        icon={<Icon.Ascending />}
-        label={t('plans.moveEntryUp', { name })}
-        onClick={onMoveUp}
-        disabled={isFirst}
-      />
-      <IconButton
-        size="sm"
-        icon={<Icon.Descending />}
-        label={t('plans.moveEntryDown', { name })}
-        onClick={onMoveDown}
-        disabled={isLast}
-      />
-    </>
-  );
-
   return (
     <li
       ref={setNodeRef}
@@ -330,7 +297,6 @@ function EntryRow({
         <>
           <div className="flex items-center justify-between gap-2">
             {dragHandle}
-            {moveControls}
             {nameSpan}
             {cumulativeTimeCell}
             {removeButton}
@@ -446,26 +412,11 @@ function PrereqRow({
 interface MarkerRowProps {
   id: string;
   markerIndex: number;
-  isDesktop: boolean;
-  /** Below-desktop reorder controls (#223): dnd-kit drag stays desktop-only, so narrow screens need an Up/Down affordance instead. */
-  isFirst: boolean;
-  isLast: boolean;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
   onRemove: (markerIndex: number) => void;
 }
 
 /** Remap Marker (CONTEXT.md): accent divider row, draggable like an entry. */
-function MarkerRow({
-  id,
-  markerIndex,
-  isDesktop,
-  isFirst,
-  isLast,
-  onMoveUp,
-  onMoveDown,
-  onRemove,
-}: MarkerRowProps) {
+function MarkerRow({ id, markerIndex, onRemove }: MarkerRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(id);
 
@@ -485,24 +436,6 @@ function MarkerRow({
       >
         ⠿
       </button>
-      {!isDesktop && (
-        <>
-          <IconButton
-            size="sm"
-            icon={<Icon.Ascending />}
-            label={t('plans.moveMarkerUp')}
-            onClick={onMoveUp}
-            disabled={isFirst}
-          />
-          <IconButton
-            size="sm"
-            icon={<Icon.Descending />}
-            label={t('plans.moveMarkerDown')}
-            onClick={onMoveDown}
-            disabled={isLast}
-          />
-        </>
-      )}
       <span aria-hidden className="h-px flex-1 bg-accent/60" />
       <span className="font-semibold uppercase tracking-wide">{t('plans.markerRow')}</span>
       <span aria-hidden className="h-px flex-1 bg-accent/60" />
@@ -578,9 +511,6 @@ export function EntryList({
   }
 
   const sortableIds = rows.filter((r) => r.kind !== 'prereq').map((r) => r.id);
-  // Up/Down (#223) reorder against the row directly above/below in this same
-  // order dnd-kit drags within — one lookup table shared by every row below.
-  const orderIndex = new Map(sortableIds.map((id, i) => [id, i]));
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -600,17 +530,6 @@ export function EntryList({
           <ul>
             {rows.map((row) => {
               const band = bandsAt.get(row.id);
-              const idx = orderIndex.get(row.id);
-              const isFirst = idx === 0;
-              const isLast = idx !== undefined && idx === sortableIds.length - 1;
-              const onMoveUp = () => {
-                if (idx !== undefined && idx > 0) onReorder(row.id, sortableIds[idx - 1]);
-              };
-              const onMoveDown = () => {
-                if (idx !== undefined && idx < sortableIds.length - 1) {
-                  onReorder(row.id, sortableIds[idx + 1]);
-                }
-              };
               return (
                 <Fragment key={row.id}>
                   {band && <BandHeader band={band} />}
@@ -630,10 +549,6 @@ export function EntryList({
                       }
                       columns={columns}
                       isDesktop={isDesktop}
-                      isFirst={isFirst}
-                      isLast={isLast}
-                      onMoveUp={onMoveUp}
-                      onMoveDown={onMoveDown}
                       onRemove={onRemove}
                       onSetPriority={onSetPriority}
                     />
@@ -653,11 +568,6 @@ export function EntryList({
                     <MarkerRow
                       id={row.id}
                       markerIndex={row.markerIndex}
-                      isDesktop={isDesktop}
-                      isFirst={isFirst}
-                      isLast={isLast}
-                      onMoveUp={onMoveUp}
-                      onMoveDown={onMoveDown}
                       onRemove={onRemoveMarker}
                     />
                   )}

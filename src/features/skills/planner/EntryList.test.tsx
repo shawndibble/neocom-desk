@@ -1,6 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EntryList } from './EntryList';
 import { entryId } from './reorder';
@@ -66,7 +65,7 @@ describe('EntryList Booster marks', () => {
     const marks = screen.getAllByRole('img', { name: /booster speeds this skill up/i });
     expect(marks).toHaveLength(1);
     // Anchored: an unanchored /Skill 1/ also matches the new "Move Skill 1
-    // up/down" tooltip text (#223) rendered elsewhere in the row.
+    // up/down" tooltip text that used to sit elsewhere in the row.
     expect(screen.getByText(/^Skill 1\b/).closest('li')).toContainElement(marks[0]);
   });
 
@@ -138,7 +137,7 @@ describe('EntryList column visibility', () => {
     // Always-present parts remain regardless of the column toggle.
     expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
     // Anchored: an unanchored /Skill 1/ also matches the new "Move Skill 1
-    // up/down" tooltip text (#223) rendered elsewhere in the row.
+    // up/down" tooltip text that used to sit elsewhere in the row.
     expect(screen.getByText(/^Skill 1\b/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /remove skill 1/i })).toBeInTheDocument();
   });
@@ -220,103 +219,30 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
     }
   });
 });
+describe('EntryList reorder affordance', () => {
+  it('offers the drag handle alone at every width — no Up/Down buttons', () => {
+    for (const desktop of [false, true]) {
+      const restore = mockDesktop(desktop);
+      try {
+        const rows: MergedRow[] = [
+          entryRow(1, [0]),
+          { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
+          entryRow(2, [1]),
+        ];
+        const { unmount } = render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
 
-describe('EntryList below-desktop Up/Down reorder controls (#223)', () => {
-  it('renders Up/Down for entry and marker rows below desktop, not on desktop', () => {
-    const restoreNarrow = mockDesktop(false);
-    try {
-      const rows: MergedRow[] = [
-        entryRow(1, [0]),
-        { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
-        entryRow(2, [1]),
-      ];
-      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /move skill 1 up/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /move skill 1 down/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /move remap marker up/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /move remap marker down/i })).toBeInTheDocument();
-    } finally {
-      restoreNarrow();
-    }
-  });
+        // Touch drag works on the handle (it carries `touch-action: none`),
+        // so the Up/Down pair #223 added as a stand-in is gone — it cost two
+        // 36px controls per row, which is what squeezed the skill name on a
+        // phone.
+        expect(screen.queryByRole('button', { name: /move .* (up|down)/i })).toBeNull();
+        expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /reorder remap marker/i })).toBeInTheDocument();
 
-  it('omits Up/Down controls on desktop, where drag-and-drop is unchanged', () => {
-    const restoreDesktop = mockDesktop(true);
-    try {
-      const rows: MergedRow[] = [entryRow(1, [0]), entryRow(2, [1])];
-      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
-      expect(screen.queryByRole('button', { name: /move skill 1 up/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /move skill 1 down/i })).not.toBeInTheDocument();
-    } finally {
-      restoreDesktop();
-    }
-  });
-
-  it("disables the first row's Up and the last row's Down", () => {
-    const restore = mockDesktop(false);
-    try {
-      const rows = [entryRow(1, [0]), entryRow(2, [1]), entryRow(3, [2])];
-      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
-      expect(screen.getByRole('button', { name: /move skill 1 up/i })).toBeDisabled();
-      expect(screen.getByRole('button', { name: /move skill 1 down/i })).not.toBeDisabled();
-      expect(screen.getByRole('button', { name: /move skill 2 up/i })).not.toBeDisabled();
-      expect(screen.getByRole('button', { name: /move skill 2 down/i })).not.toBeDisabled();
-      expect(screen.getByRole('button', { name: /move skill 3 up/i })).not.toBeDisabled();
-      expect(screen.getByRole('button', { name: /move skill 3 down/i })).toBeDisabled();
-    } finally {
-      restore();
-    }
-  });
-
-  it('clicking Down reorders an entry against the row directly below it, via onReorder', async () => {
-    const restore = mockDesktop(false);
-    try {
-      const user = userEvent.setup();
-      const onReorder = vi.fn();
-      const rows = [entryRow(1, [0]), entryRow(2, [1]), entryRow(3, [2])];
-      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} onReorder={onReorder} />);
-      await user.click(screen.getByRole('button', { name: /move skill 1 down/i }));
-      expect(onReorder).toHaveBeenCalledWith(
-        entryId({ skillTypeID: 1, targetLevel: 1 }),
-        rows[1].id
-      );
-    } finally {
-      restore();
-    }
-  });
-
-  it('clicking Up reorders an entry against the row directly above it, via onReorder', async () => {
-    const restore = mockDesktop(false);
-    try {
-      const user = userEvent.setup();
-      const onReorder = vi.fn();
-      const rows = [entryRow(1, [0]), entryRow(2, [1]), entryRow(3, [2])];
-      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} onReorder={onReorder} />);
-      await user.click(screen.getByRole('button', { name: /move skill 3 up/i }));
-      expect(onReorder).toHaveBeenCalledWith(
-        entryId({ skillTypeID: 3, targetLevel: 1 }),
-        rows[1].id
-      );
-    } finally {
-      restore();
-    }
-  });
-
-  it("clicking a marker row's Up/Down reorders it through the same onReorder path", async () => {
-    const restore = mockDesktop(false);
-    try {
-      const user = userEvent.setup();
-      const onReorder = vi.fn();
-      const rows: MergedRow[] = [
-        entryRow(1, [0]),
-        { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
-        entryRow(2, [1]),
-      ];
-      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} onReorder={onReorder} />);
-      await user.click(screen.getByRole('button', { name: /move remap marker up/i }));
-      expect(onReorder).toHaveBeenCalledWith(markerRowId(0), rows[0].id);
-    } finally {
-      restore();
+        unmount();
+      } finally {
+        restore();
+      }
     }
   });
 });
