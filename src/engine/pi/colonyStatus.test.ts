@@ -15,9 +15,10 @@ const NOW = Date.parse('2026-09-01T00:00:00Z');
 
 /**
  * CCP's worked example, the same baseline `extraction.test.ts` uses:
- * qty_per_cycle 6,965 on a 30-minute cycle over 14 days. Its current cycle is
- * at 100% of peak at install and ~32% a day in, so it straddles
- * `EFFICIENT_WINDOW_FRACTION` without either side being a near-miss.
+ * qty_per_cycle 6,965 on a 30-minute cycle over 14 days. Its trailing day of
+ * output runs at 100% of its first day through day 1, 38% across day 3 and
+ * 30% across day 4, so it straddles `EFFICIENT_WINDOW_FRACTION` between those
+ * two days without either side being a near-miss.
  */
 const decayingProgram: ExtractorYieldProgram = {
   pinId: 9,
@@ -120,8 +121,8 @@ describe('sortColoniesByAttention', () => {
 });
 
 describe('EFFICIENT_WINDOW_FRACTION', () => {
-  it('is the documented display threshold, a fraction of a program own peak', () => {
-    expect(EFFICIENT_WINDOW_FRACTION).toBe(0.5);
+  it("is the documented display threshold, a fraction of a program's own first-day rate", () => {
+    expect(EFFICIENT_WINDOW_FRACTION).toBe(0.35);
   });
 });
 
@@ -132,27 +133,42 @@ describe('colonyStatus decay', () => {
     expect('decayed' in status).toBe(false);
   });
 
-  it('is not decayed at install, when the current cycle is still the peak one', () => {
+  it('is not decayed at install, when nothing has decayed yet', () => {
     expect(colonyStatus([decayingProgram], NOW).decayed).toBe(false);
   });
 
-  it('is decayed once the current cycle falls under half the program peak', () => {
-    expect(colonyStatus([decayingProgram], NOW + DAY).decayed).toBe(true);
+  it('is not decayed four hours in, the regression this threshold exists for', () => {
+    // On the old per-cycle read this fired here, with 6% of a fourteen-day
+    // program banked — a badge on every colony, always.
+    expect(colonyStatus([decayingProgram], NOW + 4 * HOUR).decayed).toBe(false);
+  });
+
+  it('is not decayed before a full day has elapsed, when there is no rate to compare', () => {
+    expect(colonyStatus([decayingProgram], NOW + 20 * HOUR).decayed).toBe(false);
+    expect(colonyStatus([decayingProgram], NOW + DAY).decayed).toBe(false);
+  });
+
+  it("is decayed by day four, once the trailing day falls under the program's window", () => {
+    // Day 3 runs at 0.379 of the first day's rate, day 4 at 0.300.
+    expect(colonyStatus([decayingProgram], NOW + 3 * DAY).decayed).toBe(false);
+    expect(colonyStatus([decayingProgram], NOW + 4 * DAY).decayed).toBe(true);
   });
 
   it('is not decayed while any single projectable program is still inside its window', () => {
     const freshlyReset: ExtractorYieldProgram = {
       ...decayingProgram,
       pinId: 10,
-      installTimeMs: NOW + DAY,
-      expiryTimeMs: NOW + DAY + 14 * DAY,
+      installTimeMs: NOW + 2 * DAY,
+      expiryTimeMs: NOW + 2 * DAY + 14 * DAY,
     };
-    expect(colonyStatus([decayingProgram, freshlyReset], NOW + DAY).decayed).toBe(false);
+    // Two days into its own program, `freshlyReset` is at 0.547 — inside the
+    // window, so the colony stays off the flag even though the other is past.
+    expect(colonyStatus([decayingProgram, freshlyReset], NOW + 4 * DAY).decayed).toBe(false);
   });
 
   it('ignores programs with no baseline rather than counting them as fresh', () => {
     const unprojectable = { pinId: 11, expiryTimeMs: NOW + 14 * DAY };
-    expect(colonyStatus([decayingProgram, unprojectable], NOW + DAY).decayed).toBe(true);
+    expect(colonyStatus([decayingProgram, unprojectable], NOW + 4 * DAY).decayed).toBe(true);
   });
 });
 

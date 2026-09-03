@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractorCycleYields,
+  fractionOfFirstDayRate,
   fractionOfPeak,
   hasYieldBaseline,
   pastEfficientWindow,
@@ -12,6 +13,7 @@ import {
 import type { ExtractorProgram, ExtractorYieldProgram } from './types';
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 const INSTALL_MS = Date.parse('2026-09-01T00:00:00Z');
 const CYCLE_TIME_MS = 1_800_000; // ESI's cycle_time 1800 s
 const CYCLES_PER_DAY = 48;
@@ -156,17 +158,74 @@ describe('fractionOfPeak', () => {
   });
 });
 
+/**
+ * A trailing day of output over the program's first day, at the close of each
+ * of the 14 days of CCP's worked example. Literals produced by running CCP's
+ * reference generator and summing its bars into 48-cycle days — the same
+ * provenance as every other expectation here, so a shared mistake between test
+ * and implementation cannot agree with itself.
+ */
+const DAILY_RATE_FRACTIONS = [
+  1, 0.546724, 0.379254, 0.299579, 0.239838, 0.198292, 0.174904, 0.155818, 0.135307, 0.121558,
+  0.11377, 0.104863, 0.095001, 0.088169,
+];
+
+describe('fractionOfFirstDayRate', () => {
+  it("matches CCP's generator at the close of every day of a 14-day program", () => {
+    DAILY_RATE_FRACTIONS.forEach((expected, index) => {
+      expect(fractionOfFirstDayRate(program, INSTALL_MS + (index + 1) * DAY_MS)).toBeCloseTo(
+        expected,
+        5
+      );
+    });
+  });
+
+  it('reads a day flatter than a single cycle does, which is the whole point of it', () => {
+    // Four days in, the per-cycle read has already been under 0.15 for days
+    // (CCP's three cosine terms swing adjacent cycles hard) while a day of
+    // output is still at 0.30.
+    const dayFour = INSTALL_MS + 4 * DAY_MS;
+    expect(fractionOfPeak(program, dayFour)).toBeLessThan(0.15);
+    expect(fractionOfFirstDayRate(program, dayFour)).toBeCloseTo(0.299579, 5);
+  });
+
+  it('reports a full rate through the first day, before any complete day has elapsed', () => {
+    // A window clamped back to install would read 0.256 four hours in — under
+    // any threshold worth setting, and exactly the false positive this guards.
+    expect(fractionOfFirstDayRate(program, INSTALL_MS)).toBe(1);
+    expect(fractionOfFirstDayRate(program, INSTALL_MS + 4 * HOUR_MS)).toBe(1);
+    expect(fractionOfFirstDayRate(program, INSTALL_MS + DAY_MS - 1)).toBe(1);
+    expect(fractionOfFirstDayRate(program, INSTALL_MS - DAY_MS)).toBe(1);
+  });
+
+  it("holds an expired program's final day rather than dropping to zero", () => {
+    const atExpiry = fractionOfFirstDayRate(program, program.expiryTimeMs);
+    expect(atExpiry).toBeCloseTo(0.088169, 5);
+    expect(fractionOfFirstDayRate(program, program.expiryTimeMs + 10 * DAY_MS)).toBe(atExpiry);
+  });
+
+  it('reports a full rate for a program with no cycles rather than dividing by zero', () => {
+    const noCycles = { ...program, expiryTimeMs: INSTALL_MS };
+    expect(fractionOfFirstDayRate(noCycles, INSTALL_MS + DAY_MS)).toBe(1);
+  });
+});
+
 describe('pastEfficientWindow', () => {
   it('is false while the extractor is still at peak', () => {
     expect(pastEfficientWindow(program, INSTALL_MS, 0.5)).toBe(false);
   });
 
+  it('reads the trailing day, not one cycle: still inside the window four hours in', () => {
+    // The regression #316 exists for: on the per-cycle read this program was
+    // past a 0.5 window four hours in, with 6% of its output banked.
+    expect(pastEfficientWindow(program, INSTALL_MS + 4 * HOUR_MS, 0.5)).toBe(false);
+  });
+
   it('compares strictly against the caller’s threshold', () => {
-    // Day 7 sits at 0.0633 of peak.
-    const daySeven = INSTALL_MS + 7 * DAY_MS;
-    expect(fractionOfPeak(program, daySeven)).toBeCloseTo(0.06326, 5);
-    expect(pastEfficientWindow(program, daySeven, 0.07)).toBe(true);
-    expect(pastEfficientWindow(program, daySeven, 0.06)).toBe(false);
+    // Day 3 runs at 0.379 of the first day's rate, day 4 at 0.300.
+    expect(pastEfficientWindow(program, INSTALL_MS + 3 * DAY_MS, 0.35)).toBe(false);
+    expect(pastEfficientWindow(program, INSTALL_MS + 4 * DAY_MS, 0.35)).toBe(true);
+    expect(pastEfficientWindow(program, INSTALL_MS + 4 * DAY_MS, 0.29)).toBe(false);
   });
 });
 

@@ -29,6 +29,9 @@ export const EXTRACTOR_NOISE_FACTOR = 0.8;
 /** CCP's curve is expressed in 900-second bars; `t` counts bars, not seconds. */
 const BAR_SECONDS = 900;
 
+/** The window a daily rate is measured over, in both directions. */
+const DAY_MS = 86_400_000;
+
 /** A cycle's width in CCP's 900-second bars — the unit `t` is measured in. */
 function barWidthOf(program: ExtractorYieldProgram): number {
   return program.cycleTimeMs / 1000 / BAR_SECONDS;
@@ -138,14 +141,48 @@ export function fractionOfPeak(program: ExtractorYieldProgram, nowMs: number): n
 }
 
 /**
- * True once the current cycle's output has fallen strictly below `threshold`
- * of the program's peak. The threshold is the caller's — this engine takes no
- * view on when a program stops being worth leaving up.
+ * The trailing day's output over the program's first day — 1.0 through day 1,
+ * then 0.55 across day 2, 0.30 across day 4 and 0.09 across day 14 of CCP's
+ * worked 14-day example.
+ *
+ * `fractionOfPeak` is the honest per-cycle read, but it is a noisy one: the
+ * three cosine terms swing adjacent cycles hard, so a single cycle crosses any
+ * given fraction well before the program's actual output does. A day is 48
+ * cycles on a 30-minute program, which averages that ripple out — so this, not
+ * `fractionOfPeak`, is what `pastEfficientWindow` asks. `fractionOfPeak` stays
+ * the right read for "what is this cycle worth right now", which is what a
+ * reset-gain display wants.
+ *
+ * Reports 1.0 until a full day has elapsed: there is no completed day to
+ * compare before then, and a window clamped back to install would measure part
+ * of a day against a whole one — four hours into CCP's example that reads
+ * 0.256, decay that has not happened.
+ *
+ * An expired program keeps reporting its final day's rate rather than dropping
+ * to zero, matching `fractionOfPeak` — "expired" is `extractorState`'s call,
+ * not this number's.
+ */
+export function fractionOfFirstDayRate(program: ExtractorYieldProgram, nowMs: number): number {
+  const at = Math.min(nowMs, program.expiryTimeMs);
+  if (!(at - program.installTimeMs >= DAY_MS)) return 1;
+  const firstDayYield = yieldBankedBy(program, program.installTimeMs + DAY_MS);
+  if (firstDayYield <= 0) return 1;
+  return (yieldBankedBy(program, at) - yieldBankedBy(program, at - DAY_MS)) / firstDayYield;
+}
+
+/**
+ * True once the program's trailing day of output has fallen strictly below
+ * `threshold` of its first day's. The threshold is the caller's — this engine
+ * takes no view on when a program stops being worth leaving up.
+ *
+ * Reads days rather than cycles deliberately: measured per-cycle against
+ * `fractionOfPeak`, a 0.5 threshold puts CCP's worked 14-day example past its
+ * window four hours in, with 6% of the program banked (#316).
  */
 export function pastEfficientWindow(
   program: ExtractorYieldProgram,
   nowMs: number,
   threshold: number
 ): boolean {
-  return fractionOfPeak(program, nowMs) < threshold;
+  return fractionOfFirstDayRate(program, nowMs) < threshold;
 }
