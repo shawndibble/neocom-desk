@@ -123,6 +123,8 @@
     "searchPlaceholder": "Search skills…",
     "filterByGroup": "Filter by skill group",
     "level": "Level {{level}}",
+    "levelRange": "{{from}}–{{to}}",
+    "levelBreakdown": "Levels trained for {{name}}",
     "remapCount": "Remaps available",
     "remapCountTooltipLabel": "About remaps available",
     "remapCountTooltip": "How many free attribute remaps the optimizer may use (you get one per year in-game).",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@/i18n';
 import { EntryList } from './EntryList';
 import { entryId } from './reorder';
@@ -10,14 +10,27 @@ import type { PlanEntry } from '@/engine/types';
 
 const entry = (skillTypeID: number, targetLevel = 1): PlanEntry => ({ skillTypeID, targetLevel });
 
-function entryRow(skillTypeID: number, stepIndices: number[]): MergedRow {
-  const planEntry = entry(skillTypeID);
+/**
+ * One own step per stepIndex, levels running 1..n so the row's target level
+ * matches its last step. `levels` overrides that for the already-trained case,
+ * where an entry's first queued level is above I.
+ */
+function entryRow(skillTypeID: number, stepIndices: number[], levels?: number[]): MergedRow {
+  const stepLevels = levels ?? stepIndices.map((_, i) => i + 1);
+  const planEntry = entry(skillTypeID, stepLevels[stepLevels.length - 1] ?? 1);
   return {
     kind: 'entry',
     id: entryId(planEntry),
     entry: planEntry,
     seconds: 100 * stepIndices.length,
     cumulativeSeconds: 100 * (stepIndices[stepIndices.length - 1] ?? -1) + 100,
+    steps: stepIndices.map((stepIndex, i) => ({
+      skillTypeID,
+      level: stepLevels[i],
+      sp: 0,
+      seconds: 100,
+      cumulativeSeconds: 100 * stepIndex + 100,
+    })),
     stepIndices,
   };
 }
@@ -274,5 +287,117 @@ describe('EntryList band headers (#115)', () => {
       />
     );
     expect(screen.getByText('PER/WIL attributes')).toBeInTheDocument();
+  });
+});
+
+describe('EntryList entry level disclosure (#254)', () => {
+  // The reported bug: "Caldari Carrier V" pulled in I–IV as scheduled steps,
+  // but the row said "Caldari Carrier V" with one aggregated time while the
+  // prereq skills got a dimmed row per level — so the entry's own levels read
+  // as missing. The row now says which levels it trains and can show them.
+  for (const desktop of [false, true]) {
+    const width = desktop ? 'desktop' : 'narrow';
+
+    it(`labels a multi-level entry with the range it trains (${width})`, () => {
+      const restore = mockDesktop(desktop);
+      try {
+        render(
+          <EntryList rows={[entryRow(1, [0, 1, 2, 3, 4])]} bandsAt={new Map()} {...defaultProps} />
+        );
+        expect(screen.getByText(/^Skill 1 I–V$/)).toBeInTheDocument();
+      } finally {
+        restore();
+      }
+    });
+
+    it(`reveals one line per level, each with its own time, when expanded (${width})`, () => {
+      const restore = mockDesktop(desktop);
+      try {
+        render(
+          <EntryList rows={[entryRow(1, [0, 1, 2, 3, 4])]} bandsAt={new Map()} {...defaultProps} />
+        );
+        const toggle = screen.getByRole('button', { expanded: false });
+        expect(screen.queryByRole('list', { name: /levels trained for skill 1/i })).toBeNull();
+
+        fireEvent.click(toggle);
+
+        const breakdown = screen.getByRole('list', { name: /levels trained for skill 1/i });
+        const levels = within(breakdown).getAllByRole('listitem');
+        expect(levels).toHaveLength(5);
+        expect(levels.map((li) => within(li).getByLabelText(/^Level \d$/).textContent)).toEqual([
+          'I',
+          'II',
+          'III',
+          'IV',
+          'V',
+        ]);
+        // Each level shows its own duration. The collapsed row shows the sum
+        // of all five instead — which is what read as the levels going
+        // missing.
+        expect(levels.map((li) => within(li).getAllByText(/^\d+m$/)[0].textContent)).toEqual([
+          '1m',
+          '1m',
+          '1m',
+          '1m',
+          '1m',
+        ]);
+        // The level's running total folds exactly like the row above it
+        // (#114): its own column on desktop, a tooltip on the duration below
+        // `md`, where two unlabelled 6rem columns would not fit a phone.
+        expect(within(levels[1]).getAllByText(/^\d+m$/)).toHaveLength(desktop ? 2 : 1);
+        if (!desktop) {
+          fireEvent.focus(within(levels[1]).getByText(/^\d+m$/));
+          expect(screen.getByText(/^Cumulative: /)).toHaveAttribute('role', 'tooltip');
+        }
+
+        fireEvent.click(screen.getByRole('button', { expanded: true }));
+        expect(screen.queryByRole('list', { name: /levels trained for skill 1/i })).toBeNull();
+      } finally {
+        restore();
+      }
+    });
+  }
+
+  it('shows only the levels the plan actually queues, not I through the target', () => {
+    // Target V on a character already at III: the plan trains IV and V.
+    render(
+      <EntryList rows={[entryRow(1, [0, 1], [4, 5])]} bandsAt={new Map()} {...defaultProps} />
+    );
+    expect(screen.getByText(/^Skill 1 IV–V$/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    const breakdown = screen.getByRole('list', { name: /levels trained for skill 1/i });
+    expect(within(breakdown).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(breakdown).getByLabelText('Level 4')).toBeInTheDocument();
+    expect(within(breakdown).getByLabelText('Level 5')).toBeInTheDocument();
+  });
+
+  it('gives a single-level entry no toggle and no range, leaving the row as it was', () => {
+    render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
+    expect(screen.getByText(/^Skill 1 I$/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { expanded: false })).toBeNull();
+  });
+
+  it('leaves the drag handle as the only reorder affordance — the toggle is not a second one', () => {
+    render(<EntryList rows={[entryRow(1, [0, 1])]} bandsAt={new Map()} {...defaultProps} />);
+    const handle = screen.getByRole('button', { name: /reorder skill 1/i });
+    expect(handle).not.toHaveAttribute('aria-expanded');
+    expect(screen.getByRole('button', { expanded: false })).not.toBe(handle);
+  });
+
+  it('marks only the boosted level inside the breakdown', () => {
+    render(
+      <EntryList
+        rows={[entryRow(1, [0, 1, 2])]}
+        bandsAt={new Map()}
+        boostedSteps={new Set([2])}
+        {...defaultProps}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    const breakdown = screen.getByRole('list', { name: /levels trained for skill 1/i });
+    const levels = within(breakdown).getAllByRole('listitem');
+    expect(within(levels[0]).queryByRole('img', { name: /booster/i })).toBeNull();
+    expect(within(levels[2]).getByRole('img', { name: /booster/i })).toBeInTheDocument();
   });
 });

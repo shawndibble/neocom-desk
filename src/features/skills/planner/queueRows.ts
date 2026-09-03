@@ -14,6 +14,17 @@ export interface EntryQueueSummary {
   seconds: number;
   /** `cumulativeSeconds` of the last step in this entry's range, carried forward unchanged if the range was empty. */
   cumulativeSeconds: number;
+  /**
+   * This entry's own scheduled steps — one per level the plan actually trains,
+   * so a "Caldari Carrier V" entry on a character already at III carries IV
+   * and V, not I–V. The row reads its level range and its per-level
+   * disclosure off these (#254).
+   *
+   * Positional contract: `steps[i]` is the step at `stepIndices[i]`. Both are
+   * mapped from the same `own` slice and must stay derived together — the
+   * per-level Booster mark pairs one against the other.
+   */
+  steps: ScheduledStep[];
   /** Indices into `scheduled` this entry's own steps occupy (for booster-mark lookups). */
   stepIndices: number[];
 }
@@ -51,7 +62,12 @@ export function summarizeEntryQueue(
   for (const entry of entries) {
     if (!isKnown(entry.skillTypeID)) {
       result.set(entry.skillTypeID, {
-        summary: { seconds: 0, cumulativeSeconds: carriedCumulative(), stepIndices: [] },
+        summary: {
+          seconds: 0,
+          cumulativeSeconds: carriedCumulative(),
+          steps: [],
+          stepIndices: [],
+        },
         prereqRows: [],
       });
       continue;
@@ -71,6 +87,7 @@ export function summarizeEntryQueue(
       summary: {
         seconds,
         cumulativeSeconds,
+        steps: [...own],
         stepIndices: own.map((_, i) => ownOffset + i),
       },
       prereqRows: prereq.map((step, i) => ({ step, stepIndex: prevBoundary + i })),
@@ -89,11 +106,13 @@ export type MergedRow =
       entry: PlanEntry;
       seconds: number;
       cumulativeSeconds: number;
+      /** The levels this row trains, `steps[i]` at `stepIndices[i]` (see EntryQueueSummary). */
+      steps: ScheduledStep[];
       stepIndices: number[];
     };
 
 const EMPTY_SUMMARY: EntryQueueInfo = {
-  summary: { seconds: 0, cumulativeSeconds: 0, stepIndices: [] },
+  summary: { seconds: 0, cumulativeSeconds: 0, steps: [], stepIndices: [] },
   prereqRows: [],
 };
 
@@ -124,6 +143,7 @@ export function buildMergedRows(
       entry: row.entry,
       seconds: info.summary.seconds,
       cumulativeSeconds: info.summary.cumulativeSeconds,
+      steps: info.summary.steps,
       stepIndices: info.summary.stepIndices,
     });
   }

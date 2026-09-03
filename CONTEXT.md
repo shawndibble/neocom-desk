@@ -380,6 +380,18 @@
   training time. Prerequisite skills the user did not add directly still
   appear as their own dimmed, non-interactive rows, positioned where the
   schedule actually trains them.
+- **An entry row names the level range it trains, and discloses those levels
+  on request.** A "Caldari Carrier V" entry queues I–V as five scheduled
+  steps, but the row showed one aggregated time while each prerequisite got a
+  dimmed row _per level_ — so a user reported that the entry's own levels
+  "did not get added". They had been. The row is now labelled with the range
+  it actually trains ("I–V"; "IV–V" for a character already at III — read off
+  the schedule, never off the target level), and a caret in front of the name
+  reveals one line per level with that level's own time — its running total
+  folding to a tooltip below `md` exactly as the row above it does. Those
+  lines nest inside the row rather than becoming siblings of it: the
+  no-explosion decision above is what keeps the list draggable and scannable,
+  so this makes it honest instead of reversing it.
 - The merged list's optional columns (attribute-pair badge, priority,
   per-level time, cumulative time) are individually toggleable via a
   "Columns" control — a device-local view preference (not synced, not
