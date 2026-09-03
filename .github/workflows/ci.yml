@@ -69,6 +69,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      # The `built` Playwright project renders dist/ via `vite preview`, so
+      # the bundle has to exist before Playwright starts. Build-time env must
+      # match what the dev-server project gets (see E2E_ENV in
+      # playwright.config.ts) — these are baked into the bundle here, not
+      # readable from the environment later, and blank Firebase vars are what
+      # keep isSyncConfigured() false so the suite's network guard holds.
+      - run: npm run build
+        env:
+          VITE_EVE_CLIENT_ID: e2e-fake-client
+          VITE_FIREBASE_API_KEY: ''
+          VITE_FIREBASE_AUTH_DOMAIN: ''
+          VITE_FIREBASE_PROJECT_ID: ''
+          VITE_FIREBASE_APP_ID: ''
       - run: npx playwright test
         env:
           VITE_EVE_CLIENT_ID: e2e-fake-client
