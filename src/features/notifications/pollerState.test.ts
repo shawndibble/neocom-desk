@@ -11,39 +11,24 @@ import type {
   MarketOrderSnapshot,
 } from '@/engine/notificationDiffs';
 import {
-  useSkillQueuePollerState,
-  SKILL_QUEUE_POLLER_STATE_KEY,
-  DEFAULT_SKILL_QUEUE_POLLER_STATE,
+  createPollerStateStore,
+  EMPTY_POLLER_STATE,
+  isSnapshotWith,
   withCharacterSnapshot,
-  useIndustryJobPollerState,
-  INDUSTRY_JOB_POLLER_STATE_KEY,
-  DEFAULT_INDUSTRY_JOB_POLLER_STATE,
-  withCharacterJobSnapshot,
-  useColonyPollerState,
-  COLONY_POLLER_STATE_KEY,
-  DEFAULT_COLONY_POLLER_STATE,
-  withCharacterColonySnapshot,
-  useMailPollerState,
-  MAIL_POLLER_STATE_KEY,
-  DEFAULT_MAIL_POLLER_STATE,
-  withCharacterMailSnapshot,
-  useCalendarPollerState,
-  CALENDAR_POLLER_STATE_KEY,
-  DEFAULT_CALENDAR_POLLER_STATE,
-  withCharacterCalendarSnapshot,
-  useContractPollerState,
-  CONTRACT_POLLER_STATE_KEY,
-  DEFAULT_CONTRACT_POLLER_STATE,
-  withCharacterContractSnapshot,
-  useWalletPollerState,
-  WALLET_POLLER_STATE_KEY,
-  DEFAULT_WALLET_POLLER_STATE,
-  withCharacterWalletSnapshot,
-  useMarketOrderPollerState,
-  MARKET_ORDER_POLLER_STATE_KEY,
-  DEFAULT_MARKET_ORDER_POLLER_STATE,
-  withCharacterMarketOrderSnapshot,
 } from './pollerState';
+import {
+  skillQueueDomain,
+  industryJobDomain,
+  colonyDomain,
+  mailDomain,
+  calendarDomain,
+  contractDomain,
+  walletDomain,
+  marketOrderDomain,
+} from './pollDomains';
+
+/** A snapshot guard that only checks the shared `{ nowMs, entries[] }` frame. */
+const isSnapshotOfAnything = isSnapshotWith<{ nowMs: number }>('entries', () => true);
 
 const SNAPSHOT: SkillQueueSnapshot = {
   entries: [{ skillId: 1, finishedLevel: 3, queuePosition: 0, finishMs: 12345 }],
@@ -87,44 +72,44 @@ const MARKET_ORDER_SNAPSHOT: MarketOrderSnapshot = {
 
 beforeEach(async () => {
   await db.settings.clear();
-  useSkillQueuePollerState.setState({ value: DEFAULT_SKILL_QUEUE_POLLER_STATE, hydrated: false });
+  skillQueueDomain.store.setState({ value: EMPTY_POLLER_STATE, hydrated: false });
 });
 
-describe('useSkillQueuePollerState', () => {
+describe('skillQueueDomain.store', () => {
   it('defaults to no prior snapshots, unhydrated', () => {
-    expect(useSkillQueuePollerState.getState().value).toEqual(DEFAULT_SKILL_QUEUE_POLLER_STATE);
-    expect(useSkillQueuePollerState.getState().hydrated).toBe(false);
+    expect(skillQueueDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+    expect(skillQueueDomain.store.getState().hydrated).toBe(false);
   });
 
   it('persists to Dexie under a non-syncing key', async () => {
-    expect(SKILL_QUEUE_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
-    await useSkillQueuePollerState.getState().setValue({ 7: SNAPSHOT });
-    expect((await db.settings.get(SKILL_QUEUE_POLLER_STATE_KEY))?.value).toEqual({ 7: SNAPSHOT });
+    expect(skillQueueDomain.stateKey.startsWith('sync.')).toBe(false);
+    await skillQueueDomain.store.getState().setValue({ 7: SNAPSHOT });
+    expect((await db.settings.get(skillQueueDomain.stateKey))?.value).toEqual({ 7: SNAPSHOT });
   });
 
   it('hydrates a persisted value', async () => {
-    await db.settings.put({ key: SKILL_QUEUE_POLLER_STATE_KEY, value: { 7: SNAPSHOT } });
-    await useSkillQueuePollerState.getState().hydrate();
-    expect(useSkillQueuePollerState.getState().value).toEqual({ 7: SNAPSHOT });
+    await db.settings.put({ key: skillQueueDomain.stateKey, value: { 7: SNAPSHOT } });
+    await skillQueueDomain.store.getState().hydrate();
+    expect(skillQueueDomain.store.getState().value).toEqual({ 7: SNAPSHOT });
   });
 
   it('falls back to the default when the stored value has the wrong shape', async () => {
-    await db.settings.put({ key: SKILL_QUEUE_POLLER_STATE_KEY, value: { 7: { entries: 'nope' } } });
-    await useSkillQueuePollerState.getState().hydrate();
-    expect(useSkillQueuePollerState.getState().value).toEqual(DEFAULT_SKILL_QUEUE_POLLER_STATE);
+    await db.settings.put({ key: skillQueueDomain.stateKey, value: { 7: { entries: 'nope' } } });
+    await skillQueueDomain.store.getState().hydrate();
+    expect(skillQueueDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 
   it('rejects an entry missing a required numeric field', async () => {
     await db.settings.put({
-      key: SKILL_QUEUE_POLLER_STATE_KEY,
+      key: skillQueueDomain.stateKey,
       value: { 7: { entries: [{ skillId: 1, queuePosition: 0, finishMs: null }], nowMs: 1 } },
     });
-    await useSkillQueuePollerState.getState().hydrate();
-    expect(useSkillQueuePollerState.getState().value).toEqual(DEFAULT_SKILL_QUEUE_POLLER_STATE);
+    await skillQueueDomain.store.getState().hydrate();
+    expect(skillQueueDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 });
 
-describe('withCharacterSnapshot', () => {
+describe('withCharacterSnapshot (skill queue)', () => {
   it('sets one character snapshot without disturbing others', () => {
     const next = withCharacterSnapshot({ 2: SNAPSHOT }, 7, SNAPSHOT);
     expect(next).toEqual({ 2: SNAPSHOT, 7: SNAPSHOT });
@@ -138,290 +123,353 @@ describe('withCharacterSnapshot', () => {
 });
 
 beforeEach(async () => {
-  useIndustryJobPollerState.setState({ value: DEFAULT_INDUSTRY_JOB_POLLER_STATE, hydrated: false });
-  useColonyPollerState.setState({ value: DEFAULT_COLONY_POLLER_STATE, hydrated: false });
+  industryJobDomain.store.setState({ value: EMPTY_POLLER_STATE, hydrated: false });
+  colonyDomain.store.setState({ value: EMPTY_POLLER_STATE, hydrated: false });
 });
 
-describe('useIndustryJobPollerState', () => {
+describe('industryJobDomain.store', () => {
   it('defaults to no prior snapshots, unhydrated', () => {
-    expect(useIndustryJobPollerState.getState().value).toEqual(DEFAULT_INDUSTRY_JOB_POLLER_STATE);
-    expect(useIndustryJobPollerState.getState().hydrated).toBe(false);
+    expect(industryJobDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+    expect(industryJobDomain.store.getState().hydrated).toBe(false);
   });
 
   it('persists to Dexie under a non-syncing key', async () => {
-    expect(INDUSTRY_JOB_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
-    await useIndustryJobPollerState.getState().setValue({ 7: JOB_SNAPSHOT });
-    expect((await db.settings.get(INDUSTRY_JOB_POLLER_STATE_KEY))?.value).toEqual({
+    expect(industryJobDomain.stateKey.startsWith('sync.')).toBe(false);
+    await industryJobDomain.store.getState().setValue({ 7: JOB_SNAPSHOT });
+    expect((await db.settings.get(industryJobDomain.stateKey))?.value).toEqual({
       7: JOB_SNAPSHOT,
     });
   });
 
   it('hydrates a persisted value', async () => {
-    await db.settings.put({ key: INDUSTRY_JOB_POLLER_STATE_KEY, value: { 7: JOB_SNAPSHOT } });
-    await useIndustryJobPollerState.getState().hydrate();
-    expect(useIndustryJobPollerState.getState().value).toEqual({ 7: JOB_SNAPSHOT });
+    await db.settings.put({ key: industryJobDomain.stateKey, value: { 7: JOB_SNAPSHOT } });
+    await industryJobDomain.store.getState().hydrate();
+    expect(industryJobDomain.store.getState().value).toEqual({ 7: JOB_SNAPSHOT });
   });
 
   it('falls back to the default when the stored value has the wrong shape', async () => {
     await db.settings.put({
-      key: INDUSTRY_JOB_POLLER_STATE_KEY,
+      key: industryJobDomain.stateKey,
       value: { 7: { entries: 'nope' } },
     });
-    await useIndustryJobPollerState.getState().hydrate();
-    expect(useIndustryJobPollerState.getState().value).toEqual(DEFAULT_INDUSTRY_JOB_POLLER_STATE);
+    await industryJobDomain.store.getState().hydrate();
+    expect(industryJobDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 });
 
-describe('withCharacterJobSnapshot', () => {
+describe('withCharacterSnapshot (industry jobs)', () => {
   it('sets one character snapshot without disturbing others', () => {
-    const next = withCharacterJobSnapshot({ 2: JOB_SNAPSHOT }, 7, JOB_SNAPSHOT);
+    const next = withCharacterSnapshot({ 2: JOB_SNAPSHOT }, 7, JOB_SNAPSHOT);
     expect(next).toEqual({ 2: JOB_SNAPSHOT, 7: JOB_SNAPSHOT });
   });
 });
 
-describe('useColonyPollerState', () => {
+describe('colonyDomain.store', () => {
   it('defaults to no prior snapshots, unhydrated', () => {
-    expect(useColonyPollerState.getState().value).toEqual(DEFAULT_COLONY_POLLER_STATE);
-    expect(useColonyPollerState.getState().hydrated).toBe(false);
+    expect(colonyDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+    expect(colonyDomain.store.getState().hydrated).toBe(false);
   });
 
   it('persists to Dexie under a non-syncing key', async () => {
-    expect(COLONY_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
-    await useColonyPollerState.getState().setValue({ 7: COLONY_SNAPSHOT });
-    expect((await db.settings.get(COLONY_POLLER_STATE_KEY))?.value).toEqual({
+    expect(colonyDomain.stateKey.startsWith('sync.')).toBe(false);
+    await colonyDomain.store.getState().setValue({ 7: COLONY_SNAPSHOT });
+    expect((await db.settings.get(colonyDomain.stateKey))?.value).toEqual({
       7: COLONY_SNAPSHOT,
     });
   });
 
   it('hydrates a persisted value', async () => {
-    await db.settings.put({ key: COLONY_POLLER_STATE_KEY, value: { 7: COLONY_SNAPSHOT } });
-    await useColonyPollerState.getState().hydrate();
-    expect(useColonyPollerState.getState().value).toEqual({ 7: COLONY_SNAPSHOT });
+    await db.settings.put({ key: colonyDomain.stateKey, value: { 7: COLONY_SNAPSHOT } });
+    await colonyDomain.store.getState().hydrate();
+    expect(colonyDomain.store.getState().value).toEqual({ 7: COLONY_SNAPSHOT });
   });
 
   it('falls back to the default when the stored value has the wrong shape', async () => {
-    await db.settings.put({ key: COLONY_POLLER_STATE_KEY, value: { 7: { colonies: 'nope' } } });
-    await useColonyPollerState.getState().hydrate();
-    expect(useColonyPollerState.getState().value).toEqual(DEFAULT_COLONY_POLLER_STATE);
+    await db.settings.put({ key: colonyDomain.stateKey, value: { 7: { colonies: 'nope' } } });
+    await colonyDomain.store.getState().hydrate();
+    expect(colonyDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 });
 
-describe('withCharacterColonySnapshot', () => {
+describe('withCharacterSnapshot (colonies)', () => {
   it('sets one character snapshot without disturbing others', () => {
-    const next = withCharacterColonySnapshot({ 2: COLONY_SNAPSHOT }, 7, COLONY_SNAPSHOT);
+    const next = withCharacterSnapshot({ 2: COLONY_SNAPSHOT }, 7, COLONY_SNAPSHOT);
     expect(next).toEqual({ 2: COLONY_SNAPSHOT, 7: COLONY_SNAPSHOT });
   });
 });
 
 beforeEach(async () => {
-  useMailPollerState.setState({ value: DEFAULT_MAIL_POLLER_STATE, hydrated: false });
-  useCalendarPollerState.setState({ value: DEFAULT_CALENDAR_POLLER_STATE, hydrated: false });
-  useContractPollerState.setState({ value: DEFAULT_CONTRACT_POLLER_STATE, hydrated: false });
-  useWalletPollerState.setState({ value: DEFAULT_WALLET_POLLER_STATE, hydrated: false });
-  useMarketOrderPollerState.setState({ value: DEFAULT_MARKET_ORDER_POLLER_STATE, hydrated: false });
+  mailDomain.store.setState({ value: EMPTY_POLLER_STATE, hydrated: false });
+  calendarDomain.store.setState({ value: EMPTY_POLLER_STATE, hydrated: false });
+  contractDomain.store.setState({ value: EMPTY_POLLER_STATE, hydrated: false });
+  walletDomain.store.setState({ value: EMPTY_POLLER_STATE, hydrated: false });
+  marketOrderDomain.store.setState({ value: EMPTY_POLLER_STATE, hydrated: false });
 });
 
-describe('useMailPollerState', () => {
+describe('mailDomain.store', () => {
   it('defaults to no prior snapshots, unhydrated', () => {
-    expect(useMailPollerState.getState().value).toEqual(DEFAULT_MAIL_POLLER_STATE);
-    expect(useMailPollerState.getState().hydrated).toBe(false);
+    expect(mailDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+    expect(mailDomain.store.getState().hydrated).toBe(false);
   });
 
   it('persists to Dexie under a non-syncing key', async () => {
-    expect(MAIL_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
-    await useMailPollerState.getState().setValue({ 7: MAIL_SNAPSHOT });
-    expect((await db.settings.get(MAIL_POLLER_STATE_KEY))?.value).toEqual({ 7: MAIL_SNAPSHOT });
+    expect(mailDomain.stateKey.startsWith('sync.')).toBe(false);
+    await mailDomain.store.getState().setValue({ 7: MAIL_SNAPSHOT });
+    expect((await db.settings.get(mailDomain.stateKey))?.value).toEqual({ 7: MAIL_SNAPSHOT });
   });
 
   it('hydrates a persisted value', async () => {
-    await db.settings.put({ key: MAIL_POLLER_STATE_KEY, value: { 7: MAIL_SNAPSHOT } });
-    await useMailPollerState.getState().hydrate();
-    expect(useMailPollerState.getState().value).toEqual({ 7: MAIL_SNAPSHOT });
+    await db.settings.put({ key: mailDomain.stateKey, value: { 7: MAIL_SNAPSHOT } });
+    await mailDomain.store.getState().hydrate();
+    expect(mailDomain.store.getState().value).toEqual({ 7: MAIL_SNAPSHOT });
   });
 
   it('falls back to the default when the stored value has the wrong shape', async () => {
-    await db.settings.put({ key: MAIL_POLLER_STATE_KEY, value: { 7: { entries: 'nope' } } });
-    await useMailPollerState.getState().hydrate();
-    expect(useMailPollerState.getState().value).toEqual(DEFAULT_MAIL_POLLER_STATE);
+    await db.settings.put({ key: mailDomain.stateKey, value: { 7: { entries: 'nope' } } });
+    await mailDomain.store.getState().hydrate();
+    expect(mailDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 });
 
-describe('withCharacterMailSnapshot', () => {
+describe('withCharacterSnapshot (mail)', () => {
   it('sets one character snapshot without disturbing others', () => {
-    const next = withCharacterMailSnapshot({ 2: MAIL_SNAPSHOT }, 7, MAIL_SNAPSHOT);
+    const next = withCharacterSnapshot({ 2: MAIL_SNAPSHOT }, 7, MAIL_SNAPSHOT);
     expect(next).toEqual({ 2: MAIL_SNAPSHOT, 7: MAIL_SNAPSHOT });
   });
 });
 
-describe('useCalendarPollerState', () => {
+describe('calendarDomain.store', () => {
   it('defaults to no prior snapshots, unhydrated', () => {
-    expect(useCalendarPollerState.getState().value).toEqual(DEFAULT_CALENDAR_POLLER_STATE);
-    expect(useCalendarPollerState.getState().hydrated).toBe(false);
+    expect(calendarDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+    expect(calendarDomain.store.getState().hydrated).toBe(false);
   });
 
   it('persists to Dexie under a non-syncing key', async () => {
-    expect(CALENDAR_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
-    await useCalendarPollerState.getState().setValue({ 7: CALENDAR_SNAPSHOT });
-    expect((await db.settings.get(CALENDAR_POLLER_STATE_KEY))?.value).toEqual({
+    expect(calendarDomain.stateKey.startsWith('sync.')).toBe(false);
+    await calendarDomain.store.getState().setValue({ 7: CALENDAR_SNAPSHOT });
+    expect((await db.settings.get(calendarDomain.stateKey))?.value).toEqual({
       7: CALENDAR_SNAPSHOT,
     });
   });
 
   it('hydrates a persisted value', async () => {
-    await db.settings.put({ key: CALENDAR_POLLER_STATE_KEY, value: { 7: CALENDAR_SNAPSHOT } });
-    await useCalendarPollerState.getState().hydrate();
-    expect(useCalendarPollerState.getState().value).toEqual({ 7: CALENDAR_SNAPSHOT });
+    await db.settings.put({ key: calendarDomain.stateKey, value: { 7: CALENDAR_SNAPSHOT } });
+    await calendarDomain.store.getState().hydrate();
+    expect(calendarDomain.store.getState().value).toEqual({ 7: CALENDAR_SNAPSHOT });
   });
 
   it('falls back to the default when the stored value has the wrong shape', async () => {
-    await db.settings.put({ key: CALENDAR_POLLER_STATE_KEY, value: { 7: { entries: 'nope' } } });
-    await useCalendarPollerState.getState().hydrate();
-    expect(useCalendarPollerState.getState().value).toEqual(DEFAULT_CALENDAR_POLLER_STATE);
+    await db.settings.put({ key: calendarDomain.stateKey, value: { 7: { entries: 'nope' } } });
+    await calendarDomain.store.getState().hydrate();
+    expect(calendarDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 });
 
-describe('withCharacterCalendarSnapshot', () => {
+describe('withCharacterSnapshot (calendar)', () => {
   it('sets one character snapshot without disturbing others', () => {
-    const next = withCharacterCalendarSnapshot({ 2: CALENDAR_SNAPSHOT }, 7, CALENDAR_SNAPSHOT);
+    const next = withCharacterSnapshot({ 2: CALENDAR_SNAPSHOT }, 7, CALENDAR_SNAPSHOT);
     expect(next).toEqual({ 2: CALENDAR_SNAPSHOT, 7: CALENDAR_SNAPSHOT });
   });
 });
 
-describe('useContractPollerState', () => {
+describe('contractDomain.store', () => {
   it('defaults to no prior snapshots, unhydrated', () => {
-    expect(useContractPollerState.getState().value).toEqual(DEFAULT_CONTRACT_POLLER_STATE);
-    expect(useContractPollerState.getState().hydrated).toBe(false);
+    expect(contractDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+    expect(contractDomain.store.getState().hydrated).toBe(false);
   });
 
   it('persists to Dexie under a non-syncing key', async () => {
-    expect(CONTRACT_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
-    await useContractPollerState.getState().setValue({ 7: CONTRACT_SNAPSHOT });
-    expect((await db.settings.get(CONTRACT_POLLER_STATE_KEY))?.value).toEqual({
+    expect(contractDomain.stateKey.startsWith('sync.')).toBe(false);
+    await contractDomain.store.getState().setValue({ 7: CONTRACT_SNAPSHOT });
+    expect((await db.settings.get(contractDomain.stateKey))?.value).toEqual({
       7: CONTRACT_SNAPSHOT,
     });
   });
 
   it('hydrates a persisted value', async () => {
-    await db.settings.put({ key: CONTRACT_POLLER_STATE_KEY, value: { 7: CONTRACT_SNAPSHOT } });
-    await useContractPollerState.getState().hydrate();
-    expect(useContractPollerState.getState().value).toEqual({ 7: CONTRACT_SNAPSHOT });
+    await db.settings.put({ key: contractDomain.stateKey, value: { 7: CONTRACT_SNAPSHOT } });
+    await contractDomain.store.getState().hydrate();
+    expect(contractDomain.store.getState().value).toEqual({ 7: CONTRACT_SNAPSHOT });
   });
 
   it('falls back to the default when the stored value has the wrong shape', async () => {
-    await db.settings.put({ key: CONTRACT_POLLER_STATE_KEY, value: { 7: { entries: 'nope' } } });
-    await useContractPollerState.getState().hydrate();
-    expect(useContractPollerState.getState().value).toEqual(DEFAULT_CONTRACT_POLLER_STATE);
+    await db.settings.put({ key: contractDomain.stateKey, value: { 7: { entries: 'nope' } } });
+    await contractDomain.store.getState().hydrate();
+    expect(contractDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 
   it('rejects an entry with an unrecognized status', async () => {
     await db.settings.put({
-      key: CONTRACT_POLLER_STATE_KEY,
+      key: contractDomain.stateKey,
       value: { 7: { entries: [{ contractId: 1, status: 'made_up' }], nowMs: 1 } },
     });
-    await useContractPollerState.getState().hydrate();
-    expect(useContractPollerState.getState().value).toEqual(DEFAULT_CONTRACT_POLLER_STATE);
+    await contractDomain.store.getState().hydrate();
+    expect(contractDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 });
 
-describe('withCharacterContractSnapshot', () => {
+describe('withCharacterSnapshot (contracts)', () => {
   it('sets one character snapshot without disturbing others', () => {
-    const next = withCharacterContractSnapshot({ 2: CONTRACT_SNAPSHOT }, 7, CONTRACT_SNAPSHOT);
+    const next = withCharacterSnapshot({ 2: CONTRACT_SNAPSHOT }, 7, CONTRACT_SNAPSHOT);
     expect(next).toEqual({ 2: CONTRACT_SNAPSHOT, 7: CONTRACT_SNAPSHOT });
   });
 });
 
-describe('useWalletPollerState', () => {
+describe('walletDomain.store', () => {
   it('defaults to no prior snapshots, unhydrated', () => {
-    expect(useWalletPollerState.getState().value).toEqual(DEFAULT_WALLET_POLLER_STATE);
-    expect(useWalletPollerState.getState().hydrated).toBe(false);
+    expect(walletDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+    expect(walletDomain.store.getState().hydrated).toBe(false);
   });
 
   it('persists to Dexie under a non-syncing key', async () => {
-    expect(WALLET_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
-    await useWalletPollerState.getState().setValue({ 7: WALLET_SNAPSHOT });
-    expect((await db.settings.get(WALLET_POLLER_STATE_KEY))?.value).toEqual({
+    expect(walletDomain.stateKey.startsWith('sync.')).toBe(false);
+    await walletDomain.store.getState().setValue({ 7: WALLET_SNAPSHOT });
+    expect((await db.settings.get(walletDomain.stateKey))?.value).toEqual({
       7: WALLET_SNAPSHOT,
     });
   });
 
   it('hydrates a persisted value', async () => {
-    await db.settings.put({ key: WALLET_POLLER_STATE_KEY, value: { 7: WALLET_SNAPSHOT } });
-    await useWalletPollerState.getState().hydrate();
-    expect(useWalletPollerState.getState().value).toEqual({ 7: WALLET_SNAPSHOT });
+    await db.settings.put({ key: walletDomain.stateKey, value: { 7: WALLET_SNAPSHOT } });
+    await walletDomain.store.getState().hydrate();
+    expect(walletDomain.store.getState().value).toEqual({ 7: WALLET_SNAPSHOT });
   });
 
   it('falls back to the default when the stored value has the wrong shape', async () => {
-    await db.settings.put({ key: WALLET_POLLER_STATE_KEY, value: { 7: { entries: 'nope' } } });
-    await useWalletPollerState.getState().hydrate();
-    expect(useWalletPollerState.getState().value).toEqual(DEFAULT_WALLET_POLLER_STATE);
+    await db.settings.put({ key: walletDomain.stateKey, value: { 7: { entries: 'nope' } } });
+    await walletDomain.store.getState().hydrate();
+    expect(walletDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 
   it('rejects an entry missing a required numeric field', async () => {
     await db.settings.put({
-      key: WALLET_POLLER_STATE_KEY,
+      key: walletDomain.stateKey,
       value: { 7: { entries: [{ amount: 100 }], nowMs: 1 } },
     });
-    await useWalletPollerState.getState().hydrate();
-    expect(useWalletPollerState.getState().value).toEqual(DEFAULT_WALLET_POLLER_STATE);
+    await walletDomain.store.getState().hydrate();
+    expect(walletDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 });
 
-describe('withCharacterWalletSnapshot', () => {
+describe('withCharacterSnapshot (wallet)', () => {
   it('sets one character snapshot without disturbing others', () => {
-    const next = withCharacterWalletSnapshot({ 2: WALLET_SNAPSHOT }, 7, WALLET_SNAPSHOT);
+    const next = withCharacterSnapshot({ 2: WALLET_SNAPSHOT }, 7, WALLET_SNAPSHOT);
     expect(next).toEqual({ 2: WALLET_SNAPSHOT, 7: WALLET_SNAPSHOT });
   });
 });
 
-describe('useMarketOrderPollerState', () => {
+describe('marketOrderDomain.store', () => {
   it('defaults to no prior snapshots, unhydrated', () => {
-    expect(useMarketOrderPollerState.getState().value).toEqual(DEFAULT_MARKET_ORDER_POLLER_STATE);
-    expect(useMarketOrderPollerState.getState().hydrated).toBe(false);
+    expect(marketOrderDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+    expect(marketOrderDomain.store.getState().hydrated).toBe(false);
   });
 
   it('persists to Dexie under a non-syncing key', async () => {
-    expect(MARKET_ORDER_POLLER_STATE_KEY.startsWith('sync.')).toBe(false);
-    await useMarketOrderPollerState.getState().setValue({ 7: MARKET_ORDER_SNAPSHOT });
-    expect((await db.settings.get(MARKET_ORDER_POLLER_STATE_KEY))?.value).toEqual({
+    expect(marketOrderDomain.stateKey.startsWith('sync.')).toBe(false);
+    await marketOrderDomain.store.getState().setValue({ 7: MARKET_ORDER_SNAPSHOT });
+    expect((await db.settings.get(marketOrderDomain.stateKey))?.value).toEqual({
       7: MARKET_ORDER_SNAPSHOT,
     });
   });
 
   it('hydrates a persisted value', async () => {
     await db.settings.put({
-      key: MARKET_ORDER_POLLER_STATE_KEY,
+      key: marketOrderDomain.stateKey,
       value: { 7: MARKET_ORDER_SNAPSHOT },
     });
-    await useMarketOrderPollerState.getState().hydrate();
-    expect(useMarketOrderPollerState.getState().value).toEqual({ 7: MARKET_ORDER_SNAPSHOT });
+    await marketOrderDomain.store.getState().hydrate();
+    expect(marketOrderDomain.store.getState().value).toEqual({ 7: MARKET_ORDER_SNAPSHOT });
   });
 
   it('falls back to the default when the stored value has the wrong shape', async () => {
     await db.settings.put({
-      key: MARKET_ORDER_POLLER_STATE_KEY,
+      key: marketOrderDomain.stateKey,
       value: { 7: { entries: 'nope' } },
     });
-    await useMarketOrderPollerState.getState().hydrate();
-    expect(useMarketOrderPollerState.getState().value).toEqual(DEFAULT_MARKET_ORDER_POLLER_STATE);
+    await marketOrderDomain.store.getState().hydrate();
+    expect(marketOrderDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 
   it('rejects an entry missing a required boolean field', async () => {
     await db.settings.put({
-      key: MARKET_ORDER_POLLER_STATE_KEY,
+      key: marketOrderDomain.stateKey,
       value: { 7: { entries: [{ orderId: 1 }], nowMs: 1 } },
     });
-    await useMarketOrderPollerState.getState().hydrate();
-    expect(useMarketOrderPollerState.getState().value).toEqual(DEFAULT_MARKET_ORDER_POLLER_STATE);
+    await marketOrderDomain.store.getState().hydrate();
+    expect(marketOrderDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 });
 
-describe('withCharacterMarketOrderSnapshot', () => {
+describe('withCharacterSnapshot (market orders)', () => {
   it('sets one character snapshot without disturbing others', () => {
-    const next = withCharacterMarketOrderSnapshot(
-      { 2: MARKET_ORDER_SNAPSHOT },
-      7,
-      MARKET_ORDER_SNAPSHOT
-    );
+    const next = withCharacterSnapshot({ 2: MARKET_ORDER_SNAPSHOT }, 7, MARKET_ORDER_SNAPSHOT);
     expect(next).toEqual({ 2: MARKET_ORDER_SNAPSHOT, 7: MARKET_ORDER_SNAPSHOT });
+  });
+});
+
+describe('isSnapshotWith', () => {
+  const isEntry = (raw: unknown): boolean =>
+    typeof raw === 'object' && raw !== null && typeof (raw as { id?: unknown }).id === 'number';
+
+  it('accepts a snapshot whose entries all pass the element guard', () => {
+    const guard = isSnapshotWith<{ nowMs: number }>('entries', isEntry);
+    expect(guard({ entries: [{ id: 1 }, { id: 2 }], nowMs: 5 })).toBe(true);
+  });
+
+  it('accepts an empty entries array', () => {
+    const guard = isSnapshotWith<{ nowMs: number }>('entries', isEntry);
+    expect(guard({ entries: [], nowMs: 5 })).toBe(true);
+  });
+
+  it('rejects a snapshot with no nowMs', () => {
+    const guard = isSnapshotWith<{ nowMs: number }>('entries', isEntry);
+    expect(guard({ entries: [] })).toBe(false);
+  });
+
+  it('rejects a snapshot whose entries field is not an array', () => {
+    const guard = isSnapshotWith<{ nowMs: number }>('entries', isEntry);
+    expect(guard({ entries: 'nope', nowMs: 5 })).toBe(false);
+  });
+
+  it('rejects a snapshot with one bad entry', () => {
+    const guard = isSnapshotWith<{ nowMs: number }>('entries', isEntry);
+    expect(guard({ entries: [{ id: 1 }, { id: 'two' }], nowMs: 5 })).toBe(false);
+  });
+
+  it('reads the entries field the domain names, not always "entries"', () => {
+    const guard = isSnapshotWith<{ nowMs: number }>('colonies', isEntry);
+    expect(guard({ colonies: [{ id: 1 }], nowMs: 5 })).toBe(true);
+    expect(guard({ entries: [{ id: 1 }], nowMs: 5 })).toBe(false);
+  });
+
+  it('rejects a non-object', () => {
+    const guard = isSnapshotWith<{ nowMs: number }>('entries', isEntry);
+    expect(guard(null)).toBe(false);
+    expect(guard(7)).toBe(false);
+  });
+});
+
+describe('createPollerStateStore', () => {
+  it('refuses a key in the syncing namespace', () => {
+    expect(() =>
+      createPollerStateStore('sync.notifications.pollerState', isSnapshotOfAnything)
+    ).toThrow();
+  });
+
+  it('rejects a stored state keyed by something other than a character id', async () => {
+    const store = createPollerStateStore('notifications.pollerState.spec', isSnapshotOfAnything);
+    await db.settings.put({
+      key: 'notifications.pollerState.spec',
+      value: { notANumber: { entries: [], nowMs: 1 } },
+    });
+    await store.getState().hydrate();
+    expect(store.getState().value).toEqual(EMPTY_POLLER_STATE);
+  });
+
+  it('rejects an array where a state map is expected', async () => {
+    const store = createPollerStateStore('notifications.pollerState.spec2', isSnapshotOfAnything);
+    await db.settings.put({ key: 'notifications.pollerState.spec2', value: [] });
+    await store.getState().hydrate();
+    expect(store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
 });

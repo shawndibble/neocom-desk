@@ -6,25 +6,38 @@ import type {
   CalendarEventSummary,
   Contract,
   WalletJournalEntry,
-  MarketOrder,
-  MarketOrderHistory,
 } from '@/esi/endpoints';
 import {
   runForegroundPoll,
-  deriveMarketOrderEntries,
+  type DomainPollState,
   type PollDependencies,
   type CharacterRef,
 } from './foregroundPoller';
 import type {
-  SkillQueuePollerState,
-  IndustryJobPollerState,
-  ColonyPollerState,
-  MailPollerState,
-  CalendarPollerState,
-  ContractPollerState,
-  WalletPollerState,
-  MarketOrderPollerState,
-} from './pollerState';
+  SkillQueueSnapshot,
+  IndustryJobSnapshot,
+  PlanetarySnapshot,
+  MailSnapshot,
+  CalendarSnapshot,
+  ContractSnapshot,
+  WalletSnapshot,
+  MarketOrderSnapshot,
+  ColonySnapshotEntry,
+  MarketOrderEntrySnapshot,
+} from '@/engine/notificationDiffs';
+import type { PollerState } from './pollerState';
+
+// The eight per-domain state types the poller used to carry as named
+// dependencies. They are now one generic shape (`PollerState<T>`); these
+// aliases keep every case below reading exactly as it did before #273.
+type SkillQueuePollerState = PollerState<SkillQueueSnapshot>;
+type IndustryJobPollerState = PollerState<IndustryJobSnapshot>;
+type ColonyPollerState = PollerState<PlanetarySnapshot>;
+type MailPollerState = PollerState<MailSnapshot>;
+type CalendarPollerState = PollerState<CalendarSnapshot>;
+type ContractPollerState = PollerState<ContractSnapshot>;
+type WalletPollerState = PollerState<WalletSnapshot>;
+type MarketOrderPollerState = PollerState<MarketOrderSnapshot>;
 
 const CHAR: CharacterRef = { characterId: 1, name: 'Test Pilot' };
 const SKILLQUEUE_SCOPE = 'esi-skills.read_skillqueue.v1';
@@ -102,135 +115,124 @@ function contract(overrides: Partial<Contract> = {}): Contract {
   };
 }
 
-function baseDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
-  let saved: SkillQueuePollerState = {};
-  let savedJobs: IndustryJobPollerState = {};
-  let savedColonies: ColonyPollerState = {};
-  let savedMail: MailPollerState = {};
-  let savedCalendar: CalendarPollerState = {};
-  let savedContracts: ContractPollerState = {};
-  let savedWallet: WalletPollerState = {};
-  let savedMarketOrders: MarketOrderPollerState = {};
+/**
+ * The per-domain dependencies that used to sit flat on `PollDependencies`.
+ * `baseDeps` maps them onto the registry seam (`loadDomain`/`domainState`) by
+ * domain id, so the cases below still name the domain they are about.
+ */
+interface DomainOverrides {
+  loadSkillQueue?: (characterId: number) => Promise<SkillQueueEntry[] | null>;
+  prevState?: () => Promise<SkillQueuePollerState>;
+  saveState?: (state: SkillQueuePollerState) => Promise<void>;
+  loadIndustryJobs?: (characterId: number) => Promise<IndustryJob[] | null>;
+  prevIndustryJobState?: () => Promise<IndustryJobPollerState>;
+  saveIndustryJobState?: (state: IndustryJobPollerState) => Promise<void>;
+  loadColonyExtractors?: (characterId: number) => Promise<ColonySnapshotEntry[] | null>;
+  prevColonyState?: () => Promise<ColonyPollerState>;
+  saveColonyState?: (state: ColonyPollerState) => Promise<void>;
+  loadMail?: (characterId: number) => Promise<MailHeader[] | null>;
+  prevMailState?: () => Promise<MailPollerState>;
+  saveMailState?: (state: MailPollerState) => Promise<void>;
+  loadCalendarEvents?: (characterId: number) => Promise<CalendarEventSummary[] | null>;
+  prevCalendarState?: () => Promise<CalendarPollerState>;
+  saveCalendarState?: (state: CalendarPollerState) => Promise<void>;
+  loadContracts?: (characterId: number) => Promise<Contract[] | null>;
+  prevContractState?: () => Promise<ContractPollerState>;
+  saveContractState?: (state: ContractPollerState) => Promise<void>;
+  loadWalletJournal?: (characterId: number) => Promise<WalletJournalEntry[] | null>;
+  prevWalletState?: () => Promise<WalletPollerState>;
+  saveWalletState?: (state: WalletPollerState) => Promise<void>;
+  loadMarketOrders?: (characterId: number) => Promise<MarketOrderEntrySnapshot[] | null>;
+  prevMarketOrderState?: () => Promise<MarketOrderPollerState>;
+  saveMarketOrderState?: (state: MarketOrderPollerState) => Promise<void>;
+}
+
+/**
+ * Bridges one domain's old `prev*`/`save*` pair onto `DomainPollState`. The
+ * unsupplied half behaves exactly as the old defaults did: an in-memory state
+ * that only the default saver writes to.
+ */
+function domainState<T>(
+  prev: (() => Promise<PollerState<T>>) | undefined,
+  save: ((state: PollerState<T>) => Promise<void>) | undefined
+): DomainPollState {
+  let stored: PollerState<T> = {};
+  return {
+    prev: prev ?? (async () => stored),
+    save: save
+      ? (state) => save(state as PollerState<T>)
+      : async (state) => {
+          stored = state as PollerState<T>;
+        },
+  };
+}
+
+function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): PollDependencies {
+  const {
+    loadSkillQueue = async () => [],
+    prevState,
+    saveState,
+    loadIndustryJobs = async () => [],
+    prevIndustryJobState,
+    saveIndustryJobState,
+    loadColonyExtractors = async () => [],
+    prevColonyState,
+    saveColonyState,
+    loadMail = async () => [],
+    prevMailState,
+    saveMailState,
+    loadCalendarEvents = async () => [],
+    prevCalendarState,
+    saveCalendarState,
+    loadContracts = async () => [],
+    prevContractState,
+    saveContractState,
+    loadWalletJournal = async () => [],
+    prevWalletState,
+    saveWalletState,
+    loadMarketOrders = async () => [],
+    prevMarketOrderState,
+    saveMarketOrderState,
+    ...rest
+  } = overrides;
+
+  const loaders: Record<string, (characterId: number) => Promise<readonly unknown[] | null>> = {
+    skillQueue: loadSkillQueue,
+    industryJobs: loadIndustryJobs,
+    colonies: loadColonyExtractors,
+    mail: loadMail,
+    calendar: loadCalendarEvents,
+    contracts: loadContracts,
+    wallet: loadWalletJournal,
+    marketOrders: loadMarketOrders,
+  };
+  const states: Record<string, DomainPollState> = {
+    skillQueue: domainState(prevState, saveState),
+    industryJobs: domainState(prevIndustryJobState, saveIndustryJobState),
+    colonies: domainState(prevColonyState, saveColonyState),
+    mail: domainState(prevMailState, saveMailState),
+    calendar: domainState(prevCalendarState, saveCalendarState),
+    contracts: domainState(prevContractState, saveContractState),
+    wallet: domainState(prevWalletState, saveWalletState),
+    marketOrders: domainState(prevMarketOrderState, saveMarketOrderState),
+  };
+
   return {
     now: () => 1_000_000,
     characters: async () => [CHAR],
     grantedScopes: async () => new Set([SKILLQUEUE_SCOPE]),
-    loadSkillQueue: async () => [],
-    loadIndustryJobs: async () => [],
-    loadColonyExtractors: async () => [],
-    loadMail: async () => [],
-    loadCalendarEvents: async () => [],
-    loadContracts: async () => [],
-    loadWalletJournal: async () => [],
-    loadMarketOrders: async () => [],
+    loadDomain: (domain, characterId) => loaders[domain.id](characterId),
+    domainState: (domain) => states[domain.id],
     masterEnabled: async () => true,
     browserChannelEnabled: async () => true,
     feedChannelEnabled: async () => false,
     eventPrefsFor: async () => ({}),
     permission: () => 'granted',
-    prevState: async () => saved,
-    saveState: async (state) => {
-      saved = state;
-    },
-    prevIndustryJobState: async () => savedJobs,
-    saveIndustryJobState: async (state) => {
-      savedJobs = state;
-    },
-    prevColonyState: async () => savedColonies,
-    saveColonyState: async (state) => {
-      savedColonies = state;
-    },
-    prevMailState: async () => savedMail,
-    saveMailState: async (state) => {
-      savedMail = state;
-    },
-    prevCalendarState: async () => savedCalendar,
-    saveCalendarState: async (state) => {
-      savedCalendar = state;
-    },
-    prevContractState: async () => savedContracts,
-    saveContractState: async (state) => {
-      savedContracts = state;
-    },
-    prevWalletState: async () => savedWallet,
-    saveWalletState: async (state) => {
-      savedWallet = state;
-    },
-    prevMarketOrderState: async () => savedMarketOrders,
-    saveMarketOrderState: async (state) => {
-      savedMarketOrders = state;
-    },
     notify: vi.fn(async () => {}),
     recordToFeed: vi.fn(async () => {}),
-    ...overrides,
+    ...rest,
   };
 }
-
-function marketOrder(overrides: Partial<MarketOrder> = {}): MarketOrder {
-  return {
-    order_id: 1,
-    type_id: 34,
-    region_id: 10000002,
-    location_id: 60003760,
-    is_corporation: false,
-    price: 100,
-    volume_remain: 5,
-    volume_total: 10,
-    issued: '2026-01-01T00:00:00Z',
-    duration: 90,
-    range: 'region',
-    ...overrides,
-  };
-}
-
-function marketOrderHistoryEntry(overrides: Partial<MarketOrderHistory> = {}): MarketOrderHistory {
-  return { ...marketOrder(), state: 'expired', ...overrides };
-}
-
-describe('deriveMarketOrderEntries', () => {
-  it('marks every still-open order as not filled', () => {
-    const entries = deriveMarketOrderEntries([marketOrder({ order_id: 1 })], []);
-    expect(entries).toEqual([{ orderId: 1, filled: false }]);
-  });
-
-  it('marks a history order gone from the open list as filled once volume_remain is 0', () => {
-    const entries = deriveMarketOrderEntries(
-      [],
-      [marketOrderHistoryEntry({ order_id: 2, volume_remain: 0 })]
-    );
-    expect(entries).toEqual([{ orderId: 2, filled: true }]);
-  });
-
-  it('does not mark a history order with remaining volume as filled (cancelled/expired unfilled)', () => {
-    const entries = deriveMarketOrderEntries(
-      [],
-      [marketOrderHistoryEntry({ order_id: 3, volume_remain: 4 })]
-    );
-    expect(entries).toEqual([{ orderId: 3, filled: false }]);
-  });
-
-  it('prefers the open-list entry over a stale history row for the same order id', () => {
-    const entries = deriveMarketOrderEntries(
-      [marketOrder({ order_id: 4 })],
-      [marketOrderHistoryEntry({ order_id: 4, volume_remain: 0 })]
-    );
-    expect(entries).toEqual([{ orderId: 4, filled: false }]);
-  });
-
-  it('derives the same shape for a filled buy order as a filled sell order', () => {
-    const entries = deriveMarketOrderEntries(
-      [],
-      [
-        marketOrderHistoryEntry({ order_id: 5, is_buy_order: true, volume_remain: 0 }),
-        marketOrderHistoryEntry({ order_id: 6, is_buy_order: false, volume_remain: 0 }),
-      ]
-    );
-    expect(entries).toEqual([
-      { orderId: 5, filled: true },
-      { orderId: 6, filled: true },
-    ]);
-  });
-});
 
 describe('runForegroundPoll', () => {
   it('does nothing when the master switch is off', async () => {
@@ -878,7 +880,9 @@ describe('runForegroundPoll', () => {
 
 describe('runForegroundPoll delivery channels', () => {
   /** A poll whose skill queue went empty between two polls: fires characterNotTraining once. */
-  function firingDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
+  function firingDeps(
+    overrides: Partial<PollDependencies> & DomainOverrides = {}
+  ): PollDependencies {
     return baseDeps({
       now: () => 3000,
       prevState: async () => ({
@@ -939,7 +943,9 @@ describe('runForegroundPoll delivery channels', () => {
 });
 
 describe('runForegroundPoll per-event channel columns', () => {
-  function firingDeps(overrides: Partial<PollDependencies> = {}): PollDependencies {
+  function firingDeps(
+    overrides: Partial<PollDependencies> & DomainOverrides = {}
+  ): PollDependencies {
     return baseDeps({
       now: () => 3000,
       feedChannelEnabled: async () => true,
