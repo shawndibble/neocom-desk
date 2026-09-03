@@ -22,10 +22,12 @@
  * settles when nothing is registered, and this runs inside the poller's
  * per-fire loop, which must not hang.
  */
+import type { AppNotificationOptions } from './notificationOptions';
+
 export interface PageDisplayEnv {
   getRegistration: () => Promise<ServiceWorkerRegistration | undefined>;
   /** `undefined` on a browser with no Notification API at all. */
-  construct: ((title: string, options: NotificationOptions) => void) | undefined;
+  construct: ((title: string, options: AppNotificationOptions) => void) | undefined;
 }
 
 export function livePageDisplayEnv(): PageDisplayEnv {
@@ -50,12 +52,12 @@ export function livePageDisplayEnv(): PageDisplayEnv {
 export async function displayPageNotification(
   env: PageDisplayEnv,
   title: string,
-  body: string
+  options: AppNotificationOptions
 ): Promise<void> {
   try {
     const registration = await env.getRegistration();
     if (registration && typeof registration.showNotification === 'function') {
-      await registration.showNotification(title, { body });
+      await registration.showNotification(title, options);
       return;
     }
   } catch {
@@ -65,7 +67,10 @@ export async function displayPageNotification(
 
   if (!env.construct) return;
   try {
-    env.construct(title, { body });
+    // The constructor ignores `badge` and cannot be clicked into the Service
+    // Worker's `notificationclick`, but `tag` and `icon` still apply — and
+    // this branch only runs on a desktop page with no worker yet.
+    env.construct(title, options);
   } catch {
     // See doc comment above.
   }

@@ -10,6 +10,7 @@
  * unit-testability carve-out.
  */
 import { liveDependencies, notificationText } from './foregroundPoller';
+import { notificationOptionsFor } from './notificationOptions';
 import type { AnyNotificationFire, CharacterRef, PollDependencies } from './foregroundPoller';
 
 /**
@@ -27,7 +28,10 @@ export async function sendBackgroundNotification(
 ): Promise<void> {
   try {
     const { title, body } = await notificationText(fire, character);
-    await registration.showNotification(title, { body });
+    await registration.showNotification(
+      title,
+      notificationOptionsFor({ eventId: fire.eventId, characterId: character.characterId }, body)
+    );
   } catch {
     // See doc comment above.
   }

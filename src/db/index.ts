@@ -285,7 +285,9 @@ db.version(5).stores({
 });
 
 // Additive: v1-v5 stores unchanged, plus the Notification Feed. `firedAt` is
-// indexed so the panel reads newest-first without loading the whole table.
+// indexed so the feed is ordered by the database rather than sorted in JS on
+// every read; the table is capped at NOTIFICATION_FEED_LIMIT rows, so reading
+// it whole is deliberate.
 db.version(6).stores({
   characters: 'characterId',
   tokens: 'characterId',

@@ -7,7 +7,14 @@
  * means enabled — see `eventSelection.ts`).
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import { isEventEnabled, toggleAllEvents, type EventEnabledMap } from './eventSelection';
+import {
+  isEventEnabledFor,
+  toggleEventChannel,
+  toggleAllEventsOnChannel,
+  NOTIFICATION_CHANNELS,
+  type EventEnabledMap,
+  type NotificationChannel,
+} from './eventSelection';
 import type { NotificationEventId } from './events';
 
 export const NOTIFICATION_PREFS_SETTING_KEY = 'notificationPreferences';
@@ -36,9 +43,19 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferencesValue = {
   perCharacter: {},
 };
 
+/** A bare boolean (written before channels existed) or a per-channel object. */
+function isEventChannelState(raw: unknown): boolean {
+  if (typeof raw === 'boolean') return true;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) =>
+      (NOTIFICATION_CHANNELS as readonly string[]).includes(key) && typeof value === 'boolean'
+  );
+}
+
 function isEventEnabledMap(raw: unknown): raw is EventEnabledMap {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
-  return Object.values(raw as Record<string, unknown>).every((v) => typeof v === 'boolean');
+  return Object.values(raw as Record<string, unknown>).every(isEventChannelState);
 }
 
 function isPerCharacterMap(raw: unknown): raw is Record<number, EventEnabledMap> {
@@ -107,17 +124,18 @@ export function withMasterEnabled(
   return { ...value, masterEnabled };
 }
 
-export function withEventToggled(
+export function withEventChannelToggled(
   value: NotificationPreferencesValue,
   characterId: number,
-  eventId: NotificationEventId
+  eventId: NotificationEventId,
+  channel: NotificationChannel
 ): NotificationPreferencesValue {
   const prefs = characterEventPrefs(value, characterId);
   return {
     ...value,
     perCharacter: {
       ...value.perCharacter,
-      [characterId]: { ...prefs, [eventId]: !isEventEnabled(prefs, eventId) },
+      [characterId]: toggleEventChannel(prefs, eventId, channel),
     },
   };
 }
@@ -125,14 +143,18 @@ export function withEventToggled(
 export function withAllEventsToggledForCharacter(
   value: NotificationPreferencesValue,
   characterId: number,
-  eventIds: readonly NotificationEventId[]
+  eventIds: readonly NotificationEventId[],
+  channel: NotificationChannel
 ): NotificationPreferencesValue {
   const prefs = characterEventPrefs(value, characterId);
   return {
     ...value,
     perCharacter: {
       ...value.perCharacter,
-      [characterId]: toggleAllEvents(eventIds, prefs),
+      [characterId]: toggleAllEventsOnChannel(eventIds, prefs, channel),
     },
   };
 }
+
+/** Re-exported so callers gate on one import rather than reaching into eventSelection too. */
+export { isEventEnabledFor };

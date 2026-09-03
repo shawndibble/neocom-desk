@@ -23,7 +23,7 @@ describe('displayPageNotification', () => {
     const reg = registration();
     const e = env({ getRegistration: vi.fn(async () => reg) });
 
-    await displayPageNotification(e, 'New mail', 'Test Pilot has new mail.');
+    await displayPageNotification(e, 'New mail', { body: 'Test Pilot has new mail.' });
 
     expect(reg.showNotification).toHaveBeenCalledWith('New mail', {
       body: 'Test Pilot has new mail.',
@@ -34,7 +34,7 @@ describe('displayPageNotification', () => {
   it('falls back to the Notification constructor when no worker is registered', async () => {
     const e = env();
 
-    await displayPageNotification(e, 'New mail', 'Test Pilot has new mail.');
+    await displayPageNotification(e, 'New mail', { body: 'Test Pilot has new mail.' });
 
     expect(e.construct).toHaveBeenCalledWith('New mail', { body: 'Test Pilot has new mail.' });
   });
@@ -44,7 +44,7 @@ describe('displayPageNotification', () => {
       getRegistration: vi.fn(async () => ({}) as unknown as ServiceWorkerRegistration),
     });
 
-    await displayPageNotification(e, 'Title', 'Body');
+    await displayPageNotification(e, 'Title', { body: 'Body' });
 
     expect(e.construct).toHaveBeenCalledWith('Title', { body: 'Body' });
   });
@@ -57,7 +57,7 @@ describe('displayPageNotification', () => {
     });
     const e = env({ getRegistration: vi.fn(async () => reg) });
 
-    await displayPageNotification(e, 'Title', 'Body');
+    await displayPageNotification(e, 'Title', { body: 'Body' });
 
     expect(e.construct).toHaveBeenCalledWith('Title', { body: 'Body' });
   });
@@ -69,7 +69,7 @@ describe('displayPageNotification', () => {
       }),
     });
 
-    await displayPageNotification(e, 'Title', 'Body');
+    await displayPageNotification(e, 'Title', { body: 'Body' });
 
     expect(e.construct).toHaveBeenCalledWith('Title', { body: 'Body' });
   });
@@ -81,12 +81,12 @@ describe('displayPageNotification', () => {
       }),
     });
 
-    await expect(displayPageNotification(e, 'Title', 'Body')).resolves.toBeUndefined();
+    await expect(displayPageNotification(e, 'Title', { body: 'Body' })).resolves.toBeUndefined();
   });
 
   it('resolves when there is no display path at all', async () => {
     const e = env({ construct: undefined });
-    await expect(displayPageNotification(e, 'Title', 'Body')).resolves.toBeUndefined();
+    await expect(displayPageNotification(e, 'Title', { body: 'Body' })).resolves.toBeUndefined();
   });
 });
 

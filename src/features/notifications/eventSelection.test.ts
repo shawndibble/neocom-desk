@@ -1,67 +1,80 @@
 import { describe, it, expect } from 'vitest';
-import { isEventEnabled, selectionStateForEvents, toggleAllEvents } from './eventSelection';
 import type { NotificationEventId } from './events';
+import {
+  isEventEnabledFor,
+  selectionStateForEvents,
+  toggleEventChannel,
+  toggleAllEventsOnChannel,
+  type EventEnabledMap,
+} from './eventSelection';
 
-const EVENT_A = 'skillLevelComplete' satisfies NotificationEventId;
-const EVENT_B = 'newMail' satisfies NotificationEventId;
+const A = 'skillLevelComplete' satisfies NotificationEventId;
+const B = 'newMail' satisfies NotificationEventId;
 
-describe('isEventEnabled', () => {
-  it('is enabled by default when absent from the prefs map (on by default)', () => {
-    expect(isEventEnabled({}, EVENT_A)).toBe(true);
+describe('isEventEnabledFor', () => {
+  it('defaults an absent event to on for both channels', () => {
+    expect(isEventEnabledFor({}, A, 'browser')).toBe(true);
+    expect(isEventEnabledFor({}, A, 'feed')).toBe(true);
   });
 
-  it('respects an explicit false', () => {
-    expect(isEventEnabled({ [EVENT_A]: false }, EVENT_A)).toBe(false);
+  it('reads a legacy bare boolean as applying to both channels', () => {
+    const legacy: EventEnabledMap = { [A]: false };
+    expect(isEventEnabledFor(legacy, A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(legacy, A, 'feed')).toBe(false);
   });
 
-  it('respects an explicit true', () => {
-    expect(isEventEnabled({ [EVENT_A]: true }, EVENT_A)).toBe(true);
+  it('reads channels independently', () => {
+    const map: EventEnabledMap = { [A]: { browser: false } };
+    expect(isEventEnabledFor(map, A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(map, A, 'feed')).toBe(true);
   });
 });
 
 describe('selectionStateForEvents', () => {
-  it('is unchecked for an empty event list', () => {
-    expect(selectionStateForEvents([], {})).toBe('unchecked');
+  it('is per column', () => {
+    const map: EventEnabledMap = { [A]: { browser: false }, [B]: { browser: false } };
+    expect(selectionStateForEvents([A, B], map, 'browser')).toBe('unchecked');
+    expect(selectionStateForEvents([A, B], map, 'feed')).toBe('checked');
   });
 
-  it('is checked when every event is enabled (including the on-by-default absent case)', () => {
-    expect(selectionStateForEvents([EVENT_A, EVENT_B], {})).toBe('checked');
-  });
-
-  it('is unchecked when every event is explicitly disabled', () => {
-    expect(
-      selectionStateForEvents([EVENT_A, EVENT_B], { [EVENT_A]: false, [EVENT_B]: false })
-    ).toBe('unchecked');
-  });
-
-  it('is indeterminate when only some events are enabled', () => {
-    expect(selectionStateForEvents([EVENT_A, EVENT_B], { [EVENT_A]: false })).toBe('indeterminate');
+  it('is indeterminate on a partial column', () => {
+    const map: EventEnabledMap = { [A]: { browser: false } };
+    expect(selectionStateForEvents([A, B], map, 'browser')).toBe('indeterminate');
   });
 });
 
-describe('toggleAllEvents', () => {
-  it('disables every event when all are currently enabled', () => {
-    const next = toggleAllEvents([EVENT_A, EVENT_B], {});
-    expect(next).toEqual({ [EVENT_A]: false, [EVENT_B]: false });
+describe('toggleEventChannel', () => {
+  it('flips one channel and leaves the other alone', () => {
+    const next = toggleEventChannel({}, A, 'browser');
+    expect(isEventEnabledFor(next, A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(next, A, 'feed')).toBe(true);
   });
 
-  it('enables every event when only some are currently enabled (fills in the indeterminate case)', () => {
-    const next = toggleAllEvents([EVENT_A, EVENT_B], { [EVENT_A]: false });
-    expect(next).toEqual({ [EVENT_A]: true, [EVENT_B]: true });
+  it('materialises a legacy boolean without changing the untouched channel', () => {
+    const next = toggleEventChannel({ [A]: false }, A, 'feed');
+    expect(isEventEnabledFor(next, A, 'feed')).toBe(true);
+    expect(isEventEnabledFor(next, A, 'browser')).toBe(false);
   });
 
-  it('enables every event when all are currently disabled', () => {
-    const next = toggleAllEvents([EVENT_A, EVENT_B], { [EVENT_A]: false, [EVENT_B]: false });
-    expect(next).toEqual({ [EVENT_A]: true, [EVENT_B]: true });
+  it('does not disturb other events', () => {
+    const next = toggleEventChannel({ [B]: { feed: false } }, A, 'browser');
+    expect(isEventEnabledFor(next, B, 'feed')).toBe(false);
+  });
+});
+
+describe('toggleAllEventsOnChannel', () => {
+  it('clears a fully-enabled column, keeping the other column intact', () => {
+    const next = toggleAllEventsOnChannel([A, B], {}, 'browser');
+    expect(isEventEnabledFor(next, A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(next, B, 'browser')).toBe(false);
+    expect(isEventEnabledFor(next, A, 'feed')).toBe(true);
+    expect(isEventEnabledFor(next, B, 'feed')).toBe(true);
   });
 
-  it('does not mutate the input map', () => {
-    const input = { [EVENT_A]: false };
-    toggleAllEvents([EVENT_A, EVENT_B], input);
-    expect(input).toEqual({ [EVENT_A]: false });
-  });
-
-  it('is a no-op for an empty event list', () => {
-    expect(toggleAllEvents([], { [EVENT_A]: false })).toEqual({ [EVENT_A]: false });
+  it('fills in a partial column rather than clearing it', () => {
+    const map: EventEnabledMap = { [A]: { browser: false } };
+    const next = toggleAllEventsOnChannel([A, B], map, 'browser');
+    expect(isEventEnabledFor(next, A, 'browser')).toBe(true);
+    expect(isEventEnabledFor(next, B, 'browser')).toBe(true);
   });
 });

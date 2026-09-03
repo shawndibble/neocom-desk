@@ -29,6 +29,10 @@ import { backgroundDependencies } from '@/features/notifications/backgroundPolle
 import { configureEsi } from '@/esi/client';
 import { getValidAccessToken } from '@/auth/session';
 import { PERIODIC_SYNC_TAG } from '@/app/backgroundSync';
+import {
+  handleNotificationClick,
+  urlFromNotificationData,
+} from '@/features/notifications/notificationClick';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -73,5 +77,24 @@ self.addEventListener('periodicsync', (event) => {
       // A failed poll must not reject `waitUntil` — some browsers penalize
       // (throttle or unregister) a periodicsync tag that keeps rejecting.
     })
+  );
+});
+
+// Tapping a notification (best-practice audit): focus an open window and move
+// it to the event's page, or open one if nothing of ours is running. Without
+// this listener a tap did nothing at all. The decision logic is in
+// `features/notifications/notificationClick.ts` so it can be unit-tested —
+// this file stays orchestration-only per ADR 0007.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    handleNotificationClick(
+      {
+        matchAll: () => self.clients.matchAll({ type: 'window', includeUncontrolled: true }),
+        openWindow: (target) => self.clients.openWindow(target),
+        origin: self.location.origin,
+      },
+      urlFromNotificationData(event.notification.data)
+    )
   );
 });

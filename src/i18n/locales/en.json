@@ -1110,12 +1110,11 @@
     "fontScaleExtraLarge": "Extra large",
     "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Choose how you'd like to be told, and what about, per character. Stays on this device.",
+      "hint": "Choose how you'd like to be told, and what about, per character. App sends a browser notification; List adds it to the Overview page. Stays on this device.",
       "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
       "enableHint": "This device hasn't granted notification permission yet.",
       "enableButton": "Turn on browser notifications",
       "masterSwitchLabel": "Enable notifications",
-      "selectAllLabel": "Toggle all notifications for {{character}}",
       "searchPlaceholder": "Search events or characters",
       "noResults": "No matching events or characters",
       "emptyTitle": "Add a character to configure notifications",
@@ -1135,7 +1134,20 @@
       "browserChannelLabel": "Browser notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission, and only appears while the app is open on iPhone and iPad.",
       "feedChannelLabel": "Overview notifications",
-      "feedChannelHint": "A dismissible list on the Overview page. Works on every device."
+      "feedChannelHint": "A dismissible list on the Overview page. Works on every device.",
+      "column": {
+        "browser": "App",
+        "feed": "List"
+      },
+      "selectAll": {
+        "browser": "Toggle all browser notifications for {{character}}",
+        "feed": "Toggle all Overview notifications for {{character}}"
+      },
+      "toggleLabel": {
+        "browser": "{{event}}, browser notifications",
+        "feed": "{{event}}, Overview list"
+      },
+      "columnEvent": "Event"
     }
   },
   "shortcuts": {

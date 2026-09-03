@@ -7,7 +7,8 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   characterEventPrefs,
   withMasterEnabled,
-  withEventToggled,
+  withEventChannelToggled,
+  isEventEnabledFor,
   withAllEventsToggledForCharacter,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
@@ -89,37 +90,55 @@ describe('withMasterEnabled', () => {
   });
 });
 
-describe('withEventToggled', () => {
-  it('disables an event that was on by default (absent)', () => {
-    const next = withEventToggled(DEFAULT_NOTIFICATION_PREFERENCES, 1, EVENT_A);
-    expect(characterEventPrefs(next, 1)).toEqual({ [EVENT_A]: false });
+describe('withEventChannelToggled', () => {
+  it('disables one channel of an event that was on by default (absent)', () => {
+    const next = withEventChannelToggled(DEFAULT_NOTIFICATION_PREFERENCES, 1, EVENT_A, 'browser');
+    const prefs = characterEventPrefs(next, 1);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'feed')).toBe(true);
   });
 
-  it('re-enables an event that was explicitly disabled', () => {
+  it('re-enables a channel that was explicitly disabled', () => {
+    const value = {
+      masterEnabled: true,
+      perCharacter: { 1: { [EVENT_A]: { browser: false } } },
+    };
+    const next = withEventChannelToggled(value, 1, EVENT_A, 'browser');
+    expect(isEventEnabledFor(characterEventPrefs(next, 1), EVENT_A, 'browser')).toBe(true);
+  });
+
+  it('splits a legacy bare boolean into channels without changing the other one', () => {
     const value = { masterEnabled: true, perCharacter: { 1: { [EVENT_A]: false } } };
-    const next = withEventToggled(value, 1, EVENT_A);
-    expect(characterEventPrefs(next, 1)).toEqual({ [EVENT_A]: true });
+    const next = withEventChannelToggled(value, 1, EVENT_A, 'feed');
+    const prefs = characterEventPrefs(next, 1);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'feed')).toBe(true);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'browser')).toBe(false);
   });
 
   it("does not disturb another character's prefs", () => {
     const value = { masterEnabled: true, perCharacter: { 2: { [EVENT_B]: false } } };
-    const next = withEventToggled(value, 1, EVENT_A);
+    const next = withEventChannelToggled(value, 1, EVENT_A, 'browser');
     expect(characterEventPrefs(next, 2)).toEqual({ [EVENT_B]: false });
   });
 });
 
 describe('withAllEventsToggledForCharacter', () => {
-  it('disables every listed event when all are currently enabled', () => {
-    const next = withAllEventsToggledForCharacter(DEFAULT_NOTIFICATION_PREFERENCES, 1, [
-      EVENT_A,
-      EVENT_B,
-    ]);
-    expect(characterEventPrefs(next, 1)).toEqual({ [EVENT_A]: false, [EVENT_B]: false });
+  it('disables one column when it is currently fully enabled', () => {
+    const next = withAllEventsToggledForCharacter(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      [EVENT_A, EVENT_B],
+      'browser'
+    );
+    const prefs = characterEventPrefs(next, 1);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(prefs, EVENT_B, 'browser')).toBe(false);
+    expect(isEventEnabledFor(prefs, EVENT_A, 'feed')).toBe(true);
   });
 
   it("does not disturb another character's prefs", () => {
     const value = { masterEnabled: true, perCharacter: { 2: { [EVENT_B]: false } } };
-    const next = withAllEventsToggledForCharacter(value, 1, [EVENT_A]);
+    const next = withAllEventsToggledForCharacter(value, 1, [EVENT_A], 'feed');
     expect(characterEventPrefs(next, 2)).toEqual({ [EVENT_B]: false });
   });
 });
