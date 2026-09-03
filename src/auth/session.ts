@@ -6,7 +6,11 @@ import { generateVerifier, challengeFromVerifier } from './pkce';
 import { buildAuthorizeUrl, exchangeCode, refreshToken, type TokenResponse } from './sso';
 import { decodeAccessToken, type DecodedAccessToken } from './jwt';
 import { db, type CharacterRecord } from '@/db';
-import { isCachePurgePending, purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
+import {
+  isCachePurgePending,
+  purgeCharacterCacheOrSuppress,
+  purgeCorpScopedCache,
+} from '@/esi/cachePurge';
 import { revokedScopes } from '@/esi/scopes';
 
 export interface SsoConfig {
@@ -97,6 +101,11 @@ async function persistTokens(tokens: TokenResponse): Promise<CharacterRecord> {
     name: decoded.name,
     ownerHash: decoded.ownerHash,
     addedAt: existing?.addedAt ?? Date.now(),
+    // Carried forward, not re-derived: the JWT has no corporation claim, so
+    // rebuilding the record without this would reset the field to "not yet
+    // learned" on every token refresh — leaving the corp trigger below looking
+    // implemented while it silently never fired.
+    ...(existing?.corporationId !== undefined ? { corporationId: existing.corporationId } : {}),
   };
 
   await purgeCacheIfConsentChangedOrPending(decoded, existing, previous?.scopes);
@@ -110,6 +119,59 @@ async function persistTokens(tokens: TokenResponse): Promise<CharacterRecord> {
     scopes: decoded.scopes,
   });
   return character;
+}
+
+/**
+ * Record the corporation a character currently belongs to, purging the corp's
+ * cached rows when that corporation has *changed*.
+ *
+ * The third consent trigger, alongside scope revocation and `ownerHash`
+ * (issue #293), and the one the other two structurally cannot catch: a pilot
+ * who joins a new corp is the same owner under the same grant, so both of the
+ * checks in `purgeCacheIfConsentChangedOrPending` correctly stay silent.
+ *
+ * Called from `stores/publicInfo.ts` rather than from `persistTokens`, because
+ * the corporation is not in the SSO JWT — `/characters/{id}/` is where it
+ * comes from, and that is the read the store already performs. It lives in
+ * this module all the same: it is a consent purge, and those belong next to
+ * the other two rather than in a view store.
+ *
+ * Three deliberate non-events:
+ * - **An unknown character** is a no-op. Writing a record here would invent a
+ *   character that never signed in on this device.
+ * - **An unchanged corporation** writes nothing at all, so a routine public-info
+ *   refresh costs no Dexie write.
+ * - **A first-ever corporation** (an upgraded record that predates the field)
+ *   purges nothing: an unknown prior is not a change, exactly as an unknown
+ *   prior grant is not a revocation.
+ *
+ * A failed purge is swallowed and the new corporation is recorded anyway. That
+ * is safe only because `cache.corpCacheKey` puts the corporation id *in the
+ * key*: undeleted rows are unreachable orphans under the old corp's key, never
+ * data the new corp's reads could pick up. Note what is deliberately NOT done
+ * here — `purgeCharacterCacheOrSuppress`, whose suppression tier blanks every
+ * read for the character. Losing a pilot's skills and mail because they
+ * changed corp is the regression this trigger exists to avoid, not a fallback.
+ */
+export async function recordCharacterCorporation(
+  characterId: number,
+  corporationId: number
+): Promise<void> {
+  const existing = await db.characters.get(characterId);
+  if (existing === undefined || existing.corporationId === corporationId) return;
+
+  if (existing.corporationId !== undefined) {
+    try {
+      await purgeCorpScopedCache(characterId);
+    } catch {
+      // Orphans, not a leak — see above. They go with the next whole-cache
+      // purge (revoke or owner change) rather than being retried here.
+    }
+  }
+  // `update`, not `put`: a token refresh can land between the read above and
+  // this write, and rewriting the whole record would silently discard the
+  // `name`/`ownerHash` it just persisted.
+  await db.characters.update(characterId, { corporationId });
 }
 
 /** Handle the SSO callback: validate state, exchange code, persist character + token. */

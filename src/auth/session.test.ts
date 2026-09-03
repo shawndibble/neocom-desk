@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { startLogin, completeLogin, getValidAccessToken } from './session';
+import {
+  startLogin,
+  completeLogin,
+  getValidAccessToken,
+  recordCharacterCorporation,
+} from './session';
 import { challengeFromVerifier } from './pkce';
 import { db, type TokenRecord } from '@/db';
-import { GLOBAL_CACHE_CHARACTER_ID, loadWithCache } from '@/esi/cache';
+import { GLOBAL_CACHE_CHARACTER_ID, corpCacheKey, loadWithCache } from '@/esi/cache';
 import {
   CACHE_PURGE_PENDING_PREFIX,
   clearCachePurgePending,
@@ -617,5 +622,140 @@ describe('persistTokens: a failing purge degrades, it never fails the session', 
     where.mockRestore();
     clear.mockRestore();
     expect(await cachedKeys(CHAR_ID)).toEqual(['skills']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Corporation changes (issue #293). Corp-owned rows are fetched with a
+// character's token but belong to the corporation, and neither trigger above
+// fires when a pilot changes corp: the ownerHash is the same person and the
+// grant is the same grant. This is the third trigger — and, unlike the other
+// two, it is surgical: only the corp-scoped rows go.
+// ---------------------------------------------------------------------------
+
+const CORP_OLD = 98000001;
+const CORP_NEW = 98000002;
+
+/** A signed-in character, optionally with a corporation already recorded. */
+async function seedCharacterInCorp(corporationId?: number): Promise<void> {
+  await db.characters.put({
+    characterId: CHAR_ID,
+    name: 'CCP Alpha',
+    ownerHash: 'owner-hash-1',
+    addedAt: 1,
+    ...(corporationId !== undefined ? { corporationId } : {}),
+  });
+}
+
+describe('recordCharacterCorporation', () => {
+  it('purges the corp-scoped rows, and ONLY those, when the corporation changes', async () => {
+    await seedCharacterInCorp(CORP_OLD);
+    await seedCache(CHAR_ID, corpCacheKey(CORP_OLD, 'structures'));
+    await seedCache(CHAR_ID, corpCacheKey(CORP_OLD, 'wallets'));
+    await seedCache(CHAR_ID, 'skills');
+    await seedCache(CHAR_ID, 'mail:headers');
+
+    await recordCharacterCorporation(CHAR_ID, CORP_NEW);
+
+    // Skills and mail are the pilot's own and survive the move.
+    expect(await cachedKeys(CHAR_ID)).toEqual(['mail:headers', 'skills']);
+    expect((await db.characters.get(CHAR_ID))?.corporationId).toBe(CORP_NEW);
+  });
+
+  it('learning the corporation for the FIRST time purges nothing', async () => {
+    // An upgraded device: the record predates `corporationId`, so there is no
+    // prior to differ from — an unknown corp is not a corp change.
+    await seedCharacterInCorp(undefined);
+    await seedCache(CHAR_ID, corpCacheKey(CORP_OLD, 'structures'));
+    await seedCache(CHAR_ID, 'skills');
+
+    await recordCharacterCorporation(CHAR_ID, CORP_OLD);
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([corpCacheKey(CORP_OLD, 'structures'), 'skills']);
+    expect((await db.characters.get(CHAR_ID))?.corporationId).toBe(CORP_OLD);
+  });
+
+  it('an unchanged corporation touches neither the cache nor the record', async () => {
+    await seedCharacterInCorp(CORP_OLD);
+    await seedCache(CHAR_ID, corpCacheKey(CORP_OLD, 'structures'));
+    const where = vi.spyOn(db.esiCache, 'where');
+    const update = vi.spyOn(db.characters, 'update');
+
+    await recordCharacterCorporation(CHAR_ID, CORP_OLD);
+
+    expect(where).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    where.mockRestore();
+    update.mockRestore();
+    expect(await cachedKeys(CHAR_ID)).toEqual([corpCacheKey(CORP_OLD, 'structures')]);
+  });
+
+  it('writes only the corporation, so a concurrent token refresh is not clobbered', async () => {
+    await seedCharacterInCorp(CORP_OLD);
+    const stale = { ...(await db.characters.get(CHAR_ID))! };
+    // A refresh lands in the window between this call's read and its write —
+    // `persistTokens` rebuilds the record from a JWT, so it moves name and
+    // ownerHash. Writing back a whole snapshot here would revert both.
+    await db.characters.update(CHAR_ID, { name: 'CCP Renamed', ownerHash: 'owner-hash-2' });
+    const get = vi.spyOn(db.characters, 'get').mockResolvedValue(stale);
+
+    await recordCharacterCorporation(CHAR_ID, CORP_NEW);
+
+    get.mockRestore();
+    expect(await db.characters.get(CHAR_ID)).toMatchObject({
+      name: 'CCP Renamed',
+      ownerHash: 'owner-hash-2',
+      corporationId: CORP_NEW,
+    });
+  });
+
+  it('leaves ANOTHER character corp rows alone when one character moves corp', async () => {
+    await seedCharacterInCorp(CORP_OLD);
+    await seedCache(CHAR_ID, corpCacheKey(CORP_OLD, 'structures'));
+    await seedCache(OTHER_CHAR_ID, corpCacheKey(CORP_OLD, 'structures'));
+
+    await recordCharacterCorporation(CHAR_ID, CORP_NEW);
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+    expect(await cachedKeys(OTHER_CHAR_ID)).toEqual([corpCacheKey(CORP_OLD, 'structures')]);
+  });
+
+  it('is a no-op for a character that is not signed in on this device', async () => {
+    await recordCharacterCorporation(CHAR_ID, CORP_NEW);
+
+    expect(await db.characters.get(CHAR_ID)).toBeUndefined();
+  });
+
+  it('still records the new corporation when the purge itself fails', async () => {
+    // A failed delete leaves ORPHANS, not a cross-corp read: the corp id is in
+    // the key, so nothing can reach the old rows under the new corp.
+    await seedCharacterInCorp(CORP_OLD);
+    const where = vi.spyOn(db.esiCache, 'where').mockImplementation(() => {
+      throw new Error('index damaged');
+    });
+
+    await expect(recordCharacterCorporation(CHAR_ID, CORP_NEW)).resolves.toBeUndefined();
+
+    where.mockRestore();
+    expect((await db.characters.get(CHAR_ID))?.corporationId).toBe(CORP_NEW);
+  });
+});
+
+describe('persistTokens: the character upsert preserves corporationId', () => {
+  it('keeps the recorded corporation across a token REFRESH', async () => {
+    await seedPriorLogin({});
+    await db.characters.update(CHAR_ID, { corporationId: CORP_OLD });
+
+    await refresh({ scp: [SKILLS, MAIL, WALLET] });
+
+    // Without this the corp trigger would look implemented and silently never
+    // fire: every refresh would reset the field to "not yet learned".
+    expect((await db.characters.get(CHAR_ID))?.corporationId).toBe(CORP_OLD);
+  });
+
+  it('leaves it absent for a character whose corporation is not known yet', async () => {
+    await login({ scp: [SKILLS] });
+
+    expect((await db.characters.get(CHAR_ID))?.corporationId).toBeUndefined();
   });
 });
