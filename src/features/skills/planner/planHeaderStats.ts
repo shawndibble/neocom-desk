@@ -46,6 +46,14 @@ export function evaluateOptimizationBadge(
   options: Pick<PlaceRemapsOptions, 'remapCount' | 'currentAttributes' | 'implants'>
 ): OptimizationBadge | null {
   if (steps.length === 0) return null;
+  // No remaps to spend means none to place, so there is no savings figure to
+  // report and `placeRemaps` would only hand back its no-remap result
+  // anyway. A "None" chip here reads as "remapping cannot help this plan" —
+  // a verdict the run never reached, and the opposite of what the editor's
+  // own result panel now says (see optimizeVerdict.ts). Show nothing, as for
+  // a plan with no entries. This is the rule; PlanEditor's Booster branch
+  // builds its badge without coming through here and repeats the check.
+  if (options.remapCount <= 0) return null;
   const evaluatedRemapCount = Math.min(options.remapCount, MAX_SUPPORTED_REMAPS);
   const result = placeRemaps(steps, skills, { ...options, remapCount: evaluatedRemapCount });
   return toOptimizationBadge(result.savingsSeconds, evaluatedRemapCount, options.remapCount);

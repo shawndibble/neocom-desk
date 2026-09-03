@@ -1121,9 +1121,14 @@ describe('SkillPlans editor: remap markers', () => {
         'Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.'
       )
     ).toBeInTheDocument();
-    expect(await within(toolbar).findByRole('status')).toHaveTextContent('Marker splits nothing');
+    expect(await within(toolbar).findByRole('status')).toHaveTextContent(
+      'No marker splits the plan'
+    );
     expect(screen.queryByText(/^Remapping at these markers/)).not.toBeInTheDocument();
     expect(screen.queryByText('No meaningful savings')).not.toBeInTheDocument();
+    // No segment list under the message: the only segment is the whole plan
+    // on current attributes, which reads as a contradiction of it.
+    expect(screen.queryByText(/^Segment 1/)).not.toBeInTheDocument();
   });
 
   it('shows an inline confirmation beside the Optimize at my markers button (#222)', async () => {
@@ -1216,6 +1221,22 @@ describe('SkillPlans editor: plan header (#21)', () => {
     // Spaceship Command), matching the same set totalSeconds times.
     expect(within(header()).getByText('2')).toBeInTheDocument();
     expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
+    expect(within(header()).queryByText('None')).not.toBeInTheDocument();
+  });
+
+  it('omits the savings badge entirely when the plan has no remaps to spend', async () => {
+    // Otherwise the header asserts "Remap savings: None" — remapping cannot
+    // help this plan — while the Actions panel below it says the opposite:
+    // raise "Remaps available" and optimize again.
+    await db.skillPlans.add(seedTwoSkillPlan(0));
+    goToPlanEditor();
+    render(<App />);
+    await openPlanTools();
+    // The ESI-derived hint proves attributes have loaded, so the header has
+    // had its chance to render a badge and chose not to.
+    await screen.findByText('From EVE: 0 bonus + yearly ready');
+
+    expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
     expect(within(header()).queryByText('None')).not.toBeInTheDocument();
   });
 
