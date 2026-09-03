@@ -69,7 +69,7 @@ import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
 import { markerVerdict, remapVerdict, type OptimizeVerdict } from './optimizeVerdict';
 import { boostedStepIndices } from '@/engine/boosterImpact';
-import type { AttributeBaseline } from '@/engine/attributeBaseline';
+import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { formatDuration } from '@/lib/duration';
@@ -1026,6 +1026,7 @@ export function PlanEditor({
           <AttributeChips
             attributes={attributesResult?.data ?? null}
             implantBonuses={implants}
+            boosterBonus={acceleratorBonusOf(attributeBaseline)}
             dense
           />
           {/* Says which half of this section is fact. An earlier draft read

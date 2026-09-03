@@ -142,6 +142,55 @@ describe('loadTypeNames', () => {
     expect(names.get(999999)).toBe('Type #999999');
   });
 
+  it('falls back to per-id resolution when the batch is rate-limited (429), not just on a 404', async () => {
+    // Clones.tsx can ask for far more distinct implant type ids in one batch
+    // than Skills.tsx's single-clone case — sustained ESI rate-limiting
+    // (esiFetch already retried once internally by the time this throws) is
+    // a real failure mode a 404-only fallback silently gives up on, leaving
+    // every one of those implants stuck on the "Type #id" placeholder.
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 429 })),
+      http.get(`${ESI_BASE_URL}/universe/types/100`, () =>
+        HttpResponse.json({
+          type_id: 100,
+          name: 'Widget 100',
+          description: '',
+          group_id: 1,
+          published: true,
+        })
+      )
+    );
+
+    const names = await loadTypeNames([100]);
+
+    expect(names.get(100)).toBe('Widget 100');
+  });
+
+  it('still falls straight to cache on a genuine network failure, not the per-id fallback', async () => {
+    // A true offline/network error (not an ESI status response) means the
+    // per-id fallback would fail identically — no point firing it.
+    await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
+    let typeRequests = 0;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()),
+      http.get(`${ESI_BASE_URL}/universe/types/100`, () => {
+        typeRequests += 1;
+        return HttpResponse.json({
+          type_id: 100,
+          name: 'Widget 100',
+          description: '',
+          group_id: 1,
+          published: true,
+        });
+      })
+    );
+
+    const names = await loadTypeNames([100]);
+
+    expect(names.get(100)).toBe('Widget 100');
+    expect(typeRequests).toBe(0);
+  });
+
   it('bounds concurrent per-id fallback lookups instead of firing them all at once (BUG #6)', async () => {
     const ids = Array.from({ length: 30 }, (_, i) => 5000 + i);
     let inFlight = 0;

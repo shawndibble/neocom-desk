@@ -107,6 +107,11 @@ export function baselineAttributes(baseline: AttributeBaseline): Attributes | nu
   return baseline.kind === 'impossible' ? null : baseline.attributes;
 }
 
+/** The uniform per-attribute bonus a detected accelerator adds, or 0 when there isn't one. */
+export function acceleratorBonusOf(baseline: AttributeBaseline | null | undefined): number {
+  return baseline?.kind === 'accelerated' ? baseline.acceleratorBonus : 0;
+}
+
 /**
  * Classify an implant-free attribute sheet, recovering a uniform cerebral
  * accelerator when one explains why it is over budget.

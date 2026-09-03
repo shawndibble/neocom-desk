@@ -25,9 +25,11 @@ import { SkillInspector } from '@/features/skills/SkillInspector';
 import { buildSkillRequirements } from '@/features/skills/skillRequirements';
 import {
   loadSkillCatalog,
+  toAttributeBaseline,
   toTrainedSkillsMap,
   type SkillCatalog,
 } from '@/features/skills/skillMap';
+import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import {
   loadCharacterAttributes,
   loadCharacterImplants,
@@ -69,6 +71,8 @@ interface Snapshot {
   fetchedAt: Date | null;
   implantDetails: ImplantDetail[];
   implantBonuses: Implants;
+  /** Null when ESI's attributes couldn't be read — nothing to classify. */
+  attributeBaseline: AttributeBaseline | null;
 }
 
 async function loadSkillsSnapshot(
@@ -98,6 +102,9 @@ async function loadSkillsSnapshot(
   const implantBonuses = sumAttributeBonuses(
     implantTypes.map((r) => extractAttributeBonuses(r?.data?.dogma_attributes))
   );
+  const attributeBaseline = attributesResult?.data
+    ? toAttributeBaseline(attributesResult.data, implantBonuses)
+    : null;
 
   return {
     catalog,
@@ -109,6 +116,7 @@ async function loadSkillsSnapshot(
     fetchedAt,
     implantDetails,
     implantBonuses,
+    attributeBaseline,
   };
 }
 
@@ -127,6 +135,7 @@ export function Skills() {
   const fetchedAt = data?.fetchedAt ?? null;
   const implantDetails = data?.implantDetails ?? [];
   const implantBonuses = data?.implantBonuses ?? {};
+  const attributeBaseline = data?.attributeBaseline ?? null;
 
   const [selectedSkillTypeID, setSelectedSkillTypeID] = useState<number | null>(null);
 
@@ -288,6 +297,7 @@ export function Skills() {
             <AttributeChips
               attributes={attributesResult?.data ?? null}
               implantBonuses={implantBonuses}
+              boosterBonus={acceleratorBonusOf(attributeBaseline)}
             />
             <div className="mt-3">
               <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

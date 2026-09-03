@@ -4,6 +4,7 @@ import { AttributeChips } from '@/features/skills/AttributeChips';
 import { formatLocalDate } from '@/lib/localDate';
 import type { CachedResult } from '@/features/skills/data';
 import type { RemapAvailability } from './remapAvailability';
+import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
@@ -11,6 +12,8 @@ interface AttributesPaneProps {
   /** ESI's attributes read, carrying its own age; null when it could not be read. */
   result: CachedResult<CharacterAttributes> | null;
   implantBonuses: Implants;
+  /** How the base sheet was arrived at — null until ESI has been read at all. */
+  attributeBaseline?: AttributeBaseline | null;
   remapInfo: RemapAvailability | null;
   className?: string;
 }
@@ -30,6 +33,7 @@ interface AttributesPaneProps {
 export function AttributesPane({
   result,
   implantBonuses,
+  attributeBaseline = null,
   remapInfo,
   className,
 }: AttributesPaneProps) {
@@ -40,7 +44,11 @@ export function AttributesPane({
       className={className}
       actions={result?.fetchedAt && <DataAgeBadge date={result.fetchedAt} />}
     >
-      <AttributeChips attributes={result?.data ?? null} implantBonuses={implantBonuses} />
+      <AttributeChips
+        attributes={result?.data ?? null}
+        implantBonuses={implantBonuses}
+        boosterBonus={acceleratorBonusOf(attributeBaseline)}
+      />
       {remapInfo && (
         <p className="mt-3 text-xs text-text-dim">
           {remapInfo.yearlyReady
