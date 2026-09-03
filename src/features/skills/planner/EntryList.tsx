@@ -19,12 +19,13 @@ import { useTranslation } from 'react-i18next';
 import { Button, Caret, EmptyState, NativeSelect, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
-import type { AttributeName, PlanPriority, ScheduledStep } from '@/engine/types';
+import type { AttributeName, Attributes, PlanPriority, ScheduledStep } from '@/engine/types';
 import { formatDuration, stepTimeline } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
 import type { MergedRow } from './queueRows';
+import { remapInstruction } from './remapInstruction';
 
 /** A band header's grouping (#115): either mode carries enough to render its label. */
 export type BandInfo =
@@ -591,11 +592,18 @@ function PrereqRow({
 interface MarkerRowProps {
   id: string;
   markerIndex: number;
+  /** This marker's target attribute spread, once "Optimize at my markers" has run. */
+  attributes?: Attributes;
   onRemove: (markerIndex: number) => void;
 }
 
-/** Remap Marker (CONTEXT.md): accent divider row, draggable like an entry. */
-function MarkerRow({ id, markerIndex, onRemove }: MarkerRowProps) {
+/**
+ * Remap Marker (CONTEXT.md): accent divider row, draggable like an entry.
+ * Once its target attributes are known (an "Optimize at my markers" run),
+ * the divider gives way to the spread itself — a plainer divider left the
+ * marker saying only *that* a remap happens here, not what to set.
+ */
+function MarkerRow({ id, markerIndex, attributes, onRemove }: MarkerRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(id);
 
@@ -615,9 +623,18 @@ function MarkerRow({ id, markerIndex, onRemove }: MarkerRowProps) {
       >
         ⠿
       </button>
-      <span aria-hidden className="h-px flex-1 bg-accent/60" />
-      <span className="font-semibold uppercase tracking-wide">{t('plans.markerRow')}</span>
-      <span aria-hidden className="h-px flex-1 bg-accent/60" />
+      {attributes ? (
+        <>
+          <span className="font-semibold uppercase tracking-wide">{t('plans.markerRow')}</span>
+          <span className="flex-1 truncate tabular-nums">{remapInstruction(attributes)}</span>
+        </>
+      ) : (
+        <>
+          <span aria-hidden className="h-px flex-1 bg-accent/60" />
+          <span className="font-semibold uppercase tracking-wide">{t('plans.markerRow')}</span>
+          <span aria-hidden className="h-px flex-1 bg-accent/60" />
+        </>
+      )}
       <Button
         variant="danger"
         size="sm"
@@ -648,6 +665,8 @@ interface EntryListProps {
   onReorder: (activeId: string, overId: string) => void;
   onRemove: (skillTypeID: number) => void;
   onRemoveMarker: (markerIndex: number) => void;
+  /** A marker's target attribute spread, once known. Undefined when no "Optimize at my markers" result covers it yet. */
+  markerAttributesFor?: (markerIndex: number) => Attributes | undefined;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
   /** Turn a derived prereq row into a real entry where it already sits (CONTEXT.md "Prereq Promotion"). */
   onPromotePrereq: (rowId: string) => void;
@@ -679,6 +698,7 @@ export function EntryList({
   onReorder,
   onRemove,
   onRemoveMarker,
+  markerAttributesFor,
   onSetPriority,
   onPromotePrereq,
 }: EntryListProps) {
@@ -771,6 +791,7 @@ export function EntryList({
                     <MarkerRow
                       id={row.id}
                       markerIndex={row.markerIndex}
+                      attributes={markerAttributesFor?.(row.markerIndex)}
                       onRemove={onRemoveMarker}
                     />
                   )}

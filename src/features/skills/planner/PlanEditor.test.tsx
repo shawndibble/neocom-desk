@@ -195,14 +195,13 @@ describe('PlanEditor tools pane', () => {
     configureClipboard(null);
   });
 
-  it('gathers every plan-level control into one tools pane of labelled sections', async () => {
+  it('gathers plan-level actions and attributes into one tools pane of labelled sections', async () => {
     const user = userEvent.setup();
     renderEditor();
     await openTools(user);
 
     const actions = sectionFor('Actions');
     const attributesSection = sectionFor('Attributes');
-    const importExport = sectionFor('Import / Export');
 
     // Actions: the ones used while working the list.
     for (const name of [
@@ -221,23 +220,20 @@ describe('PlanEditor tools pane', () => {
     expect(within(attributesSection).getByLabelText('What-if implants')).toBeInTheDocument();
     expect(within(attributesSection).getByLabelText('Booster')).toBeInTheDocument();
 
-    // Import/Export: plan-level file operations, still their own section.
+    // Import/Export: plan-level file operations, now icon buttons in the
+    // "Your entries" panel header rather than their own tools-pane section.
     for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
-      expect(within(importExport).getByRole('button', { name })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+      expect(within(actions).queryByRole('button', { name })).toBeNull();
     }
-    expect(within(importExport).queryByRole('button', { name: 'Suggest reorder' })).toBeNull();
-    expect(within(actions).queryByRole('button', { name: 'Import from skill queue' })).toBeNull();
   });
 
-  it('renders each action as one full-width labelled row, not an icon-only control', async () => {
+  it('renders each Actions-section control as one full-width labelled row, not an icon-only control', async () => {
     const user = userEvent.setup();
     renderEditor();
     await openTools(user);
 
     for (const name of [
-      'Import from skill queue',
-      'Import from clipboard',
-      'Export',
       'Optimize remaps',
       'Add remap marker',
       'Optimize at my markers',
@@ -250,6 +246,17 @@ describe('PlanEditor tools pane', () => {
       expect(button.textContent).toBe(name);
       expect(button.className).toContain('w-full');
       expect(button.className).toContain('justify-start');
+    }
+  });
+
+  it('renders Import/Export as icon-only controls in the entries panel header', () => {
+    renderEditor();
+
+    for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
+      const button = screen.getByRole('button', { name });
+      // Icon-only: the accessible name comes from aria-label, not visible text.
+      expect(button).toHaveAttribute('aria-label', name);
+      expect(button.textContent).toBe('');
     }
   });
 
@@ -334,6 +341,83 @@ describe('PlanEditor tools pane', () => {
     const actions = sectionFor('Actions');
     expect(within(actions).getByRole('status')).toBeInTheDocument();
   });
+
+  it('"Apply as markers" writes the Optimize remaps segments back as plan markers', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await user.click(screen.getByRole('button', { name: 'Apply as markers' }));
+
+    // Skill A (intelligence/memory) and Skill B (perception/willpower) are
+    // different pairs, so a single remap is worth spending on the second —
+    // the marker lands right before it, at entry-list position 1.
+    expect(onUpdate).toHaveBeenCalledWith({ markers: [1] });
+  });
+
+  it('gives two markers that delimit the same optimizer step the same attribute display, not one shifted onto the wrong segment', async () => {
+    // Skill C sits between markers 0 and 1 already trained to its target
+    // level, so it contributes zero steps: entry positions 1 (before C) and
+    // 2 (before B) land on the identical step index, which optimizeAtMarkers
+    // dedupes into one remap segment. Marker 2 (before D) is a later,
+    // distinct step. Indexing the remapped segments by marker ordinal
+    // (rather than by the step index each marker actually sits at) would
+    // read marker 1 off the wrong (D's) segment and leave marker 2 with none.
+    const localSkills: SkillType[] = [
+      skill({ typeID: 10, name: 'Skill A', primaryAttr: 'intelligence', secondaryAttr: 'memory' }),
+      skill({ typeID: 30, name: 'Skill C', primaryAttr: 'intelligence', secondaryAttr: 'memory' }),
+      skill({ typeID: 20, name: 'Skill B', primaryAttr: 'perception', secondaryAttr: 'willpower' }),
+      skill({ typeID: 40, name: 'Skill D', primaryAttr: 'charisma', secondaryAttr: 'intelligence' }),
+    ];
+    const engineSkills = new Map(
+      localSkills.map((s) => [
+        s.typeID,
+        {
+          typeID: s.typeID,
+          name: s.name,
+          rank: s.rank,
+          primary: s.primaryAttr,
+          secondary: s.secondaryAttr,
+          prereqs: [],
+        },
+      ])
+    );
+    const localCatalog: SkillCatalog = {
+      engineSkills,
+      bySkillTypeID: new Map(localSkills.map((s) => [s.typeID, s])),
+      unlocksByTypeID: buildUnlockIndex(engineSkills),
+    };
+    const localPlan: SkillPlanRecord = {
+      ...PLAN,
+      entries: [
+        { skillTypeID: 10, targetLevel: 1 },
+        { skillTypeID: 30, targetLevel: 1 },
+        { skillTypeID: 20, targetLevel: 1 },
+        { skillTypeID: 40, targetLevel: 1 },
+      ],
+      markers: [1, 2, 3],
+    };
+    const trained: ReadonlyMap<number, TrainedSkill> = new Map([[30, { level: 1, sp: 0 }]]);
+
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { plan: localPlan, catalog: localCatalog, trainedSkills: trained });
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
+
+    // remapInstruction's own format: five "XXX N" terms joined by " / ",
+    // which only a marker row's attribute spread (never an attribute-pair
+    // badge or a band header) matches.
+    const entriesPanel = screen.getByRole('heading', { name: 'Your entries' }).closest('section')!;
+    const attributeTexts = within(entriesPanel)
+      .getAllByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)
+      .map((el) => el.textContent);
+
+    expect(attributeTexts).toHaveLength(3);
+    expect(attributeTexts[0]).toBe(attributeTexts[1]);
+    expect(attributeTexts[2]).not.toBe(attributeTexts[0]);
+  });
 });
 
 describe('PlanEditor tools pane placement', () => {
@@ -342,11 +426,13 @@ describe('PlanEditor tools pane placement', () => {
 
     const toggle = screen.getByRole('button', { name: /plan tools/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // Nothing inside is mounted while collapsed — the whole tool set costs
-    // one row, where it used to cost three panels.
+    // Nothing inside the tools pane is mounted while collapsed — the whole
+    // tool set costs one row, where it used to cost three panels.
     expect(screen.queryByRole('button', { name: 'Optimize remaps' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Import from skill queue' })).toBeNull();
     expect(screen.queryByLabelText('What-if implants')).toBeNull();
+    // Import/Export lives in the entries panel header, not the tools pane —
+    // on screen regardless of the disclosure's state.
+    expect(screen.getByRole('button', { name: 'Import from skill queue' })).toBeInTheDocument();
   });
 
   it('puts the tools in the sidebar under the plan list at `lg`+, always open', () => {

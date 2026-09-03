@@ -12,7 +12,8 @@
  * so drag interactions are unit-testable without simulating drag events.
  */
 import { arrayMove } from '@dnd-kit/sortable';
-import { normalizePlan } from '@/engine/plan';
+import { normalizePlan, normalizePlanWithBoundaries } from '@/engine/plan';
+import type { RemapSegment } from '@/engine/optimizer';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import { entryId } from './reorder';
 
@@ -130,6 +131,11 @@ export function markersAfterEntryRemoval(
   );
 }
 
+/** An entry whose skill is missing from the catalog contributes no step — the same filter `normalizePlan`/computeQueue apply. Shared so markerStepIndices and segmentsToMarkers can't drift on what "missing from the catalog" means. */
+function hasKnownSkill(entry: PlanEntry, skills: ReadonlyMap<number, EngineSkill>): boolean {
+  return skills.has(entry.skillTypeID);
+}
+
 /**
  * Marker <-> step mapping: a marker at entry-list position p means "remap
  * before entries[p]", which in the computed queue is the step right after
@@ -146,8 +152,54 @@ export function markerStepIndices(
   skills: ReadonlyMap<number, EngineSkill>,
   trainedSkills: ReadonlyMap<number, TrainedSkill>
 ): number[] {
-  const valid = (list: readonly PlanEntry[]) => list.filter((e) => skills.has(e.skillTypeID));
+  const valid = (list: readonly PlanEntry[]) => list.filter((e) => hasKnownSkill(e, skills));
   return normalizeMarkers(markers, entries.length).map(
     (position) => normalizePlan(valid(entries.slice(0, position)), skills, trainedSkills).length
+  );
+}
+
+/**
+ * Inverse of markerStepIndices: turn "Optimize remaps"' free-search
+ * RemapSegments (which cut at step indices, wherever an attribute-pair run
+ * changes) into entry-list marker positions, so a search result can be
+ * turned into actual, draggable Remap Markers with one click.
+ *
+ * `normalizePlanWithBoundaries` gives entryBoundaries[i] = step count after
+ * entries[0..i] inclusive, keyed by position in the catalog-filtered entry
+ * list (not the raw one) — validIndices maps back to the caller's real
+ * positions the same way `valid()`/markerStepIndices does.
+ *
+ * A run boundary is not always an entry boundary: an entry whose prereq
+ * chain touches a different attribute pair than the entry's own skill
+ * expands to steps from two different runs, so a segment can start strictly
+ * inside one entry's contributed range. That step index cannot be
+ * represented as an entry-list position without splitting the entry, so it
+ * snaps to the position right before the whole straddling entry (the first
+ * entry boundary strictly past the target step).
+ */
+export function segmentsToMarkers(
+  entries: readonly PlanEntry[],
+  segments: readonly RemapSegment[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  trainedSkills: ReadonlyMap<number, TrainedSkill>
+): number[] {
+  const validIndices: number[] = [];
+  const valid: PlanEntry[] = [];
+  entries.forEach((e, i) => {
+    if (hasKnownSkill(e, skills)) {
+      validIndices.push(i);
+      valid.push(e);
+    }
+  });
+  const { entryBoundaries } = normalizePlanWithBoundaries(valid, skills, trainedSkills);
+
+  const toEntryPosition = (stepIndex: number): number => {
+    const i = entryBoundaries.findIndex((boundary) => boundary > stepIndex);
+    return i === -1 ? entries.length : validIndices[i];
+  };
+
+  return normalizeMarkers(
+    segments.filter((s) => s.remap).map((s) => toEntryPosition(s.startIndex)),
+    entries.length
   );
 }
