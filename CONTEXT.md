@@ -1246,14 +1246,15 @@
   alone among the corp-adjacent scopes. It is cheap, ungated, and every corp
   surface downstream needs it for _every_ Character in order to know whether to
   render at all — a scope that decides visibility cannot itself be opt-in. The
-  other corp scopes stay out of the base grant and arrive behind an opt-in
-  group with the incremental-auth work.
+  other corp scopes stay out of the base grant and arrive behind the opt-in
+  Scope Group of round 37.
 - **The two halves of the gate live on opposite sides of the engine boundary.**
   Role -> Corp Capability is pure game logic in `engine/corpRoles.ts`; Corp
   Capability -> scope is an ESI concern in `features/corp/corpScopes.ts`,
-  because `src/engine` may never import `esi/registry.ts`. Those scope strings
-  are declared locally only until the other corp scopes are registered, at
-  which point the map derives from `ESI_REGISTRY` like `SCOPES` already does.
+  because `src/engine` may never import `esi/registry.ts`. Since round 37 those
+  scope strings are typed as the registry-derived `Scope` union, so an
+  unregistered one is a build error, and the map is a _selection_ from
+  `ESI_REGISTRY` rather than a second copy of it.
 - **Only the corporation-wide `roles` array counts.** The `roles_at_hq` /
   `roles_at_base` / `roles_at_other` grants apply at one office and do not open
   the corporation-wide endpoints each capability stands for.
@@ -1308,3 +1309,75 @@
   `timestamp` key. The envelope timestamp is the instant ESI vouches for, and
   the two agree on the sample where both can be checked — but only one of
   them is a field CCP can silently repurpose.
+
+## Glossary (round 37 additions)
+
+- **Scope Group**: A named, opt-in set of OAuth scopes a Character is asked for
+  only when they ask for the feature, rather than at sign-in with everyone
+  else. Declared per endpoint in `esi/registry.ts` (`group: 'corp'`); absent
+  means the Base Grant. `SCOPES` derives from the ungrouped endpoints and
+  `scopesForGroup(group)` from the grouped ones, both from the same registry.
+  `corp` is the only group today.
+- **Base Grant**: What every Character is asked for at sign-in — `SCOPES`, and
+  nothing from any Scope Group.
+- **Requested Scopes**: What one authorize round trip asked SSO for, stashed
+  beside the PKCE verifier by `startLogin` and read back by `completeLogin`.
+  The baseline the login path judges revocation against; the refresh path has
+  none and uses the stored grant instead.
+
+## Scope decisions (round 37) — incremental auth for the corp group
+
+- **A scope leaves the Base Grant when most users would be consenting to
+  something they can never exercise.** All seven corp scopes qualify: CCP
+  role-gates the endpoints server-side, so the ~95% of users who hold no Corp
+  Role gain nothing from granting them but a longer consent screen. This is a
+  product judgement per scope, not a mechanical rule — the default is the Base
+  Grant, and `esi-characters.read_corporation_roles.v1` stays in it (round 35)
+  precisely because every Character needs it.
+- **The base/group split is decided per _endpoint_, and the two sets must never
+  overlap.** One ungrouped endpoint declaring a grouped scope would put it back
+  on everyone's consent screen with nothing else failing, so `scopes.test.ts`
+  asserts the intersection is empty. An overlap is an error to fix at the
+  declaration, never something to subtract in the derivation.
+- **A whole group is requested, not the individual scopes a Character's roles
+  need.** A Character who grants corp access once should not be sent back to
+  SSO the day they gain a second role. Readiness stays per capability (round
+  35), so a Junior_Accountant is still `ready` on the wallet scopes alone.
+- **The login path judges revocation as Requested Scopes vs granted; the
+  refresh path keeps previous vs granted.** Incremental auth means an ordinary
+  add-a-character login asks for less than some Character on the device holds,
+  and reading that as a revocation is the cache-wipe defect of #293. A scope
+  the app never asked for going missing from the JWT is no evidence the
+  Character revoked it. The refresh path requests nothing at all, so the stored
+  grant remains its baseline — and it is the only path a portal-side revoke
+  arrives on, so revocation detection is not weakened.
+- **Only scopes the Character actually _held_ can be lost.** Not a plain
+  "requested minus granted" diff: `SCOPES` asks for the same set every login,
+  so a scope SSO never returns — retired upstream, or missing from the EVE
+  application's own registration — would otherwise purge the cache on every
+  login, forever.
+- **Two login branches, split on whether the returning Character is knowable at
+  redirect time.** Add-a-character asks for the Base Grant alone, because SSO
+  decides who comes back _after_ the redirect. Every other entry point — the
+  Settings Corp access row, the grant prompt, the `ReauthBanner` — is initiated
+  from a Character context and unions with that Character's own stored grant.
+  Unioning across _every_ stored Character, as #293 did, is safe but over-asks:
+  an alt would be shown corp scopes only a main ever granted.
+- **The accepted trade: an add-a-character login by an already-granted
+  Character narrows its stored grant.** EVE issues a token carrying exactly
+  what was requested, so the narrowing is real rather than a bookkeeping
+  artefact — but the cache survives, and re-granting is one press in Settings.
+- **The grant prompt is offered once per Character per device, and both buttons
+  end it.** Declining must not be re-litigated on the next boot, and granting
+  makes it moot; a prompt that keeps returning is the same consent bloat
+  wearing a different hat. Recorded device-locally, per Character, so an alt
+  that later makes Director still gets its own offer.
+- **The Settings Corp access row is scoped to the active Character**, like
+  `useCorpAccess` itself. Roles are per Character and only knowable by asking
+  ESI for each one, so a row per stored Character would mean a read per stored
+  Character on every visit to Settings.
+- **`none` gets no Grant button.** Granting would widen the consent screen and
+  unlock nothing, because the gate that stops it is server-side. It is told
+  apart from `roles-without-grant` on sight all the same — all four states are
+  distinguishable, which is what makes the row a place to understand the gate
+  rather than only act on it.

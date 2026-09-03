@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CORP_CAPABILITIES, corpCapabilities } from '@/engine/corpRoles';
+import { SCOPES, scopesForGroup } from '@/esi/scopes';
 import { CORP_SCOPES_FOR_CAPABILITY, missingCorpScopes } from './corpScopes';
 
 /** Nothing granted, so "missing" is the full required set — the shape most tests want. */
@@ -16,6 +17,30 @@ describe('CORP_SCOPES_FOR_CAPABILITY', () => {
     for (const capability of CORP_CAPABILITIES) {
       for (const scope of CORP_SCOPES_FOR_CAPABILITY[capability]) {
         expect(scope, capability).toMatch(/^esi-[a-z_]+\.[a-z_]+\.v\d+$/);
+      }
+    }
+  });
+
+  /**
+   * The map selects from the registry rather than restating it (#295). A scope
+   * outside the `corp` group is unreachable: the Grant button asks for the
+   * group, so a capability needing something the group does not carry would sit
+   * at `roles-without-grant` forever, one click away from nothing.
+   */
+  it('names only scopes the corp group actually requests', () => {
+    const group = new Set<string>(scopesForGroup('corp'));
+    for (const capability of CORP_CAPABILITIES) {
+      for (const scope of CORP_SCOPES_FOR_CAPABILITY[capability]) {
+        expect(group.has(scope), `${capability}: ${scope}`).toBe(true);
+      }
+    }
+  });
+
+  it('names no scope already in the base grant — those need no gate', () => {
+    const base = new Set<string>(SCOPES);
+    for (const capability of CORP_CAPABILITIES) {
+      for (const scope of CORP_SCOPES_FOR_CAPABILITY[capability]) {
+        expect(base.has(scope), `${capability}: ${scope}`).toBe(false);
       }
     }
   });

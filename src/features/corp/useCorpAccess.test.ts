@@ -198,3 +198,40 @@ describe('useCorpAccess — switching Character', () => {
     await waitFor(() => expect(mockedLoadRoles).toHaveBeenCalledWith(77));
   });
 });
+
+/**
+ * The Settings Corp access row (#295) reports the roles themselves, not just
+ * the capabilities they imply: "you hold Station_Manager" is the sentence that
+ * explains why only structures are readable, and a capability list cannot say
+ * it. Raw ESI strings, for the same reason `corpCapabilities` tolerates
+ * unrecognised ones — CCP extends the enum without notice.
+ */
+describe('useCorpAccess — the roles held', () => {
+  it('reports the corporation-wide roles once they have resolved', async () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Station_Manager', 'Hangar_Take_1']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.state).toBe('ready'));
+    expect(result.current.roles).toEqual(['Station_Manager', 'Hangar_Take_1']);
+  });
+
+  it('reports no roles while the state is still unknown', () => {
+    mockedLoadRoles.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useCorpAccess());
+    expect(result.current.state).toBe('unknown');
+    expect(result.current.roles).toEqual([]);
+  });
+
+  /**
+   * `none` means "resolved, and holds no capability" — which a member with only
+   * office-scoped or cosmetic roles still is. The row says so honestly rather
+   * than claiming an empty role list.
+   */
+  it('reports roles that grant no capability, alongside the none state', async () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Hangar_Take_1']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.state).toBe('none'));
+    expect(result.current.roles).toEqual(['Hangar_Take_1']);
+  });
+});
