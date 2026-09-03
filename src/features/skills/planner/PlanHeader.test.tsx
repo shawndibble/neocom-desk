@@ -18,11 +18,13 @@ describe('PlanHeader', () => {
     expect(screen.getByText('4')).toBeInTheDocument();
   });
 
-  it('pins the summary strip flush to the top of the scroll box on lg+, alongside the toolbar below it', () => {
+  it('does not pin itself: only the entry list scrolls, so the strip above it stays in view anyway', () => {
     render(<PlanHeader totalSeconds={0} skillCount={0} projectedFinish={null} badge={null} />);
 
+    // Two stacked sticky panels needed each other's rendered height to stay
+    // clear (#221/#229). Capping the list alone removes the whole class.
     const section = screen.getByRole('heading', { name: 'Plan summary' }).closest('section');
-    expect(section).toHaveClass('lg:sticky', 'lg:top-0');
+    expect(section?.className).not.toMatch(/sticky/);
   });
 
   it('shows an empty finish rather than inventing a date for an empty plan', () => {

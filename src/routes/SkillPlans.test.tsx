@@ -172,6 +172,28 @@ function goToPlanEditor(id = 'plan-1') {
   window.history.pushState({}, '', `/skills/plans/${id}`);
 }
 
+/**
+ * Below `lg` — where jsdom's stub `matchMedia` always lands — the plan's
+ * tools (optimize/marker actions, the what-if lens, import/export) sit in a
+ * collapsed disclosure, so the plan itself leads the page. Editor tests open
+ * it before reaching for anything inside. Doubles as the "editor is up" wait,
+ * and is a no-op once open.
+ */
+async function openPlanTools() {
+  await screen.findByText('Your entries');
+  const toggle = screen.queryByRole('button', { name: /plan tools/i });
+  if (toggle?.getAttribute('aria-expanded') === 'false') {
+    await userEvent.setup().click(toggle);
+  }
+}
+
+/** The tools-pane section a heading titles (Actions / Training / Import / Export). */
+function toolsSection(title: string): HTMLElement {
+  const section = screen.getByRole('heading', { name: title }).parentElement;
+  if (!section) throw new Error(`expected the "${title}" tools section`);
+  return section;
+}
+
 let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -335,11 +357,12 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     await user.click(await screen.findByText('Test plan'));
     await screen.findByText('Your entries');
 
-    // The list pane is still rendered (CSS-hidden, not unmounted) behind
-    // the editor on narrow screens, matching Market's narrow-screen
-    // precedent — the same `hidden`-toggle approach, not literal DOM removal.
-    const listPanelOnEditor = screen.getByText('Test plan').closest('section');
-    expect(listPanelOnEditor).toHaveClass('hidden');
+    // The editor's sidebar — the plan list and, below it, the plan's tools —
+    // is not built at all below `lg`: the tools move into the single column
+    // as a collapsed disclosure, and rendering the list hidden beside them
+    // would keep a live Dexie subscription alive for a pane nobody can see.
+    expect(screen.queryByText('Test plan')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /plan tools/i })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Back to plans' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
@@ -739,6 +762,7 @@ describe('SkillPlans editor: import / export', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
     const entriesPanel = screen.getByText('Your entries').closest('section')!;
@@ -772,6 +796,7 @@ describe('SkillPlans editor: import / export', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
 
@@ -793,13 +818,15 @@ describe('SkillPlans editor: optimize remaps', () => {
     );
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
-    const panel = (await screen.findByRole('heading', { name: 'Optimize remaps' })).closest(
-      'section'
-    )!;
+    // The verdict renders under the button that produced it, inside the tools
+    // pane's Actions section — it used to be a Panel of its own further down.
+    await screen.findByText(/^Remapping saves/);
+    const panel = toolsSection('Actions');
     // Single verdict line (UX-REVIEW #2), not the Total/Current/Savings triple.
     expect(within(panel).getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
     expect(within(panel).queryByText(/Total time/)).not.toBeInTheDocument();
@@ -832,6 +859,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     );
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
@@ -874,6 +902,7 @@ describe('SkillPlans editor: optimize remaps', () => {
       }) as unknown as MediaQueryList;
     try {
       render(<App />);
+      await openPlanTools();
 
       await screen.findByText('Your entries');
       const button = screen.getByRole('button', { name: 'Optimize remaps' });
@@ -902,10 +931,11 @@ describe('SkillPlans editor: optimize remaps', () => {
     );
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
-    expect(await screen.findByRole('heading', { name: 'Optimize remaps' })).toBeInTheDocument();
+    expect(await screen.findByText(/^Remapping saves/)).toBeInTheDocument();
 
     const entriesPanel = screen.getByText('Your entries').closest('section')!;
     // Remove enough entries to shrink the scheduled queue below the stale
@@ -915,9 +945,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     // not visible text — entries[0] is Gunnery.
     await user.click(within(entriesPanel).getByRole('button', { name: 'Remove Gunnery' }));
 
-    await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: 'Optimize remaps' })).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText(/^Remapping saves/)).not.toBeInTheDocument());
     // The rest of the app must still be usable — no crash boundary tripped.
     expect(await screen.findByText('Your entries')).toBeInTheDocument();
   });
@@ -935,6 +963,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     );
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     const toolbar = screen.getByRole('button', { name: 'Optimize remaps' }).closest('section')!;
@@ -959,6 +988,7 @@ describe('SkillPlans editor: remap markers', () => {
     );
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     expect(screen.queryByText('Remap marker')).not.toBeInTheDocument();
@@ -979,6 +1009,7 @@ describe('SkillPlans editor: remap markers', () => {
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     const toolbar = screen.getByRole('button', { name: 'Add remap marker' }).closest('section')!;
@@ -1002,15 +1033,15 @@ describe('SkillPlans editor: remap markers', () => {
     );
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     const optimizeButton = screen.getByRole('button', { name: 'Optimize at my markers' });
     expect(optimizeButton).toBeEnabled();
     await user.click(optimizeButton);
 
-    expect(
-      await screen.findByRole('heading', { name: 'Optimize at my markers' })
-    ).toBeInTheDocument();
+    await screen.findByText(/^Remapping saves/);
+    expect(toolsSection('Actions')).toBeInTheDocument();
     // Verdict line, same pattern as "optimize now".
     expect(screen.getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
     // Segment 1: leading current-attributes prefix, no remap spent.
@@ -1034,6 +1065,7 @@ describe('SkillPlans editor: remap markers', () => {
     );
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     const toolbar = screen
@@ -1048,6 +1080,7 @@ describe('SkillPlans editor: remap markers', () => {
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     expect(screen.getByRole('button', { name: 'Optimize at my markers' })).toBeDisabled();
@@ -1068,9 +1101,9 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
     );
     goToPlanEditor();
     render(<App />);
-    await screen.findByText('Your entries');
+    await openPlanTools();
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
-    await screen.findByRole('heading', { name: 'Optimize remaps' });
+    await screen.findByText(/^Remapping saves|^No remap improves/);
   };
 
   it('says the optimizer evaluated fewer remaps than the plan allows', async () => {
@@ -1122,6 +1155,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     await db.skillPlans.add(seedTwoSkillPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
     await screen.findByText('Your entries');
 
     expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
@@ -1134,7 +1168,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
-    await screen.findByRole('heading', { name: 'Optimize remaps' });
+    await screen.findByText(/^Remapping saves|^No remap improves/);
 
     await waitFor(() => {
       expect(within(header()).getByText('Remap savings')).toBeInTheDocument();
@@ -1169,6 +1203,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     expect(
       await screen.findByText('From EVE: 2 bonus + yearly on cooldown until 2027-01-15')
@@ -1176,6 +1211,7 @@ describe('SkillPlans editor: remaps available from ESI', () => {
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
+    await openPlanTools();
     // Prefilled but user-editable: the yearly remap is on cooldown, so only
     // the 2 bonus remaps count.
     await waitFor(() => expect(screen.getByLabelText('Remaps available')).toHaveValue(2));
@@ -1199,11 +1235,13 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     expect(await screen.findByText('From EVE: 1 bonus + yearly ready')).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
+    await openPlanTools();
     await waitFor(() => expect(screen.getByLabelText('Remaps available')).toHaveValue(2));
   });
 });
@@ -1213,6 +1251,7 @@ describe('SkillPlans editor: Remaps input label (UX-REVIEW #6)', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     expect(screen.getByLabelText('Remaps available')).toBeInTheDocument();
@@ -1234,6 +1273,7 @@ describe('SkillPlans editor: suggest reorder', () => {
     );
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Suggest reorder' }));
@@ -1262,6 +1302,7 @@ describe('SkillPlans editor: suggest reorder', () => {
     );
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await screen.findByText('Your entries');
     const toolbar = screen.getByRole('button', { name: 'Suggest reorder' }).closest('section')!;
@@ -1279,6 +1320,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
@@ -1300,7 +1342,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
-    await screen.findByText('Training options');
+    await openPlanTools();
 
     expect(screen.queryByLabelText('Expires')).not.toBeInTheDocument();
 
@@ -1317,6 +1359,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
@@ -1340,6 +1383,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
@@ -1363,6 +1407,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
@@ -1400,6 +1445,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
@@ -1436,6 +1482,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
     render(<App />);
+    await openPlanTools();
 
     await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
     const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });

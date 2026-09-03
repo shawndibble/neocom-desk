@@ -86,13 +86,50 @@ function renderEditor(onUpdate = vi.fn()) {
       attributes={ATTRIBUTES}
       implants={IMPLANTS}
       remapInfo={null}
+      listPane={<div data-testid="plan-list-pane" />}
       onUpdate={onUpdate}
     />
   );
   return { onUpdate };
 }
 
-describe('PlanEditor toolbar reorganization', () => {
+/**
+ * jsdom's default `window.matchMedia` (vitest.setup.ts) never matches, so
+ * every test here runs below `lg` unless it opts in — which is where the
+ * tools pane is a collapsed disclosure.
+ */
+async function openTools(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /plan tools/i }));
+}
+
+/** The tools-pane section a heading titles. */
+function sectionFor(title: string): HTMLElement {
+  const section = screen.getByRole('heading', { name: title }).parentElement;
+  if (!section) throw new Error(`expected a section for "${title}"`);
+  return section;
+}
+
+/** Runs `body` with `matchMedia` reporting a `lg`+ viewport, then restores it. */
+function withDesktopViewport(body: () => void) {
+  const realMatchMedia = window.matchMedia;
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: true,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+  try {
+    body();
+  } finally {
+    window.matchMedia = realMatchMedia;
+  }
+}
+describe('PlanEditor tools pane', () => {
   let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;
 
   beforeEach(() => {
@@ -104,70 +141,82 @@ describe('PlanEditor toolbar reorganization', () => {
     configureClipboard(null);
   });
 
-  it('puts Import/Export in their own area, separate from the pinned reorder/optimize/marker toolbar', () => {
+  it('gathers every plan-level control into one tools pane of labelled sections', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+
+    const actions = sectionFor('Actions');
+    const training = sectionFor('Training');
+    const importExport = sectionFor('Import / Export');
+
+    // Actions: the ones used while working the list.
+    for (const name of [
+      'Optimize remaps',
+      'Add remap marker',
+      'Optimize at my markers',
+      'Suggest reorder',
+    ]) {
+      expect(within(actions).getByRole('button', { name })).toBeInTheDocument();
+    }
+    expect(within(actions).getByLabelText('Remaps available')).toBeInTheDocument();
+
+    // Training: the what-if lens, which changes the numbers rather than the plan.
+    expect(within(training).getByLabelText('What-if implants')).toBeInTheDocument();
+    expect(within(training).getByLabelText('Booster')).toBeInTheDocument();
+
+    // Import/Export: plan-level file operations, still their own section.
+    for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
+      expect(within(importExport).getByRole('button', { name })).toBeInTheDocument();
+    }
+    expect(within(importExport).queryByRole('button', { name: 'Suggest reorder' })).toBeNull();
+    expect(within(actions).queryByRole('button', { name: 'Import from skill queue' })).toBeNull();
+  });
+
+  it('renders each action as one full-width labelled row, not an icon-only control', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+
+    for (const name of [
+      'Import from skill queue',
+      'Import from clipboard',
+      'Export',
+      'Optimize remaps',
+      'Add remap marker',
+      'Optimize at my markers',
+      'Suggest reorder',
+    ]) {
+      const button = screen.getByRole('button', { name });
+      // The visible label *is* the accessible name — no aria-label standing in
+      // for a glyph, as the icon-only mobile strip (#224) used to need.
+      expect(button).not.toHaveAttribute('aria-label');
+      expect(button.textContent).toBe(name);
+      expect(button.className).toContain('w-full');
+      expect(button.className).toContain('justify-start');
+    }
+  });
+
+  it('keeps the entry list out of the tools pane, so the plan itself stays the main column', () => {
     renderEditor();
 
-    const importExportSection = screen
-      .getByRole('heading', { name: 'Import / Export' })
-      .closest('section');
-    const toolbarSection = screen.getByRole('heading', { name: 'Toolbar' }).closest('section');
-    if (!importExportSection || !toolbarSection) throw new Error('expected both panels');
-
-    expect(
-      within(importExportSection).getByRole('button', { name: 'Import from skill queue' })
-    ).toBeInTheDocument();
-    expect(
-      within(importExportSection).getByRole('button', { name: 'Import from clipboard' })
-    ).toBeInTheDocument();
-    expect(within(importExportSection).getByRole('button', { name: 'Export' })).toBeInTheDocument();
-    expect(
-      within(importExportSection).queryByRole('button', { name: 'Suggest reorder' })
-    ).toBeNull();
-
-    expect(
-      within(toolbarSection).getByRole('button', { name: 'Optimize remaps' })
-    ).toBeInTheDocument();
-    expect(
-      within(toolbarSection).getByRole('button', { name: 'Add remap marker' })
-    ).toBeInTheDocument();
-    expect(
-      within(toolbarSection).getByRole('button', { name: 'Optimize at my markers' })
-    ).toBeInTheDocument();
-    expect(
-      within(toolbarSection).getByRole('button', { name: 'Suggest reorder' })
-    ).toBeInTheDocument();
-    expect(
-      within(toolbarSection).queryByRole('button', { name: 'Import from skill queue' })
-    ).toBeNull();
-
-    // Pinned near the top of the entries list, not scrolling away with it,
-    // stacked below the also-pinned summary strip at a distinct offset so
-    // neither hides the other.
-    const summarySection = screen.getByRole('heading', { name: 'Plan summary' }).closest('section');
-    if (!summarySection) throw new Error('expected summary section');
-
-    expect(summarySection).toHaveClass('lg:sticky', 'lg:top-0');
-    // The offset that stacks the toolbar below the summary strip is
-    // measured live off the summary Panel's rendered height (see
-    // PlanEditor.tsx's `headerRef`/`toolbarTop`), not a fixed Tailwind
-    // class — a hand-derived constant here previously went stale and the
-    // two panels visibly overlapped (PR #229, fixed in a follow-up). Assert
-    // the mechanism is wired up (sticky, no baked-in top-* class, an inline
-    // `top` supplied) rather than a specific pixel value, which jsdom can't
-    // render anyway.
-    expect(toolbarSection).toHaveClass('lg:sticky');
-    expect(toolbarSection.className).not.toMatch(/\blg:top-/);
-    expect((toolbarSection as HTMLElement).style.top).not.toBe('');
+    // Collapsed on a narrow viewport, the tools cost a single row and the
+    // entry list is still rendered and reachable without expanding anything.
+    expect(screen.getByRole('button', { name: /plan tools/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(screen.getByRole('heading', { name: 'Your entries' })).toBeInTheDocument();
+    expect(screen.getByText('Skill A I')).toBeInTheDocument();
   });
 
   it('collapses Export into one control that reveals "to clipboard" / "to CSV" only after being opened', async () => {
     const user = userEvent.setup();
     renderEditor();
+    await openTools(user);
 
     expect(screen.queryByRole('menuitem', { name: 'Export to clipboard' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: 'Export CSV' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Export to clipboard' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Export CSV' })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Export' }));
 
@@ -181,6 +230,7 @@ describe('PlanEditor toolbar reorganization', () => {
   it("opens Suggest reorder's preview in a Modal; Accept applies the reorder and closes it", async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
+    await openTools(user);
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
@@ -204,6 +254,7 @@ describe('PlanEditor toolbar reorganization', () => {
   it('Reject closes the Suggest reorder Modal without updating the plan', async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
+    await openTools(user);
 
     await user.click(screen.getByRole('button', { name: 'Suggest reorder' }));
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
@@ -214,104 +265,48 @@ describe('PlanEditor toolbar reorganization', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('keeps Optimize remaps results inline (no dialog)', async () => {
+  it('keeps Optimize remaps results inline, beneath the button that produced them', async () => {
     const user = userEvent.setup();
     renderEditor();
+    await openTools(user);
 
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Optimize remaps' })).toBeInTheDocument();
+    // The verdict lands in the same Actions section as its trigger, rather
+    // than in another panel at the bottom of the page.
+    const actions = sectionFor('Actions');
+    expect(within(actions).getByRole('status')).toBeInTheDocument();
   });
 });
 
-describe('PlanEditor icon-only toolbar below desktop width (#224)', () => {
-  // jsdom's default `window.matchMedia` (vitest.setup.ts) never matches, so
-  // this already runs at a narrow (below-`lg`) viewport with no mock needed.
-  it('renders the toolbar actions as icon-only buttons, same accessible names as the text buttons, in a scrollable row', () => {
+describe('PlanEditor tools pane placement', () => {
+  it('folds the tools into one collapsed disclosure below `lg`, so the plan leads the page', () => {
     renderEditor();
 
-    const importExportSection = screen
-      .getByRole('heading', { name: 'Import / Export' })
-      .closest('section')!;
-    const toolbarSection = screen.getByRole('heading', { name: 'Toolbar' }).closest('section')!;
-
-    const actionNames = [
-      'Import from skill queue',
-      'Import from clipboard',
-      'Export',
-      'Optimize remaps',
-      'Add remap marker',
-      'Optimize at my markers',
-      'Suggest reorder',
-    ];
-    for (const name of actionNames) {
-      const button = screen.getByRole('button', { name });
-      // Icon-only: the accessible name comes from `aria-label`, not visible
-      // text — the glyph is the only rendered child, hidden from assistive
-      // tech (IconButton.test.tsx covers that contract directly).
-      expect(button).toHaveAttribute('aria-label', name);
-      expect(button.textContent).toBe('');
-    }
-
-    // `.closest` rather than `.parentElement`: Tooltip's Radix trigger clones
-    // its props directly onto the button (no wrapping element), but `.closest`
-    // doesn't depend on that either way.
-    const importExportRow = screen
-      .getByRole('button', { name: 'Import from skill queue' })
-      .closest('div.flex.items-center.gap-2')!;
-    expect(importExportRow).toHaveClass('overflow-x-auto');
-    expect(importExportRow).not.toHaveClass('flex-wrap');
-    expect(within(importExportSection).getAllByRole('button')).toHaveLength(3);
-
-    const toolbarRow = screen
-      .getByRole('button', { name: 'Add remap marker' })
-      .closest('div.flex.items-center.gap-2')!;
-    expect(toolbarRow).toHaveClass('overflow-x-auto');
-    expect(toolbarRow).not.toHaveClass('flex-wrap');
-    // The 4 toolbar actions, plus the remap-count row's own "?" InfoTooltip
-    // button (unrelated to this ticket — not an action, not converted).
-    expect(within(toolbarSection).getAllByRole('button')).toHaveLength(5);
+    const toggle = screen.getByRole('button', { name: /plan tools/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Nothing inside is mounted while collapsed — the whole tool set costs
+    // one row, where it used to cost three panels.
+    expect(screen.queryByRole('button', { name: 'Optimize remaps' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Import from skill queue' })).toBeNull();
+    expect(screen.queryByLabelText('What-if implants')).toBeNull();
   });
 
-  it('keeps full-text buttons at `lg`+, unchanged', () => {
-    const realMatchMedia = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-    try {
+  it('puts the tools in the sidebar under the plan list at `lg`+, always open', () => {
+    withDesktopViewport(() => {
       renderEditor();
 
-      const importExportRow = screen
-        .getByRole('button', { name: 'Import from skill queue' })
-        .closest('div.flex.items-center.gap-2')!;
-      expect(importExportRow).toHaveClass('flex-wrap');
-      expect(importExportRow).not.toHaveClass('overflow-x-auto');
+      // No disclosure toggle at all: the sidebar has the room, so the tools
+      // are simply there.
+      expect(screen.queryByRole('button', { name: /^plan tools$/i })).toBeNull();
+      expect(screen.getByRole('heading', { name: 'Plan tools' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Optimize remaps' })).toBeInTheDocument();
 
-      for (const name of [
-        'Import from skill queue',
-        'Import from clipboard',
-        'Export',
-        'Optimize remaps',
-        'Add remap marker',
-        'Optimize at my markers',
-        'Suggest reorder',
-      ]) {
-        const button = screen.getByRole('button', { name });
-        expect(button).not.toHaveAttribute('aria-label');
-        expect(button.textContent).toBe(name);
-      }
-    } finally {
-      window.matchMedia = realMatchMedia;
-    }
+      const sidebar = screen.getByTestId('plan-list-pane').closest('aside');
+      if (!sidebar) throw new Error('expected the tools to share the sidebar with the plan list');
+      expect(within(sidebar).getByRole('heading', { name: 'Plan tools' })).toBeInTheDocument();
+    });
   });
 });
 

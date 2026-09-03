@@ -1,4 +1,3 @@
-import { forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel, StatChip } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
@@ -15,32 +14,22 @@ interface PlanHeaderProps {
 /**
  * Plan-at-a-glance header: total time, skill count, projected finish, and a
  * live remap-savings badge.
- *
- * Forwards its ref to the root Panel — PlanEditor.tsx measures this Panel's
- * rendered height at runtime to position the also-sticky toolbar below it.
  */
-export const PlanHeader = forwardRef<HTMLElement, PlanHeaderProps>(function PlanHeader(
-  { totalSeconds, skillCount, projectedFinish, badge },
-  ref
-) {
+export function PlanHeader({ totalSeconds, skillCount, projectedFinish, badge }: PlanHeaderProps) {
   const { t } = useTranslation();
   const savingsSeconds = badge?.savingsSeconds ?? 0;
   const showsSavings = badge !== null && savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
 
   return (
-    // Sticky from `lg` up, same as the toolbar below it (PlanEditor.tsx):
-    // both stay visible while a long entry queue scrolls inside
-    // SkillPlanEditor's own scroll box. This is the first (topmost) sticky
-    // Panel, so it sticks flush at `top-0`; the toolbar below it uses a
-    // non-zero offset so the two stack instead of overlapping. `lg:z-20`
-    // keeps it above the toolbar's `lg:z-10` while both are stuck.
-    <Panel ref={ref} title={t('plans.headerTitle')} className="lg:sticky lg:top-0 lg:z-20">
-      {/* `lg:flex-nowrap` keeps this row a fixed one-line height at `lg`+;
-          the toolbar's stacking offset below is measured live off this
-          Panel's rendered height, so a chip (e.g. the remap-savings note)
-          wrapping to a second row would still be picked up correctly, but
-          nowrap keeps the header itself visually compact. `lg:overflow-x-auto`
-          keeps any overflow reachable at the narrow end of `lg`. */}
+    // Not sticky any more, and no longer measured: only the entry list
+    // scrolls now (PlanEditor caps that list alone), so this strip stays in
+    // view by simply sitting above it. That retires the pair of stacked
+    // sticky panels whose offsets had to be derived from each other's
+    // rendered height and drifted apart whenever either changed (#221/#229).
+    <Panel title={t('plans.headerTitle')}>
+      {/* `lg:flex-nowrap` keeps this row one line at `lg`+, where the sidebar
+          leaves it less width than the page; `lg:overflow-x-auto` keeps any
+          overflow reachable at the narrow end of that range. */}
       <div className="flex flex-wrap gap-2 lg:flex-nowrap lg:overflow-x-auto">
         <StatChip label={t('plans.headerTrainingTime')} value={formatDuration(totalSeconds)} />
         <StatChip label={t('plans.headerSkillCount')} value={skillCount} />
@@ -67,4 +56,4 @@ export const PlanHeader = forwardRef<HTMLElement, PlanHeaderProps>(function Plan
       </div>
     </Panel>
   );
-});
+}

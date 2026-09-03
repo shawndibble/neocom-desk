@@ -347,11 +347,30 @@
   (in-game data, character-wide, not plan-specific) plus plan CRUD with
   icon-only row actions (edit/duplicate/delete) and an in-app `Modal`
   replacing `window.confirm` on delete.
-- **No plan-switcher sidebar** on the editor page — a back link plus a
-  toolbar pinned above the entry list substitute for it. Import (from
-  in-game queue / from clipboard) and Export live in their own compact area,
-  separate from the pinned toolbar, which carries only reorder/optimize/
-  marker actions — the ones used while actively working the list.
+- **The editor page is a sidebar plus the plan** (supersedes round 18's "no
+  plan-switcher sidebar, pinned toolbar above the list", and #158's list pane
+  beside the editor). The sidebar carries the plan list and, below it, a
+  single **Plan Tools** panel of three labelled sections: Actions
+  (reorder/optimize/marker, the ones used while working the list), Training
+  (the what-if implants/booster lens), and Import / Export. The main column
+  carries only the plan summary strip and the entry list. Rationale: five
+  peer panels said the controls mattered as much as the plan, cost five panel
+  header strips of chrome to say it, and left the sidebar empty below a short
+  plan list.
+  - Below `lg` the sidebar is not built at all: the tools move into the one
+    column as a **collapsed disclosure** above the entry list, so the whole
+    tool set costs one row rather than three panels, and the plan leads the
+    page. This supersedes #224's icon-only, sideways-scrolling toolbar — a
+    full-width labelled row is a bigger touch target and self-describing.
+  - Only the entry list scrolls, capped against the live viewport. Nothing is
+    `position: sticky` any more: the summary strip and the sidebar stay in
+    view by sitting outside that scroller, which retires the pair of stacked
+    sticky panels whose offsets had to be derived from each other's rendered
+    height (#221/#229).
+  - "Optimize remaps" and "Optimize at markers" results render inline in the
+    Actions section, under the button that produced them, rather than as
+    extra panels at the bottom of the page. Still read-only findings to
+    consult, not a decision to commit.
 - **"Your entries" and "Computed queue" merge into one list**: one row per
   plan entry (not exploded per individual level), draggable, with priority,
   target level, and an icon-only remove button, plus per-level and cumulative

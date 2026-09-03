@@ -11,12 +11,16 @@ import { PlanEditor } from '@/features/skills/planner/PlanEditor';
 import { PlanListPane } from '@/features/skills/planner/PlanListPane';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import {
-  useViewportBoundedHeight,
-  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
-} from '@/lib/useViewportBoundedHeight';
 
-/** Skill Plan editor: the full editing surface for one plan, beside the plan list on wide screens (#158). */
+/**
+ * Skill Plan editor: the full editing surface for one plan, beside the plan
+ * list on wide screens (#158).
+ *
+ * The two-column grid itself belongs to `PlanEditor`, not to this route: the
+ * sidebar's lower half is the plan's own tools, which need every handler
+ * `PlanEditor` already owns. This route's job is the data, and the plan list
+ * it hands over to fill the top of that sidebar.
+ */
 export function SkillPlanEditor() {
   const { t } = useTranslation();
   const { planId } = useParams<{ planId: string }>();
@@ -25,7 +29,6 @@ export function SkillPlanEditor() {
   const { catalog, trainedSkills, attributes, implants, remapInfo } =
     usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
-  const [scrollerRef, scrollerMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   // Wrapped so `undefined` (still loading) is distinguishable from a plan
   // genuinely not found: db.skillPlans.get() resolves to undefined either
@@ -68,54 +71,31 @@ export function SkillPlanEditor() {
     <div className="mx-auto max-w-6xl space-y-4">
       <SkillsSubNav />
 
-      {/* `lg:items-start`: grid items stretch to the row's height by
-          default, so without this the list column (often just a couple of
-          short rows) gets pulled up to match the editor column's full
-          (capped) height, rendering as a tall, mostly-empty box. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
-        <PlanListPane
-          activeCharacterId={activeCharacterId}
-          remapInfo={remapInfo}
-          className={isDesktop ? '' : 'hidden'}
-        />
-        <div className="space-y-2">
-          {!isDesktop && (
-            <Link to="/skills/plans" className="inline-block text-xs text-accent hover:underline">
-              {t('plans.backToList')}
-            </Link>
-          )}
-          {/* The height cap exists to keep the plan list beside it in view on a
-              wide screen — measured live against the viewport instead of a
-              flat constant, so it uses whatever room is actually available.
-              Below `lg` the list is not rendered at all, so the cap is
-              skipped entirely — it would only buy a scroller inside an
-              already-scrolling phone page. */}
-          <div
-            ref={scrollerRef}
-            className="lg:overflow-y-auto"
-            style={
-              isDesktop && scrollerMaxHeight !== null ? { maxHeight: scrollerMaxHeight } : undefined
-            }
-          >
-            {!catalog ? (
-              <div className="flex justify-center py-16">
-                <Spinner label={t('common.loading')} />
-              </div>
-            ) : (
-              <PlanEditor
-                characterId={activeCharacterId}
-                plan={plan}
-                catalog={catalog}
-                trainedSkills={trainedSkills}
-                attributes={attributes}
-                implants={implants}
-                remapInfo={remapInfo}
-                onUpdate={(patch) => void handleUpdate(patch)}
-              />
-            )}
-          </div>
+      {/* Below `lg` the list is not on screen at all, so this is the only way
+          back to it. */}
+      {!isDesktop && (
+        <Link to="/skills/plans" className="inline-block text-xs text-accent hover:underline">
+          {t('plans.backToList')}
+        </Link>
+      )}
+
+      {!catalog ? (
+        <div className="flex justify-center py-16">
+          <Spinner label={t('common.loading')} />
         </div>
-      </div>
+      ) : (
+        <PlanEditor
+          characterId={activeCharacterId}
+          plan={plan}
+          catalog={catalog}
+          trainedSkills={trainedSkills}
+          attributes={attributes}
+          implants={implants}
+          remapInfo={remapInfo}
+          listPane={<PlanListPane activeCharacterId={activeCharacterId} remapInfo={remapInfo} />}
+          onUpdate={(patch) => void handleUpdate(patch)}
+        />
+      )}
     </div>
   );
 }

@@ -53,20 +53,25 @@ test('optimize remaps shows attribute segments and savings', async ({ page }) =>
   await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
   await page.getByRole('button', { name: 'Optimize remaps' }).click();
 
-  const resultPanel = page.getByRole('heading', { name: 'Optimize remaps' }).locator('../..');
+  // The verdict renders inline in the tools pane's Actions section, under
+  // the button that produced it.
+  const resultPanel = page
+    .getByRole('heading', { name: 'Actions' })
+    .locator('xpath=ancestor::section[1]');
   await expect(resultPanel.getByText(/Remapping saves (?:\d+[dhm]\s*)+/)).toBeVisible();
   await expect(resultPanel.getByText('Segment 1')).toBeVisible();
   await expect(resultPanel.getByText(/remap to (?:[A-Z]{3} \d+ \/ ){4}[A-Z]{3} \d+/)).toBeVisible();
 });
 
-test('sticky plan summary and toolbar stack without overlap once the entries queue scrolls (#221 regression)', async ({
+test('the plan summary and tools stay in view while the entries queue scrolls (#221 successor)', async ({
   page,
 }) => {
-  // A prior fix's `top` offset was a hand-derived constant that went stale
-  // the moment the summary strip's rendered height changed, so the toolbar
-  // overlapped it once actually scrolled — invisible at rest, only visible
-  // once the entries queue genuinely overflows its box. Needs enough
-  // entries to overflow SkillPlanEditor's scroller, which is capped against
+  // The pane used to pin two panels — the summary strip and a toolbar below
+  // it — whose `top` offsets had to be derived from each other's rendered
+  // height, and overlapped whenever that derivation went stale (#221/#229).
+  // Only the entry list is capped now, so the strip above it and the tools
+  // beside it stay put structurally, with nothing to keep in sync. Needs
+  // enough entries to actually overflow that cap, which is measured against
   // the live viewport height (#237), not a flat constant.
   await addCaldariCruiserToNewPlan(page);
   await page.getByRole('button', { name: 'Import from clipboard' }).click();
@@ -97,22 +102,10 @@ test('sticky plan summary and toolbar stack without overlap once the entries que
   await dialog.getByRole('button', { name: 'Apply' }).click();
   await expect(dialog).toBeHidden();
 
-  // The whole Panel `<section>`, not just its `<header>` title bar (`..`
-  // only reaches the immediate parent, i.e. the header) — the chip row/
-  // toolbar controls that actually matter for this overlap check live in a
-  // sibling of `<header>`, further up the tree.
-  const summaryPanel = page
-    .getByRole('heading', { name: 'Plan summary' })
-    .locator('xpath=ancestor::section[1]');
-  const toolbarPanel = page
-    .getByRole('heading', { name: 'Toolbar' })
-    .locator('xpath=ancestor::section[1]');
-
-  // Confirm the setup actually overflows the box this bug depends on
-  // (SkillPlanEditor.tsx's viewport-bounded scroller) — otherwise the wheel
-  // scroll below has nothing to do and this test would pass vacuously
-  // regardless of the bug. Exact class match: several other elements on the
-  // page carry `overflow-y-auto` combined with other utility classes.
+  // Confirm the setup actually overflows the capped list — otherwise the
+  // wheel scroll below has nothing to do and this test would pass vacuously.
+  // Exact class match: other elements combine `overflow-y-auto` with more
+  // utility classes.
   await expect(async () => {
     const overflowed = await page.evaluate(() => {
       const el = Array.from(document.querySelectorAll<HTMLElement>('div')).find(
@@ -134,13 +127,20 @@ test('sticky plan summary and toolbar stack without overlap once the entries que
   await page.mouse.wheel(0, 700);
   await page.waitForTimeout(100);
 
+  // The list scrolled inside its own box, so everything framing it is still
+  // on screen: the summary strip above, the panel's own header, and the
+  // tools sidebar beside it.
+  const summaryPanel = page
+    .getByRole('heading', { name: 'Plan summary' })
+    .locator('xpath=ancestor::section[1]');
   await expect(summaryPanel).toBeInViewport();
-  await expect(toolbarPanel).toBeInViewport();
+  await expect(entriesHeading).toBeInViewport();
+  await expect(page.getByRole('heading', { name: 'Plan tools' })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Optimize remaps' })).toBeInViewport();
+
+  // And the summary strip never ends up overlapped by what follows it.
   const summaryBox = await summaryPanel.boundingBox();
-  const toolbarBox = await toolbarPanel.boundingBox();
-  if (!summaryBox || !toolbarBox) throw new Error('expected both panels to have a layout box');
-  // Toolbar starts at or after the summary strip's bottom edge (a small
-  // rounding allowance, not a gap requirement) — this is what overlap
-  // failing would violate.
-  expect(toolbarBox.y).toBeGreaterThanOrEqual(summaryBox.y + summaryBox.height - 1);
+  const entriesBox = await entriesHeading.boundingBox();
+  if (!summaryBox || !entriesBox) throw new Error('expected both to have a layout box');
+  expect(entriesBox.y).toBeGreaterThanOrEqual(summaryBox.y + summaryBox.height - 1);
 });
