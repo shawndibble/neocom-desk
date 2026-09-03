@@ -368,7 +368,12 @@ describe('PlanEditor tools pane', () => {
       skill({ typeID: 10, name: 'Skill A', primaryAttr: 'intelligence', secondaryAttr: 'memory' }),
       skill({ typeID: 30, name: 'Skill C', primaryAttr: 'intelligence', secondaryAttr: 'memory' }),
       skill({ typeID: 20, name: 'Skill B', primaryAttr: 'perception', secondaryAttr: 'willpower' }),
-      skill({ typeID: 40, name: 'Skill D', primaryAttr: 'charisma', secondaryAttr: 'intelligence' }),
+      skill({
+        typeID: 40,
+        name: 'Skill D',
+        primaryAttr: 'charisma',
+        secondaryAttr: 'intelligence',
+      }),
     ];
     const engineSkills = new Map(
       localSkills.map((s) => [
