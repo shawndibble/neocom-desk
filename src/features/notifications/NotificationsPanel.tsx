@@ -265,7 +265,8 @@ export function NotificationsPanel() {
                 const eveTypePrefs = characterEveTypePrefs(prefsValue, character.characterId);
                 const knownEveTypes = knownEveTypesForCharacter(
                   feedEntries ?? [],
-                  character.characterId
+                  character.characterId,
+                  prefsValue
                 );
 
                 return (
