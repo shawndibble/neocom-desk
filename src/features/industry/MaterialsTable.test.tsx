@@ -72,6 +72,24 @@ describe('MaterialsTable sourcing', () => {
     const tritanium = within(row('Tritanium'));
     expect(tritanium.getByText('5')).toBeTruthy();
     expect(tritanium.getByText('5,000')).toBeTruthy();
+    expect(tritanium.getByText('Hub')).toBeTruthy();
+  });
+
+  it('falls back to placeholder text for every row when prices could not be loaded', () => {
+    render(<Harness pricesReady={false} />);
+    const tritanium = within(row('Tritanium'));
+    expect(tritanium.getByText('No price')).toBeTruthy();
+    expect(tritanium.getByText('—')).toBeTruthy();
+  });
+
+  it('keeps showing an override price when prices could not be loaded', () => {
+    // The override is the player's own number, so no market data is needed to
+    // price the row — and the results panel already counts it.
+    render(<Harness initial={{ 34: { overridePrice: 7 } }} pricesReady={false} />);
+    const tritanium = within(row('Tritanium'));
+    expect(tritanium.getByText('Override')).toBeTruthy();
+    expect(tritanium.getByText('7,000')).toBeTruthy();
+    expect(tritanium.queryByText('No price')).toBeNull();
   });
 
   it('editing an owned quantity reprices the row and reports the patch', async () => {

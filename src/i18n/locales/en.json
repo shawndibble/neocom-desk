@@ -295,7 +295,7 @@
     "unpriced": "No price",
     "ownedQuantity": "Owned",
     "ownedQuantityFor": "Owned quantity for {{material}}",
-    "overridePrice": "Override Price",
+    "overridePrice": "Override price",
     "overridePriceFor": "Override unit price for {{material}}",
     "priceSourceHub": "Hub",
     "priceSourceOverride": "Override",

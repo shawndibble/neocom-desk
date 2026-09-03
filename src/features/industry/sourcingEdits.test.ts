@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { db, type BuildPlanRecord } from '@/db';
 import type { MaterialSourcingMap } from '@/engine/industry/types';
-import { applySourcingPatch } from './sourcingEdits';
+import { applySourcingPatch, saveSourcingEdit } from './sourcingEdits';
 
 describe('applySourcingPatch', () => {
   it('sets an owned quantity on a plan that had no sourcing at all', () => {
@@ -64,5 +65,57 @@ describe('applySourcingPatch', () => {
   it('treats a garbage value as a cleared field rather than storing it', () => {
     const map: MaterialSourcingMap = { 34: { ownedQuantity: 500 } };
     expect(applySourcingPatch(map, 34, { ownedQuantity: Number.NaN })).toBeUndefined();
+  });
+});
+
+const PLAN: BuildPlanRecord = {
+  id: 'plan-1',
+  characterId: 1,
+  name: 'Rifter',
+  blueprintTypeID: 683,
+  runs: 1,
+  me: 0,
+  te: 0,
+  facility: 'npcStation',
+  rigLevel: 'none',
+  security: 'highsec',
+  hubId: 'jita',
+  updatedAt: 1,
+};
+
+describe('saveSourcingEdit', () => {
+  beforeEach(async () => {
+    await db.buildPlans.clear();
+    await db.buildPlans.put(PLAN);
+  });
+
+  it('persists the edit onto the plan record', async () => {
+    await saveSourcingEdit(PLAN.id, 34, { ownedQuantity: 400 });
+    const stored = await db.buildPlans.get(PLAN.id);
+    expect(stored?.materialSourcing).toEqual({ 34: { ownedQuantity: 400 } });
+    expect(stored?.updatedAt).toBeGreaterThan(PLAN.updatedAt);
+  });
+
+  it('merges against the stored record, so a second edit cannot drop the first', async () => {
+    // Both edits are issued from the same rendered map (the empty one) — the
+    // real hazard when tabbing straight from a row's owned quantity into its
+    // override price, before the live query has re-emitted.
+    await saveSourcingEdit(PLAN.id, 34, { ownedQuantity: 400 });
+    await saveSourcingEdit(PLAN.id, 34, { overridePrice: 7 });
+    const stored = await db.buildPlans.get(PLAN.id);
+    expect(stored?.materialSourcing).toEqual({ 34: { ownedQuantity: 400, overridePrice: 7 } });
+  });
+
+  it('clears the field back off the record, leaving no empty map behind', async () => {
+    await saveSourcingEdit(PLAN.id, 34, { overridePrice: 7 });
+    await saveSourcingEdit(PLAN.id, 34, { overridePrice: undefined });
+    const stored = await db.buildPlans.get(PLAN.id);
+    expect(stored?.materialSourcing).toBeUndefined();
+  });
+
+  it('does nothing for a plan deleted mid-edit rather than resurrecting it', async () => {
+    await db.buildPlans.delete(PLAN.id);
+    await saveSourcingEdit(PLAN.id, 34, { ownedQuantity: 400 });
+    expect(await db.buildPlans.get(PLAN.id)).toBeUndefined();
   });
 });

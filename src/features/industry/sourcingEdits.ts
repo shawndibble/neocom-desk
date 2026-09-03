@@ -1,6 +1,6 @@
 /**
  * Editing side of `MaterialSourcing`: turns one row's edit into the whole
- * replacement map a Build Plan patch carries.
+ * replacement map a Build Plan record stores.
  *
  * The map is stored on the plan record, so an edit is a read-modify-write of a
  * plain object rather than a field assignment. Two rules keep that honest:
@@ -12,6 +12,7 @@
  * exactly the way a plan that never had any stores it.
  */
 
+import { db } from '@/db';
 import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
 
@@ -20,10 +21,7 @@ import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/ty
  *
  * `patch` members set to `undefined` clear that field — the caller passes
  * `{ overridePrice: undefined }` for a cleared input, and normalization then
- * drops it. Returns `undefined` when nothing is left to store; a caller
- * patching a plan record must pass that through explicitly
- * (`{ materialSourcing: undefined }`) rather than omitting the key, or the
- * spread that applies the patch keeps the stale map.
+ * drops it. Returns `undefined` when nothing is left to store.
  */
 export function applySourcingPatch(
   sourcing: MaterialSourcingMap | undefined,
@@ -33,5 +31,33 @@ export function applySourcingPatch(
   return normalizeMaterialSourcingMap({
     ...sourcing,
     [typeID]: { ...sourcing?.[typeID], ...patch },
+  });
+}
+
+/**
+ * Persists one row's edit against the stored plan.
+ *
+ * The merge happens inside the write transaction, reading the record rather
+ * than whatever map the panel last rendered. Unlike runs/ME/TE — each a whole
+ * field, so a stale base can only lose a concurrent edit to a *different*
+ * field — a sourcing edit merges into a nested map, and merging into a map
+ * read one render ago would drop the edit made just before it. Tabbing from a
+ * row's owned quantity straight into its override price is exactly that case.
+ *
+ * A plan deleted mid-edit is a no-op, not a resurrection.
+ */
+export async function saveSourcingEdit(
+  planId: string,
+  typeID: number,
+  patch: MaterialSourcing
+): Promise<void> {
+  await db.transaction('rw', db.buildPlans, async () => {
+    const plan = await db.buildPlans.get(planId);
+    if (!plan) return;
+    await db.buildPlans.put({
+      ...plan,
+      materialSourcing: applySourcingPatch(plan.materialSourcing, typeID, patch),
+      updatedAt: Date.now(),
+    });
   });
 }

@@ -13,7 +13,7 @@ import {
   VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
 } from '@/lib/useViewportBoundedHeight';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import type { SkillLevels } from '@/engine/industry/types';
+import type { MaterialSourcing, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import {
@@ -25,6 +25,7 @@ import { findOwnedBlueprint, loadCharacterBlueprints } from '@/features/industry
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import { BuildPlanDetail, type PlanPatch } from '@/features/industry/BuildPlanDetail';
+import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
 
 function newBuildPlan(
   characterId: number,
@@ -225,6 +226,12 @@ export function Industry() {
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
+  async function handleSourcingChange(typeID: number, patch: MaterialSourcing) {
+    if (!selectedPlan) return;
+    await saveSourcingEdit(selectedPlan.id, typeID, patch);
+    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title={t('nav.industry')} />
@@ -294,6 +301,7 @@ export function Industry() {
                   ownedBlueprints={ownedBlueprints}
                   skills={skills}
                   onUpdate={(patch) => void handleUpdate(patch)}
+                  onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
                 />
               ) : plans.length > 0 ? (
                 <div className="flex justify-center py-8">

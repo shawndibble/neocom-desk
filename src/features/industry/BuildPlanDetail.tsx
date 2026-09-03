@@ -29,22 +29,13 @@ import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { MaterialsTable } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
-import { applySourcingPatch } from './sourcingEdits';
 import { ResultsSummary } from './ResultsSummary';
 
 /** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
 export type PlanPatch = Partial<
   Pick<
     BuildPlanRecord,
-    | 'runs'
-    | 'me'
-    | 'te'
-    | 'facility'
-    | 'rigLevel'
-    | 'security'
-    | 'hubId'
-    | 'facilityTaxPct'
-    | 'materialSourcing'
+    'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'hubId' | 'facilityTaxPct'
   >
 >;
 
@@ -54,6 +45,12 @@ interface BuildPlanDetailProps {
   ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
   onUpdate: (patch: PlanPatch) => void;
+  /**
+   * One material row’s sourcing edit. Separate from `onUpdate` because it is a
+   * read-modify-write of a nested map rather than a whole field, so it has to
+   * merge against the stored record, not against this render’s `plan`.
+   */
+  onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
 }
 
 function clampInt(value: number, min: number, max: number): number {
@@ -68,6 +65,7 @@ export function BuildPlanDetail({
   ownedBlueprints,
   skills,
   onUpdate,
+  onSourcingChange,
 }: BuildPlanDetailProps) {
   const { t } = useTranslation();
 
@@ -132,19 +130,17 @@ export function BuildPlanDetail({
     onUpdate(patch);
   }
 
-  function updateSourcing(typeID: number, patch: MaterialSourcing) {
-    // The key is sent even when the result is `undefined`: the patch is spread
-    // over the record, so omitting it would keep the stale map and clearing the
-    // last override would silently do nothing.
-    update({ materialSourcing: applySourcingPatch(plan.materialSourcing, typeID, patch) });
-  }
-
   function exportMaterialsCsv() {
     if (!result) return;
     downloadCsv(
       'build-materials',
       result.materials,
-      materialsCsvColumns(t, (typeID) => nameForType(catalog, typeID), pricesReady)
+      materialsCsvColumns(
+        t,
+        (typeID) => nameForType(catalog, typeID),
+        plan.materialSourcing,
+        pricesReady
+      )
     );
   }
 
@@ -343,7 +339,7 @@ export function BuildPlanDetail({
             nameFor={(typeID) => nameForType(catalog, typeID)}
             sourcing={plan.materialSourcing}
             pricesReady={pricesReady}
-            onSourcingChange={updateSourcing}
+            onSourcingChange={onSourcingChange}
           />
         )}
       </Panel>

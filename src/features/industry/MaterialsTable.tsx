@@ -8,6 +8,7 @@ import type {
 } from '@/engine/industry/types';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
+import { materialRowState } from './materialRow';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -15,7 +16,7 @@ interface MaterialsTableProps {
   nameFor: (typeID: number) => string;
   /** The plan's raw overrides. Needed to tell an override apart from a hub price of the same value. */
   sourcing: MaterialSourcingMap | undefined;
-  /** False when prices couldn't be fetched at all (offline) — unit price and line total fall back to placeholder text. */
+  /** False when the market snapshot couldn't be fetched — hub prices fall back to placeholder text. */
   pricesReady: boolean;
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
 }
@@ -88,11 +89,11 @@ function SourcingInput({
  *
  * Three pricing states have to be told apart — hub-priced, owned-free, manually
  * overridden — and they are not mutually exclusive: a row can be half owned and
- * overridden at once. So each cue is text, never colour alone (WCAG 1.4.1): the
- * unit price carries a Hub/Override tag read from the stored overrides rather
- * than by comparing numbers (an override equal to the hub price is otherwise
- * invisible), and a partly-owned row spells its owned/bought split out beneath
- * the blended line total.
+ * overridden at once. So every cue is text, never colour alone (WCAG 1.4.1, and
+ * docs/DESIGN.md §7): a Hub/Override tag beside the unit price, and an
+ * owned/bought split spelled out beneath a partly-owned row's blended total.
+ * `materialRow.ts` decides what each row shows, so the CSV export can't drift
+ * from it.
  */
 export function MaterialsTable({
   materials,
@@ -153,22 +154,22 @@ export function MaterialsTable({
         align: 'right',
         className: 'tabular-nums',
         render: (material) => {
-          const priced = pricesReady && material.unitPrice !== null;
-          if (!priced) {
-            // A fully owned material costs nothing, so a missing hub price for
-            // it is not a problem worth a warning — only a real remainder is.
-            return material.remainingQuantity === 0 ? (
+          const state = materialRowState(material, sourcing, pricesReady);
+          if (state.unitPrice === null) {
+            // A fully owned material costs nothing, so a missing price for it
+            // is not a problem worth a warning — only a real remainder is.
+            return state.fullyOwned ? (
               <span className="text-text-dim">{t('industry.priceSourceOwned')}</span>
             ) : (
               <span className="text-warning">{t('industry.unpriced')}</span>
             );
           }
-          const overridden = sourcing?.[material.typeID]?.overridePrice !== undefined;
+          const overridden = state.priceSource === 'override';
           return (
             <span className="inline-flex items-baseline justify-end gap-1">
-              {formatIsk(material.unitPrice ?? 0)}
+              {formatIsk(state.unitPrice)}
               <span
-                className={cx('text-[0.6875rem]', overridden ? 'text-accent' : 'text-text-faint')}
+                className={cx('text-[0.6875rem]', overridden ? 'text-accent' : 'text-text-dim')}
               >
                 {overridden ? t('industry.priceSourceOverride') : t('industry.priceSourceHub')}
               </span>
@@ -182,24 +183,22 @@ export function MaterialsTable({
         align: 'right',
         className: 'tabular-nums',
         render: (material) => {
-          const priced = pricesReady && material.unitPrice !== null;
-          // A fully owned row costs nothing whether or not anything is priced.
-          const fullyOwned = material.remainingQuantity === 0;
+          const state = materialRowState(material, sourcing, pricesReady);
           const owned = material.ownedQuantity;
           return (
             <span className="flex flex-col items-end">
               <span>
-                {fullyOwned || priced ? formatIsk(material.lineCost) : t('common.unknown')}
+                {state.lineCost === null ? t('common.unknown') : formatIsk(state.lineCost)}
               </span>
               {owned > 0 && (
                 <span className="text-[0.6875rem] text-text-dim">
-                  {fullyOwned
+                  {state.fullyOwned
                     ? t('industry.sourcingAllOwned', { owned: owned.toLocaleString() })
-                    : priced
+                    : state.unitPrice !== null
                       ? t('industry.sourcingSplit', {
                           owned: owned.toLocaleString(),
                           bought: material.remainingQuantity.toLocaleString(),
-                          price: formatIsk(material.unitPrice ?? 0),
+                          price: formatIsk(state.unitPrice),
                         })
                       : t('industry.sourcingSplitUnpriced', {
                           owned: owned.toLocaleString(),
