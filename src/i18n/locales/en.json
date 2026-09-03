@@ -47,6 +47,7 @@
     "refresh": "Refresh",
     "attributes": "Attributes",
     "attributeEffective": "{{base}} + {{bonus}} = {{effective}}",
+    "attributeEffectiveBoth": "{{base}} + {{implant}} implant + {{booster}} booster = {{effective}}",
     "implants": "Implants",
     "implantsNone": "None fitted",
     "emptyTitle": "No skill data cached",

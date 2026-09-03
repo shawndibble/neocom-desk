@@ -23,7 +23,8 @@ export function SkillPlans() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const syncStatus = useSyncStatus();
-  const { catalog, attributesResult, implants, remapInfo } = usePlanEditorData(activeCharacterId);
+  const { catalog, attributesResult, implants, attributeBaseline, remapInfo } =
+    usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
 
   if (!hydrated) {
@@ -52,6 +53,7 @@ export function SkillPlans() {
         <AttributesPane
           result={attributesResult}
           implantBonuses={implants}
+          attributeBaseline={attributeBaseline}
           remapInfo={remapInfo}
           className={isDesktop ? '' : 'hidden'}
         />
