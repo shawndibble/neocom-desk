@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
   Caret,
@@ -19,10 +18,7 @@ import {
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { db, type QuickbarItem } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { scheduleSync } from '@/sync';
-import { isSyncConfigured } from '@/app/syncStatus';
 import {
   loadMarketGroups,
   loadMarketTypes,
@@ -63,11 +59,8 @@ import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { getVariationRows } from '@/features/market/variations';
 import { VariationsTable } from '@/features/market/VariationsTable';
 import { VariationsCompareModal } from '@/features/market/VariationsCompareModal';
-import {
-  addQuickbarItem,
-  removeQuickbarItem,
-  reorderQuickbarItems,
-} from '@/features/market/quickbar';
+import { removeQuickbarItem, reorderQuickbarItems } from '@/features/market/quickbar';
+import { useQuickbar } from '@/features/market/useQuickbar';
 import {
   splitOrderBook,
   resolveOrderLocation,
@@ -277,26 +270,12 @@ export function Market() {
   // as [] rather than requiring an active character — Market Browser itself
   // needs none — so Add to Quickbar silently no-ops with nobody active.
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const quickbarRecord = useLiveQuery(async () => {
-    if (activeCharacterId === null) return undefined;
-    return db.quickbars.get(String(activeCharacterId));
-  }, [activeCharacterId]);
-  const quickbarItems = quickbarRecord?.items ?? [];
+  const {
+    items: quickbarItems,
+    write: writeQuickbar,
+    add: handleAddToQuickbar,
+  } = useQuickbar(activeCharacterId);
 
-  async function writeQuickbar(items: QuickbarItem[]) {
-    if (activeCharacterId === null) return;
-    await db.quickbars.put({
-      id: String(activeCharacterId),
-      characterId: activeCharacterId,
-      items,
-      updatedAt: Date.now(),
-    });
-    if (isSyncConfigured()) scheduleSync(activeCharacterId);
-  }
-
-  function handleAddToQuickbar(typeId: number, itemName: string) {
-    void writeQuickbar(addQuickbarItem(quickbarItems, { typeId, name: itemName }));
-  }
   function handleRemoveFromQuickbar(typeId: number) {
     void writeQuickbar(removeQuickbarItem(quickbarItems, typeId));
   }
