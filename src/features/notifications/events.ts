@@ -17,7 +17,8 @@ export type NotificationEventId =
   | 'newCalendarEvent'
   | 'calendarEventStarting'
   | 'contractAccepted'
-  | 'walletBalanceChanged';
+  | 'walletBalanceChanged'
+  | 'eveNotification';
 
 export interface NotificationEventDef {
   readonly id: NotificationEventId;
@@ -84,6 +85,11 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     id: 'walletBalanceChanged',
     labelKey: 'settings.notifications.event.walletBalanceChanged',
     scope: requiredScope('getCharacterWallet'),
+  },
+  {
+    id: 'eveNotification',
+    labelKey: 'settings.notifications.event.eveNotification',
+    scope: requiredScope('getCharacterNotifications'),
   },
 ] as const;
 

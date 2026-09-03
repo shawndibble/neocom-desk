@@ -17,12 +17,14 @@ import { db, type NotificationFeedRecord } from '@/db';
 import { refreshAppBadge } from './appBadge';
 
 /**
- * How many entries the feed keeps. Chosen to be comfortably more than a
- * session's worth of events while still bounding a table that only ever grows
- * — the panel shows the newest handful, and an entry nobody has looked at in
- * a hundred notifications is not one they are coming back for.
+ * How many entries the feed keeps. Originally chosen for ten low-frequency
+ * synthesized events; issue #274 adds a domain covering roughly a hundred
+ * EVE-native types, most far more frequent than any of the original ten, so
+ * the cap is raised threefold to keep a session's worth of the new volume
+ * from crowding out everything else — still bounding a table that only ever
+ * grows, not an attempt to size it exactly.
  */
-export const NOTIFICATION_FEED_LIMIT = 100;
+export const NOTIFICATION_FEED_LIMIT = 300;
 
 export type NotificationFeedEntry = NotificationFeedRecord;
 

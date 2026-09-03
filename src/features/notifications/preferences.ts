@@ -11,8 +11,11 @@ import {
   isEventEnabledFor,
   toggleEventChannel,
   toggleAllEventsOnChannel,
+  isEveTypeEnabledFor,
+  toggleEveTypeChannel,
   NOTIFICATION_CHANNELS,
   type EventEnabledMap,
+  type EveTypeEnabledMap,
   type NotificationChannel,
 } from './eventSelection';
 import type { NotificationEventId } from './events';
@@ -36,6 +39,16 @@ export interface NotificationPreferencesValue {
   browserEnabled?: boolean;
   feedEnabled?: boolean;
   perCharacter: Record<number, EventEnabledMap>;
+  /**
+   * Per-`type` opt-out underneath the single `eveNotification` event (issue
+   * #274), keyed separately from `perCharacter` because its per-type default
+   * (feed-on/browser-off, `EVE_TYPE_DEFAULT`) is the opposite of
+   * `perCharacter`'s absence-means-both-on idiom — a validator that treated
+   * the two maps as interchangeable would read the wrong default for
+   * whichever shape it guessed. Absent entirely means "nothing seen or
+   * toggled for this character yet", not "everything off".
+   */
+  eveNotificationTypesByCharacter?: Record<number, EveTypeEnabledMap>;
 }
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferencesValue = {
@@ -65,6 +78,26 @@ function isPerCharacterMap(raw: unknown): raw is Record<number, EventEnabledMap>
   );
 }
 
+function isEveTypeChannelState(raw: unknown): boolean {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) =>
+      (NOTIFICATION_CHANNELS as readonly string[]).includes(key) && typeof value === 'boolean'
+  );
+}
+
+function isEveTypeEnabledMap(raw: unknown): raw is EveTypeEnabledMap {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.values(raw as Record<string, unknown>).every(isEveTypeChannelState);
+}
+
+function isEveNotificationTypesByCharacter(raw: unknown): raw is Record<number, EveTypeEnabledMap> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) => !Number.isNaN(Number(key)) && isEveTypeEnabledMap(value)
+  );
+}
+
 function isOptionalBoolean(raw: unknown): boolean {
   return raw === undefined || typeof raw === 'boolean';
 }
@@ -76,7 +109,9 @@ function isNotificationPreferencesValue(raw: unknown): raw is NotificationPrefer
     typeof r.masterEnabled === 'boolean' &&
     isOptionalBoolean(r.browserEnabled) &&
     isOptionalBoolean(r.feedEnabled) &&
-    isPerCharacterMap(r.perCharacter)
+    isPerCharacterMap(r.perCharacter) &&
+    (r.eveNotificationTypesByCharacter === undefined ||
+      isEveNotificationTypesByCharacter(r.eveNotificationTypesByCharacter))
   );
 }
 
@@ -156,5 +191,28 @@ export function withAllEventsToggledForCharacter(
   };
 }
 
+export function characterEveTypePrefs(
+  value: NotificationPreferencesValue,
+  characterId: number
+): EveTypeEnabledMap {
+  return value.eveNotificationTypesByCharacter?.[characterId] ?? {};
+}
+
+export function withEveNotificationTypeToggled(
+  value: NotificationPreferencesValue,
+  characterId: number,
+  type: string,
+  channel: NotificationChannel
+): NotificationPreferencesValue {
+  const prefs = characterEveTypePrefs(value, characterId);
+  return {
+    ...value,
+    eveNotificationTypesByCharacter: {
+      ...value.eveNotificationTypesByCharacter,
+      [characterId]: toggleEveTypeChannel(prefs, type, channel),
+    },
+  };
+}
+
 /** Re-exported so callers gate on one import rather than reaching into eventSelection too. */
-export { isEventEnabledFor };
+export { isEventEnabledFor, isEveTypeEnabledFor };

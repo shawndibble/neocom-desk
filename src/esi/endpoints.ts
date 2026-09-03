@@ -547,6 +547,37 @@ export function getCharacterMailLabels(
   });
 }
 
+// --- GET /characters/{character_id}/notifications (esi-characters.read_notifications.v1) ---
+
+/**
+ * EVE's own server-pushed notification (issue #274) — a different,
+ * non-overlapping set from every other Notification Event, which the app
+ * synthesizes by diffing. `type` is deliberately `string`, not a closed
+ * union: CCP adds types without notice (esi/esi-issues#1380), so this app
+ * must render an unrecognised one generically rather than drop or throw on
+ * it. `text` is a YAML payload whose shape varies per type.
+ */
+export interface CharacterNotification {
+  notification_id: number;
+  type: string;
+  sender_id: number;
+  sender_type: string;
+  text?: string;
+  timestamp: string;
+  is_read?: boolean;
+}
+
+export function getCharacterNotifications(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterNotification[]>> {
+  return esiFetch<CharacterNotification[]>(`/characters/${characterId}/notifications`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterNotifications',
+  });
+}
+
 // --- GET /markets/prices (public) ---
 
 export interface MarketPrice {

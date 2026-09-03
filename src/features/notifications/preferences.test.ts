@@ -14,6 +14,9 @@ import {
   isFeedChannelEnabled,
   withBrowserEnabled,
   withFeedEnabled,
+  characterEveTypePrefs,
+  withEveNotificationTypeToggled,
+  isEveTypeEnabledFor,
 } from './preferences';
 
 const EVENT_A = 'skillLevelComplete' satisfies NotificationEventId;
@@ -63,6 +66,34 @@ describe('useNotificationPreferences', () => {
     await db.settings.put({
       key: NOTIFICATION_PREFS_SETTING_KEY,
       value: { masterEnabled: true, perCharacter: { 1: { [EVENT_A]: 'nope' } } },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+
+  it('applies a persisted eveNotificationTypesByCharacter map on hydrate', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: {},
+        eveNotificationTypesByCharacter: { 1: { BillOutOfMoneyMsg: { browser: true } } },
+      },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(useNotificationPreferences.getState().value.eveNotificationTypesByCharacter).toEqual({
+      1: { BillOutOfMoneyMsg: { browser: true } },
+    });
+  });
+
+  it('rejects an eveNotificationTypesByCharacter entry whose channel flags are not booleans', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: {},
+        eveNotificationTypesByCharacter: { 1: { BillOutOfMoneyMsg: { browser: 'nope' } } },
+      },
     });
     await useNotificationPreferences.getState().hydrate();
     expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
@@ -182,5 +213,33 @@ describe('delivery channels', () => {
     expect(value.perCharacter).toEqual({ 7: { [EVENT_B]: false } });
     expect(isBrowserChannelEnabled(value)).toBe(true);
     expect(isFeedChannelEnabled(value)).toBe(true);
+  });
+});
+
+describe('characterEveTypePrefs / withEveNotificationTypeToggled', () => {
+  it('returns an empty map for a character with no overrides', () => {
+    expect(characterEveTypePrefs(DEFAULT_NOTIFICATION_PREFERENCES, 1)).toEqual({});
+  });
+
+  it('toggling a type off its default browser value takes effect immediately', () => {
+    const next = withEveNotificationTypeToggled(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'BillOutOfMoneyMsg',
+      'browser'
+    );
+    const prefs = characterEveTypePrefs(next, 1);
+    expect(isEveTypeEnabledFor(prefs, 'BillOutOfMoneyMsg', 'browser')).toBe(true);
+    expect(isEveTypeEnabledFor(prefs, 'BillOutOfMoneyMsg', 'feed')).toBe(true);
+  });
+
+  it("does not disturb another character's type prefs", () => {
+    const value = {
+      masterEnabled: true,
+      perCharacter: {},
+      eveNotificationTypesByCharacter: { 2: { AllWarDeclaredMsg: { feed: false } } },
+    };
+    const next = withEveNotificationTypeToggled(value, 1, 'BillOutOfMoneyMsg', 'browser');
+    expect(characterEveTypePrefs(next, 2)).toEqual({ AllWarDeclaredMsg: { feed: false } });
   });
 });

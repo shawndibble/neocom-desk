@@ -89,6 +89,7 @@ const PREFETCHED_EMPTY = new Set(
     'contracts',
     'industry/jobs',
     'mail',
+    'notifications',
     'orders',
     'orders/history',
     'planets',

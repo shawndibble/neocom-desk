@@ -20,6 +20,7 @@ import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { extractorProgramsFromPins } from '@/features/pi/adapters';
 import { loadMailHeaders } from '@/features/character/mail';
+import { loadCharacterNotifications } from '@/features/character/notifications';
 import { loadCalendarEvents as loadCharacterCalendarEvents } from '@/features/character/calendar';
 import { loadContracts as loadCharacterContracts } from '@/features/character/contracts';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
@@ -33,6 +34,7 @@ import type {
   WalletJournalEntry,
   MarketOrder,
   MarketOrderHistory,
+  CharacterNotification,
 } from '@/esi/endpoints';
 import {
   runSkillQueueNotificationDiffs,
@@ -45,6 +47,7 @@ import {
   diffContractAccepted,
   diffWalletBalanceChanged,
   diffMarketOrderFilled,
+  diffEveNotification,
   type NotificationFire,
   type SkillQueueEntrySnapshot,
   type SkillQueueSnapshot,
@@ -73,6 +76,9 @@ import {
   type MarketOrderEntrySnapshot,
   type MarketOrderSnapshot,
   type MarketOrderNotificationFire,
+  type EveNotificationEntrySnapshot,
+  type EveNotificationSnapshot,
+  type EveNotificationFire,
 } from '@/engine/notificationDiffs';
 import type { NotificationEventId } from './events';
 import { createPollerStateStore, isSnapshotWith, type PollerState } from './pollerState';
@@ -88,7 +94,8 @@ export type AnyNotificationFire =
   | CalendarEventStartingFire
   | ContractNotificationFire
   | WalletNotificationFire
-  | MarketOrderNotificationFire;
+  | MarketOrderNotificationFire
+  | EveNotificationFire;
 
 /**
  * The one diff signature every domain speaks. Most engine diffs don't take an
@@ -561,9 +568,65 @@ export const marketOrderDomain = defineDomain<
   diffs: [gatedOn('marketOrderFilled', diffMarketOrderFilled)],
 });
 
+/* -------------------------------------------------------------------------- */
+/* EVE's own notifications                                                    */
+/* -------------------------------------------------------------------------- */
+
+function isEveNotificationEntrySnapshot(raw: unknown): raw is EveNotificationEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.notificationId === 'number' &&
+    typeof r.type === 'string' &&
+    typeof r.senderId === 'number' &&
+    typeof r.senderType === 'string' &&
+    typeof r.text === 'string' &&
+    typeof r.timestamp === 'string'
+  );
+}
+
+/**
+ * The ninth domain (issue #274): EVE's own server-pushed notifications, a
+ * different, non-overlapping set from every other domain here — those are
+ * all synthesized by diffing; this one is fed to the app pre-formed. Single
+ * `eveNotification` event covering roughly a hundred underlying `type`
+ * strings, filtered individually at delivery time
+ * (`foregroundPoller.ts`/`preferences.ts`) rather than modeled as one
+ * `NotificationEventId` per type — CCP adds types without notice, so the
+ * catalog cannot be a closed enum (esi/esi-issues#1380).
+ */
+export const eveNotificationDomain = defineDomain<
+  CharacterNotification,
+  EveNotificationSnapshot,
+  EveNotificationFire
+>({
+  id: 'eveNotification',
+  eventIds: ['eveNotification'],
+  stateKey: 'notifications.pollerState.eveNotification',
+  entriesKey: 'entries',
+  isEntry: isEveNotificationEntrySnapshot,
+  load: async (characterId) => {
+    const result = await loadCharacterNotifications(characterId);
+    if (result.needsReauth || result.cached === null) return null;
+    return result.cached.data;
+  },
+  toSnapshot: (notifications, nowMs) => ({
+    entries: notifications.map((n) => ({
+      notificationId: n.notification_id,
+      type: n.type,
+      senderId: n.sender_id,
+      senderType: n.sender_type,
+      text: n.text ?? '',
+      timestamp: n.timestamp,
+    })),
+    nowMs,
+  }),
+  diffs: [gatedOn('eveNotification', diffEveNotification)],
+});
+
 /**
  * Every polled domain, in fetch order. One entry here is the whole cost of
- * adding a ninth: `foregroundPoller.ts` names no domain at all.
+ * adding a domain: `foregroundPoller.ts` names none of them.
  */
 export const POLL_DOMAINS: readonly PollDomain[] = [
   skillQueueDomain,
@@ -574,4 +637,5 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   contractDomain,
   walletDomain,
   marketOrderDomain,
+  eveNotificationDomain,
 ];

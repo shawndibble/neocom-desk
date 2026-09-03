@@ -38,6 +38,7 @@ import {
 import {
   useNotificationPreferences,
   characterEventPrefs,
+  characterEveTypePrefs,
   withMasterEnabled,
   withBrowserEnabled,
   withFeedEnabled,
@@ -45,14 +46,17 @@ import {
   isFeedChannelEnabled,
   withEventChannelToggled,
   withAllEventsToggledForCharacter,
+  withEveNotificationTypeToggled,
 } from './preferences';
 import {
   isEventEnabledFor,
+  isEveTypeEnabledFor,
   selectionStateForEvents,
   NOTIFICATION_CHANNELS,
   type NotificationChannel,
 } from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
+import { knownEveTypesForCharacter } from './feedSelection';
 import { refreshAppBadge } from './appBadge';
 import {
   useNotificationPermission,
@@ -74,6 +78,11 @@ export function NotificationsPanel() {
   const { t } = useTranslation();
   const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
   const tokens = useLiveQuery(() => db.tokens.toArray());
+  // The only way to discover which EVE notification types (issue #274) to
+  // offer per-type toggles for — there is no closed catalog of the ~100
+  // types to list up front, so Settings surfaces whatever the feed has
+  // actually recorded.
+  const feedEntries = useLiveQuery(() => db.notificationFeed.toArray());
 
   const prefsValue = useNotificationPreferences((state) => state.value);
   const hydratePrefs = useNotificationPreferences((state) => state.hydrate);
@@ -253,6 +262,11 @@ export function NotificationsPanel() {
                   grantedScopes.has(eventDef(eventId).scope)
                 );
                 const prefs = characterEventPrefs(prefsValue, character.characterId);
+                const eveTypePrefs = characterEveTypePrefs(prefsValue, character.characterId);
+                const knownEveTypes = knownEveTypesForCharacter(
+                  feedEntries ?? [],
+                  character.characterId
+                );
 
                 return (
                   <div
@@ -326,36 +340,93 @@ export function NotificationsPanel() {
                             const hasScope = grantedScopes.has(def.scope);
                             const eventLabel = t(def.labelKey);
                             return (
-                              <li
-                                key={eventId}
-                                className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
-                              >
-                                <span className={hasScope ? 'text-text' : 'text-text-faint'}>
-                                  {eventLabel}
-                                </span>
-                                <div className="grid shrink-0 grid-cols-2 gap-x-6">
-                                  {NOTIFICATION_CHANNELS.map((channel) => (
-                                    <ChannelCheckbox
-                                      key={channel}
-                                      channel={channel}
-                                      eventLabel={eventLabel}
-                                      hasScope={
-                                        hasScope && !(channel === 'browser' && browserBlocked)
-                                      }
-                                      checked={isEventEnabledFor(prefs, eventId, channel)}
-                                      onToggle={() =>
-                                        void setPrefsValue(
-                                          withEventChannelToggled(
-                                            prefsValue,
-                                            character.characterId,
-                                            eventId,
-                                            channel
+                              <li key={eventId}>
+                                <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                                  <span className={hasScope ? 'text-text' : 'text-text-faint'}>
+                                    {eventLabel}
+                                  </span>
+                                  <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                                    {NOTIFICATION_CHANNELS.map((channel) => (
+                                      <ChannelCheckbox
+                                        key={channel}
+                                        channel={channel}
+                                        eventLabel={eventLabel}
+                                        hasScope={
+                                          hasScope && !(channel === 'browser' && browserBlocked)
+                                        }
+                                        checked={isEventEnabledFor(prefs, eventId, channel)}
+                                        onToggle={() =>
+                                          void setPrefsValue(
+                                            withEventChannelToggled(
+                                              prefsValue,
+                                              character.characterId,
+                                              eventId,
+                                              channel
+                                            )
                                           )
-                                        )
-                                      }
-                                    />
-                                  ))}
+                                        }
+                                      />
+                                    ))}
+                                  </div>
                                 </div>
+                                {/*
+                                  Per-type opt-out underneath the single
+                                  eveNotification event (issue #274, AC3):
+                                  types appear here only once seen, since
+                                  there is no closed catalog to list up
+                                  front (eventSelection.ts's per-type
+                                  default doc comment has the full reasoning).
+                                */}
+                                {eventId === 'eveNotification' && hasScope && (
+                                  <div className="border-t border-line bg-panel/60 pl-3">
+                                    <p className="px-3 py-1.5 text-[0.6875rem] text-text-dim">
+                                      {t('settings.notifications.eveTypesHint')}
+                                    </p>
+                                    {knownEveTypes.length === 0 ? (
+                                      <p className="px-3 pb-2 text-[0.6875rem] text-text-faint">
+                                        {t('settings.notifications.eveTypesEmpty')}
+                                      </p>
+                                    ) : (
+                                      <ul className="divide-y divide-line/60">
+                                        {knownEveTypes.map((type) => (
+                                          <li
+                                            key={type}
+                                            className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
+                                          >
+                                            <span className="truncate text-text-dim">{type}</span>
+                                            <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                                              {NOTIFICATION_CHANNELS.map((channel) => (
+                                                <ChannelCheckbox
+                                                  key={channel}
+                                                  channel={channel}
+                                                  eventLabel={type}
+                                                  hasScope={
+                                                    !(channel === 'browser' && browserBlocked)
+                                                  }
+                                                  checked={isEveTypeEnabledFor(
+                                                    eveTypePrefs,
+                                                    type,
+                                                    channel
+                                                  )}
+                                                  onToggle={() =>
+                                                    void setPrefsValue(
+                                                      withEveNotificationTypeToggled(
+                                                        prefsValue,
+                                                        character.characterId,
+                                                        type,
+                                                        channel
+                                                      )
+                                                    )
+                                                  }
+                                                />
+                                              ))}
+                                            </div>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )}
                               </li>
                             );
                           })}

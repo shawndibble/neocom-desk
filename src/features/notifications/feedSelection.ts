@@ -8,8 +8,12 @@
  * flipping it back on restores them — a toggle is a view preference here, not
  * a destructive edit. Dismissing is the destructive one.
  */
-import { isEventEnabledFor } from './eventSelection';
-import { characterEventPrefs, type NotificationPreferencesValue } from './preferences';
+import { isEventEnabledFor, isEveTypeEnabledFor } from './eventSelection';
+import {
+  characterEventPrefs,
+  characterEveTypePrefs,
+  type NotificationPreferencesValue,
+} from './preferences';
 import type { NotificationEventId } from './events';
 import type { NotificationFeedRecord as NotificationFeedEntry } from '@/db';
 
@@ -34,7 +38,17 @@ function isEntryVisible(
   prefs: NotificationPreferencesValue
 ): boolean {
   const forCharacter = characterEventPrefs(prefs, entry.characterId);
-  return isEventEnabledFor(forCharacter, entry.eventId as NotificationEventId, 'feed');
+  if (!isEventEnabledFor(forCharacter, entry.eventId as NotificationEventId, 'feed')) {
+    return false;
+  }
+  // A layer underneath the eventId check above: an eveNotification row also
+  // carries the raw ESI type it fired for (issue #274), individually
+  // opt-out-able on top of the parent event staying enabled.
+  if (entry.eveType !== undefined) {
+    const eveTypePrefs = characterEveTypePrefs(prefs, entry.characterId);
+    return isEveTypeEnabledFor(eveTypePrefs, entry.eveType, 'feed');
+  }
+  return true;
 }
 
 export function visibleFeedEntries(
@@ -42,6 +56,25 @@ export function visibleFeedEntries(
   prefs: NotificationPreferencesValue
 ): NotificationFeedEntry[] {
   return entries.filter((entry) => isEntryVisible(entry, prefs));
+}
+
+/**
+ * Every distinct EVE notification `type` this Character's feed has recorded
+ * (issue #274) — Settings' only way to discover which per-type toggles to
+ * offer, since there is no closed catalog of the ~100 types to list up
+ * front. A type has to have fired (and reached the feed) at least once
+ * before it can be opted in or out here.
+ */
+export function knownEveTypesForCharacter(
+  entries: readonly NotificationFeedEntry[],
+  characterId: number
+): string[] {
+  const types = new Set<string>();
+  for (const entry of entries) {
+    if (entry.characterId !== characterId || entry.eveType === undefined) continue;
+    types.add(entry.eveType);
+  }
+  return [...types].sort();
 }
 
 export function entriesForCharacter(

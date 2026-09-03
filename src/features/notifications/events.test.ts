@@ -3,7 +3,7 @@ import { ESI_REGISTRY } from '@/esi/registry';
 import { NOTIFICATION_EVENTS, NOTIFICATION_EVENT_IDS } from './events';
 
 describe('NOTIFICATION_EVENTS', () => {
-  it('lists exactly the 10 events from CONTEXT.md round 20, in order', () => {
+  it('lists exactly the 10 synthesized events from CONTEXT.md round 20 plus eveNotification (issue #274), in order', () => {
     expect(NOTIFICATION_EVENT_IDS).toEqual([
       'skillLevelComplete',
       'characterNotTraining',
@@ -15,6 +15,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'calendarEventStarting',
       'contractAccepted',
       'walletBalanceChanged',
+      'eveNotification',
     ]);
   });
 

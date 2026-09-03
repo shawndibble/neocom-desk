@@ -40,6 +40,10 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   contractAccepted: '/contracts',
   walletBalanceChanged: '/wallet',
   marketOrderFilled: '/orders',
+  // ~100 EVE-native types (issue #274), most with no corresponding page in
+  // the app — the Overview fallback is a deliberate choice for this event,
+  // not an inherited default.
+  eveNotification: '/overview',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/overview';
