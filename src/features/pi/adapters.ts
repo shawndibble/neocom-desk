@@ -28,12 +28,41 @@ export function extractorExpiryMs(pin: PlanetPin): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
-/** Extractor pins with a parseable expiry_time; everything else is dropped. */
+/**
+ * Parsed `install_time` in ms, or null when it is missing or unparseable —
+ * same guard as `extractorExpiryMs`, since ESI marks `install_time` optional
+ * too.
+ */
+export function extractorInstallMs(pin: PlanetPin): number | null {
+  if (!pin.install_time) return null;
+  const ms = Date.parse(pin.install_time);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * Extractor pins with a parseable expiry_time; everything else is dropped.
+ *
+ * The yield baseline (`qtyPerCycle`, `cycleTimeMs`, `installTimeMs`, fed to
+ * `engine/pi/extraction.ts`) is filled in when ESI supplied it and left
+ * undefined otherwise — those three fields are all spec-optional, so requiring
+ * them would start dropping pins this function used to keep and silently
+ * shrink the colony-health input. `hasYieldBaseline` is how a caller checks
+ * whether a program can be projected.
+ */
 export function extractorProgramsFromPins(pins: readonly PlanetPin[]): ExtractorProgram[] {
   const programs: ExtractorProgram[] = [];
   for (const pin of pins) {
     const expiryTimeMs = extractorExpiryMs(pin);
-    if (expiryTimeMs !== null) programs.push({ pinId: pin.pin_id, expiryTimeMs });
+    if (expiryTimeMs === null) continue;
+    const installTimeMs = extractorInstallMs(pin);
+    const details = pin.extractor_details;
+    programs.push({
+      pinId: pin.pin_id,
+      expiryTimeMs,
+      ...(installTimeMs !== null ? { installTimeMs } : {}),
+      ...(details?.qty_per_cycle !== undefined ? { qtyPerCycle: details.qty_per_cycle } : {}),
+      ...(details?.cycle_time !== undefined ? { cycleTimeMs: details.cycle_time * 1000 } : {}),
+    });
   }
   return programs;
 }
