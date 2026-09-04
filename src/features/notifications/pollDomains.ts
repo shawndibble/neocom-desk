@@ -113,10 +113,45 @@ import {
   type CorpWalletSnapshot,
   type CorpWalletThresholdFire,
 } from '@/engine/notificationDiffs';
+import {
+  projectSkillQueue,
+  projectIndustryJobs,
+  projectColonies,
+  projectCalendar,
+  projectStructureFuel,
+  type ProjectionRow,
+} from '@/engine/projection';
+import { loadUniverseType } from '@/features/skills/data';
+import { loadPlanetName } from '@/features/pi/names';
+import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { NotificationEventId } from './events';
 import { useNotificationPreferences, characterEventThresholds } from './preferences';
 import { createPollerStateStore, isSnapshotWith, type PollerState } from './pollerState';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
+
+/**
+ * Resolves a batch of type/planet ids to display names for a Projection row
+ * (issue #355) — the impure boundary the pure `engine/projection.ts` module
+ * deliberately stays on the far side of. Ids that fail to resolve are simply
+ * absent from the map; each `project*` caller already falls back to `#id`.
+ */
+async function resolveProjectionNames(
+  ids: readonly number[],
+  loadName: (id: number) => Promise<string | null>
+): Promise<ReadonlyMap<number, string>> {
+  const uniqueIds = [...new Set(ids)];
+  const names = new Map<number, string>();
+  await mapWithConcurrencyLimit(uniqueIds, ESI_FANOUT_CONCURRENCY, async (id) => {
+    const name = await loadName(id);
+    if (name !== null) names.set(id, name);
+  });
+  return names;
+}
+
+async function universeTypeName(typeId: number): Promise<string | null> {
+  const result = await loadUniverseType(typeId);
+  return result?.data.name ?? null;
+}
 
 /** Every fire any registered diff can produce. */
 export type AnyNotificationFire =
@@ -181,6 +216,20 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire> {
   readonly toSnapshot: (raw: readonly TRaw[], nowMs: number) => TSnapshot;
   /** Run in order against the snapshot; a domain may register more than one. */
   readonly diffs: readonly DomainDiff<TSnapshot, TFire>[];
+  /**
+   * Turns this poll's snapshot into Scheduled Push Projection rows (issue
+   * #355, ADR 0010) — absent for a domain with nothing inside the 72-hour
+   * horizon worth projecting (mail, wallet, market orders, corp roster, EVE's
+   * own notifications: all "as it happens", not fixed-timestamp-in-advance).
+   * Resolves whatever display names the row text needs (Dexie-cached), which
+   * `engine/projection.ts` deliberately cannot do itself.
+   */
+  readonly projection?: (
+    characterId: number,
+    characterName: string,
+    snapshot: TSnapshot,
+    nowMs: number
+  ) => Promise<ProjectionRow[]>;
 }
 
 /**
@@ -201,6 +250,12 @@ export interface PollDomain {
     next: unknown,
     enabledEvents: ReadonlySet<NotificationEventId>
   ) => AnyNotificationFire[];
+  readonly projection?: (
+    characterId: number,
+    characterName: string,
+    snapshot: unknown,
+    nowMs: number
+  ) => Promise<ProjectionRow[]>;
 }
 
 /**
@@ -231,6 +286,10 @@ function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire>(
       }
       return fires;
     },
+    projection: spec.projection
+      ? (characterId, characterName, snapshot, nowMs) =>
+          spec.projection!(characterId, characterName, snapshot as TSnapshot, nowMs)
+      : undefined,
   };
 }
 
@@ -289,6 +348,13 @@ export const skillQueueDomain = defineDomain<SkillQueueEntry, SkillQueueSnapshot
           new Set(SKILL_QUEUE_EVENT_IDS.filter((eventId) => enabledEvents.has(eventId)))
         ),
     ],
+    projection: async (characterId, characterName, snapshot, nowMs) => {
+      const skillNames = await resolveProjectionNames(
+        snapshot.entries.map((entry) => entry.skillId),
+        universeTypeName
+      );
+      return projectSkillQueue(characterId, characterName, snapshot.entries, skillNames, nowMs);
+    },
   }
 );
 
@@ -335,6 +401,13 @@ export const industryJobDomain = defineDomain<
   },
   toSnapshot: (jobs, nowMs) => ({ entries: jobs.map(toIndustryJobEntrySnapshot), nowMs }),
   diffs: [gatedOn('industryJobComplete', diffIndustryJobComplete)],
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    const itemNames = await resolveProjectionNames(
+      snapshot.entries.map((entry) => entry.productTypeId ?? entry.blueprintTypeId),
+      universeTypeName
+    );
+    return projectIndustryJobs(characterId, characterName, snapshot.entries, itemNames, nowMs);
+  },
 });
 
 /* -------------------------------------------------------------------------- */
@@ -394,6 +467,13 @@ export const colonyDomain = defineDomain<
     gatedOn('planetaryExtractionDone', diffPlanetaryExtractionDone),
     gatedOn('planetaryExtractorExpiring', diffPlanetaryExtractorExpiring),
   ],
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    const planetNames = await resolveProjectionNames(
+      snapshot.colonies.map((colony) => colony.planetId),
+      loadPlanetName
+    );
+    return projectColonies(characterId, characterName, snapshot.colonies, planetNames, nowMs);
+  },
 });
 
 /* -------------------------------------------------------------------------- */
@@ -462,6 +542,11 @@ export const calendarDomain = defineDomain<
     gatedOn('newCalendarEvent', diffNewCalendarEvent),
     gatedOn('calendarEventStarting', diffCalendarEventStarting),
   ],
+  // `newCalendarEvent` has no fixed future timestamp to project — only
+  // `calendarEventStarting`'s `startMs` is; the pure `projectCalendar`
+  // already emits `calendarEventStarting` rows exclusively.
+  projection: async (characterId, characterName, snapshot, nowMs) =>
+    projectCalendar(characterId, characterName, snapshot.entries, nowMs),
 });
 
 /* -------------------------------------------------------------------------- */
@@ -746,6 +831,10 @@ export const structureFuelDomain = defineDomain<
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   diffs: [gatedOn('structureFuelLow', diffStructureFuelLow)],
+  // `entry.thresholdMs` is already baked in per entry above (this poll's
+  // fuel lead time), so no preference read is needed here.
+  projection: async (characterId, characterName, snapshot, nowMs) =>
+    projectStructureFuel(characterId, characterName, snapshot.entries, nowMs),
 });
 
 /* Corp industry jobs --------------------------------------------------------- */
