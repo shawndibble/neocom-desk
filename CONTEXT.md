@@ -1923,8 +1923,20 @@ offeredScopes: Record<number, readonly Scope[]> }`. Round 37's "offered once
   stays full width — giving People a grid cell of its own would have taken
   that width from the ranking, which is the feature. The `sm:grid-cols-2`
   class is conditional on _both_ rails actually rendering, so a wallet-only
-  Character's Money rail is byte-for-byte the full-width panel it was before
-  (AC3's "unaffected and unchanged").
+  Character's Money rail keeps the full width it had before (AC3's
+  "unaffected and unchanged"). "Where there is width" excludes `lg` and up,
+  where the side column _is_ the 18rem track: two ~9rem columns would overflow
+  it, because a `StatChip` and the vitals rail's ISK figures are `shrink-0` by
+  contract. So the pair is side by side only between `sm` and `lg`, and stacked
+  either side of that band. AC1 asks for side-by-side on desktop too; the
+  ticket's own Scope caps the container at that track, and a rail that
+  overflows its column is the worse of the two failures.
+- **A member-id list that could not be read is `null`, not an empty diff.**
+  Joined/Left are dropped in that case rather than printed as zero: with the
+  tracking read still fine the rail is up, and `/corp/members` renders no
+  summary at all there (`isEmptyRosterDiff`), so a confident zero would be
+  exactly the drift AC2 forbids. This is the failed-read branch only — a
+  genuinely unchanged roster still shows `0`.
 - **The overview reads the roster baseline and deliberately does not replace
   it.** `features/corp/rosterState.ts` stores what this device has already
   _reported_, and `/corp/members` reads and records in one pass so each

@@ -67,12 +67,7 @@ import {
 } from '@/features/corp/boardSources';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { buildCorpBoard } from '@/engine/corp/board';
-import {
-  EMPTY_ROSTER_DIFF,
-  diffRoster,
-  type MemberActivity,
-  type RosterDiff,
-} from '@/engine/corp/members';
+import { diffRoster, type MemberActivity, type RosterDiff } from '@/engine/corp/members';
 import type { VitalsJournalEntry } from '@/engine/corp/vitals';
 import type { CorpCapabilities } from '@/engine/corpRoles';
 import type {
@@ -109,8 +104,12 @@ interface CorpSnapshot {
   journal: VitalsJournalEntry[];
   /** Tracking rows for the People rail, or `null` when unread (#345). */
   members: MemberActivity[] | null;
-  /** Joins/leaves since this device last opened the roster — read, never consumed. */
-  rosterDiff: RosterDiff;
+  /**
+   * Joins/leaves since this device last opened the roster — read, never
+   * consumed. `null` when the member-id list could not be read, which is not
+   * the same answer as an empty diff: see the loader.
+   */
+  rosterDiff: RosterDiff | null;
   typeNames: ReadonlyMap<number, string>;
   /** Oldest `fetchedAt` across the panels actually read — see `Corp` below. */
   oldestFetchedAt: Date | null;
@@ -126,7 +125,7 @@ const EMPTY_SNAPSHOT: CorpSnapshot = {
   wallets: null,
   journal: [],
   members: null,
-  rosterDiff: EMPTY_ROSTER_DIFF,
+  rosterDiff: null,
   typeNames: new Map(),
   oldestFetchedAt: null,
   loadedAt: 0,
@@ -192,9 +191,14 @@ async function loadCorpSnapshot(
    * "should I go look": it stops saying so once you have looked, and not before.
    */
   const memberIds = roster?.cached?.data ?? null;
+  // `null`, not `EMPTY_ROSTER_DIFF`: an id list we could not read is "unknown",
+  // and printing it as "nothing changed" would be the rail stating a fact it
+  // does not have. `/corp/members` renders no summary in that case
+  // (`isEmptyRosterDiff`), so a confident zero here would be exactly the drift
+  // AC2 forbids — with the tracking read still fine, so the rail is up.
   const rosterDiff =
     memberIds === null
-      ? EMPTY_ROSTER_DIFF
+      ? null
       : diffRoster(await readPreviousRoster(characterId, corporationId), memberIds);
 
   const jobRows = jobs?.cached?.data ?? null;
@@ -339,12 +343,20 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             The pair share the one 18rem grid cell rather than taking a cell
             each, which is what keeps the board's own column full width. They
             sit side by side wherever there is room for it and stack where
-            there is not — and the two-column class is conditional on both
-            actually rendering, so a wallet-only Character's rail stays exactly
-            the full-width panel it was before this pair existed.
+            there is not — which includes `lg` and up, where the column is
+            the fixed 18rem track: two ~9rem columns would overflow, since a
+            `StatChip` and the rail's ISK figures are `shrink-0` by contract.
+            The two-column class is also conditional on both rails actually
+            rendering, so a wallet-only Character's Money rail keeps the full
+            width it had before this pair existed.
           */}
           {(showVitals || showPeople) && data !== null && (
-            <div className={cx('grid gap-3', showVitals && showPeople && 'sm:grid-cols-2')}>
+            <div
+              className={cx(
+                'grid gap-3',
+                showVitals && showPeople && 'sm:grid-cols-2 lg:grid-cols-1'
+              )}
+            >
               {showVitals && (
                 <CorpVitalsRail
                   divisions={data.wallets ?? []}
