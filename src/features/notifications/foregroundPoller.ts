@@ -24,6 +24,7 @@ import i18n from '@/i18n';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
 import { POLL_DOMAINS, type AnyNotificationFire, type PollDomain } from './pollDomains';
+import { groupIdenticalFires, type RenderedFire } from './groupFires';
 import { withCharacterSnapshot, type PollerState } from './pollerState';
 import {
   useNotificationPreferences,
@@ -90,7 +91,21 @@ export interface PollDependencies {
   /** Per-`type` opt-out underneath the single `eveNotification` event (issue #274). */
   eveTypePrefsFor: (characterId: number) => Promise<EveTypeEnabledMap>;
   permission: () => NotificationPermission | 'unsupported' | 'default' | 'denied';
-  notify: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
+  /**
+   * `override` carries copy the delivery loop already rendered and grouped
+   * (`groupFires.ts`, count-adjusted when more than one fire in this poll
+   * rendered identical copy) so it isn't rendered a second time here. Omitted
+   * only by a caller reaching this directly outside that loop
+   * (`backgroundPoller.test.ts`'s direct calls, `sendBackgroundNotification`
+   * used standalone) — those fall back to rendering it themselves. `notify`
+   * is the only member grouped this way; `recordToFeed` always renders (and
+   * writes) its own copy per fire — see its doc comment.
+   */
+  notify: (
+    fire: AnyNotificationFire,
+    character: CharacterRef,
+    override?: { title: string; body: string }
+  ) => Promise<void>;
   recordToFeed: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
   /**
    * This poll's Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round
@@ -321,18 +336,24 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   for (const update of updates) {
     const character = charactersById.get(update.characterId);
     if (!character) continue;
-    for (const fire of update.fires) {
-      // No cast: every AnyNotificationFire's eventId is already the literal
-      // union, so a genuinely new engine fire type must fail here rather than
-      // be waved through.
+    // Notification Allow-List (CONTEXT.md round 44): a type outside the
+    // closed list is dropped here, before either channel and before any
+    // name-resolution work (notificationText → resolveEveNotificationNames)
+    // that recordToFeed/notify would otherwise trigger for it.
+    const allowedFires = update.fires.filter(
+      (fire) => fire.eventId !== 'eveNotification' || isEveTypeAllowed(fire.type)
+    );
+
+    // Feed: one row per actual occurrence, never grouped — each fire's own
+    // Occurrence Key (`@/engine/occurrenceKey`) is what lets the Scheduled
+    // Push backend, independently observing the same occurrence, agree with
+    // the Foreground Poller on the feed row it belongs to (CONTEXT.md round
+    // 44/48). Collapsing several fires into one feed write, the way the
+    // browser channel below does, would permanently lose the other
+    // occurrences from the feed's history — nothing re-fires an
+    // already-high-water-marked diff to recover them.
+    for (const fire of allowedFires) {
       const eventId = fire.eventId;
-      // Notification Allow-List (CONTEXT.md round 44): a type outside the
-      // closed list is dropped here, before either channel and before any
-      // name-resolution work (notificationText → resolveEveNotificationNames)
-      // that recordToFeed/notify would otherwise trigger for it.
-      if (eventId === 'eveNotification' && !isEveTypeAllowed(fire.type)) continue;
-      // Feed first: it is the channel that cannot fail for platform reasons,
-      // so a fire is recorded before anything that might silently no-op.
       if (
         feedEnabled &&
         isEventEnabledFor(update.eventPrefs, eventId, 'feed') &&
@@ -340,19 +361,40 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       ) {
         await deps.recordToFeed(fire, character);
       }
-      if (
+    }
+
+    // Browser: grouped. A burst of fires that render identical copy (three
+    // market orders filling in one poll, none of which name an order) is
+    // what `groupIdenticalFires` collapses into a single "...x3" toast
+    // instead of three back-to-back near-duplicate ones (grouped on the
+    // rendered copy itself, not the fires' own fields, since the differing
+    // field is often not part of the copy at all — see `groupFires.ts`).
+    // Toasts are ephemeral and per-device, with no Occurrence Key contract
+    // to preserve, unlike the feed loop above.
+    const browserFires = allowedFires.filter(
+      (fire) =>
         browserEnabled &&
-        isEventEnabledFor(update.eventPrefs, eventId, 'browser') &&
+        isEventEnabledFor(update.eventPrefs, fire.eventId, 'browser') &&
         eveTypeAllowsChannel(fire, update.eveTypePrefs, 'browser')
-      ) {
-        await deps.notify(fire, character);
-      }
+    );
+    const rendered: RenderedFire<AnyNotificationFire>[] = [];
+    for (const fire of browserFires) {
+      rendered.push({ fire, ...(await notificationText(fire, character)) });
+    }
+    for (const group of groupIdenticalFires(rendered)) {
+      const title = group.count > 1 ? groupedTitle(group.title, group.count) : group.title;
+      await deps.notify(group.fire, character, { title, body: group.body });
     }
   }
 
   await deps.uploadProjection(
     new Map(updates.map((update) => [update.characterId, update.projectionRows]))
   );
+}
+
+/** `"{{title}} x{{count}}"` — the suffix a grouped browser-toast title carries (`groupFires.ts`). */
+function groupedTitle(title: string, count: number): string {
+  return i18n.t('notifications.groupedTitle', { title, count });
 }
 
 /** Exported for `backgroundPoller.ts` — the Service Worker's `push` handler renders the exact same copy the Foreground Poller does, driven by the same registry. */
@@ -529,12 +571,17 @@ export async function notificationText(
  * the one path that reaches a phone at all. A failure on every path is
  * swallowed there: pollerState.ts is what prevents a re-fire, not this call
  * succeeding.
+ *
+ * `override` is the copy the delivery loop already rendered (and, for a
+ * grouped burst, already count-adjusted) — `notificationText` is only called
+ * here as a fallback for a caller reaching this directly, outside that loop.
  */
 async function sendBrowserNotification(
   fire: AnyNotificationFire,
-  character: CharacterRef
+  character: CharacterRef,
+  override?: { title: string; body: string }
 ): Promise<void> {
-  const { title, body } = await notificationText(fire, character);
+  const { title, body } = override ?? (await notificationText(fire, character));
   await displayPageNotification(
     livePageDisplayEnv(),
     title,
@@ -543,16 +590,12 @@ async function sendBrowserNotification(
 }
 
 /**
- * Renders the same copy the browser notification carries and files it in the
- * Notification Feed. `notificationText` is called separately from
- * `sendBrowserNotification`'s call rather than threaded through both: its
- * ESI lookups (`loadUniverseType`, `loadPlanetName`) read the Dexie cache and
- * `resolveEveNotificationNames` memoizes per notification id, so the second
- * render costs a cache hit rather than a second round-trip — issue #300's
- * `postUniverseNames` path asks ESI live before it consults its own cache, so
- * that memo is what keeps this sentence true. Keeping `notify`'s signature
- * untouched is what lets `backgroundPoller.ts` override it without knowing
- * the feed exists (the Service Worker's poll files to the feed too).
+ * Files the same copy the browser notification carries into the Notification
+ * Feed. Always renders its own copy from the raw `fire` — never grouped the
+ * way `sendBrowserNotification`'s toast is (`runForegroundPollOnce`'s doc
+ * comment on the feed-delivery loop): one row per actual occurrence, each
+ * keyed by its own `occurrenceKey`, is what keeps the feed agreeing with the
+ * Scheduled Push backend's independent view of the same occurrences.
  */
 async function recordFeedNotification(
   fire: AnyNotificationFire,

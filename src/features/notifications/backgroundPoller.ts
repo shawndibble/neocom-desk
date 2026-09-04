@@ -22,14 +22,19 @@ import type { AnyNotificationFire, CharacterRef, PollDependencies } from './fore
  * runs (foregroundPoller.ts), so a rejected/throwing call here (permission
  * revoked mid-flight, an unsupported platform) must not abort the rest of
  * this poll's already-persisted fires.
+ *
+ * `override` is the copy the delivery loop already rendered (count-adjusted
+ * for a grouped burst of identical fires, `groupFires.ts`) — `notificationText`
+ * is only called here as a fallback for a caller reaching this directly.
  */
 export async function sendBackgroundNotification(
   registration: ServiceWorkerRegistration,
   fire: AnyNotificationFire,
-  character: CharacterRef
+  character: CharacterRef,
+  override?: { title: string; body: string }
 ): Promise<void> {
   try {
-    const { title, body } = await notificationText(fire, character);
+    const { title, body } = override ?? (await notificationText(fire, character));
     await registration.showNotification(
       title,
       notificationOptionsFor({ eventId: fire.eventId, characterId: character.characterId }, body)
@@ -62,6 +67,7 @@ export function backgroundDependencies(registration: ServiceWorkerRegistration):
   return {
     ...liveDependencies(),
     permission: () => backgroundPermission(registration),
-    notify: (fire, character) => sendBackgroundNotification(registration, fire, character),
+    notify: (fire, character, override) =>
+      sendBackgroundNotification(registration, fire, character, override),
   };
 }

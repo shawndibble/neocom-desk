@@ -16,7 +16,12 @@ import {
   gatedOn,
   deriveMarketOrderEntries,
 } from './pollDomains';
-import { useNotificationPreferences, DEFAULT_NOTIFICATION_PREFERENCES } from './preferences';
+import {
+  useNotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  withCharacterEventThreshold,
+  DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+} from './preferences';
 import { loadContracts } from '@/features/character/contracts';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
@@ -355,6 +360,49 @@ describe('truncation guards', () => {
     vi.mocked(loadOrders).mockResolvedValue(statusResult([marketOrder({ order_id: 9 })], false));
     vi.mocked(loadOrderHistory).mockResolvedValue(statusResult([], false));
     expect(await marketOrderDomain.load(1)).toEqual([{ orderId: 9, filled: false }]);
+  });
+});
+
+/**
+ * `walletDomain.load` bakes the Character's current wallet-balance-changed
+ * threshold onto every entry it returns, the same async-preference-read
+ * pattern `structureFuelDomain`'s own test below documents — the threshold
+ * is device-local state, only readable in `load`'s async context, so
+ * `toSnapshot` stays a pure passthrough for this domain.
+ */
+describe('walletDomain threshold', () => {
+  beforeEach(async () => {
+    vi.mocked(loadWalletJournalWithStatus).mockReset();
+    await db.settings.clear();
+    useNotificationPreferences.setState({
+      value: DEFAULT_NOTIFICATION_PREFERENCES,
+      hydrated: true,
+    });
+  });
+
+  it('embeds the default threshold when the Character has no override', async () => {
+    vi.mocked(loadWalletJournalWithStatus).mockResolvedValue(
+      statusResult([journalEntry({ id: 5, amount: 250 })], false)
+    );
+    expect(await walletDomain.load(1)).toEqual([
+      { id: 5, amount: 250, thresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK },
+    ]);
+  });
+
+  it("embeds the Character's own threshold once set", async () => {
+    useNotificationPreferences.setState({
+      value: withCharacterEventThreshold(
+        DEFAULT_NOTIFICATION_PREFERENCES,
+        1,
+        'walletBalanceChangedThresholdIsk',
+        10_500_000
+      ),
+      hydrated: true,
+    });
+    vi.mocked(loadWalletJournalWithStatus).mockResolvedValue(
+      statusResult([journalEntry({ id: 5, amount: 250 })], false)
+    );
+    expect(await walletDomain.load(1)).toEqual([{ id: 5, amount: 250, thresholdIsk: 10_500_000 }]);
   });
 });
 

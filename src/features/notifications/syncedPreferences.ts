@@ -1,7 +1,8 @@
 /**
  * The synced slice of Notification Preferences (issue #363, CONTEXT.md round
  * 44/45): the **feed** half of every per-Character event/eve-type toggle, and
- * the corp/structure thresholds, cross-device. Everything else in
+ * every threshold (structure fuel, corp wallet, personal wallet balance),
+ * cross-device. Everything else in
  * `preferences.ts` — the master switch, the browser channel, and the browser
  * half of those same toggles — stays device-local, since the permission it
  * gates is itself per-device.
@@ -83,6 +84,9 @@ function extractThresholds(raw: CharacterEventThresholds | undefined): Character
   if (raw?.corpWalletTransactionCeilingIsk !== undefined) {
     result.corpWalletTransactionCeilingIsk = raw.corpWalletTransactionCeilingIsk;
   }
+  if (raw?.walletBalanceChangedThresholdIsk !== undefined) {
+    result.walletBalanceChangedThresholdIsk = raw.walletBalanceChangedThresholdIsk;
+  }
   return result;
 }
 
@@ -137,7 +141,8 @@ function isThresholds(raw: unknown): raw is CharacterEventThresholds {
   return (
     isOptionalFiniteNumber(r.structureFuelLowDays) &&
     isOptionalFiniteNumber(r.corpWalletBalanceFloorIsk) &&
-    isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk)
+    isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk) &&
+    isOptionalFiniteNumber(r.walletBalanceChangedThresholdIsk)
   );
 }
 

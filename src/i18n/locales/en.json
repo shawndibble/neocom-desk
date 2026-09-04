@@ -150,6 +150,9 @@
     "reorderPreviewTitle": "Suggested reorder",
     "reorderAccept": "Accept",
     "reorderReject": "Reject",
+    "remapAccept": "Accept",
+    "remapReject": "Reject",
+    "remapDismiss": "Dismiss",
     "prereq": "Prereq",
     "importClipboard": "Import from clipboard",
     "whatIfImplants": "What-if implants",
@@ -200,8 +203,6 @@
     "importError": "Couldn't import the skill queue: {{message}}",
     "addMarker": "Add remap marker",
     "markerAdded": "Marker added",
-    "applyAsMarkers": "Apply as markers",
-    "markersApplied": "Markers applied",
     "optimizeAtMarkers": "Optimize at my markers",
     "markerRow": "Remap marker",
     "removeMarker": "Remove marker",
@@ -1116,6 +1117,7 @@
       "enable": "Enable",
       "dismiss": "Not now"
     },
+    "groupedTitle": "{{title}} x{{count}}",
     "fired": {
       "pushFallback": {
         "title": "NeoCom Desk",
@@ -1501,6 +1503,8 @@
       "structureFuelLowNotDuplicateHint": "This is separate from EVE's own low-fuel alert, which fires later at a fixed point — not a copy of it, an earlier warning of your choosing.",
       "corpWalletBalanceFloorLabel": "Balance floor (ISK):",
       "corpWalletTransactionCeilingLabel": "Transaction ceiling (ISK):",
+      "walletBalanceChangedThresholdLabel": "Notify on changes of at least:",
+      "walletBalanceChangedThresholdHint": "Accepts shorthand: 10.5m, 10,500,000, or 10500000 (b = billion, m = million, t = thousand).",
       "browserChannelLabel": "Browser notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
       "feedChannelLabel": "Overview notifications",
