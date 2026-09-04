@@ -144,9 +144,11 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   useEffect(() => {
     if (offerTypeIds.length === 0) return;
     let cancelled = false;
-    void loadTypeNames(offerTypeIds).then((names) => {
-      if (!cancelled) setItemNames(names);
-    });
+    void loadTypeNames(offerTypeIds)
+      .catch(() => new Map<number, string>())
+      .then((names) => {
+        if (!cancelled) setItemNames(names);
+      });
     return () => {
       cancelled = true;
     };
