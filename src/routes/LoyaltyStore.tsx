@@ -31,6 +31,7 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { useMarketHub } from '@/features/market/hub';
+import { usePriceBasis, type PriceBasis } from '@/features/loyalty/priceBasis';
 import { TRADE_HUBS } from '@/market/hubs';
 import { nameForType } from '@/features/industry/blueprintCatalog';
 import { buildMarketParams } from '@/engine/market/urlState';
@@ -46,6 +47,7 @@ interface OfferDetailProps {
   row: LoyaltyOfferRow;
   catalog: BlueprintCatalog | null;
   hubName: string;
+  priceBasis: PriceBasis;
   playerLp: number;
   useOwnMaterials: boolean;
   onToggleUseOwnMaterials: () => void;
@@ -57,6 +59,7 @@ function OfferDetail({
   row,
   catalog,
   hubName,
+  priceBasis,
   playerLp,
   useOwnMaterials,
   onToggleUseOwnMaterials,
@@ -116,7 +119,11 @@ function OfferDetail({
 
       <dl className="flex flex-col gap-1 text-xs">
         <div className="flex justify-between gap-4 text-text-dim">
-          <dt>{t('loyaltyStore.sellPriceAt', { hub: hubName })}</dt>
+          <dt>
+            {t(priceBasis === 'buy' ? 'loyaltyStore.buyPriceAt' : 'loyaltyStore.sellPriceAt', {
+              hub: hubName,
+            })}
+          </dt>
           <dd className="tabular-nums text-text">
             {profit.revenue === null ? '—' : formatIsk(profit.revenue)}
           </dd>
@@ -221,6 +228,13 @@ export function LoyaltyStore() {
   useEffect(() => {
     void hydrateHub();
   }, [hydrateHub]);
+
+  const hydratePriceBasis = usePriceBasis((s) => s.hydrate);
+  const priceBasis = usePriceBasis((s) => s.value);
+  const setPriceBasis = usePriceBasis((s) => s.setValue);
+  useEffect(() => {
+    void hydratePriceBasis();
+  }, [hydratePriceBasis]);
 
   const {
     corpName,
@@ -355,6 +369,7 @@ export function LoyaltyStore() {
       row={selectedRow}
       catalog={catalog}
       hubName={hub.name}
+      priceBasis={priceBasis}
       playerLp={playerLp}
       useOwnMaterials={useOwnMaterialsFor.has(selectedRow.offer.offer_id)}
       onToggleUseOwnMaterials={() => toggleUseOwnMaterials(selectedRow.offer.offer_id)}
@@ -408,16 +423,27 @@ export function LoyaltyStore() {
             </option>
           ))}
         </NativeSelect>
+        <NativeSelect
+          aria-label={t('loyaltyStore.priceBasisLabel')}
+          value={priceBasis}
+          onChange={(e) => void setPriceBasis(e.target.value as PriceBasis)}
+          className="w-auto"
+        >
+          <option value="sell">{t('loyaltyStore.priceBasisSell')}</option>
+          <option value="buy">{t('loyaltyStore.priceBasisBuy')}</option>
+        </NativeSelect>
         <FilterChip
           label={t('loyaltyStore.affordableFilter')}
           selected={affordableOnly}
           onToggle={() => setAffordableOnly((v) => !v)}
           count={affordableCount}
+          size="md"
         />
         <FilterChip
           label={t('loyaltyStore.blueprintsFilter')}
           selected={blueprintsOnly}
           onToggle={() => setBlueprintsOnly((v) => !v)}
+          size="md"
         />
       </div>
 

@@ -18,6 +18,7 @@ import { loadMarketSnapshot, type MarketSnapshot } from '@/features/industry/mar
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { usePriceBasis } from './priceBasis';
 import { useDetectedOwnedStock } from '@/features/industry/useDetectedOwnedStock';
 import type { MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
@@ -44,6 +45,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const hubId = useMarketHub((s) => s.value);
   const hubHydrated = useMarketHub((s) => s.hydrated);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  const priceBasis = usePriceBasis((s) => s.value);
 
   const [corpName, setCorpName] = useState<string | null>(null);
   const [offers, setOffers] = useState<LoyaltyStoreOffer[] | null>(null);
@@ -185,6 +187,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       offers,
       catalog,
       hubPrices: snapshot.hubPrices,
+      revenueHubPrices: priceBasis === 'buy' ? snapshot.hubBuyPrices : snapshot.hubPrices,
       adjustedPrices: snapshot.adjustedPrices,
       systemCostIndex: snapshot.systemCostIndex,
       skills,
@@ -197,6 +200,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     offers,
     catalog,
     snapshot,
+    priceBasis,
     skills,
     materialSourcing,
     itemNames,
