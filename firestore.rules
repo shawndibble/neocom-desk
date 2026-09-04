@@ -69,6 +69,15 @@ service cloud.firestore {
         allow update: if isOwner() && hashMatches() && incomingHashMatches();
         allow delete: if isOwner();
       }
+
+      // No delete rule: this collection carries no tombstones (dismissal is a
+      // flag — issue #362), so a client never deletes a row here.
+      match /notificationFeed/{occurrenceKey} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+      }
     }
 
     // Device registrations (issue #356, ADR 0010): written only by the

@@ -196,6 +196,45 @@ describe('diffCharacterNotTraining', () => {
     expect(diffCharacterNotTraining(7, prev, next)).toEqual([]);
   });
 
+  it('does not fire when a just-finished entry is still the queue-position-0 row but the queue has more, active entries behind it', () => {
+    // A completed-but-still-present row at the front is the normal shape on
+    // a completion poll (diffSkillLevelComplete detects completion the same
+    // way) — this must read "training" off the next real entry, not
+    // "not training" off the completed one.
+    const prev = snapshot(
+      [
+        entry({ skillId: 1, queuePosition: 0, finishMs: T0 + 1000 }),
+        entry({ skillId: 2, queuePosition: 1, finishMs: T0 + 10_000 }),
+      ],
+      T0
+    );
+    const next = snapshot(
+      [
+        entry({ skillId: 1, queuePosition: 0, finishMs: T0 + 1000 }),
+        entry({ skillId: 2, queuePosition: 1, finishMs: T0 + 10_000 }),
+      ],
+      T0 + 2000
+    );
+    expect(diffCharacterNotTraining(7, prev, next)).toEqual([]);
+  });
+
+  it('still fires when the entry that just finished was the last one in the queue', () => {
+    const prev = snapshot([entry({ skillId: 1, queuePosition: 0, finishMs: T0 + 1000 })], T0);
+    const next = snapshot(
+      [entry({ skillId: 1, queuePosition: 0, finishMs: T0 + 1000 })],
+      T0 + 2000
+    );
+    expect(diffCharacterNotTraining(7, prev, next)).toEqual([
+      {
+        eventId: 'characterNotTraining',
+        characterId: 7,
+        skillId: null,
+        level: null,
+        finishMs: null,
+      },
+    ]);
+  });
+
   it('does not re-fire on a later poll while still stalled', () => {
     const prev = snapshot([], T0);
     const next = snapshot([], T0 + FIVE_MIN);
@@ -243,6 +282,33 @@ describe('SKILL_QUEUE_NOTIFICATION_DIFFS / runSkillQueueNotificationDiffs', () =
         level: null,
         finishMs: null,
       },
+    ]);
+  });
+
+  it('fires only skillLevelComplete, not characterNotTraining, when a skill finishes with more behind it', () => {
+    const completionPrev = snapshot(
+      [
+        entry({ skillId: 1, queuePosition: 0, finishedLevel: 3, finishMs: T0 + 1000 }),
+        entry({ skillId: 2, queuePosition: 1, finishedLevel: 1, finishMs: T0 + 10_000 }),
+      ],
+      T0
+    );
+    const completionNext = snapshot(
+      [
+        entry({ skillId: 1, queuePosition: 0, finishedLevel: 3, finishMs: T0 + 1000 }),
+        entry({ skillId: 2, queuePosition: 1, finishedLevel: 1, finishMs: T0 + 10_000 }),
+      ],
+      T0 + 2000
+    );
+    expect(
+      runSkillQueueNotificationDiffs(
+        7,
+        completionPrev,
+        completionNext,
+        new Set(['skillLevelComplete', 'characterNotTraining'])
+      )
+    ).toEqual([
+      { eventId: 'skillLevelComplete', characterId: 7, skillId: 1, level: 3, finishMs: T0 + 1000 },
     ]);
   });
 });

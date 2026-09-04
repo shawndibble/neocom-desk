@@ -95,9 +95,18 @@ export function diffSkillLevelComplete(
 
 type HeadStatus = 'training' | 'notTraining';
 
+/**
+ * The head is the first entry not already completed, not literally
+ * `entries[0]` by queue position. `diffSkillLevelComplete` detects a
+ * completion from an entry that is still present in `entries` with its
+ * `finishMs` in the past, so a completed-but-present row at the front is the
+ * normal shape on a completion poll — reading `entries[0]` directly would
+ * misreport "not training" on every completion that has more queued behind it.
+ */
 function headStatus(snapshot: SkillQueueSnapshot): HeadStatus {
-  if (snapshot.entries.length === 0) return 'notTraining';
-  const [head] = orderedByQueuePosition(snapshot.entries);
+  const ordered = orderedByQueuePosition(snapshot.entries);
+  const head = ordered.find((entry) => !isCompleted(entry, snapshot.nowMs));
+  if (!head) return 'notTraining';
   return isActive(head, snapshot.nowMs) ? 'training' : 'notTraining';
 }
 

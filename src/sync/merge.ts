@@ -153,6 +153,91 @@ export function mergeRecords<L extends SyncRecord, R extends RemoteDoc>(
   return result;
 }
 
+/** Minimum shape of a local Notification Feed row needed to merge it (issue #362). */
+export interface FeedRow {
+  /** The Occurrence Key (issue #348) — never a minted id, so a push/pull can never duplicate a row. */
+  id: string;
+  /** Epoch ms the poller (or the backend) fired this. */
+  firedAt: number;
+  /** Epoch ms dismissed, absent while live. */
+  dismissedAt?: number;
+}
+
+/** Remote Firestore doc at /characters/{uid}/notificationFeed/{id}. */
+export interface RemoteFeedDoc extends FeedRow {
+  ownerHash: string;
+}
+
+export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
+  /** Local rows to create remotely — never seen there yet, and within the sync window. */
+  pushCreate: L[];
+  /** Local rows whose dismissal is newer than the remote copy — push the flag. */
+  pushDismiss: L[];
+  /** Remote rows to create locally — never seen here yet. */
+  pullCreate: R[];
+  /** Remote rows whose dismissal is newer than the local copy — pull the flag. */
+  pullDismiss: R[];
+}
+
+/**
+ * Feed sync has no tombstones (CONTEXT.md round 45: dismissal is a flag, this
+ * collection never deletes) and no generic LWW over a whole record — content
+ * fields never change once a row is fired, only `dismissedAt` does. So unlike
+ * {@link mergeRecords}, this keys strictly on `firedAt`/`dismissedAt`:
+ * `dismissedAt` is the one field that reconciles LWW-style (higher wins,
+ * absent treated as 0/never), the same shape as `mergeRecords`' `updatedAt`
+ * policy but scoped to that single field.
+ *
+ * `pushEligible` gates PUSH only — CONTEXT.md's synced window (30 days or 100
+ * rows, whichever is smaller; see `rowsWithinSyncWindow` in `features/notifications/feed.ts`)
+ * bounds what a device uploads, not what it will accept. A dismissal on a row
+ * that has since aged out of the push window must still win over a stale
+ * remote copy once seen — so the PULL direction always compares against every
+ * local row passed in, never just the windowed subset, and never regresses an
+ * already-recorded dismissal.
+ */
+export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
+  local: readonly L[],
+  pushEligible: ReadonlySet<string>,
+  remote: readonly R[]
+): FeedMergeResult<L, R> {
+  const result: FeedMergeResult<L, R> = {
+    pushCreate: [],
+    pushDismiss: [],
+    pullCreate: [],
+    pullDismiss: [],
+  };
+
+  const localById = new Map(local.map((r) => [r.id, r]));
+  const remoteById = new Map(remote.map((r) => [r.id, r]));
+  const ids = new Set([...localById.keys(), ...remoteById.keys()]);
+
+  for (const id of ids) {
+    const l = localById.get(id);
+    const r = remoteById.get(id);
+
+    if (l && !r) {
+      if (pushEligible.has(id)) result.pushCreate.push(l);
+      continue;
+    }
+    if (!l && r) {
+      result.pullCreate.push(r);
+      continue;
+    }
+    if (l && r) {
+      const localDismissed = l.dismissedAt ?? 0;
+      const remoteDismissed = r.dismissedAt ?? 0;
+      if (localDismissed > remoteDismissed) {
+        if (pushEligible.has(id)) result.pushDismiss.push(l);
+      } else if (remoteDismissed > localDismissed) {
+        result.pullDismiss.push(r);
+      }
+    }
+  }
+
+  return result;
+}
+
 /** A synced setting with its last-write timestamp (epoch ms). */
 export interface SyncedSettingValue {
   key: string;

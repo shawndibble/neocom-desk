@@ -42,6 +42,27 @@ export function idsBeyondLimit(newestFirst: readonly { id: string }[], limit: nu
   return newestFirst.slice(limit).map((entry) => entry.id);
 }
 
+/**
+ * The synced window (issue #362, CONTEXT.md round 45): 30 days or 100 rows,
+ * whichever is smaller, against the local {@link NOTIFICATION_FEED_LIMIT} of
+ * 300. Only rows in this window are eligible to be *pushed* during a sync —
+ * the fuller local archive stays device-local. Pure so it's testable without
+ * a database; the caller passes the feed newest-first (as `readFeed` returns
+ * it).
+ */
+export const FEED_SYNC_WINDOW_MAX_ROWS = 100;
+export const FEED_SYNC_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function rowsWithinSyncWindow<T extends { firedAt: number }>(
+  newestFirst: readonly T[],
+  now: number,
+  maxRows: number = FEED_SYNC_WINDOW_MAX_ROWS,
+  windowMs: number = FEED_SYNC_WINDOW_MS
+): T[] {
+  const cutoff = now - windowMs;
+  return newestFirst.filter((entry) => entry.firedAt >= cutoff).slice(0, maxRows);
+}
+
 /** Newest first. */
 export async function readFeed(): Promise<NotificationFeedEntry[]> {
   return db.notificationFeed.orderBy('firedAt').reverse().toArray();
@@ -54,8 +75,13 @@ export async function recordFeedEntry(entry: NewNotificationFeedEntry): Promise<
   await refreshAppBadge();
 }
 
+/**
+ * A flag rather than a delete, so this collection carries no tombstones —
+ * see `dismissedAt` on `NotificationFeedRecord` for why that matters once
+ * the feed syncs (issue #361).
+ */
 export async function dismissFeedEntry(id: string): Promise<void> {
-  await db.notificationFeed.delete(id);
+  await db.notificationFeed.update(id, { dismissedAt: Date.now() });
   await refreshAppBadge();
 }
 
@@ -66,6 +92,9 @@ export async function dismissFeedEntry(id: string): Promise<void> {
  * the other-Characters row is counting.
  */
 export async function dismissFeedEntries(ids: readonly string[]): Promise<void> {
-  await db.notificationFeed.bulkDelete([...ids]);
+  await db.notificationFeed
+    .where('id')
+    .anyOf([...ids])
+    .modify({ dismissedAt: Date.now() });
   await refreshAppBadge();
 }
