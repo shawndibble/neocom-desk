@@ -345,32 +345,43 @@ describe('PlanEditor tools pane', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('keeps Optimize remaps results inline, beneath the button that produced them', async () => {
-    const user = userEvent.setup();
-    renderEditor();
-    await openTools(user);
-
-    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
-
-    expect(screen.queryByRole('dialog')).toBeNull();
-    // The verdict lands in the same Actions section as its trigger, rather
-    // than in another panel at the bottom of the page.
-    const actions = sectionFor('Actions');
-    expect(within(actions).getByRole('status')).toBeInTheDocument();
-  });
-
-  it('"Apply as markers" writes the Optimize remaps segments back as plan markers', async () => {
+  it("opens Optimize remaps' preview in a Modal when it finds savings; Accept applies the segments as markers and closes it", async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
     await openTools(user);
 
+    expect(screen.queryByRole('dialog')).toBeNull();
+
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
-    await user.click(screen.getByRole('button', { name: 'Apply as markers' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
+    expect(within(dialog).getByText(/^Remapping saves/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
+    // The beside-the-button confirmation (#222) still fires alongside the
+    // Modal, same as "Suggest reorder"'s toast + Modal pairing.
+    expect(within(sectionFor('Actions')).getByRole('status')).toHaveTextContent(/^Saves/);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
     // Skill A (intelligence/memory) and Skill B (perception/willpower) are
     // different pairs, so a single remap is worth spending on the second —
     // the marker lands right before it, at entry-list position 1.
     expect(onUpdate).toHaveBeenCalledWith({ markers: [1] });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Reject closes the Optimize remaps Modal without updating the plan', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('shows the new marker\'s target attributes immediately, without a separate "Optimize at my markers" click', async () => {
@@ -379,7 +390,8 @@ describe('PlanEditor tools pane', () => {
     await openTools(user);
 
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
-    await user.click(screen.getByRole('button', { name: 'Apply as markers' }));
+    const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
+    await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
     // remapInstruction's own format: five "XXX N" terms joined by " / ",
     // which only a marker row's attribute spread renders — asserting it
@@ -389,6 +401,44 @@ describe('PlanEditor tools pane', () => {
     expect(
       within(entriesPanel).getByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)
     ).toBeInTheDocument();
+  });
+
+  it("opens Optimize at my markers' preview in a Modal when it finds savings; Accept re-applies the segments as markers and closes it", async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
+    await openTools(user);
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
+    expect(within(dialog).getByText(/^Remapping saves/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
+    // The beside-the-button confirmation (#222) still fires alongside the
+    // Modal, same as "Suggest reorder"'s toast + Modal pairing.
+    expect(within(sectionFor('Actions')).getByRole('status')).toHaveTextContent(/^Saves/);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
+
+    // The plan's own marker (position 1) round-trips back through the same
+    // segments-to-markers conversion "Optimize remaps" uses.
+    expect(onUpdate).toHaveBeenCalledWith({ markers: [1] });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Reject closes the Optimize at my markers Modal without updating the plan', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
+    const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it("shows a marker's target attributes on first mount too, not only after an explicit optimize click", () => {

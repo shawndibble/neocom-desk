@@ -263,7 +263,6 @@ export function PlanEditor({
   // Panel/Modal results those same actions already produce below.
   const [optimizeConfirm, setOptimizeConfirm] = useState<string | null>(null);
   const [markerConfirm, setMarkerConfirm] = useState(false);
-  const [markersAppliedConfirm, setMarkersAppliedConfirm] = useState(false);
   const [markersOptimizeConfirm, setMarkersOptimizeConfirm] = useState<string | null>(null);
   const [reorderConfirm, setReorderConfirm] = useState(false);
   // Outcome of the last drag on the entry list. A drop that would land a
@@ -618,6 +617,10 @@ export function PlanEditor({
     }
   }
 
+  // A "saves" verdict now also opens its own Accept/Reject Modal (below),
+  // beside this beside-the-button confirmation (#222) — the same pairing
+  // "Suggest reorder" already uses: an instant toast plus the Modal that
+  // holds the actual decision.
   function handleOptimizeRemaps() {
     if (scheduled.length === 0) return;
     const result = placeRemaps(scheduled, catalog.engineSkills, {
@@ -637,24 +640,34 @@ export function PlanEditor({
   }
 
   /**
-   * "Apply as markers": turn the last Optimize Remaps result's segments into
-   * actual Remap Markers, so the user doesn't have to drag/add them by hand
-   * to match what the search already found. Replaces `plan.markers` wholesale
-   * rather than diffing — that's "move the existing one, add the missing
-   * one" in a single write.
+   * Turn a set of RemapSegments into actual Remap Markers, so the user
+   * doesn't have to drag/add them by hand to match what a search (Optimize
+   * Remaps) or a live read of the plan's existing markers (Optimize at my
+   * markers) found. Replaces `plan.markers` wholesale rather than diffing —
+   * that's "move the existing one, add the missing one" in a single write.
+   * Shared by both flows' Accept button: for Optimize at my markers this
+   * round-trips the plan's own markers back through the same conversion, so
+   * it is normally a no-op, but two markers that now delimit the same
+   * optimizer step (see markerAttributesByStepIndex below) collapse to one.
    */
-  function handleApplyOptimizedMarkers() {
-    if (!optimizeResult) return;
+  function applySegmentsAsMarkers(segments: readonly RemapSegment[]) {
     onUpdate({
-      markers: segmentsToMarkers(
-        plan.entries,
-        optimizeResult.segments,
-        catalog.engineSkills,
-        trainedSkills
-      ),
+      markers: segmentsToMarkers(plan.entries, segments, catalog.engineSkills, trainedSkills),
     });
-    setMarkersAppliedConfirm(true);
-    setTimeout(() => setMarkersAppliedConfirm(false), 2000);
+  }
+
+  /** Accept on the Optimize Remaps preview Modal. */
+  function acceptOptimizeRemaps() {
+    if (!optimizeResult) return;
+    applySegmentsAsMarkers(optimizeResult.segments);
+    setOptimizeResult(null);
+    setOptimizeVerdict(null);
+  }
+
+  /** Reject on the Optimize Remaps preview Modal: dismiss without applying. */
+  function rejectOptimizeRemaps() {
+    setOptimizeResult(null);
+    setOptimizeVerdict(null);
   }
 
   /**
@@ -663,9 +676,9 @@ export function PlanEditor({
    * the cut points are fixed by the markers rather than searched, so this is
    * one bounded per-segment allocation search per marker, not a DP over where
    * to cut), so a marker row shows its target attributes immediately: after
-   * "Apply as markers", after a drag, and on a fresh page load or another
-   * device, without a separate "Optimize at my markers" click first. That
-   * button now only reveals the panel below (`markersPanelOpen`) — an
+   * Accept on either preview Modal, after a drag, and on a fresh page load or
+   * another device, without a separate "Optimize at my markers" click first.
+   * That button now only reveals the panel below (`markersPanelOpen`) — an
    * explicit finding the user asked to see, not a second computation of what
    * this memo already holds.
    */
@@ -695,6 +708,18 @@ export function PlanEditor({
     setMarkersPanelOpen(true);
     setMarkersOptimizeConfirm(confirmRemapOutcome(markersVerdict));
     setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
+  }
+
+  /** Accept on the Optimize at my markers preview Modal. */
+  function acceptOptimizeAtMarkers() {
+    if (!markersAtCurrentPositions) return;
+    applySegmentsAsMarkers(markersAtCurrentPositions.segments);
+    setMarkersPanelOpen(false);
+  }
+
+  /** Reject on the Optimize at my markers preview Modal: dismiss, changing nothing. */
+  function rejectOptimizeAtMarkers() {
+    setMarkersPanelOpen(false);
   }
 
   /**
@@ -821,6 +846,45 @@ export function PlanEditor({
           );
         })}
       </ul>
+    );
+  }
+
+  /**
+   * Shared shape of the two Accept/Reject preview Modals below: a `saves`
+   * verdict's figure, its segments, and the two actions. `saves` is already
+   * narrowed by the caller (a `null` here just means "closed"), so this
+   * only has to render, not re-check the verdict kind.
+   */
+  function renderRemapPreviewModal({
+    title,
+    saves,
+    onAccept,
+    onReject,
+  }: {
+    title: string;
+    saves: { savingsSeconds: number; segments: readonly RemapSegment[] } | null;
+    onAccept: () => void;
+    onReject: () => void;
+  }) {
+    return (
+      <Modal open={saves !== null} onClose={onReject} title={title}>
+        {saves && (
+          <div className="space-y-2 text-xs">
+            <p className="font-semibold text-success">
+              {t('plans.remapSaves', { duration: formatDuration(saves.savingsSeconds) })}
+            </p>
+            <div className="max-h-56 overflow-y-auto">{renderSegments(saves.segments)}</div>
+            <div className="flex gap-2">
+              <Button variant="primary" size="sm" onClick={onAccept}>
+                {t('plans.remapAccept')}
+              </Button>
+              <Button size="sm" onClick={onReject}>
+                {t('plans.remapReject')}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     );
   }
 
@@ -959,62 +1023,45 @@ export function PlanEditor({
             {reorderConfirm && confirmation(t('plans.reorderSuggested'))}
           </div>
 
-          {/* Read-only findings from the two optimize actions, under the
-              buttons that produced them. They used to be two more panels at
-              the bottom of the page, far from their own triggers. */}
-          {optimizeResult && optimizeVerdict && (
+          {/* A "saves" verdict from either action gets its own Accept/Reject
+              Modal below, next to the Suggest reorder one — an actual figure
+              to weigh belongs beside the two decisions it's weighed against,
+              not read-only text under the button that produced it. The other
+              verdicts have nothing to accept or reject, so they stay here,
+              under the button that produced them, exactly as before. */}
+          {optimizeResult && optimizeVerdict && optimizeVerdict.kind !== 'saves' && (
             <div className="border-t border-line pt-2 text-xs">
               {/* The summary badge already discloses a capped evaluation
                   live, before any click — repeating it here would show the
                   same warning twice. */}
-              {optimizeVerdict.kind === 'saves' ? (
-                <div className="space-y-2">
-                  <p className="font-semibold text-success">
-                    {t('plans.remapSaves', {
-                      duration: formatDuration(optimizeVerdict.savingsSeconds),
-                    })}
-                  </p>
-                  {renderSegments(optimizeResult.segments)}
-                  <Button size="sm" onClick={handleApplyOptimizedMarkers}>
-                    {t('plans.applyAsMarkers')}
-                  </Button>
-                  {markersAppliedConfirm && confirmation(t('plans.markersApplied'))}
-                </div>
-              ) : (
-                // `remapNoGain` blames the entry order and points at
-                // "Suggest reorder" — true only when a remap was actually
-                // weighed and lost, never when there was none to spend.
-                <p className="text-text-dim">
-                  {optimizeVerdict.kind === 'noRemapsAvailable'
-                    ? t('plans.remapNoneAvailable')
-                    : t('plans.remapNoGain')}
-                </p>
-              )}
+              {/* `remapNoGain` blames the entry order and points at
+                  "Suggest reorder" — true only when a remap was actually
+                  weighed and lost, never when there was none to spend. */}
+              <p className="text-text-dim">
+                {optimizeVerdict.kind === 'noRemapsAvailable'
+                  ? t('plans.remapNoneAvailable')
+                  : t('plans.remapNoGain')}
+              </p>
             </div>
           )}
-          {markersPanelOpen && markersAtCurrentPositions && markersVerdict && (
-            <div className="space-y-2 border-t border-line pt-2 text-xs">
-              {markersVerdict.kind === 'saves' ? (
-                <p className="font-semibold text-success">
-                  {t('plans.remapSaves', {
-                    duration: formatDuration(markersVerdict.savingsSeconds),
-                  })}
-                </p>
-              ) : (
+          {markersPanelOpen &&
+            markersAtCurrentPositions &&
+            markersVerdict &&
+            markersVerdict.kind !== 'saves' && (
+              <div className="space-y-2 border-t border-line pt-2 text-xs">
                 <p className="text-text-dim">
                   {markersVerdict.kind === 'markersAtEnd'
                     ? t('plans.markersAtEnd')
                     : t('plans.markersNoGain')}
                 </p>
-              )}
-              {/* Segments are the plan as the markers would train it — worth
+                {/* Segments are the plan as the markers would train it — worth
                   seeing even when the trade is poor, but not when no marker
                   split anything: the lone "keep current attributes" row then
                   reads as a contradiction of the message above it. */}
-              {markersVerdict.kind !== 'markersAtEnd' &&
-                renderSegments(markersAtCurrentPositions.segments)}
-            </div>
-          )}
+                {markersVerdict.kind !== 'markersAtEnd' &&
+                  renderSegments(markersAtCurrentPositions.segments)}
+              </div>
+            )}
         </div>
       ),
     },
@@ -1496,6 +1543,29 @@ export function PlanEditor({
           </Button>
         </div>
       </Modal>
+
+      {renderRemapPreviewModal({
+        title: t('plans.optimizeRemaps'),
+        saves:
+          optimizeResult && optimizeVerdict?.kind === 'saves'
+            ? { savingsSeconds: optimizeVerdict.savingsSeconds, segments: optimizeResult.segments }
+            : null,
+        onAccept: acceptOptimizeRemaps,
+        onReject: rejectOptimizeRemaps,
+      })}
+
+      {renderRemapPreviewModal({
+        title: t('plans.optimizeAtMarkers'),
+        saves:
+          markersPanelOpen && markersAtCurrentPositions && markersVerdict?.kind === 'saves'
+            ? {
+                savingsSeconds: markersVerdict.savingsSeconds,
+                segments: markersAtCurrentPositions.segments,
+              }
+            : null,
+        onAccept: acceptOptimizeAtMarkers,
+        onReject: rejectOptimizeAtMarkers,
+      })}
     </>
   );
 }
