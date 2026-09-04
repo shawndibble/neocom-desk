@@ -5,7 +5,6 @@ import type {
   MailHeader,
   CalendarEventSummary,
   Contract,
-  WalletJournalEntry,
   CharacterNotification,
 } from '@/esi/endpoints';
 import {
@@ -22,6 +21,7 @@ import type {
   CalendarSnapshot,
   ContractSnapshot,
   WalletSnapshot,
+  WalletJournalEntrySnapshot,
   MarketOrderSnapshot,
   ColonySnapshotEntry,
   MarketOrderEntrySnapshot,
@@ -92,14 +92,19 @@ function calendarEvent(overrides: Partial<CalendarEventSummary> = {}): CalendarE
   };
 }
 
-function walletJournalEntry(overrides: Partial<WalletJournalEntry> = {}): WalletJournalEntry {
-  return {
-    id: 1,
-    date: '2026-01-01T00:00:00Z',
-    ref_type: 'bounty',
-    description: '',
-    ...overrides,
-  };
+/**
+ * `walletDomain.load` (`pollDomains.ts`) now bakes the Character's threshold
+ * onto each entry it returns, since `toSnapshot` is a pure passthrough for
+ * this domain (the wallet-balance-threshold feature) — so this harness's fake
+ * loader, which bypasses `load` entirely, must hand back entries already in
+ * that shape rather than the raw ESI `WalletJournalEntry`. `thresholdIsk`
+ * defaults to 0 so every case below keeps firing exactly as it did before the
+ * threshold existed, unless a case opts into testing the threshold itself.
+ */
+function walletJournalEntry(
+  overrides: Partial<WalletJournalEntrySnapshot> = {}
+): WalletJournalEntrySnapshot {
+  return { id: 1, amount: 100, thresholdIsk: 0, ...overrides };
 }
 
 function eveNotification(overrides: Partial<CharacterNotification> = {}): CharacterNotification {
@@ -155,7 +160,7 @@ interface DomainOverrides {
   loadContracts?: (characterId: number) => Promise<Contract[] | null>;
   prevContractState?: () => Promise<ContractPollerState>;
   saveContractState?: (state: ContractPollerState) => Promise<void>;
-  loadWalletJournal?: (characterId: number) => Promise<WalletJournalEntry[] | null>;
+  loadWalletJournal?: (characterId: number) => Promise<WalletJournalEntrySnapshot[] | null>;
   prevWalletState?: () => Promise<WalletPollerState>;
   saveWalletState?: (state: WalletPollerState) => Promise<void>;
   loadMarketOrders?: (characterId: number) => Promise<MarketOrderEntrySnapshot[] | null>;
@@ -837,7 +842,7 @@ describe('runForegroundPoll', () => {
 
   it('leaves the wallet high-water mark untouched and fires nothing when the load is truncated', async () => {
     const initial: WalletPollerState = {
-      [CHAR.characterId]: { entries: [{ id: 5, amount: 100 }], nowMs: 500 },
+      [CHAR.characterId]: { entries: [{ id: 5, amount: 100, thresholdIsk: 0 }], nowMs: 500 },
     };
     const saveWalletState = vi.fn(async () => {});
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
@@ -866,12 +871,14 @@ describe('runForegroundPoll', () => {
     await runForegroundPoll(deps);
     expect(deps.notify).not.toHaveBeenCalled();
     expect(savedWallet).not.toBeNull();
-    expect(savedWallet![CHAR.characterId].entries).toEqual([{ id: 5, amount: 100 }]);
+    expect(savedWallet![CHAR.characterId].entries).toEqual([
+      { id: 5, amount: 100, thresholdIsk: 0 },
+    ]);
   });
 
   it('records walletBalanceChanged to the feed but does not raise a browser notification by default (feed-only, CONTEXT.md round 45)', async () => {
     const savedWallet: WalletPollerState = {
-      [CHAR.characterId]: { entries: [{ id: 5, amount: 100 }], nowMs: 1000 },
+      [CHAR.characterId]: { entries: [{ id: 5, amount: 100, thresholdIsk: 0 }], nowMs: 1000 },
     };
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
@@ -893,7 +900,7 @@ describe('runForegroundPoll', () => {
 
   it('fires walletBalanceChanged when a journal entry id above the previous high-water mark appears', async () => {
     let savedWallet: WalletPollerState = {
-      [CHAR.characterId]: { entries: [{ id: 5, amount: 100 }], nowMs: 1000 },
+      [CHAR.characterId]: { entries: [{ id: 5, amount: 100, thresholdIsk: 0 }], nowMs: 1000 },
     };
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const deps = baseDeps({
@@ -1036,6 +1043,98 @@ describe('runForegroundPoll', () => {
     expect(notify).toHaveBeenCalledTimes(1);
     const [fire] = notify.mock.calls[0];
     expect(fire.eventId).toBe('marketOrderFilled');
+  });
+
+  it('groups several marketOrderFilled fires from the same poll into one notify call, since none name the order (issue: duplicate order-filled toasts)', async () => {
+    let savedMarketOrders: MarketOrderPollerState = {
+      [CHAR.characterId]: {
+        entries: [
+          { orderId: 1, filled: false },
+          { orderId: 2, filled: false },
+          { orderId: 3, filled: false },
+        ],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({ marketOrderFilled: { browser: true } }),
+      prevMarketOrderState: async () => savedMarketOrders,
+      saveMarketOrderState: async (state) => {
+        savedMarketOrders = state;
+      },
+      loadMarketOrders: async () => [
+        { orderId: 1, filled: true },
+        { orderId: 2, filled: true },
+        { orderId: 3, filled: true },
+      ],
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [fire, character, override] = notify.mock.calls[0];
+    expect(fire.eventId).toBe('marketOrderFilled');
+    expect(character).toEqual(CHAR);
+    expect(override?.title).toContain('x3');
+  });
+
+  it('does not group the feed the way it groups the browser toast — one row per occurrence, each with its own Occurrence Key', async () => {
+    let savedMarketOrders: MarketOrderPollerState = {
+      [CHAR.characterId]: {
+        entries: [
+          { orderId: 1, filled: false },
+          { orderId: 2, filled: false },
+        ],
+        nowMs: 1000,
+      },
+    };
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      feedChannelEnabled: async () => true,
+      prevMarketOrderState: async () => savedMarketOrders,
+      saveMarketOrderState: async (state) => {
+        savedMarketOrders = state;
+      },
+      loadMarketOrders: async () => [
+        { orderId: 1, filled: true },
+        { orderId: 2, filled: true },
+      ],
+      recordToFeed,
+    });
+    await runForegroundPoll(deps);
+    // Two distinct occurrences (orders 1 and 2) -> two feed rows, even though
+    // they'd collapse into one browser toast — losing either row here would
+    // permanently drop that occurrence's history, since the diff that
+    // produced it is already high-water-marked and will never re-fire.
+    expect(recordToFeed).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not group fires whose rendered copy actually differs (a different Character each firing marketOrderFilled once)', async () => {
+    const CHAR_2: CharacterRef = { characterId: 2, name: 'Second Pilot' };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const marketOrderStates: Record<number, MarketOrderPollerState[number]> = {
+      1: { entries: [{ orderId: 1, filled: false }], nowMs: 1000 },
+      2: { entries: [{ orderId: 9, filled: false }], nowMs: 1000 },
+    };
+    const deps = baseDeps({
+      characters: async () => [CHAR, CHAR_2],
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({ marketOrderFilled: { browser: true } }),
+      prevMarketOrderState: async () => marketOrderStates,
+      saveMarketOrderState: async (state) => {
+        Object.assign(marketOrderStates, state);
+      },
+      loadMarketOrders: async (characterId) =>
+        characterId === 1 ? [{ orderId: 1, filled: true }] : [{ orderId: 9, filled: true }],
+      notify,
+    });
+    await runForegroundPoll(deps);
+    // Different Characters -> different rendered copy ("X's market order was
+    // filled." vs "Y's..."), so each stays its own delivery rather than
+    // collapsing across characters.
+    expect(notify).toHaveBeenCalledTimes(2);
   });
 
   it('skips eveNotification for a character with no granted scope', async () => {

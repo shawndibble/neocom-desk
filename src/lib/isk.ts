@@ -34,3 +34,28 @@ export function clampIskZero(value: number, decimals: number): number {
 export function formatIsk(value: number, decimals = 0): string {
   return formatterFor(decimals).format(clampIskZero(value, decimals));
 }
+
+const ISK_SHORTHAND_MULTIPLIERS: Readonly<Record<string, number>> = {
+  b: 1_000_000_000,
+  m: 1_000_000,
+  t: 1_000,
+};
+
+/** `10.5m`, `10,500,000`, and `10500000` all parse to 10,500,000. Suffixes: b = billion, m = million, t = thousand. */
+const ISK_AMOUNT_PATTERN = /^(\d[\d,]*(?:\.\d+)?|\.\d+)\s*([bmt])?$/i;
+
+/**
+ * Parses a threshold-style ISK amount from free text (issue #wallet-balance-threshold):
+ * comma-separated thousands, a decimal point, and an optional case-insensitive
+ * `b`/`m`/`t` shorthand suffix, in any combination. Returns `null` for anything
+ * that doesn't match rather than `NaN`, so a caller can tell "invalid" from "zero".
+ */
+export function parseIskAmount(input: string): number | null {
+  const match = ISK_AMOUNT_PATTERN.exec(input.trim());
+  if (!match) return null;
+  const numeric = Number(match[1].replace(/,/g, ''));
+  if (!Number.isFinite(numeric)) return null;
+  const suffix = match[2]?.toLowerCase();
+  const multiplier = suffix ? ISK_SHORTHAND_MULTIPLIERS[suffix] : 1;
+  return numeric * multiplier;
+}

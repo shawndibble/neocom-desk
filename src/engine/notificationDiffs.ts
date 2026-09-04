@@ -544,6 +544,8 @@ export function diffContractAccepted(
 export interface WalletJournalEntrySnapshot {
   id: number;
   amount: number | null;
+  /** The Character's current wallet-change threshold, in ISK, as it stood when this poll ran — see `StructureFuelEntrySnapshot`. */
+  thresholdIsk: number;
 }
 
 export interface WalletSnapshot {
@@ -564,6 +566,16 @@ export interface WalletNotificationFire {
  * merely differs from some baseline, whereas journal entry `id` is
  * monotonically increasing, so gating on it fires exactly once per new entry.
  *
+ * Also requires the entry's absolute amount to be at or above the
+ * Character's chosen threshold (`entry.thresholdIsk`, baked in per entry at
+ * `pollDomains.ts`'s `load()` time — see `StructureFuelEntrySnapshot`), so a
+ * threshold change takes effect on the very next poll without special-casing
+ * it here: an entry once seen (id `<=` the high-water mark) is never
+ * re-evaluated even if the threshold is lowered later, matching
+ * `diffCorpWalletThreshold`'s `transactionAbove` half. An entry with a `null`
+ * amount can't be compared to a threshold, so it never fires — same
+ * treatment `diffCorpWalletThreshold` gives a null-amount journal entry.
+ *
  * Sorted oldest-new-entry-first rather than left in ESI's own order (the
  * journal comes back newest-first): the delivery loop stamps each fire's
  * feed entry with `Date.now()` as it's recorded, in this array's order, and
@@ -581,6 +593,7 @@ export function diffWalletBalanceChanged(
   const maxPrevId = prev.entries.reduce((max, entry) => Math.max(max, entry.id), 0);
   return next.entries
     .filter((entry) => entry.id > maxPrevId)
+    .filter((entry) => entry.amount !== null && Math.abs(entry.amount) >= entry.thresholdIsk)
     .sort((a, b) => a.id - b.id)
     .map((entry) => ({ eventId: 'walletBalanceChanged', characterId, amount: entry.amount }));
 }

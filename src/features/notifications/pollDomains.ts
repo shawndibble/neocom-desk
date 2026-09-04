@@ -42,7 +42,6 @@ import type {
   MailHeader,
   CalendarEventSummary,
   Contract,
-  WalletJournalEntry,
   MarketOrder,
   MarketOrderHistory,
   CharacterNotification,
@@ -613,11 +612,22 @@ export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractN
 function isWalletJournalEntrySnapshot(raw: unknown): raw is WalletJournalEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  return typeof r.id === 'number' && (r.amount === null || typeof r.amount === 'number');
+  return (
+    typeof r.id === 'number' &&
+    (r.amount === null || typeof r.amount === 'number') &&
+    typeof r.thresholdIsk === 'number'
+  );
 }
 
+/**
+ * `TRaw` is already the engine snapshot shape here, not the ESI type
+ * (`structureFuelDomain`'s precedent): the Character's wallet-change
+ * threshold is a preference, only readable in `load()`'s async context, so
+ * it's baked into each entry there rather than in the synchronous
+ * `toSnapshot`.
+ */
 export const walletDomain = defineDomain<
-  WalletJournalEntry,
+  WalletJournalEntrySnapshot,
   WalletSnapshot,
   WalletNotificationFire
 >({
@@ -633,12 +643,14 @@ export const walletDomain = defineDomain<
     // tracks, re-firing for entries already reported once the next complete poll
     // sees them again (same reasoning as the contracts truncation guard above).
     if (result.cached.truncated) return null;
-    return result.cached.data;
+    const thresholds = await currentThresholds(characterId);
+    return result.cached.data.map((entry) => ({
+      id: entry.id,
+      amount: entry.amount ?? null,
+      thresholdIsk: thresholds.walletBalanceChangedThresholdIsk,
+    }));
   },
-  toSnapshot: (entries, nowMs) => ({
-    entries: entries.map((entry) => ({ id: entry.id, amount: entry.amount ?? null })),
-    nowMs,
-  }),
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   diffs: [gatedOn('walletBalanceChanged', diffWalletBalanceChanged)],
 });
 

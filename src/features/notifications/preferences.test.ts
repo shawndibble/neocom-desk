@@ -24,6 +24,7 @@ import {
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+  DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
 } from './preferences';
 import { SYNCED_NOTIFICATION_FEED_PREFS_KEY } from './syncedPreferences';
 
@@ -283,6 +284,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       structureFuelLowDays: DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+      walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
     });
   });
 
@@ -297,6 +299,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       structureFuelLowDays: 3,
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+      walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
     });
   });
 
@@ -312,6 +315,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       structureFuelLowDays: 1,
       corpWalletBalanceFloorIsk: 10_000_000,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+      walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
     });
   });
 
@@ -323,6 +327,21 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
     };
     const next = withCharacterEventThreshold(value, 1, 'structureFuelLowDays', 3);
     expect(characterEventThresholds(next, 2).structureFuelLowDays).toBe(1);
+  });
+
+  it('sets walletBalanceChangedThresholdIsk, leaving the other fields at their default', () => {
+    const next = withCharacterEventThreshold(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'walletBalanceChangedThresholdIsk',
+      10_500_000
+    );
+    expect(characterEventThresholds(next, 1)).toEqual({
+      structureFuelLowDays: DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+      corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+      corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+      walletBalanceChangedThresholdIsk: 10_500_000,
+    });
   });
 
   it('applies a persisted thresholdsByCharacter map on hydrate', async () => {
