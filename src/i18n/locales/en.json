@@ -152,6 +152,7 @@
     "reorderReject": "Reject",
     "remapAccept": "Accept",
     "remapReject": "Reject",
+    "remapDismiss": "Dismiss",
     "prereq": "Prereq",
     "importClipboard": "Import from clipboard",
     "whatIfImplants": "What-if implants",

@@ -2183,11 +2183,17 @@ offeredScopes: Record<number, readonly Scope[]> }`. Round 37's "offered once
   round's reasoning was sound at the time — a remap result was "read-only
   findings to consult, not a decision to commit" — but user feedback asked
   for the same Accept/Reject pattern "Suggest reorder" already has, so both
-  now get one too, gated on the one branch that has anything to decide: a
-  `saves` verdict. `noRemapsAvailable` / `markersAtEnd` / `noGain` carry no
-  proposal to accept, so they stay exactly where round 17 put them — inline,
-  under the button that produced them, with the beside-the-button toast as
-  their only other channel.
+  now get one too. The Modal opens on every click, matching "Suggest
+  reorder"'s own Modal, which opens unconditionally even when reordering
+  finds nothing to improve — the first draft of this round gated the Modal
+  on a `saves` verdict and kept the other outcomes inline, but that read
+  the request narrower than intended and was corrected before merge. A
+  `saves` verdict gets the figure, its segments, and Accept/Reject; every
+  other verdict (`noRemapsAvailable` / `markersAtEnd` / `noGain`) gets its
+  explanatory text inside the same Modal, with a single `common.close`
+  dismiss action instead of Accept/Reject, since there is nothing to accept.
+  The beside-the-button toast (#222) still fires alongside the Modal for
+  every verdict, same as "Suggest reorder"'s toast + Modal pairing.
 - **"Optimize at my markers"' Accept round-trips the plan's own markers
   through the same segments-to-markers conversion "Optimize remaps" uses to
   turn a search result into markers** (`applySegmentsAsMarkers`, shared by

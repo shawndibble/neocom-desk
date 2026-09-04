@@ -850,36 +850,54 @@ export function PlanEditor({
   }
 
   /**
-   * Shared shape of the two Accept/Reject preview Modals below: a `saves`
-   * verdict's figure, its segments, and the two actions. `saves` is already
-   * narrowed by the caller (a `null` here just means "closed"), so this
-   * only has to render, not re-check the verdict kind.
+   * Shared shape of the two Accept/Reject preview Modals below: like
+   * "Suggest reorder"'s Modal, this opens on every click, not only when
+   * there is something to accept. A `saves` verdict gets the figure, its
+   * segments, and both actions; every other verdict gets its explanatory
+   * text (and, for "Optimize at my markers", still its segments — see the
+   * caller) with a single dismiss action, since there is nothing to accept.
+   * `message` and `segments` are resolved by the caller rather than derived
+   * here: the same verdict `kind` reads differently depending on which
+   * action produced it (e.g. `noGain` blames the entry order for a search,
+   * but blames marker placement for markers already placed).
    */
   function renderRemapPreviewModal({
     title,
-    saves,
+    open,
+    verdict,
+    segments,
+    message,
     onAccept,
-    onReject,
+    onClose,
   }: {
     title: string;
-    saves: { savingsSeconds: number; segments: readonly RemapSegment[] } | null;
+    open: boolean;
+    verdict: OptimizeVerdict | null;
+    segments: readonly RemapSegment[] | null;
+    message: string;
     onAccept: () => void;
-    onReject: () => void;
+    onClose: () => void;
   }) {
     return (
-      <Modal open={saves !== null} onClose={onReject} title={title}>
-        {saves && (
+      <Modal open={open} onClose={onClose} title={title}>
+        {verdict && (
           <div className="space-y-2 text-xs">
-            <p className="font-semibold text-success">
-              {t('plans.remapSaves', { duration: formatDuration(saves.savingsSeconds) })}
-            </p>
-            <div className="max-h-56 overflow-y-auto">{renderSegments(saves.segments)}</div>
+            {verdict.kind === 'saves' ? (
+              <p className="font-semibold text-success">
+                {t('plans.remapSaves', { duration: formatDuration(verdict.savingsSeconds) })}
+              </p>
+            ) : (
+              <p className="text-text-dim">{message}</p>
+            )}
+            {segments && <div className="max-h-56 overflow-y-auto">{renderSegments(segments)}</div>}
             <div className="flex gap-2">
-              <Button variant="primary" size="sm" onClick={onAccept}>
-                {t('plans.remapAccept')}
-              </Button>
-              <Button size="sm" onClick={onReject}>
-                {t('plans.remapReject')}
+              {verdict.kind === 'saves' && (
+                <Button variant="primary" size="sm" onClick={onAccept}>
+                  {t('plans.remapAccept')}
+                </Button>
+              )}
+              <Button size="sm" onClick={onClose}>
+                {verdict.kind === 'saves' ? t('plans.remapReject') : t('plans.remapDismiss')}
               </Button>
             </div>
           </div>
@@ -1022,46 +1040,6 @@ export function PlanEditor({
             })}
             {reorderConfirm && confirmation(t('plans.reorderSuggested'))}
           </div>
-
-          {/* A "saves" verdict from either action gets its own Accept/Reject
-              Modal below, next to the Suggest reorder one — an actual figure
-              to weigh belongs beside the two decisions it's weighed against,
-              not read-only text under the button that produced it. The other
-              verdicts have nothing to accept or reject, so they stay here,
-              under the button that produced them, exactly as before. */}
-          {optimizeResult && optimizeVerdict && optimizeVerdict.kind !== 'saves' && (
-            <div className="border-t border-line pt-2 text-xs">
-              {/* The summary badge already discloses a capped evaluation
-                  live, before any click — repeating it here would show the
-                  same warning twice. */}
-              {/* `remapNoGain` blames the entry order and points at
-                  "Suggest reorder" — true only when a remap was actually
-                  weighed and lost, never when there was none to spend. */}
-              <p className="text-text-dim">
-                {optimizeVerdict.kind === 'noRemapsAvailable'
-                  ? t('plans.remapNoneAvailable')
-                  : t('plans.remapNoGain')}
-              </p>
-            </div>
-          )}
-          {markersPanelOpen &&
-            markersAtCurrentPositions &&
-            markersVerdict &&
-            markersVerdict.kind !== 'saves' && (
-              <div className="space-y-2 border-t border-line pt-2 text-xs">
-                <p className="text-text-dim">
-                  {markersVerdict.kind === 'markersAtEnd'
-                    ? t('plans.markersAtEnd')
-                    : t('plans.markersNoGain')}
-                </p>
-                {/* Segments are the plan as the markers would train it — worth
-                  seeing even when the trade is poor, but not when no marker
-                  split anything: the lone "keep current attributes" row then
-                  reads as a contradiction of the message above it. */}
-                {markersVerdict.kind !== 'markersAtEnd' &&
-                  renderSegments(markersAtCurrentPositions.segments)}
-              </div>
-            )}
         </div>
       ),
     },
@@ -1546,25 +1524,40 @@ export function PlanEditor({
 
       {renderRemapPreviewModal({
         title: t('plans.optimizeRemaps'),
-        saves:
-          optimizeResult && optimizeVerdict?.kind === 'saves'
-            ? { savingsSeconds: optimizeVerdict.savingsSeconds, segments: optimizeResult.segments }
-            : null,
+        open: optimizeResult !== null,
+        verdict: optimizeVerdict,
+        // `remapNoGain` blames the entry order and points at "Suggest
+        // reorder" — true only when a remap was actually weighed and lost,
+        // never when there was none to spend. No segments on this branch:
+        // a search that found nothing to remap has no plan-as-trained to
+        // show, unlike the markers Modal below, which already has one.
+        segments: optimizeVerdict?.kind === 'saves' ? (optimizeResult?.segments ?? null) : null,
+        message:
+          optimizeVerdict?.kind === 'noRemapsAvailable'
+            ? t('plans.remapNoneAvailable')
+            : t('plans.remapNoGain'),
         onAccept: acceptOptimizeRemaps,
-        onReject: rejectOptimizeRemaps,
+        onClose: rejectOptimizeRemaps,
       })}
 
       {renderRemapPreviewModal({
         title: t('plans.optimizeAtMarkers'),
-        saves:
-          markersPanelOpen && markersAtCurrentPositions && markersVerdict?.kind === 'saves'
-            ? {
-                savingsSeconds: markersVerdict.savingsSeconds,
-                segments: markersAtCurrentPositions.segments,
-              }
+        open: markersPanelOpen && markersAtCurrentPositions !== null,
+        verdict: markersVerdict,
+        // Segments are the plan as the markers would train it — worth
+        // seeing even when the trade is poor, but not when no marker split
+        // anything: the lone "keep current attributes" row would then read
+        // as a contradiction of the message above it.
+        segments:
+          markersAtCurrentPositions && markersVerdict?.kind !== 'markersAtEnd'
+            ? markersAtCurrentPositions.segments
             : null,
+        message:
+          markersVerdict?.kind === 'markersAtEnd'
+            ? t('plans.markersAtEnd')
+            : t('plans.markersNoGain'),
         onAccept: acceptOptimizeAtMarkers,
-        onReject: rejectOptimizeAtMarkers,
+        onClose: rejectOptimizeAtMarkers,
       })}
     </>
   );

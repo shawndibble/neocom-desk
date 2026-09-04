@@ -384,6 +384,27 @@ describe('PlanEditor tools pane', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('opens the Optimize remaps Modal even with no savings, offering only Close', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 0 } });
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
+    expect(
+      within(dialog).getByText(
+        'This plan has 0 remaps to spend, so nothing was placed — raise "Remaps available" above and optimize again.'
+      )
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Accept' })).toBeNull();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Dismiss' }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('shows the new marker\'s target attributes immediately, without a separate "Optimize at my markers" click', async () => {
     const user = userEvent.setup();
     renderEditor();
@@ -436,6 +457,30 @@ describe('PlanEditor tools pane', () => {
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('opens the Optimize at my markers Modal even with no savings, offering only Close', async () => {
+    const user = userEvent.setup();
+    // A marker at the very end of the entry list delimits nothing to remap.
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: { ...PLAN, markers: [PLAN.entries.length] },
+    });
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
+    expect(
+      within(dialog).getByText(
+        'Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.'
+      )
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Accept' })).toBeNull();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Dismiss' }));
 
     expect(onUpdate).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).toBeNull();
