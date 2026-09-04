@@ -40,7 +40,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   calendarEventStarting: '/calendar',
   contractAccepted: '/contracts',
   walletBalanceChanged: '/wallet',
-  marketOrderFilled: '/orders',
+  // Open Orders is now Market's own tab, not a route of its own.
+  marketOrderFilled: '/market?section=orders',
   // ~100 EVE-native types (issue #274), most with no corresponding page in
   // the app — the Overview fallback is a deliberate choice for this event,
   // not an inherited default.

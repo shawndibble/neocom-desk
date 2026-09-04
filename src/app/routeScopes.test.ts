@@ -24,7 +24,6 @@ describe('scope derivation', () => {
     expect(requiredScopesForRoute('/contracts')).toEqual([
       'esi-contracts.read_character_contracts.v1',
     ]);
-    expect(requiredScopesForRoute('/orders')).toEqual(['esi-markets.read_character_orders.v1']);
     expect(requiredScopesForRoute('/clones')).toEqual(['esi-clones.read_clones.v1']);
   });
 
@@ -86,7 +85,6 @@ describe('gated routes', () => {
       '/contacts',
       '/contracts',
       '/mail',
-      '/orders',
       '/planetary-industry',
     ]);
   });

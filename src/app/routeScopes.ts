@@ -41,7 +41,11 @@ export type RouteRequirement = Ungated | GatedRoute;
 export const ROUTE_REQUIREMENTS = {
   // Character-agnostic or locally-backed: nothing to gate.
   '/characters': UNGATED,
-  // Market Browser is SDE + Fuzzwork only — no character endpoint.
+  // Market Browser itself is SDE + Fuzzwork only — no character endpoint. Its
+  // Open Orders/History/Transactions tabs (formerly the separate `/orders`
+  // route and Wallet's Transactions tab) are each panel-gated the same way
+  // `/wallet` is below, so a missing grant only banners that tab rather than
+  // hiding the scope-free Browser tab everyone can use.
   '/market': UNGATED,
   // Skill Plans are local, editable data. The ESI reads sharpen them — the
   // queue carries levels /skills has not caught up to — but a plan still
@@ -150,15 +154,6 @@ export const ROUTE_REQUIREMENTS = {
   '/contracts': {
     endpoints: ['getCharacterContracts', 'postUniverseNames'],
     strings: 'contracts',
-  },
-  '/orders': {
-    endpoints: [
-      'getCharacterOrders',
-      'getCharacterOrderHistory',
-      'postUniverseNames',
-      'getUniverseType',
-    ],
-    strings: 'orders',
   },
   // Deliberately does not list getCharacterSkills, even though the loader
   // reads it for the cooldown's Infomorph Synchronizing level: skills is a
