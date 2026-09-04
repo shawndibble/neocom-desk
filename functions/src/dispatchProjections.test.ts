@@ -85,4 +85,19 @@ describe('buildPushData', () => {
       body: "Aurelia's industry job for Tritanium is complete.",
     });
   });
+
+  it('carries eveType through when the row has one, for per-type muting of a push-delivered eveNotification', () => {
+    expect(buildPushData({ ...ROW, eveType: 'StructureLostShields' })).toEqual({
+      characterId: '1',
+      eventId: 'industryJobComplete',
+      occurrenceKey: '1:industryJobComplete:987',
+      title: 'Industry job complete',
+      body: "Aurelia's industry job for Tritanium is complete.",
+      eveType: 'StructureLostShields',
+    });
+  });
+
+  it('omits eveType from the FCM data payload when the row has none', () => {
+    expect(buildPushData(ROW).eveType).toBeUndefined();
+  });
 });

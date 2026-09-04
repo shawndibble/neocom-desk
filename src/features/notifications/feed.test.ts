@@ -10,6 +10,8 @@ import {
   rowsWithinSyncWindow,
   FEED_SYNC_WINDOW_MAX_ROWS,
   FEED_SYNC_WINDOW_MS,
+  feedHasOccurrence,
+  deleteFeedForCharacter,
 } from './feed';
 
 beforeEach(async () => {
@@ -237,5 +239,50 @@ describe('dismissing', () => {
     const feed = await readFeed();
     expect(feed).toHaveLength(NOTIFICATION_FEED_LIMIT);
     expect(feed.find((e) => e.id === oldestId)).toBeUndefined();
+  });
+});
+
+describe('feedHasOccurrence', () => {
+  it('is false for an occurrence never recorded', async () => {
+    expect(await feedHasOccurrence('never-seen')).toBe(false);
+  });
+
+  it('is true once that Occurrence Key has been recorded', async () => {
+    await recordFeedEntry({
+      id: 'occurrence-1',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 't',
+      body: 'b',
+      firedAt: 1000,
+    });
+    expect(await feedHasOccurrence('occurrence-1')).toBe(true);
+  });
+});
+
+describe('deleteFeedForCharacter', () => {
+  it("deletes only the given Character's rows, leaving other Characters' feed intact", async () => {
+    await recordFeedEntry({
+      id: 'a',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 't',
+      body: 'b',
+      firedAt: 1,
+    });
+    await recordFeedEntry({
+      id: 'b',
+      characterId: 2,
+      eventId: 'newMail',
+      title: 't',
+      body: 'b',
+      firedAt: 2,
+    });
+
+    await deleteFeedForCharacter(1);
+
+    const feed = await readFeed();
+    expect(feed).toHaveLength(1);
+    expect(feed[0].characterId).toBe(2);
   });
 });

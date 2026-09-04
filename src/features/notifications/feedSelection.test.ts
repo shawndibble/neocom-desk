@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { NotificationFeedEntry } from './feed';
-import { visibleFeedEntries, entriesForCharacter, otherCharacterAlerts } from './feedSelection';
+import {
+  visibleFeedEntries,
+  entriesForCharacter,
+  otherCharacterAlerts,
+  entryChannelTarget,
+} from './feedSelection';
 import type { NotificationPreferencesValue } from './preferences';
 
 function entry(over: Partial<NotificationFeedEntry> = {}): NotificationFeedEntry {
@@ -16,6 +21,21 @@ function entry(over: Partial<NotificationFeedEntry> = {}): NotificationFeedEntry
 }
 
 const ALL_ON: NotificationPreferencesValue = { masterEnabled: true, perCharacter: {} };
+
+describe('entryChannelTarget', () => {
+  it("targets the entry's eveType when present, so a per-type opt-out governs it", () => {
+    expect(
+      entryChannelTarget(entry({ eventId: 'eveNotification', eveType: 'CorpKicked' }))
+    ).toEqual({ kind: 'eveType', type: 'CorpKicked' });
+  });
+
+  it('falls back to the parent event when the entry has no eveType', () => {
+    expect(entryChannelTarget(entry({ eventId: 'newMail' }))).toEqual({
+      kind: 'event',
+      eventId: 'newMail',
+    });
+  });
+});
 
 describe('visibleFeedEntries', () => {
   it('keeps everything when no event is toggled off', () => {

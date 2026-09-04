@@ -72,5 +72,6 @@ export function buildPushData(row: StoredProjectionRow): Record<string, string> 
     occurrenceKey: row.occurrenceKey,
     title: row.title,
     body: row.body,
+    ...(row.eveType !== undefined ? { eveType: row.eveType } : {}),
   };
 }

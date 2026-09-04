@@ -15,9 +15,9 @@
  * without a feed write (no Occurrence Key to key it by).
  *
  * The payload wire format mirrors `engine/projection.ts`'s `ProjectionRow`
- * (`characterId`, `eventId`, `occurrenceKey`, `title`, `body`) — the backend
- * (issue #358) sends already-rendered text, since it has no SDE and no i18n
- * catalog (ADR 0010).
+ * (`characterId`, `eventId`, `occurrenceKey`, `title`, `body`, optional
+ * `eveType`) — the backend (issue #358) sends already-rendered text, since it
+ * has no SDE and no i18n catalog (ADR 0010).
  *
  * The fields sit under a top-level `data` key, not flat: FCM's Admin SDK only
  * ever sends webpush `data` payloads as a `{[key: string]: string}` map, and
@@ -48,6 +48,14 @@ export interface PushPayload {
   readonly occurrenceKey: string;
   readonly title: string;
   readonly body: string;
+  /**
+   * The raw ESI type underneath an `eveNotification` row (issue #274's
+   * per-type opt-out; `engine/projection.ts`'s `ProjectionRow.eveType`),
+   * absent for every other `eventId`. Without this, a push-delivered
+   * `eveNotification` occurrence could not be muted per-type the way the
+   * Foreground Poller's own feed write already is.
+   */
+  readonly eveType?: string;
 }
 
 function isNotificationEventId(value: unknown): value is NotificationEventId {
@@ -72,15 +80,26 @@ export function parsePushPayload(rawText: string | null): PushPayload | null {
   const { data } = parsed as Record<string, unknown>;
   if (typeof data !== 'object' || data === null) return null;
 
-  const { characterId, eventId, occurrenceKey, title, body } = data as Record<string, unknown>;
+  const { characterId, eventId, occurrenceKey, title, body, eveType } = data as Record<
+    string,
+    unknown
+  >;
   const characterIdNum = typeof characterId === 'string' ? Number(characterId) : NaN;
   if (!Number.isFinite(characterIdNum)) return null;
   if (!isNotificationEventId(eventId)) return null;
   if (typeof occurrenceKey !== 'string' || occurrenceKey.length === 0) return null;
   if (typeof title !== 'string' || title.length === 0) return null;
   if (typeof body !== 'string') return null;
+  if (eveType !== undefined && typeof eveType !== 'string') return null;
 
-  return { characterId: characterIdNum, eventId, occurrenceKey, title, body };
+  return {
+    characterId: characterIdNum,
+    eventId,
+    occurrenceKey,
+    title,
+    body,
+    ...(eveType !== undefined ? { eveType } : {}),
+  };
 }
 
 /**
@@ -116,6 +135,7 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
           title: payload.title,
           body: payload.body,
           firedAt: now,
+          ...(payload.eveType !== undefined ? { eveType: payload.eveType } : {}),
         });
 
   await Promise.allSettled([notify, feedWrite]);

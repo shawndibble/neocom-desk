@@ -34,7 +34,7 @@ import {
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
 } from './preferences';
-import { recordFeedEntry } from './feed';
+import { recordFeedEntry, feedHasOccurrence } from './feed';
 import {
   isEventEnabledFor,
   isEveTypeAllowed,
@@ -94,10 +94,7 @@ export interface PollDependencies {
   /**
    * `override` carries copy the delivery loop already rendered and grouped
    * (`groupFires.ts`, count-adjusted when more than one fire in this poll
-   * rendered identical copy) so it isn't rendered a second time here. Omitted
-   * only by a caller reaching this directly outside that loop
-   * (`backgroundPoller.test.ts`'s direct calls, `sendBackgroundNotification`
-   * used standalone) — those fall back to rendering it themselves. `notify`
+   * rendered identical copy) so it isn't rendered a second time here. `notify`
    * is the only member grouped this way; `recordToFeed` always renders (and
    * writes) its own copy per fire — see its doc comment.
    */
@@ -415,8 +412,7 @@ function groupedTitle(title: string, count: number): string {
   return i18n.t('notifications.groupedTitle', { title, count });
 }
 
-/** Exported for `backgroundPoller.ts` — the Service Worker's `push` handler renders the exact same copy the Foreground Poller does, driven by the same registry. */
-export async function notificationText(
+async function notificationText(
   fire: AnyNotificationFire,
   character: CharacterRef
 ): Promise<{ title: string; body: string }> {
@@ -678,7 +674,7 @@ export function liveDependencies(): PollDependencies {
     permission: () => readNotificationPermission(),
     notify: sendBrowserNotification,
     recordToFeed: recordFeedNotification,
-    alreadyDelivered: async (key) => (await db.notificationFeed.get(key)) !== undefined,
+    alreadyDelivered: feedHasOccurrence,
     uploadProjection: uploadProjectionRows,
   };
 }

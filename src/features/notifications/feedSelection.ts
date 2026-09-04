@@ -25,6 +25,24 @@ export interface OtherCharacterAlerts {
 }
 
 /**
+ * Which preference map governs one feed entry's channel state: the per-type
+ * opt-out underneath `eveNotification` (issue #274) when the entry carries
+ * one, else the parent event. Shared so "does this row key off its eveType or
+ * its eventId" is answered in one place instead of re-derived at every call
+ * site that needs it (`isEntryVisible` below, `NotificationContextMenu.tsx`).
+ */
+export type EntryChannelTarget =
+  { kind: 'eveType'; type: string } | { kind: 'event'; eventId: NotificationEventId };
+
+export function entryChannelTarget(
+  entry: Pick<NotificationFeedEntry, 'eventId' | 'eveType'>
+): EntryChannelTarget {
+  return entry.eveType !== undefined
+    ? { kind: 'eveType', type: entry.eveType }
+    : { kind: 'event', eventId: entry.eventId as NotificationEventId };
+}
+
+/**
  * Gated on the **feed** channel specifically: an event can be set to raise a
  * browser notification while staying out of this list, and the reverse.
  *
@@ -46,9 +64,10 @@ function isEntryVisible(
   // A layer underneath the eventId check above: an eveNotification row also
   // carries the raw ESI type it fired for (issue #274), individually
   // opt-out-able on top of the parent event staying enabled.
-  if (entry.eveType !== undefined) {
+  const target = entryChannelTarget(entry);
+  if (target.kind === 'eveType') {
     const eveTypePrefs = characterEveTypePrefs(prefs, entry.characterId);
-    return isEveTypeEnabledFor(eveTypePrefs, entry.eveType, 'feed');
+    return isEveTypeEnabledFor(eveTypePrefs, target.type, 'feed');
   }
   return true;
 }

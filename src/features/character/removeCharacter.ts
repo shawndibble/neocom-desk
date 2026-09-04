@@ -14,6 +14,7 @@ import { db } from '@/db';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import { clearCharacterSyncBookkeeping, purgeCharacterRemoteDataOrDefer } from '@/sync';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
+import { deleteFeedForCharacter } from '@/features/notifications/feed';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 export interface RemoveCharacterResult {
@@ -50,7 +51,7 @@ export async function removeCharacter(
   // Orphaned feed rows are invisible in the UI (both the Overview list and the
   // other-character counts skip ids with no Character) but `refreshAppBadge`
   // counts the whole table — leaving an app-icon count nothing can dismiss.
-  await db.notificationFeed.where('characterId').equals(characterId).delete();
+  await deleteFeedForCharacter(characterId);
   await clearCharacterSyncBookkeeping(characterId);
   await refreshAppBadge();
   await purgeCharacterCacheOrSuppress(characterId);

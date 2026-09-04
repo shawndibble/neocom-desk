@@ -98,3 +98,19 @@ export async function dismissFeedEntries(ids: readonly string[]): Promise<void> 
     .modify({ dismissedAt: Date.now() });
   await refreshAppBadge();
 }
+
+/**
+ * Whether an Occurrence Key already has a feed row — the Foreground Poller's
+ * dedup check against a Scheduled Push (or another device) that already
+ * delivered this exact occurrence (issue #360). A thin read, but exported so
+ * `foregroundPoller.ts` never has to know the row's id *is* the Occurrence
+ * Key to look one up.
+ */
+export async function feedHasOccurrence(occurrenceKey: string): Promise<boolean> {
+  return (await db.notificationFeed.get(occurrenceKey)) !== undefined;
+}
+
+/** Every feed row for one Character (`removeCharacter.ts`'s local cleanup). */
+export async function deleteFeedForCharacter(characterId: number): Promise<void> {
+  await db.notificationFeed.where('characterId').equals(characterId).delete();
+}
