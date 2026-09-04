@@ -180,6 +180,16 @@ export const ROUTE_REQUIREMENTS = {
     ],
     strings: 'pi',
   },
+  // Reached only from Wallet's Loyalty Points table (an LP amount), which
+  // already requires this scope to render at all — but a direct/bookmarked
+  // visit still needs its own gate. getLoyaltyStoreOffers is PUBLIC, so this
+  // one scope is what the route actually needs a grant for: the character's
+  // own LP balance decides affordability. Same reauth copy as `/wallet`'s
+  // loyalty panel — it is the same grant.
+  '/wallet/loyalty/:corporationId': {
+    endpoints: ['getCharacterLoyaltyPoints'],
+    strings: 'loyalty',
+  },
   '/contacts': {
     endpoints: ['getCharacterContacts', 'postUniverseNames'],
     strings: 'contacts',

@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadPlanetName, loadSchematicName } from './names';
+import { loadPlanetName, loadSchematicName, readCachedSchematicNames } from './names';
 
 const server = setupServer();
 
@@ -48,5 +48,23 @@ describe('loadSchematicName', () => {
       )
     );
     expect(await loadSchematicName(65)).toBe('Water');
+  });
+});
+
+describe('readCachedSchematicNames', () => {
+  it('reads a name a prior loadSchematicName call already cached, with no live call', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/schematics/65`, () =>
+        HttpResponse.json({ schematic_name: 'Water', cycle_time: 1800 })
+      )
+    );
+    await loadSchematicName(65);
+
+    // No handler for 66 at all: onUnhandledRequest 'error' means reaching
+    // this line at all proves the miss below never fetched.
+    const names = await readCachedSchematicNames([65, 66]);
+
+    expect(names.get(65)).toBe('Water');
+    expect(names.has(66)).toBe(false);
   });
 });

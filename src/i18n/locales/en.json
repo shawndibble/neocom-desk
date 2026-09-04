@@ -81,6 +81,9 @@
       "levelNeeded": "Level {{level}}",
       "trained": "Trained · Level {{level}}",
       "close": "Close"
+    },
+    "detail": {
+      "title": "Skill Detail"
     }
   },
   "plans": {
@@ -834,8 +837,12 @@
       "plasma": "Plasma"
     },
     "upgradeLevel": "Upgrade level {{level}}",
-    "pinCount": "{{count}} pins",
+    "pinCount_one": "{{count}} pin",
+    "pinCount_other": "{{count}} pins",
     "planetLabel": "Planet #{{id}}",
+    "characterLabel": "Character #{{id}}",
+    "noOwnColoniesTitle": "This character has no colonies",
+    "noOwnColoniesHint": "Turn on \"Show alt colonies\" above to see your other characters' colonies.",
     "noPinsTitle": "No pin data cached for this colony",
     "state": {
       "active": "Active",
@@ -859,6 +866,14 @@
     "infrastructure": {
       "title": "Infrastructure · no per-cycle data"
     },
+    "colonies": {
+      "panelTitle_one": "{{count}} colony",
+      "panelTitle_other": "{{count}} colonies"
+    },
+    "summary": {
+      "expiryLine": "{{product}} · {{duration}}",
+      "productCount": "{{name}} ×{{count}}"
+    },
     "yield": {
       "bankedColumn": "Banked",
       "bankedValue": "{{amount}} ({{percent}}%)",
@@ -866,23 +881,11 @@
       "resetGainValue": "+{{amount}}/day",
       "decayedTooltip": "Every extractor here has fallen to under 35% of the output it managed in its first day. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows what a day of that is worth."
     },
-    "timeline": {
-      "title": "Extractor Timeline",
-      "listLabel": "Extractor programs across every character, the ones needing attention first",
-      "windowHint": "Every extractor program cached for any of your characters, worst first. Each bar is the time left in the next {{days}} days; a longer program fills its track.",
-      "coloniesStat": "Colonies",
-      "idleStat": "Idle",
-      "nextExpiryStat": "Next Expiry",
-      "skippedStat": "Skipped",
-      "noneValue": "None",
-      "skippedTooltip": "Characters that haven't granted this app planetary access. Nothing is fetched for them, so they never raise a log-in prompt — log in again with that character to include it here.",
-      "emptyTitle": "No extractor programs cached",
-      "emptyHint": "Colony data is cached as you open this page on each character. Refresh loads the active character now.",
-      "notLoaded": "Not loaded yet, so their programs aren't listed: {{names}}. Switch to a character and refresh to cache its colonies.",
-      "coloniesNotLoaded": "{{count}} listed colonies have no cached detail yet, so their programs aren't listed.",
+    "altColonies": {
+      "toggleLabel": "Show alt colonies",
+      "notLoaded": "Not loaded yet, so their colonies aren't listed: {{names}}. Switch to that character and refresh to cache them.",
       "noColonies": "No colonies: {{names}}.",
-      "skipped": "Skipped, no planetary access granted: {{names}}.",
-      "peakShareValue": "{{percent}}% of peak"
+      "skipped": "Skipped, no planetary access granted: {{names}}."
     }
   },
   "piPlan": {
@@ -1121,9 +1124,47 @@
     "emptyHint": "Reconnect to fetch this character's loyalty point balances.",
     "corporation": "Corporation",
     "points": "Loyalty Points",
+    "viewStore": "View {{corporation}} LP store",
     "reauthTitle": "Log in again to see your loyalty points",
     "reauthHint": "Log in again to fetch this character's loyalty point balances.",
     "reauthAction": "Log in again with EVE Online"
+  },
+  "loyaltyStore": {
+    "back": "Loyalty Points",
+    "title": "LP Store",
+    "searchPlaceholder": "Search offers",
+    "hubLabel": "Market hub",
+    "priceBasisLabel": "Revenue basis",
+    "priceBasisSell": "Sell (list order)",
+    "priceBasisBuy": "Buy (instant)",
+    "affordableFilter": "Affordable now",
+    "blueprintsFilter": "Blueprints only",
+    "yourLp": "Your LP",
+    "offersShown": "Offers shown",
+    "colItem": "Item",
+    "colProfit": "Profit",
+    "colIskPerLp": "ISK / LP",
+    "emptyTitle": "No offers cached",
+    "emptyHint": "Reconnect to fetch this corporation's LP store.",
+    "noMatchTitle": "No offers match these filters",
+    "noMatchHint": "Try clearing the search or the Affordable/Blueprints filters.",
+    "selectPrompt": "Select an offer to see its profit breakdown.",
+    "needMoreLp": "Needs {{amount}} more LP",
+    "sellPriceAt": "Sell price ({{hub}})",
+    "buyPriceAt": "Buy price ({{hub}})",
+    "storeCost": "LP store cost",
+    "requiredItems": "Required items",
+    "materials": "Materials",
+    "netProfit": "Net profit",
+    "useOwnMaterials": "Use my own materials",
+    "useOwnMaterialsHint": "Prices the build against your detected asset stock instead of buying every material at the hub.",
+    "materialColName": "Material",
+    "materialColNeeded": "Needed",
+    "materialColOwned": "From stock",
+    "materialColBuyCost": "Buy cost",
+    "unpriceable": "Can't be priced at this hub — a material or the product has no listed sell price.",
+    "viewInMarket": "View in Market",
+    "planInIndustry": "Plan in Industry"
   },
   "orders": {
     "openTab": "Open",
@@ -1181,26 +1222,6 @@
         "title": "NeoCom Desk",
         "body": "Something happened — open the app for details."
       },
-      "skillLevelComplete": {
-        "title": "Skill training complete",
-        "body": "{{character}} finished training {{skill}} {{level}}."
-      },
-      "characterNotTraining": {
-        "title": "Not training",
-        "body": "{{character}} has no skill in training."
-      },
-      "industryJobComplete": {
-        "title": "Industry job complete",
-        "body": "{{character}}'s industry job for {{item}} is complete."
-      },
-      "planetaryExtractionDone": {
-        "title": "Extraction done",
-        "body": "{{character}}'s extraction on {{planet}} has stopped."
-      },
-      "planetaryExtractorExpiring": {
-        "title": "Extractor expiring",
-        "body": "{{character}}'s extractor on {{planet}} expires in under {{hours}} hours."
-      },
       "newMail": {
         "title": "New mail",
         "body": "{{character}} has new mail."
@@ -1208,10 +1229,6 @@
       "newCalendarEvent": {
         "title": "New calendar event",
         "body": "{{character}} has a new calendar event."
-      },
-      "calendarEventStarting": {
-        "title": "Calendar event starting",
-        "body": "{{character}}'s calendar event is starting."
       },
       "contractAccepted": {
         "title": "Contract accepted",
@@ -1740,5 +1757,18 @@
     "accessNoneHint": "This character holds no corporation role that opens corp data, so granting access would unlock nothing.",
     "accessMissingHint": "Corp data stays hidden until this character grants access.",
     "accessReadyHint": "This character can see the corp data its roles allow."
+  },
+  "publicInfo": {
+    "title": "Public info",
+    "tabsLabel": "Character, corporation, and alliance",
+    "characterTab": "Character",
+    "corporationTab": "Corporation",
+    "allianceTab": "Alliance",
+    "securityStatus": "Security status",
+    "corporation": "Corporation",
+    "alliance": "Alliance",
+    "ticker": "Ticker",
+    "memberCount": "Members",
+    "ceo": "CEO"
   }
 }

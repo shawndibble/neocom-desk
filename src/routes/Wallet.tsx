@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -247,6 +247,7 @@ function walletTabFromParam(param: string | null): 'balance' | 'journal' {
  */
 export function Wallet() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadWalletSnapshot);
 
@@ -349,11 +350,40 @@ export function Wallet() {
         header: t('loyalty.points'),
         align: 'right',
         className: 'tabular-nums font-semibold',
-        render: (entry) => entry.loyalty_points.toLocaleString(),
+        // Opens that corporation's LP store — offers ranked by profit, with a
+        // filter for what the character can currently afford (LoyaltyStore.tsx).
+        render: (entry) => (
+          <Link
+            to={`/wallet/loyalty/${entry.corporation_id}`}
+            className="text-accent hover:underline"
+          >
+            {entry.loyalty_points.toLocaleString()}
+          </Link>
+        ),
         sortValue: (entry) => entry.loyalty_points,
       },
+      {
+        id: 'lpStore',
+        header: '',
+        align: 'right',
+        // A second, always-visible entry point to the same LP store the
+        // points column above already links to — the LP number alone reads
+        // as data, not as a control, so this is the row's explicit "there's
+        // a store here" affordance.
+        render: (entry) => (
+          <IconButton
+            size="sm"
+            variant="plain"
+            icon={<Icon.Buy />}
+            label={t('loyalty.viewStore', {
+              corporation: corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
+            })}
+            onClick={() => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
+          />
+        ),
+      },
     ],
-    [t, corporationNames]
+    [t, corporationNames, navigate]
   );
 
   const journalColumns = useMemo<DataTableColumn<WalletJournalEntry>[]>(

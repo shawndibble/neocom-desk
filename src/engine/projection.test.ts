@@ -48,7 +48,7 @@ describe('projectSkillQueue', () => {
     expect(rows[0].eventId).toEqual('skillLevelComplete');
     expect(rows[0].fireAt).toEqual(T0 + 10 * HOUR_MS);
     expect(rows[0].title).toEqual('Skill training complete');
-    expect(rows[0].body).toContain('Gunnery');
+    expect(rows[0].body).toEqual('Kestrel finished training Gunnery III.');
     expect(rows[1].eventId).toEqual('characterNotTraining');
     expect(rows[1].fireAt).toEqual(T0 + 20 * HOUR_MS);
   });

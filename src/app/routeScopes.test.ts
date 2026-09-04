@@ -86,6 +86,7 @@ describe('gated routes', () => {
       '/contracts',
       '/mail',
       '/planetary-industry',
+      '/wallet/loyalty/:corporationId',
     ]);
   });
 

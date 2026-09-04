@@ -11,3 +11,11 @@ export function characterPortraitUrl(characterId: number, size: 64 | 128 | 256 |
 export function typeIconUrl(typeId: number, size: 32 | 64 | 128): string {
   return `https://images.evetech.net/types/${typeId}/icon?size=${size}`;
 }
+
+export function corporationLogoUrl(corporationId: number, size: 32 | 64 | 128 | 256): string {
+  return `https://images.evetech.net/corporations/${corporationId}/logo?size=${size}`;
+}
+
+export function allianceLogoUrl(allianceId: number, size: 32 | 64 | 128 | 256): string {
+  return `https://images.evetech.net/alliances/${allianceId}/logo?size=${size}`;
+}

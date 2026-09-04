@@ -16,7 +16,7 @@ recorded "No new SDE payload": factory and extractor product names resolved
 live, zero bytes added to `public/data/`.
 
 Since then, Planetary Industry gained a third peer tab, **Advisor**
-(CONTEXT.md round 50), which answers a question neither Colonies nor Plan
+(CONTEXT.md round 51), which answers a question neither Colonies nor Plan
 does: in _this_ system, on _these_ planets, what fits. That question turned
 out to be a CPU/Powergrid question — the game caps a colony by a **budget**,
 not by any pin-count limit — plus a materials-flow question, and both needed

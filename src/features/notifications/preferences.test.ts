@@ -25,6 +25,11 @@ import {
   DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+  updateNotificationPrefs,
+  toggleEventChannelPref,
+  toggleAllEventsChannelPref,
+  toggleEveTypeChannelPref,
+  toggleAllEveTypesChannelPref,
 } from './preferences';
 import { SYNCED_NOTIFICATION_FEED_PREFS_KEY } from './syncedPreferences';
 
@@ -370,6 +375,112 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
     });
     await useNotificationPreferences.getState().hydrate();
     expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+});
+
+describe('toggleEventChannelPref / toggleAllEventsChannelPref / toggleEveTypeChannelPref / toggleAllEveTypesChannelPref', () => {
+  /**
+   * These wrap `with*Toggled` + `updateNotificationPrefs` into one call so a
+   * caller states `channel` once instead of passing it to both — the two used
+   * to be independent arguments a caller could accidentally mismatch (issue:
+   * nothing checked that a `with*Toggled` call's channel and the trailing
+   * `updateNotificationPrefs` channel argument agreed). The tests below pin
+   * the sync-vs-local rule `updateNotificationPrefs` documents: a browser
+   * write never reaches the synced setting, a feed write always does.
+   */
+  it('toggleEventChannelPref: a browser toggle updates the store but never touches the synced setting', async () => {
+    await toggleEventChannelPref(1, DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
+    expect(
+      isEventEnabledFor(
+        characterEventPrefs(useNotificationPreferences.getState().value, 1),
+        EVENT_A,
+        'browser'
+      )
+    ).toBe(false);
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+  });
+
+  it('toggleEventChannelPref: a feed toggle updates the store and pushes the synced setting', async () => {
+    await toggleEventChannelPref(1, DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'feed');
+    expect(
+      isEventEnabledFor(
+        characterEventPrefs(useNotificationPreferences.getState().value, 1),
+        EVENT_A,
+        'feed'
+      )
+    ).toBe(false);
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('toggleAllEventsChannelPref: a browser column toggle never touches the synced setting', async () => {
+    await toggleAllEventsChannelPref(
+      1,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      [EVENT_A, EVENT_B],
+      'browser'
+    );
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+  });
+
+  it('toggleAllEventsChannelPref: a feed column toggle pushes the synced setting', async () => {
+    await toggleAllEventsChannelPref(
+      1,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      [EVENT_A, EVENT_B],
+      'feed'
+    );
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('toggleEveTypeChannelPref: a browser toggle never touches the synced setting', async () => {
+    await toggleEveTypeChannelPref(
+      1,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      'StructureUnderAttack',
+      'browser'
+    );
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+  });
+
+  it('toggleEveTypeChannelPref: a feed toggle pushes the synced setting', async () => {
+    await toggleEveTypeChannelPref(
+      1,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      'StructureUnderAttack',
+      'feed'
+    );
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('toggleAllEveTypesChannelPref: a browser column toggle never touches the synced setting', async () => {
+    await toggleAllEveTypesChannelPref(
+      1,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      ['StructureUnderAttack', 'CorpKicked'],
+      'browser'
+    );
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+  });
+
+  it('toggleAllEveTypesChannelPref: a feed column toggle pushes the synced setting', async () => {
+    await toggleAllEveTypesChannelPref(
+      1,
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      ['StructureUnderAttack', 'CorpKicked'],
+      'feed'
+    );
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('a threshold write (no channel argument) still pushes the synced setting', async () => {
+    const next = withCharacterEventThreshold(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'structureFuelLowDays',
+      3
+    );
+    await updateNotificationPrefs(1, next);
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
   });
 });
 
