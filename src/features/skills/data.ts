@@ -125,8 +125,13 @@ export function loadCharacterSkillQueueWithStatus(
   );
 }
 
-/** Universe type info (name, description, icon group) for a typeID. Public, ESI or cache. */
-export function loadUniverseType(typeId: number): Promise<CachedResult<UniverseType> | null> {
+const TYPE_LOOKUP_RETRY_DELAY_MS = 750;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType> | null> {
   return loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     `type:${typeId}`,
@@ -138,50 +143,44 @@ export function loadUniverseType(typeId: number): Promise<CachedResult<UniverseT
 }
 
 /**
+ * Universe type info (name, description, icon group) for a typeID. Public,
+ * ESI or cache.
+ *
+ * One retry on a failed live call, paced by a short delay: unlike
+ * typeNames.ts's POST /universe/names (a batch with a per-id fallback), every
+ * caller here — implant names and bonuses, notification item/skill names,
+ * the clipboard import flow — resolves one type at a time, so a single
+ * transient failure used to silently drop just that lookup (an implant read
+ * "#12345", and the SAME failure also meant its attribute bonus never
+ * reached `loadImplantBonuses`, reading the character's sheet as an
+ * unexplainable "impossible" baseline). Retries indiscriminately rather than
+ * narrowing by failure kind, since `loadWithCache` doesn't surface why a
+ * call failed; the delay assumes a failure surviving esiFetch's own 429/420
+ * retry (up to 10s) is a real rate-limit window, not a blip. Roughly doubles
+ * the worst case on a persistent failure — accepted here, but two of
+ * `foregroundPoller.ts`'s callers feed the Periodic Background Sync handler
+ * (`notificationText`), which has its own execution-time limits and isn't
+ * currently budget-aware the way `eveNotification`'s name resolution is
+ * (issue #300); worth revisiting there if background notifications start
+ * missing their window.
+ */
+export async function loadUniverseType(typeId: number): Promise<CachedResult<UniverseType> | null> {
+  const first = await loadUniverseTypeOnce(typeId);
+  if (first) return first;
+  await sleep(TYPE_LOOKUP_RETRY_DELAY_MS);
+  return loadUniverseTypeOnce(typeId);
+}
+
+/**
  * Aggregate attribute bonuses across a character's fitted implants: implant
  * typeIDs (ESI or cache) -> per-type dogma attributes (ESI or cache) -> summed
  * into one Implants map (engine's computeSchedule/optimizer input). Returns
  * `{}` when there's no implant data cached or fetchable (offline first-load).
- *
- * `loadUniverseType` is one live call per implant with no batch to fall back
- * to (unlike typeNames.ts's POST /universe/names, which retries per-id after
- * a *batch* failure and deliberately only for the failure kinds worth
- * retrying): here, a single implant type failing for any reason — a 429
- * esiFetch's own retry didn't clear, a dropped connection, a genuine 404 —
- * used to drop that one implant's whole bonus from the sum with nothing on
- * screen saying why. The character's sheet then reads as an unexplainable
- * "impossible" baseline (engine/attributeBaseline.ts) instead of merely
- * under-read. `loadWithCache` doesn't surface *why* a call failed, so this
- * retries indiscriminately rather than narrowing by failure kind the way
- * typeNames.ts does — deliberately: an implant list is small (usually under
- * ten), so a wasted retry on a permanent 404 or while offline costs at most
- * a handful of doomed requests, not the fan-out typeNames.ts is guarding
- * against. One retry pass over whichever types came back empty (paced after
- * the first pass rather than doubling every call up front) catches the
- * transient case. A short pause before that retry, rather than firing it
- * back-to-back with the first pass: a failure that survives esiFetch's own
- * internal 429/420 retry (up to 10s) is a real rate-limit window, not a
- * one-off blip, and retrying instantly into the same window would likely
- * just fail again.
+ * `loadUniverseType` above already retries a failed per-type lookup once.
  */
-const IMPLANT_RETRY_DELAY_MS = 750;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export async function loadImplantBonuses(characterId: number): Promise<Implants> {
   const implants = await loadCharacterImplants(characterId);
   const typeIds = implants?.data ?? [];
-  if (typeIds.length === 0) return {};
-
-  let types = await Promise.all(typeIds.map((typeId) => loadUniverseType(typeId)));
-  const missing = typeIds.filter((_, i) => !types[i]);
-  if (missing.length > 0) {
-    await sleep(IMPLANT_RETRY_DELAY_MS);
-    const retried = await Promise.all(missing.map((typeId) => loadUniverseType(typeId)));
-    const retriedById = new Map(missing.map((typeId, i) => [typeId, retried[i]]));
-    types = types.map((t, i) => t ?? retriedById.get(typeIds[i]) ?? null);
-  }
+  const types = await Promise.all(typeIds.map((typeId) => loadUniverseType(typeId)));
   return sumAttributeBonuses(types.map((t) => extractAttributeBonuses(t?.data?.dogma_attributes)));
 }
