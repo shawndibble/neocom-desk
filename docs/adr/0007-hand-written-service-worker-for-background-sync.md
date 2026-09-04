@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted (2026-09-01)
+Accepted (2026-09-01). Superseded by ADR 0009 (2026-09-03): Periodic Background
+Sync never delivered — Chrome floors `periodicsync` at 12 hours and gates it on
+Site Engagement. The hand-written service worker this ADR introduced is kept,
+for Web Push instead.
 
 ## Context
 
