@@ -1,12 +1,11 @@
 /**
  * Fetch + cache layer for the corporation's assets (issue #327).
  *
- * The corp twin of `features/character/assets.ts`, and the same three
- * departures every corp data module makes: `corpCacheKey` (issue #293) so a
- * corporation change misses rather than serving the previous corporation's
- * hangars, `detectCorpAuthFailure` so a 403 reads as the in-game role gate
- * rather than an expired session, and a corporation id alongside the Character
- * whose token pays for the call.
+ * The corp twin of `features/character/assets.ts`, and the same departures
+ * every corp data module makes via `corpRead.ts`: a corp-scoped cache key
+ * (issue #293) so a corporation change misses rather than serving the previous
+ * corporation's hangars, and `detectCorpAuthFailure` so a 403 reads as the
+ * in-game role gate rather than an expired session.
  *
  * The role gate is the whole story on this endpoint: `x-required-roles` is
  * `["Director"]` and nothing else, so a 403 is the ordinary answer for almost
@@ -19,12 +18,12 @@
  * the read it will use.
  */
 import { getCorporationAssets, type CorporationAsset } from '@/esi/endpoints';
-import { corpCacheKey, loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
+import type { StatusResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { CorpAssetInput } from '@/engine/corp/assetDivisions';
-import { detectCorpAuthFailure } from './corpAuthFailure';
+import { loadCorpPaginatedWithCacheStatus } from './corpRead';
 
 /**
  * Exported so a test can assert the row it lands in. Distinct from the
@@ -46,11 +45,8 @@ export function loadCorporationAssets(
   characterId: number,
   corporationId: number
 ): Promise<CorpAssetsLoadResult> {
-  return loadPaginatedWithCacheStatus(
-    characterId,
-    corpCacheKey(corporationId, CORP_ASSETS_KEY),
-    () => getCorporationAssets(characterId, corporationId),
-    { detectAuthFailure: detectCorpAuthFailure }
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, CORP_ASSETS_KEY, () =>
+    getCorporationAssets(characterId, corporationId)
   );
 }
 

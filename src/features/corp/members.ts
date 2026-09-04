@@ -12,8 +12,8 @@
  * and it names members who have *left*, who by definition no longer appear in
  * tracking.
  *
- * Both keys go through `corpCacheKey` (issue #293), and a 403 is the in-game
- * role gate rather than a re-login (`corpAuthFailure.ts`).
+ * Both keys go through `corpRead.ts`'s corp-scoped wrapper (issue #293), and a
+ * 403 is the in-game role gate rather than a re-login (`corpAuthFailure.ts`).
  *
  * The name/ship/location resolution below is the other half of this module.
  * AC3 is a bound on *calls*, not on ids: a 200-member corp must not fan out to
@@ -26,35 +26,25 @@ import {
   getCorporationMemberTracking,
   type CorporationMemberTracking,
 } from '@/esi/endpoints';
-import {
-  corpCacheKey,
-  loadPaginatedWithCacheStatus,
-  loadWithCacheStatus,
-  type StatusResult,
-} from '@/esi/cache';
+import type { StatusResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { MemberActivity } from '@/engine/corp/members';
-import { detectCorpAuthFailure } from './corpAuthFailure';
+import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './corpRead';
 
 export const KEYS = {
   members: 'members',
   tracking: 'membertracking',
 } as const;
 
-const CORP_OPTIONS = { detectAuthFailure: detectCorpAuthFailure };
-
 /** Character ids of every member. Paginated; the diff's input. */
 export function loadCorporationMemberIds(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<number[]>> {
-  return loadPaginatedWithCacheStatus(
-    characterId,
-    corpCacheKey(corporationId, KEYS.members),
-    () => getCorporationMembers(characterId, corporationId),
-    CORP_OPTIONS
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEYS.members, () =>
+    getCorporationMembers(characterId, corporationId)
   );
 }
 
@@ -63,11 +53,11 @@ export function loadCorporationMemberTracking(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationMemberTracking[]>> {
-  return loadWithCacheStatus(
+  return loadCorpWithCacheStatus(
     characterId,
-    corpCacheKey(corporationId, KEYS.tracking),
-    async () => (await getCorporationMemberTracking(characterId, corporationId)).data,
-    CORP_OPTIONS
+    corporationId,
+    KEYS.tracking,
+    async () => (await getCorporationMemberTracking(characterId, corporationId)).data
   );
 }
 

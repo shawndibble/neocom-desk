@@ -42,11 +42,11 @@ export interface NotificationClickEnv {
   origin: string;
 }
 
-/** Same-origin and already pointing at the requested path — nothing to navigate. */
+/** Same-origin and already pointing at the requested path (and query) — nothing to navigate. */
 function isAlreadyThere(clientUrl: string, url: string, origin: string): boolean {
   try {
     const parsed = new URL(clientUrl);
-    return parsed.origin === origin && parsed.pathname === url;
+    return parsed.origin === origin && parsed.pathname + parsed.search === url;
   } catch {
     return false;
   }

@@ -56,6 +56,13 @@ describe('handleNotificationClick', () => {
     expect(open.navigate).not.toHaveBeenCalled();
   });
 
+  it('focuses without navigating when already on that route, query string included', async () => {
+    const open = client(`${ORIGIN}/market?section=orders`);
+    await handleNotificationClick(env([open]), '/market?section=orders');
+    expect(open.focus).toHaveBeenCalled();
+    expect(open.navigate).not.toHaveBeenCalled();
+  });
+
   it('still focuses on a browser with no navigate()', async () => {
     const open = client(`${ORIGIN}/overview`, { navigate: undefined });
     const e = env([open]);

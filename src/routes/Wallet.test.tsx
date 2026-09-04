@@ -26,8 +26,6 @@ const TYPES: TypeMap = {
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
 };
 
-import { loadTypes } from '@/sde/loadSde';
-
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
@@ -57,33 +55,6 @@ const journalPage2 = [
   },
 ];
 
-const transactions = [
-  {
-    transaction_id: 1,
-    date: '2026-08-01T00:00:00Z',
-    location_id: 60003760,
-    type_id: 34,
-    unit_price: 5,
-    quantity: 100,
-    client_id: 1,
-    is_buy: false,
-    is_personal: true,
-    journal_ref_id: 1,
-  },
-  {
-    transaction_id: 2,
-    date: '2026-08-01T00:00:01Z',
-    location_id: 60003760,
-    type_id: 35,
-    unit_price: 12,
-    quantity: 10,
-    client_id: 2,
-    is_buy: true,
-    is_personal: true,
-    journal_ref_id: 2,
-  },
-];
-
 const loyaltyPayload = [
   { corporation_id: 1000167, loyalty_points: 5000 },
   { corporation_id: 1000419, loyalty_points: 250 }, // Paragon — EverMarks
@@ -96,10 +67,6 @@ const server = setupServer(
     return HttpResponse.json(page === '2' ? journalPage2 : journalPage1, {
       headers: { 'X-Pages': '2' },
     });
-  }),
-  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, ({ request }) => {
-    const fromId = new URL(request.url).searchParams.get('from_id');
-    return HttpResponse.json(fromId === null ? transactions : []);
   }),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>
     HttpResponse.json(loyaltyPayload)
@@ -191,26 +158,6 @@ describe('Wallet', () => {
     expect(screen.queryByText('bounty_prize')).not.toBeInTheDocument();
   });
 
-  it('shows transactions with SDE item names resolved', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(await screen.findByRole('tab', { name: 'Transactions' }));
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('Sell')).toBeInTheDocument();
-  });
-
-  it('signs and colors transaction totals: buy negative red, sell positive green', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(await screen.findByRole('tab', { name: 'Transactions' }));
-
-    const sellTotal = await screen.findByText('500.00');
-    expect(sellTotal.className).toContain('text-isk-pos');
-
-    const buyTotal = await screen.findByText('-120.00');
-    expect(buyTotal.className).toContain('text-isk-neg');
-  });
-
   it('falls back to cached data when ESI is unreachable, showing the offline banner', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,
@@ -241,31 +188,12 @@ describe('Wallet', () => {
     expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
   });
 
-  it('warns that transactions stop at the page cap when every call comes back full (D4)', async () => {
-    let calls = 0;
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, () => {
-        calls += 1;
-        return HttpResponse.json([{ ...transactions[0], transaction_id: 1000 - calls }]);
-      })
-    );
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(await screen.findByRole('tab', { name: 'Transactions' }));
-    expect(await screen.findByText(/recent transactions only/i)).toBeInTheDocument();
-    expect(calls).toBe(5);
-  });
-
-  it('shows no truncation warning when the journal and transactions came back whole', async () => {
+  it('shows no truncation warning when the journal came back whole', async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.queryByText(/incomplete data/i)).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('tab', { name: 'Transactions' }));
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.queryByText(/recent transactions only/i)).not.toBeInTheDocument();
   });
 
   it('shows the empty state when there is no data at all', async () => {
@@ -312,17 +240,5 @@ describe('Wallet', () => {
     const { beginEveLogin } = await import('@/app/loginFlow');
     screen.getByRole('button', { name: /log in again/i }).click();
     expect(beginEveLogin).toHaveBeenCalled();
-  });
-
-  it('says the load failed when a decoration throws, not that the wallet is empty', () => {
-    // The real shape of this: balance, journal and transactions all resolve
-    // from cache, and loadTypeNames' unconditional loadTypes() throws because
-    // the SDE fetch failed. Before the hook stamped failures, the whole page
-    // spun forever with Refresh disabled.
-    vi.mocked(loadTypes).mockRejectedValueOnce(new Error('sde offline'));
-
-    render(<App />);
-
-    return screen.findByText(/Could not load/i).then((el) => expect(el).toBeInTheDocument());
   });
 });

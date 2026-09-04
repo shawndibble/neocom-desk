@@ -89,7 +89,7 @@ describe('ScopeGate', () => {
 
   it('shows no banner on any gated route for a character holding every scope', async () => {
     await seedGrant(SCOPES);
-    for (const path of ['/assets', '/mail', '/calendar', '/contracts', '/orders'] as const) {
+    for (const path of ['/assets', '/mail', '/calendar', '/contracts'] as const) {
       const { unmount } = renderGate(path);
       await grantResolved();
       expect(screen.getByText('Mail from Aura'), path).toBeInTheDocument();

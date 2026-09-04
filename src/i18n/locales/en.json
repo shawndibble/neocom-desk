@@ -24,7 +24,6 @@
     "calendar": "Calendar",
     "contracts": "Contracts",
     "contacts": "Contacts",
-    "orders": "Orders",
     "settings": "Settings",
     "soon": "Soon",
     "switchCharacter": "Switch character",
@@ -1072,7 +1071,6 @@
     "reauthAction": "Log in again with EVE Online"
   },
   "orders": {
-    "title": "Orders",
     "openTab": "Open",
     "historyTab": "History",
     "refresh": "Refresh",
@@ -1395,6 +1393,12 @@
     "tabOrders": "Market Data",
     "tabHistory": "Price History",
     "itemTabsLabel": "Item view",
+    "sections": {
+      "browser": "Market",
+      "openOrders": "Open Orders",
+      "history": "History",
+      "transactions": "Transactions"
+    },
     "priceHistory": {
       "chartLabel": "Daily average price and traded volume for {{item}}",
       "date": "Date",

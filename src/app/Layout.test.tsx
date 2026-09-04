@@ -118,7 +118,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(mobileNav).getByRole('button', { name: 'More' })).toBeInTheDocument();
   });
 
-  it('opens a dialog listing Wallet, Assets, Mail, Calendar, Contracts and Orders (not Styleguide)', async () => {
+  it('opens a dialog listing Wallet, Assets, Mail, Calendar and Contracts (not Styleguide)', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayout();
@@ -133,7 +133,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
 
     const sheet = screen.getByRole('dialog', { name: 'More' });
     expect(moreButton.getAttribute('aria-controls')).toBe(sheet.id);
-    for (const label of ['Wallet', 'Assets', 'Mail', 'Calendar', 'Contracts', 'Orders']) {
+    for (const label of ['Wallet', 'Assets', 'Mail', 'Calendar', 'Contracts']) {
       expect(within(sheet).getByRole('link', { name: label })).toBeInTheDocument();
     }
     expect(within(sheet).queryByRole('link', { name: 'Styleguide' })).not.toBeInTheDocument();
@@ -364,7 +364,6 @@ describe('Layout desktop rail domain grouping', () => {
       'Market',
       'Wallet',
       'Assets',
-      'Orders',
       'Contracts',
       '[Social]',
       'Mail',
