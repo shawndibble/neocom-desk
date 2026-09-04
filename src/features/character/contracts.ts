@@ -13,3 +13,10 @@ const KEY = 'contracts';
 export function loadContracts(characterId: number): Promise<StatusResult<Contract[]>> {
   return loadPaginatedWithCacheStatus(characterId, KEY, () => getCharacterContracts(characterId));
 }
+
+/** A contract still open or being worked, as opposed to the character's full (mostly historical) contract history. */
+const ACTIVE_STATUSES = new Set<Contract['status']>(['outstanding', 'in_progress']);
+
+export function isActiveContractStatus(status: Contract['status']): boolean {
+  return ACTIVE_STATUSES.has(status);
+}
