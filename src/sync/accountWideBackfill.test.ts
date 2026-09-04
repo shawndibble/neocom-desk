@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import type { StationPinRecord } from '@/db';
+import { stationPinTombstonesKey } from './localBookkeeping';
 import { backfillAccountWideData } from './accountWideBackfill';
 
 async function seedCharacter(characterId: number): Promise<void> {
@@ -27,9 +28,20 @@ async function seedPin(
   });
 }
 
+async function seedTombstone(
+  characterId: number,
+  locationId: number,
+  deletedAt: number
+): Promise<void> {
+  await db.settings.put({
+    key: stationPinTombstonesKey(characterId),
+    value: [{ id: `${characterId}:${locationId}`, deletedAt }],
+  });
+}
+
 beforeEach(async () => {
   vi.clearAllMocks();
-  await Promise.all([db.characters.clear(), db.stationPins.clear()]);
+  await Promise.all([db.characters.clear(), db.stationPins.clear(), db.settings.clear()]);
 });
 
 describe('backfillAccountWideData', () => {
@@ -138,6 +150,54 @@ describe('backfillAccountWideData', () => {
 
     expect(await backfillAccountWideData(2)).toBe(false);
     expect((await db.stationPins.get('2:60003760'))?.updatedAt).toBe(999);
+  });
+
+  it('skips a row another Character has already recorded a deletion for', async () => {
+    // The resurrection this guards. `cloneOnto` re-keys the row to an id no
+    // tombstone anywhere targets, so `merge.ts` would see `l && !r` and push it
+    // as a brand-new remote doc nothing can out-rank — and `pinStateForStation`
+    // reports 'account' if ANY Character holds an account row. Copying a stale
+    // row therefore brings a cleared pin back permanently, not until next sync.
+    await seedCharacter(1);
+    await seedPin(1, 60_003_760, 'account', 100);
+    await seedCharacter(3);
+    await seedTombstone(3, 60_003_760, 500);
+    await seedCharacter(2);
+
+    expect(await backfillAccountWideData(2)).toBe(false);
+    expect(await db.stationPins.get('2:60003760')).toBeUndefined();
+  });
+
+  it('still copies a row made after the deletion it is compared against', async () => {
+    // A re-pin is not a stale row. Only a candidate OLDER than the recorded
+    // deletion is refused, or the guard would block legitimate state.
+    await seedCharacter(1);
+    await seedPin(1, 60_003_760, 'account', 900);
+    await seedCharacter(3);
+    await seedTombstone(3, 60_003_760, 500);
+    await seedCharacter(2);
+
+    expect(await backfillAccountWideData(2)).toBe(true);
+    expect((await db.stationPins.get('2:60003760'))?.updatedAt).toBe(900);
+  });
+
+  it('leaves nothing behind when the backfilled Character is then removed', async () => {
+    // #432's third named test case. `removeCharacter` deletes station pins by
+    // characterId, and backfilled rows carry the new Character's own id — so
+    // they are its rows in every sense, including on the way out. The other
+    // Characters' copies must survive: an account-wide pin is still the
+    // account's after one pilot leaves.
+    const { removeCharacter } = await import('@/features/character/removeCharacter');
+    await seedCharacter(1);
+    await seedPin(1, 60_003_760, 'account');
+    await seedCharacter(2);
+    await backfillAccountWideData(2);
+    expect(await db.stationPins.get('2:60003760')).toBeDefined();
+
+    await removeCharacter(2, false);
+
+    expect(await db.stationPins.get('2:60003760')).toBeUndefined();
+    expect(await db.stationPins.get('1:60003760')).toBeDefined();
   });
 
   it('deduplicates a location several Characters hold, keeping the newest stamp', async () => {
