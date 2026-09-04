@@ -23,14 +23,14 @@ import type { NotificationFeedRecord } from '@/db';
 import { entryChannelTarget } from './feedSelection';
 import {
   useNotificationPreferences,
-  updateNotificationPrefs,
   characterEventPrefs,
   characterEveTypePrefs,
   isEventEnabledFor,
   isEveTypeEnabledFor,
-  withEventChannelToggled,
-  withEveNotificationTypeToggled,
+  toggleEventChannelPref,
+  toggleEveTypeChannelPref,
 } from './preferences';
+import type { NotificationChannel } from './eventSelection';
 
 export interface NotificationContextMenuProps {
   entry: NotificationFeedRecord;
@@ -56,21 +56,18 @@ export function NotificationContextMenu({ entry, children }: NotificationContext
           'browser'
         );
 
-  function toggled(channel: 'browser' | 'feed') {
+  /** Effectful, unlike `isEventEnabledFor`/`isEveTypeEnabledFor` above — writes the toggle and returns its promise. */
+  function applyToggle(channel: NotificationChannel) {
     return target.kind === 'eveType'
-      ? withEveNotificationTypeToggled(prefsValue, entry.characterId, target.type, channel)
-      : withEventChannelToggled(prefsValue, entry.characterId, target.eventId, channel);
+      ? toggleEveTypeChannelPref(entry.characterId, prefsValue, target.type, channel)
+      : toggleEventChannelPref(entry.characterId, prefsValue, target.eventId, channel);
   }
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem
-          onSelect={() =>
-            void updateNotificationPrefs(entry.characterId, toggled('browser'), 'browser')
-          }
-        >
+        <ContextMenuItem onSelect={() => void applyToggle('browser')}>
           {browserEnabled ? (
             <BrowserNotifyOn size={ICON_SIZE.sm} />
           ) : (
@@ -80,9 +77,7 @@ export function NotificationContextMenu({ entry, children }: NotificationContext
             ? t('notifications.contextMenu.browserOn')
             : t('notifications.contextMenu.browserOff')}
         </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => void updateNotificationPrefs(entry.characterId, toggled('feed'), 'feed')}
-        >
+        <ContextMenuItem onSelect={() => void applyToggle('feed')}>
           <HideInFeed size={ICON_SIZE.sm} />
           {t('notifications.contextMenu.hideInFeed')}
         </ContextMenuItem>

@@ -54,10 +54,10 @@ import {
   withFeedEnabled,
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
-  withEventChannelToggled,
-  withAllEventsToggledForCharacter,
-  withEveNotificationTypeToggled,
-  withAllEveTypesToggledForCharacter,
+  toggleEventChannelPref,
+  toggleAllEventsChannelPref,
+  toggleEveTypeChannelPref,
+  toggleAllEveTypesChannelPref,
   characterEventThresholds,
   withCharacterEventThreshold,
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
@@ -397,14 +397,10 @@ export function NotificationsPanel() {
                             key={channel}
                             state={selectionStateForEvents(togglableEventIds, prefs, channel)}
                             onToggle={() =>
-                              void updatePrefs(
+                              void toggleAllEventsChannelPref(
                                 character.characterId,
-                                withAllEventsToggledForCharacter(
-                                  prefsValue,
-                                  character.characterId,
-                                  togglableEventIds,
-                                  channel
-                                ),
+                                prefsValue,
+                                togglableEventIds,
                                 channel
                               )
                             }
@@ -466,14 +462,10 @@ export function NotificationsPanel() {
                                         }
                                         checked={isEventEnabledFor(prefs, eventId, channel)}
                                         onToggle={() =>
-                                          void updatePrefs(
+                                          void toggleEventChannelPref(
                                             character.characterId,
-                                            withEventChannelToggled(
-                                              prefsValue,
-                                              character.characterId,
-                                              eventId,
-                                              channel
-                                            ),
+                                            prefsValue,
+                                            eventId,
                                             channel
                                           )
                                         }
@@ -682,14 +674,10 @@ export function NotificationsPanel() {
                                                     channel
                                                   )}
                                                   onToggle={() =>
-                                                    void updatePrefs(
+                                                    void toggleAllEveTypesChannelPref(
                                                       character.characterId,
-                                                      withAllEveTypesToggledForCharacter(
-                                                        prefsValue,
-                                                        character.characterId,
-                                                        familyTypes,
-                                                        channel
-                                                      ),
+                                                      prefsValue,
+                                                      familyTypes,
                                                       channel
                                                     )
                                                   }
@@ -726,14 +714,10 @@ export function NotificationsPanel() {
                                                         channel
                                                       )}
                                                       onToggle={() =>
-                                                        void updatePrefs(
+                                                        void toggleEveTypeChannelPref(
                                                           character.characterId,
-                                                          withEveNotificationTypeToggled(
-                                                            prefsValue,
-                                                            character.characterId,
-                                                            type,
-                                                            channel
-                                                          ),
+                                                          prefsValue,
+                                                          type,
                                                           channel
                                                         )
                                                       }

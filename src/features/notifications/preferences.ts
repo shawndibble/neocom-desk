@@ -354,6 +354,69 @@ export function withAllEveTypesToggledForCharacter(
   };
 }
 
+/**
+ * Toggles one event's channel and writes it in one call — `channel` is
+ * stated once rather than passed to `withEventChannelToggled` and then again
+ * to `updateNotificationPrefs`'s own `channel` argument, which used to let a
+ * caller's two copies silently disagree (nothing checked that a browser
+ * toggle's builder call and its write call named the same channel). The
+ * three toggle pairs below and `updateNotificationPrefs` itself are the only
+ * way a caller should apply a channel toggle; a threshold write has no
+ * channel and keeps calling `updateNotificationPrefs` directly, since it
+ * always syncs.
+ */
+export async function toggleEventChannelPref(
+  characterId: number,
+  value: NotificationPreferencesValue,
+  eventId: NotificationEventId,
+  channel: NotificationChannel
+): Promise<void> {
+  await updateNotificationPrefs(
+    characterId,
+    withEventChannelToggled(value, characterId, eventId, channel),
+    channel
+  );
+}
+
+export async function toggleAllEventsChannelPref(
+  characterId: number,
+  value: NotificationPreferencesValue,
+  eventIds: readonly NotificationEventId[],
+  channel: NotificationChannel
+): Promise<void> {
+  await updateNotificationPrefs(
+    characterId,
+    withAllEventsToggledForCharacter(value, characterId, eventIds, channel),
+    channel
+  );
+}
+
+export async function toggleEveTypeChannelPref(
+  characterId: number,
+  value: NotificationPreferencesValue,
+  type: string,
+  channel: NotificationChannel
+): Promise<void> {
+  await updateNotificationPrefs(
+    characterId,
+    withEveNotificationTypeToggled(value, characterId, type, channel),
+    channel
+  );
+}
+
+export async function toggleAllEveTypesChannelPref(
+  characterId: number,
+  value: NotificationPreferencesValue,
+  types: readonly string[],
+  channel: NotificationChannel
+): Promise<void> {
+  await updateNotificationPrefs(
+    characterId,
+    withAllEveTypesToggledForCharacter(value, characterId, types, channel),
+    channel
+  );
+}
+
 /** One Character's thresholds, defaulted (issue #299) — the shape both the settings row and the poller read. */
 export function characterEventThresholds(
   value: NotificationPreferencesValue,
