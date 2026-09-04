@@ -34,19 +34,22 @@ export function NotificationPermissionPrompt() {
     void hydrate();
   }, [hydrate]);
 
+  // iOS delivers Web Push only to an installed PWA — requesting permission
+  // here would either do nothing or grant a permission that can never
+  // deliver anything, so this state skips the browser prompt and explains
+  // why instead (issue #356 AC1). Notification is undefined on a
+  // non-installed iOS Safari tab, so `permission` alone would read
+  // 'unsupported' and hide the explainer entirely without this.
+  const installRequired = webPushSupport() === 'requires-install';
+
   const visible = shouldShowPermissionExplainer({
     hydrated,
     seen: value.seen,
     hasCharacter: (characterCount ?? 0) > 0,
     permission,
+    installRequired,
   });
   if (!visible) return null;
-
-  // iOS delivers Web Push only to an installed PWA — requesting permission
-  // here would either do nothing or grant a permission that can never
-  // deliver anything, so this state skips the browser prompt and explains
-  // why instead (issue #356 AC1).
-  const installRequired = webPushSupport() === 'requires-install';
 
   const dismiss = () => void setValue({ seen: true, outcome: value.outcome });
   const enable = async () => {

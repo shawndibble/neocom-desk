@@ -90,12 +90,26 @@ export function shouldShowPermissionExplainer(state: {
   seen: boolean;
   hasCharacter: boolean;
   permission: NotificationPermissionState;
+  /**
+   * True on a platform that can receive Web Push but not from this page as
+   * it is running now — iOS Safari outside an installed PWA (issue #356).
+   * `Notification` is undefined there, so `permission` reads 'unsupported'
+   * exactly like a browser with no notification support at all; this is
+   * what tells the two apart so the explainer still shows (with the "install
+   * first" copy, never the Enable button) instead of silently never
+   * appearing on the one platform AC1 exists for.
+   */
+  installRequired: boolean;
 }): boolean {
   if (!state.hydrated || state.seen || !state.hasCharacter) return false;
   // 'granted'/'denied' mean the browser has already been asked on this origin,
   // and a denied grant can never be re-requested from JS — an explainer whose
-  // Enable button would do nothing is worse than no explainer.
-  return state.permission === 'default';
+  // Enable button would do nothing is worse than no explainer. The
+  // install-required 'unsupported' case is the exception: no browser has
+  // "answered" there, it simply has no Notification API to ask yet.
+  return (
+    state.permission === 'default' || (state.installRequired && state.permission === 'unsupported')
+  );
 }
 
 /**

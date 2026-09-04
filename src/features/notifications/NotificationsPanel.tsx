@@ -238,7 +238,13 @@ export function NotificationsPanel() {
             {t('settings.notifications.blockedNotice')}
           </p>
         )}
-        {permission === 'default' && installRequired && (
+        {/*
+          `permission` reads 'unsupported' here, not 'default' — a
+          non-installed iOS Safari tab has no Notification API to ask at
+          all (issue #356 AC1). Gating this on 'default' alone would hide
+          the explanation on exactly the platform it exists for.
+        */}
+        {installRequired && (permission === 'default' || permission === 'unsupported') && (
           <p
             role="status"
             className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim"
