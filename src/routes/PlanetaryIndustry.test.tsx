@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -248,18 +248,31 @@ async function addAlt(characterId: number, name: string, scopes: string[]) {
 }
 
 /**
- * The per-colony panel for a planet, found by its own heading.
+ * The per-colony row+drilldown wrapper for a planet, found by its own
+ * heading and expanded (clicked open) if it wasn't already — the Colonies
+ * panel is Concept C, summary-then-drill-down: a collapsed row carries only
+ * status/expiry/product/pin-count text, and the extraction/production/
+ * infrastructure cards a lot of these assertions check only mount once the
+ * row's drilldown region is open.
  *
- * The cross-character timeline above these panels names the same planets,
- * products and states, so a page-wide `getByText` is ambiguous here by
- * design — the two surfaces really do say the same words about the same
+ * The cross-character timeline above the colonies panel names the same
+ * planets, products and states, so a page-wide `getByText` is ambiguous here
+ * by design — the two surfaces really do say the same words about the same
  * colony. An assertion about the pin table therefore says which panel it
  * means rather than loosening its counts.
  */
 async function colonyPanelFor(name: RegExp): Promise<HTMLElement> {
   const heading = await screen.findByRole('heading', { name });
-  const panel = heading.closest('section');
+  const panel = heading.closest('div');
   if (!(panel instanceof HTMLElement)) throw new Error(`no colony panel for ${String(name)}`);
+  // Scoped to the heading itself (the `<h3>`), not the whole panel: an
+  // already-expanded region carries its own `InfoTooltip` button(s) (Last
+  // Update, and Status for unknown/decayed), so a panel-wide
+  // `getByRole('button')` is only unambiguous before expansion. The `<h3>`
+  // wraps nothing but the summary row's trigger.
+  const trigger = within(heading).getByRole('button');
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
+  await within(panel).findByRole('region');
   return panel;
 }
 
@@ -273,9 +286,10 @@ describe('PlanetaryIndustry', () => {
     const panel = await colonyPanelFor(/Jita IV/);
     expect(within(panel).getByText('Extractor Control Unit')).toBeInTheDocument();
     expect(within(panel).getByText('Idle')).toBeInTheDocument();
-    // Both the per-pin Status column and the Expires column read "Expired"
-    // for an already-expired extractor.
-    expect(within(panel).getAllByText('Expired')).toHaveLength(2);
+    // The summary row's own expiry cell, the extraction card's Status chip,
+    // and its Expires field all read "Expired" for an already-expired
+    // extractor.
+    expect(within(panel).getAllByText('Expired')).toHaveLength(3);
   });
 
   it('explains the staleness rule in the UI', async () => {
@@ -306,9 +320,11 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
     // The fixture's pin has an expiry but no qty_per_cycle/cycle_time/
-    // install_time, so Banked and Reset now are the only em-dashed cells —
-    // never a zero, which would read as "this program has produced nothing".
-    expect(within(panel).getAllByText('—')).toHaveLength(2);
+    // install_time, so Banked and Reset now are em-dashed — never a zero,
+    // which would read as "this program has produced nothing" — and the
+    // summary row's own product cell is a third dash, since this fixture has
+    // no factory pins at all.
+    expect(within(panel).getAllByText('—')).toHaveLength(3);
     expect(within(panel).queryByText('0 (0%)')).not.toBeInTheDocument();
   });
 
@@ -322,7 +338,12 @@ describe('PlanetaryIndustry', () => {
     const panel = await colonyPanelFor(/Jita IV/);
     expect(within(panel).getByText('513,262 (27%)')).toBeInTheDocument();
     expect(within(panel).getByText('+793,859/day')).toBeInTheDocument();
-    expect(within(panel).queryByText('—')).not.toBeInTheDocument();
+    // Scoped to the drilldown region, not the whole row: the summary row's
+    // own product cell reads "—" too, since this fixture has no factory
+    // pins — this assertion is about the extraction card having no blanks,
+    // not about the row.
+    const region = within(panel).getByRole('region');
+    expect(within(region).queryByText('—')).not.toBeInTheDocument();
   });
 
   it('flags a colony whose extractors are all past the efficient window as decayed', async () => {

@@ -859,6 +859,14 @@
     "infrastructure": {
       "title": "Infrastructure · no per-cycle data"
     },
+    "colonies": {
+      "panelTitle_one": "{{count}} colony",
+      "panelTitle_other": "{{count}} colonies"
+    },
+    "summary": {
+      "expiryLine": "{{product}} · {{duration}}",
+      "productCount": "{{name}} ×{{count}}"
+    },
     "yield": {
       "bankedColumn": "Banked",
       "bankedValue": "{{amount}} ({{percent}}%)",
