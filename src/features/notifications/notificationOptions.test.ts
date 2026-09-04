@@ -21,8 +21,8 @@ describe('notificationUrlFor', () => {
     expect(notificationUrlFor('somethingRetired')).toBe(NOTIFICATION_FALLBACK_ROUTE);
   });
 
-  it('routes wallet alerts to the wallet', () => {
-    expect(notificationUrlFor('walletBalanceChanged')).toBe('/wallet');
+  it('routes wallet alerts to the wallet journal tab', () => {
+    expect(notificationUrlFor('walletBalanceChanged')).toBe('/wallet?tab=journal');
   });
 });
 
@@ -57,7 +57,7 @@ describe('notificationOptionsFor', () => {
       icon: '/icons/icon-192.png',
       badge: '/icons/badge-96.png',
       tag: '7:walletBalanceChanged',
-      data: { url: '/wallet' },
+      data: { url: '/wallet?tab=journal' },
     });
   });
 

@@ -149,6 +149,13 @@ describe('Wallet', () => {
     expect(screen.getByText('Donation')).toBeInTheDocument();
   });
 
+  it('opens straight to the journal tab when a walletBalanceChanged notification deep-links here', async () => {
+    window.history.pushState({}, '', '/wallet?tab=journal');
+    render(<App />);
+    expect(await screen.findByText('Bounty')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Journal' })).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('humanizes the raw ESI ref_type into readable text', async () => {
     const user = userEvent.setup();
     render(<App />);

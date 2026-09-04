@@ -177,8 +177,13 @@ describe('Overview', () => {
     await screen.findByText(/1,234,567\.89/);
 
     // No page title restating the tab, and no controls: the wallet and queue
-    // panels below carry their own data age.
-    const header = screen.getByRole('heading', { level: 1, name: 'Pilot One' }).closest('header');
+    // panels below carry their own data age. The name comes from a Dexie
+    // useLiveQuery independent of the wallet balance just awaited above, so
+    // this must wait for it too rather than assume it's already resolved —
+    // same lesson Settings.test.tsx documents for its own character-name read.
+    const header = (await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).closest(
+      'header'
+    );
     expect(header).not.toBeNull();
     expect(within(header as HTMLElement).queryAllByRole('button')).toHaveLength(0);
     expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).toBeNull();

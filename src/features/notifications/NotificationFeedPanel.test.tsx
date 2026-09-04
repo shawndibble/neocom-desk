@@ -164,6 +164,21 @@ describe('NotificationFeedPanel', () => {
     expect(link).toHaveAttribute('href', '/settings#notifications');
   });
 
+  it('links each entry to the page its event belongs on', async () => {
+    await recordFeedEntry({
+      id: crypto.randomUUID(),
+      characterId: ACTIVE,
+      eventId: 'walletBalanceChanged',
+      title: 'Wallet changed',
+      body: 'ISK moved',
+      firedAt: 1000,
+    });
+    renderPanel();
+
+    const link = await screen.findByRole('link', { name: /Wallet changed/ });
+    expect(link).toHaveAttribute('href', '/wallet?tab=journal');
+  });
+
   it('renders nothing when the master switch is off', async () => {
     await db.settings.put({
       key: NOTIFICATION_PREFS_SETTING_KEY,

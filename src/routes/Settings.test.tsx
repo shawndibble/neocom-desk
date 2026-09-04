@@ -159,11 +159,12 @@ const ALL_NOTIFICATION_SCOPES = [...new Set(NOTIFICATION_EVENTS.map((event) => e
 const CHAR_2_ID = 92;
 
 /**
- * The shell's rail renders a character-menu button named after the active
- * pilot, so a bare `getByRole('button', { name: /pilot one/i })` matches twice
- * once Settings is reached through `<App />`. Same ambiguity the Activity Log
- * assertion resolves by naming its table: scope per-character queries to the
- * Notifications panel rather than the whole document.
+ * Per-character controls in this panel (select-all checkboxes etc.) can share
+ * an accessible name with another character's row, so a bare
+ * `getByRole('button', { name: /pilot one/i })` risks matching more than one
+ * once both are seeded. Same ambiguity the Activity Log assertion resolves by
+ * naming its table: scope per-character queries to the Notifications panel
+ * rather than the whole document.
  */
 async function notificationsPanel(): Promise<HTMLElement> {
   const heading = await screen.findByRole('heading', { name: /^notifications$/i });

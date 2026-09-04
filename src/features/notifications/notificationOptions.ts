@@ -39,7 +39,9 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   newCalendarEvent: '/calendar',
   calendarEventStarting: '/calendar',
   contractAccepted: '/contracts',
-  walletBalanceChanged: '/wallet',
+  // `?tab=` deep-links straight to the tab that actually shows the event,
+  // not just the page — `Wallet.tsx` reads it once on mount.
+  walletBalanceChanged: '/wallet?tab=journal',
   // Open Orders is now Market's own tab, not a route of its own.
   marketOrderFilled: '/market?section=orders',
   // ~100 EVE-native types (issue #274), most with no corresponding page in
