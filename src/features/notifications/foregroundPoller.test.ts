@@ -1074,8 +1074,9 @@ describe('runForegroundPoll', () => {
     expect(character).toEqual(CHAR);
   });
 
-  it('renders a generic body and never throws for a notification type this catalog has never heard of (AC2)', async () => {
+  it('drops a notification type that is not on the allow-list before it reaches either channel, without throwing (AC1/AC2)', async () => {
     const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, NOTIFICATIONS_SCOPE]),
       feedChannelEnabled: async () => true,
@@ -1086,13 +1087,11 @@ describe('runForegroundPoll', () => {
         eveNotification({ notification_id: 1, type: 'SomeBrandNewMsgType6041' }),
       ],
       recordToFeed,
+      notify,
     });
     await expect(runForegroundPoll(deps)).resolves.not.toThrow();
-    expect(recordToFeed).toHaveBeenCalledTimes(1);
-    const [fire] = recordToFeed.mock.calls[0];
-    expect(fire).toEqual(
-      expect.objectContaining({ eventId: 'eveNotification', type: 'SomeBrandNewMsgType6041' })
-    );
+    expect(recordToFeed).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it('opts an individual EVE notification type out of a channel without touching the parent event (AC3)', async () => {

@@ -34,6 +34,7 @@ import {
 import { recordFeedEntry } from './feed';
 import {
   isEventEnabledFor,
+  isEveTypeAllowed,
   isEveTypeEnabledFor,
   type EventEnabledMap,
   type EveTypeEnabledMap,
@@ -152,8 +153,10 @@ interface CharacterUpdate {
 /**
  * A layer underneath `isEventEnabledFor` for `eveNotification` fires only
  * (issue #274): every other event's channel gate is the single check above,
- * but this one event covers ~100 underlying types, each independently
- * opt-out-able. Non-`eveNotification` fires pass through unchanged.
+ * but this one event covers the Notification Allow-List's types (issue
+ * #350), each independently opt-out-able. Non-`eveNotification` fires pass
+ * through unchanged. Only ever reached for allow-listed types — the poll
+ * loop below drops everything else before this runs.
  */
 function eveTypeAllowsChannel(
   fire: AnyNotificationFire,
@@ -283,6 +286,11 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       // union, so a genuinely new engine fire type must fail here rather than
       // be waved through.
       const eventId = fire.eventId;
+      // Notification Allow-List (CONTEXT.md round 44): a type outside the
+      // closed list is dropped here, before either channel and before any
+      // name-resolution work (notificationText → resolveEveNotificationNames)
+      // that recordToFeed/notify would otherwise trigger for it.
+      if (eventId === 'eveNotification' && !isEveTypeAllowed(fire.type)) continue;
       // Feed first: it is the channel that cannot fail for platform reasons,
       // so a fire is recorded before anything that might silently no-op.
       if (
