@@ -187,6 +187,33 @@ async function persistTokens(
  * here — `purgeCharacterCacheOrSuppress`, whose suppression tier blanks every
  * read for the character. Losing a pilot's skills and mail because they
  * changed corp is the regression this trigger exists to avoid, not a fallback.
+ *
+ * The final write is a re-checked `db.transaction`, not a bare `update()`,
+ * for two reasons. First, correctness: `existing` above can go stale — a
+ * token refresh (`persistTokens`) or a character removal
+ * (`features/character/removeCharacter`) can land between that read and this
+ * write. Re-reading inside the transaction closes the former (no stale
+ * `corporationId` clobbers a refresh that just landed); `update`, not `put`,
+ * already makes the latter safe on its own (a no-op on a since-deleted row,
+ * never a resurrection) — the transaction just makes that guarantee atomic
+ * with the read instead of leaving a window between them.
+ *
+ * Second — and what this was actually written to fix — a bare
+ * `db.characters.update()` here races Dexie's `liveQuery` against any other
+ * bare write landing on `characters` moments later. `Characters.tsx` calls
+ * this (via `stores/publicInfo.ts`'s `load`) for every character it renders,
+ * so the ordinary case is this write and `removeCharacter`'s
+ * `db.characters.delete()` landing back-to-back the moment someone removes a
+ * character whose corp just finished resolving. Two bare auto-transactions
+ * on the same table, close enough together, left `useLiveQuery` emitting
+ * once more with pre-delete data and then going silent — the removed
+ * character stayed rendered until an unrelated table write jarred the
+ * subscription loose (or the page reloaded). Scoping the write in an
+ * explicit transaction closes that window too:
+ * `Characters.test.tsx`'s "removes a character after confirmation" test
+ * pins it. (Confirmed empirically: delaying the bare `update()` by a
+ * microtask instead of transacting it did not fix the test — this is not a
+ * timing coincidence.)
  */
 export async function recordCharacterCorporation(
   characterId: number,
@@ -203,10 +230,11 @@ export async function recordCharacterCorporation(
       // purge (revoke or owner change) rather than being retried here.
     }
   }
-  // `update`, not `put`: a token refresh can land between the read above and
-  // this write, and rewriting the whole record would silently discard the
-  // `name`/`ownerHash` it just persisted.
-  await db.characters.update(characterId, { corporationId });
+  await db.transaction('rw', db.characters, async () => {
+    const current = await db.characters.get(characterId);
+    if (current === undefined || current.corporationId === corporationId) return;
+    await db.characters.update(characterId, { corporationId });
+  });
 }
 
 /**
