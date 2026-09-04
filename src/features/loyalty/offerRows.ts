@@ -55,6 +55,16 @@ export interface LoyaltyOfferComputeInputs {
   /** Detected owned-stock coverage, applied only to offers named in `useOwnMaterialsFor`. */
   materialSourcing: MaterialSourcingMap | undefined;
   /**
+   * Names for plain-item offers whose `type_id` isn't in `catalog.typesById`
+   * — that map only carries types some blueprint or skill references
+   * (`src/sde/loadSde.ts`'s trimmed snapshot), while LP stores hand out
+   * plenty of items neither ever references (implants, Mindlinks, SKINs).
+   * Resolved by the caller via `loadTypeNames` (`src/features/character/typeNames.ts`,
+   * the same ESI-backed resolver Assets/Wallet already use), not looked up
+   * here — this module stays a pure compute step over data its caller fetched.
+   */
+  itemNames?: ReadonlyMap<number, string>;
+  /**
    * Which blueprint offers (by `offer_id`) should price their build against
    * `materialSourcing` rather than buying every material at the hub — the "use
    * my own materials" toggle is per-offer, not global, since the sourcing map
@@ -148,7 +158,7 @@ function computeItemRow(
   });
   return {
     offer,
-    itemName: nameForType(catalog, offer.type_id),
+    itemName: inputs.itemNames?.get(offer.type_id) ?? nameForType(catalog, offer.type_id),
     isBlueprint: false,
     productTypeId: null,
     productName: null,

@@ -91,6 +91,68 @@ describe('computeLoyaltyOfferRows', () => {
     expect(row.profit.profit).toBe(8 * 1_800 - 96_000);
   });
 
+  it("names a plain item from `itemNames` when catalog.typesById (the trimmed, blueprint/skill-referenced SDE snapshot) doesn't cover it — LP stores hand out plenty of items no blueprint or skill ever references, e.g. implants, Mindlinks, SKINs", () => {
+    const MINDLINK_ID = 21890;
+    const mindlink: LoyaltyStoreOffer = {
+      isk_cost: 20_000_000,
+      lp_cost: 20_000,
+      offer_id: 4,
+      quantity: 1,
+      required_items: [],
+      type_id: MINDLINK_ID,
+    };
+    const [row] = computeLoyaltyOfferRows({
+      offers: [mindlink],
+      catalog: makeCatalog(),
+      hubPrices: { [MINDLINK_ID]: 50_000_000 },
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      itemNames: new Map([[MINDLINK_ID, 'Skirmish Command Mindlink']]),
+      playerLp: 1_000_000,
+    });
+
+    expect(row.itemName).toBe('Skirmish Command Mindlink');
+  });
+
+  it('falls back to catalog.typesById, then `#typeId`, when `itemNames` has no entry', () => {
+    const UNKNOWN_ID = 999_999;
+    const unknown: LoyaltyStoreOffer = {
+      isk_cost: 1,
+      lp_cost: 1,
+      offer_id: 5,
+      quantity: 1,
+      required_items: [],
+      type_id: UNKNOWN_ID,
+    };
+    const [probeRow] = computeLoyaltyOfferRows({
+      offers: [probes],
+      catalog: makeCatalog(),
+      hubPrices: { [PROBE_ID]: 1_800 },
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      itemNames: new Map(),
+      playerLp: 1_000_000,
+    });
+    const [unknownRow] = computeLoyaltyOfferRows({
+      offers: [unknown],
+      catalog: makeCatalog(),
+      hubPrices: {},
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      itemNames: new Map(),
+      playerLp: 1_000_000,
+    });
+
+    expect(probeRow.itemName).toBe('Sisters Combat Scanner Probe');
+    expect(unknownRow.itemName).toBe(`#${UNKNOWN_ID}`);
+  });
+
   it('ranks the more profitable-per-LP offer first', () => {
     const rows = computeLoyaltyOfferRows({
       offers: [astero, probes],
