@@ -281,6 +281,17 @@ describe('projectEveNotificationReinforcementExit', () => {
     expect(rows[0].body).toContain('Keepstar');
   });
 
+  it("carries the entry's raw eveType, so a push-delivered row can be muted per-type like a live one", () => {
+    const rows = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ type: 'StructureLostShields' })],
+      new Map(),
+      T0
+    );
+    expect(rows[0].eveType).toBe('StructureLostShields');
+  });
+
   it('is skipped, without error, when timeLeft is absent', () => {
     const args = [7, 'Kestrel', [entry({ text: 'structureID: 111\n' })], new Map(), T0] as const;
     expect(() => projectEveNotificationReinforcementExit(...args)).not.toThrow();

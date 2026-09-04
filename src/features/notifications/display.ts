@@ -13,10 +13,10 @@
  * swallowed by the throw.
  *
  * The Service Worker path is therefore tried first — the same
- * `showNotification` call `backgroundPoller.ts` makes from inside the worker,
- * only reached through `navigator.serviceWorker` from the page side — with
- * the constructor kept as the fallback for a page with no worker registered
- * yet (dev server, first load before activation) where it does still work.
+ * `showNotification` call `pushHandler.ts` makes on Web Push receipt, only
+ * reached through `navigator.serviceWorker` from the page side — with the
+ * constructor kept as the fallback for a page with no worker registered yet
+ * (dev server, first load before activation) where it does still work.
  *
  * `getRegistration()` rather than `serviceWorker.ready`: `ready` never
  * settles when nothing is registered, and this runs inside the poller's

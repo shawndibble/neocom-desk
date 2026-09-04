@@ -107,6 +107,14 @@ export interface ProjectionRow {
   readonly fireAt: number;
   readonly title: string;
   readonly body: string;
+  /**
+   * The raw ESI type underneath an `eveNotification` row (issue #274's
+   * per-type opt-out), carried through so a push-delivered occurrence can be
+   * muted per-type exactly like the Foreground Poller's own feed write
+   * (`foregroundPoller.ts`'s `recordFeedEntry` call) — absent for every other
+   * `ProjectableEventId`, which has no type underneath it to carry.
+   */
+  readonly eveType?: string;
 }
 
 /**
@@ -141,7 +149,8 @@ function buildRow(
   eventId: ProjectableEventId,
   fire: OccurrenceFire,
   fireAt: number,
-  text: { title: string; body: string }
+  text: { title: string; body: string },
+  eveType?: string
 ): ProjectionRow {
   return {
     characterId,
@@ -150,6 +159,7 @@ function buildRow(
     fireAt,
     title: text.title,
     body: text.body,
+    ...(eveType !== undefined ? { eveType } : {}),
   };
 }
 
@@ -525,7 +535,8 @@ export function projectEveNotificationReinforcementExit(
         'eveNotification',
         fire,
         exitMs,
-        eveNotificationReinforcementExitText(characterName, label)
+        eveNotificationReinforcementExitText(characterName, label),
+        entry.type
       )
     );
   }

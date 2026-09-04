@@ -1,7 +1,7 @@
 /**
  * The `showNotification` options every fired notification carries, shared by
  * the page-context path (`display.ts`) and the Service Worker path
- * (`backgroundPoller.ts`) so the two cannot drift.
+ * (`pushHandler.ts`) so the two cannot drift.
  *
  * Previously both passed `{ body }` alone, which left three things on the
  * table:

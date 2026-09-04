@@ -26,6 +26,8 @@ export interface ProjectionRowInput {
   fireAt: number;
   title: string;
   body: string;
+  /** The raw ESI type underneath an `eveNotification` row (issue #274's per-type opt-out); absent for every other eventId. */
+  eveType?: string;
 }
 
 export interface DeviceCharacterInput {
@@ -71,7 +73,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseProjectionRow(raw: unknown, path: string): ProjectionRowInput {
   if (!isRecord(raw)) throw new Error(`${path} must be an object`);
-  const { eventId, occurrenceKey, fireAt, title, body } = raw;
+  const { eventId, occurrenceKey, fireAt, title, body, eveType } = raw;
   if (typeof eventId !== 'string' || eventId.length === 0) {
     throw new Error(`${path}.eventId (non-empty string) is required`);
   }
@@ -87,7 +89,17 @@ function parseProjectionRow(raw: unknown, path: string): ProjectionRowInput {
   if (typeof body !== 'string') {
     throw new Error(`${path}.body (string) is required`);
   }
-  return { eventId, occurrenceKey, fireAt, title, body };
+  if (eveType !== undefined && typeof eveType !== 'string') {
+    throw new Error(`${path}.eveType, if present, must be a string`);
+  }
+  return {
+    eventId,
+    occurrenceKey,
+    fireAt,
+    title,
+    body,
+    ...(eveType !== undefined ? { eveType } : {}),
+  };
 }
 
 /** Validate the callable's raw `request.data`. Throws a plain Error on any shape violation. */

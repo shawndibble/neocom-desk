@@ -97,6 +97,46 @@ describe('parseRegisterDeviceInput', () => {
     ).toThrow();
   });
 
+  it('carries an optional eveType through on a projection row', () => {
+    const input = parseRegisterDeviceInput({
+      deviceId: 'd',
+      fcmToken: 'f',
+      characters: [
+        {
+          characterId: 1,
+          accessToken: 'a',
+          projectionRows: [{ ...PROJECTION_ROW, eveType: 'StructureLostShields' }],
+        },
+      ],
+    });
+    expect(input.characters[0].projectionRows[0].eveType).toBe('StructureLostShields');
+  });
+
+  it('omits eveType from a projection row that has none', () => {
+    const input = parseRegisterDeviceInput({
+      deviceId: 'd',
+      fcmToken: 'f',
+      characters: [{ characterId: 1, accessToken: 'a', projectionRows: [PROJECTION_ROW] }],
+    });
+    expect(input.characters[0].projectionRows[0].eveType).toBeUndefined();
+  });
+
+  it('rejects a projection row whose eveType is not a string', () => {
+    expect(() =>
+      parseRegisterDeviceInput({
+        deviceId: 'd',
+        fcmToken: 'f',
+        characters: [
+          {
+            characterId: 1,
+            accessToken: 'a',
+            projectionRows: [{ ...PROJECTION_ROW, eveType: 42 }],
+          },
+        ],
+      })
+    ).toThrow();
+  });
+
   it('accepts an empty-string body on a projection row', () => {
     const input = parseRegisterDeviceInput({
       deviceId: 'd',

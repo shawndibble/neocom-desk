@@ -100,6 +100,28 @@ describe('parsePushPayload', () => {
     const characterId = String(VALID_PAYLOAD.characterId);
     expect(parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, body: 42 }))).toBeNull();
   });
+
+  it('carries an optional eveType through, for per-type muting of a push-delivered eveNotification', () => {
+    const characterId = String(VALID_PAYLOAD.characterId);
+    expect(
+      parsePushPayload(
+        rawFcmPayload({ ...VALID_PAYLOAD, characterId, eveType: 'StructureLostShields' })
+      )
+    ).toEqual({ ...VALID_PAYLOAD, eveType: 'StructureLostShields' });
+  });
+
+  it('omits eveType when the wire payload has none', () => {
+    const characterId = String(VALID_PAYLOAD.characterId);
+    const parsed = parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId }));
+    expect(parsed?.eveType).toBeUndefined();
+  });
+
+  it('returns null when eveType is present but not a string', () => {
+    const characterId = String(VALID_PAYLOAD.characterId);
+    expect(
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, eveType: 42 }))
+    ).toBeNull();
+  });
 });
 
 const VALID_RAW = rawFcmPayload({
@@ -142,6 +164,21 @@ describe('handlePush', () => {
       body: VALID_PAYLOAD.body,
       firedAt: now,
     });
+  });
+
+  it("records the feed entry's eveType when the pushed payload carries one", async () => {
+    const e = env();
+    const now = 1_700_000_000_000;
+    const raw = rawFcmPayload({
+      ...VALID_PAYLOAD,
+      characterId: String(VALID_PAYLOAD.characterId),
+      eveType: 'StructureLostShields',
+    });
+    await handlePush(e, raw, now);
+
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ eveType: 'StructureLostShields' })
+    );
   });
 
   it('still shows a notification when the payload is missing', async () => {

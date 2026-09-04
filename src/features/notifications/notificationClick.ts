@@ -4,8 +4,8 @@
  * listener at all, so tapping a "your wallet changed" alert did nothing — it
  * told the user something happened and then stranded them.
  *
- * Extracted from `src/sw.ts` for the same reason `backgroundPoller.ts` was:
- * ADR 0007's carve-out makes the Service Worker file orchestration-only and
+ * Extracted from `src/sw.ts` for the same reason `pushHandler.ts` was: ADR
+ * 0007's carve-out makes the Service Worker file orchestration-only and
  * untested, so anything with a decision in it lives here instead.
  *
  * The rule is focus-then-navigate, not open-a-second-window: a PWA that opens

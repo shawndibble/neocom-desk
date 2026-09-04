@@ -20,7 +20,7 @@ import {
 } from '@/components/ui';
 import { BrowserNotifyOn, BrowserNotifyOff, HideInFeed, ICON_SIZE } from '@/components/ui/icons';
 import type { NotificationFeedRecord } from '@/db';
-import type { NotificationEventId } from './events';
+import { entryChannelTarget } from './feedSelection';
 import {
   useNotificationPreferences,
   updateNotificationPrefs,
@@ -41,28 +41,25 @@ export function NotificationContextMenu({ entry, children }: NotificationContext
   const { t } = useTranslation();
   const prefsValue = useNotificationPreferences((state) => state.value);
 
+  const target = entryChannelTarget(entry);
+
   const browserEnabled =
-    entry.eveType !== undefined
+    target.kind === 'eveType'
       ? isEveTypeEnabledFor(
           characterEveTypePrefs(prefsValue, entry.characterId),
-          entry.eveType,
+          target.type,
           'browser'
         )
       : isEventEnabledFor(
           characterEventPrefs(prefsValue, entry.characterId),
-          entry.eventId as NotificationEventId,
+          target.eventId,
           'browser'
         );
 
   function toggled(channel: 'browser' | 'feed') {
-    return entry.eveType !== undefined
-      ? withEveNotificationTypeToggled(prefsValue, entry.characterId, entry.eveType, channel)
-      : withEventChannelToggled(
-          prefsValue,
-          entry.characterId,
-          entry.eventId as NotificationEventId,
-          channel
-        );
+    return target.kind === 'eveType'
+      ? withEveNotificationTypeToggled(prefsValue, entry.characterId, target.type, channel)
+      : withEventChannelToggled(prefsValue, entry.characterId, target.eventId, channel);
   }
 
   return (
