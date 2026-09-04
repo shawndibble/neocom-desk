@@ -547,7 +547,12 @@
     "remove": "Remove",
     "removeButtonLabel": "Remove {{name}}",
     "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device, and — if a session can still be started as them — their synced plans, build plans, quickbar and settings too. If not, that remote data stays until you sign in as {{name}} again. This cannot be undone here.",
-    "removeDeferredNotice": "{{name}}'s synced data couldn't be cleared right now — their session couldn't be re-established. It will be cleared automatically the next time you sign in as {{name}}."
+    "removeDeferredNoticeTitle": "Sync deferred",
+    "removeDeferredNotice": "{{name}}'s synced data couldn't be cleared right now — their session couldn't be re-established. It will be cleared automatically the next time you sign in as {{name}}.",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "searchPlaceholder": "Search by name or corporation",
+    "noSearchMatches": "No characters match this search."
   },
   "overview": {
     "title": "Overview",
@@ -798,8 +803,11 @@
     "noImplants": "No implants",
     "stationLabel": "Station #{{id}}",
     "structureLabel": "Structure #{{id}}",
-    "cooldownReady": "Ready to jump now",
-    "cooldownOnCooldown": "On cooldown until {{date}} ({{duration}} left)",
+    "homeLocation": "Home Clone",
+    "lastStationChange": "Last moved {{date}}",
+    "cooldown": "Jump Cooldown",
+    "cooldownReadyValue": "Ready",
+    "cooldownOnCooldownValue": "Until {{date}} ({{duration}} left)",
     "reauthTitle": "Log in again to see your clones",
     "reauthHint": "Log in again to fetch this character's jump clones.",
     "reauthAction": "Log in again with EVE Online"
@@ -993,7 +1001,8 @@
     "emptyHint": "Reconnect to fetch this character's corporation history.",
     "corporation": "Corporation",
     "started": "Joined",
-    "duration": "Duration"
+    "duration": "Duration",
+    "current": "Current"
   },
   "contracts": {
     "title": "Contracts",

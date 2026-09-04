@@ -80,7 +80,13 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
 
-  await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
+  await db.characters.put({
+    characterId: CHAR_ID,
+    name: 'Pilot One',
+    ownerHash: 'oh',
+    addedAt: 1,
+    corporationId: 200,
+  });
   // No token scopes granted at all: the route is public and must not require one.
   await db.tokens.put({
     characterId: CHAR_ID,
@@ -99,13 +105,62 @@ describe('EmploymentHistory', () => {
     // 'Past Corp' rather than 'Current Corp': the shared header names the
     // character's *current* corporation too, and it resolves first.
     expect(await screen.findByText('Past Corp')).toBeInTheDocument();
-    expect(screen.getByText('Current Corp', { selector: 'td' })).toBeInTheDocument();
+    // Current Corp's row is the ongoing/matching one, so it renders as a link.
+    expect(screen.getByRole('link', { name: 'Current Corp' })).toBeInTheDocument();
     const rows = screen.getAllByRole('row');
     // Row 0 is the header; row 1 should be the most recent corp.
     expect(rows[1]).toHaveTextContent('Current Corp');
     expect(rows[2]).toHaveTextContent('Past Corp');
     // Past Corp ran exactly 2025-01-01 to 2026-01-01: a full non-leap year.
     expect(rows[2]).toHaveTextContent('365d');
+  });
+
+  it('links the ongoing row to /corp and badges it when it matches the character record', async () => {
+    render(<App />);
+
+    await screen.findByText('Past Corp');
+    const link = screen.getByRole('link', { name: 'Current Corp' });
+    expect(link).toHaveAttribute('href', '/corp');
+    expect(screen.getByText('Current')).toBeInTheDocument();
+    // The past corp's row stays plain text — no link, no badge.
+    expect(screen.queryByRole('link', { name: 'Past Corp' })).toBeNull();
+  });
+
+  it('does not link the ongoing row when the character record has a different corp', async () => {
+    // The character's own corp record resolves from ESI's public-info fetch
+    // (CharacterHeader triggers it), which would otherwise resync back to
+    // 200 — override the endpoint itself rather than the db row, so this
+    // reflects a character whose current corp genuinely isn't the ongoing
+    // history row's corp (e.g. corp record hasn't caught up to a corp move
+    // reflected in the history yet).
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}`, () =>
+        HttpResponse.json({
+          name: 'Pilot One',
+          corporation_id: 999,
+          birthday: '2015-01-01T00:00:00Z',
+          bloodline_id: 1,
+          gender: 'female',
+          race_id: 1,
+        })
+      ),
+      http.get('https://esi.evetech.net/corporations/999', () =>
+        HttpResponse.json({
+          name: 'Other Corp',
+          ticker: 'OC',
+          ceo_id: 1,
+          creator_id: 1,
+          member_count: 5,
+          tax_rate: 0.1,
+        })
+      )
+    );
+    render(<App />);
+
+    await screen.findByText('Past Corp');
+    await screen.findByText('Other Corp');
+    expect(screen.queryByRole('link', { name: 'Current Corp' })).toBeNull();
+    expect(screen.queryByText('Current')).toBeNull();
   });
 
   it('carries the same character header the Overview tab shows, without reaching for a scope', async () => {
@@ -142,7 +197,7 @@ describe('EmploymentHistory', () => {
     );
     render(<App />);
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
-    expect(screen.getByText(/#200|Current Corp/, { selector: 'td' })).toBeInTheDocument();
+    expect(screen.getByText(/#200|Current Corp/, { selector: 'td, a' })).toBeInTheDocument();
   });
 
   it('shows the empty state when there is no data at all', async () => {
