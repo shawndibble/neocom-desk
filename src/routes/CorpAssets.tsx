@@ -13,9 +13,9 @@
  * **Director-only, and the whole page rather than a panel**, for the same
  * reason `/corp/members` is: `canReadAssets` (`engine/corpRoles.ts`) answers
  * to `Director` alone, so anyone else following an Assets tab would land on
- * an explanation instead of a division list. See that route for the
- * `unknown`/`ready` split and the mount-on-`ready` reasoning, both repeated
- * here.
+ * an explanation instead of a division list. The `unknown`/`ready` split and
+ * the mount-on-`ready` reasoning live in `useCorpRouteGate`, shared with
+ * `/corp` and `/corp/members`.
  */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,7 +31,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { loadCorporationId } from '@/features/corp/boardData';
 import {
@@ -296,11 +296,11 @@ function CorpAssetsView() {
 
 export function CorpAssets() {
   const { t } = useTranslation();
-  const { state, capabilities } = useCorpAccess();
+  const gate = useCorpRouteGate((capabilities) => capabilities.canReadAssets);
 
-  if (state === 'unknown') return <Spinner />;
+  if (gate.status === 'loading') return <Spinner />;
 
-  if (state !== 'ready' || !capabilities.canReadAssets) {
+  if (gate.status === 'denied') {
     return (
       <div className="space-y-4">
         <PageHeader title={t('corp.assets.title')} />
