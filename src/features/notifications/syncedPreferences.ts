@@ -28,6 +28,7 @@ import {
 } from './eventSelection';
 import type { NotificationEventId } from './events';
 import type { CharacterEventThresholds, NotificationPreferencesValue } from './preferences';
+import { recordByCharacterId } from './recordByCharacterId';
 
 export const SYNCED_NOTIFICATION_FEED_PREFS_KEY = 'sync.notificationFeedPrefs';
 
@@ -124,17 +125,19 @@ function isBooleanMap(raw: unknown): raw is Record<string, boolean> {
   return Object.values(raw as Record<string, unknown>).every((v) => typeof v === 'boolean');
 }
 
-function isBooleanMapByCharacter(raw: unknown): raw is Record<number, Record<string, boolean>> {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
-  return Object.entries(raw as Record<string, unknown>).every(
-    ([key, value]) => !Number.isNaN(Number(key)) && isBooleanMap(value)
-  );
-}
+const isBooleanMapByCharacter = recordByCharacterId(isBooleanMap);
 
 function isOptionalFiniteNumber(raw: unknown): boolean {
   return raw === undefined || (typeof raw === 'number' && Number.isFinite(raw));
 }
 
+/**
+ * Structurally identical to `preferences.ts`'s own `isCharacterEventThresholds`
+ * today, but kept as its own predicate: this one validates the *synced wire
+ * shape* (`SyncedFeedPrefs`), the other the *local Dexie shape*
+ * (`NotificationPreferencesValue`) — two different trust boundaries that
+ * happen to agree now but aren't guaranteed to stay identical.
+ */
 function isThresholds(raw: unknown): raw is CharacterEventThresholds {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
   const r = raw as Record<string, unknown>;
@@ -146,12 +149,7 @@ function isThresholds(raw: unknown): raw is CharacterEventThresholds {
   );
 }
 
-function isThresholdsByCharacter(raw: unknown): raw is Record<number, CharacterEventThresholds> {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
-  return Object.entries(raw as Record<string, unknown>).every(
-    ([key, value]) => !Number.isNaN(Number(key)) && isThresholds(value)
-  );
-}
+const isThresholdsByCharacter = recordByCharacterId(isThresholds);
 
 function isSyncedFeedPrefs(raw: unknown): raw is SyncedFeedPrefs {
   if (typeof raw !== 'object' || raw === null) return false;

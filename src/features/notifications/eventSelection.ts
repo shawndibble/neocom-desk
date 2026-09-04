@@ -47,6 +47,75 @@ function eventDefaultFor(eventId: NotificationEventId, channel: NotificationChan
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// Shared per-channel toggle-map behavior
+//
+// `toggleEventChannel`/`toggleAllEventsOnChannel`/`selectionStateForEvents`
+// below and their `*EveType*` counterparts further down implement one shape
+// twice: "given a way to read whether a key is enabled on a channel, flip
+// one, flip a whole column, or summarize a column's checked state." The
+// three generics here are that shape's one implementation, each taking the
+// caller's own `isEnabledFor` as its reader rather than a map directly — so
+// they never need to know `EventEnabledMap`'s legacy bare-boolean case
+// (`EventChannelState`) exists at all, and produce only object-shaped
+// `ChannelFlags`, which both `EventChannelState` and `EveTypeChannelState`
+// accept without a cast. `isEventEnabledFor`/`isEveTypeEnabledFor` stay
+// separate, tiny functions: reading a stored value is the one part that
+// genuinely differs between the two (the event side alone must still accept
+// a bare boolean), and forcing it into the shared shape would mean the
+// eveType side newly "handling" a case its own data can never contain.
+// ---------------------------------------------------------------------------
+
+type ChannelFlags = Partial<Record<NotificationChannel, boolean>>;
+
+function toggledFlags<K extends string, M>(
+  map: M,
+  key: K,
+  channel: NotificationChannel,
+  isEnabledFor: (map: M, key: K, channel: NotificationChannel) => boolean
+): ChannelFlags {
+  const next: ChannelFlags = {};
+  for (const c of NOTIFICATION_CHANNELS) next[c] = isEnabledFor(map, key, c);
+  next[channel] = !next[channel];
+  return next;
+}
+
+/**
+ * Column select-all's new flags, for `keys` only — the caller merges these
+ * back into its own map, carrying every other key through unchanged
+ * (including a legacy bare boolean elsewhere, on the event side). Cascades
+ * over one channel only: checked or indeterminate both fill in to fully
+ * enabled; only a fully-enabled column clears.
+ */
+function allToggledFlags<K extends string, M>(
+  keys: readonly K[],
+  map: M,
+  channel: NotificationChannel,
+  isEnabledFor: (map: M, key: K, channel: NotificationChannel) => boolean
+): Record<K, ChannelFlags> {
+  const allEnabled = keys.length > 0 && keys.every((k) => isEnabledFor(map, k, channel));
+  const result = {} as Record<K, ChannelFlags>;
+  for (const key of keys) {
+    const flags: ChannelFlags = {};
+    for (const c of NOTIFICATION_CHANNELS) flags[c] = isEnabledFor(map, key, c);
+    flags[channel] = !allEnabled;
+    result[key] = flags;
+  }
+  return result;
+}
+
+function selectionStateFor<K extends string, M>(
+  keys: readonly K[],
+  map: M,
+  channel: NotificationChannel,
+  isEnabledFor: (map: M, key: K, channel: NotificationChannel) => boolean
+): SelectionState {
+  if (keys.length === 0) return 'unchecked';
+  const enabledCount = keys.filter((k) => isEnabledFor(map, k, channel)).length;
+  if (enabledCount === 0) return 'unchecked';
+  return enabledCount === keys.length ? 'checked' : 'indeterminate';
+}
+
 export function isEventEnabledFor(
   map: EventEnabledMap,
   eventId: NotificationEventId,
@@ -63,10 +132,7 @@ export function selectionStateForEvents(
   map: EventEnabledMap,
   channel: NotificationChannel
 ): SelectionState {
-  if (eventIds.length === 0) return 'unchecked';
-  const enabledCount = eventIds.filter((id) => isEventEnabledFor(map, id, channel)).length;
-  if (enabledCount === 0) return 'unchecked';
-  return enabledCount === eventIds.length ? 'checked' : 'indeterminate';
+  return selectionStateFor(eventIds, map, channel, isEventEnabledFor);
 }
 
 /** Flips one event on one channel, preserving whatever the other channel said. */
@@ -75,32 +141,15 @@ export function toggleEventChannel(
   eventId: NotificationEventId,
   channel: NotificationChannel
 ): EventEnabledMap {
-  const next: Partial<Record<NotificationChannel, boolean>> = {};
-  for (const c of NOTIFICATION_CHANNELS) next[c] = isEventEnabledFor(map, eventId, c);
-  next[channel] = !next[channel];
-  return { ...map, [eventId]: next };
+  return { ...map, [eventId]: toggledFlags(map, eventId, channel, isEventEnabledFor) };
 }
 
-/**
- * Column select-all: cascades over one channel only — checked or
- * indeterminate both fill in to fully enabled; only a fully-enabled column
- * clears. The other channel's flags are carried through untouched.
- */
 export function toggleAllEventsOnChannel(
   eventIds: readonly NotificationEventId[],
   map: EventEnabledMap,
   channel: NotificationChannel
 ): EventEnabledMap {
-  const allEnabled =
-    eventIds.length > 0 && eventIds.every((id) => isEventEnabledFor(map, id, channel));
-  const next: EventEnabledMap = { ...map };
-  for (const id of eventIds) {
-    const flags: Partial<Record<NotificationChannel, boolean>> = {};
-    for (const c of NOTIFICATION_CHANNELS) flags[c] = isEventEnabledFor(map, id, c);
-    flags[channel] = !allEnabled;
-    next[id] = flags;
-  }
-  return next;
+  return { ...map, ...allToggledFlags(eventIds, map, channel, isEventEnabledFor) };
 }
 
 /**
@@ -211,7 +260,7 @@ function eveTypeDefaultFor(type: string, channel: NotificationChannel): boolean 
   return EVE_TYPE_DEFAULT[channel];
 }
 
-export type EveTypeChannelState = Partial<Record<NotificationChannel, boolean>>;
+export type EveTypeChannelState = ChannelFlags;
 export type EveTypeEnabledMap = Record<string, EveTypeChannelState>;
 
 export function isEveTypeEnabledFor(
@@ -230,10 +279,7 @@ export function toggleEveTypeChannel(
   type: string,
   channel: NotificationChannel
 ): EveTypeEnabledMap {
-  const next: EveTypeChannelState = {};
-  for (const c of NOTIFICATION_CHANNELS) next[c] = isEveTypeEnabledFor(map, type, c);
-  next[channel] = !next[channel];
-  return { ...map, [type]: next };
+  return { ...map, [type]: toggledFlags(map, type, channel, isEveTypeEnabledFor) };
 }
 
 /** Family header select-all/none state (issue #352) — same shape as `selectionStateForEvents`. */
@@ -242,10 +288,7 @@ export function selectionStateForEveTypes(
   map: EveTypeEnabledMap,
   channel: NotificationChannel
 ): SelectionState {
-  if (types.length === 0) return 'unchecked';
-  const enabledCount = types.filter((type) => isEveTypeEnabledFor(map, type, channel)).length;
-  if (enabledCount === 0) return 'unchecked';
-  return enabledCount === types.length ? 'checked' : 'indeterminate';
+  return selectionStateFor(types, map, channel, isEveTypeEnabledFor);
 }
 
 /**
@@ -258,14 +301,5 @@ export function toggleAllEveTypesOnChannel(
   map: EveTypeEnabledMap,
   channel: NotificationChannel
 ): EveTypeEnabledMap {
-  const allEnabled =
-    types.length > 0 && types.every((type) => isEveTypeEnabledFor(map, type, channel));
-  const next: EveTypeEnabledMap = { ...map };
-  for (const type of types) {
-    const flags: EveTypeChannelState = {};
-    for (const c of NOTIFICATION_CHANNELS) flags[c] = isEveTypeEnabledFor(map, type, c);
-    flags[channel] = !allEnabled;
-    next[type] = flags;
-  }
-  return next;
+  return { ...map, ...allToggledFlags(types, map, channel, isEveTypeEnabledFor) };
 }
