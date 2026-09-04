@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -14,10 +16,20 @@ import type {
   MaterialSourcingMap,
 } from '@/engine/industry/types';
 import type { OwnedStockPlacement } from '@/engine/industry/ownedStock';
+import type { PiData } from '@/sde/types';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { applySourcingPatch } from './sourcingEdits';
 import { MaterialsTable } from './MaterialsTable';
 import type { OwnedStockDetection } from './ownedStockDetection';
+
+// The row menu's PI action reads `pi.json` for itself; the real payload keeps
+// "is 9840 planetary" an answer the SDE gives rather than one this file makes up.
+vi.mock('@/sde/loadSde', () => ({
+  loadPi: vi.fn(
+    async () =>
+      JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')) as PiData
+  ),
+}));
 
 const NAMES: Record<number, string> = {
   34: 'Tritanium',
@@ -536,6 +548,23 @@ describe('MaterialsTable', () => {
         'aria-disabled',
         'true'
       );
+    });
+
+    it('offers a PI Plan for a material planetary industry makes (Transmitter, P2)', async () => {
+      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }) });
+      const row = screen.getByText('Mechanical Parts').closest('tr');
+      fireEvent.contextMenu(row!);
+      expect(await screen.findByRole('menuitem', { name: 'PI Plan' })).toBeInTheDocument();
+    });
+
+    it('offers no PI Plan for a material no factory makes', async () => {
+      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }) });
+      const row = screen.getByText('Tritanium').closest('tr');
+      fireEvent.contextMenu(row!);
+      expect(
+        await screen.findByRole('menuitem', { name: 'No blueprint options' })
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'PI Plan' })).not.toBeInTheDocument();
     });
 
     it('targets the right-clicked material, not the first row', async () => {
