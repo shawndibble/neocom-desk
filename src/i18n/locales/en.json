@@ -1471,8 +1471,7 @@
         "feed": "{{event}}, Overview list"
       },
       "columnEvent": "Event",
-      "eveTypesHint": "EVE sends about a hundred kinds of these. Each appears below the first time it fires, defaulting to the Overview list only — flip one up to a browser notification if it matters enough to interrupt you.",
-      "eveTypesEmpty": "None received yet for this character."
+      "eveTypesHint": "This curated set of structure, war, bill, and corp notifications defaults to the Overview list only, except the three structure-under-attack alerts, which also default to a browser notification — flip any type up or down per channel."
     }
   },
   "shortcuts": {

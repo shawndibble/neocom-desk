@@ -58,36 +58,6 @@ export function visibleFeedEntries(
   return entries.filter((entry) => isEntryVisible(entry, prefs));
 }
 
-/**
- * Every distinct EVE notification `type` this Character's feed has recorded,
- * unioned with any type already toggled in preferences (issue #274) —
- * Settings' only way to discover which per-type toggles to offer, since
- * there is no closed catalog of the ~100 types to list up front. A type has
- * to have fired (and reached the feed) at least once before it can be opted
- * in or out here.
- *
- * The preferences half of the union matters once a type is toggled off the
- * feed channel: it then never reaches `entries` again, and its earlier rows
- * age out past `NOTIFICATION_FEED_LIMIT` — feed-only discovery would make
- * that toggle a one-way door, with no way back to the row that turns it back
- * on.
- */
-export function knownEveTypesForCharacter(
-  entries: readonly NotificationFeedEntry[],
-  characterId: number,
-  prefs: NotificationPreferencesValue
-): string[] {
-  const types = new Set<string>();
-  for (const entry of entries) {
-    if (entry.characterId !== characterId || entry.eveType === undefined) continue;
-    types.add(entry.eveType);
-  }
-  for (const type of Object.keys(characterEveTypePrefs(prefs, characterId))) {
-    types.add(type);
-  }
-  return [...types].sort();
-}
-
 export function entriesForCharacter(
   entries: readonly NotificationFeedEntry[],
   characterId: number | null

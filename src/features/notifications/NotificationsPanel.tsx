@@ -64,10 +64,10 @@ import {
   isEveTypeEnabledFor,
   selectionStateForEvents,
   NOTIFICATION_CHANNELS,
+  EVE_ALLOWED_TYPES,
   type NotificationChannel,
 } from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
-import { knownEveTypesForCharacter } from './feedSelection';
 import { refreshAppBadge } from './appBadge';
 import {
   useNotificationPermission,
@@ -102,11 +102,6 @@ export function NotificationsPanel() {
   const { t } = useTranslation();
   const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
   const tokens = useLiveQuery(() => db.tokens.toArray());
-  // The only way to discover which EVE notification types (issue #274) to
-  // offer per-type toggles for — there is no closed catalog of the ~100
-  // types to list up front, so Settings surfaces whatever the feed has
-  // actually recorded.
-  const feedEntries = useLiveQuery(() => db.notificationFeed.toArray());
 
   const prefsValue = useNotificationPreferences((state) => state.value);
   const hydratePrefs = useNotificationPreferences((state) => state.hydrate);
@@ -339,11 +334,6 @@ export function NotificationsPanel() {
                 const prefs = characterEventPrefs(prefsValue, character.characterId);
                 const eveTypePrefs = characterEveTypePrefs(prefsValue, character.characterId);
                 const thresholds = characterEventThresholds(prefsValue, character.characterId);
-                const knownEveTypes = knownEveTypesForCharacter(
-                  feedEntries ?? [],
-                  character.characterId,
-                  prefsValue
-                );
 
                 return (
                   <div
@@ -582,61 +572,54 @@ export function NotificationsPanel() {
                                 )}
                                 {/*
                                   Per-type opt-out underneath the single
-                                  eveNotification event (issue #274, AC3):
-                                  types appear here only once seen, since
-                                  there is no closed catalog to list up
-                                  front (eventSelection.ts's per-type
-                                  default doc comment has the full reasoning).
+                                  eveNotification event (issue #274, AC3).
+                                  Enumerated from the closed allow-list
+                                  (`EVE_ALLOWED_TYPES`) rather than discovered
+                                  from the feed, so every type is toggle-able
+                                  immediately rather than only after it has
+                                  fired once.
                                 */}
                                 {eventId === 'eveNotification' && hasScope && (
                                   <div className="border-t border-line bg-panel/60 pl-3">
                                     <p className="px-3 py-1.5 text-[0.6875rem] text-text-dim">
                                       {t('settings.notifications.eveTypesHint')}
                                     </p>
-                                    {knownEveTypes.length === 0 ? (
-                                      <p className="px-3 pb-2 text-[0.6875rem] text-text-faint">
-                                        {t('settings.notifications.eveTypesEmpty')}
-                                      </p>
-                                    ) : (
-                                      <ul className="divide-y divide-line/60">
-                                        {knownEveTypes.map((type) => (
-                                          <li
-                                            key={type}
-                                            className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
-                                          >
-                                            <span className="truncate text-text-dim">{type}</span>
-                                            <div className="grid shrink-0 grid-cols-2 gap-x-6">
-                                              {NOTIFICATION_CHANNELS.map((channel) => (
-                                                <ChannelCheckbox
-                                                  key={channel}
-                                                  channel={channel}
-                                                  eventLabel={type}
-                                                  enabled={
-                                                    !(channel === 'browser' && browserBlocked)
-                                                  }
-                                                  disabledReason={null}
-                                                  checked={isEveTypeEnabledFor(
-                                                    eveTypePrefs,
-                                                    type,
-                                                    channel
-                                                  )}
-                                                  onToggle={() =>
-                                                    void setPrefsValue(
-                                                      withEveNotificationTypeToggled(
-                                                        prefsValue,
-                                                        character.characterId,
-                                                        type,
-                                                        channel
-                                                      )
+                                    <ul className="divide-y divide-line/60">
+                                      {EVE_ALLOWED_TYPES.map((type) => (
+                                        <li
+                                          key={type}
+                                          className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
+                                        >
+                                          <span className="truncate text-text-dim">{type}</span>
+                                          <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                                            {NOTIFICATION_CHANNELS.map((channel) => (
+                                              <ChannelCheckbox
+                                                key={channel}
+                                                channel={channel}
+                                                eventLabel={type}
+                                                enabled={!(channel === 'browser' && browserBlocked)}
+                                                disabledReason={null}
+                                                checked={isEveTypeEnabledFor(
+                                                  eveTypePrefs,
+                                                  type,
+                                                  channel
+                                                )}
+                                                onToggle={() =>
+                                                  void setPrefsValue(
+                                                    withEveNotificationTypeToggled(
+                                                      prefsValue,
+                                                      character.characterId,
+                                                      type,
+                                                      channel
                                                     )
-                                                  }
-                                                />
-                                              ))}
-                                            </div>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    )}
+                                                  )
+                                                }
+                                              />
+                                            ))}
+                                          </div>
+                                        </li>
+                                      ))}
+                                    </ul>
                                   </div>
                                 )}
                               </li>
