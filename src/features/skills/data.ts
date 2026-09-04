@@ -142,10 +142,46 @@ export function loadUniverseType(typeId: number): Promise<CachedResult<UniverseT
  * typeIDs (ESI or cache) -> per-type dogma attributes (ESI or cache) -> summed
  * into one Implants map (engine's computeSchedule/optimizer input). Returns
  * `{}` when there's no implant data cached or fetchable (offline first-load).
+ *
+ * `loadUniverseType` is one live call per implant with no batch to fall back
+ * to (unlike typeNames.ts's POST /universe/names, which retries per-id after
+ * a *batch* failure and deliberately only for the failure kinds worth
+ * retrying): here, a single implant type failing for any reason — a 429
+ * esiFetch's own retry didn't clear, a dropped connection, a genuine 404 —
+ * used to drop that one implant's whole bonus from the sum with nothing on
+ * screen saying why. The character's sheet then reads as an unexplainable
+ * "impossible" baseline (engine/attributeBaseline.ts) instead of merely
+ * under-read. `loadWithCache` doesn't surface *why* a call failed, so this
+ * retries indiscriminately rather than narrowing by failure kind the way
+ * typeNames.ts does — deliberately: an implant list is small (usually under
+ * ten), so a wasted retry on a permanent 404 or while offline costs at most
+ * a handful of doomed requests, not the fan-out typeNames.ts is guarding
+ * against. One retry pass over whichever types came back empty (paced after
+ * the first pass rather than doubling every call up front) catches the
+ * transient case. A short pause before that retry, rather than firing it
+ * back-to-back with the first pass: a failure that survives esiFetch's own
+ * internal 429/420 retry (up to 10s) is a real rate-limit window, not a
+ * one-off blip, and retrying instantly into the same window would likely
+ * just fail again.
  */
+const IMPLANT_RETRY_DELAY_MS = 750;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function loadImplantBonuses(characterId: number): Promise<Implants> {
   const implants = await loadCharacterImplants(characterId);
   const typeIds = implants?.data ?? [];
-  const types = await Promise.all(typeIds.map((typeId) => loadUniverseType(typeId)));
+  if (typeIds.length === 0) return {};
+
+  let types = await Promise.all(typeIds.map((typeId) => loadUniverseType(typeId)));
+  const missing = typeIds.filter((_, i) => !types[i]);
+  if (missing.length > 0) {
+    await sleep(IMPLANT_RETRY_DELAY_MS);
+    const retried = await Promise.all(missing.map((typeId) => loadUniverseType(typeId)));
+    const retriedById = new Map(missing.map((typeId, i) => [typeId, retried[i]]));
+    types = types.map((t, i) => t ?? retriedById.get(typeIds[i]) ?? null);
+  }
   return sumAttributeBonuses(types.map((t) => extractAttributeBonuses(t?.data?.dogma_attributes)));
 }

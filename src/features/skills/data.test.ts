@@ -309,6 +309,95 @@ describe('loadImplantBonuses', () => {
     );
     expect(await loadImplantBonuses(CHAR_ID)).toEqual({});
   });
+
+  it('retries a single implant type that failed transiently, rather than silently dropping its bonus', async () => {
+    // Unlike typeNames.ts's POST /universe/names, loadUniverseType is one
+    // live call per implant with no batch-level fallback to fall back to: a
+    // single transient failure here used to drop that implant's whole bonus
+    // from the sum with nothing on screen saying why (the character's sheet
+    // then looks "impossible" instead of merely under-read).
+    let memoryTypeRequests = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/implants`, () =>
+        HttpResponse.json([10209, 9899])
+      ),
+      http.get(`${ESI_BASE_URL}/universe/types/10209`, () => {
+        memoryTypeRequests += 1;
+        if (memoryTypeRequests === 1) return HttpResponse.error();
+        return HttpResponse.json({
+          type_id: 10209,
+          name: 'Memory Augmentation - Improved',
+          description: '',
+          group_id: 745,
+          published: true,
+          dogma_attributes: [{ attribute_id: 177, value: 5.0 }],
+        });
+      }),
+      http.get(`${ESI_BASE_URL}/universe/types/9899`, () =>
+        HttpResponse.json({
+          type_id: 9899,
+          name: 'Ocular Filter - Basic',
+          description: '',
+          group_id: 300,
+          published: true,
+          dogma_attributes: [{ attribute_id: 178, value: 1.0 }],
+        })
+      )
+    );
+
+    expect(await loadImplantBonuses(CHAR_ID)).toEqual({ memory: 5, perception: 1 });
+    expect(memoryTypeRequests).toBe(2);
+  });
+
+  it('re-associates two simultaneously-failing implant types back to their own bonuses on retry, not to each other', async () => {
+    let memoryTypeRequests = 0;
+    let charismaTypeRequests = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/implants`, () =>
+        HttpResponse.json([10209, 9899, 20000])
+      ),
+      http.get(`${ESI_BASE_URL}/universe/types/10209`, () => {
+        memoryTypeRequests += 1;
+        if (memoryTypeRequests === 1) return HttpResponse.error();
+        return HttpResponse.json({
+          type_id: 10209,
+          name: 'Memory Augmentation - Improved',
+          description: '',
+          group_id: 745,
+          published: true,
+          dogma_attributes: [{ attribute_id: 177, value: 5.0 }],
+        });
+      }),
+      // Succeeds on the first pass, unlike the other two — a control proving
+      // the retry pass doesn't touch (or duplicate) an already-resolved type.
+      http.get(`${ESI_BASE_URL}/universe/types/9899`, () =>
+        HttpResponse.json({
+          type_id: 9899,
+          name: 'Ocular Filter - Basic',
+          description: '',
+          group_id: 300,
+          published: true,
+          dogma_attributes: [{ attribute_id: 178, value: 1.0 }],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/universe/types/20000`, () => {
+        charismaTypeRequests += 1;
+        if (charismaTypeRequests === 1) return HttpResponse.error();
+        return HttpResponse.json({
+          type_id: 20000,
+          name: 'Test Charisma Implant',
+          description: '',
+          group_id: 300,
+          published: true,
+          dogma_attributes: [{ attribute_id: 175, value: 3.0 }],
+        });
+      })
+    );
+
+    expect(await loadImplantBonuses(CHAR_ID)).toEqual({ memory: 5, perception: 1, charisma: 3 });
+    expect(memoryTypeRequests).toBe(2);
+    expect(charismaTypeRequests).toBe(2);
+  });
 });
 
 describe('loadUniverseType', () => {
