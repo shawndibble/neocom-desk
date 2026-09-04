@@ -19,6 +19,7 @@ import type {
   StationPinRecord,
   WhatIfImplantSelection,
 } from '@/db';
+import type { Attributes } from '@/engine/types';
 
 export const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -43,6 +44,7 @@ export interface RemotePlanDoc extends RemoteDoc {
   entries: SkillPlanRecord['entries'];
   remapCount: number;
   markers?: number[];
+  markerAttributes?: (Attributes | null)[];
   whatIfImplants?: WhatIfImplantSelection;
   booster?: PlanBooster;
 }

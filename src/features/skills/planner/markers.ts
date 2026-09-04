@@ -14,7 +14,7 @@
 import { arrayMove } from '@dnd-kit/sortable';
 import { normalizePlan, normalizePlanWithBoundaries } from '@/engine/plan';
 import type { RemapSegment } from '@/engine/optimizer';
-import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
+import type { Attributes, EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import { entryId } from './reorder';
 
 const MARKER_ID_PREFIX = 'marker-';
@@ -32,6 +32,38 @@ export function normalizeMarkers(
   return [...new Set((markers ?? []).map((m) => Math.min(entryCount, Math.max(0, m))))].sort(
     (a, b) => a - b
   );
+}
+
+/**
+ * `SkillPlanRecord.markerAttributes?`: the user's manually-set target
+ * attributes for a marker (set via the Remap Marker modal), addressed by the
+ * same ordinal as `markerRowId`/`onRemoveMarker`/`markerAttributesFor` — the
+ * app's one convention for naming "which marker", rather than a second
+ * identity scheme keyed by position. `null` (not a missing array slot) marks
+ * "no override" — every writer emits a dense array the same length as the
+ * normalized markers, which is what keeps Firestore's rejected `undefined`
+ * out of it, same reasoning as `PlanBooster`'s fields.
+ *
+ * Aligned to `normalizeMarkers`' own output: entry i of the result is the
+ * override for the marker now at `normalizeMarkers(markers, entryCount)[i]`.
+ * When two raw positions collapse onto the same normalized slot (entry
+ * removal can do this — see `markerAttributesAfterEntryRemoval`), the first
+ * one's override survives, the same "first write wins" a `Set` gives
+ * `normalizeMarkers` for the position itself.
+ */
+export function normalizeMarkerAttributes(
+  markers: readonly number[] | undefined,
+  attributes: readonly (Attributes | null)[] | undefined,
+  entryCount: number
+): (Attributes | null)[] {
+  const raw = markers ?? [];
+  const attrs = attributes ?? [];
+  const byPosition = new Map<number, Attributes | null>();
+  raw.forEach((m, i) => {
+    const position = Math.min(entryCount, Math.max(0, m));
+    if (!byPosition.has(position)) byPosition.set(position, attrs[i] ?? null);
+  });
+  return normalizeMarkers(markers, entryCount).map((position) => byPosition.get(position) ?? null);
 }
 
 export type PlanRow =
@@ -57,19 +89,40 @@ export function buildRows(
   return rows;
 }
 
+/** `rowsToState`'s result: the persisted entry/marker positions, plus `markerOrder` (see below). */
+export interface RowsToState {
+  entries: PlanEntry[];
+  markers: number[];
+  /**
+   * For each marker in `markers` (same order), the ordinal index it had in
+   * the marker list `buildRows` assigned `row.markerIndex` from — identity
+   * ([0, 1, 2, ...]) unless the drag reordered two markers relative to each
+   * other, the only way a marker's ordinal can change (an entry moving past
+   * a marker changes the marker's *position*, never its ordinal). A caller
+   * carrying per-marker data addressed by ordinal (manual remap attributes)
+   * uses this to move that data along with the marker it belongs to:
+   * `newMarkerAttributes = markerOrder.map((oldOrdinal) => oldMarkerAttributes[oldOrdinal])`.
+   */
+  markerOrder: number[];
+}
+
 /**
  * Derive the persisted shape back out of a (reordered) row list. Exported for
  * planDrop.ts, which builds row lists this module's own drags never produce —
  * one with a promoted prereq entry spliced in.
  */
-export function rowsToState(rows: readonly PlanRow[]): { entries: PlanEntry[]; markers: number[] } {
+export function rowsToState(rows: readonly PlanRow[]): RowsToState {
   const entries: PlanEntry[] = [];
   const markers: number[] = [];
+  const markerOrder: number[] = [];
   for (const row of rows) {
     if (row.kind === 'entry') entries.push(row.entry);
-    else markers.push(entries.length);
+    else {
+      markers.push(entries.length);
+      markerOrder.push(row.markerIndex);
+    }
   }
-  return { entries, markers };
+  return { entries, markers, markerOrder };
 }
 
 /**
@@ -89,12 +142,17 @@ export function reorderRows(
   markers: readonly number[] | undefined,
   activeId: string,
   overId: string
-): { entries: PlanEntry[]; markers: number[] } {
+): RowsToState {
   const rows = buildRows(entries, markers);
   const oldIndex = rows.findIndex((r) => r.id === activeId);
   const newIndex = rows.findIndex((r) => r.id === overId);
   if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
-    return { entries: [...entries], markers: normalizeMarkers(markers, entries.length) };
+    const normalized = normalizeMarkers(markers, entries.length);
+    return {
+      entries: [...entries],
+      markers: normalized,
+      markerOrder: normalized.map((_, i) => i),
+    };
   }
   return rowsToState(arrayMove(rows, oldIndex, newIndex));
 }
@@ -104,6 +162,19 @@ export function addMarker(markers: readonly number[] | undefined, entryCount: nu
   return normalizeMarkers([...(markers ?? []), entryCount], entryCount);
 }
 
+/** `addMarker`'s companion: the newly appended marker gets no override. */
+export function addMarkerAttributes(
+  markers: readonly number[] | undefined,
+  attributes: readonly (Attributes | null)[] | undefined,
+  entryCount: number
+): (Attributes | null)[] {
+  return normalizeMarkerAttributes(
+    [...(markers ?? []), entryCount],
+    [...(attributes ?? []), null],
+    entryCount
+  );
+}
+
 /** Remove the marker at `markerIndex` (an index into the normalized list). */
 export function removeMarker(
   markers: readonly number[] | undefined,
@@ -111,6 +182,18 @@ export function removeMarker(
   entryCount: number
 ): number[] {
   const normalized = normalizeMarkers(markers, entryCount);
+  normalized.splice(markerIndex, 1);
+  return normalized;
+}
+
+/** `removeMarker`'s companion: drop the override at the same normalized index. */
+export function removeMarkerAttributes(
+  markers: readonly number[] | undefined,
+  attributes: readonly (Attributes | null)[] | undefined,
+  markerIndex: number,
+  entryCount: number
+): (Attributes | null)[] {
+  const normalized = normalizeMarkerAttributes(markers, attributes, entryCount);
   normalized.splice(markerIndex, 1);
   return normalized;
 }
@@ -129,6 +212,23 @@ export function markersAfterEntryRemoval(
     (markers ?? []).map((m) => (m > entryIndex ? m - 1 : m)),
     entryCountBefore - 1
   );
+}
+
+/**
+ * `markersAfterEntryRemoval`'s companion. Removing an entry can make two
+ * markers land on the same shifted position — `normalizeMarkerAttributes`
+ * then keeps the earlier one's override, exactly like `markersAfterEntryRemoval`
+ * itself collapses the two positions into one marker.
+ */
+export function markerAttributesAfterEntryRemoval(
+  markers: readonly number[] | undefined,
+  attributes: readonly (Attributes | null)[] | undefined,
+  entryIndex: number,
+  entryCountBefore: number
+): (Attributes | null)[] {
+  if (entryIndex < 0) return normalizeMarkerAttributes(markers, attributes, entryCountBefore);
+  const shifted = (markers ?? []).map((m) => (m > entryIndex ? m - 1 : m));
+  return normalizeMarkerAttributes(shifted, attributes, entryCountBefore - 1);
 }
 
 /** An entry whose skill is missing from the catalog contributes no step — the same filter `normalizePlan`/computeQueue apply. Shared so markerStepIndices and segmentsToMarkers can't drift on what "missing from the catalog" means. */

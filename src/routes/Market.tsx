@@ -979,6 +979,7 @@ export function Market() {
                 </NativeSelect>
               )}
               <IconButton
+                size="sm"
                 icon={<Icon.Refresh />}
                 label={t('market.refresh')}
                 onClick={handleRefresh}

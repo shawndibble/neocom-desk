@@ -83,13 +83,18 @@ import {
 } from './reorder';
 import {
   addMarker,
+  addMarkerAttributes,
   buildRows,
+  markerAttributesAfterEntryRemoval,
   markerStepIndices,
   markersAfterEntryRemoval,
+  normalizeMarkerAttributes,
   removeMarker,
+  removeMarkerAttributes,
   segmentsToMarkers,
 } from './markers';
 import { planDrop, promotePrereq } from './planDrop';
+import { RemapMarkerModal } from './RemapMarkerModal';
 import { bandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
 import type { RemapAvailability } from './remapAvailability';
@@ -116,7 +121,10 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 /** The persisted fields the editor may change. */
 export type PlanPatch = Partial<
-  Pick<SkillPlanRecord, 'entries' | 'remapCount' | 'markers' | 'whatIfImplants' | 'booster'>
+  Pick<
+    SkillPlanRecord,
+    'entries' | 'remapCount' | 'markers' | 'markerAttributes' | 'whatIfImplants' | 'booster'
+  >
 >;
 
 interface PlanEditorProps {
@@ -272,6 +280,9 @@ export function PlanEditor({
   // into user data), so it says so too.
   const [dropError, setDropError] = useState<string | null>(null);
   const [promoteConfirm, setPromoteConfirm] = useState<string | null>(null);
+  // Which marker's manual attribute editor (RemapMarkerModal) is open, by
+  // ordinal — the same addressing `onRemoveMarker`/`markerAttributesFor` use.
+  const [editingMarkerIndex, setEditingMarkerIndex] = useState<number | null>(null);
 
   // The entry list is the only thing that scrolls independently: it gets a
   // live-measured cap so it fills the room actually left below it, while the
@@ -653,6 +664,10 @@ export function PlanEditor({
   function applySegmentsAsMarkers(segments: readonly RemapSegment[]) {
     onUpdate({
       markers: segmentsToMarkers(plan.entries, segments, catalog.engineSkills, trainedSkills),
+      // Wholesale replacement, not a diff against the old markers — any
+      // manual override the old markers carried is for a segmentation this
+      // search just discarded, so it has nothing left to attach to.
+      markerAttributes: [],
     });
   }
 
@@ -748,9 +763,31 @@ export function PlanEditor({
         : null,
     [markersAtCurrentPositions, plan.entries, plan.markers, catalog.engineSkills, trainedSkills]
   );
-  function markerAttributesFor(markerIndex: number): Attributes | undefined {
+  // Manual overrides (RemapMarkerModal), aligned to the current markers —
+  // recomputed here rather than trusted as-is, since `plan.markerAttributes`
+  // can be stale relative to `plan.markers` (a drag or removal touches one
+  // without necessarily touching the other in the same write).
+  const normalizedMarkerAttributes = useMemo(
+    () => normalizeMarkerAttributes(plan.markers, plan.markerAttributes, plan.entries.length),
+    [plan.markers, plan.markerAttributes, plan.entries.length]
+  );
+
+  /** What "Optimize at my markers" computes for this marker, ignoring any manual override — RemapMarkerModal needs this half on its own so it can seed a fresh edit from the optimizer's spread without that spread being mistaken for an existing override. */
+  function computedMarkerAttributesFor(markerIndex: number): Attributes | undefined {
     const stepIndex = markerStepIndicesForResult?.[markerIndex];
     return stepIndex === undefined ? undefined : markerAttributesByStepIndex?.get(stepIndex);
+  }
+
+  /** A manual override always wins — it is the user overriding the optimizer, not the other way around. */
+  function markerAttributesFor(markerIndex: number): Attributes | undefined {
+    return normalizedMarkerAttributes[markerIndex] ?? computedMarkerAttributesFor(markerIndex);
+  }
+
+  /** RemapMarkerModal's Save/Clear: set (or clear, via `null`) marker `markerIndex`'s manual override. */
+  function handleSaveMarkerAttributes(markerIndex: number, attributes: Attributes | null) {
+    const next = [...normalizedMarkerAttributes];
+    next[markerIndex] = attributes;
+    onUpdate({ markerAttributes: next });
   }
 
   /** "{Skill} III" — how a promoted prereq is named back to the user. */
@@ -769,6 +806,11 @@ export function PlanEditor({
    * normalizer would silently undo, which is refused with the entry that
    * requires the dragged skill named rather than springing back unexplained.
    */
+  /** `markerOrder` names, per new marker, which old ordinal it was — see `RowsToState`. */
+  function reorderedMarkerAttributes(markerOrder: readonly number[]): (Attributes | null)[] {
+    return markerOrder.map((oldOrdinal) => normalizedMarkerAttributes[oldOrdinal] ?? null);
+  }
+
   function handleDrop(activeId: string, overId: string) {
     const result = planDrop({
       entries: plan.entries,
@@ -789,7 +831,11 @@ export function PlanEditor({
       return;
     }
     setDropError(null);
-    onUpdate({ entries: result.entries, markers: result.markers });
+    onUpdate({
+      entries: result.entries,
+      markers: result.markers,
+      markerAttributes: reorderedMarkerAttributes(result.markerOrder),
+    });
     if (result.promoted) confirmPromotion(result.promoted.skillTypeID, result.promoted.level);
   }
 
@@ -803,13 +849,24 @@ export function PlanEditor({
     });
     if (!result) return;
     setDropError(null);
-    onUpdate({ entries: result.entries, markers: result.markers });
+    onUpdate({
+      entries: result.entries,
+      markers: result.markers,
+      markerAttributes: reorderedMarkerAttributes(result.markerOrder),
+    });
     const row = mergedRows.find((r) => r.id === rowId);
     if (row?.kind === 'prereq') confirmPromotion(row.step.skillTypeID, row.step.level);
   }
 
   function handleAddMarker() {
-    onUpdate({ markers: addMarker(plan.markers, plan.entries.length) });
+    onUpdate({
+      markers: addMarker(plan.markers, plan.entries.length),
+      markerAttributes: addMarkerAttributes(
+        plan.markers,
+        plan.markerAttributes,
+        plan.entries.length
+      ),
+    });
     setMarkerConfirm(true);
     setTimeout(() => setMarkerConfirm(false), 2000);
   }
@@ -1399,6 +1456,12 @@ export function PlanEditor({
                               entryIndex,
                               plan.entries.length
                             ),
+                            markerAttributes: markerAttributesAfterEntryRemoval(
+                              plan.markers,
+                              plan.markerAttributes,
+                              entryIndex,
+                              plan.entries.length
+                            ),
                           }
                         : {}),
                     });
@@ -1406,9 +1469,16 @@ export function PlanEditor({
                   onRemoveMarker={(markerIndex) =>
                     onUpdate({
                       markers: removeMarker(plan.markers, markerIndex, plan.entries.length),
+                      markerAttributes: removeMarkerAttributes(
+                        plan.markers,
+                        plan.markerAttributes,
+                        markerIndex,
+                        plan.entries.length
+                      ),
                     })
                   }
                   markerAttributesFor={markerAttributesFor}
+                  onEditMarker={setEditingMarkerIndex}
                   onSetPriority={(skillTypeID, priority) =>
                     update(setEntryPriority(plan.entries, skillTypeID, priority))
                   }
@@ -1559,6 +1629,23 @@ export function PlanEditor({
         onAccept: acceptOptimizeAtMarkers,
         onClose: rejectOptimizeAtMarkers,
       })}
+
+      <RemapMarkerModal
+        open={editingMarkerIndex !== null}
+        onClose={() => setEditingMarkerIndex(null)}
+        override={
+          editingMarkerIndex === null
+            ? null
+            : (normalizedMarkerAttributes[editingMarkerIndex] ?? null)
+        }
+        computed={
+          editingMarkerIndex === null ? undefined : computedMarkerAttributesFor(editingMarkerIndex)
+        }
+        baseline={attributes}
+        onSave={(next) => {
+          if (editingMarkerIndex !== null) handleSaveMarkerAttributes(editingMarkerIndex, next);
+        }}
+      />
     </>
   );
 }

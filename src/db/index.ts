@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Implants, PlanEntry } from '@/engine/types';
+import type { Attributes, Implants, PlanEntry } from '@/engine/types';
 import type {
   FacilityKind,
   MaterialSourcing,
@@ -101,6 +101,17 @@ export interface SkillPlanRecord {
    * additive — not indexed, so no Dexie schema version bump is needed.
    */
   markers?: number[];
+  /**
+   * Manual target-attribute overrides for markers, set via the Remap Marker
+   * modal. Addressed by the same ordinal as `markers` once normalized
+   * (`features/skills/planner/markers.ts`'s `normalizeMarkerAttributes`), not
+   * by position — `null` marks "no override" (the marker shows whatever
+   * "Optimize at my markers" last computed for it, if anything). Optional and
+   * additive, like `markers` itself — absent means no marker has ever been
+   * edited manually, and every writer emits a dense array so an
+   * `undefined` element (which Firestore rejects) never appears.
+   */
+  markerAttributes?: (Attributes | null)[];
   /**
    * What-If Implants lens the plan is costed under. Optional and additive —
    * absent means the clone's real implants ('current'), which is how every

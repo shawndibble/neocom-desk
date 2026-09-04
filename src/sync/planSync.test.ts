@@ -515,6 +515,9 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     entries: [{ skillTypeID: 3327, targetLevel: 5, priority: 'high' }],
     remapCount: 2,
     markers: [1],
+    markerAttributes: [
+      { intelligence: 17, memory: 17, perception: 27, willpower: 21, charisma: 17 },
+    ],
     whatIfImplants: { kind: 'preset', preset: '+4' },
     booster: { enabled: true, bonus: 6, expiresAt: 4_102_444_800_000 },
     updatedAt: Date.now() - 1000,
@@ -543,6 +546,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       'characterId',
       'entries',
       'id',
+      'markerAttributes',
       'markers',
       'name',
       'remapCount',

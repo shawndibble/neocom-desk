@@ -592,18 +592,25 @@ function PrereqRow({
 interface MarkerRowProps {
   id: string;
   markerIndex: number;
-  /** This marker's target attribute spread, once "Optimize at my markers" has run. */
+  /** This marker's target attribute spread — a manual override, or "Optimize at my markers"' result, once either is known. */
   attributes?: Attributes;
   onRemove: (markerIndex: number) => void;
+  /** Opens the manual attribute editor (RemapMarkerModal) for this marker. */
+  onEdit: (markerIndex: number) => void;
 }
 
 /**
  * Remap Marker (CONTEXT.md): accent divider row, draggable like an entry.
- * Once its target attributes are known (an "Optimize at my markers" run),
- * the divider gives way to the spread itself — a plainer divider left the
- * marker saying only *that* a remap happens here, not what to set.
+ * Once its target attributes are known (a manual edit, or an "Optimize at my
+ * markers" run), the divider gives way to the spread itself and the "REMAP
+ * MARKER" label drops out entirely — the numbers already say what this row
+ * is, and repeating the label next to them read as clutter. A plain marker
+ * (nothing known yet) keeps the dividers and the label, same as always.
+ * Either way the label/spread is a real button, not a click handler on the
+ * `<li>`, so it doesn't fight the drag handle or the remove button for the
+ * row's clicks: clicking it opens the manual attribute editor.
  */
-function MarkerRow({ id, markerIndex, attributes, onRemove }: MarkerRowProps) {
+function MarkerRow({ id, markerIndex, attributes, onRemove, onEdit }: MarkerRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(id);
 
@@ -624,14 +631,23 @@ function MarkerRow({ id, markerIndex, attributes, onRemove }: MarkerRowProps) {
         ⠿
       </button>
       {attributes ? (
-        <>
-          <span className="font-semibold uppercase tracking-wide">{t('plans.markerRow')}</span>
-          <span className="flex-1 truncate tabular-nums">{remapInstruction(attributes)}</span>
-        </>
+        <button
+          type="button"
+          onClick={() => onEdit(markerIndex)}
+          className="flex-1 truncate text-left tabular-nums hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        >
+          {remapInstruction(attributes)}
+        </button>
       ) : (
         <>
           <span aria-hidden className="h-px flex-1 bg-accent/60" />
-          <span className="font-semibold uppercase tracking-wide">{t('plans.markerRow')}</span>
+          <button
+            type="button"
+            onClick={() => onEdit(markerIndex)}
+            className="font-semibold tracking-wide uppercase hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          >
+            {t('plans.markerRow')}
+          </button>
           <span aria-hidden className="h-px flex-1 bg-accent/60" />
         </>
       )}
@@ -667,6 +683,8 @@ interface EntryListProps {
   onRemoveMarker: (markerIndex: number) => void;
   /** A marker's target attribute spread, once known. Undefined when no "Optimize at my markers" result covers it yet. */
   markerAttributesFor?: (markerIndex: number) => Attributes | undefined;
+  /** Opens the manual attribute editor (RemapMarkerModal) for a marker. */
+  onEditMarker: (markerIndex: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
   /** Turn a derived prereq row into a real entry where it already sits (CONTEXT.md "Prereq Promotion"). */
   onPromotePrereq: (rowId: string) => void;
@@ -699,6 +717,7 @@ export function EntryList({
   onRemove,
   onRemoveMarker,
   markerAttributesFor,
+  onEditMarker,
   onSetPriority,
   onPromotePrereq,
 }: EntryListProps) {
@@ -793,6 +812,7 @@ export function EntryList({
                       markerIndex={row.markerIndex}
                       attributes={markerAttributesFor?.(row.markerIndex)}
                       onRemove={onRemoveMarker}
+                      onEdit={onEditMarker}
                     />
                   )}
                 </Fragment>

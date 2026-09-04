@@ -206,6 +206,15 @@
     "markerRow": "Remap marker",
     "removeMarker": "Remove marker",
     "reorderMarker": "Reorder remap marker",
+    "markerAttributesModalTitle": "Remap marker attributes",
+    "markerAttributesModalHint": "Set the attributes this remap should target. Every point spent on one attribute comes off another — a legal remap always totals {{total}}, {{min}}–{{max}} per attribute.",
+    "markerAttributesRemaining_one": "{{count}} point left to allocate",
+    "markerAttributesRemaining_other": "{{count}} points left to allocate",
+    "markerAttributesOverBudget_one": "{{count}} point over budget — lower another attribute first",
+    "markerAttributesOverBudget_other": "{{count}} points over budget — lower another attribute first",
+    "markerAttributesOutOfRange": "One or more attributes are outside {{min}}–{{max}}",
+    "markerAttributesSave": "Save",
+    "markerAttributesClear": "Clear override",
     "markersNoGain": "Remapping at these markers doesn't save time — try moving them.",
     "markersAtEnd": "Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.",
     "optimizeConfirmMarkersAtEnd": "No marker splits the plan",
@@ -1426,7 +1435,6 @@
     "quickbar": {
       "title": "Quickbar",
       "empty": "No items yet — right-click an item and choose Add to Quickbar.",
-      "remove": "Remove",
       "removeItem": "Remove {{name}} from Quickbar",
       "reorderItem": "Reorder {{name}}"
     },
