@@ -2263,42 +2263,68 @@ offeredScopes: Record<number, readonly Scope[]> }`. Round 37's "offered once
   string before checking a route is real, since `ROUTE_REQUIREMENTS` keys are
   bare paths.
 
-## Scope decisions (round 49) — Shared Public Info Modal
+## Scope decisions (round 49) — Public Info Modal, Skill Detail popover, and a codebase-wide improvement pass
 
-- **A single, cross-feature `PublicInfoModal` (`src/components/PublicInfoModal.tsx`)
-  replaces "link to Contacts" as the way a view lets you look up another
-  Character, Corporation, or Alliance you are not necessarily tracking as a
-  Contact.** Contacts, Corp Members, and Contracts (separate follow-up
-  tickets) each currently have no sane target for "who is this?" unless the
-  entity already happens to be a saved Contact — this modal is the general
-  answer, opened by id + kind (`character` | `corporation` | `alliance`) from
-  any feature via `openPublicInfoModal(kind, id)` /
-  `usePublicInfoModal().open(kind, id)` (`src/stores/publicInfoModal.ts`).
-  A feature adopting this rule swaps its "open Contacts" affordance for
-  "open this modal" — it does not require the looked-up entity to become a
-  Contact as a side effect.
+Following a page-by-page improvement audit, ~24 GitHub issues were opened
+covering context-menu additions, cross-page links, performance, filters, and
+UI/polish across every route. Two new shared components fell out of that
+review and are recorded here so the tickets that consume them agree on shape
+rather than each inventing its own:
+
+- **Public Info Modal.** A tabbed, read-only modal showing another entity's
+  public ESI info — Character (portrait, name, corp/alliance, security
+  status), Corporation (name, ticker, member count, alliance), Alliance (name,
+  ticker) — fed by the existing scope-free public endpoints
+  (`/characters/{id}/`, `/corporations/{id}/`, `/alliances/{id}/`; no new
+  scope, no consent-screen change). **Rule going forward: any action that
+  today would "link to Contacts" or "link to /corp" to show what an entity
+  is, where that entity is not guaranteed to already be a saved Contact or
+  the user's own corp, opens this modal instead of navigating away.** Contacts
+  itself opens it from a "Show Info" row action; Corp Members opens it in
+  place of a Contacts link (a fellow corp member is not necessarily one of
+  your Contacts); a contract's issuer likewise opens it rather than linking
+  to Contacts. Employment History's link to the character's _own current_
+  corp is unaffected — that's `/corp`, a real owned section, not a
+  third-party lookup.
+- **Skill Detail popover.** A small shared component (a modal or a rich
+  tooltip — implementer's choice, not prescribed) showing one skill's
+  description, unlocks, and prerequisite skills. Replaces two places that
+  would otherwise navigate to a different route just to show read-only detail
+  about a skill: Skills' own unlocks/prerequisites links, and Skill Plan
+  Editor's skill-name links. Both should reuse the same component rather than
+  building their own.
+- **The Assets → Industry "view as material" context-menu action keys off
+  `type_id`, not the row's per-stack `item_id`.** A Build Plan's materials
+  list is matched by SDE type (a blueprint needs N units of _type_ X), not by
+  a specific inventory item instance, so `item_id` would be the wrong key
+  entirely — asked and settled during the audit review. The same context
+  menu also gets a plain "Copy Type ID" action alongside "Copy Name" while
+  it's being touched.
+
+## Implementation notes (round 50) — Public Info Modal (issue #399)
+
+Round 49 above set the shape and the going-forward rule; this round records
+the choices its first implementation actually made, for the Contacts/Corp
+Members/Contracts tickets that adopt it next:
+
 - **Global Zustand signal store, not local `selected` state.** Every other
   detail modal in this repo (`ContractDetailModal`, `ItemDetailModal`,
   `EventDetailModal`) is opened by one route's own local state, because only
   that route ever opens it. This modal is opened from several unrelated
   features sharing one instance, so it follows `stores/authFailure.ts`'s
-  shape instead: a store holds `request: { kind, id } | null`, and
-  `PublicInfoModal` — mounted once in `App.tsx` beside `WhatsNewPanel` — is
-  the only place that renders it.
-- **No new ESI scope, no registry entry.** `/characters/{id}`,
-  `/corporations/{id}`, and `/alliances/{id}` were already registered as
-  `PUBLIC` (unauthenticated) endpoints before this round; the modal calls
-  them exactly as `getCharacterPublicInfo`/`getCorporationPublicInfo`/
-  `getAlliancePublicInfo` already existed.
+  shape instead: `src/stores/publicInfoModal.ts` holds
+  `request: { kind, id } | null`, and `PublicInfoModal` — mounted once in
+  `App.tsx` beside `WhatsNewPanel` — is the only place that renders it. A
+  feature opens it via `openPublicInfoModal(kind, id)` or
+  `usePublicInfoModal().open(kind, id)`.
 - **Cached like `stations.ts`, not like `stores/publicInfo.ts`.** The
   existing `publicInfo.ts` store only caches `{ corporationName,
 allianceName }` strings for the signed-in Character's own header and is
   not reused here — this modal needs the fuller record (ticker, member
-  count, CEO) for an arbitrary looked-up entity. The new
-  `features/character/publicInfoData.ts` instead read-throughs
-  `esi/cache.ts` under the global cache sentinel with `STALE_AFTER.static`,
-  the same choice already made for other public, rarely-changing lookups
-  (station/structure names).
+  count, CEO) for an arbitrary looked-up entity. `features/character/
+publicInfoData.ts` instead read-throughs `esi/cache.ts` under the global
+  cache sentinel with `STALE_AFTER.static`, the same choice already made for
+  other public, rarely-changing lookups (station/structure names).
 - **CEO name resolves via `resolveNames` (`POST /universe/names`)**, not a
   second `getCharacterPublicInfo` call — `CorporationPublicInfo` only carries
   `ceo_id`, and a name is all the Corporation tab needs.

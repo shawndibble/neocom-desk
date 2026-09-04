@@ -1,5 +1,5 @@
 /**
- * Shared, read-only public-info lookup (CONTEXT.md round 49): a tabbed
+ * Shared, read-only public-info lookup (CONTEXT.md rounds 49-50): a tabbed
  * Character / Corporation / Alliance view any feature can open by id + kind,
  * via `openPublicInfoModal`/`usePublicInfoModal` (`stores/publicInfoModal.ts`).
  * Mounted once in `App.tsx` — same "always mounted, driven by a global

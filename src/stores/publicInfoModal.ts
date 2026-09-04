@@ -3,7 +3,7 @@
  * feature (Contacts, Corp Members, Contracts, …) without threading modal
  * state through each one. Same shape as `authFailure.ts`: a global store
  * holds the current request, and `PublicInfoModal` — mounted once in
- * `App.tsx` — renders it. See CONTEXT.md round 49.
+ * `App.tsx` — renders it. See CONTEXT.md rounds 49-50.
  */
 import { create } from 'zustand';
 
