@@ -15,6 +15,7 @@ export { Tooltip, InfoTooltip } from './Tooltip';
 export { IconButton } from './IconButton';
 export { ReauthBanner } from './ReauthBanner';
 export { SkillBar } from './SkillBar';
+export { StandingBar } from './StandingBar';
 export { Modal } from './Modal';
 export type { ModalPlacement } from './Modal';
 export { DataTable } from './DataTable';

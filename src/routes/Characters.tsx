@@ -10,7 +10,9 @@ import {
   EmptyState,
   FilterChip,
   IconButton,
+  Modal,
   PageHeader,
+  SearchInput,
   Select,
   SelectContent,
   SelectItem,
@@ -280,11 +282,28 @@ export function Characters() {
   const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
+  const [search, setSearch] = useState('');
+  const [removingCharacter, setRemovingCharacter] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [deferredNoticeName, setDeferredNoticeName] = useState<string | null>(null);
 
   const charactersById = useMemo(
     () => new Map((characters ?? []).map((character) => [character.characterId, character])),
     [characters]
   );
+
+  const query = search.trim().toLowerCase();
+  function matchesSearch(characterId: number): boolean {
+    if (!query) return true;
+    const character = charactersById.get(characterId);
+    const corpName = publicInfo[characterId]?.corporationName ?? '';
+    return (
+      (character?.name.toLowerCase().includes(query) ?? false) ||
+      corpName.toLowerCase().includes(query)
+    );
+  }
 
   useEffect(() => {
     void hydrateGroups();
@@ -361,10 +380,16 @@ export function Characters() {
     navigate('/overview');
   }
 
-  async function handleRemoveCharacter(characterId: number, name: string) {
-    if (!window.confirm(t('characters.removeConfirm', { name }))) return;
-    const { remotePurged } = await removeCharacter(characterId, isSyncConfigured());
-    if (!remotePurged) window.alert(t('characters.removeDeferredNotice', { name }));
+  function requestRemoveCharacter(characterId: number, name: string) {
+    setRemovingCharacter({ id: characterId, name });
+  }
+
+  async function confirmRemoveCharacter() {
+    if (!removingCharacter) return;
+    const { id, name } = removingCharacter;
+    setRemovingCharacter(null);
+    const { remotePurged } = await removeCharacter(id, isSyncConfigured());
+    if (!remotePurged) setDeferredNoticeName(name);
   }
 
   async function handleMoveToGroup(characterId: number, groupId: string | null) {
@@ -411,7 +436,15 @@ export function Characters() {
   }
 
   function renderCharacterList(characterIds: readonly number[]) {
-    const sortedIds = sortCharacterIds(characterIds, stats, sortKey, sortDirection);
+    // A group (or the ungrouped section) that the filter emptied just shows
+    // nothing here — repeating a "no matches" line under every such section
+    // would be noise once any other section still has results. The one case
+    // worth telling the user about, the whole roster coming up empty, is
+    // handled once, above every section, by the caller.
+    const filteredIds = characterIds.filter((characterId) => matchesSearch(characterId));
+    if (filteredIds.length === 0) return null;
+
+    const sortedIds = sortCharacterIds(filteredIds, stats, sortKey, sortDirection);
     return (
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {sortedIds.map((characterId) => {
@@ -427,7 +460,7 @@ export function Characters() {
               groupId={groupIdByCharacterId.get(characterId) ?? null}
               onSelect={(id) => void select(id)}
               onMoveToGroup={(id, groupId) => void handleMoveToGroup(id, groupId)}
-              onRemove={(id, name) => void handleRemoveCharacter(id, name)}
+              onRemove={(id, name) => requestRemoveCharacter(id, name)}
             />
           );
         })}
@@ -445,6 +478,7 @@ export function Characters() {
 
   const allIds = characters.map((character) => character.characterId);
   const ungroupedIds = ungroupedCharacterIds(groupsValue.groups, allIds);
+  const noSearchMatches = query.length > 0 && !allIds.some((id) => matchesSearch(id));
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -468,6 +502,11 @@ export function Characters() {
         <EmptyState title={t('characters.emptyTitle')} hint={t('characters.emptyHint')} />
       ) : (
         <>
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('characters.searchPlaceholder')}
+          />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <Select
@@ -526,38 +565,75 @@ export function Characters() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            {groupsValue.groups.map((group, index) => (
-              <section key={group.id} className="space-y-2">
-                <GroupSectionHeader
-                  group={group}
-                  index={index}
-                  groupCount={groupsValue.groups.length}
-                  onRename={(id, name) => void handleRenameGroup(id, name)}
-                  onRemove={(id) => void handleRemoveGroup(id)}
-                  onMove={(index2, direction) => void handleMoveGroup(index2, direction)}
-                />
-                {group.characterIds.length === 0 ? (
-                  <p className="text-xs text-text-dim">{t('characters.emptyGroup')}</p>
-                ) : (
-                  renderCharacterList(group.characterIds)
-                )}
-              </section>
-            ))}
+          {noSearchMatches ? (
+            <EmptyState title={t('characters.noSearchMatches')} />
+          ) : (
+            <div className="space-y-4">
+              {groupsValue.groups.map((group, index) => (
+                <section key={group.id} className="space-y-2">
+                  <GroupSectionHeader
+                    group={group}
+                    index={index}
+                    groupCount={groupsValue.groups.length}
+                    onRename={(id, name) => void handleRenameGroup(id, name)}
+                    onRemove={(id) => void handleRemoveGroup(id)}
+                    onMove={(index2, direction) => void handleMoveGroup(index2, direction)}
+                  />
+                  {group.characterIds.length === 0 ? (
+                    <p className="text-xs text-text-dim">{t('characters.emptyGroup')}</p>
+                  ) : (
+                    renderCharacterList(group.characterIds)
+                  )}
+                </section>
+              ))}
 
-            {(groupsValue.groups.length === 0 || ungroupedIds.length > 0) && (
-              <section className="space-y-2">
-                {groupsValue.groups.length > 0 && (
-                  <h2 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
-                    {t('characters.ungrouped')}
-                  </h2>
-                )}
-                {renderCharacterList(ungroupedIds)}
-              </section>
-            )}
-          </div>
+              {(groupsValue.groups.length === 0 || ungroupedIds.length > 0) && (
+                <section className="space-y-2">
+                  {groupsValue.groups.length > 0 && (
+                    <h2 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
+                      {t('characters.ungrouped')}
+                    </h2>
+                  )}
+                  {renderCharacterList(ungroupedIds)}
+                </section>
+              )}
+            </div>
+          )}
         </>
       )}
+
+      <Modal
+        open={removingCharacter !== null}
+        onClose={() => setRemovingCharacter(null)}
+        title={t('characters.remove')}
+      >
+        <p className="text-xs text-text-dim">
+          {removingCharacter && t('characters.removeConfirm', { name: removingCharacter.name })}
+        </p>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button size="sm" onClick={() => setRemovingCharacter(null)}>
+            {t('characters.cancel')}
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => void confirmRemoveCharacter()}>
+            {t('characters.remove')}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={deferredNoticeName !== null}
+        onClose={() => setDeferredNoticeName(null)}
+        title={t('characters.removeDeferredNoticeTitle')}
+      >
+        <p className="text-xs text-text-dim">
+          {deferredNoticeName && t('characters.removeDeferredNotice', { name: deferredNoticeName })}
+        </p>
+        <div className="mt-3 flex justify-end">
+          <Button size="sm" onClick={() => setDeferredNoticeName(null)}>
+            {t('characters.ok')}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

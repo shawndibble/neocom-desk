@@ -55,6 +55,19 @@ describe('deriveEmploymentHistoryRows', () => {
   it('returns an empty list for no entries', () => {
     expect(deriveEmploymentHistoryRows([], Date.now())).toEqual([]);
   });
+
+  it('flags only the most recent row as ongoing', () => {
+    const now = new Date('2026-06-01T00:00:00Z').getTime();
+    const rows = deriveEmploymentHistoryRows(
+      [ENTRY(1, 100, '2025-01-01T00:00:00Z'), ENTRY(2, 200, '2026-01-01T00:00:00Z')],
+      now
+    );
+
+    expect(rows.map((r) => ({ recordId: r.recordId, ongoing: r.ongoing }))).toEqual([
+      { recordId: 2, ongoing: true },
+      { recordId: 1, ongoing: false },
+    ]);
+  });
 });
 
 describe('loadEmploymentHistory', () => {

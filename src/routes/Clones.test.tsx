@@ -26,6 +26,8 @@ const CHAR_ID = 91;
 const ESI = 'https://esi.evetech.net';
 
 const clonesPayload = {
+  home_location: { location_id: 60003760, location_type: 'station' as const },
+  last_station_change_date: '2025-06-01T00:00:00Z',
   jump_clones: [
     {
       jump_clone_id: 1,
@@ -135,11 +137,25 @@ describe('Clones', () => {
   it('lists jump clones with resolved location and implant names, and the cooldown', async () => {
     render(<App />);
     expect(
-      await screen.findByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant')
-    ).toBeInTheDocument();
+      await screen.findAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant')
+    ).not.toHaveLength(0);
     expect(screen.getByText('High-grade Ascendancy Alpha')).toBeInTheDocument();
     expect(screen.getByText('No implants')).toBeInTheDocument();
-    expect(screen.getByText(/On cooldown until/)).toBeInTheDocument();
+    expect(screen.getByText(/Until/)).toBeInTheDocument();
+  });
+
+  it('surfaces the home station and last jump-clone-change date', async () => {
+    render(<App />);
+    await screen.findByText('High-grade Ascendancy Alpha');
+    // Home station shares its id with a jump clone, so its name resolves
+    // from the same batch — appearing once in the home-location line and
+    // again in the jump-clone table row.
+    expect(
+      screen.getAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant').length
+    ).toBeGreaterThan(1);
+    expect(
+      screen.getByText(new Date('2025-06-01T00:00:00Z').toLocaleString(), { exact: false })
+    ).toBeInTheDocument();
   });
 
   it('still resolves implant names via the per-id fallback when the names batch is rate-limited', async () => {
@@ -169,7 +185,7 @@ describe('Clones', () => {
 
   it('renders a clone in an inaccessible structure as an id fallback, without a re-auth banner', async () => {
     render(<App />);
-    await screen.findByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+    await screen.findAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
     expect(screen.getByText('Structure #1000000000002')).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your clones')).not.toBeInTheDocument();
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -234,14 +234,15 @@ describe('Characters', () => {
   });
 
   it('removes a character after confirmation, deleting its Dexie rows', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     renderCharacters();
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    expect(dialog).toHaveTextContent('Pilot One');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Pilot One'));
     await waitFor(() => expect(screen.queryByText('Pilot One')).not.toBeInTheDocument());
     // Folded into waitFor rather than a bare `await db.characters.get(91)`:
     // a raw Dexie read after the DOM settles still leaves room for a
@@ -252,45 +253,71 @@ describe('Characters', () => {
   });
 
   it('keeps the character when the removal confirmation is declined', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     const user = userEvent.setup();
     renderCharacters();
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
     expect(await db.characters.get(91)).toBeDefined();
     expect(screen.getByText('Pilot One')).toBeInTheDocument();
   });
 
   it('reassigns the active character when the removed one was active', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     await useActiveCharacter.getState().setActiveCharacter(91);
     const user = userEvent.setup();
     renderCharacters();
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
   });
 
-  it('alerts when the remote purge is deferred', async () => {
+  it('shows a deferred-sync notice when the remote purge is deferred', async () => {
     const removeCharacterModule = await import('@/features/character/removeCharacter');
     vi.spyOn(removeCharacterModule, 'removeCharacter').mockResolvedValueOnce({
       remotePurged: false,
     });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    vi.spyOn(window, 'alert').mockImplementation(() => {});
     const user = userEvent.setup();
     renderCharacters();
     await screen.findByText('Pilot One');
 
     await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
-    await waitFor(() =>
-      expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('Pilot One'))
-    );
+    const notice = await screen.findByRole('dialog', { name: 'Sync deferred' });
+    expect(notice).toHaveTextContent('Pilot One');
+  });
+
+  it('filters the roster by name or corporation', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+    // Pilot Two's public-info fetch fails (character 92 simulates offline),
+    // so only Pilot One ever gets a resolved corp name to search on.
+    await screen.findByText('Test Corp');
+
+    const search = screen.getByPlaceholderText('Search by name or corporation');
+    await user.type(search, 'Pilot One');
+    expect(screen.getByText('Pilot One')).toBeInTheDocument();
+    expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, 'Test Corp');
+    expect(screen.getByText('Pilot One')).toBeInTheDocument();
+    expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, 'no such pilot');
+    expect(screen.queryByText('Pilot One')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
+    expect(screen.getByText('No characters match this search.')).toBeInTheDocument();
   });
 
   it('drops a character from its group once the character no longer exists', async () => {
