@@ -21,6 +21,8 @@ import {
   ArrowUp,
   ArrowsDownUp,
   ArrowsLeftRight,
+  Bell,
+  BellSlash,
   CaretDown,
   CaretLeft,
   CaretRight,
@@ -32,6 +34,7 @@ import {
   DotsThreeVertical,
   DownloadSimple,
   EnvelopeSimple,
+  EyeSlash,
   Export as ExportIcon,
   Factory,
   Flag,
@@ -143,6 +146,12 @@ export const Build = withWeight(Hammer);
 export const Buy = withWeight(ShoppingCart);
 /** Promote a derived prereq row into a real Skill Plan entry (CONTEXT.md "Prereq Promotion"). */
 export const AddToPlan = withWeight(Plus);
+/** A row's browser-notification channel is currently on (issue #364). */
+export const BrowserNotifyOn = withWeight(Bell);
+/** A row's browser-notification channel is currently off (issue #364). */
+export const BrowserNotifyOff = withWeight(BellSlash);
+/** Hide a Notification Feed row's type from the feed (issue #364) — one-way from here, reversible in Settings. */
+export const HideInFeed = withWeight(EyeSlash);
 
 // The Login page's feature list (src/routes/Login.tsx) is the one caller for
 // the seven below — grouped here so a reader can see they're a set.

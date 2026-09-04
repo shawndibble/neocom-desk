@@ -1118,6 +1118,11 @@
       "dismiss": "Not now"
     },
     "groupedTitle": "{{title}} x{{count}}",
+    "contextMenu": {
+      "browserOn": "Turn off browser notifications",
+      "browserOff": "Turn on browser notifications",
+      "hideInFeed": "Hide in feed"
+    },
     "fired": {
       "pushFallback": {
         "title": "NeoCom Desk",
