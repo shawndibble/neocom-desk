@@ -5,8 +5,10 @@ import {
   selectionStateForEvents,
   toggleEventChannel,
   toggleAllEventsOnChannel,
+  isEveTypeAllowed,
   isEveTypeEnabledFor,
   toggleEveTypeChannel,
+  EVE_ALLOWED_TYPES,
   type EventEnabledMap,
   type EveTypeEnabledMap,
 } from './eventSelection';
@@ -85,6 +87,23 @@ describe('toggleAllEventsOnChannel', () => {
 const TYPE_A = 'BillOutOfMoneyMsg';
 const TYPE_B = 'AllWarDeclaredMsg';
 
+describe('EVE_ALLOWED_TYPES / isEveTypeAllowed', () => {
+  it('holds exactly the 17 types with hand-written bodies', () => {
+    expect(EVE_ALLOWED_TYPES).toHaveLength(17);
+    expect(new Set(EVE_ALLOWED_TYPES).size).toBe(17);
+  });
+
+  it('allows every type on the list', () => {
+    for (const type of EVE_ALLOWED_TYPES) {
+      expect(isEveTypeAllowed(type)).toBe(true);
+    }
+  });
+
+  it('rejects a type outside the list', () => {
+    expect(isEveTypeAllowed('SomeBrandNewMsgType6041')).toBe(false);
+  });
+});
+
 describe('isEveTypeEnabledFor', () => {
   it('defaults an absent type to feed-on, browser-off — the opposite of isEventEnabledFor', () => {
     expect(isEveTypeEnabledFor({}, TYPE_A, 'browser')).toBe(false);
@@ -101,6 +120,18 @@ describe('isEveTypeEnabledFor', () => {
   it('never falls back to another type', () => {
     const map: EveTypeEnabledMap = { [TYPE_A]: { feed: false } };
     expect(isEveTypeEnabledFor(map, TYPE_B, 'feed')).toBe(true);
+  });
+
+  it('defaults the three structure-attack types to browser-on as well as feed-on', () => {
+    for (const type of ['StructureUnderAttack', 'StructureLostShields', 'StructureLostArmor']) {
+      expect(isEveTypeEnabledFor({}, type, 'browser')).toBe(true);
+      expect(isEveTypeEnabledFor({}, type, 'feed')).toBe(true);
+    }
+  });
+
+  it('lets an explicit preference win over a structure-attack type browser-on default', () => {
+    const map: EveTypeEnabledMap = { StructureUnderAttack: { browser: false } };
+    expect(isEveTypeEnabledFor(map, 'StructureUnderAttack', 'browser')).toBe(false);
   });
 });
 

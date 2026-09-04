@@ -85,22 +85,72 @@ export function toggleAllEventsOnChannel(
 }
 
 /**
+ * The closed Notification Allow-List (CONTEXT.md round 44): a `type` outside
+ * it is dropped at the poller (`foregroundPoller.ts`) before it reaches
+ * either delivery channel or any name-resolution work, rather than opted out
+ * from a much larger catalog after the fact (round 34's model — the live ESI
+ * catalog turned out to hold 254 types, not the ~100 that assumed). This is
+ * the first tranche: the 17 types that already have hand-written bodies in
+ * `notifications.fired.eveNotification.types` (`src/i18n/locales/en.json`).
+ */
+export const EVE_ALLOWED_TYPES: readonly string[] = [
+  'StructureUnderAttack',
+  'StructureLostShields',
+  'StructureLostArmor',
+  'StructureFuelAlert',
+  'StructureWentLowPower',
+  'StructureWentHighPower',
+  'StructureServicesOffline',
+  'StructureImpendingAbandonmentAssetsAtRisk',
+  'MoonminingExtractionFinished',
+  'MoonminingAutomaticFracture',
+  'CorpAllBillMsg',
+  'BillOutOfMoneyMsg',
+  'CorpOfficeExpirationMsg',
+  'WarDeclared',
+  'AllWarDeclaredMsg',
+  'CorpBecameWarEligible',
+  'CorpAppNewMsg',
+];
+
+const EVE_ALLOWED_TYPES_SET: ReadonlySet<string> = new Set(EVE_ALLOWED_TYPES);
+
+/** Whether `type` is on the closed allow-list — the poller's drop gate. */
+export function isEveTypeAllowed(type: string): boolean {
+  return EVE_ALLOWED_TYPES_SET.has(type);
+}
+
+/**
  * Per-`type` opt-out underneath the single `eveNotification` event (issue
- * #274) — keyed by ESI's raw open-ended type string, not `NotificationEventId`,
- * since the catalog can't enumerate the ~100 types as a closed union
- * (esi/esi-issues#1380).
+ * #274) — keyed by ESI's raw open-ended type string, not `NotificationEventId`.
  *
  * Default is **feed-on / browser-off**, the opposite of every other event's
- * default-on-both above: these are far more numerous and mostly
- * informational, so a type has to be opted *up* to a browser notification
- * rather than opted down from one. Because the default itself differs from
- * `isEventEnabledFor`'s, it must be expressed here explicitly per channel
- * rather than reused from the "absence means enabled" idiom.
+ * default-on-both above: these are still numerous relative to other events
+ * and mostly informational, so a type has to be opted *up* to a browser
+ * notification rather than opted down from one. The three structure-under-
+ * attack types are the exception — losing a structure is worth interrupting
+ * someone for, so they default browser-on too. Because these defaults differ
+ * from `isEventEnabledFor`'s, they must be expressed here explicitly per
+ * channel rather than reused from the "absence means enabled" idiom.
  */
 export const EVE_TYPE_DEFAULT: Readonly<Record<NotificationChannel, boolean>> = {
   browser: false,
   feed: true,
 };
+
+// Must stay a subset of `EVE_ALLOWED_TYPES` — a type not on the allow-list
+// never reaches this lookup (`foregroundPoller.ts` drops it first), but a
+// stale entry here left behind by a future tranche change would be silent.
+const EVE_TYPES_BROWSER_ON_BY_DEFAULT: ReadonlySet<string> = new Set([
+  'StructureUnderAttack',
+  'StructureLostShields',
+  'StructureLostArmor',
+]);
+
+function eveTypeDefaultFor(type: string, channel: NotificationChannel): boolean {
+  if (channel === 'browser' && EVE_TYPES_BROWSER_ON_BY_DEFAULT.has(type)) return true;
+  return EVE_TYPE_DEFAULT[channel];
+}
 
 export type EveTypeChannelState = Partial<Record<NotificationChannel, boolean>>;
 export type EveTypeEnabledMap = Record<string, EveTypeChannelState>;
@@ -111,8 +161,8 @@ export function isEveTypeEnabledFor(
   channel: NotificationChannel
 ): boolean {
   const state = map[type];
-  if (state === undefined) return EVE_TYPE_DEFAULT[channel];
-  return state[channel] ?? EVE_TYPE_DEFAULT[channel];
+  if (state === undefined) return eveTypeDefaultFor(type, channel);
+  return state[channel] ?? eveTypeDefaultFor(type, channel);
 }
 
 /** Flips one type on one channel, preserving whatever the other channel said. */
