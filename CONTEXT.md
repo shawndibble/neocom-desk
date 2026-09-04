@@ -2544,6 +2544,16 @@ richness-only workaround that would leave Station Pins broken or as a
 sync-layer change buried inside #425's already-large feature PR. The backfill
 must be generic over collections rather than hardcoded to `stationPins`,
 since #425 adds the second caller and the fan-out is this app's standing
-recipe for any account-wide collection to come. Its source-Character choice
-has to be deterministic (and documented) so two devices adding the same alt
-converge instead of racing.
+recipe for any account-wide collection to come. Its source has to be
+deterministic so two devices adding the same alt converge instead of racing —
+and the implementation settled on the **union of every existing Character's
+account-scoped rows** rather than picking one source Character. In steady
+state the two are the same answer, since `setAccountStationPin` writes to
+every Character and `clearStationPin` tombstones every Character; they diverge
+only on a partially synced device, where the union is the reading that loses
+nothing, and it is order-independent by construction rather than by a rule
+someone has to remember. The copied row keeps the **source row's
+`updatedAt`**, which is load-bearing: `merge.ts` compares a row's `updatedAt`
+against a tombstone's `deletedAt`, so a row stamped `Date.now()` would
+out-rank every tombstone the added Character holds on another device and
+resurrect pins the user had deleted there.
