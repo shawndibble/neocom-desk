@@ -140,7 +140,17 @@ const SECONDS_PER_HOUR = 3_600;
 /** Absorbs float drift so 66.666.../40 does not ceil to 3 pins instead of 2. */
 const CEIL_EPSILON = 1e-9;
 
-const FLOOR_TIER: Readonly<Record<SourcingFloor, PiTier>> = { P0: 0, P1: 1, P2: 2, P3: 3 };
+/**
+ * The tier a sourcing floor sits at: at or below it is bought, above it is
+ * made. Exported because `pinBudget.ts` splits the same chain on the same
+ * boundary, and two copies of this could drift apart.
+ */
+export const SOURCING_FLOOR_TIER: Readonly<Record<SourcingFloor, PiTier>> = {
+  P0: 0,
+  P1: 1,
+  P2: 2,
+  P3: 3,
+};
 
 /**
  * The one place P0 membership is decided. Everything else asks through here,
@@ -273,7 +283,7 @@ export function chainCost(chain: PiChain, opts: ChainCostOptions): ChainCostResu
   const target = byId.get(chain.targetTypeId);
   if (!target) throw new Error(`chain is missing its own target ${chain.targetTypeId}`);
 
-  const floorTier = FLOOR_TIER[sourcingFloor];
+  const floorTier = SOURCING_FLOOR_TIER[sourcingFloor];
   if (floorTier >= target.tier) {
     throw new Error(
       `sourcing floor ${sourcingFloor} is at or above the target's own tier P${target.tier}; there would be nothing to make`

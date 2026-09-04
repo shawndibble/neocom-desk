@@ -7,6 +7,7 @@ import {
   pastEfficientWindow,
   programCycleCount,
   programTotalYield,
+  sustainedRatePerHour,
   yieldBankedBy,
   yieldRemaining,
 } from './extraction';
@@ -82,6 +83,24 @@ describe('extractorCycleYields', () => {
   it('returns nothing for a non-positive cycle count', () => {
     expect(extractorCycleYields(program, 0)).toEqual([]);
     expect(extractorCycleYields(program, -5)).toEqual([]);
+  });
+});
+
+describe('sustainedRatePerHour', () => {
+  it("averages CCP's whole 14-day program into one units-per-hour figure", () => {
+    // 1,874,985 units over 336 hours.
+    expect(sustainedRatePerHour(program)).toBeCloseTo(1_874_985 / 336, 0);
+  });
+
+  it('is two and a half times under what qty_per_cycle alone implies, which is the whole point', () => {
+    // Two 30-minute cycles an hour at the install-time baseline.
+    const naiveRate = program.qtyPerCycle * 2;
+    expect(naiveRate).toBe(13_930);
+    expect(naiveRate / sustainedRatePerHour(program)).toBeCloseTo(2.4963, 3);
+  });
+
+  it('is zero for a program with no whole cycle in it, not a divide-by-zero', () => {
+    expect(sustainedRatePerHour({ ...program, expiryTimeMs: program.installTimeMs })).toBe(0);
   });
 });
 

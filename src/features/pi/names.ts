@@ -4,7 +4,7 @@
  * GET; schematic names come from the public schematic GET. Both cache under
  * the global sentinel, same shape as `features/character/stations.ts`.
  */
-import { getUniversePlanet, getUniverseSchematic } from '@/esi/endpoints';
+import { getUniversePlanet, getUniverseSchematic, type UniversePlanet } from '@/esi/endpoints';
 import { loadWithCache, readCached, GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER } from '@/esi/cache';
 
 // Both are static game data, as this module's name says — a planet does not
@@ -15,14 +15,35 @@ function planetInfoKey(planetId: number): string {
   return `planet-info:${planetId}`;
 }
 
-export async function loadPlanetName(planetId: number): Promise<string | null> {
+async function loadPlanetInfoRow(planetId: number): Promise<UniversePlanet | null> {
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     planetInfoKey(planetId),
     async () => (await getUniversePlanet(planetId)).data,
     STATIC
   );
-  return result?.data.name ?? null;
+  return result?.data ?? null;
+}
+
+export async function loadPlanetName(planetId: number): Promise<string | null> {
+  return (await loadPlanetInfoRow(planetId))?.name ?? null;
+}
+
+/**
+ * A planet's name and its own typeID, which
+ * `PiData.planetTypeByTypeId` turns into the same `PlanetType` string an
+ * owned colony reports. The Advisor needs both for a planet in the system
+ * that the character has *no* colony on, where `/characters/{id}/planets`
+ * says nothing at all.
+ *
+ * Shares the cached row `loadPlanetName` already reads, so a planet whose
+ * name is on screen costs no second request to type.
+ */
+export async function loadPlanetInfo(
+  planetId: number
+): Promise<{ name: string; typeId: number } | null> {
+  const info = await loadPlanetInfoRow(planetId);
+  return info ? { name: info.name, typeId: info.type_id } : null;
 }
 
 /**

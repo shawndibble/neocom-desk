@@ -12,7 +12,13 @@
  * its own controls — a sourcing-floor picker and a layout picker are UI over
  * `SourcingFloor` and `ChainLayout` — and because the cost result is the seam
  * a caller renders. `chain.ts` re-exports them, so either import path works.
+ *
+ * Pin budget: what `pinBudget.ts` fits onto one planet. Its CPU/Powergrid
+ * numbers arrive as `PiData.infrastructure` — a parameter like every other
+ * payload the engine reads, never an import.
  */
+
+import type { PiInfrastructure, PiPinKind } from '@/sde/types';
 
 export interface ExtractorProgram {
   pinId: number;
@@ -194,4 +200,117 @@ export interface ChainCostOptions {
    * overstates a 14-day program by ~150%.
    */
   extractionRate?: number | null;
+}
+
+// --- Pin budget: what fits on one planet (engine/pi/pinBudget.ts) ---
+
+/** CPU and Powergrid, the colony's two independent ceilings. */
+export interface PinLoad {
+  /** tf. */
+  cpu: number;
+  /** MW. */
+  powergrid: number;
+}
+
+/** How many of each pin kind a layout places. */
+export type PinCounts = Readonly<Partial<Record<PiPinKind, number>>>;
+
+/**
+ * The pins that exist once on a planet whatever the scale, as against the
+ * ratio block that repeats. A Launchpad is mandatory — nothing leaves the
+ * planet without one — and a Storage Facility is the caller's decision, not a
+ * rule this module invents.
+ */
+export interface PinOverhead {
+  launchpads: number;
+  storageFacilities: number;
+}
+
+export interface FitColonyOptions {
+  /**
+   * What the Command Center supplies at the colony's CC-Upgrades level (ESI's
+   * per-colony `upgrade_level`, not the pilot's skill, which only caps it).
+   * Finite and non-negative on both axes; anything else is caller error and
+   * throws, because a `NaN` axis has no block count and would take the one
+   * result shape `limitedBy` reserves for a dead end.
+   */
+  budget: PinLoad;
+  /** Per-pin costs — `PiData.infrastructure`, passed in, never imported. */
+  infrastructure: PiInfrastructure;
+  overhead: PinOverhead;
+  /** One ratio block's pins: the smallest whole-pin set that runs the chain once. */
+  block: PinCounts;
+  /**
+   * Extractor heads fitted per ECU. Each head draws its own CPU/Powergrid on
+   * top of the ECU's, so this is part of the budget, not a detail. Read the
+   * real count off a live pin's `extractor_details.heads`; there is no
+   * default, because guessing it silently mis-sizes every planet.
+   */
+  headsPerExtractor: number;
+}
+
+export interface ColonyFit {
+  /** Whole ratio blocks that fit beside the overhead. Zero means the overhead alone already overruns, or one block does. */
+  blocks: number;
+  /** `overhead + blocks * block`, flattened. */
+  pins: PinCounts;
+  /** What `pins` draws. */
+  used: PinLoad;
+  /** The budget it was fitted against, echoed so a caller can render a meter without re-deriving it. */
+  budget: PinLoad;
+  /**
+   * Which of the two ceilings stopped the count going higher — both, when
+   * they bind at once. Empty means the overhead alone does not fit, which is
+   * a dead end rather than a scaling limit: the fix is a Command Center
+   * Upgrades level, not fewer factories. A block that does not fit even once
+   * still names its ceiling, so empty is that one answer and nothing else —
+   * which is why a budget or a pin cost that is not a finite number throws
+   * rather than arriving here with `blocks: NaN`.
+   */
+  limitedBy: readonly ('cpu' | 'powergrid')[];
+}
+
+/**
+ * The throughput axis, which is a different budget from CPU/Powergrid and the
+ * one that actually drove EVE University's "one extractor feeds three Basic
+ * Facilities" example — that ratio is storage-overflow-driven, not CPU-driven.
+ */
+export type ThroughputVerdict =
+  /** Links carry the flow and the buffer holds a cycle. */
+  | 'ok'
+  /** The flow exceeds what the colony's links can move. */
+  | 'link-capacity'
+  /** A buffer cycle's output does not fit in the launchpad and storage. */
+  | 'buffer-overflow'
+  /** No link capacity was supplied, so only the buffer side was checked. */
+  | 'link-capacity-unknown';
+
+export interface ThroughputCheck {
+  verdict: ThroughputVerdict;
+  /** m3 an hour crossing the colony's links at this scale. */
+  flowPerHourM3: number;
+  /** m3 the launchpad and any storage facilities hold between them. */
+  bufferM3: number;
+  /** m3 the buffer must hold, being `flowPerHourM3 * bufferHours`. */
+  bufferNeedM3: number;
+  /** m3/hr one link carries, as supplied; null when unknown. */
+  linkCapacityPerHour: number | null;
+}
+
+export interface ThroughputOptions {
+  /**
+   * m3/hr one planetary link carries. A basic link moves 1,250 and each
+   * upgrade level doubles it to 40,000 at level 5 — but whether that upgrade
+   * axis is the same skill as the CPU/Powergrid table is not confirmed
+   * (docs/research/pi-cpu-power-mechanics.md, open questions), so this module
+   * never picks a level. `null` means unknown and yields
+   * `link-capacity-unknown` rather than a guess.
+   */
+  linkCapacityPerHour: number | null;
+  /**
+   * Hours of output the buffer must hold without overflowing — how long the
+   * user is willing to leave the colony unattended. A caller's policy, not a
+   * game constant.
+   */
+  bufferHours: number;
 }

@@ -31,6 +31,7 @@ const BAR_SECONDS = 900;
 
 /** The window a daily rate is measured over, in both directions. */
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 
 /** A cycle's width in CCP's 900-second bars — the unit `t` is measured in. */
 function barWidthOf(program: ExtractorYieldProgram): number {
@@ -105,6 +106,25 @@ function sumCycles(program: ExtractorYieldProgram, fromCycle: number, toCycle: n
 /** Everything the program will have produced by the time it expires. */
 export function programTotalYield(program: ExtractorYieldProgram): number {
   return sumCycles(program, 0, programCycleCount(program));
+}
+
+/**
+ * The program's whole output averaged over its whole length: one
+ * units-per-hour figure for an extractor that in fact yields a different
+ * amount every cycle.
+ *
+ * This is the number to hand `chainCost`'s and `pinBudget`'s
+ * `extractionRate`, and the reason those take a rate rather than a
+ * `qty_per_cycle`. Averaging the decay curve is the honest summary of what a
+ * program delivers; the opening cycle is not, and neither is the current one.
+ * Zero for a program with no whole cycle in it — a real answer, since such a
+ * program yields nothing.
+ */
+export function sustainedRatePerHour(program: ExtractorYieldProgram): number {
+  const cycles = programCycleCount(program);
+  if (cycles === 0) return 0;
+  const hours = (cycles * program.cycleTimeMs) / HOUR_MS;
+  return hours > 0 ? programTotalYield(program) / hours : 0;
 }
 
 /** Cycles finished at `nowMs`, clamped to the program's own span. */

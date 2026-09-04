@@ -6,7 +6,9 @@
  * — the route still lists it in the pin table with an "unavailable" state.
  */
 import type { PlanetPin } from '@/esi/endpoints';
-import type { ExtractorProgram } from '@/engine/pi/types';
+import type { ExtractorProgram, PinCounts, PinLoad } from '@/engine/pi/types';
+import type { PiData, PiPinKind } from '@/sde/types';
+import { pinsLoad } from '@/engine/pi/pinBudget';
 
 export type PinRole = 'extractor' | 'factory' | 'other';
 
@@ -115,4 +117,66 @@ export function groupFactoryPins(pins: readonly PlanetPin[]): FactoryPinGroup[] 
  */
 export function hasUnverifiedExtractors(pins: readonly PlanetPin[]): boolean {
   return pins.some((pin) => pinRole(pin) === 'extractor' && extractorExpiryMs(pin) === null);
+}
+
+export interface ColonyPinLoad {
+  /** Pins by kind, ready for `engine/pi/pinBudget`. */
+  counts: PinCounts;
+  /** Extractor heads across the whole colony, counted one by one. */
+  extractorHeads: number;
+  /**
+   * What the colony draws right now. Understated by whatever
+   * `unknownTypeIds` holds, so a caller showing it as a measured figure must
+   * check that list is empty first.
+   */
+  load: PinLoad;
+  /**
+   * Pin typeIDs the payload names no kind for, in the order seen, deduped.
+   * Command Centers are excluded — every colony has one, it supplies the
+   * budget and draws nothing from it, so listing it here would fire "the
+   * meter understates this colony" on every colony and bury the real signal.
+   * Anything that does land here means the snapshot is behind the game and
+   * the meter is missing a real cost.
+   */
+  unknownTypeIds: number[];
+}
+
+/**
+ * A live colony's own CPU/Powergrid draw, read off the pins ESI reports.
+ *
+ * This is the measured path, and it deliberately does not go anywhere near
+ * `chainBlockPins`: that function derives an extractor count from a chain's
+ * demand and one assumed yield rate, which is the right answer for a colony
+ * that does not exist yet and the wrong one for a colony you can just read.
+ * Here the pins are a fact, and so is each extractor's own head count —
+ * `extractor_details.heads` is per-pin, so a colony with a ten-head and a
+ * three-head extractor is charged for thirteen heads rather than for some
+ * average of them.
+ */
+export function colonyPinLoad(pins: readonly PlanetPin[], pi: PiData): ColonyPinLoad {
+  const counts: Partial<Record<PiPinKind, number>> = {};
+  const unknownTypeIds: number[] = [];
+  const commandCenters = new Set(pi.infrastructure.commandCenterTypeIds);
+  let extractorHeads = 0;
+
+  for (const pin of pins) {
+    const kind = pi.infrastructure.pinKindByTypeId[String(pin.type_id)];
+    if (!kind) {
+      if (!commandCenters.has(pin.type_id) && !unknownTypeIds.includes(pin.type_id)) {
+        unknownTypeIds.push(pin.type_id);
+      }
+      continue;
+    }
+    counts[kind] = (counts[kind] ?? 0) + 1;
+    if (kind === 'extractorControlUnit') {
+      extractorHeads += pin.extractor_details?.heads.length ?? 0;
+    }
+  }
+
+  return {
+    counts,
+    extractorHeads,
+    load: pinsLoad(counts, pi.infrastructure, { extractorHeads }),
+    unknownTypeIds,
+  };
 }

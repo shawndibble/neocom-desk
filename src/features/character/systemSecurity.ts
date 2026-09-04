@@ -32,3 +32,20 @@ export async function loadSystemSecurity(systemId: number): Promise<number | nul
 export async function loadSystemName(systemId: number): Promise<string | null> {
   return (await loadSystem(systemId))?.name ?? null;
 }
+
+/**
+ * Every planet in a system, in ESI's own order — which is orbital order, so
+ * the Nth entry is the system's Nth planet (Ashab I, II, III...).
+ *
+ * This is the only way to learn what a system holds when the character has no
+ * colony there: `/characters/{id}/planets` covers owned colonies only. Empty
+ * when the system has no planets or could not be resolved; the two are the
+ * same answer to a caller that just wants a list.
+ *
+ * No extra request: the same cached `/universe/systems/{id}` row the security
+ * badge already reads carries the planet list.
+ */
+export async function loadSystemPlanetIds(systemId: number): Promise<number[]> {
+  const system = await loadSystem(systemId);
+  return system?.planets?.map((planet) => planet.planet_id) ?? [];
+}
