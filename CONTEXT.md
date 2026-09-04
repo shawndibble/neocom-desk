@@ -2486,3 +2486,64 @@ publicInfoData.ts` instead read-throughs `esi/cache.ts` under the global
   (`AdvisorPanel.tsx`). That is the honest cost of shipping steps 1-5 ahead of
   6-7 rather than a sign anything is wrong today — but if #426 is ever closed
   as wontfix, that unused surface should be deleted rather than left in place.
+
+## Scope decisions (round 52) — PI Advisor resource richness (issue #425)
+
+Issue #425 needs a per-planet, per-resource **best-to-worst ordering** stored
+somewhere, because ESI carries no per-planet richness at all and the in-game
+scan overlay shows a colour map rather than a number (`engine/pi/chain.ts`'s
+header already records this). The ticket flagged two questions as unsettled.
+Both are in fact settled by existing precedent, and are recorded here as
+decisions rather than left for an implementer to guess:
+
+- **Synced Editable Data, not device-local.** Round 20 made notification
+  preferences device-local for one stated reason: "browser permission is
+  inherently per-device, so syncing 'what I want to hear about' across devices
+  would be misleading when each device's actual permission grant is
+  independent." That rationale is about a fact that genuinely differs per
+  device. A planet's scan ranking is not such a fact — it is durable
+  knowledge the user paid probe time to learn, and it is equally true on
+  every device they own. It therefore falls under the glossary's **Editable
+  Data** entry ("data created inside the app… synced across devices") with no
+  exception to carve.
+- **Account-wide, by the round 7 fan-out, and account-wide is the _only_
+  scope.** Round 7 settled this shape for **Station Pins**: an account-wide
+  record has no shared account identity to key off, since Account has no
+  storage, sync or server-side identity, so it fans out — one row per
+  Character currently known on this device, each synced under that Character's
+  own ownerHash (feature-parity README §5.7). `setAccountStationPin`
+  (`src/sync/planSync.ts`) is the working recipe: `bulkPut` one row per
+  Character, then `scheduleSync` each.
+  Where richness **departs** from Station Pins is that it needs no `scope`
+  field and no three-state cycle. A pin is a per-Character preference that the
+  user may choose to elevate, so `StationPinRecord` carries
+  `scope: 'character' | 'account'` and `pinStateForStation` resolves it on
+  read. Richness is a property of the _planet_, objectively the same for every
+  Character in the account, so there is no per-Character reading to offer and
+  nothing for a user to elevate. Every row is written account-wide; the record
+  needs only `id: '${characterId}:${planetId}'`, the ordering, and
+  `updatedAt`.
+
+### The one thing precedent did not answer: no backfill-on-add hook exists
+
+The round 7 fan-out writes one row per Character **currently known on this
+device**. Nothing backfills a Character added later — `src/auth/session.ts`'s
+`db.characters.put` is the only add path and it has no such hook, and no
+`backfill` mechanism exists anywhere in `src/`.
+
+For Station Pins that gap is tolerable: a missing pin is a station that does
+not float to the top. For richness it is worse, and worse in the direction
+this tab is built to avoid — a planet the user has already ranked would
+silently revert to "resources named, nothing priced" on the new Character,
+which reads as data loss rather than as a Character-scoped absence.
+
+**Decision: it spins out as issue #432, and #425 is blocked by it.** The gap
+belongs to the round 7 fan-out itself, not to richness — Station Pins has it
+today — so it is fixed once, generically, in `src/sync`, rather than as a
+richness-only workaround that would leave Station Pins broken or as a
+sync-layer change buried inside #425's already-large feature PR. The backfill
+must be generic over collections rather than hardcoded to `stationPins`,
+since #425 adds the second caller and the fan-out is this app's standing
+recipe for any account-wide collection to come. Its source-Character choice
+has to be deterministic (and documented) so two devices adding the same alt
+converge instead of racing.
