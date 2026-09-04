@@ -96,3 +96,23 @@ export function notificationOptionsFor(
     data: { url: notificationUrlFor(target.eventId) },
   };
 }
+
+/**
+ * Same shared `icon`/`badge`/`tag`+`renotify` shape as {@link notificationOptionsFor},
+ * for the one caller (`pushHandler.ts`'s malformed-payload path) that has no
+ * `NotificationTarget` to key a tag with — there is no Character or Event id
+ * to trust in an unparseable push. A fixed tag still matters here: several
+ * malformed pushes in a row should replace one bubble, not stack into many.
+ */
+const PUSH_FALLBACK_TAG = 'push:fallback';
+
+export function fallbackNotificationOptions(body: string): AppNotificationOptions {
+  return {
+    body,
+    icon: ICON_URL,
+    badge: BADGE_URL,
+    tag: PUSH_FALLBACK_TAG,
+    renotify: true,
+    data: { url: NOTIFICATION_FALLBACK_ROUTE },
+  };
+}

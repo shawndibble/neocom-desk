@@ -1117,6 +1117,10 @@
       "dismiss": "Not now"
     },
     "fired": {
+      "pushFallback": {
+        "title": "NeoCom Desk",
+        "body": "Something happened — open the app for details."
+      },
       "skillLevelComplete": {
         "title": "Skill training complete",
         "body": "{{character}} finished training {{skill}} {{level}}."

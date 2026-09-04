@@ -7,6 +7,7 @@ import {
   notificationUrlFor,
   notificationTagFor,
   notificationOptionsFor,
+  fallbackNotificationOptions,
 } from './notificationOptions';
 
 describe('notificationUrlFor', () => {
@@ -64,6 +65,24 @@ describe('notificationOptionsFor', () => {
     const options = notificationOptionsFor({ characterId: 1, eventId: 'newMail' }, 'b');
     expect(options.renotify).toBe(true);
     expect(options.tag).toBeTruthy();
+  });
+});
+
+describe('fallbackNotificationOptions', () => {
+  it('carries the same shared icon/badge/tag/renotify shape with no target to key by', () => {
+    const options = fallbackNotificationOptions('parse failed');
+    expect(options).toMatchObject({
+      body: 'parse failed',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/badge-96.png',
+      data: { url: NOTIFICATION_FALLBACK_ROUTE },
+    });
+    expect(options.tag).toBeTruthy();
+    expect(options.renotify).toBe(true);
+  });
+
+  it('uses a fixed tag so repeats replace instead of stacking', () => {
+    expect(fallbackNotificationOptions('a').tag).toBe(fallbackNotificationOptions('b').tag);
   });
 });
 

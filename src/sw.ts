@@ -24,29 +24,14 @@ import {
   createHandlerBoundToURL,
 } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
-import { configureEsi } from '@/esi/client';
-import { getValidAccessToken } from '@/auth/session';
 import {
   handleNotificationClick,
   urlFromNotificationData,
 } from '@/features/notifications/notificationClick';
+import { handlePush, type PushEnv } from '@/features/notifications/pushHandler';
+import { recordFeedEntry } from '@/features/notifications/feed';
 
 declare let self: ServiceWorkerGlobalScope;
-
-// The worker is a separate module graph from the page, so `configureEsi`
-// (a module-level singleton, `esi/client.ts`) needs wiring here too, exactly
-// as `App.tsx` wires it for the page. Plain `getValidAccessToken`, not the
-// page's `getAccessTokenReportingFailures` wrapper — that publishes to a
-// zustand auth-failure store the page's UI reads, which this worker has no
-// separate instance of and nothing here would ever observe.
-//
-// No listener in this file calls `esiFetch` today (the `periodicsync`
-// handler that did is retired, ADR 0009) — this wiring stays because the
-// `push` handler that replaces it will: `backgroundPoller.ts`'s
-// `sendBackgroundNotification` resolves item/skill names via ESI
-// (`notificationText`, `foregroundPoller.ts`) before it can build a
-// notification body.
-configureEsi({ getToken: (characterId) => getValidAccessToken(characterId) });
 
 // registerType: 'prompt' (vite.config.ts) — the worker must stay in
 // `waiting` until the page's ReloadPrompt asks for it, not skip ahead on its
@@ -86,4 +71,24 @@ self.addEventListener('notificationclick', (event) => {
       urlFromNotificationData(event.notification.data)
     )
   );
+});
+
+function pushEnv(): PushEnv {
+  return {
+    showNotification: (title, options) => self.registration.showNotification(title, options),
+    recordFeedEntry,
+  };
+}
+
+// A push must always result in a shown notification (ADR 0009/0010): WebKit
+// revokes the subscription if a push event completes without posting one, so
+// there is no silent path here, including a malformed payload. Decision logic
+// (payload parsing, the fallback, the Notification Feed write) lives in
+// `features/notifications/pushHandler.ts` so it's unit-tested — this file
+// stays orchestration-only per ADR 0007's carve-out. `event.data.text()`
+// rather than `.json()`: `.text()` never throws on malformed bytes, which is
+// what lets `pushHandler.ts` treat "invalid JSON" as an ordinary value to
+// fall back on instead of an exception this file would have to catch.
+self.addEventListener('push', (event) => {
+  event.waitUntil(handlePush(pushEnv(), event.data ? event.data.text() : null, Date.now()));
 });
