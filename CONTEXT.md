@@ -1970,12 +1970,15 @@ offeredScopes: Record<number, readonly Scope[]> }`. Round 37's "offered once
   skill queue is; replacing it means every app open self-heals whatever drifted
   while the app was closed, which is also the only correction mechanism
   available when the backend cannot re-read ESI.
-- **A Scheduled Push asserts for skills and industry jobs and hedges for
-  structure fuel.** The backend cannot verify a Projection before firing it, so
-  the wording carries the uncertainty. Skill training and industry jobs are
-  deterministic enough that hedging every one of them would make the reliable
-  case read as unreliable; a structure refuelled in-game while the app was
-  closed makes its alert plainly wrong, so that one says "was due to".
+- **A Scheduled Push asserts for skills, industry jobs and a structure's
+  reinforcement exit, and hedges for structure fuel.** The backend cannot
+  verify a Projection before firing it, so the wording carries the
+  uncertainty. Skill training and industry jobs are deterministic enough that
+  hedging every one of them would make the reliable case read as unreliable;
+  a structure refuelled in-game while the app was closed makes its fuel alert
+  plainly wrong, so that one says "was due to". A reinforcement exit is the
+  same as skills/jobs in this respect: once the timer starts, the exit
+  instant is fixed and nothing in-game can move it early (issue #359).
 - **Projection rows carry rendered text, not structured data.** The backend
   holds no SDE, no i18n catalog and no notion of what a skill is; it pushes
   what it was handed. The cost — re-wording a notification does not fix rows

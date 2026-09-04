@@ -7,9 +7,10 @@ import {
   projectColonies,
   projectCalendar,
   projectStructureFuel,
+  projectEveNotificationReinforcementExit,
 } from './projection';
 import { occurrenceKey } from './occurrenceKey';
-import type { NotificationFire } from './notificationDiffs';
+import type { NotificationFire, EveNotificationEntrySnapshot } from './notificationDiffs';
 import { EXTRACTOR_EXPIRY_WARNING_MS } from './notificationDiffs';
 
 const T0 = 1_700_000_000_000;
@@ -28,6 +29,7 @@ describe('projectionWording', () => {
       'planetaryExtractionDone',
       'planetaryExtractorExpiring',
       'calendarEventStarting',
+      'eveNotification',
     ];
     for (const eventId of asserted) {
       expect(projectionWording(eventId)).toEqual('assert');
@@ -250,5 +252,86 @@ describe('projectStructureFuel', () => {
     ];
     expect(() => projectStructureFuel(7, 'Kestrel', entries, T0)).not.toThrow();
     expect(projectStructureFuel(7, 'Kestrel', entries, T0)).toEqual([]);
+  });
+});
+
+describe('projectEveNotificationReinforcementExit', () => {
+  const T_ISO = new Date(T0).toISOString();
+
+  function entry(
+    overrides: Partial<EveNotificationEntrySnapshot> = {}
+  ): EveNotificationEntrySnapshot {
+    return {
+      notificationId: 1,
+      type: 'StructureUnderAttack',
+      senderId: 1000132,
+      senderType: 'corporation',
+      // 36,000,000,000 ticks (100ns units) = 3,600,000 ms = 1 hour.
+      text: 'structureID: 111\ntimeLeft: 36000000000\n',
+      timestamp: T_ISO,
+      ...overrides,
+    };
+  }
+
+  it('projects a row at the derived reinforcement-exit instant, naming the structure', () => {
+    const names = new Map([[111, 'Keepstar']]);
+    const rows = projectEveNotificationReinforcementExit(7, 'Kestrel', [entry()], names, T0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].fireAt).toEqual(T0 + HOUR_MS);
+    expect(rows[0].body).toContain('Keepstar');
+  });
+
+  it('is skipped, without error, when timeLeft is absent', () => {
+    const args = [7, 'Kestrel', [entry({ text: 'structureID: 111\n' })], new Map(), T0] as const;
+    expect(() => projectEveNotificationReinforcementExit(...args)).not.toThrow();
+    expect(projectEveNotificationReinforcementExit(...args)).toEqual([]);
+  });
+
+  it('is skipped, without error, when timeLeft is unparseable', () => {
+    const rows = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ text: 'structureID: 111\ntimeLeft: not-a-number\n' })],
+      new Map(),
+      T0
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it('is skipped when the exit falls outside the 72-hour horizon, and appears once inside it', () => {
+    const outsideTicks = (PROJECTION_HORIZON_MS + HOUR_MS) * 10_000;
+    const outside = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ text: `structureID: 111\ntimeLeft: ${outsideTicks}\n` })],
+      new Map(),
+      T0
+    );
+    expect(outside).toEqual([]);
+
+    const insideTicks = (PROJECTION_HORIZON_MS - HOUR_MS) * 10_000;
+    const inside = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ text: `structureID: 111\ntimeLeft: ${insideTicks}\n` })],
+      new Map(),
+      T0
+    );
+    expect(inside).toHaveLength(1);
+  });
+
+  it('degrades to the structure id, then a neutral phrase, when the name cannot be resolved', () => {
+    const byId = projectEveNotificationReinforcementExit(7, 'Kestrel', [entry()], new Map(), T0);
+    expect(byId[0].body).toContain('111');
+
+    const noId = projectEveNotificationReinforcementExit(
+      7,
+      'Kestrel',
+      [entry({ text: 'timeLeft: 36000000000\n' })],
+      new Map(),
+      T0
+    );
+    expect(noId).toHaveLength(1);
+    expect(noId[0].body).not.toContain('undefined');
   });
 });

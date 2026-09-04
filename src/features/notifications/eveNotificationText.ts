@@ -29,6 +29,7 @@ import i18n from '@/i18n';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
 import {
   parseEveNotificationPayload,
+  reinforcementExitMs,
   type EveNotificationPayload,
 } from '@/engine/eveNotificationPayload';
 import { formatIsk } from '@/lib/isk';
@@ -93,12 +94,10 @@ function entityLabel(id: number, names: EveNotificationNames): string {
   return names.entities?.get(id) ?? i18n.t(`${BASE}.entityById`, { id });
 }
 
-/** When the reinforcement timer runs out: the notification's own instant plus the payload's remaining duration. */
+/** When the reinforcement timer runs out (round 36's rule, `eveNotificationPayload.ts`). */
 function timerEnd({ fire, payload }: RenderContext): string | null {
-  if (payload.timeLeftMs === undefined) return null;
-  const firedAtMs = Date.parse(fire.timestamp);
-  if (!Number.isFinite(firedAtMs)) return null;
-  return formatLocalDateTime(new Date(firedAtMs + payload.timeLeftMs));
+  const exitMs = reinforcementExitMs(fire.timestamp, payload);
+  return exitMs === undefined ? null : formatLocalDateTime(new Date(exitMs));
 }
 
 /** `planet #<id>`, or `null` when the payload carries no `planetID` at all. */

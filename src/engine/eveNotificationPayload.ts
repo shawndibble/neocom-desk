@@ -186,6 +186,24 @@ function linkText(markup: string | undefined): string | undefined {
   return stripped.length === 0 ? undefined : stripped;
 }
 
+/**
+ * Round 36: a reinforcement timer is the notification's own envelope
+ * timestamp plus the payload's `timeLeft` duration, not the payload's
+ * sibling `timestamp` key — the envelope is the instant ESI vouches for, and
+ * only that one is a field CCP can't silently repurpose. `eveNotificationText.ts`'s
+ * `timerEnd` and `engine/projection.ts`'s reinforcement-exit Projection both
+ * call this, so the rule is derived once.
+ */
+export function reinforcementExitMs(
+  notificationTimestamp: string,
+  payload: EveNotificationPayload
+): number | undefined {
+  if (payload.timeLeftMs === undefined) return undefined;
+  const firedAtMs = Date.parse(notificationTimestamp);
+  if (!Number.isFinite(firedAtMs)) return undefined;
+  return firedAtMs + payload.timeLeftMs;
+}
+
 /** Parses one EVE Notification's `text` payload. Never throws; every field may be absent. */
 export function parseEveNotificationPayload(text: string): EveNotificationPayload {
   const fields = scalarLines(text);

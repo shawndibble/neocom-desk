@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseEveNotificationPayload } from './eveNotificationPayload';
+import { parseEveNotificationPayload, reinforcementExitMs } from './eveNotificationPayload';
 
 /**
  * Robustness first (issue #300 AC2): the parser is fed a `text` blob CCP can
@@ -359,5 +359,29 @@ describe('parseEveNotificationPayload — real payload samples', () => {
     expect(payload.corpId).toBe(2001);
     expect(payload.dueDateMs).toBe(Date.parse('2022-04-05T03:13:00Z'));
     expect(payload.amount).toBeUndefined();
+  });
+});
+
+/**
+ * Round 36's rule, extracted so `projection.ts` (issue #359) can reuse the
+ * identical derivation `eveNotificationText.ts`'s `timerEnd` renders from,
+ * rather than a second copy that could drift.
+ */
+describe('reinforcementExitMs', () => {
+  it('adds the envelope timestamp to the payload timeLeft duration', () => {
+    const payload = parseEveNotificationPayload('timeLeft: 1727805401093\n');
+    expect(reinforcementExitMs('2026-09-03T00:00:00Z', payload)).toBe(
+      Date.parse('2026-09-03T00:00:00Z') + payload.timeLeftMs!
+    );
+  });
+
+  it('is undefined when the payload carries no timeLeft', () => {
+    const payload = parseEveNotificationPayload('structureID: 111\n');
+    expect(reinforcementExitMs('2026-09-03T00:00:00Z', payload)).toBeUndefined();
+  });
+
+  it('is undefined when the envelope timestamp is unparseable', () => {
+    const payload = parseEveNotificationPayload('timeLeft: 1727805401093\n');
+    expect(reinforcementExitMs('not-a-date', payload)).toBeUndefined();
   });
 });
