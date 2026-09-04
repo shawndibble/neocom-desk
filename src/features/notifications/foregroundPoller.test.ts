@@ -857,6 +857,7 @@ describe('runForegroundPoll', () => {
     let savedWallet: WalletPollerState | null = null;
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+      eventPrefsFor: async () => ({ walletBalanceChanged: { browser: true } }),
       loadWalletJournal: async () => [walletJournalEntry({ id: 5, amount: 100 })],
       saveWalletState: async (state) => {
         savedWallet = state;
@@ -868,6 +869,28 @@ describe('runForegroundPoll', () => {
     expect(savedWallet![CHAR.characterId].entries).toEqual([{ id: 5, amount: 100 }]);
   });
 
+  it('records walletBalanceChanged to the feed but does not raise a browser notification by default (feed-only, CONTEXT.md round 45)', async () => {
+    const savedWallet: WalletPollerState = {
+      [CHAR.characterId]: { entries: [{ id: 5, amount: 100 }], nowMs: 1000 },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+      feedChannelEnabled: async () => true,
+      prevWalletState: async () => savedWallet,
+      loadWalletJournal: async () => [
+        walletJournalEntry({ id: 6, amount: 250 }),
+        walletJournalEntry({ id: 5, amount: 100 }),
+      ],
+      notify,
+      recordToFeed,
+    });
+    await runForegroundPoll(deps);
+    expect(recordToFeed).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
+  });
+
   it('fires walletBalanceChanged when a journal entry id above the previous high-water mark appears', async () => {
     let savedWallet: WalletPollerState = {
       [CHAR.characterId]: { entries: [{ id: 5, amount: 100 }], nowMs: 1000 },
@@ -875,6 +898,7 @@ describe('runForegroundPoll', () => {
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, WALLET_SCOPE]),
+      eventPrefsFor: async () => ({ walletBalanceChanged: { browser: true } }),
       prevWalletState: async () => savedWallet,
       saveWalletState: async (state) => {
         savedWallet = state;
@@ -936,6 +960,7 @@ describe('runForegroundPoll', () => {
     let savedMarketOrders: MarketOrderPollerState | null = null;
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({ marketOrderFilled: { browser: true } }),
       loadMarketOrders: async () => [{ orderId: 1, filled: false }],
       saveMarketOrderState: async (state) => {
         savedMarketOrders = state;
@@ -947,6 +972,25 @@ describe('runForegroundPoll', () => {
     expect(savedMarketOrders![CHAR.characterId].entries).toEqual([{ orderId: 1, filled: false }]);
   });
 
+  it('records marketOrderFilled to the feed but does not raise a browser notification by default (feed-only, CONTEXT.md round 45)', async () => {
+    const savedMarketOrders: MarketOrderPollerState = {
+      [CHAR.characterId]: { entries: [{ orderId: 1, filled: false }], nowMs: 1000 },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      feedChannelEnabled: async () => true,
+      prevMarketOrderState: async () => savedMarketOrders,
+      loadMarketOrders: async () => [{ orderId: 1, filled: true }],
+      notify,
+      recordToFeed,
+    });
+    await runForegroundPoll(deps);
+    expect(recordToFeed).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
+  });
+
   it('fires marketOrderFilled when an order newly transitions to filled', async () => {
     let savedMarketOrders: MarketOrderPollerState = {
       [CHAR.characterId]: { entries: [{ orderId: 1, filled: false }], nowMs: 1000 },
@@ -954,6 +998,7 @@ describe('runForegroundPoll', () => {
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({ marketOrderFilled: { browser: true } }),
       prevMarketOrderState: async () => savedMarketOrders,
       saveMarketOrderState: async (state) => {
         savedMarketOrders = state;
@@ -979,6 +1024,7 @@ describe('runForegroundPoll', () => {
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({ marketOrderFilled: { browser: true } }),
       prevMarketOrderState: async () => savedMarketOrders,
       saveMarketOrderState: async (state) => {
         savedMarketOrders = state;

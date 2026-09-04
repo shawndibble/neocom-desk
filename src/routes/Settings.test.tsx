@@ -197,7 +197,7 @@ describe('Settings — Notifications (issue #170)', () => {
     });
   });
 
-  it('lists one collapsible section per signed-in character, every event on by default', async () => {
+  it('lists one collapsible section per signed-in character, every event on by default except the feed-only exceptions', async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
@@ -211,8 +211,19 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(
       screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
     ).toBeChecked();
+    // marketOrderFilled/walletBalanceChanged default feed-on/browser-off
+    // (CONTEXT.md round 45) — worth a row, not worth an interruption.
     expect(
       screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, Overview list' })
+    ).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Market Order Filled, browser notifications' })
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Market Order Filled, Overview list' })
     ).toBeChecked();
   });
 
@@ -270,23 +281,30 @@ describe('Settings — Notifications (issue #170)', () => {
       await within(await notificationsPanel()).findByRole('button', { name: /pilot one/i })
     );
 
+    // The browser column starts indeterminate: Wallet Balance Changed/Market
+    // Order Filled default browser-off while the rest default browser-on
+    // (CONTEXT.md round 45). A partial column fills in rather than clears.
     await user.click(
       screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
     );
 
+    expect(
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+    ).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+    ).toBeChecked();
+
+    // Now fully enabled, so the next click clears the whole column.
+    await user.click(
+      screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
+    );
     expect(
       screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
     ).not.toBeChecked();
     expect(
       screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
     ).not.toBeChecked();
-
-    await user.click(
-      screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
-    );
-    expect(
-      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
-    ).toBeChecked();
   });
 
   it('the master switch persists independently of any per-character state', async () => {
