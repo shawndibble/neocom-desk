@@ -1266,52 +1266,7 @@ export function PlanEditor({
         <Panel
           title={t('plans.yourEntries')}
           actions={
-            // Group-by and Columns are this list's own view controls — they
-            // took the room Import/Export left for the page header (below).
             <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
-              <label className="flex items-center gap-1">
-                {t('plans.groupBy')}
-                <NativeSelect
-                  size="sm"
-                  aria-label={t('plans.groupBy')}
-                  value={groupingMode}
-                  onChange={(e) => void setGroupingMode(e.target.value as GroupingMode)}
-                >
-                  {GROUPING_MODES.map((mode) => (
-                    <option key={mode} value={mode}>
-                      {mode === 'priority'
-                        ? t('plans.groupByPriority')
-                        : t('plans.groupByAttributePair')}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm">{t('plans.columns')}</Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {(
-                    [
-                      ['attributePair', 'plans.columnAttributePair'],
-                      ['priority', 'plans.columnPriority'],
-                      ['perLevelTime', 'plans.columnPerLevel'],
-                      ['cumulativeTime', 'plans.columnCumulative'],
-                    ] as const
-                  ).map(([key, labelKey]) => (
-                    <DropdownMenuCheckboxItem
-                      key={key}
-                      checked={columnVisibility[key]}
-                      onSelect={(event) => event.preventDefault()}
-                      onCheckedChange={(checked) =>
-                        void setColumnVisibility({ ...columnVisibility, [key]: checked })
-                      }
-                    >
-                      {t(labelKey)}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
               <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
               {planFinish && (
                 <span>{t('plans.projectedFinish', { date: formatLocalDate(planFinish) })}</span>
@@ -1325,6 +1280,56 @@ export function PlanEditor({
               catalog={catalog}
               trainedSkills={trainedSkills}
               onAdd={(entry) => update(upsertEntry(plan.entries, entry))}
+              controls={
+                // Group-by and Columns are this list's own view controls —
+                // riding the search bar's row keeps them off the page
+                // header, which Import/Export already fills.
+                <>
+                  <label className="flex items-center gap-1">
+                    {t('plans.groupBy')}
+                    <NativeSelect
+                      size="sm"
+                      aria-label={t('plans.groupBy')}
+                      value={groupingMode}
+                      onChange={(e) => void setGroupingMode(e.target.value as GroupingMode)}
+                    >
+                      {GROUPING_MODES.map((mode) => (
+                        <option key={mode} value={mode}>
+                          {mode === 'priority'
+                            ? t('plans.groupByPriority')
+                            : t('plans.groupByAttributePair')}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm">{t('plans.columns')}</Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {(
+                        [
+                          ['attributePair', 'plans.columnAttributePair'],
+                          ['priority', 'plans.columnPriority'],
+                          ['perLevelTime', 'plans.columnPerLevel'],
+                          ['cumulativeTime', 'plans.columnCumulative'],
+                        ] as const
+                      ).map(([key, labelKey]) => (
+                        <DropdownMenuCheckboxItem
+                          key={key}
+                          checked={columnVisibility[key]}
+                          onSelect={(event) => event.preventDefault()}
+                          onCheckedChange={(checked) =>
+                            void setColumnVisibility({ ...columnVisibility, [key]: checked })
+                          }
+                        >
+                          {t(labelKey)}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              }
             />
             {/* Outside the scroller, so a refusal is on screen wherever in a
                 long queue the drag happened. */}
@@ -1397,24 +1402,18 @@ export function PlanEditor({
         createPortal(
           <>
             <IconButton
-              size="sm"
-              icon={<Icon.ImportQueue size={Icon.ICON_SIZE.sm} />}
+              icon={<Icon.ImportQueue />}
               label={t('plans.importQueue')}
               onClick={() => void handleImport()}
             />
             <IconButton
-              size="sm"
-              icon={<Icon.ImportClipboard size={Icon.ICON_SIZE.sm} />}
+              icon={<Icon.ImportClipboard />}
               label={t('plans.importClipboard')}
               onClick={() => setImportOpen(true)}
             />
             <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <IconButton
-                  size="sm"
-                  icon={<Icon.Export size={Icon.ICON_SIZE.sm} />}
-                  label={t('plans.export')}
-                />
+                <IconButton icon={<Icon.Export />} label={t('plans.export')} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
