@@ -2107,6 +2107,7 @@ offeredScopes: Record<number, readonly Scope[]> }`. Round 37's "offered once
   shared state is not a device preference any more, so the fuel lead time joins
   the feed flags in `SYNCED_SETTING_KEYS`. The corp wallet thresholds follow it
   for consistency of the settings model, though nothing projects them today.
+
 ## Scope decisions (round 46) — People beside Money on the corp overview (#345)
 
 - **People was always intended on the `/corp` overview; it was never cut.**
