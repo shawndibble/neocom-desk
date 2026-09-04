@@ -1,9 +1,14 @@
 /**
  * Pure per-character Notification Event toggle helpers.
  *
- * Every event is on by default (CONTEXT.md round 20), so absence from the map
- * means enabled, not unset — mirroring `assetSelection.ts`'s tri-state shape
- * but keyed by event id with a default-true map instead of a `Set`.
+ * Every event is on by default for both channels (CONTEXT.md round 20), so
+ * absence from the map means enabled, not unset — mirroring
+ * `assetSelection.ts`'s tri-state shape but keyed by event id with a
+ * default-true map instead of a `Set`. `marketOrderFilled` and
+ * `walletBalanceChanged` are the exception (CONTEXT.md round 45): they
+ * default to feed-on/browser-off, the same reasoning in reverse as
+ * `eveTypeDefaultFor`'s default below — worth a row, not worth an
+ * interruption.
  *
  * A toggle is now **per delivery channel**: an event can raise a browser
  * notification but stay out of the Overview feed, or the reverse. The two are
@@ -28,15 +33,29 @@ export type EventChannelState = boolean | Partial<Record<NotificationChannel, bo
 
 export type EventEnabledMap = Partial<Record<NotificationEventId, EventChannelState>>;
 
+/**
+ * Events that default to feed-on/browser-off instead of on-for-both
+ * (CONTEXT.md round 45) — worth a row, not worth an interruption.
+ */
+const EVENTS_FEED_ONLY_BY_DEFAULT: ReadonlySet<NotificationEventId> = new Set([
+  'marketOrderFilled',
+  'walletBalanceChanged',
+]);
+
+function eventDefaultFor(eventId: NotificationEventId, channel: NotificationChannel): boolean {
+  if (channel === 'browser' && EVENTS_FEED_ONLY_BY_DEFAULT.has(eventId)) return false;
+  return true;
+}
+
 export function isEventEnabledFor(
   map: EventEnabledMap,
   eventId: NotificationEventId,
   channel: NotificationChannel
 ): boolean {
   const state = map[eventId];
-  if (state === undefined) return true;
+  if (state === undefined) return eventDefaultFor(eventId, channel);
   if (typeof state === 'boolean') return state;
-  return state[channel] ?? true;
+  return state[channel] ?? eventDefaultFor(eventId, channel);
 }
 
 export function selectionStateForEvents(

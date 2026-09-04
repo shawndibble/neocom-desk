@@ -39,6 +39,27 @@ describe('isEventEnabledFor', () => {
   });
 });
 
+describe('isEventEnabledFor — feed-only defaults', () => {
+  it('defaults marketOrderFilled and walletBalanceChanged to feed-on, browser-off — unlike the default-both-on rule above', () => {
+    for (const eventId of ['marketOrderFilled', 'walletBalanceChanged'] as const) {
+      expect(isEventEnabledFor({}, eventId, 'browser')).toBe(false);
+      expect(isEventEnabledFor({}, eventId, 'feed')).toBe(true);
+    }
+  });
+
+  it('lets an explicit preference win over the feed-only default', () => {
+    const map: EventEnabledMap = { marketOrderFilled: { browser: true } };
+    expect(isEventEnabledFor(map, 'marketOrderFilled', 'browser')).toBe(true);
+    expect(isEventEnabledFor(map, 'marketOrderFilled', 'feed')).toBe(true);
+  });
+
+  it('reads a legacy bare boolean for a feed-only event as applying to both channels regardless of the new default', () => {
+    const legacy: EventEnabledMap = { walletBalanceChanged: true };
+    expect(isEventEnabledFor(legacy, 'walletBalanceChanged', 'browser')).toBe(true);
+    expect(isEventEnabledFor(legacy, 'walletBalanceChanged', 'feed')).toBe(true);
+  });
+});
+
 describe('selectionStateForEvents', () => {
   it('is per column', () => {
     const map: EventEnabledMap = { [A]: { browser: false }, [B]: { browser: false } };
