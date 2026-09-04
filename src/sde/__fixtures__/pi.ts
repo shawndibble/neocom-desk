@@ -24,6 +24,15 @@ const INFRASTRUCTURE: PiInfrastructure = {
     storage: { cpu: 500, powergrid: 700, capacity: 12_000 },
     launchpad: { cpu: 3_600, powergrid: 700, capacity: 10_000 },
   },
+  // The Temperate variant of each pin, enough for a fixture to name one.
+  pinKindByTypeId: {
+    3068: 'extractorControlUnit',
+    2481: 'basic',
+    2480: 'advanced',
+    2482: 'highTech',
+    2562: 'storage',
+    2256: 'launchpad',
+  },
   extractorHead: { cpu: 110, powergrid: 550 },
   commandCenterUpgrades: [
     { level: 0, cpu: 1_675, powergrid: 6_000 },

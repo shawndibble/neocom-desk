@@ -447,6 +447,23 @@ export interface UniverseSystem {
   system_id: number;
   name: string;
   security_status: number;
+  /**
+   * The system's planets, and each planet's own moons and asteroid belts.
+   * Optional because a system can have none — the shattered Thera-like and
+   * Abyssal systems do — and ESI then omits the field rather than sending an
+   * empty array.
+   *
+   * This is the only way to learn what a system a Character has no colony on
+   * holds: `/characters/{id}/planets` covers owned colonies only. A planet's
+   * type then comes from `/universe/planets/{planet_id}`, whose `type_id`
+   * maps through `PiData.planetTypeByTypeId` to the same `PlanetType` string
+   * an owned colony reports.
+   */
+  planets?: {
+    planet_id: number;
+    moons?: number[];
+    asteroid_belts?: number[];
+  }[];
 }
 
 export function getUniverseSystem(

@@ -8,8 +8,10 @@ import {
   checkThroughput,
   fitColony,
   pinsLoad,
+  planColony,
   singleFactoryChain,
   singleFactoryRate,
+  spareCapacity,
 } from './pinBudget';
 
 // The real snapshot, same reasoning as chain.test.ts: the pin counts below are
@@ -39,6 +41,16 @@ const FIXTURE_INFRASTRUCTURE: PiInfrastructure = {
     highTech: { cpu: 1_100, powergrid: 400, capacity: 0 },
     storage: { cpu: 500, powergrid: 700, capacity: 12_000 },
     launchpad: { cpu: 3_600, powergrid: 700, capacity: 10_000 },
+  },
+  // Only the Temperate variants; the snapshot check at the bottom asserts the
+  // shipped map covers every kind.
+  pinKindByTypeId: {
+    3068: 'extractorControlUnit',
+    2481: 'basic',
+    2480: 'advanced',
+    2482: 'highTech',
+    2562: 'storage',
+    2256: 'launchpad',
   },
   extractorHead: { cpu: 110, powergrid: 550 },
   commandCenterUpgrades: [
@@ -126,15 +138,24 @@ describe('chainBlockPins', () => {
 describe('pinsLoad', () => {
   it('charges every extractor head on top of its ECU', () => {
     const load = pinsLoad({ extractorControlUnit: 2 }, FIXTURE_INFRASTRUCTURE, {
-      headsPerExtractor: 6,
+      extractorHeads: 12,
     });
     // 2 ECUs at 400/2,600, plus 12 heads at 110/550.
     expect(load).toEqual({ cpu: 2 * 400 + 12 * 110, powergrid: 2 * 2_600 + 12 * 550 });
   });
 
-  it('charges nothing for heads on a block with no extractors', () => {
+  it('takes a total head count, not a per-ECU one, so a real colony’s uneven extractors add up honestly', () => {
+    // Two live ECUs, one with 10 heads and one with 3. No per-extractor
+    // average describes that; the total does.
+    const load = pinsLoad({ extractorControlUnit: 2 }, FIXTURE_INFRASTRUCTURE, {
+      extractorHeads: 13,
+    });
+    expect(load).toEqual({ cpu: 2 * 400 + 13 * 110, powergrid: 2 * 2_600 + 13 * 550 });
+  });
+
+  it('charges nothing for heads on a pin set with no extractors', () => {
     const load = pinsLoad({ advanced: 1, basic: 2 }, FIXTURE_INFRASTRUCTURE, {
-      headsPerExtractor: 10,
+      extractorHeads: 0,
     });
     expect(load).toEqual({ cpu: 500 + 400, powergrid: 700 + 1_600 });
   });
@@ -208,6 +229,13 @@ describe('fitColony', () => {
     expect(() =>
       fitColony({ ...options, headsPerExtractor: EXTRACTOR_HEADS_MAX + 1 })
     ).toThrowError(/heads/i);
+  });
+
+  it('rejects an empty block rather than reporting it as a dead end', () => {
+    // Zero blocks with nothing limiting them is what "the overhead alone
+    // overruns" means, so a block that draws nothing must not reach that
+    // branch and read as the same answer.
+    expect(() => fitColony({ ...options, block: {} })).toThrowError(/block/i);
   });
 });
 
@@ -292,7 +320,89 @@ describe('checkThroughput', () => {
   });
 });
 
+describe('planColony', () => {
+  const base = {
+    infrastructure: FIXTURE_INFRASTRUCTURE,
+    budget: LEVEL_4,
+    overhead: { launchpads: 1, storageFacilities: 0 },
+    headsPerExtractor: 6,
+    linkCapacityPerHour: 40_000,
+    bufferHours: 24,
+  };
+
+  it('takes a chain and answers with the fit and the throughput in one call', () => {
+    const result = planColony(TEST_CULTURES, pi, { ...base, sourcingFloor: 'P1' });
+    expect(result.status).toBe('planned');
+    if (result.status !== 'planned') throw new Error('unreachable');
+    // One Advanced Industry Facility a block: CPU allows 35, Powergrid 23.
+    expect(result.block).toEqual({ advanced: 1 });
+    expect(result.fit.blocks).toBe(23);
+    expect(result.fit.limitedBy).toEqual(['powergrid']);
+    // And this is why throughput is checked at all: the CPU/Powergrid fit is
+    // happy at 23 factories, and a day of their output does not fit in the
+    // one launchpad the overhead gave them. A layout can clear the budget and
+    // still stall.
+    expect(result.throughput.verdict).toBe('buffer-overflow');
+  });
+
+  it('clears the same layout once the overhead buffers through storage', () => {
+    const result = planColony(TEST_CULTURES, pi, {
+      ...base,
+      sourcingFloor: 'P1',
+      overhead: { launchpads: 1, storageFacilities: 1 },
+    });
+    expect(result.status).toBe('planned');
+    if (result.status !== 'planned') throw new Error('unreachable');
+    expect(result.throughput.verdict).toBe('ok');
+    // The storage facility costs a factory's worth of budget to buy that
+    // buffer, which is the trade the caller is being asked to make.
+    expect(result.fit.blocks).toBe(22);
+  });
+
+  it('passes the refusal straight through instead of making the caller unwrap it', () => {
+    const result = planColony(TEST_CULTURES, pi, {
+      ...base,
+      sourcingFloor: 'P0',
+      extractionRatePerHour: null,
+    });
+    expect(result.status).toBe('needs-extraction-rate');
+    if (result.status !== 'needs-extraction-rate') throw new Error('unreachable');
+    expect(result.p0PerHour).toHaveLength(2);
+  });
+
+  it('has nothing to plan for a P0 resource, which no factory makes', () => {
+    const microorganisms = pi.raw.find((r) => r.name === 'Microorganisms')!;
+    const result = planColony(microorganisms.typeID, pi, { ...base, sourcingFloor: 'P1' });
+    expect(result.status).toBe('not-a-product');
+  });
+
+  it('reports a dead end rather than a plan when the budget cannot host the layout', () => {
+    const result = planColony(TEST_CULTURES, pi, {
+      ...base,
+      budget: FIXTURE_INFRASTRUCTURE.commandCenterUpgrades[0],
+      sourcingFloor: 'P1',
+    });
+    expect(result.status).toBe('planned');
+    if (result.status !== 'planned') throw new Error('unreachable');
+    expect(result.fit.blocks).toBe(0);
+    expect(result.fit.limitedBy).toEqual([]);
+  });
+});
+
 describe('the shipped snapshot', () => {
+  it('names a kind for every pin typeID a live colony can report', () => {
+    const byTypeId = pi.infrastructure.pinKindByTypeId;
+    // 2481 Temperate Basic Industry Facility, 2552 Ice Launchpad,
+    // 3068 Temperate Extractor Control Unit.
+    expect(byTypeId['2481']).toBe('basic');
+    expect(byTypeId['2552']).toBe('launchpad');
+    expect(byTypeId['3068']).toBe('extractorControlUnit');
+    // The Command Center supplies the budget and draws nothing from it, so it
+    // is deliberately not a pin kind.
+    expect(byTypeId['2254']).toBeUndefined();
+    expect(new Set(Object.values(byTypeId))).toEqual(new Set(Object.keys(pi.infrastructure.pins)));
+  });
+
   it('carries the ESI-confirmed pin costs the fixture above asserts', () => {
     expect(pi.infrastructure.pins).toEqual(FIXTURE_INFRASTRUCTURE.pins);
     expect(pi.infrastructure.extractorHead).toEqual(FIXTURE_INFRASTRUCTURE.extractorHead);
@@ -326,5 +436,44 @@ describe('the shipped snapshot', () => {
     const p4 = pi.schematics[String(BROADCAST_NODE)];
     expect(p4.facility).toBe('highTech');
     expect(p4.planetTypes).toEqual(['barren', 'temperate']);
+  });
+});
+
+describe('spareCapacity', () => {
+  it('says how many more of each pin kind the leftover budget holds', () => {
+    const spare = spareCapacity({ cpu: 6_620, powergrid: 14_800 }, LEVEL_4, FIXTURE_INFRASTRUCTURE);
+    // 14,695 tf and 2,200 MW left. Powergrid is what runs out: 2 basic
+    // (800 MW each), 3 advanced or storage (700), 3 launchpads (700), and no
+    // extractor at all — an ECU alone wants 2,600 MW.
+    expect(spare).toEqual({
+      extractorControlUnit: 0,
+      basic: 2,
+      advanced: 3,
+      highTech: 5,
+      storage: 3,
+      launchpad: 3,
+    });
+  });
+
+  it('is zero everywhere once the colony is over budget, never negative', () => {
+    const spare = spareCapacity(
+      { cpu: 30_000, powergrid: 30_000 },
+      LEVEL_4,
+      FIXTURE_INFRASTRUCTURE
+    );
+    expect(Object.values(spare).every((count) => count === 0)).toBe(true);
+  });
+
+  it('counts an extractor with the heads it would actually carry', () => {
+    const budget = { cpu: 10_000, powergrid: 20_000 };
+    const bare = spareCapacity({ cpu: 0, powergrid: 0 }, budget, FIXTURE_INFRASTRUCTURE, {
+      headsPerExtractor: 0,
+    });
+    const loaded = spareCapacity({ cpu: 0, powergrid: 0 }, budget, FIXTURE_INFRASTRUCTURE, {
+      headsPerExtractor: 10,
+    });
+    // 20,000 MW / 2,600 bare, against 20,000 / (2,600 + 10 x 550).
+    expect(bare.extractorControlUnit).toBe(7);
+    expect(loaded.extractorControlUnit).toBe(2);
   });
 });

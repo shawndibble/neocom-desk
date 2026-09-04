@@ -148,6 +148,14 @@ export interface PiInfrastructure {
   /** Per-pin CPU/Powergrid cost and capacity, one entry per `PiPinKind`. */
   pins: Record<PiPinKind, PiPinSpec>;
   /**
+   * Pin typeID -> its kind. Every pin is planet-type-specific — a Temperate
+   * Basic Industry Facility and a Storm one are different typeIDs at the same
+   * cost — so this is how a live colony's own `pins[]` is read: the ESI pin
+   * carries a `type_id` and nothing else that says what it is. Command
+   * Centers are absent: they supply the budget and draw nothing from it.
+   */
+  pinKindByTypeId: Record<string, PiPinKind>;
+  /**
    * One Extractor Control Unit head's own draw, on top of the ECU's
    * (attributes 1690/1691). A head is fitted per resource-reach, so its cost
    * scales with how many the user places rather than being part of the ECU.

@@ -253,9 +253,11 @@ export interface ColonyFit {
   /** The budget it was fitted against, echoed so a caller can render a meter without re-deriving it. */
   budget: PinLoad;
   /**
-   * Which of the two ceilings stopped the count going higher. Both when they
-   * bind at once; null when the overhead alone does not fit, which is not a
-   * scaling limit but a dead end.
+   * Which of the two ceilings stopped the count going higher — both, when
+   * they bind at once. Empty means the overhead alone does not fit, which is
+   * a dead end rather than a scaling limit: the fix is a Command Center
+   * Upgrades level, not fewer factories. A block that does not fit even once
+   * still names its ceiling, so empty is that one answer and nothing else.
    */
   limitedBy: readonly ('cpu' | 'powergrid')[];
 }

@@ -19,6 +19,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { ExtractorTimeline } from '@/features/pi/ExtractorTimeline';
 import { PlanPanel } from '@/features/pi/PlanPanel';
+import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
 import { loadPiRosterSnapshot, type PiRosterSnapshot } from '@/features/pi/roster';
 import { loadPlanetName, loadSchematicName } from '@/features/pi/names';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -512,7 +513,18 @@ function ColonyPanel({
 }
 
 /** Which peer view is showing. `colonies` is the default and needs no URL param. */
-type PiTab = 'colonies' | 'plan';
+type PiTab = 'colonies' | 'plan' | 'advisor';
+
+const PI_TABS: readonly PiTab[] = ['colonies', 'plan', 'advisor'];
+
+function parseTab(value: string | null): PiTab {
+  return PI_TABS.includes(value as PiTab) && value !== 'colonies' ? (value as PiTab) : 'colonies';
+}
+
+function parsePositiveInt(value: string | null): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
 
 /**
  * Planetary Industry: colony health from extractor expiry — the one PI field
@@ -525,7 +537,8 @@ type PiTab = 'colonies' | 'plan';
  * planner answers on day one. A second nav entry would also cost a row in the
  * mobile nav sheet, which is the surface that can least afford one.
  *
- * The tab and the planned commodity live in the URL (`?tab=plan&type=2867`)
+ * The tab, the planned commodity and the Advisor's system live in the URL
+ * (`?tab=plan&type=2867`, `?tab=advisor&system=30002187`)
  * so a plan survives a reload and can be deep-linked into later. Both fall
  * back silently: an unknown tab is `colonies`, and an unknown type is handled
  * by the planner picking its own default rather than rendering nothing.
@@ -536,15 +549,15 @@ export function PlanetaryIndustry() {
   const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadPiSnapshot);
 
-  const tab: PiTab = searchParams.get('tab') === 'plan' ? 'plan' : 'colonies';
-  const typeParam = Number(searchParams.get('type'));
-  const plannedTypeId = Number.isInteger(typeParam) && typeParam > 0 ? typeParam : null;
+  const tab: PiTab = parseTab(searchParams.get('tab'));
+  const plannedTypeId = parsePositiveInt(searchParams.get('type'));
+  const advisorSystemId = parsePositiveInt(searchParams.get('system'));
 
   const setTab = useCallback(
     (next: string) => {
       const params = new URLSearchParams(searchParams);
-      if (next === 'plan') params.set('tab', 'plan');
-      else params.delete('tab');
+      if (next === 'colonies') params.delete('tab');
+      else params.set('tab', next);
       setSearchParams(params, { replace: true });
     },
     [searchParams, setSearchParams]
@@ -554,6 +567,15 @@ export function PlanetaryIndustry() {
     (next: number) => {
       const params = new URLSearchParams(searchParams);
       params.set('type', String(next));
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
+
+  const setAdvisorSystemId = useCallback(
+    (next: number) => {
+      const params = new URLSearchParams(searchParams);
+      params.set('system', String(next));
       setSearchParams(params, { replace: true });
     },
     [searchParams, setSearchParams]
@@ -623,10 +645,17 @@ export function PlanetaryIndustry() {
         tabs={[
           { id: 'colonies', label: t('piPlan.coloniesTab') },
           { id: 'plan', label: t('piPlan.planTab') },
+          { id: 'advisor', label: t('piPlan.advisorTab') },
         ]}
       />
 
-      {tab === 'plan' ? (
+      {tab === 'advisor' ? (
+        <AdvisorPanel
+          characterId={activeCharacterId}
+          systemId={advisorSystemId}
+          onSystemIdChange={setAdvisorSystemId}
+        />
+      ) : tab === 'plan' ? (
         <PlanPanel
           characterId={activeCharacterId}
           typeId={plannedTypeId}

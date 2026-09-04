@@ -609,6 +609,7 @@ async function main() {
     return PROCESSOR_KINDS.find(([suffix]) => t.name.endsWith(suffix))?.[1];
   };
   const piPinSpecs = {};
+  const piPinKindByTypeId = {}; // pin typeID -> kind, for reading a live colony's own pins
   const piPinsByKind = new Map(); // kind -> [{ typeID, name, cpu, powergrid, capacity }]
   const piPinPlanetTypes = new Map(); // pin typeID -> PlanetType
   const piUnclassifiedPins = [];
@@ -660,6 +661,7 @@ async function main() {
       const list = piPinsByKind.get(kind) ?? [];
       list.push({ typeID, name: t.name, ...spec });
       piPinsByKind.set(kind, list);
+      piPinKindByTypeId[typeID] = kind;
 
       if (kind === 'extractorControlUnit') {
         const head = {
@@ -827,6 +829,7 @@ async function main() {
     raw: piRaw,
     infrastructure: {
       pins: Object.fromEntries(PIN_KINDS.map((kind) => [kind, piPinSpecs[kind]])),
+      pinKindByTypeId: piPinKindByTypeId,
       extractorHead: piExtractorHead,
       commandCenterUpgrades: CC_UPGRADE_LEVELS,
     },

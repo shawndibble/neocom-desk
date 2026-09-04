@@ -5,8 +5,10 @@ import {
   hasUnverifiedExtractors,
   factorySchematicId,
   groupFactoryPins,
+  colonyPinLoad,
 } from './adapters';
 import type { PlanetPin } from '@/esi/endpoints';
+import { piFixture } from '@/sde/__fixtures__/pi';
 
 const extractorHeads = [{ head_id: 1, latitude: 0, longitude: 0 }];
 
@@ -292,5 +294,61 @@ describe('hasUnverifiedExtractors', () => {
       extractor_details: { heads: extractorHeads },
     };
     expect(hasUnverifiedExtractors([pin])).toBe(true);
+  });
+});
+
+describe('colonyPinLoad', () => {
+  const pi = piFixture();
+  const head = (id: number) => ({ head_id: id, latitude: 0, longitude: 0 });
+  const pin = (pin_id: number, type_id: number, extra: Partial<PlanetPin> = {}): PlanetPin => ({
+    pin_id,
+    type_id,
+    latitude: 0,
+    longitude: 0,
+    ...extra,
+  });
+
+  it('counts a live colony’s own pins by kind, and its heads one by one', () => {
+    // Two Temperate extractors with 10 and 3 heads, one Basic and one
+    // Advanced facility, and a launchpad.
+    const result = colonyPinLoad(
+      [
+        pin(1, 3068, { extractor_details: { heads: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(head) } }),
+        pin(2, 3068, { extractor_details: { heads: [1, 2, 3].map(head) } }),
+        pin(3, 2481, { factory_details: { schematic_id: 133 } }),
+        pin(4, 2480, { factory_details: { schematic_id: 65 } }),
+        pin(5, 2256),
+      ],
+      pi
+    );
+    expect(result.counts).toEqual({
+      extractorControlUnit: 2,
+      basic: 1,
+      advanced: 1,
+      launchpad: 1,
+    });
+    expect(result.extractorHeads).toBe(13);
+    expect(result.unknownTypeIds).toEqual([]);
+    // 2 ECUs + 13 heads + basic + advanced + launchpad.
+    expect(result.load).toEqual({
+      cpu: 2 * 400 + 13 * 110 + 200 + 500 + 3_600,
+      powergrid: 2 * 2_600 + 13 * 550 + 800 + 700 + 700,
+    });
+  });
+
+  it('names a pin it cannot classify instead of dropping it silently', () => {
+    // A Command Center is a real pin ESI reports and deliberately not a kind:
+    // it supplies the budget rather than drawing on it. A typeID the payload
+    // has never heard of lands here too, and either way the caller can say
+    // the meter is incomplete rather than showing it as measured.
+    const result = colonyPinLoad([pin(1, 2254), pin(2, 999_999), pin(3, 2256)], pi);
+    expect(result.counts).toEqual({ launchpad: 1 });
+    expect(result.unknownTypeIds).toEqual([2254, 999999]);
+  });
+
+  it('charges no heads for an extractor pin ESI sent without any', () => {
+    const result = colonyPinLoad([pin(1, 3068)], pi);
+    expect(result.extractorHeads).toBe(0);
+    expect(result.load).toEqual({ cpu: 400, powergrid: 2_600 });
   });
 });

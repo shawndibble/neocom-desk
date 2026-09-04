@@ -52,7 +52,7 @@
  * imports.
  */
 
-import type { PiData, PiInfrastructure, PiPinKind } from '@/sde/types';
+import type { PiData, PiInfrastructure, PiPinKind, PiPinSpec } from '@/sde/types';
 import { SOURCING_FLOOR_TIER, expandChain } from './chain';
 import type {
   ColonyFit,
@@ -207,26 +207,26 @@ export function chainBlockPins(
  * — a head has its own CPU and Powergrid cost, so a ten-head extractor costs
  * over three times a one-head extractor and a layout that ignores heads
  * under-reports every extraction planet.
+ *
+ * `extractorHeads` is the **total** across the whole pin set, not a per-ECU
+ * figure. A real colony's extractors are not uniform — each ECU's heads were
+ * placed by hand, and ESI reports each one's own `heads` array — so a per-ECU
+ * average would be a number no colony actually has. A hypothetical layout
+ * multiplies its own uniform count up before calling.
  */
 export function pinsLoad(
   counts: PinCounts,
   infrastructure: PiInfrastructure,
-  opts: { headsPerExtractor: number }
+  opts: { extractorHeads: number }
 ): PinLoad {
-  const { headsPerExtractor } = opts;
-  let cpu = 0;
-  let powergrid = 0;
+  let cpu = infrastructure.extractorHead.cpu * opts.extractorHeads;
+  let powergrid = infrastructure.extractorHead.powergrid * opts.extractorHeads;
   for (const [kind, count] of Object.entries(counts) as [PiPinKind, number][]) {
     if (!count) continue;
     const spec = infrastructure.pins[kind];
     if (!spec) throw new Error(`no cost data for pin kind ${kind}`);
     cpu += spec.cpu * count;
     powergrid += spec.powergrid * count;
-    if (kind === 'extractorControlUnit') {
-      const heads = count * headsPerExtractor;
-      cpu += infrastructure.extractorHead.cpu * heads;
-      powergrid += infrastructure.extractorHead.powergrid * heads;
-    }
   }
   return { cpu, powergrid };
 }
@@ -270,11 +270,18 @@ export function fitColony(opts: FitColonyOptions): ColonyFit {
     );
   }
 
+  // An empty block has no scale to solve for, and letting one through would
+  // return zero blocks with nothing limiting them — which is exactly the
+  // signal reserved for "the overhead alone overruns". Two different answers
+  // must not share one shape.
+  const blockPinCount = Object.values(block).reduce((sum, count) => sum + (count ?? 0), 0);
+  if (blockPinCount <= 0) throw new Error('fitColony needs a block with at least one pin in it');
+
   const overheadPins: PinCounts = {
     launchpad: overhead.launchpads,
     storage: overhead.storageFacilities,
   };
-  const overheadLoad = pinsLoad(overheadPins, infrastructure, { headsPerExtractor });
+  const overheadLoad = pinsLoad(overheadPins, infrastructure, { extractorHeads: 0 });
   const cpuLeft = budget.cpu - overheadLoad.cpu;
   const powergridLeft = budget.powergrid - overheadLoad.powergrid;
   if (cpuLeft < 0 || powergridLeft < 0) {
@@ -287,29 +294,72 @@ export function fitColony(opts: FitColonyOptions): ColonyFit {
     };
   }
 
-  const blockLoad = pinsLoad(block, infrastructure, { headsPerExtractor });
+  const blockLoad = pinsLoad(block, infrastructure, {
+    extractorHeads: (block.extractorControlUnit ?? 0) * headsPerExtractor,
+  });
   // A block that draws nothing on an axis is not limited by it; treating
-  // "divide by zero" as unbounded is the honest reading.
+  // "divide by zero" as unbounded is the honest reading. Both axes unbounded
+  // is impossible here — the block has a pin, and every pin costs something.
   const cpuBlocks = blockLoad.cpu > 0 ? cpuLeft / blockLoad.cpu : Infinity;
   const powergridBlocks = blockLoad.powergrid > 0 ? powergridLeft / blockLoad.powergrid : Infinity;
-  const blocks = Number.isFinite(Math.min(cpuBlocks, powergridBlocks))
-    ? floorBlocks(Math.min(cpuBlocks, powergridBlocks))
-    : 0;
+  const blocks = floorBlocks(Math.min(cpuBlocks, powergridBlocks));
 
   const limitedBy: ('cpu' | 'powergrid')[] = [];
-  if (blocks > 0) {
-    if (floorBlocks(cpuBlocks) === blocks) limitedBy.push('cpu');
-    if (floorBlocks(powergridBlocks) === blocks) limitedBy.push('powergrid');
-  }
+  if (floorBlocks(cpuBlocks) === blocks) limitedBy.push('cpu');
+  if (floorBlocks(powergridBlocks) === blocks) limitedBy.push('powergrid');
 
   const pins = merge(overheadPins, scale(block, blocks));
   return {
     blocks,
     pins,
-    used: pinsLoad(pins, infrastructure, { headsPerExtractor }),
+    used: pinsLoad(pins, infrastructure, {
+      extractorHeads: (pins.extractorControlUnit ?? 0) * headsPerExtractor,
+    }),
     budget,
     limitedBy,
   };
+}
+
+/**
+ * How many more of each pin kind the leftover budget holds — the measured
+ * headroom on a colony that already exists.
+ *
+ * `fitColony` answers "how big could this layout be"; this answers "what
+ * could I still add to the layout I have". A built colony's `used` is read
+ * off its own pins (`features/pi/adapters.ts`'s `colonyPinLoad`), so nothing
+ * here is an estimate, and the per-kind answer is what makes the CPU/Powergrid
+ * meter actionable rather than decorative: one number says a colony is 87%
+ * full, six say it has room for three more factories and no extractor at all.
+ *
+ * Independent per kind, deliberately: these are alternatives, not a plan. Two
+ * of one and one of another may well not fit together.
+ */
+export function spareCapacity(
+  used: PinLoad,
+  budget: PinLoad,
+  infrastructure: PiInfrastructure,
+  opts: { headsPerExtractor?: number } = {}
+): Record<PiPinKind, number> {
+  const cpuLeft = Math.max(0, budget.cpu - used.cpu);
+  const powergridLeft = Math.max(0, budget.powergrid - used.powergrid);
+  const heads = opts.headsPerExtractor ?? 0;
+
+  const out = {} as Record<PiPinKind, number>;
+  for (const [kind, spec] of Object.entries(infrastructure.pins) as [PiPinKind, PiPinSpec][]) {
+    // An extractor is only worth counting with the heads it would carry —
+    // a head-less ECU extracts nothing, so its bare cost is not the price of
+    // a usable one.
+    const extraCpu = kind === 'extractorControlUnit' ? infrastructure.extractorHead.cpu * heads : 0;
+    const extraPowergrid =
+      kind === 'extractorControlUnit' ? infrastructure.extractorHead.powergrid * heads : 0;
+    const cpu = spec.cpu + extraCpu;
+    const powergrid = spec.powergrid + extraPowergrid;
+    const byCpu = cpu > 0 ? cpuLeft / cpu : Infinity;
+    const byPowergrid = powergrid > 0 ? powergridLeft / powergrid : Infinity;
+    const fits = Math.min(byCpu, byPowergrid);
+    out[kind] = Number.isFinite(fits) ? floorBlocks(fits) : 0;
+  }
+  return out;
 }
 
 export interface CheckThroughputOptions {
@@ -377,4 +427,63 @@ export function checkThroughput(
           : 'ok';
 
   return { verdict, flowPerHourM3, bufferM3, bufferNeedM3, linkCapacityPerHour };
+}
+
+export interface PlanColonyOptions extends ChainBlockOptions, ThroughputOptions {
+  budget: PinLoad;
+  infrastructure: PiInfrastructure;
+  overhead: FitColonyOptions['overhead'];
+  headsPerExtractor: number;
+}
+
+export type PlanColonyResult =
+  | {
+      status: 'planned';
+      /** The chain one target factory sustains — the shape the block repeats. */
+      chain: PiChain;
+      /** One ratio block's pins. */
+      block: PinCounts;
+      fit: ColonyFit;
+      throughput: ThroughputCheck;
+    }
+  | (Extract<ChainBlockResult, { status: 'needs-extraction-rate' }> & { chain: PiChain })
+  /** `typeId` is a P0 resource, or absent from the payload: no factory makes it, so there is no layout to plan. */
+  | { status: 'not-a-product' };
+
+/**
+ * One call from "what should this planet build" to "how much of it fits, and
+ * will it move".
+ *
+ * The three steps compose only one way — expand at one factory's rate, size
+ * the block, fit it, then check the throughput at the scale the fit arrived at
+ * — and the extraction-rate refusal has to be honoured before any of it. Left
+ * as three exported functions, every call site would re-derive that order and
+ * unwrap that refusal by hand, which is where a caller silently plans a
+ * colony against a guessed rate. So this is the entry point; the pieces stay
+ * exported for a caller that genuinely needs one of them alone (a built
+ * colony reads its own pins and only wants `pinsLoad`).
+ */
+export function planColony(typeId: number, pi: PiData, opts: PlanColonyOptions): PlanColonyResult {
+  const chain = singleFactoryChain(typeId, pi);
+  if (chain === null) return { status: 'not-a-product' };
+
+  const sized = chainBlockPins(chain, pi, opts);
+  if (sized.status === 'needs-extraction-rate') return { ...sized, chain };
+
+  const fit = fitColony({
+    budget: opts.budget,
+    infrastructure: opts.infrastructure,
+    overhead: opts.overhead,
+    block: sized.pins,
+    headsPerExtractor: opts.headsPerExtractor,
+  });
+  const throughput = checkThroughput(chain, pi, {
+    blocks: fit.blocks,
+    pins: fit.pins,
+    infrastructure: opts.infrastructure,
+    sourcingFloor: opts.sourcingFloor,
+    linkCapacityPerHour: opts.linkCapacityPerHour,
+    bufferHours: opts.bufferHours,
+  });
+  return { status: 'planned', chain, block: sized.pins, fit, throughput };
 }
