@@ -80,7 +80,6 @@ const server = setupServer(
   http.get(`${BASE}/characters/${CHAR_ID}/wallet/journal`, () =>
     HttpResponse.json(personalJournal)
   ),
-  http.get(`${BASE}/characters/${CHAR_ID}/wallet/transactions`, () => HttpResponse.json([])),
   http.get(`${BASE}/characters/${CHAR_ID}/loyalty/points`, () => HttpResponse.json([])),
   http.post(`${BASE}/universe/names`, () => HttpResponse.json([])),
   http.get(`${BASE}/characters/${CHAR_ID}/roles`, () => HttpResponse.json({ roles: ['Director'] })),
@@ -150,8 +149,8 @@ describe('Wallet: the switch is hidden without the capability (AC 1)', () => {
 
     expect(screen.queryByRole('group', { name: 'Wallet owner' })).toBeNull();
     expect(screen.queryByLabelText('Wallet division')).toBeNull();
-    // And the page still has all three of its own tabs.
-    expect(screen.getByRole('tab', { name: 'Transactions' })).toBeInTheDocument();
+    // And the page still has both of its own tabs.
+    expect(screen.getByRole('tab', { name: 'Journal' })).toBeInTheDocument();
   });
 
   it('renders no switch for a Director who has not granted the corp scopes', async () => {
@@ -218,31 +217,6 @@ describe('Wallet: the corporation side (AC 2, AC 3)', () => {
 
     expect(await screen.findByText('Master division payout')).toBeInTheDocument();
     expect(screen.queryByText('My bounty')).toBeNull();
-  });
-
-  /**
-   * ESI publishes no corp wallet *transactions* endpoint in this app's
-   * registry, so the tab has nothing to show and is dropped rather than left
-   * empty. A visitor already on it lands on the journal.
-   */
-  it('drops the Transactions tab on the corp side and falls back to the journal', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await findSwitch();
-    await user.click(screen.getByRole('tab', { name: 'Transactions' }));
-    await user.click(screen.getByRole('button', { name: 'Corporation' }));
-
-    expect(screen.queryByRole('tab', { name: 'Transactions' })).toBeNull();
-    expect(await screen.findByText('Master division payout')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Journal' })).toHaveAttribute('aria-selected', 'true');
-
-    // Back on the personal side the tab is there again, still selected.
-    await user.click(screen.getByRole('button', { name: 'Personal' }));
-    expect(await screen.findByRole('tab', { name: 'Transactions' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
   });
 
   it('gives the corp side its own DataAgeBadge value, not the personal one', async () => {

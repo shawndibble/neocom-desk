@@ -95,7 +95,10 @@ describe('NOTIFICATION_ROUTES against the real route table', () => {
   it('routes every event to a path the app actually serves', () => {
     const realRoutes = new Set<string>(Object.keys(ROUTE_REQUIREMENTS));
     for (const [eventId, route] of Object.entries(NOTIFICATION_ROUTES)) {
-      expect(realRoutes, `${eventId} -> ${route}`).toContain(route);
+      // A route may carry a query string (e.g. Market's own tab, `?section=`)
+      // that a route path never does — strip it before checking the path is real.
+      const [path] = route.split('?');
+      expect(realRoutes, `${eventId} -> ${route}`).toContain(path);
     }
   });
 

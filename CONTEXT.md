@@ -2214,3 +2214,44 @@ offeredScopes: Record<number, readonly Scope[]> }`. Round 37's "offered once
   confirmation are removed**, not left dead: Accept in the new Modal already
   performs that write and closes immediately, exactly like "Suggest
   reorder"'s Accept, so nothing renders the old confirmation text again.
+
+## Scope decisions (round 48) — Market's own tabs
+
+- **`/orders` (open + history) and Wallet's Transactions tab both moved onto
+  `/market` as top-level tabs: Market, Open Orders, History, Transactions.**
+  The round 3 glossary distinction between **Market Browser** and a
+  character's own **Market Orders** is unchanged as a _concept_ — this is a
+  routing/presentation consolidation, not a redefinition. `/orders` no longer
+  exists as a route; the nav's Orders link and Wallet's Transactions tab are
+  both gone. `loadOrders`/`loadOrderHistory`
+  (`features/character/orders.ts`) and `loadWalletTransactions`
+  (`features/character/wallet.ts`) are unchanged and unmoved — only their
+  call sites did.
+- **Each of the three character-scoped tabs owns its own `useRouteSnapshot`
+  call**, in its own component (`features/market/OpenOrdersPanel.tsx`,
+  `OrderHistoryPanel.tsx`, `TransactionsPanel.tsx`), rather than one merged
+  loader like the old `/orders` route's `loadOrdersSnapshot` (open + history
+  together). Splitting them means switching tabs only fetches the tab being
+  opened, and each still refreshes independently — a strict improvement over
+  the old always-fetch-both shape, not a behavior this round set out to change.
+- **Market Browser stays `UNGATED`; the three character-scoped tabs are each
+  panel-gated**, the same pattern `/wallet` already uses (each panel renders
+  its own `ReauthBanner` off its own `needsReauth`) — not a page-level scope
+  gate, which would hide the scope-free Browser tab from a character with no
+  grants at all.
+- **The top-level tab selection lives in a `?section=` query param**
+  (`browser` is the default and is never written to the URL), read once on
+  mount rather than kept in sync with browser back/forward — the same
+  "own tab state, not URL-synced" shape Wallet and the old `/orders` route
+  already had for their own tabs. The one exception: this is what lets the
+  `marketOrderFilled` notification (`features/notifications/notificationOptions.ts`)
+  deep-link straight to `/market?section=orders` instead of landing on the
+  Browser tab and stranding the visitor.
+- **This is the first `NOTIFICATION_ROUTES` entry to carry a query string.**
+  `notificationClick.ts`'s `isAlreadyThere` compared only `pathname` before
+  this round, which would have silently broken its already-there/no-navigate
+  optimization for this one event without failing (`navigate()` to the
+  current URL is a harmless no-op) — fixed to compare `pathname + search`.
+  `notificationOptions.test.ts`'s route-table check similarly strips a query
+  string before checking a route is real, since `ROUTE_REQUIREMENTS` keys are
+  bare paths.

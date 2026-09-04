@@ -31,7 +31,6 @@ import { Calendar } from '@/routes/Calendar';
 import { Contracts } from '@/routes/Contracts';
 import { Contacts } from '@/routes/Contacts';
 import { EmploymentHistory } from '@/routes/EmploymentHistory';
-import { Orders } from '@/routes/Orders';
 import { Settings } from '@/routes/Settings';
 import { Styleguide } from '@/routes/Styleguide';
 import { Layout } from './Layout';
@@ -88,7 +87,6 @@ const ROUTE_ELEMENTS = {
   '/calendar': <Calendar />,
   '/contracts': <Contracts />,
   '/contacts': <Contacts />,
-  '/orders': <Orders />,
   '/settings': <Settings />,
 } satisfies Record<AppRoutePath, ReactElement>;
 

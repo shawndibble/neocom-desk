@@ -16,15 +16,10 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
-import {
-  loadWalletBalanceWithStatus,
-  loadWalletJournal,
-  loadWalletTransactions,
-} from '@/features/character/wallet';
+import { loadWalletBalanceWithStatus, loadWalletJournal } from '@/features/character/wallet';
 import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
 import { resolveNames } from '@/features/character/names';
 import type { CachedResult, StatusResult } from '@/esi/cache';
-import { loadTypeNames } from '@/features/character/typeNames';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useCorpOwner } from '@/features/corp/owner';
@@ -39,20 +34,14 @@ import {
 import { formatIsk } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
-import {
-  transactionTotal,
-  walletTransactionsCsvColumns,
-} from '@/features/character/walletTransactionsCsv';
 import type {
   CharacterLoyaltyPoints,
   CorporationDivisions,
   CorporationWalletDivision,
   WalletJournalEntry,
-  WalletTransaction,
 } from '@/esi/endpoints';
 
-/** Stable identity, so the fallback doesn't invalidate the column memos every render. */
-const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
+/** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
 interface Snapshot {
@@ -62,10 +51,6 @@ interface Snapshot {
   journalResult: CachedResult<WalletJournalEntry[]> | null;
   /** Fewer pages came back than ESI advertised — the list below is partial. */
   journalTruncated: boolean;
-  transactionsResult: CachedResult<WalletTransaction[]> | null;
-  /** The fetch stopped at the transactions page cap; older history is missing. */
-  transactionsTruncated: boolean;
-  typeNames: Map<number, string>;
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   loyaltyNeedsReauth: boolean;
@@ -76,35 +61,24 @@ async function loadWalletSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [balanceStatus, journalResult, transactionsResult, loyaltyStatus] = await Promise.all([
+  const [balanceStatus, journalResult, loyaltyStatus] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
     loadWalletJournal(characterId),
-    loadWalletTransactions(characterId),
     loadCharacterLoyaltyPoints(characterId),
   ]);
   const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
   const { cached: loyaltyResult, needsReauth: loyaltyNeedsReauth } = loyaltyStatus;
   const journalTruncated = journalResult?.truncated ?? false;
-  const transactionsTruncated = transactionsResult?.truncated ?? false;
-  // Already superseded: skip the ESI name resolves, their results would be discarded.
-  const typeIds = signal.cancelled
-    ? []
-    : [...new Set((transactionsResult?.data ?? []).map((txn) => txn.type_id))];
+  // Already superseded: skip the ESI name resolve, its result would be discarded.
   const corporationIds = signal.cancelled
     ? []
     : (loyaltyResult?.data ?? []).map((entry) => entry.corporation_id);
-  const [typeNames, corporationNames] = await Promise.all([
-    loadTypeNames(typeIds),
-    resolveNames(corporationIds),
-  ]);
+  const corporationNames = await resolveNames(corporationIds);
   return {
     balanceResult,
     balanceNeedsReauth,
     journalResult,
     journalTruncated,
-    transactionsResult,
-    transactionsTruncated,
-    typeNames,
     loyaltyResult,
     loyaltyNeedsReauth,
     corporationNames,
@@ -129,7 +103,7 @@ async function loadCorpBalances(
 }
 
 interface CorpWalletViewProps {
-  tab: 'balance' | 'journal' | 'transactions';
+  tab: 'balance' | 'journal';
   balances: CorpBalancesSnapshot | null;
   balancesLoading: boolean;
   journalResult: CachedResult<WalletJournalEntry[]> | null;
@@ -147,8 +121,8 @@ interface CorpWalletViewProps {
  *
  * Reuses the page's own journal columns rather than declaring its own — ESI
  * returns the same schema for both journals, which is the whole reason this
- * direction works. There is no loyalty panel (that is a Character's own) and no
- * transactions tab (see `effectiveTab`).
+ * direction works. There is no loyalty panel (that is a Character's own); nor
+ * a Transactions tab (Market's own now — personal-only, see TransactionsPanel).
  */
 function CorpWalletView({
   tab,
@@ -256,8 +230,8 @@ function CorpWalletView({
 }
 
 /**
- * Wallet: ISK balance, journal, and recent transactions. Read-only, cached for
- * offline.
+ * Wallet: ISK balance and journal. Read-only, cached for offline. Recent
+ * transactions moved to Market's own Transactions tab.
  *
  * For a Character holding the corp wallet capability the same page also shows
  * the corporation's wallet, one division at a time (issue #298) — the same
@@ -270,7 +244,7 @@ export function Wallet() {
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadWalletSnapshot);
 
-  const [tab, setTab] = useState<'balance' | 'journal' | 'transactions'>('balance');
+  const [tab, setTab] = useState<'balance' | 'journal'>('balance');
 
   const {
     owner,
@@ -309,19 +283,12 @@ export function Wallet() {
     : (divisions[0]?.division ?? division);
   const selectedDivision = divisions.find((entry) => entry.division === effectiveDivision) ?? null;
 
-  // Transactions are personal-only, and that is a registry fact rather than a
-  // layout choice: ESI publishes a corp wallet transactions endpoint but #295
-  // registered only the journal, and nothing here may add one (`esi/scopes.ts`
-  // derives everything from `ESI_REGISTRY`). Landing on that tab and flipping
-  // the switch falls back to the journal rather than showing an empty third tab.
-  const effectiveTab = showingCorp && tab === 'transactions' ? 'journal' : tab;
-
   // Its own key, division included: ESI publishes no all-divisions journal and
   // each division caches separately (features/corp/wallet.ts). Gated on the tab
   // as well, so opening the corp side on Balance doesn't page a whole journal
   // nobody asked to see.
   const corpJournal = useCorpSnapshot<StatusResult<WalletJournalEntry[]> | null>(
-    showingCorp && effectiveTab === 'journal'
+    showingCorp && tab === 'journal'
       ? `${activeCharacterId}:${corporationId}:${effectiveDivision}`
       : null,
     async () =>
@@ -347,9 +314,6 @@ export function Wallet() {
   const balanceNeedsReauth = data?.balanceNeedsReauth ?? false;
   const journalResult = data?.journalResult ?? null;
   const journalTruncated = data?.journalTruncated ?? false;
-  const transactionsResult = data?.transactionsResult ?? null;
-  const transactionsTruncated = data?.transactionsTruncated ?? false;
-  const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
   const loyaltyResult = data?.loyaltyResult ?? null;
   const loyaltyNeedsReauth = data?.loyaltyNeedsReauth ?? false;
   const corporationNames = data?.corporationNames ?? NO_NAMES;
@@ -423,59 +387,9 @@ export function Wallet() {
     [t]
   );
 
-  const transactionColumns = useMemo<DataTableColumn<WalletTransaction>[]>(
-    () => [
-      {
-        id: 'date',
-        header: t('wallet.date'),
-        className: 'whitespace-nowrap text-text-dim',
-        render: (txn) => new Date(txn.date).toLocaleString(),
-      },
-      {
-        id: 'item',
-        header: t('wallet.item'),
-        /** Titles the card on a phone — the item is what the transaction is. */
-        primary: true,
-        render: (txn) => typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`,
-      },
-      {
-        id: 'side',
-        header: t('wallet.side'),
-        render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
-      },
-      {
-        id: 'quantity',
-        header: t('wallet.quantity'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (txn) => txn.quantity.toLocaleString(),
-      },
-      {
-        id: 'unitPrice',
-        header: t('wallet.unitPrice'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (txn) => formatIsk(txn.unit_price, 2),
-      },
-      {
-        id: 'total',
-        header: t('wallet.total'),
-        align: 'right',
-        className: 'tabular-nums',
-        cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
-        render: (txn) => formatIsk(transactionTotal(txn), 2),
-      },
-    ],
-    [t, typeNames]
-  );
-
   const journal = useMemo(
     () => [...(journalResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
     [journalResult]
-  );
-  const transactions = useMemo(
-    () => [...(transactionsResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
-    [transactionsResult]
   );
 
   const corpJournalResult = corpJournal.data?.cached ?? null;
@@ -544,25 +458,17 @@ export function Wallet() {
 
       <Tabs
         label={t('wallet.title')}
-        value={effectiveTab}
+        value={tab}
         onChange={(id) => setTab(id as typeof tab)}
-        tabs={
-          showingCorp
-            ? [
-                { id: 'balance', label: t('wallet.balanceTab') },
-                { id: 'journal', label: t('wallet.journalTab') },
-              ]
-            : [
-                { id: 'balance', label: t('wallet.balanceTab') },
-                { id: 'journal', label: t('wallet.journalTab') },
-                { id: 'transactions', label: t('wallet.transactionsTab') },
-              ]
-        }
+        tabs={[
+          { id: 'balance', label: t('wallet.balanceTab') },
+          { id: 'journal', label: t('wallet.journalTab') },
+        ]}
       />
 
       {showingCorp ? (
         <CorpWalletView
-          tab={effectiveTab}
+          tab={tab}
           balances={corpBalances.data}
           balancesLoading={corpBalances.loading}
           journalResult={corpJournalResult}
@@ -658,7 +564,7 @@ export function Wallet() {
             )}
           </Panel>
         </div>
-      ) : tab === 'journal' ? (
+      ) : (
         <Panel
           padded={false}
           title={t('wallet.journalTab')}
@@ -708,60 +614,6 @@ export function Wallet() {
                 columns={journalColumns}
                 rows={journal}
                 rowKey={(entry) => entry.id}
-              />
-            </>
-          )}
-        </Panel>
-      ) : (
-        <Panel
-          padded={false}
-          title={t('wallet.transactionsTab')}
-          actions={
-            transactionsResult ? (
-              <span className="flex items-center gap-2">
-                <IconButton
-                  size="sm"
-                  icon={<Icon.Download />}
-                  label={t('wallet.exportCsvTransactions')}
-                  disabled={transactions.length === 0}
-                  onClick={() =>
-                    downloadCsv(
-                      'wallet-transactions',
-                      transactions,
-                      walletTransactionsCsvColumns(t, (id) => typeNames.get(id) ?? `Type #${id}`),
-                      new Date(),
-                      transactionsTruncated
-                    )
-                  }
-                />
-                <DataAgeBadge date={transactionsResult.fetchedAt} />
-              </span>
-            ) : undefined
-          }
-        >
-          {!transactionsResult || transactions.length === 0 ? (
-            <EmptyState
-              title={t('wallet.transactionsEmptyTitle')}
-              hint={t('wallet.transactionsEmptyHint')}
-              className="py-8"
-            />
-          ) : (
-            <>
-              {transactionsResult.fromCache && (
-                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                  {t(offlineTitleKey)}
-                </p>
-              )}
-              {transactionsTruncated && (
-                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                  {t('wallet.transactionsCapped')}
-                </p>
-              )}
-              <DataTable
-                label={t('wallet.transactionsTab')}
-                columns={transactionColumns}
-                rows={transactions}
-                rowKey={(txn) => txn.transaction_id}
               />
             </>
           )}
