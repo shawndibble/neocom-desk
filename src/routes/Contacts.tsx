@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,11 +11,13 @@ import {
   Panel,
   ReauthBanner,
   Spinner,
+  StandingBar,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContacts } from '@/features/character/contacts';
+import { ContactContextMenu } from '@/features/character/ContactContextMenu';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterContact } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
@@ -85,6 +87,24 @@ export function Contacts() {
     return counts;
   }, [contacts]);
 
+  // Refreshing bumps useRouteSnapshot's epoch, which clears `data` (and so
+  // `contactsResult`/`countByCategory`) until the new load lands — remember
+  // the last successful counts so the filter chips (and the user's active
+  // selection) stay on screen through a refresh instead of disappearing.
+  // Switching character bumps the same epoch, so the remembered counts must
+  // be dropped there too — otherwise the outgoing character's chips would
+  // linger under the incoming one until its own load lands.
+  const [lastGoodCounts, setLastGoodCounts] = useState<Record<StandingCategory, number> | null>(
+    null
+  );
+  const [lastGoodCharacterId, setLastGoodCharacterId] = useState(activeCharacterId);
+  if (activeCharacterId !== lastGoodCharacterId) {
+    setLastGoodCharacterId(activeCharacterId);
+    setLastGoodCounts(null);
+  } else if (contactsResult && !contactsNeedsReauth && lastGoodCounts !== countByCategory) {
+    setLastGoodCounts(countByCategory);
+  }
+
   const filteredContacts = useMemo(
     () => contacts.filter((contact) => standingFilter.has(standingCategory(contact.standing))),
     [contacts, standingFilter]
@@ -97,6 +117,17 @@ export function Contacts() {
       else next.add(category);
       return next;
     });
+  }
+
+  function contactRowContextMenu(contact: CharacterContact, tr: ReactElement) {
+    return (
+      <ContactContextMenu
+        contact={contact}
+        name={contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`}
+      >
+        {tr}
+      </ContactContextMenu>
+    );
   }
 
   const columns = useMemo<DataTableColumn<CharacterContact>[]>(
@@ -118,9 +149,16 @@ export function Contacts() {
         id: 'standing',
         header: t('contacts.standing'),
         align: 'right',
-        className: 'tabular-nums font-semibold',
-        cellClassName: (contact) => STANDING_TONE[standingCategory(contact.standing)],
-        render: (contact) => contact.standing,
+        render: (contact) => (
+          <span className="inline-flex items-center justify-end gap-1.5">
+            <StandingBar value={contact.standing} />
+            <span
+              className={`tabular-nums font-semibold ${STANDING_TONE[standingCategory(contact.standing)]}`}
+            >
+              {contact.standing}
+            </span>
+          </span>
+        ),
         sortValue: (contact) => contact.standing,
       },
       {
@@ -165,25 +203,25 @@ export function Contacts() {
         }
       />
 
-      {!loading && contactsResult && !contactsNeedsReauth && (
+      {lastGoodCounts && (
         <div role="group" aria-label={t('contacts.standing')} className="flex flex-wrap gap-2">
           <FilterChip
             label={t('contacts.filterGood')}
             selected={standingFilter.has('good')}
             onToggle={() => toggleStandingFilter('good')}
-            count={countByCategory.good}
+            count={lastGoodCounts.good}
           />
           <FilterChip
             label={t('contacts.filterNeutral')}
             selected={standingFilter.has('neutral')}
             onToggle={() => toggleStandingFilter('neutral')}
-            count={countByCategory.neutral}
+            count={lastGoodCounts.neutral}
           />
           <FilterChip
             label={t('contacts.filterBad')}
             selected={standingFilter.has('bad')}
             onToggle={() => toggleStandingFilter('bad')}
-            count={countByCategory.bad}
+            count={lastGoodCounts.bad}
           />
         </div>
       )}
@@ -224,6 +262,7 @@ export function Contacts() {
               rows={filteredContacts}
               rowKey={(contact) => contact.contact_id}
               defaultSort={{ columnId: 'standing', direction: 'desc' }}
+              rowContextMenu={contactRowContextMenu}
             />
           )}
         </Panel>
