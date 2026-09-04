@@ -17,6 +17,7 @@ import { getMessaging, getToken } from 'firebase/messaging';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
 import { db } from '@/db';
+import type { ProjectionRow } from '@/engine/projection';
 import { getFirebaseApp, getSyncFunctions } from './firebaseApp';
 import { getDeviceId } from './deviceId';
 
@@ -27,6 +28,9 @@ interface RegisterDeviceResponse {
   registered: number[];
   rejected: number[];
 }
+
+/** No Projection to upload for a Character this call doesn't mention. */
+const NO_PROJECTION_ROWS: readonly ProjectionRow[] = [];
 
 function isIos(): boolean {
   return /iP(hone|ad|od)/.test(navigator.userAgent);
@@ -63,10 +67,18 @@ export function webPushSupport(): WebPushSupport {
  * currently stored on it. Returns `null` (not an error) when there is
  * nothing to register — no FCM token available, or no Character stored yet —
  * both ordinary, non-exceptional states.
+ *
+ * `projectionsByCharacter` is this call's Scheduled Push upload (issue #358,
+ * ADR 0010, CONTEXT.md round 45): each Character's whole 72-hour Projection
+ * window, replacing whatever the backend holds for that Character wholesale.
+ * A Character with no entry here (the default, an empty map) uploads an empty
+ * Projection — correct for a caller with nothing projectable to say, and for
+ * every call site before this ticket wired one up.
  */
 export async function registerDeviceForWebPush(
   vapidKey: string,
-  serviceWorkerRegistration: ServiceWorkerRegistration
+  serviceWorkerRegistration: ServiceWorkerRegistration,
+  projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]> = new Map()
 ): Promise<RegisterDeviceResponse | null> {
   const messaging = getMessaging(getFirebaseApp());
   const fcmToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
@@ -97,7 +109,11 @@ export async function registerDeviceForWebPush(
     {
       deviceId: string;
       fcmToken: string;
-      characters: { characterId: number; accessToken: string }[];
+      characters: {
+        characterId: number;
+        accessToken: string;
+        projectionRows: readonly ProjectionRow[];
+      }[];
     },
     RegisterDeviceResponse
   >(getSyncFunctions(), 'registerDevice');
@@ -105,7 +121,10 @@ export async function registerDeviceForWebPush(
   const result = await call({
     deviceId: getDeviceId(),
     fcmToken,
-    characters: withAccessTokens,
+    characters: withAccessTokens.map((character) => ({
+      ...character,
+      projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,
+    })),
   });
   return result.data;
 }

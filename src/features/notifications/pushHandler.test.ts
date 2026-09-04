@@ -18,9 +18,23 @@ const VALID_PAYLOAD: PushPayload = {
   body: "Aurelia's industry job for Tritanium is complete.",
 };
 
+/**
+ * The real FCM webpush wire shape: custom fields nested under `data`, every
+ * value a string (Admin SDK's `data` is `{[key: string]: string}`) — see
+ * `parsePushPayload`'s docstring for how this was confirmed against
+ * `@firebase/messaging`'s own service-worker source.
+ */
+function rawFcmPayload(payload: Partial<Record<keyof PushPayload, unknown>>): string {
+  return JSON.stringify({ data: payload });
+}
+
 describe('parsePushPayload', () => {
-  it('parses a well-formed payload', () => {
-    expect(parsePushPayload(JSON.stringify(VALID_PAYLOAD))).toEqual(VALID_PAYLOAD);
+  it('parses a well-formed payload nested under data, coercing characterId from a string', () => {
+    expect(
+      parsePushPayload(
+        rawFcmPayload({ ...VALID_PAYLOAD, characterId: String(VALID_PAYLOAD.characterId) })
+      )
+    ).toEqual(VALID_PAYLOAD);
   });
 
   it('returns null for no data at all', () => {
@@ -37,37 +51,66 @@ describe('parsePushPayload', () => {
     expect(parsePushPayload('"hello"')).toBeNull();
   });
 
-  it('returns null when characterId is missing or the wrong type', () => {
-    expect(parsePushPayload(JSON.stringify({ ...VALID_PAYLOAD, characterId: '12345' }))).toBeNull();
+  it('returns null when there is no data envelope at all', () => {
+    expect(parsePushPayload(JSON.stringify({ ...VALID_PAYLOAD }))).toBeNull();
+    expect(parsePushPayload(JSON.stringify({ notification: { title: 'x' } }))).toBeNull();
+  });
+
+  it('returns null when characterId is missing, non-numeric, or already a number', () => {
+    // Already a number is invalid too: real FCM data values are always
+    // strings, so a numeric characterId here can never come off the wire.
+    expect(
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId: VALID_PAYLOAD.characterId }))
+    ).toBeNull();
+    expect(
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId: 'not-a-number' }))
+    ).toBeNull();
     const { eventId, occurrenceKey, title, body } = VALID_PAYLOAD;
-    expect(parsePushPayload(JSON.stringify({ eventId, occurrenceKey, title, body }))).toBeNull();
+    expect(parsePushPayload(rawFcmPayload({ eventId, occurrenceKey, title, body }))).toBeNull();
   });
 
   it('returns null for an eventId outside the Notification Event catalog', () => {
+    const characterId = String(VALID_PAYLOAD.characterId);
     expect(
-      parsePushPayload(JSON.stringify({ ...VALID_PAYLOAD, eventId: 'notARealEvent' }))
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, eventId: 'notARealEvent' }))
     ).toBeNull();
   });
 
   it('returns null for a missing or empty occurrenceKey', () => {
-    expect(parsePushPayload(JSON.stringify({ ...VALID_PAYLOAD, occurrenceKey: '' }))).toBeNull();
-    expect(parsePushPayload(JSON.stringify({ ...VALID_PAYLOAD, occurrenceKey: 42 }))).toBeNull();
+    const characterId = String(VALID_PAYLOAD.characterId);
+    expect(
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, occurrenceKey: '' }))
+    ).toBeNull();
+    expect(
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, occurrenceKey: 42 }))
+    ).toBeNull();
   });
 
   it('returns null for a missing or empty title', () => {
-    expect(parsePushPayload(JSON.stringify({ ...VALID_PAYLOAD, title: '' }))).toBeNull();
-    expect(parsePushPayload(JSON.stringify({ ...VALID_PAYLOAD, title: undefined }))).toBeNull();
+    const characterId = String(VALID_PAYLOAD.characterId);
+    expect(
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, title: '' }))
+    ).toBeNull();
+    expect(
+      parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, title: undefined }))
+    ).toBeNull();
   });
 
   it('returns null when body is not a string', () => {
-    expect(parsePushPayload(JSON.stringify({ ...VALID_PAYLOAD, body: 42 }))).toBeNull();
+    const characterId = String(VALID_PAYLOAD.characterId);
+    expect(parsePushPayload(rawFcmPayload({ ...VALID_PAYLOAD, characterId, body: 42 }))).toBeNull();
   });
+});
+
+const VALID_RAW = rawFcmPayload({
+  ...VALID_PAYLOAD,
+  characterId: String(VALID_PAYLOAD.characterId),
 });
 
 describe('handlePush', () => {
   it('shows a notification carrying the payload title and body', async () => {
     const e = env();
-    await handlePush(e, JSON.stringify(VALID_PAYLOAD), Date.now());
+    await handlePush(e, VALID_RAW, Date.now());
 
     expect(e.showNotification).toHaveBeenCalledTimes(1);
     const [title, options] = vi.mocked(e.showNotification).mock.calls[0];
@@ -77,7 +120,7 @@ describe('handlePush', () => {
 
   it('tags and routes the notification the same way a poller-raised one would', async () => {
     const e = env();
-    await handlePush(e, JSON.stringify(VALID_PAYLOAD), Date.now());
+    await handlePush(e, VALID_RAW, Date.now());
 
     const [, options] = vi.mocked(e.showNotification).mock.calls[0];
     expect(options.tag).toBe(
@@ -89,7 +132,7 @@ describe('handlePush', () => {
   it('records a feed entry keyed by the Occurrence Key', async () => {
     const e = env();
     const now = 1_700_000_000_000;
-    await handlePush(e, JSON.stringify(VALID_PAYLOAD), now);
+    await handlePush(e, VALID_RAW, now);
 
     expect(e.recordFeedEntry).toHaveBeenCalledWith({
       id: VALID_PAYLOAD.occurrenceKey,
@@ -143,7 +186,7 @@ describe('handlePush', () => {
         throw new Error('permission revoked');
       }),
     });
-    await expect(handlePush(e, JSON.stringify(VALID_PAYLOAD), Date.now())).resolves.toBeUndefined();
+    await expect(handlePush(e, VALID_RAW, Date.now())).resolves.toBeUndefined();
   });
 
   it('resolves and still shows a notification when recordFeedEntry throws', async () => {
@@ -152,7 +195,7 @@ describe('handlePush', () => {
         throw new Error('db closed');
       }),
     });
-    await expect(handlePush(e, JSON.stringify(VALID_PAYLOAD), Date.now())).resolves.toBeUndefined();
+    await expect(handlePush(e, VALID_RAW, Date.now())).resolves.toBeUndefined();
     expect(e.showNotification).toHaveBeenCalledTimes(1);
   });
 });

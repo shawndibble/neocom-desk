@@ -14,6 +14,7 @@
  */
 import { db } from '@/db';
 import { occurrenceKey } from '@/engine/occurrenceKey';
+import type { ProjectionRow } from '@/engine/projection';
 import { loadUniverseType } from '@/features/skills/data';
 import { loadPlanetName } from '@/features/pi/names';
 import { resolveNames } from '@/features/character/names';
@@ -47,6 +48,7 @@ import { displayPageNotification, livePageDisplayEnv } from './display';
 import { notificationOptionsFor } from './notificationOptions';
 import { eveNotificationText } from './eveNotificationText';
 import { resolveEveNotificationNames } from './eveNotificationNames';
+import { uploadProjectionRows } from './projectionUpload';
 
 export type { AnyNotificationFire } from './pollDomains';
 
@@ -105,6 +107,14 @@ export interface PollDependencies {
     override?: { title: string; body: string }
   ) => Promise<void>;
   recordToFeed: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
+  /**
+   * This poll's Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round
+   * 45): every Character updated this poll, mapped to its whole 72-hour
+   * Projection window. Called once per poll — "every app open and every
+   * foreground poll" collapses to this one call site, since
+   * `ForegroundNotificationPoller` already runs a poll immediately on mount.
+   */
+  uploadProjection: (rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>) => Promise<void>;
 }
 
 /** Which delivery channels are live for this poll, before per-event opinions. */
@@ -164,6 +174,8 @@ interface CharacterUpdate {
   /** The snapshot this poll built per domain — absent for a domain it skipped. */
   snapshots: Map<DomainRun, unknown>;
   fires: AnyNotificationFire[];
+  /** This poll's contribution to the Scheduled Push upload (issue #358) — see `PollDependencies.uploadProjection`. */
+  projectionRows: ProjectionRow[];
 }
 
 /**
@@ -248,6 +260,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
 
     const fires: AnyNotificationFire[] = [];
     const snapshots = new Map<DomainRun, unknown>();
+    const projectionRows: ProjectionRow[] = [];
 
     for (const run of runs) {
       const enabledEvents = enabledEventsFor(run.domain.eventIds, scopes, eventPrefs, channels);
@@ -269,6 +282,31 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
           enabledEvents
         )
       );
+      // Scheduled Push upload (issue #358): a Scheduled Push is the
+      // closed-app analog of the *browser* channel specifically (it shows an
+      // OS notification, same as `notify` below) — never gated on `feed`,
+      // which shows nothing. Filtering to `enabledEvents` alone (browser OR
+      // feed) would upload — and later push — a feed-only event the user
+      // switched browser notifications off for. `projectColonies` in
+      // particular emits both colony events off one snapshot regardless of
+      // which is individually toggled, so this filter is load-bearing there,
+      // not redundant.
+      if (run.domain.projection) {
+        const domainProjectionRows = await run.domain.projection(
+          character.characterId,
+          character.name,
+          next,
+          deps.now()
+        );
+        projectionRows.push(
+          ...domainProjectionRows.filter(
+            (row) =>
+              enabledEvents.has(row.eventId) &&
+              browserEnabled &&
+              isEventEnabledFor(eventPrefs, row.eventId, 'browser')
+          )
+        );
+      }
     }
 
     if (snapshots.size > 0) {
@@ -278,6 +316,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
         eveTypePrefs,
         snapshots,
         fires,
+        projectionRows,
       });
     }
   });
@@ -347,6 +386,10 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       await deps.notify(group.fire, character, { title, body: group.body });
     }
   }
+
+  await deps.uploadProjection(
+    new Map(updates.map((update) => [update.characterId, update.projectionRows]))
+  );
 }
 
 /** `"{{title}} x{{count}}"` — the suffix a grouped browser-toast title carries (`groupFires.ts`). */
@@ -617,5 +660,6 @@ export function liveDependencies(): PollDependencies {
     permission: () => readNotificationPermission(),
     notify: sendBrowserNotification,
     recordToFeed: recordFeedNotification,
+    uploadProjection: uploadProjectionRows,
   };
 }
