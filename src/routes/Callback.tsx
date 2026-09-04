@@ -14,7 +14,7 @@ export function Callback() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { search } = useLocation();
-  const [error, setError] = useState<string | null>(null);
+  const [hasError, setHasError] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export function Callback() {
     const state = params.get('state');
     Promise.resolve()
       .then(() => {
-        if (!code || !state) throw new Error(t('callback.errorTitle'));
+        if (!code || !state) throw new Error('missing code or state param');
         return completeLogin({ code, state });
       })
       .then(async (character) => {
@@ -34,22 +34,24 @@ export function Callback() {
         if (activeCharacterId === null) await setActiveCharacter(character.characterId);
         navigate('/characters', { replace: true });
       })
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : t('callback.errorTitle'));
+      .catch(() => {
+        // Never surface the thrown Error's message: it may be an ESI/PKCE
+        // internal detail, and every UI string routes through i18n.
+        setHasError(true);
       });
-  }, [search, navigate, t]);
+  }, [search, navigate]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg p-6 text-text">
-      {error === null ? (
+      {!hasError ? (
         <div className="flex items-center gap-3 text-sm text-text-dim">
           <Spinner size="sm" label={t('common.loading')} />
           {t('callback.completing')}
         </div>
       ) : (
         <Panel title={t('callback.errorTitle')} className="w-full max-w-sm">
-          <div className="space-y-3">
-            <p className="text-sm text-danger">{error}</p>
+          <div role="alert" className="space-y-3">
+            <p className="text-sm text-danger">{t('callback.errorMessage')}</p>
             <Link to="/login" className="text-sm text-accent hover:underline">
               {t('callback.retry')}
             </Link>

@@ -1,7 +1,11 @@
 import { useState, type ComponentType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Navigate } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
-import { DataAgeBadge, LogoMark, Panel, StatChip } from '@/components/ui';
+import { db } from '@/db';
+import { DataAgeBadge, LogoMark, Panel, Spinner, StatChip } from '@/components/ui';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
 import {
   Clones,
@@ -52,6 +56,19 @@ export function Login() {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
 
+  // Wall-clock reads for illustrative "how fresh is this" values in the
+  // static preview panel — same class of impurity Overview.tsx and
+  // NotificationFeedPanel.tsx already accept for the real thing. Lazy
+  // initializers run once on mount rather than every render.
+  const [previewFetchedAt] = useState(() => new Date(Date.now() - 2 * MINUTE_MS));
+  const [previewFinishDate] = useState(() =>
+    new Date(Date.now() + 4 * HOUR_MS + 12 * MINUTE_MS).toLocaleString()
+  );
+
+  // Bookmark/back-button case: a Character already exists, so the marketing
+  // page is not the right thing to show — mirror App.tsx's root gate.
+  const characterCount = useLiveQuery(() => db.characters.count());
+
   function onLogin() {
     setPending(true);
     // The add-a-character branch: nobody is signed in yet, so there is no
@@ -59,13 +76,8 @@ export function Login() {
     void beginAddCharacterLogin().catch(() => setPending(false));
   }
 
-  // Wall-clock reads for illustrative "how fresh is this" values in the
-  // static preview panel — same class of impurity Overview.tsx and
-  // NotificationFeedPanel.tsx already accept for the real thing.
-  // eslint-disable-next-line react-hooks/purity -- see comment above
-  const previewFetchedAt = new Date(Date.now() - 2 * MINUTE_MS);
-  // eslint-disable-next-line react-hooks/purity -- see comment above
-  const previewFinishDate = new Date(Date.now() + 4 * HOUR_MS + 12 * MINUTE_MS).toLocaleString();
+  if (characterCount === undefined) return <BootScreen />;
+  if (characterCount > 0) return <Navigate to="/characters" replace />;
 
   return (
     <main className="bg-bg text-text">
@@ -204,7 +216,14 @@ export function Login() {
       <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-[0.75rem] text-text-faint">
         <span>{t('login.footerMultiChar')}</span>
         <span>{t('login.footerOffline')}</span>
-        <span>{t('login.footerOpenSource')}</span>
+        <a
+          href="https://github.com/shawndibble/neocom-desk"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-text-dim hover:underline"
+        >
+          {t('login.footerOpenSource')}
+        </a>
       </footer>
     </main>
   );
@@ -219,6 +238,7 @@ function SsoButton({
   onClick: () => void;
   label: string;
 }) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -226,9 +246,13 @@ function SsoButton({
       disabled={pending}
       className="inline-flex h-11 items-center gap-2 rounded-xs border border-line-bright bg-black px-5 text-sm font-semibold tracking-wider text-white transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40"
     >
-      <span aria-hidden="true" className="text-accent">
-        ▶
-      </span>
+      {pending ? (
+        <Spinner size="sm" label={t('common.loading')} />
+      ) : (
+        <span aria-hidden="true" className="text-accent">
+          ▶
+        </span>
+      )}
       {label}
     </button>
   );

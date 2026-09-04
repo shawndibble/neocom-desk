@@ -78,14 +78,22 @@ describe('Callback', () => {
     expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
   });
 
-  it('shows an error with a retry link on state mismatch', async () => {
+  it('shows an i18n error with a retry link on state mismatch', async () => {
     sessionStorage.setItem('neocom.sso.state', 'state-1');
     sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
     renderCallback('?code=good-code&state=wrong-state');
 
-    expect(await screen.findByText(/state mismatch/i)).toBeInTheDocument();
+    expect(await screen.findByText(/something went wrong signing you in/i)).toBeInTheDocument();
     expect(tokenRequests).toBe(0);
     expect(screen.getByRole('link', { name: /try again/i })).toHaveAttribute('href', '/login');
+  });
+
+  it('announces the error panel to screen readers', async () => {
+    sessionStorage.setItem('neocom.sso.state', 'state-1');
+    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
+    renderCallback('?code=good-code&state=wrong-state');
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
   it('shows an error when code/state params are missing', async () => {
