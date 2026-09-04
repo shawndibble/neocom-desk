@@ -136,4 +136,25 @@ describe('missingCorpScopes', () => {
   it('ignores unrelated granted scopes', () => {
     expect(missingCorpScopes(corpCapabilities([]), ['esi-skills.read_skills.v1'])).toEqual([]);
   });
+
+  /**
+   * #330's scope decision (CONTEXT.md round 44): `canReadAssets` claims
+   * `read_divisions` too, not just `canReadWallet`, so this map does not lie
+   * about what a division-first assets surface actually needs. It costs no
+   * one a re-grant — every Director (the only role `canReadAssets` answers
+   * to) already holds `canReadWallet` as well (`corpCapabilities` sets every
+   * capability for a Director), and already needed the scope through that.
+   * The required set names it once, not twice.
+   */
+  it('claims read_divisions for canReadAssets as well as canReadWallet, and a Director needing it twice over still asks for it once', () => {
+    expect(CORP_SCOPES_FOR_CAPABILITY.canReadAssets).toContain(
+      'esi-corporations.read_divisions.v1'
+    );
+    const director = corpCapabilities(['Director']);
+    expect(director.canReadWallet).toBe(true);
+    expect(director.canReadAssets).toBe(true);
+    expect(
+      requiredFor(['Director']).filter((scope) => scope === 'esi-corporations.read_divisions.v1')
+    ).toHaveLength(1);
+  });
 });

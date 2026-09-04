@@ -50,3 +50,29 @@ export function walletDivisions(
       balance: wallet.balance,
     }));
 }
+
+export interface HangarDivision {
+  /** 1-7. */
+  division: number;
+  /** The corporation's own name for it, or null when it never set one. */
+  name: string | null;
+}
+
+/**
+ * All seven hangar divisions, each carrying whatever name the divisions read
+ * had for it. Issue #330's grouping, unlike `walletDivisions`, has no wallet
+ * list to drive which divisions exist — a corp asset row names its division
+ * by number in `location_flag` regardless of whether `/divisions` answered at
+ * all — so every one of the seven is always returned, named or not.
+ */
+export function hangarDivisions(divisions: CorporationDivisions | null): HangarDivision[] {
+  const nameByDivision = new Map<number, string>();
+  for (const entry of divisions?.hangar ?? []) {
+    const name = entry.name?.trim();
+    if (entry.division !== undefined && name) nameByDivision.set(entry.division, name);
+  }
+  return [1, 2, 3, 4, 5, 6, 7].map((division) => ({
+    division,
+    name: nameByDivision.get(division) ?? null,
+  }));
+}

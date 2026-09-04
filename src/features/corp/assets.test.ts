@@ -5,7 +5,25 @@ import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { corpCacheKey } from '@/esi/cache';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { db } from '@/db';
-import { CORP_ASSETS_KEY, loadCorporationAssets } from './assets';
+import type { CorporationAsset } from '@/esi/endpoints';
+import {
+  CORP_ASSETS_KEY,
+  loadCorporationAssets,
+  loadCorpAssetLabels,
+  toCorpAssetInputs,
+} from './assets';
+
+/**
+ * `loadTypeNames` reads the SDE snapshot off disk before it touches ESI and
+ * has its own tests for that. Stubbing it keeps these cases about the label
+ * loader's own name-resolution split, the same reason `members.test.ts`
+ * stubs it.
+ */
+vi.mock('@/features/character/typeNames', () => ({
+  loadTypeNames: vi.fn(
+    async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Type ${id}`]))
+  ),
+}));
 
 const CHAR_ID = 91;
 const CORP_ID = 98000001;
@@ -29,7 +47,7 @@ function assetsUrl(corporationId: number) {
 }
 
 /** One row per hangar division, which is what makes a corp asset list corp-shaped. */
-const ASSETS = [
+const ASSETS: CorporationAsset[] = [
   {
     item_id: 1001,
     type_id: 34,
@@ -124,5 +142,91 @@ describe('loadCorporationAssets', () => {
 
     expect(result.cached?.data).toEqual(ASSETS);
     expect(result.cached?.fromCache).toBe(true);
+  });
+});
+
+describe('toCorpAssetInputs', () => {
+  it('adapts ESI snake_case rows into the engine-native shape groupCorpAssets takes', () => {
+    expect(toCorpAssetInputs(ASSETS)).toEqual([
+      { itemId: 1001, typeId: 34, quantity: 5000, locationId: 60003760, locationFlag: 'CorpSAG1' },
+      { itemId: 1002, typeId: 35, quantity: 20, locationId: 60003760, locationFlag: 'CorpSAG7' },
+    ]);
+  });
+});
+
+describe('loadCorpAssetLabels', () => {
+  it('resolves type names through loadTypeNames', async () => {
+    const labels = await loadCorpAssetLabels(CHAR_ID, ASSETS);
+    expect(labels.types.get(34)).toBe('Type 34');
+    expect(labels.types.get(35)).toBe('Type 35');
+  });
+
+  it('resolves a shared NPC-station location in a single /universe/names call', async () => {
+    let nameCalls = 0;
+    let batched: number[] = [];
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        nameCalls += 1;
+        batched = (await request.json()) as number[];
+        return HttpResponse.json(
+          batched.map((id) => ({ id, name: `Location ${id}`, category: 'station' }))
+        );
+      })
+    );
+
+    const labels = await loadCorpAssetLabels(CHAR_ID, ASSETS);
+
+    // Both rows share location_id 60003760 — one distinct location, one call.
+    expect(nameCalls).toBe(1);
+    expect(batched).toEqual([60003760]);
+    expect(labels.locations.get(60003760)).toBe('Location 60003760');
+  });
+
+  /**
+   * Same split as `features/corp/members.ts`'s `resolveLocationNames`:
+   * `/universe/names` 404s the whole batch on one bad id, and an Upwell
+   * structure has no bulk endpoint at all, so it is resolved on its own.
+   */
+  it('resolves an Upwell structure separately from the bulk batch', async () => {
+    const STRUCTURE_ID = 1035466617946;
+    let structureCalls = 0;
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        const ids = (await request.json()) as number[];
+        expect(ids).not.toContain(STRUCTURE_ID);
+        return HttpResponse.json(
+          ids.map((id) => ({ id, name: `Location ${id}`, category: 'station' }))
+        );
+      }),
+      http.get(`${ESI_BASE_URL}/universe/structures/${STRUCTURE_ID}`, () => {
+        structureCalls += 1;
+        return HttpResponse.json({
+          name: 'X-7OMU - Home Office',
+          owner_id: 1,
+          solar_system_id: 30000001,
+        });
+      })
+    );
+
+    const assets = ASSETS.map((asset) => ({ ...asset, location_id: STRUCTURE_ID }));
+    const labels = await loadCorpAssetLabels(CHAR_ID, assets);
+
+    expect(structureCalls).toBe(1);
+    expect(labels.locations.get(STRUCTURE_ID)).toBe('X-7OMU - Home Office');
+  });
+
+  /** A structure the reading Character is not on the ACL for is simply absent, same as Assets. */
+  it('leaves an unresolvable structure out of the map rather than throwing', async () => {
+    const STRUCTURE_ID = 1035466617946;
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/${STRUCTURE_ID}`, () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+      )
+    );
+
+    const assets = ASSETS.map((asset) => ({ ...asset, location_id: STRUCTURE_ID }));
+    const labels = await loadCorpAssetLabels(CHAR_ID, assets);
+
+    expect(labels.locations.has(STRUCTURE_ID)).toBe(false);
   });
 });

@@ -95,6 +95,13 @@ export const ROUTE_REQUIREMENTS = {
    * Character who is merely not a Director, which is almost all of them.
    */
   '/corp/members': UNGATED,
+  /**
+   * UNGATED for the same reasons as `/corp/members` — `canReadAssets`
+   * (issue #330) answers to `Director` alone too, so a scope declaration here
+   * would offer a re-login to almost everyone, for a permission no login can
+   * grant.
+   */
+  '/corp/assets': UNGATED,
 
   // One scope each, so a missing grant leaves the page with literally nothing
   // to show.

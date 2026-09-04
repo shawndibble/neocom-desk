@@ -1500,6 +1500,7 @@
     "title": "Corporation",
     "overviewTab": "Overview",
     "membersTab": "Members",
+    "assetsTab": "Assets",
     "refresh": "Refresh corp data",
     "boardTitle": "Ops board",
     "dataAgeNote": "EVE caches corporation data for about an hour, so anything due sooner than that may already have happened — check the game client before acting on a short timer.",
@@ -1562,6 +1563,29 @@
       "emptyHint": "EVE reported no tracking rows for this corporation.",
       "noAccessTitle": "Member tracking needs Director",
       "noAccessHint": "EVE only opens the member list and its last-login dates to a Director. No other corporation role can see them, and granting access here will not change that."
+    },
+    "assets": {
+      "title": "Assets",
+      "refresh": "Refresh corp assets",
+      "empty": "No corporation assets",
+      "emptyHint": "EVE reported no assets for this corporation.",
+      "divisionEmpty": "Nothing in this division",
+      "tableLabel": "{{group}} assets",
+      "columnItem": "Item",
+      "columnQuantity": "Quantity",
+      "columnLocation": "Location",
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} items",
+      "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this corporation has more.",
+      "noAccessTitle": "Corp assets need Director",
+      "noAccessHint": "EVE only opens the corporation asset list to a Director. No other corporation role can see it, and granting access here will not change that.",
+      "flag": {
+        "officeFolder": "Office",
+        "corpDeliveries": "Deliveries",
+        "impounded": "Impounded",
+        "assetSafety": "Asset Safety",
+        "other": "Other"
+      }
     },
     "grantPromptTitle": "Corporation access",
     "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so NeoCom Desk can show your corporation's data?",
