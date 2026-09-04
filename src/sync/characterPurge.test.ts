@@ -60,12 +60,13 @@ beforeEach(async () => {
 });
 
 describe('purgeCharacterRemoteData', () => {
-  it('deletes every doc across all five Editable Data collections', async () => {
+  it('deletes every doc across all six Editable Data collections', async () => {
     seed(1, 'plans', [{ id: 'p1' }, { id: 'p2' }]);
     seed(1, 'buildPlans', [{ id: 'b1' }]);
     seed(1, 'quickbars', [{ id: '1' }]);
     seed(1, 'stationPins', [{ id: '1:60003760' }]);
     seed(1, 'settings', [{ id: 'sync.foo' }]);
+    seed(1, 'notificationFeed', [{ id: 'occ-1' }]);
 
     await purgeCharacterRemoteData(1);
 
@@ -74,6 +75,7 @@ describe('purgeCharacterRemoteData', () => {
     expect(remoteStore.get('characters/char:1/quickbars')?.size).toBe(0);
     expect(remoteStore.get('characters/char:1/stationPins')?.size).toBe(0);
     expect(remoteStore.get('characters/char:1/settings')?.size).toBe(0);
+    expect(remoteStore.get('characters/char:1/notificationFeed')?.size).toBe(0);
   });
 
   it('does not touch another character’s docs', async () => {

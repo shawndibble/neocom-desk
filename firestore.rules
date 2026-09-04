@@ -70,13 +70,16 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
-      // No delete rule: this collection carries no tombstones (dismissal is a
-      // flag — issue #362), so a client never deletes a row here.
+      // This collection carries no tombstones (dismissal is a flag — issue
+      // #362), so nothing in the sync path ever deletes a row here. `delete`
+      // is still granted uid-only, like every sibling collection above, so
+      // characterPurge.ts can clear a dropped Character's rows.
       match /notificationFeed/{occurrenceKey} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();
         allow create: if isOwner() && incomingHashMatches();
         allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
       }
     }
 

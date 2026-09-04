@@ -188,12 +188,18 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
  * absent treated as 0/never), the same shape as `mergeRecords`' `updatedAt`
  * policy but scoped to that single field.
  *
- * `pushEligible` gates PUSH only — CONTEXT.md's synced window (30 days or 100
- * rows, whichever is smaller; see `rowsWithinSyncWindow` in `features/notifications/feed.ts`)
- * bounds what a device uploads, not what it will accept. A dismissal on a row
- * that has since aged out of the push window must still win over a stale
- * remote copy once seen — so the PULL direction always compares against every
- * local row passed in, never just the windowed subset, and never regresses an
+ * `pushEligible` gates push-CREATE only — CONTEXT.md's synced window (30 days
+ * or 100 rows, whichever is smaller; see `rowsWithinSyncWindow` in
+ * `features/notifications/feed.ts`) bounds which *new* rows a device starts
+ * uploading, not what it will accept, and not corrections to a row the
+ * remote side already has. A dismissal on a row that has since aged out of
+ * the push window must still push once the remote side already knows about
+ * that row (it got there via an earlier push, a pull, or the backend) — the
+ * window only decides whether a row is introduced to sync at all, not
+ * whether an already-shared row's `dismissedAt` can be corrected. So
+ * push-DISMISS is unconditional whenever both sides have the row, exactly
+ * like the PULL direction, which always compares against every local row
+ * passed in, never just the windowed subset, and never regresses an
  * already-recorded dismissal.
  */
 export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
@@ -228,7 +234,7 @@ export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
       const localDismissed = l.dismissedAt ?? 0;
       const remoteDismissed = r.dismissedAt ?? 0;
       if (localDismissed > remoteDismissed) {
-        if (pushEligible.has(id)) result.pushDismiss.push(l);
+        result.pushDismiss.push(l);
       } else if (remoteDismissed > localDismissed) {
         result.pullDismiss.push(r);
       }
