@@ -28,6 +28,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { readFeed, dismissFeedEntry, dismissFeedEntries } from './feed';
 import { refreshAppBadge } from './appBadge';
 import { NotificationContextMenu } from './NotificationContextMenu';
+import { notificationUrlFor } from './notificationOptions';
 import {
   useNotificationPreferences,
   hydrateNotificationPreferences,
@@ -103,10 +104,20 @@ export function NotificationFeedPanel() {
           {mine.map((entry) => (
             <NotificationContextMenu key={entry.id} entry={entry}>
               <li className="flex items-start gap-3 py-2 first:pt-0">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{entry.title}</p>
+                {/*
+                  The same route a browser notification's own click lands on
+                  (`notificationOptions.ts`'s `NOTIFICATION_ROUTES`) — the feed
+                  is this app's other delivery channel for the same fires, so a
+                  tap here should go to the same place a tap on the OS bubble
+                  would (issue: notification click-through).
+                */}
+                <Link
+                  to={notificationUrlFor(entry.eventId)}
+                  className="min-w-0 flex-1 rounded-xs focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                >
+                  <p className="text-sm font-medium hover:underline">{entry.title}</p>
                   <p className="text-xs text-text-dim">{entry.body}</p>
-                </div>
+                </Link>
                 <FiredAt firedAt={entry.firedAt} />
                 <IconButton
                   icon={<Close />}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -229,6 +229,11 @@ function CorpWalletView({
   );
 }
 
+/** Parses the `?tab=` deep link; anything unrecognized lands on Balance rather than erroring. */
+function walletTabFromParam(param: string | null): 'balance' | 'journal' {
+  return param === 'journal' ? 'journal' : 'balance';
+}
+
 /**
  * Wallet: ISK balance and journal. Read-only, cached for offline. Recent
  * transactions moved to Market's own Transactions tab.
@@ -244,7 +249,13 @@ export function Wallet() {
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadWalletSnapshot);
 
-  const [tab, setTab] = useState<'balance' | 'journal'>('balance');
+  // A notification's `?tab=` deep link (`notificationOptions.ts`) picks the
+  // opening tab; read once on mount, same as the `Tabs` control's own local
+  // state below — an invalid or missing value falls back to Balance.
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<'balance' | 'journal'>(() =>
+    walletTabFromParam(searchParams.get('tab'))
+  );
 
   const {
     owner,
