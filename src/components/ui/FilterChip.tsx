@@ -1,5 +1,5 @@
 import { cx } from '@/lib/cx';
-import { controlHeightClassName } from './controlStyles';
+import { controlHeightClassName, type ControlSize } from './controlStyles';
 
 interface FilterChipProps {
   /** Already-translated label. */
@@ -9,6 +9,8 @@ interface FilterChipProps {
   /** Optional match count, shown after the label. */
   count?: number;
   className?: string;
+  /** `sm` (default) matches every existing toolbar; `md` lines up with a `SearchInput`/`NativeSelect` left at their own default size. */
+  size?: ControlSize;
 }
 
 /**
@@ -17,7 +19,14 @@ interface FilterChipProps {
  * `Select` it shares a toolbar with — including the touch tier, which a
  * readout chip does not get.
  */
-export function FilterChip({ label, selected, onToggle, count, className = '' }: FilterChipProps) {
+export function FilterChip({
+  label,
+  selected,
+  onToggle,
+  count,
+  className = '',
+  size = 'sm',
+}: FilterChipProps) {
   return (
     <button
       type="button"
@@ -25,7 +34,7 @@ export function FilterChip({ label, selected, onToggle, count, className = '' }:
       onClick={onToggle}
       className={cx(
         'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-        controlHeightClassName.sm,
+        controlHeightClassName[size],
         selected
           ? 'border-accent-dim bg-accent/15 text-accent'
           : 'border-line bg-panel-2 text-text-dim hover:border-line-bright hover:text-text',

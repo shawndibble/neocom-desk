@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -247,6 +247,7 @@ function walletTabFromParam(param: string | null): 'balance' | 'journal' {
  */
 export function Wallet() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadWalletSnapshot);
 
@@ -361,8 +362,28 @@ export function Wallet() {
         ),
         sortValue: (entry) => entry.loyalty_points,
       },
+      {
+        id: 'lpStore',
+        header: '',
+        align: 'right',
+        // A second, always-visible entry point to the same LP store the
+        // points column above already links to — the LP number alone reads
+        // as data, not as a control, so this is the row's explicit "there's
+        // a store here" affordance.
+        render: (entry) => (
+          <IconButton
+            size="sm"
+            variant="plain"
+            icon={<Icon.Buy />}
+            label={t('loyalty.viewStore', {
+              corporation: corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
+            })}
+            onClick={() => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
+          />
+        ),
+      },
     ],
-    [t, corporationNames]
+    [t, corporationNames, navigate]
   );
 
   const journalColumns = useMemo<DataTableColumn<WalletJournalEntry>[]>(

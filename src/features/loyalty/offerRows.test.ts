@@ -91,6 +91,146 @@ describe('computeLoyaltyOfferRows', () => {
     expect(row.profit.profit).toBe(8 * 1_800 - 96_000);
   });
 
+  it("names a plain item from `itemNames` when catalog.typesById (the trimmed, blueprint/skill-referenced SDE snapshot) doesn't cover it — LP stores hand out plenty of items no blueprint or skill ever references, e.g. implants, Mindlinks, SKINs", () => {
+    const MINDLINK_ID = 21890;
+    const mindlink: LoyaltyStoreOffer = {
+      isk_cost: 20_000_000,
+      lp_cost: 20_000,
+      offer_id: 4,
+      quantity: 1,
+      required_items: [],
+      type_id: MINDLINK_ID,
+    };
+    const [row] = computeLoyaltyOfferRows({
+      offers: [mindlink],
+      catalog: makeCatalog(),
+      hubPrices: { [MINDLINK_ID]: 50_000_000 },
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      itemNames: new Map([[MINDLINK_ID, 'Skirmish Command Mindlink']]),
+      playerLp: 1_000_000,
+    });
+
+    expect(row.itemName).toBe('Skirmish Command Mindlink');
+  });
+
+  it('falls back to catalog.typesById, then `#typeId`, when `itemNames` has no entry', () => {
+    const UNKNOWN_ID = 999_999;
+    const unknown: LoyaltyStoreOffer = {
+      isk_cost: 1,
+      lp_cost: 1,
+      offer_id: 5,
+      quantity: 1,
+      required_items: [],
+      type_id: UNKNOWN_ID,
+    };
+    const [probeRow] = computeLoyaltyOfferRows({
+      offers: [probes],
+      catalog: makeCatalog(),
+      hubPrices: { [PROBE_ID]: 1_800 },
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      itemNames: new Map(),
+      playerLp: 1_000_000,
+    });
+    const [unknownRow] = computeLoyaltyOfferRows({
+      offers: [unknown],
+      catalog: makeCatalog(),
+      hubPrices: {},
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      itemNames: new Map(),
+      playerLp: 1_000_000,
+    });
+
+    expect(probeRow.itemName).toBe('Sisters Combat Scanner Probe');
+    expect(unknownRow.itemName).toBe(`#${UNKNOWN_ID}`);
+  });
+
+  it('prices a plain item\'s revenue from `revenueHubPrices` (the "instant-sell to buy orders" basis) when given, instead of `hubPrices`', () => {
+    const [row] = computeLoyaltyOfferRows({
+      offers: [probes],
+      catalog: makeCatalog(),
+      hubPrices: { [PROBE_ID]: 1_800 }, // sell basis — should be ignored for revenue here
+      revenueHubPrices: { [PROBE_ID]: 1_500 }, // buy basis
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      playerLp: 1_000_000,
+    });
+
+    expect(row.profit.revenue).toBe(8 * 1_500);
+  });
+
+  it("defaults a plain item's revenue to `hubPrices` when `revenueHubPrices` isn't given — today's behavior, unchanged", () => {
+    const [row] = computeLoyaltyOfferRows({
+      offers: [probes],
+      catalog: makeCatalog(),
+      hubPrices: { [PROBE_ID]: 1_800 },
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      playerLp: 1_000_000,
+    });
+
+    expect(row.profit.revenue).toBe(8 * 1_800);
+  });
+
+  it("prices a blueprint offer's product revenue from `revenueHubPrices` while materials stay priced at `hubPrices`", () => {
+    const sellBasis = computeLoyaltyOfferRows({
+      offers: [astero],
+      catalog: makeCatalog(),
+      hubPrices: { [TRITANIUM_ID]: 5, [ASTERO_ID]: 26_000_000 },
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      playerLp: 1_000_000,
+    })[0];
+    const buyBasis = computeLoyaltyOfferRows({
+      offers: [astero],
+      catalog: makeCatalog(),
+      hubPrices: { [TRITANIUM_ID]: 5, [ASTERO_ID]: 26_000_000 },
+      revenueHubPrices: { [ASTERO_ID]: 24_000_000 }, // lower buy-order price for the built product
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      playerLp: 1_000_000,
+    })[0];
+
+    expect(sellBasis.profit.revenue).toBe(26_000_000);
+    expect(buyBasis.profit.revenue).toBe(24_000_000);
+    // Materials cost is unaffected by the revenue basis — same buildCost either way.
+    expect(buyBasis.build!.materialCost).toBe(sellBasis.build!.materialCost);
+    expect(buyBasis.profit.profit).toBeLessThan(sellBasis.profit.profit!);
+  });
+
+  it("nulls a blueprint offer's revenue when `revenueHubPrices` has no price for the product, even though `hubPrices` (the sell basis) does", () => {
+    const [row] = computeLoyaltyOfferRows({
+      offers: [astero],
+      catalog: makeCatalog(),
+      hubPrices: { [TRITANIUM_ID]: 5, [ASTERO_ID]: 26_000_000 },
+      revenueHubPrices: {}, // no buy-order price for the product at this hub
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      playerLp: 1_000_000,
+    });
+
+    expect(row.profit.revenue).toBeNull();
+    expect(row.profit.profit).toBeNull();
+  });
+
   it('ranks the more profitable-per-LP offer first', () => {
     const rows = computeLoyaltyOfferRows({
       offers: [astero, probes],

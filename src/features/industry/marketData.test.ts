@@ -23,9 +23,12 @@ function fuzzworkHandler() {
     const body: Record<string, unknown> = {};
     for (const t of types) {
       if (t === '34') {
-        body[t] = { sell: { min: '5.5', volume: '100', orderCount: '2' } };
+        body[t] = {
+          sell: { min: '5.5', volume: '100', orderCount: '2' },
+          buy: { max: '4.8', volume: '80', orderCount: '3' },
+        };
       } else {
-        body[t] = { sell: { orderCount: '0' } }; // no orders -> unpriceable
+        body[t] = { sell: { orderCount: '0' }, buy: { orderCount: '0' } }; // no orders -> unpriceable
       }
     }
     return HttpResponse.json(body);
@@ -57,6 +60,8 @@ describe('loadMarketSnapshot', () => {
 
     expect(snapshot.hubPrices).toEqual({ 34: 5.5 });
     expect(snapshot.hubPrices[587]).toBeUndefined();
+    expect(snapshot.hubBuyPrices).toEqual({ 34: 4.8 });
+    expect(snapshot.hubBuyPrices[587]).toBeUndefined();
     expect(snapshot.adjustedPrices).toEqual({ 34: 4.2 });
     expect(snapshot.systemCostIndex).toBe(0.0464);
   });
