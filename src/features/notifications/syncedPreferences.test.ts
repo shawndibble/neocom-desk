@@ -90,6 +90,16 @@ describe('toSyncedFeedPrefs', () => {
     const value: NotificationPreferencesValue = { ...BASE, thresholdsByCharacter: { 1: {} } };
     expect(toSyncedFeedPrefs(value).thresholdsByCharacter).toEqual({});
   });
+
+  it('extracts walletBalanceChangedThresholdIsk alongside the other threshold fields', () => {
+    const value: NotificationPreferencesValue = {
+      ...BASE,
+      thresholdsByCharacter: { 1: { walletBalanceChangedThresholdIsk: 10_500_000 } },
+    };
+    expect(toSyncedFeedPrefs(value).thresholdsByCharacter).toEqual({
+      1: { walletBalanceChangedThresholdIsk: 10_500_000 },
+    });
+  });
 });
 
 describe('withSyncedFeedPrefsApplied', () => {
@@ -143,6 +153,21 @@ describe('withSyncedFeedPrefsApplied', () => {
     expect(merged.thresholdsByCharacter?.[1]).toEqual({
       structureFuelLowDays: 1,
       corpWalletBalanceFloorIsk: 1,
+    });
+  });
+
+  it('merges a synced walletBalanceChangedThresholdIsk over a local one', () => {
+    const local: NotificationPreferencesValue = {
+      ...BASE,
+      thresholdsByCharacter: { 1: { walletBalanceChangedThresholdIsk: 1_000_000 } },
+    };
+    const merged = withSyncedFeedPrefsApplied(local, {
+      perCharacter: {},
+      eveNotificationTypesByCharacter: {},
+      thresholdsByCharacter: { 1: { walletBalanceChangedThresholdIsk: 10_500_000 } },
+    });
+    expect(merged.thresholdsByCharacter?.[1]).toEqual({
+      walletBalanceChangedThresholdIsk: 10_500_000,
     });
   });
 

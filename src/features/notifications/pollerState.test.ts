@@ -61,7 +61,7 @@ const CONTRACT_SNAPSHOT: ContractSnapshot = {
 };
 
 const WALLET_SNAPSHOT: WalletSnapshot = {
-  entries: [{ id: 5, amount: 100 }],
+  entries: [{ id: 5, amount: 100, thresholdIsk: 0 }],
   nowMs: 999,
 };
 

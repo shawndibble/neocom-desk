@@ -82,6 +82,8 @@ export interface CharacterEventThresholds {
   corpWalletBalanceFloorIsk?: number;
   /** ISK amount a single journal entry must exceed to fire `corpWalletThreshold`'s `transactionAbove` half. */
   corpWalletTransactionCeilingIsk?: number;
+  /** Absolute ISK amount a single wallet journal entry must reach to fire `walletBalanceChanged`. */
+  walletBalanceChangedThresholdIsk?: number;
 }
 
 /** The three lead times `structureFuelLow`'s inline control offers (issue #299) — CCP's own alert fires separately and later. */
@@ -91,6 +93,7 @@ export const STRUCTURE_FUEL_LOW_DAY_OPTIONS: readonly number[] = [7, 3, 1];
 export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
 export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
+export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferencesValue = {
   masterEnabled: true,
@@ -153,7 +156,8 @@ function isCharacterEventThresholds(raw: unknown): raw is CharacterEventThreshol
   return (
     isOptionalFiniteNumber(r.structureFuelLowDays) &&
     isOptionalFiniteNumber(r.corpWalletBalanceFloorIsk) &&
-    isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk)
+    isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk) &&
+    isOptionalFiniteNumber(r.walletBalanceChangedThresholdIsk)
   );
 }
 
@@ -338,6 +342,8 @@ export function characterEventThresholds(
       raw.corpWalletBalanceFloorIsk ?? DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
     corpWalletTransactionCeilingIsk:
       raw.corpWalletTransactionCeilingIsk ?? DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+    walletBalanceChangedThresholdIsk:
+      raw.walletBalanceChangedThresholdIsk ?? DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
   };
 }
 

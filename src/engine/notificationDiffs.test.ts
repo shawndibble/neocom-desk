@@ -829,8 +829,12 @@ describe('diffContractAccepted', () => {
   });
 });
 
-function walletEntry(id: number, amount: number | null = 100): WalletJournalEntrySnapshot {
-  return { id, amount };
+function walletEntry(
+  id: number,
+  amount: number | null = 100,
+  thresholdIsk = 0
+): WalletJournalEntrySnapshot {
+  return { id, amount, thresholdIsk };
 }
 
 function walletSnapshot(
@@ -887,6 +891,46 @@ describe('diffWalletBalanceChanged', () => {
       { eventId: 'walletBalanceChanged', characterId: 7, amount: 600 },
       { eventId: 'walletBalanceChanged', characterId: 7, amount: 700 },
     ]);
+  });
+
+  it('does not fire for a new entry whose absolute amount is under the threshold', () => {
+    const prev = walletSnapshot([walletEntry(5, 100, 1_000_000)], T0);
+    const next = walletSnapshot(
+      [walletEntry(6, 999_999, 1_000_000), walletEntry(5, 100, 1_000_000)],
+      T0 + 2000
+    );
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([]);
+  });
+
+  it('fires for a new entry whose absolute amount is at or above the threshold', () => {
+    const prev = walletSnapshot([walletEntry(5, 100, 1_000_000)], T0);
+    const next = walletSnapshot(
+      [walletEntry(6, 1_000_000, 1_000_000), walletEntry(5, 100, 1_000_000)],
+      T0 + 2000
+    );
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
+      { eventId: 'walletBalanceChanged', characterId: 7, amount: 1_000_000 },
+    ]);
+  });
+
+  it('fires for a large negative (ISK spent) entry once its magnitude crosses the threshold', () => {
+    const prev = walletSnapshot([walletEntry(5, 100, 1_000_000)], T0);
+    const next = walletSnapshot(
+      [walletEntry(6, -2_000_000, 1_000_000), walletEntry(5, 100, 1_000_000)],
+      T0 + 2000
+    );
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
+      { eventId: 'walletBalanceChanged', characterId: 7, amount: -2_000_000 },
+    ]);
+  });
+
+  it('does not fire for a new entry with a null amount, since it cannot be compared to the threshold', () => {
+    const prev = walletSnapshot([walletEntry(5, 100, 1_000_000)], T0);
+    const next = walletSnapshot(
+      [walletEntry(6, null, 1_000_000), walletEntry(5, 100, 1_000_000)],
+      T0 + 2000
+    );
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([]);
   });
 });
 

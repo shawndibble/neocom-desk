@@ -74,6 +74,7 @@ import {
   type NotificationChannel,
 } from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
+import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
 import { setSyncedSetting, scheduleSync } from '@/sync';
 import {
@@ -572,6 +573,43 @@ export function NotificationsPanel() {
                                   </div>
                                 )}
                                 {/*
+                                  walletBalanceChanged's inline threshold
+                                  control — the minimum absolute ISK change a
+                                  single wallet journal entry must reach to
+                                  fire, same persistence and input widget as
+                                  structure fuel's and corp wallet's controls
+                                  above. Accepts shorthand ("10.5m",
+                                  "10,500,000", "10500000") via
+                                  `parseIskAmount`.
+                                */}
+                                {eventId === 'walletBalanceChanged' && rowEnabled && (
+                                  <div className="border-t border-line bg-panel/60 px-6 py-1.5">
+                                    <ThresholdAmountInput
+                                      id={`wallet-balance-changed-threshold-${character.characterId}`}
+                                      label={t(
+                                        'settings.notifications.walletBalanceChangedThresholdLabel'
+                                      )}
+                                      value={thresholds.walletBalanceChangedThresholdIsk}
+                                      onCommit={(amount) =>
+                                        void updatePrefs(
+                                          character.characterId,
+                                          withCharacterEventThreshold(
+                                            prefsValue,
+                                            character.characterId,
+                                            'walletBalanceChangedThresholdIsk',
+                                            amount
+                                          )
+                                        )
+                                      }
+                                    />
+                                    <p className="mt-1 text-[0.6875rem] text-text-faint">
+                                      {t(
+                                        'settings.notifications.walletBalanceChangedThresholdHint'
+                                      )}
+                                    </p>
+                                  </div>
+                                )}
+                                {/*
                                   Corp wallet's two independent thresholds
                                   (issue #299, AC4) — a division balance floor
                                   and a single-transaction ceiling, either of
@@ -799,11 +837,16 @@ function ChannelCheckbox({
 }
 
 /**
- * An ISK-amount threshold field (issue #299): local text state so a
- * mid-typing value like "50," or an empty field never round-trips through
- * `withCharacterEventThreshold` as `NaN`. Commits on blur, matching the
- * pattern used elsewhere for numeric fields (`piPlan.tsx`); reverts to the
- * last committed value on an invalid blur.
+ * An ISK-amount threshold field (issue #299, extended for the wallet-balance
+ * threshold): local text state so a mid-typing value like "50," or an empty
+ * field never round-trips through `withCharacterEventThreshold` as `NaN`.
+ * Commits on blur, matching the pattern used elsewhere for numeric fields
+ * (`piPlan.tsx`); reverts to the last committed value on an invalid blur.
+ *
+ * Parsed with `parseIskAmount` (`lib/isk.ts`) rather than a bare `Number()`,
+ * so "10.5m", "10,500,000" and "10500000" all commit to the same 10,500,000 —
+ * a plain `<input type="number">` can't hold the shorthand-suffix forms, so
+ * this is `type="text"` with a numeric-friendly `inputMode`.
  */
 function ThresholdAmountInput({
   id,
@@ -816,7 +859,7 @@ function ThresholdAmountInput({
   value: number;
   onCommit: (value: number) => void;
 }) {
-  const [text, setText] = useState(String(value));
+  const [text, setText] = useState(formatIsk(value));
   // Adjusted during render, not an effect (react-hooks/set-state-in-effect):
   // this is React's own "store info from previous renders" pattern for
   // resetting local state when a prop changes, not a DOM/external-system
@@ -824,15 +867,17 @@ function ThresholdAmountInput({
   const [prevValue, setPrevValue] = useState(value);
   if (value !== prevValue) {
     setPrevValue(value);
-    setText(String(value));
+    setText(formatIsk(value));
   }
 
   function commit() {
-    const amount = Number(text);
-    if (Number.isFinite(amount) && amount >= 0) {
-      onCommit(Math.round(amount));
+    const amount = parseIskAmount(text);
+    if (amount !== null && amount >= 0) {
+      const rounded = Math.round(amount);
+      onCommit(rounded);
+      setText(formatIsk(rounded));
     } else {
-      setText(String(value));
+      setText(formatIsk(value));
     }
   }
 
@@ -842,10 +887,8 @@ function ThresholdAmountInput({
       <TextInput
         id={id}
         size="sm"
-        type="number"
-        min={0}
-        step={1}
-        inputMode="numeric"
+        type="text"
+        inputMode="decimal"
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={commit}
