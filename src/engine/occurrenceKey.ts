@@ -1,5 +1,5 @@
 /**
- * The Occurrence Key (issue #348, CONTEXT.md glossary): the deterministic
+ * The Occurrence Key (CONTEXT.md round 44, issue #348): the deterministic
  * identity of one notification occurrence, derived from the Character, the
  * Notification Event and the natural id of the thing that happened. Two
  * devices' Foreground Pollers and the Scheduled Push backend, each
