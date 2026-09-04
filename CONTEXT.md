@@ -547,14 +547,10 @@
 - **Foreground Poller**: Client-side interval (5 minutes) that checks each
   enabled Notification Event's underlying ESI data while the app is open and
   the tab/window is visible; paused via the Page Visibility API when
-  backgrounded, with an immediate catch-up check on regaining visibility.
-- **Background Sync Poller**: A hand-written service worker (`injectManifest`
-  Workbox strategy, replacing the current auto-generated `generateSW` one)
-  registered for the Periodic Background Sync API, so notifications can still
-  fire when the app isn't open. Chrome/Edge desktop + Android only (no
-  Safari/Firefox), requires the PWA installed, and runs on a browser-decided
-  schedule with no fixed interval — a best-effort supplement to the
-  Foreground Poller, never a replacement for it.
+  backgrounded, with an immediate catch-up check on regaining visibility. It
+  is the only delivery path today — Periodic Background Sync, once its
+  best-effort supplement, is retired (round 45); Scheduled Push (round 45) is
+  its eventual replacement for timestamped events.
 
 ## Scope decisions (round 20) — Install prompt & notifications
 

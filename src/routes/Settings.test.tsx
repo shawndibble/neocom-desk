@@ -260,7 +260,6 @@ describe('Settings — Notifications (issue #170)', () => {
       })
     ).toBeInTheDocument();
     expect(screen.getByText(/every five minutes while the app is open/i)).toBeInTheDocument();
-    expect(screen.getByText(/not at all on iPhone, iPad, or Firefox/i)).toBeInTheDocument();
   });
 
   it("select-all/none checkbox toggles every togglable event for that character's section", async () => {
