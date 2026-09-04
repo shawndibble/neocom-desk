@@ -16,6 +16,7 @@ import {
   withFeedEnabled,
   characterEveTypePrefs,
   withEveNotificationTypeToggled,
+  withAllEveTypesToggledForCharacter,
   isEveTypeEnabledFor,
   characterEventThresholds,
   withCharacterEventThreshold,
@@ -245,6 +246,31 @@ describe('characterEveTypePrefs / withEveNotificationTypeToggled', () => {
       eveNotificationTypesByCharacter: { 2: { AllWarDeclaredMsg: { feed: false } } },
     };
     const next = withEveNotificationTypeToggled(value, 1, 'BillOutOfMoneyMsg', 'browser');
+    expect(characterEveTypePrefs(next, 2)).toEqual({ AllWarDeclaredMsg: { feed: false } });
+  });
+});
+
+describe('withAllEveTypesToggledForCharacter', () => {
+  it('fills a partial column to fully enabled rather than clearing it', () => {
+    const next = withAllEveTypesToggledForCharacter(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      ['BillOutOfMoneyMsg', 'AllWarDeclaredMsg'],
+      'browser'
+    );
+    const prefs = characterEveTypePrefs(next, 1);
+    expect(isEveTypeEnabledFor(prefs, 'BillOutOfMoneyMsg', 'browser')).toBe(true);
+    expect(isEveTypeEnabledFor(prefs, 'AllWarDeclaredMsg', 'browser')).toBe(true);
+    expect(isEveTypeEnabledFor(prefs, 'BillOutOfMoneyMsg', 'feed')).toBe(true);
+  });
+
+  it("does not disturb another character's type prefs", () => {
+    const value = {
+      masterEnabled: true,
+      perCharacter: {},
+      eveNotificationTypesByCharacter: { 2: { AllWarDeclaredMsg: { feed: false } } },
+    };
+    const next = withAllEveTypesToggledForCharacter(value, 1, ['BillOutOfMoneyMsg'], 'feed');
     expect(characterEveTypePrefs(next, 2)).toEqual({ AllWarDeclaredMsg: { feed: false } });
   });
 });

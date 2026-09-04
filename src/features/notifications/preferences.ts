@@ -13,6 +13,7 @@ import {
   toggleAllEventsOnChannel,
   isEveTypeEnabledFor,
   toggleEveTypeChannel,
+  toggleAllEveTypesOnChannel,
   NOTIFICATION_CHANNELS,
   type EventEnabledMap,
   type EveTypeEnabledMap,
@@ -260,6 +261,23 @@ export function withEveNotificationTypeToggled(
     eveNotificationTypesByCharacter: {
       ...value.eveNotificationTypesByCharacter,
       [characterId]: toggleEveTypeChannel(prefs, type, channel),
+    },
+  };
+}
+
+/** Family header select-all/none for one Character (issue #352). */
+export function withAllEveTypesToggledForCharacter(
+  value: NotificationPreferencesValue,
+  characterId: number,
+  types: readonly string[],
+  channel: NotificationChannel
+): NotificationPreferencesValue {
+  const prefs = characterEveTypePrefs(value, characterId);
+  return {
+    ...value,
+    eveNotificationTypesByCharacter: {
+      ...value.eveNotificationTypesByCharacter,
+      [characterId]: toggleAllEveTypesOnChannel(types, prefs, channel),
     },
   };
 }
