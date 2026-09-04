@@ -133,6 +133,17 @@ which silently skips `prepare`. (Confirmed empirically: without that
 explicit step, the hook never installs in a linked worktree and a commit
 with a real type error sails straight through.)
 
+`npx husky`'s own exit code is not proof it worked, though: husky v9's CLI
+exits 0 unconditionally, even on a run that silently installed nothing
+(e.g. `.git` not found, or the underlying `git config core.hooksPath` write
+itself failing). `setup-worktree.mjs` therefore checks the on-disk result
+directly after that call — that `git config core.hooksPath` resolves to an
+existing, executable `pre-commit` file — via `verifyHuskyHook()` in
+`scripts/verify-husky.mjs`, and fails worktree setup
+(`{"status":"error","step":"husky-verify",...}`) if it doesn't. This is
+what closes the gap that let #310's worktree run with no hook despite the
+install step "succeeding."
+
 No full local gate (format:check/lint/typecheck/`test:run`/build) runs
 anywhere in this loop. GitHub Actions' `validate` job runs exactly those
 checks on every push regardless, so a local pre-PR full run only ever

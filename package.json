@@ -16,7 +16,8 @@
     "test:run": "vitest run",
     "test:e2e": "playwright test",
     "sde:build": "node scripts/build-sde.mjs",
-    "prepare": "husky"
+    "prepare": "husky && node scripts/verify-husky.mjs",
+    "verify-hooks": "node scripts/verify-husky.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,mjs,cjs}": [
