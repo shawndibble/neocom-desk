@@ -1108,6 +1108,7 @@
     "name": "Name",
     "type": "Type",
     "standing": "Standing",
+    "standingValue": "Standing: {{value}}",
     "flags": "Flags",
     "blocked": "Blocked",
     "watched": "Watched",
@@ -1116,7 +1117,12 @@
     "filterBad": "Bad",
     "reauthTitle": "Log in again to see your contacts",
     "reauthHint": "Log in again to fetch this character's contacts.",
-    "reauthAction": "Log in again with EVE Online"
+    "reauthAction": "Log in again with EVE Online",
+    "contextMenu": {
+      "copyName": "Copy name",
+      "copyContactId": "Copy Contact ID",
+      "showInfo": "Show info"
+    }
   },
   "loyalty": {
     "title": "Loyalty Points",

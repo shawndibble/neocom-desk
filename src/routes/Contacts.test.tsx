@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -7,6 +8,7 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -53,6 +55,7 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  usePublicInfoModalStore.setState({ request: null });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -115,5 +118,86 @@ describe('Contacts', () => {
     render(<App />);
     expect(await screen.findByText('Log in again to see your contacts')).toBeInTheDocument();
     expect(screen.queryByText(/no contacts cached/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('Contacts row context menu (issue #403)', () => {
+  /** Right-clicks a contact row by its resolved name and returns the row. */
+  async function openContactMenu(name: string) {
+    const row = (await screen.findByText(name)).closest('tr');
+    if (!row) throw new Error(`expected a ${name} contact row`);
+    row.focus();
+    fireEvent.contextMenu(row);
+    return row;
+  }
+
+  it('offers Copy Name, Copy Contact ID, and Show Info as the only entry point to the modal', async () => {
+    render(<App />);
+    await openContactMenu('Good Friend');
+
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy Contact ID' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
+
+  it('Show Info opens the shared Public Info Modal, tabbed to the contact type', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get(`${ESI}/characters/1001`, () =>
+        HttpResponse.json({
+          name: 'Good Friend',
+          birthday: '2020-01-01T00:00:00Z',
+          bloodline_id: 1,
+          gender: 'male',
+          race_id: 1,
+          security_status: 1.5,
+        })
+      )
+    );
+    render(<App />);
+    await openContactMenu('Good Friend');
+    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('tab', { name: 'Character' })).toBeInTheDocument();
+  });
+});
+
+describe('Contacts standing filter chips (issue #403)', () => {
+  it('stay visible through a manual refresh instead of disappearing', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    let resolveRefresh!: () => void;
+    const refreshGate = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/contacts`, async () => {
+        await refreshGate;
+        return HttpResponse.json(contactsPayload);
+      })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(await screen.findByRole('group', { name: 'Standing' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Bad/ })).toBeInTheDocument();
+
+    resolveRefresh();
+    await waitFor(() => expect(screen.getByText('Good Friend')).toBeInTheDocument());
+  });
+});
+
+describe('Contacts standing bar (issue #403)', () => {
+  it('renders standing as a bar, not just a colored number', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    const goodRow = screen.getByText('Good Friend').closest('tr');
+    expect(goodRow).not.toBeNull();
+    expect(
+      within(goodRow as HTMLElement).getByRole('img', { name: 'Standing: 10' })
+    ).toBeInTheDocument();
   });
 });
