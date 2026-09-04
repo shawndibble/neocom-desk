@@ -16,6 +16,7 @@
 import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { setSyncedSetting, scheduleSync } from '@/sync';
+import { recordByCharacterId } from './recordByCharacterId';
 import {
   isEventEnabledFor,
   toggleEventChannel,
@@ -117,13 +118,16 @@ function isEventEnabledMap(raw: unknown): raw is EventEnabledMap {
   return Object.values(raw as Record<string, unknown>).every(isEventChannelState);
 }
 
-function isPerCharacterMap(raw: unknown): raw is Record<number, EventEnabledMap> {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
-  return Object.entries(raw as Record<string, unknown>).every(
-    ([key, value]) => !Number.isNaN(Number(key)) && isEventEnabledMap(value)
-  );
-}
+const isPerCharacterMap = recordByCharacterId(isEventEnabledMap);
 
+/**
+ * Unlike `isEventChannelState` above, this rejects a bare boolean —
+ * `eveNotificationTypesByCharacter` (issue #274) was introduced after the
+ * channel split already existed, so it never needed the pre-channel legacy
+ * shape. Keeping this a distinct predicate (not derived from the
+ * boolean-accepting one) is what stops a previously-malformed stored value
+ * from newly validating.
+ */
 function isEveTypeChannelState(raw: unknown): boolean {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
   return Object.entries(raw as Record<string, unknown>).every(
@@ -137,12 +141,7 @@ function isEveTypeEnabledMap(raw: unknown): raw is EveTypeEnabledMap {
   return Object.values(raw as Record<string, unknown>).every(isEveTypeChannelState);
 }
 
-function isEveNotificationTypesByCharacter(raw: unknown): raw is Record<number, EveTypeEnabledMap> {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
-  return Object.entries(raw as Record<string, unknown>).every(
-    ([key, value]) => !Number.isNaN(Number(key)) && isEveTypeEnabledMap(value)
-  );
-}
+const isEveNotificationTypesByCharacter = recordByCharacterId(isEveTypeEnabledMap);
 
 function isOptionalBoolean(raw: unknown): boolean {
   return raw === undefined || typeof raw === 'boolean';
@@ -163,12 +162,7 @@ function isCharacterEventThresholds(raw: unknown): raw is CharacterEventThreshol
   );
 }
 
-function isThresholdsByCharacter(raw: unknown): raw is Record<number, CharacterEventThresholds> {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
-  return Object.entries(raw as Record<string, unknown>).every(
-    ([key, value]) => !Number.isNaN(Number(key)) && isCharacterEventThresholds(value)
-  );
-}
+const isThresholdsByCharacter = recordByCharacterId(isCharacterEventThresholds);
 
 function isNotificationPreferencesValue(raw: unknown): raw is NotificationPreferencesValue {
   if (typeof raw !== 'object' || raw === null) return false;
@@ -358,6 +352,69 @@ export function withAllEveTypesToggledForCharacter(
       [characterId]: toggleAllEveTypesOnChannel(types, prefs, channel),
     },
   };
+}
+
+/**
+ * Toggles one event's channel and writes it in one call — `channel` is
+ * stated once rather than passed to `withEventChannelToggled` and then again
+ * to `updateNotificationPrefs`'s own `channel` argument, which used to let a
+ * caller's two copies silently disagree (nothing checked that a browser
+ * toggle's builder call and its write call named the same channel). The
+ * three toggle pairs below and `updateNotificationPrefs` itself are the only
+ * way a caller should apply a channel toggle; a threshold write has no
+ * channel and keeps calling `updateNotificationPrefs` directly, since it
+ * always syncs.
+ */
+export async function toggleEventChannelPref(
+  characterId: number,
+  value: NotificationPreferencesValue,
+  eventId: NotificationEventId,
+  channel: NotificationChannel
+): Promise<void> {
+  await updateNotificationPrefs(
+    characterId,
+    withEventChannelToggled(value, characterId, eventId, channel),
+    channel
+  );
+}
+
+export async function toggleAllEventsChannelPref(
+  characterId: number,
+  value: NotificationPreferencesValue,
+  eventIds: readonly NotificationEventId[],
+  channel: NotificationChannel
+): Promise<void> {
+  await updateNotificationPrefs(
+    characterId,
+    withAllEventsToggledForCharacter(value, characterId, eventIds, channel),
+    channel
+  );
+}
+
+export async function toggleEveTypeChannelPref(
+  characterId: number,
+  value: NotificationPreferencesValue,
+  type: string,
+  channel: NotificationChannel
+): Promise<void> {
+  await updateNotificationPrefs(
+    characterId,
+    withEveNotificationTypeToggled(value, characterId, type, channel),
+    channel
+  );
+}
+
+export async function toggleAllEveTypesChannelPref(
+  characterId: number,
+  value: NotificationPreferencesValue,
+  types: readonly string[],
+  channel: NotificationChannel
+): Promise<void> {
+  await updateNotificationPrefs(
+    characterId,
+    withAllEveTypesToggledForCharacter(value, characterId, types, channel),
+    channel
+  );
 }
 
 /** One Character's thresholds, defaulted (issue #299) — the shape both the settings row and the poller read. */
