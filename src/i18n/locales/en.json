@@ -1701,5 +1701,18 @@
     "accessNoneHint": "This character holds no corporation role that opens corp data, so granting access would unlock nothing.",
     "accessMissingHint": "Corp data stays hidden until this character grants access.",
     "accessReadyHint": "This character can see the corp data its roles allow."
+  },
+  "publicInfo": {
+    "title": "Public info",
+    "tabsLabel": "Character, corporation, and alliance",
+    "characterTab": "Character",
+    "corporationTab": "Corporation",
+    "allianceTab": "Alliance",
+    "securityStatus": "Security status",
+    "corporation": "Corporation",
+    "alliance": "Alliance",
+    "ticker": "Ticker",
+    "memberCount": "Members",
+    "ceo": "CEO"
   }
 }
