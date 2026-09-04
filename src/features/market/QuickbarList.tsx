@@ -20,7 +20,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { IconButton } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { QuickbarItem } from '@/db';
 
 interface QuickbarRowProps {
@@ -64,14 +65,13 @@ function QuickbarRow({ item, selected, onSelect, onRemove }: QuickbarRowProps) {
       >
         {item.name}
       </button>
-      <Button
-        variant="danger"
+      <IconButton
         size="sm"
-        aria-label={t('market.quickbar.removeItem', { name: item.name })}
+        icon={<Icon.Close />}
+        label={t('market.quickbar.removeItem', { name: item.name })}
+        tone="danger"
         onClick={() => onRemove(item.typeId)}
-      >
-        {t('market.quickbar.remove')}
-      </Button>
+      />
     </li>
   );
 }

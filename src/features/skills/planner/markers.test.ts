@@ -3,12 +3,16 @@ import type { AttributeName, Attributes, EngineSkill, PlanEntry } from '@/engine
 import type { RemapSegment } from '@/engine/optimizer';
 import {
   addMarker,
+  addMarkerAttributes,
   buildRows,
+  markerAttributesAfterEntryRemoval,
   markerRowId,
   markersAfterEntryRemoval,
   markerStepIndices,
+  normalizeMarkerAttributes,
   normalizeMarkers,
   removeMarker,
+  removeMarkerAttributes,
   reorderRows,
   segmentsToMarkers,
 } from './markers';
@@ -71,6 +75,8 @@ describe('reorderRows', () => {
     const result = reorderRows(entries, [1], '3', '1');
     expect(result.entries.map((e) => e.skillTypeID)).toEqual([3, 1, 2]);
     expect(result.markers).toEqual([2]);
+    // The lone marker didn't change relative order, so it's still ordinal 0.
+    expect(result.markerOrder).toEqual([0]);
   });
 
   it('moves a marker onto an entry row', () => {
@@ -78,12 +84,25 @@ describe('reorderRows', () => {
     const result = reorderRows(entries, [1], markerRowId(0), '3');
     expect(result.entries.map((e) => e.skillTypeID)).toEqual([1, 2, 3]);
     expect(result.markers).toEqual([3]);
+    expect(result.markerOrder).toEqual([0]);
   });
 
   it('returns the input unchanged for unknown ids', () => {
     const result = reorderRows(entries, [1], 'nope', '1');
     expect(result.entries).toEqual(entries);
     expect(result.markers).toEqual([1]);
+    expect(result.markerOrder).toEqual([0]);
+  });
+
+  it('reports the old ordinal each marker lands at, so a caller can carry per-marker data along when dragging one marker past another', () => {
+    // Rows: [M0@0, e1, e2, e3, M1@3]. Drag M1 onto M0: [M1, M0, e1, e2, e3].
+    // M1 (old ordinal 1) now renders first; M0 (old ordinal 0) second — the
+    // one case besides an unknown id where a marker's ordinal actually
+    // changes (buildRows/rowsToState assign ordinals by pre-drag position).
+    const result = reorderRows(entries, [0, 3], markerRowId(1), markerRowId(0));
+    expect(result.entries.map((e) => e.skillTypeID)).toEqual([1, 2, 3]);
+    expect(result.markers).toEqual([0, 0]);
+    expect(result.markerOrder).toEqual([1, 0]);
   });
 
   it('preserves fields beyond skillTypeID and targetLevel on every entry', () => {
@@ -127,6 +146,67 @@ describe('markersAfterEntryRemoval', () => {
 
   it('is a clamped no-op when the entry was not found', () => {
     expect(markersAfterEntryRemoval([1, 9], -1, 3)).toEqual([1, 3]);
+  });
+});
+
+describe('normalizeMarkerAttributes', () => {
+  const A: Attributes = ATTRS;
+  const B: Attributes = { ...ATTRS, perception: 20, willpower: 24 };
+
+  it("aligns each override to normalizeMarkers' own output", () => {
+    expect(normalizeMarkerAttributes([3, 1], [A, B], 3)).toEqual([B, A]);
+  });
+
+  it('defaults a marker with no override to null', () => {
+    expect(normalizeMarkerAttributes([1, 2], [A], 3)).toEqual([A, null]);
+    expect(normalizeMarkerAttributes([1], undefined, 3)).toEqual([null]);
+  });
+
+  it('keeps the first override when two positions collapse onto the same normalized slot', () => {
+    expect(normalizeMarkerAttributes([3, 3], [A, B], 3)).toEqual([A]);
+  });
+});
+
+describe('addMarkerAttributes', () => {
+  const A: Attributes = ATTRS;
+
+  it('gives the newly appended marker no override', () => {
+    expect(addMarkerAttributes([], undefined, 3)).toEqual([null]);
+    expect(addMarkerAttributes([1], [A], 3)).toEqual([A, null]);
+  });
+
+  it('keeps the existing override when the append collides with a marker already at the last position', () => {
+    expect(addMarkerAttributes([3], [A], 3)).toEqual([A]);
+  });
+});
+
+describe('removeMarkerAttributes', () => {
+  const A: Attributes = ATTRS;
+  const B: Attributes = { ...ATTRS, perception: 20, willpower: 24 };
+
+  it('splices the override at the given normalized index, matching removeMarker', () => {
+    // normalizeMarkers([3, 1], 3) -> [1, 3], so attributes align to [B, A].
+    expect(removeMarkerAttributes([3, 1], [A, B], 0, 3)).toEqual([A]);
+    expect(removeMarkerAttributes([3, 1], [A, B], 1, 3)).toEqual([B]);
+  });
+});
+
+describe('markerAttributesAfterEntryRemoval', () => {
+  const A: Attributes = ATTRS;
+  const B: Attributes = { ...ATTRS, perception: 20, willpower: 24 };
+
+  it('shifts alongside markersAfterEntryRemoval', () => {
+    // Same fixture as markersAfterEntryRemoval's own test: markers before
+    // entries[1] and after the last entry, removing entry 0 shifts both left.
+    expect(markersAfterEntryRemoval([1, 3], 0, 3)).toEqual([0, 2]);
+    expect(markerAttributesAfterEntryRemoval([1, 3], [A, B], 0, 3)).toEqual([A, B]);
+  });
+
+  it('drops the later override when removing an entry collapses two markers into one', () => {
+    // Same repro as normalizeMarkers itself: markers [3, 4] both shift to 3
+    // once the entry at index 3 is removed, so they collapse into one row —
+    // the first marker's override has to be the one that survives.
+    expect(markerAttributesAfterEntryRemoval([3, 4], [A, B], 3, 5)).toEqual([A]);
   });
 });
 

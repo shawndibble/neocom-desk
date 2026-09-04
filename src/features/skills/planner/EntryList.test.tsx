@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { EntryList } from './EntryList';
 import { entryId } from './reorder';
@@ -47,6 +48,7 @@ const defaultProps = {
   onReorder: noop,
   onRemove: noop,
   onRemoveMarker: noop,
+  onEditMarker: noop,
   onSetPriority: noop,
   onPromotePrereq: noop,
 };
@@ -316,7 +318,7 @@ describe('EntryList marker row attributes', () => {
     expect(screen.queryByText(/PER 27/)).not.toBeInTheDocument();
   });
 
-  it("shows the marker's target attribute spread instead of the divider once known", () => {
+  it('shows the marker\'s target attribute spread instead of the divider once known, and drops the "Remap marker" label entirely', () => {
     const attributes = {
       intelligence: 17,
       memory: 17,
@@ -333,6 +335,44 @@ describe('EntryList marker row attributes', () => {
       />
     );
     expect(screen.getByText('PER 27 / WIL 21 / INT 17 / MEM 17 / CHA 17')).toBeInTheDocument();
+    // The numbers already say what the row is; repeating the generic label
+    // next to them would just be clutter — it stays only for a marker with
+    // nothing known yet (the sibling test above).
+    expect(screen.queryByText('Remap marker')).not.toBeInTheDocument();
+  });
+
+  it('opens the manual attribute editor when the marker row is clicked, whichever text it shows', async () => {
+    const user = userEvent.setup();
+    const onEditMarker = vi.fn();
+    const attributes = {
+      intelligence: 17,
+      memory: 17,
+      perception: 27,
+      willpower: 21,
+      charisma: 17,
+    };
+
+    const { unmount } = render(
+      <EntryList rows={rows} bandsAt={new Map()} {...defaultProps} onEditMarker={onEditMarker} />
+    );
+    await user.click(screen.getByRole('button', { name: 'Remap marker' }));
+    expect(onEditMarker).toHaveBeenCalledWith(0);
+    unmount();
+
+    onEditMarker.mockClear();
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        markerAttributesFor={() => attributes}
+        onEditMarker={onEditMarker}
+      />
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'PER 27 / WIL 21 / INT 17 / MEM 17 / CHA 17' })
+    );
+    expect(onEditMarker).toHaveBeenCalledWith(0);
   });
 });
 

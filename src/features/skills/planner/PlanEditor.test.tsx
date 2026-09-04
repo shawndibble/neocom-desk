@@ -366,7 +366,7 @@ describe('PlanEditor tools pane', () => {
     // Skill A (intelligence/memory) and Skill B (perception/willpower) are
     // different pairs, so a single remap is worth spending on the second —
     // the marker lands right before it, at entry-list position 1.
-    expect(onUpdate).toHaveBeenCalledWith({ markers: [1] });
+    expect(onUpdate).toHaveBeenCalledWith({ markers: [1], markerAttributes: [] });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -444,7 +444,7 @@ describe('PlanEditor tools pane', () => {
 
     // The plan's own marker (position 1) round-trips back through the same
     // segments-to-markers conversion "Optimize remaps" uses.
-    expect(onUpdate).toHaveBeenCalledWith({ markers: [1] });
+    expect(onUpdate).toHaveBeenCalledWith({ markers: [1], markerAttributes: [] });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -494,6 +494,99 @@ describe('PlanEditor tools pane', () => {
     renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
 
     expect(screen.getByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)).toBeInTheDocument();
+  });
+
+  describe('manual remap marker attributes', () => {
+    // Sums to 99 (17+17+27+21+17), unlike the module's default ATTRIBUTES
+    // fixture (20 x 5 = 100) — legal from the moment the modal opens, so
+    // Save doesn't start disabled and these tests aren't also exercising the
+    // allocator's clamping (RemapMarkerModal.test.tsx already covers that).
+    const LEGAL_ATTRIBUTES: Attributes = {
+      intelligence: 17,
+      memory: 17,
+      perception: 27,
+      willpower: 21,
+      charisma: 17,
+    };
+
+    // Position 2 == PLAN.entries.length: a marker after the last entry, same
+    // as "Add remap marker" places one. optimizeAtMarkers gives that trailing
+    // position no segment to remap (nothing follows it to speed up), so the
+    // row starts on the plain "Remap marker" divider — the case a manual
+    // override actually has something to add, unlike a marker mid-plan,
+    // which the sibling describe block above already shows resolving to a
+    // computed spread on its own.
+    it('opens the editor seeded from the base sheet for a marker nothing has set yet, and Save persists the override', async () => {
+      const user = userEvent.setup();
+      const { onUpdate } = renderEditor(vi.fn(), {
+        plan: { ...PLAN, markers: [2] },
+        attributes: LEGAL_ATTRIBUTES,
+      });
+
+      await user.click(screen.getByRole('button', { name: 'Remap marker' }));
+      const dialog = screen.getByRole('dialog', { name: 'Remap marker attributes' });
+      expect(within(dialog).getByLabelText('Perception')).toHaveValue(27);
+
+      // Intelligence and memory both sit at the 17 floor already, so the 3
+      // points intelligence gains have to come off willpower (21), the only
+      // other attribute with room above the floor.
+      const intelligence = within(dialog).getByLabelText<HTMLInputElement>('Intelligence');
+      const willpower = within(dialog).getByLabelText<HTMLInputElement>('Willpower');
+      await user.clear(intelligence);
+      await user.type(intelligence, '20');
+      await user.clear(willpower);
+      await user.type(willpower, '18');
+      await user.tab();
+      await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+      expect(onUpdate).toHaveBeenCalledWith({
+        markerAttributes: [
+          { intelligence: 20, memory: 17, perception: 27, willpower: 18, charisma: 17 },
+        ],
+      });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      // The label is gone now that this marker has a spread to show instead.
+      expect(screen.queryByText('Remap marker')).not.toBeInTheDocument();
+      expect(screen.getByText('PER 27 / INT 20 / WIL 18 / MEM 17 / CHA 17')).toBeInTheDocument();
+    });
+
+    it('offers no "Clear override" for a marker with nothing manual set, and Cancel leaves the plan untouched', async () => {
+      const user = userEvent.setup();
+      const { onUpdate } = renderEditor(vi.fn(), {
+        plan: { ...PLAN, markers: [2] },
+        attributes: LEGAL_ATTRIBUTES,
+      });
+
+      await user.click(screen.getByRole('button', { name: 'Remap marker' }));
+      const dialog = screen.getByRole('dialog', { name: 'Remap marker attributes' });
+      expect(within(dialog).queryByRole('button', { name: 'Clear override' })).toBeNull();
+
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(onUpdate).not.toHaveBeenCalled();
+      expect(screen.getByText('Remap marker')).toBeInTheDocument();
+    });
+
+    it('reopens on an already-overridden marker showing the override, and "Clear override" reverts it', async () => {
+      const user = userEvent.setup();
+      const { onUpdate } = renderEditor(vi.fn(), {
+        plan: { ...PLAN, markers: [2], markerAttributes: [LEGAL_ATTRIBUTES] },
+        attributes: LEGAL_ATTRIBUTES,
+      });
+
+      // The override already renders as the marker's spread, not the divider.
+      expect(screen.getByText('PER 27 / WIL 21 / INT 17 / MEM 17 / CHA 17')).toBeInTheDocument();
+      await user.click(
+        screen.getByRole('button', { name: 'PER 27 / WIL 21 / INT 17 / MEM 17 / CHA 17' })
+      );
+      const dialog = screen.getByRole('dialog', { name: 'Remap marker attributes' });
+      expect(within(dialog).getByLabelText('Perception')).toHaveValue(27);
+
+      await user.click(within(dialog).getByRole('button', { name: 'Clear override' }));
+      expect(onUpdate).toHaveBeenCalledWith({ markerAttributes: [null] });
+      // No optimizer result covers this marker, so clearing the override
+      // drops it back to the plain divider rather than a different spread.
+      expect(screen.getByText('Remap marker')).toBeInTheDocument();
+    });
   });
 
   it('gives two markers that delimit the same optimizer step the same attribute display, not one shifted onto the wrong segment', async () => {
@@ -752,6 +845,7 @@ describe('PlanEditor prereq promotion', () => {
         { skillTypeID: 40, targetLevel: 3 },
       ],
       markers: [],
+      markerAttributes: [],
     });
     expect(screen.getByText('Skill A II is now a plan entry')).toBeInTheDocument();
   });

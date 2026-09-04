@@ -58,6 +58,8 @@ export function parsePrereqRowId(id: string): { skillTypeID: number; level: numb
 export interface PlanDropState {
   entries: PlanEntry[];
   markers: number[];
+  /** See `RowsToState.markerOrder` (markers.ts) — lets a caller carry per-marker data (manual remap attributes) along with the marker it belongs to. */
+  markerOrder: number[];
 }
 
 export type PlanDropResult =
@@ -201,12 +203,16 @@ export function planDrop({
   skills: ReadonlyMap<number, EngineSkill>;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
 }): PlanDropResult {
-  const unchanged = (): PlanDropResult => ({
-    ok: true,
-    entries: [...entries],
-    markers: normalizeMarkers(markers, entries.length),
-    promoted: null,
-  });
+  const unchanged = (): PlanDropResult => {
+    const normalized = normalizeMarkers(markers, entries.length);
+    return {
+      ok: true,
+      entries: [...entries],
+      markers: normalized,
+      markerOrder: normalized.map((_, i) => i),
+      promoted: null,
+    };
+  };
 
   const promotion = withPromotedEntry(entries, markers, rows, activeId);
   if (parsePrereqRowId(activeId) && !promotion) return unchanged();

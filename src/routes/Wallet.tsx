@@ -222,6 +222,7 @@ function CorpWalletView({
             columns={journalColumns}
             rows={journal}
             rowKey={(entry) => entry.id}
+            defaultSort={{ columnId: 'date', direction: 'desc' }}
           />
         </>
       )}
@@ -351,6 +352,7 @@ export function Wallet() {
         header: t('wallet.date'),
         className: 'whitespace-nowrap text-text-dim',
         render: (entry) => new Date(entry.date).toLocaleString(),
+        sortValue: (entry) => entry.date,
       },
       {
         id: 'refType',
@@ -360,11 +362,13 @@ export function Wallet() {
         // where the date column it follows would not.
         primary: true,
         render: (entry) => humanizeRefType(entry.ref_type),
+        sortValue: (entry) => humanizeRefType(entry.ref_type),
       },
       {
         id: 'description',
         header: t('wallet.description'),
         render: (entry) => entry.description,
+        sortValue: (entry) => entry.description,
       },
       {
         id: 'amount',
@@ -374,6 +378,7 @@ export function Wallet() {
         cellClassName: (entry) => (entry.amount !== undefined ? iskToneClass(entry.amount) : ''),
         render: (entry) =>
           entry.amount !== undefined ? formatIsk(entry.amount, 2) : t('common.unknown'),
+        sortValue: (entry) => entry.amount,
       },
       {
         id: 'balance',
@@ -382,6 +387,7 @@ export function Wallet() {
         className: 'tabular-nums text-text-dim',
         render: (entry) =>
           entry.balance !== undefined ? formatIsk(entry.balance, 2) : t('common.unknown'),
+        sortValue: (entry) => entry.balance,
       },
     ],
     [t]
@@ -560,6 +566,7 @@ export function Wallet() {
                 rows={otherLoyalty}
                 rowKey={(entry) => entry.corporation_id}
                 defaultSort={{ columnId: 'points', direction: 'desc' }}
+                responsive="table"
               />
             )}
           </Panel>
@@ -614,6 +621,7 @@ export function Wallet() {
                 columns={journalColumns}
                 rows={journal}
                 rowKey={(entry) => entry.id}
+                defaultSort={{ columnId: 'date', direction: 'desc' }}
               />
             </>
           )}
