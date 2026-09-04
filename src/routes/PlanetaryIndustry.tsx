@@ -5,6 +5,7 @@ import {
   Caret,
   DataAgeBadge,
   EmptyState,
+  FilterChip,
   IconButton,
   InfoTooltip,
   PageHeader,
@@ -17,12 +18,22 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { db } from '@/db';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
-import { ExtractorTimeline } from '@/features/pi/ExtractorTimeline';
 import { PlanPanel } from '@/features/pi/PlanPanel';
-import { loadPiRosterSnapshot, type PiRosterSnapshot } from '@/features/pi/roster';
-import { loadPlanetName, loadSchematicName } from '@/features/pi/names';
-import { loadTypeNames } from '@/features/character/typeNames';
+import {
+  loadPiRosterSnapshot,
+  type PiRosterSnapshot,
+  type RosterCharacter,
+  type RosterColony,
+} from '@/features/pi/roster';
+import {
+  loadPlanetName,
+  loadSchematicName,
+  readCachedPlanetNames,
+  readCachedSchematicNames,
+} from '@/features/pi/names';
+import { loadTypeNames, readCachedTypeNames } from '@/features/character/typeNames';
 import {
   extractorExpiryMs,
   extractorProgramsFromPins,
@@ -53,6 +64,7 @@ import { formatDuration } from '@/lib/duration';
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_DETAILS: ReadonlyMap<number, StatusResult<CharacterPlanetDetail>> = new Map();
 const EMPTY_STATUS: ColonyStatus = { idle: false, soonestExpiryMs: null };
+const EMPTY_ROSTER: PiRosterSnapshot = { colonies: [], skipped: [], notLoaded: [], noColonies: [] };
 
 interface ActiveColonies {
   planetsResult: CachedResult<CharacterPlanet[]> | null;
@@ -68,7 +80,9 @@ interface ActiveColonies {
 }
 
 interface Snapshot extends ActiveColonies {
-  /** Every Character's programs, read cache-only — see `features/pi/roster.ts`. */
+  /** Null when the active Character record itself isn't cached (shouldn't happen post-login, but the type is honest about it). */
+  activeCharacterName: string | null;
+  /** Every OTHER Character's colonies, read cache-only — see `features/pi/roster.ts`. */
   roster: PiRosterSnapshot;
 }
 
@@ -145,18 +159,58 @@ async function loadActiveColonies(
 }
 
 /**
- * The active Character's colonies live, then every Character's programs from
- * Dexie.
+ * The active Character's colonies live, then every other Character's
+ * colonies from Dexie, for the alt-colonies toggle.
  *
- * Order matters and is the whole cache-first story: the live load above has
- * already written the active Character's fresh rows, so the cache-only roster
- * read below picks them up without a second call, and page open costs exactly
- * the ESI traffic it cost before this panel existed. Refresh re-runs this
- * function, so the roster is refreshed by the same gesture.
+ * The cache-only story is the whole reason page open costs exactly the ESI
+ * traffic it cost before this toggle existed: `loadPiRosterSnapshot` never
+ * fetches, so resolving *its* colonies' pin/product/schematic/planet names
+ * must stay cache-only too (`readCached*`, never `load*`) — otherwise a
+ * character with several alts would turn every page open into a name-lookup
+ * fan-out for colonies nobody asked to see yet. Roster names are spread
+ * first and the active Character's live-resolved ones last, so a same-id
+ * collision (there won't usually be one — this is static game data) resolves
+ * to the fresher live read.
  */
 async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
-  const active = await loadActiveColonies(characterId, signal);
-  return { ...active, roster: await loadPiRosterSnapshot() };
+  const [active, activeCharacterRecord, roster] = await Promise.all([
+    loadActiveColonies(characterId, signal),
+    db.characters.get(characterId),
+    loadPiRosterSnapshot(characterId),
+  ]);
+  const activeCharacterName = activeCharacterRecord?.name ?? null;
+
+  const rosterPins = roster.colonies.flatMap((colony) => colony.detail?.pins ?? []);
+  const rosterPinTypeIds = [...new Set(rosterPins.map((pin) => pin.type_id))];
+  const rosterProductTypeIds = [
+    ...new Set(
+      rosterPins
+        .map((pin) => pin.extractor_details?.product_type_id)
+        .filter((id): id is number => id !== undefined)
+    ),
+  ];
+  const rosterSchematicIds = [
+    ...new Set(rosterPins.map(factorySchematicId).filter((id): id is number => id !== undefined)),
+  ];
+  const rosterPlanetIds = roster.colonies.map((colony) => colony.planet.planet_id);
+
+  const [rosterPinTypeNames, rosterProductNames, rosterSchematicNames, rosterPlanetNames] =
+    await Promise.all([
+      readCachedTypeNames(rosterPinTypeIds),
+      readCachedTypeNames(rosterProductTypeIds),
+      readCachedSchematicNames(rosterSchematicIds),
+      readCachedPlanetNames(rosterPlanetIds),
+    ]);
+
+  return {
+    ...active,
+    activeCharacterName,
+    pinTypeNames: new Map([...rosterPinTypeNames, ...active.pinTypeNames]),
+    productNames: new Map([...rosterProductNames, ...active.productNames]),
+    schematicNames: new Map([...rosterSchematicNames, ...active.schematicNames]),
+    planetNames: new Map([...rosterPlanetNames, ...active.planetNames]),
+    roster,
+  };
 }
 
 /**
@@ -387,6 +441,8 @@ function soonestExtractorPin(pins: readonly PlanetPin[]): PlanetPin | null {
 }
 
 interface ColonyRowProps {
+  /** DOM-id namespacing only — a planet_id is not unique across characters (two characters can each colonize the same planet). */
+  characterId: number;
   planet: CharacterPlanet;
   detail: CharacterPlanetDetail | null;
   status: ColonyStatus;
@@ -415,6 +471,7 @@ interface ColonyRowProps {
  * all, in the expanded region's meta line instead.
  */
 function ColonyRow({
+  characterId,
   planet,
   detail,
   status,
@@ -500,7 +557,7 @@ function ColonyRow({
             duration: formatDuration((soonestExpiryMs - loadedAt) / 1000),
           });
 
-  const rowId = `pi-colony-${planet.planet_id}`;
+  const rowId = `pi-colony-${characterId}-${planet.planet_id}`;
   const buttonId = `${rowId}-trigger`;
   const regionId = `${rowId}-region`;
 
@@ -642,6 +699,19 @@ function ColonyRow({
   );
 }
 
+/** A character sub-heading above its colony rows — only rendered once more than one character's colonies are on screen (the alt-colonies toggle is on). */
+function CharacterGroupHeader({ name }: { name: string }) {
+  return (
+    <div className="border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      {name}
+    </div>
+  );
+}
+
+function characterNames(characters: readonly RosterCharacter[]): string {
+  return characters.map((character) => character.name).join(', ');
+}
+
 /** Which peer view is showing. `colonies` is the default and needs no URL param. */
 type PiTab = 'colonies' | 'plan';
 
@@ -667,9 +737,13 @@ export function PlanetaryIndustry() {
   const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadPiSnapshot);
   // Single-open accordion: at most one colony's drilldown is on screen at a
-  // time, matching the summary row's whole reason for existing — several
-  // colonies used to mean that many full pin tables stacked on load.
-  const [expandedPlanetId, setExpandedPlanetId] = useState<number | null>(null);
+  // time. Keyed by `${characterId}:${planetId}`, not the planet id alone —
+  // two characters can each hold a colony on the same planet.
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  // Off by default: appends every other Character's cache-only colonies
+  // (features/pi/roster.ts) below the active Character's live ones, grouped
+  // by character.
+  const [showAltColonies, setShowAltColonies] = useState(false);
 
   const tab: PiTab = searchParams.get('tab') === 'plan' ? 'plan' : 'colonies';
   const typeParam = Number(searchParams.get('type'));
@@ -702,6 +776,7 @@ export function PlanetaryIndustry() {
   const productNames = data?.productNames ?? NO_NAMES;
   const schematicNames = data?.schematicNames ?? NO_NAMES;
   const loadedAt = data?.loadedAt ?? 0;
+  const roster = data?.roster ?? EMPTY_ROSTER;
 
   const planets = useMemo(() => planetsResult?.data ?? [], [planetsResult]);
 
@@ -725,6 +800,51 @@ export function PlanetaryIndustry() {
     [planets, statusByPlanet, loadedAt]
   );
 
+  // Alt colonies grouped by character, each group sorted worst-first the
+  // same way the active Character's own colonies are above. Status is
+  // computed once here, not again per row at render — `sortColoniesByAttention`
+  // needs it anyway to order the group.
+  const altGroups = useMemo(() => {
+    const byCharacter = new Map<
+      number,
+      { characterName: string; colonies: { colony: RosterColony; status: ColonyStatus }[] }
+    >();
+    for (const colony of roster.colonies) {
+      const status = colonyStatus(
+        colony.detail ? extractorProgramsFromPins(colony.detail.pins) : [],
+        loadedAt
+      );
+      const group = byCharacter.get(colony.characterId);
+      if (group) group.colonies.push({ colony, status });
+      else
+        byCharacter.set(colony.characterId, {
+          characterName: colony.characterName,
+          colonies: [{ colony, status }],
+        });
+    }
+    return [...byCharacter.entries()].map(([characterId, group]) => ({
+      characterId,
+      characterName: group.characterName,
+      colonies: sortColoniesByAttention(group.colonies, (entry) => entry.status, loadedAt),
+    }));
+  }, [roster.colonies, loadedAt]);
+
+  // Every other Character with something the toggle would surface — a
+  // colony row, or a reason it has none ("skipped"/"not loaded"/"no
+  // colonies"). Each Character lands in exactly one bucket (roster.ts's own
+  // classification), so this never double-counts. Deliberately a Character
+  // count, not a colony-row count: `roster.colonies.length` reads as 0 for a
+  // roster that is entirely skipped/not-loaded characters, which would make
+  // the toggle read "Show alt colonies 0" right above the messages that
+  // explain why — the one case this toggle most needs to be findable.
+  const otherCharacterCount =
+    altGroups.length + roster.skipped.length + roster.notLoaded.length + roster.noColonies.length;
+  // Whether the toggle (and the messaging beneath it) has anything to show
+  // at all — used both to render the toggle and to decide whether an empty
+  // active-character colony list still deserves a Panel (with the toggle)
+  // rather than the page-level empty state.
+  const hasOtherCharacters = otherCharacterCount > 0;
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -733,6 +853,10 @@ export function PlanetaryIndustry() {
     );
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
+
+  const activeCharacterName =
+    data?.activeCharacterName ?? t('pi.characterLabel', { id: activeCharacterId });
+  const hasAnyColoniesSurface = sortedPlanets.length > 0 || hasOtherCharacters;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -767,34 +891,36 @@ export function PlanetaryIndustry() {
           typeId={plannedTypeId}
           onTypeIdChange={setPlannedTypeId}
         />
+      ) : loading ? (
+        <div className="flex justify-center py-16">
+          <Spinner label={t('common.loading')} />
+        </div>
       ) : (
         <>
           {/*
-            Above the per-colony panels, and above the branch below rather
-            than inside it: the active Character losing the planets scope, or
-            simply having no colonies, says nothing about the alts whose
-            programs are already cached — and answering "which character do I
-            log in next" for exactly that case is what a cross-character panel
-            is for. It stays inside the Colonies tab: it is a colony readout,
-            and #321 owns that component next.
+            Reauth/load-failure banners sit above the colonies Panel rather
+            than replacing it: the active Character losing the planets scope,
+            or its live load failing, says nothing about the alts whose
+            colonies are already cached — and answering "which character do I
+            log in next" is exactly what the alt-colonies toggle is for.
           */}
-          {!loading && data && <ExtractorTimeline snapshot={data.roster} nowMs={loadedAt} />}
-
-          {loading ? (
-            <div className="flex justify-center py-16">
-              <Spinner label={t('common.loading')} />
-            </div>
-          ) : planetsNeedsReauth ? (
+          {planetsNeedsReauth && (
             <ReauthBanner
               title={t('pi.reauthTitle')}
               hint={t('pi.reauthHint')}
               actionLabel={t('pi.reauthAction')}
               onLogin={() => void beginEveLogin()}
             />
-          ) : error ? (
+          )}
+          {!planetsNeedsReauth && error && (
             <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-          ) : !planetsResult || planets.length === 0 ? (
-            <EmptyState title={t('pi.emptyTitle')} hint={t('pi.emptyHint')} />
+          )}
+
+          {!hasAnyColoniesSurface ? (
+            // Truly nothing anywhere — not just the active Character's own
+            // colonies — and a banner above hasn't already explained why.
+            !planetsNeedsReauth &&
+            !error && <EmptyState title={t('pi.emptyTitle')} hint={t('pi.emptyHint')} />
           ) : (
             <>
               <Panel>
@@ -803,34 +929,114 @@ export function PlanetaryIndustry() {
                   <InfoTooltip label={t('pi.stalenessLabel')} content={t('pi.stalenessTooltip')} />
                 </p>
               </Panel>
-              {planetsResult.fromCache && (
+              {planetsResult?.fromCache && (
                 <p className="text-[0.6875rem] text-warning uppercase">
                   {t('common.offlineTitle')}
                 </p>
               )}
               <Panel
-                title={t('pi.colonies.panelTitle', { count: sortedPlanets.length })}
+                title={t('pi.colonies.panelTitle', {
+                  count: sortedPlanets.length + (showAltColonies ? roster.colonies.length : 0),
+                })}
+                actions={
+                  hasOtherCharacters ? (
+                    <FilterChip
+                      label={t('pi.altColonies.toggleLabel')}
+                      selected={showAltColonies}
+                      onToggle={() => setShowAltColonies((current) => !current)}
+                      count={otherCharacterCount}
+                    />
+                  ) : undefined
+                }
                 padded={false}
               >
-                {sortedPlanets.map((planet) => (
-                  <ColonyRow
-                    key={planet.planet_id}
-                    planet={planet}
-                    detail={details.get(planet.planet_id)?.cached?.data ?? null}
-                    status={statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS}
-                    expanded={expandedPlanetId === planet.planet_id}
-                    onToggle={() =>
-                      setExpandedPlanetId((current) =>
-                        current === planet.planet_id ? null : planet.planet_id
-                      )
-                    }
-                    planetNames={planetNames}
-                    pinTypeNames={pinTypeNames}
-                    productNames={productNames}
-                    schematicNames={schematicNames}
-                    loadedAt={loadedAt}
+                {sortedPlanets.length === 0 ? (
+                  <EmptyState
+                    title={t('pi.noOwnColoniesTitle')}
+                    hint={showAltColonies ? undefined : t('pi.noOwnColoniesHint')}
+                    className="py-6"
                   />
-                ))}
+                ) : (
+                  <>
+                    {showAltColonies && <CharacterGroupHeader name={activeCharacterName} />}
+                    {sortedPlanets.map((planet) => {
+                      const key = `${activeCharacterId}:${planet.planet_id}`;
+                      return (
+                        <ColonyRow
+                          key={key}
+                          characterId={activeCharacterId}
+                          planet={planet}
+                          detail={details.get(planet.planet_id)?.cached?.data ?? null}
+                          status={statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS}
+                          expanded={expandedKey === key}
+                          onToggle={() =>
+                            setExpandedKey((current) => (current === key ? null : key))
+                          }
+                          planetNames={planetNames}
+                          pinTypeNames={pinTypeNames}
+                          productNames={productNames}
+                          schematicNames={schematicNames}
+                          loadedAt={loadedAt}
+                        />
+                      );
+                    })}
+                  </>
+                )}
+
+                {showAltColonies &&
+                  altGroups.map((group) => (
+                    <div key={group.characterId}>
+                      <CharacterGroupHeader name={group.characterName} />
+                      {group.colonies.map(({ colony, status }) => {
+                        const key = `${group.characterId}:${colony.planet.planet_id}`;
+                        return (
+                          <ColonyRow
+                            key={key}
+                            characterId={group.characterId}
+                            planet={colony.planet}
+                            detail={colony.detail}
+                            status={status}
+                            expanded={expandedKey === key}
+                            onToggle={() =>
+                              setExpandedKey((current) => (current === key ? null : key))
+                            }
+                            planetNames={planetNames}
+                            pinTypeNames={pinTypeNames}
+                            productNames={productNames}
+                            schematicNames={schematicNames}
+                            loadedAt={loadedAt}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+
+                {showAltColonies &&
+                  (roster.notLoaded.length > 0 ||
+                    roster.noColonies.length > 0 ||
+                    roster.skipped.length > 0) && (
+                    <ul className="space-y-1 border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                      {roster.notLoaded.length > 0 && (
+                        <li>
+                          {t('pi.altColonies.notLoaded', {
+                            names: characterNames(roster.notLoaded),
+                          })}
+                        </li>
+                      )}
+                      {roster.noColonies.length > 0 && (
+                        <li>
+                          {t('pi.altColonies.noColonies', {
+                            names: characterNames(roster.noColonies),
+                          })}
+                        </li>
+                      )}
+                      {roster.skipped.length > 0 && (
+                        <li className="text-warning">
+                          {t('pi.altColonies.skipped', { names: characterNames(roster.skipped) })}
+                        </li>
+                      )}
+                    </ul>
+                  )}
               </Panel>
             </>
           )}

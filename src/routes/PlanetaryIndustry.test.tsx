@@ -276,8 +276,12 @@ async function colonyPanelFor(name: RegExp): Promise<HTMLElement> {
   return panel;
 }
 
-function timeline(): HTMLElement {
-  return screen.getByRole('list', { name: /needing attention first/i });
+/** The whole Colonies panel (every character's rows once the toggle is on), found by its own "N colony/colonies" header — as opposed to `colonyPanelFor`'s single-colony wrapper. */
+function coloniesPanel(): HTMLElement {
+  const heading = screen.getByRole('heading', { name: /colon(y|ies)$/i });
+  const panel = heading.closest('section');
+  if (!(panel instanceof HTMLElement)) throw new Error('no colonies panel found');
+  return panel;
 }
 
 describe('PlanetaryIndustry', () => {
@@ -314,6 +318,52 @@ describe('PlanetaryIndustry', () => {
     );
     render(<App />);
     expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
+  });
+
+  it('shows the alt-colonies toggle alongside the re-login prompt, not instead of it, when an alt has cached colonies', async () => {
+    // The active Character's own live load 403s...
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    // ...but an alt's colonies are already cached from a prior visit as that
+    // character — exactly the case a cross-character surface exists for.
+    const ALT_ID = 92;
+    const ALT_PLANET_ID = 40000002;
+    await addAlt(ALT_ID, 'Alt Two', [PLANETS_SCOPE]);
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: 'planets',
+      value: [{ ...planetsPayload[0], planet_id: ALT_PLANET_ID, owner_id: ALT_ID }],
+      fetchedAt: Date.now(),
+    });
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: `planet:${ALT_PLANET_ID}`,
+      value: detailPayload,
+      fetchedAt: Date.now(),
+    });
+
+    render(<App />);
+
+    // The banner is not a substitute for the panel: both render.
+    expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
+    const toggle = await screen.findByRole('button', { name: /show alt colonies/i });
+
+    const user = userEvent.setup();
+    await user.click(toggle);
+    // No `universe/planets/{id}` mock is registered for the alt's planet in
+    // this test, so it renders its "Planet #id" fallback — a real row for a
+    // real (if unnamed) colony, not an error state.
+    const altRow = screen.getByRole('button', { name: new RegExp(`Planet #${ALT_PLANET_ID}`) });
+    expect(altRow).toHaveAttribute('aria-expanded', 'false');
+
+    // Expanding an alt's row exercises the composite `${characterId}:${planetId}`
+    // key and DOM ids end to end, not just that the row renders collapsed.
+    await user.click(altRow);
+    expect(altRow).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('region')).toBeInTheDocument();
   });
 
   it('leaves both yield columns blank for an extractor with no install-time baseline', async () => {
@@ -474,13 +524,16 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
 
-    const rows = within(timeline()).getAllByRole('listitem');
-    expect(rows).toHaveLength(2);
-    // Worst first: the active character's extractor has already expired, the
-    // alt's runs for another five days.
-    expect(rows[0]).toHaveTextContent('Pilot One');
-    expect(rows[1]).toHaveTextContent('Alt Two');
+    // Grouped by character: the active Character's own group heading plus
+    // the alt's, each above that character's colony rows. Scoped to the
+    // colonies panel — "Pilot One" is also the active Character's own name
+    // in the nav rail.
+    const panel = coloniesPanel();
+    expect(within(panel).getByText('Pilot One')).toBeInTheDocument();
+    expect(within(panel).getByText('Alt Two')).toBeInTheDocument();
     expect(altPlanetsFetch).not.toHaveBeenCalled();
   });
 
@@ -497,6 +550,8 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
 
     expect(scopelessFetch).not.toHaveBeenCalled();
     expect(screen.getByText(/Scopeless Alt/)).toHaveTextContent(/no planetary access/i);
@@ -570,6 +625,8 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
 
     const unread = screen.getByText(/Unread Alt/);
     const empty = screen.getByText(/Empty Alt/);
