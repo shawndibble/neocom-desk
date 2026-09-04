@@ -681,6 +681,23 @@ export interface EveNotificationFire {
 }
 
 /**
+ * Synthetic — never produced by a diff, never seen live. `projection.ts`'s
+ * reinforcement-exit Projection (issue #359) reuses `notificationId` for its
+ * own Occurrence Key derivation (`occurrenceKey.ts`) so it stays correlated
+ * with the notification it was derived from, but under a distinct `eventId`
+ * from the plain `EveNotificationFire` for the same id — a projected exit
+ * and the live "lost shields/armor" fire are two different real-world
+ * instants that happen to share one ESI `notification_id`, and reusing
+ * `EveNotificationFire`'s key would let the later Feed upsert silently
+ * overwrite the earlier one.
+ */
+export interface StructureReinforcementExitFire {
+  eventId: 'structureReinforcementExit';
+  characterId: number;
+  notificationId: number;
+}
+
+/**
  * Fires per EVE-native notification id newly above the highest id seen in
  * `prev` (issue #274) — same high-water-mark reasoning as `diffNewMail`:
  * `getCharacterNotifications` returns a bounded recent window rather than

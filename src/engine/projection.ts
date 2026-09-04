@@ -33,9 +33,13 @@
  * the two intentionally read the same today — keep them in sync by hand if
  * either wording changes, since nothing enforces that automatically.
  *
- * Only 7 of the 17 Notification Events carry a timestamp fixed far enough in
+ * 8 of the 17 Notification Events carry a timestamp fixed far enough in
  * advance to be worth projecting; the rest are inherently "as it happens"
- * (new mail, a filled order, a wallet change) and have no seat here.
+ * (new mail, a filled order, a wallet change) and have no seat here. EVE's
+ * own notifications are mostly the same "as it happens" case — except a
+ * structure reinforcement's `timeLeft` payload field, whose derived exit
+ * instant (round 36) is exactly the kind of future timestamp this module
+ * projects (issue #359).
  */
 import {
   type SkillQueueEntrySnapshot,
@@ -43,14 +47,17 @@ import {
   type ColonySnapshotEntry,
   type CalendarEventEntrySnapshot,
   type StructureFuelEntrySnapshot,
+  type EveNotificationEntrySnapshot,
   type NotificationFire,
   type IndustryJobNotificationFire,
   type PlanetaryNotificationFire,
   type ExtractorExpiringFire,
   type CalendarEventStartingFire,
   type StructureFuelLowFire,
+  type StructureReinforcementExitFire,
   EXTRACTOR_EXPIRY_WARNING_MS,
 } from './notificationDiffs';
+import { reinforcementExitMs, parseEveNotificationPayload } from './eveNotificationPayload';
 import { occurrenceKey, type OccurrenceFire } from './occurrenceKey';
 
 export type ProjectableEventId =
@@ -60,7 +67,8 @@ export type ProjectableEventId =
   | 'planetaryExtractionDone'
   | 'planetaryExtractorExpiring'
   | 'calendarEventStarting'
-  | 'structureFuelLow';
+  | 'structureFuelLow'
+  | 'eveNotification';
 
 export type ProjectionWording = 'assert' | 'hedge';
 
@@ -80,6 +88,7 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
     case 'planetaryExtractionDone':
     case 'planetaryExtractorExpiring':
     case 'calendarEventStarting':
+    case 'eveNotification':
       return 'assert';
     default: {
       const exhaustive: never = eventId;
@@ -208,6 +217,32 @@ function structureFuelLowText(characterName: string, structureName: string) {
   return {
     title: 'Structure fuel low',
     body: `${characterName}: ${structureName} was due to run out of fuel.`,
+  };
+}
+
+/**
+ * Best structure label available, in the same preference order as
+ * `eveNotificationText.ts`'s `structureLabel` (never nothing, since "exits
+ * reinforcement soon" with no subject is worse than the generic body it
+ * would otherwise fall back to) — duplicated by hand rather than imported
+ * because that module lives above `src/engine` and pulls in `src/i18n`.
+ */
+function structureReinforcementExitLabel(
+  payloadStructureName: string | undefined,
+  resolvedName: string | undefined,
+  structureId: number | undefined
+): string {
+  if (payloadStructureName !== undefined) return payloadStructureName;
+  if (resolvedName !== undefined) return resolvedName;
+  if (structureId !== undefined) return `structure #${structureId}`;
+  return 'a structure';
+}
+
+function eveNotificationReinforcementExitText(characterName: string, structureLabel: string) {
+  assertWording('eveNotification', 'assert');
+  return {
+    title: 'Structure coming out of reinforcement',
+    body: `${characterName}: ${structureLabel} exits reinforcement soon.`,
   };
 }
 
@@ -437,6 +472,60 @@ export function projectStructureFuel(
         fire,
         fireAt,
         structureFuelLowText(characterName, entry.name)
+      )
+    );
+  }
+  return rows;
+}
+
+/**
+ * A structure reinforcement's exit instant (round 36: the notification's own
+ * timestamp plus the payload's `timeLeft` duration), for every
+ * EVE Notification entry whose payload has one and whose exit falls inside
+ * the horizon (issue #359). Parsing is type-agnostic — `timeLeft` means the
+ * same thing wherever it appears, and CCP's own catalog of which types carry
+ * it is not this module's to hardcode — so any entry lacking a usable one is
+ * silently skipped rather than filtered by `type` first.
+ *
+ * The row's `eventId` stays `'eveNotification'` (matching this domain's only
+ * `NotificationEventId`, so `foregroundPoller.ts`'s `enabledEvents` filter
+ * lets it through), but its Occurrence Key derives from a distinct synthetic
+ * `StructureReinforcementExitFire` rather than `EveNotificationFire` — see
+ * that type's doc comment in `notificationDiffs.ts` for why reusing the
+ * plain fire would collide with the live "lost shields/armor" fire sharing
+ * the same `notificationId`.
+ */
+export function projectEveNotificationReinforcementExit(
+  characterId: number,
+  characterName: string,
+  entries: readonly EveNotificationEntrySnapshot[],
+  structureNames: ReadonlyMap<number, string>,
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): ProjectionRow[] {
+  const rows: ProjectionRow[] = [];
+  for (const entry of entries) {
+    const payload = parseEveNotificationPayload(entry.text);
+    const exitMs = reinforcementExitMs(entry.timestamp, payload);
+    if (exitMs === undefined) continue;
+    if (!inHorizon(exitMs, nowMs, horizonMs)) continue;
+    const label = structureReinforcementExitLabel(
+      payload.structureName,
+      payload.structureId === undefined ? undefined : structureNames.get(payload.structureId),
+      payload.structureId
+    );
+    const fire: StructureReinforcementExitFire = {
+      eventId: 'structureReinforcementExit',
+      characterId,
+      notificationId: entry.notificationId,
+    };
+    rows.push(
+      buildRow(
+        characterId,
+        'eveNotification',
+        fire,
+        exitMs,
+        eveNotificationReinforcementExitText(characterName, label)
       )
     );
   }

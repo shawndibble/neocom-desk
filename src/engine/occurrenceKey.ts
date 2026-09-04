@@ -40,6 +40,7 @@ import type {
   CorpMemberJoinedFire,
   CorpMemberLeftFire,
   CorpWalletThresholdFire,
+  StructureReinforcementExitFire,
 } from './notificationDiffs';
 
 /**
@@ -65,7 +66,8 @@ export type OccurrenceFire =
   | CorpIndustryJobNotificationFire
   | CorpMemberJoinedFire
   | CorpMemberLeftFire
-  | CorpWalletThresholdFire;
+  | CorpWalletThresholdFire
+  | StructureReinforcementExitFire;
 
 const DAY_MS = 86_400_000;
 
@@ -101,6 +103,7 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     case 'newMail':
       return [characterId, fire.eventId, fire.mailId].join(':');
     case 'eveNotification':
+    case 'structureReinforcementExit':
       return [characterId, fire.eventId, fire.notificationId].join(':');
     case 'structureFuelLow':
       return [characterId, fire.eventId, fire.structureId, fire.fuelExpiresMs].join(':');

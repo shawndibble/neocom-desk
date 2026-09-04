@@ -10,6 +10,7 @@ import {
   walletDomain,
   marketOrderDomain,
   structureFuelDomain,
+  eveNotificationDomain,
   corpIndustryJobDomain,
   corpRosterDomain,
   corpWalletDomain,
@@ -20,11 +21,13 @@ import {
   useNotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
   withCharacterEventThreshold,
+  withEveNotificationTypeToggled,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
 } from './preferences';
 import { loadContracts } from '@/features/character/contracts';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
+import { loadStructureName } from '@/features/character/structures';
 import { loadCorporationId, loadCorporationStructures } from '@/features/corp/boardData';
 import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
 import { loadCorporationMemberIds } from '@/features/corp/members';
@@ -61,6 +64,7 @@ vi.mock('@/features/corp/wallet', () => ({
   loadCorporationWallets: vi.fn(),
   loadCorporationWalletJournal: vi.fn(),
 }));
+vi.mock('@/features/character/structures', () => ({ loadStructureName: vi.fn() }));
 vi.mock('@/features/corp/roles', () => ({
   loadCharacterRoles: vi.fn(),
   corpWideRoles: (payload: CharacterCorporationRoles | null | undefined) => payload?.roles ?? [],
@@ -209,7 +213,7 @@ describe('deriveMarketOrderEntries', () => {
 
 /**
  * Registry wiring for the Scheduled Push Projection engine (issue #355,
- * ADR 0010): each of the five domains with a fixed future timestamp resolves
+ * ADR 0010): each of the six domains with a fixed future timestamp resolves
  * whatever names its row text needs, then delegates row-building to the pure
  * `engine/projection.ts` functions covered exhaustively by their own tests —
  * these only prove the wiring reaches them with the right arguments.
@@ -227,17 +231,30 @@ describe('projection wiring', () => {
     } as Awaited<ReturnType<typeof loadUniverseType>>;
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.mocked(loadUniverseType).mockReset();
     vi.mocked(loadPlanetName).mockReset();
+    vi.mocked(loadStructureName).mockReset();
+    await db.settings.clear();
+    useNotificationPreferences.setState({
+      value: DEFAULT_NOTIFICATION_PREFERENCES,
+      hydrated: true,
+    });
   });
 
-  it('gives exactly the five fixed-future-timestamp domains a projection', () => {
+  it('gives exactly the six fixed-future-timestamp domains a projection', () => {
     const withProjection = POLL_DOMAINS.filter((domain) => domain.projection !== undefined).map(
       (domain) => domain.id
     );
     expect([...withProjection].sort()).toEqual(
-      ['calendar', 'colonies', 'industryJobs', 'skillQueue', 'structureFuel'].sort()
+      [
+        'calendar',
+        'colonies',
+        'eveNotification',
+        'industryJobs',
+        'skillQueue',
+        'structureFuel',
+      ].sort()
     );
   });
 
@@ -309,6 +326,70 @@ describe('projection wiring', () => {
     };
     const rows = await structureFuelDomain.projection!(7, 'Kestrel', snapshot, T0);
     expect(rows[0].body).toContain('was due to run out');
+  });
+
+  describe('eveNotificationDomain.projection', () => {
+    function notificationSnapshot(overrides: { type?: string; text?: string } = {}) {
+      return {
+        entries: [
+          {
+            notificationId: 42,
+            type: overrides.type ?? 'StructureUnderAttack',
+            senderId: 1000132,
+            senderType: 'corporation',
+            // 36,000,000,000 ticks (100ns units) = 3,600,000 ms = 1 hour.
+            text: overrides.text ?? 'structureID: 111\ntimeLeft: 36000000000\n',
+            timestamp: new Date(T0).toISOString(),
+          },
+        ],
+        nowMs: T0,
+      };
+    }
+
+    it('resolves the structure name and projects a row for an allow-listed, enabled type', async () => {
+      vi.mocked(loadStructureName).mockResolvedValue('Keepstar');
+      const rows = await eveNotificationDomain.projection!(
+        7,
+        'Kestrel',
+        notificationSnapshot(),
+        T0
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].eventId).toEqual('eveNotification');
+      expect(rows[0].fireAt).toEqual(T0 + HOUR_MS);
+      expect(rows[0].body).toContain('Keepstar');
+      expect(loadStructureName).toHaveBeenCalledWith(7, 111);
+    });
+
+    it('drops a type off the round-45 allow-list before it reaches the engine', async () => {
+      const rows = await eveNotificationDomain.projection!(
+        7,
+        'Kestrel',
+        notificationSnapshot({ type: 'NotOnTheAllowList' }),
+        T0
+      );
+      expect(rows).toEqual([]);
+      expect(loadStructureName).not.toHaveBeenCalled();
+    });
+
+    it("drops a type the Character has switched browser notifications off for, mirroring the live channel's own gate", async () => {
+      useNotificationPreferences.setState({
+        value: withEveNotificationTypeToggled(
+          DEFAULT_NOTIFICATION_PREFERENCES,
+          7,
+          'StructureUnderAttack',
+          'browser'
+        ),
+        hydrated: true,
+      });
+      const rows = await eveNotificationDomain.projection!(
+        7,
+        'Kestrel',
+        notificationSnapshot(),
+        T0
+      );
+      expect(rows).toEqual([]);
+    });
   });
 });
 

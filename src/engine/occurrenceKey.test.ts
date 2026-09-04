@@ -17,6 +17,7 @@ import type {
   CorpMemberJoinedFire,
   CorpMemberLeftFire,
   CorpWalletThresholdFire,
+  StructureReinforcementExitFire,
 } from './notificationDiffs';
 
 const T0 = 1_700_000_000_000;
@@ -155,6 +156,26 @@ describe('occurrenceKey', () => {
       timestamp: '2024-01-01T00:00:00Z',
     };
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0 + 1000));
+  });
+
+  it('keys structureReinforcementExit on the same notificationId distinctly from the live eveNotification fire (issue #359: a Feed upsert must not overwrite the shields/armor-lost row with the exit row)', () => {
+    const notificationId = 321;
+    const live: EveNotificationFire = {
+      eventId: 'eveNotification',
+      characterId: 7,
+      notificationId,
+      type: 'StructureLostShields',
+      senderId: 1,
+      senderType: 'corporation',
+      text: 't',
+      timestamp: '2024-01-01T00:00:00Z',
+    };
+    const projectedExit: StructureReinforcementExitFire = {
+      eventId: 'structureReinforcementExit',
+      characterId: 7,
+      notificationId,
+    };
+    expect(occurrenceKey(projectedExit, T0)).not.toEqual(occurrenceKey(live, T0));
   });
 
   it('keys structureFuelLow on structureId and the fuel countdown it belongs to', () => {

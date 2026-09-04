@@ -21,6 +21,7 @@ import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { extractorProgramsFromPins } from '@/features/pi/adapters';
 import { loadMailHeaders } from '@/features/character/mail';
 import { loadCharacterNotifications } from '@/features/character/notifications';
+import { loadStructureName } from '@/features/character/structures';
 import { loadCalendarEvents as loadCharacterCalendarEvents } from '@/features/character/calendar';
 import { loadContracts as loadCharacterContracts } from '@/features/character/contracts';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
@@ -112,12 +113,14 @@ import {
   type CorpWalletSnapshot,
   type CorpWalletThresholdFire,
 } from '@/engine/notificationDiffs';
+import { parseEveNotificationPayload } from '@/engine/eveNotificationPayload';
 import {
   projectSkillQueue,
   projectIndustryJobs,
   projectColonies,
   projectCalendar,
   projectStructureFuel,
+  projectEveNotificationReinforcementExit,
   type ProjectionRow,
 } from '@/engine/projection';
 import { loadUniverseType } from '@/features/skills/data';
@@ -128,7 +131,9 @@ import {
   useNotificationPreferences,
   hydrateNotificationPreferences,
   characterEventThresholds,
+  characterEveTypePrefs,
 } from './preferences';
+import { isEveTypeAllowed, isEveTypeEnabledFor } from './eventSelection';
 import { createPollerStateStore, isSnapshotWith, type PollerState } from './pollerState';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 
@@ -222,8 +227,10 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire> {
   /**
    * Turns this poll's snapshot into Scheduled Push Projection rows (issue
    * #355, ADR 0010) — absent for a domain with nothing inside the 72-hour
-   * horizon worth projecting (mail, wallet, market orders, corp roster, EVE's
-   * own notifications: all "as it happens", not fixed-timestamp-in-advance).
+   * horizon worth projecting (mail, wallet, market orders, corp roster: all
+   * "as it happens", not fixed-timestamp-in-advance). EVE's own notifications
+   * are mostly the same "as it happens" case too, except the one shape below
+   * whose payload derives a future reinforcement-exit instant (issue #359).
    * Resolves whatever display names the row text needs (Dexie-cached), which
    * `engine/projection.ts` deliberately cannot do itself.
    */
@@ -768,6 +775,34 @@ export const eveNotificationDomain = defineDomain<
     nowMs,
   }),
   diffs: [gatedOn('eveNotification', diffEveNotification)],
+  // Structure reinforcement exits (issue #359): the only EVE Notification
+  // shape with a future, fixed-enough timestamp to project. Kept to the same
+  // gates the live browser channel already applies to this domain
+  // (`foregroundPoller.ts`'s `isEveTypeAllowed` + `eveTypeAllowsChannel`) —
+  // Scheduled Push is that channel's closed-app analog (see the comment on
+  // `projection` above), so a type the user has switched browser
+  // notifications off for, or that fell off the round-45 allow-list, must
+  // not reach the backend either.
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    const eveTypePrefs = await currentEveTypePrefs(characterId);
+    const eligible = snapshot.entries.filter(
+      (entry) =>
+        isEveTypeAllowed(entry.type) && isEveTypeEnabledFor(eveTypePrefs, entry.type, 'browser')
+    );
+    const structureIds = eligible
+      .map((entry) => parseEveNotificationPayload(entry.text).structureId)
+      .filter((id): id is number => id !== undefined);
+    const structureNames = await resolveProjectionNames(structureIds, (id) =>
+      loadStructureName(characterId, id)
+    );
+    return projectEveNotificationReinforcementExit(
+      characterId,
+      characterName,
+      eligible,
+      structureNames,
+      nowMs
+    );
+  },
 });
 
 /* -------------------------------------------------------------------------- */
@@ -803,6 +838,12 @@ async function corpContextFor(
 async function currentThresholds(characterId: number) {
   await hydrateNotificationPreferences();
   return characterEventThresholds(useNotificationPreferences.getState().value, characterId);
+}
+
+/** This Character's current per-EVE-notification-type settings, re-read every poll for the same reason as `currentThresholds`. */
+async function currentEveTypePrefs(characterId: number) {
+  await hydrateNotificationPreferences();
+  return characterEveTypePrefs(useNotificationPreferences.getState().value, characterId);
 }
 
 /* Structure fuel low ------------------------------------------------------- */
