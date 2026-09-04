@@ -14,14 +14,14 @@
  * gate, so it hides whole (CONTEXT.md round 35) rather than rendering a shell
  * over a permission no login can grant.
  *
- * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are `/corp`'s
- * and are repeated here for the same reasons — see `routes/Corp.tsx`.
+ * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are
+ * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, IconButton, PageHeader, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import {
   CorpRosterStats,
@@ -182,11 +182,11 @@ function CorpMembersView() {
 
 export function CorpMembers() {
   const { t } = useTranslation();
-  const { state, capabilities } = useCorpAccess();
+  const gate = useCorpRouteGate((capabilities) => capabilities.canReadMembers);
 
-  if (state === 'unknown') return <Spinner />;
+  if (gate.status === 'loading') return <Spinner />;
 
-  if (state !== 'ready' || !capabilities.canReadMembers) {
+  if (gate.status === 'denied') {
     return (
       <div className="space-y-4">
         <PageHeader title={t('corp.members.title')} />

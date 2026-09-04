@@ -2,15 +2,14 @@
  * Fetch + cache layer for the corporation's industry jobs (issue #298).
  *
  * The corp twin of `features/industry/jobs.ts`, and deliberately not a copy of
- * its auth handling: see `corpAuthFailure.ts` for why a 403 here is the in-game
- * role gate rather than a re-login prompt.
- *
- * The cache key is `corpCacheKey`'d (issue #293), so a corp change computes a
- * different key and misses rather than serving the previous corporation's jobs.
+ * its auth handling: `corpRead.ts`'s wrapper is why a 403 here is the in-game
+ * role gate rather than a re-login prompt, and why the cache key is corp-scoped
+ * (issue #293) — a corp change computes a different key and misses rather than
+ * serving the previous corporation's jobs.
  */
 import { getCorporationIndustryJobs, type CorporationIndustryJob } from '@/esi/endpoints';
-import { corpCacheKey, loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
-import { detectCorpAuthFailure } from './corpAuthFailure';
+import type { StatusResult } from '@/esi/cache';
+import { loadCorpPaginatedWithCacheStatus } from './corpRead';
 
 const KEY = 'industryJobs';
 
@@ -21,10 +20,7 @@ export function loadCorporationIndustryJobs(
   characterId: number,
   corporationId: number
 ): Promise<CorpJobsLoadResult> {
-  return loadPaginatedWithCacheStatus(
-    characterId,
-    corpCacheKey(corporationId, KEY),
-    () => getCorporationIndustryJobs(characterId, corporationId, { includeCompleted: false }),
-    { detectAuthFailure: detectCorpAuthFailure }
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEY, () =>
+    getCorporationIndustryJobs(characterId, corporationId, { includeCompleted: false })
   );
 }

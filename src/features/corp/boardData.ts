@@ -8,7 +8,8 @@
  * copy. What is left here is the structure list, the moon-extraction schedule,
  * and `loadCorporationId`.
  *
- * Two rules hold across every corp read, here and there:
+ * Two rules hold across every corp read, here and there — both applied by
+ * `corpRead.ts`'s wrapper rather than by hand at each loader:
  *
  * - **Every row is filed under `corpCacheKey`** (#293). `esiCache` is keyed
  *   `[characterId, key]`, which can say "this Character's skills" but not "this
@@ -33,13 +34,11 @@ import {
   type CorporationMiningExtraction,
   type CorporationStructure,
 } from '@/esi/endpoints';
-import { corpCacheKey, loadPaginatedWithCacheStatus, loadWithCacheStatus } from '@/esi/cache';
+import { loadWithCacheStatus } from '@/esi/cache';
 import type { StatusResult } from '@/esi/cache';
 import { recordCharacterCorporation } from '@/auth/session';
 import { db } from '@/db';
-import { detectCorpAuthFailure } from './corpAuthFailure';
-
-const CORP_OPTIONS = { detectAuthFailure: detectCorpAuthFailure };
+import { loadCorpPaginatedWithCacheStatus } from './corpRead';
 
 /**
  * Which corporation this Character is in, as a read rather than a lookup.
@@ -84,11 +83,8 @@ export function loadCorporationStructures(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationStructure[]>> {
-  return loadPaginatedWithCacheStatus(
-    characterId,
-    corpCacheKey(corporationId, 'structures'),
-    () => getCorporationStructures(characterId, corporationId),
-    CORP_OPTIONS
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, 'structures', () =>
+    getCorporationStructures(characterId, corporationId)
   );
 }
 
@@ -96,11 +92,8 @@ export function loadCorporationMiningExtractions(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationMiningExtraction[]>> {
-  return loadPaginatedWithCacheStatus(
-    characterId,
-    corpCacheKey(corporationId, 'miningExtractions'),
-    () => getCorporationMiningExtractions(characterId, corporationId),
-    CORP_OPTIONS
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, 'miningExtractions', () =>
+    getCorporationMiningExtractions(characterId, corporationId)
   );
 }
 

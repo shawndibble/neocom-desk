@@ -9,9 +9,9 @@
  *
  * - **Each panel is gated on its own capability.** A Station Manager who is not
  *   an Accountant sees structures and no wallet rail, with no error and no
- *   empty-state noise (AC3). The gate is `useCorpAccess().capabilities`, never
- *   a role string, and it decides what is *fetched* as well as what is drawn —
- *   an ungated read buys a guaranteed 403.
+ *   empty-state noise (AC3). The gate is `useCorpRouteGate()`'s resolved
+ *   `capabilities`, never a role string, and it decides what is *fetched* as
+ *   well as what is drawn — an ungated read buys a guaranteed 403.
  * - **`unknown` renders neutrally here, and nothing in the nav.** The
  *   asymmetry is deliberate: a nav item that flickers into existence is worse
  *   than one a beat late (CONTEXT.md round 35), but bouncing a Director who
@@ -26,7 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, IconButton, PageHeader, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { useCorpAccess } from '@/features/corp/useCorpAccess';
+import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { CorpBoard } from '@/features/corp/CorpBoard';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
@@ -382,19 +382,19 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
 
 export function Corp() {
   const { t } = useTranslation();
-  const { state, capabilities } = useCorpAccess();
+  const gate = useCorpRouteGate();
 
   // Still resolving. This is the one place corp UI treats `unknown` as its own
   // state rather than as `none`: the nav hides so it cannot flicker, but
   // bouncing a Director who deep-linked before their roles read landed would
-  // simply be a bug. See the module note.
-  if (state === 'unknown') return <Spinner />;
+  // simply be a bug. See `useCorpRouteGate`.
+  if (gate.status === 'loading') return <Spinner />;
 
   // Reached the URL without the access for it. A bare explanation, not the
   // section's shell drawn over nothing — that would be a lock, and corp UI
   // hides rather than locks (CONTEXT.md round 35). Settings' Corp access row is
   // where the two-axis gate is actually explained and, where possible, fixed.
-  if (state !== 'ready') {
+  if (gate.status === 'denied') {
     return (
       <div className="space-y-4">
         <PageHeader title={t('corp.title')} />
@@ -403,5 +403,5 @@ export function Corp() {
     );
   }
 
-  return <CorpBoardView capabilities={capabilities} />;
+  return <CorpBoardView capabilities={gate.capabilities} />;
 }
