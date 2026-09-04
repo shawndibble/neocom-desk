@@ -4,6 +4,8 @@ import {
   POLL_DOMAINS,
   calendarDomain,
   skillQueueDomain,
+  industryJobDomain,
+  colonyDomain,
   contractDomain,
   walletDomain,
   marketOrderDomain,
@@ -23,6 +25,8 @@ import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
 import { loadCorporationMemberIds } from '@/features/corp/members';
 import { loadCorporationWallets, loadCorporationWalletJournal } from '@/features/corp/wallet';
 import { loadCharacterRoles } from '@/features/corp/roles';
+import { loadUniverseType } from '@/features/skills/data';
+import { loadPlanetName } from '@/features/pi/names';
 import { db } from '@/db';
 import type { StatusResult } from '@/esi/cache';
 import type {
@@ -56,6 +60,14 @@ vi.mock('@/features/corp/roles', () => ({
   loadCharacterRoles: vi.fn(),
   corpWideRoles: (payload: CharacterCorporationRoles | null | undefined) => payload?.roles ?? [],
 }));
+vi.mock('@/features/skills/data', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/skills/data')>();
+  return { ...actual, loadUniverseType: vi.fn() };
+});
+vi.mock('@/features/pi/names', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/pi/names')>();
+  return { ...actual, loadPlanetName: vi.fn() };
+});
 
 function statusResult<T>(data: T, truncated: boolean): StatusResult<T> {
   return {
@@ -187,6 +199,111 @@ describe('deriveMarketOrderEntries', () => {
       { orderId: 5, filled: true },
       { orderId: 6, filled: true },
     ]);
+  });
+});
+
+/**
+ * Registry wiring for the Scheduled Push Projection engine (issue #355,
+ * ADR 0010): each of the five domains with a fixed future timestamp resolves
+ * whatever names its row text needs, then delegates row-building to the pure
+ * `engine/projection.ts` functions covered exhaustively by their own tests —
+ * these only prove the wiring reaches them with the right arguments.
+ */
+describe('projection wiring', () => {
+  const T0 = 1_700_000_000_000;
+  const HOUR_MS = 3_600_000;
+
+  function universeTypeResult(name: string) {
+    return {
+      data: { name },
+      fetchedAt: new Date(0),
+      fromCache: false,
+      truncated: false,
+    } as Awaited<ReturnType<typeof loadUniverseType>>;
+  }
+
+  beforeEach(() => {
+    vi.mocked(loadUniverseType).mockReset();
+    vi.mocked(loadPlanetName).mockReset();
+  });
+
+  it('gives exactly the five fixed-future-timestamp domains a projection', () => {
+    const withProjection = POLL_DOMAINS.filter((domain) => domain.projection !== undefined).map(
+      (domain) => domain.id
+    );
+    expect([...withProjection].sort()).toEqual(
+      ['calendar', 'colonies', 'industryJobs', 'skillQueue', 'structureFuel'].sort()
+    );
+  });
+
+  it('resolves skill names for the skill queue and defers row-building to the engine', async () => {
+    vi.mocked(loadUniverseType).mockResolvedValue(universeTypeResult('Gunnery'));
+    const snapshot = {
+      entries: [
+        { skillId: 3300, finishedLevel: 4, queuePosition: 0, finishMs: T0 + 5 * HOUR_MS },
+        { skillId: 3301, finishedLevel: 1, queuePosition: 1, finishMs: T0 + 10 * HOUR_MS },
+      ],
+      nowMs: T0,
+    };
+    const rows = await skillQueueDomain.projection!(7, 'Kestrel', snapshot, T0);
+    expect(rows[0].eventId).toEqual('skillLevelComplete');
+    expect(rows[0].body).toContain('Gunnery');
+    expect(rows[1].eventId).toEqual('characterNotTraining');
+  });
+
+  it('resolves item names for industry jobs', async () => {
+    vi.mocked(loadUniverseType).mockResolvedValue(universeTypeResult('Rifter'));
+    const snapshot = {
+      entries: [
+        {
+          jobId: 1,
+          endMs: T0 + 5 * HOUR_MS,
+          blueprintTypeId: 10,
+          productTypeId: 20,
+          activityId: 1,
+        },
+      ],
+      nowMs: T0,
+    };
+    const rows = await industryJobDomain.projection!(7, 'Kestrel', snapshot, T0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].body).toContain('Rifter');
+  });
+
+  it('resolves planet names for colonies', async () => {
+    vi.mocked(loadPlanetName).mockResolvedValue('Amarr III');
+    const snapshot = {
+      colonies: [
+        { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: T0 + 5 * HOUR_MS }] },
+      ],
+      nowMs: T0,
+    };
+    const rows = await colonyDomain.projection!(7, 'Kestrel', snapshot, T0);
+    const extractionDone = rows.find((r) => r.eventId === 'planetaryExtractionDone');
+    expect(extractionDone?.body).toContain('Amarr III');
+  });
+
+  it('projects calendarEventStarting without any name resolution', async () => {
+    const snapshot = { entries: [{ calendarEventId: 99, startMs: T0 + 5 * HOUR_MS }], nowMs: T0 };
+    const rows = await calendarDomain.projection!(7, 'Kestrel', snapshot, T0);
+    expect(rows).toEqual([expect.objectContaining({ eventId: 'calendarEventStarting' })]);
+    expect(loadUniverseType).not.toHaveBeenCalled();
+  });
+
+  it('hedges the structure fuel projection using the entry-level threshold, without a preference read', async () => {
+    const snapshot = {
+      entries: [
+        {
+          structureId: 111,
+          name: 'Keepstar',
+          fuelExpiresMs: T0 + 50 * HOUR_MS,
+          thresholdMs: 24 * HOUR_MS,
+        },
+      ],
+      nowMs: T0,
+    };
+    const rows = await structureFuelDomain.projection!(7, 'Kestrel', snapshot, T0);
+    expect(rows[0].body).toContain('was due to run out');
   });
 });
 
