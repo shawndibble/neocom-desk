@@ -263,7 +263,7 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     const personalBadge = container.querySelector('header time')?.getAttribute('dateTime');
     expect(personalBadge).not.toBe(new Date(corpFetchedAt).toISOString());
 
-    await user.click(screen.getByRole('button', { name: 'Corp jobs' }));
+    await user.click(await screen.findByRole('button', { name: 'Corp jobs' }));
 
     await screen.findByText('Widget Beta');
     expect(container.querySelector('header time')?.getAttribute('dateTime')).toBe(
