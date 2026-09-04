@@ -150,6 +150,35 @@ describe('Skills', () => {
     expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
   });
 
+  it('recovers an implant name and its attribute bonus from a transient type lookup failure, instead of stalling on "#id"', async () => {
+    // loadUniverseType (shared by the implant name lookup here and the
+    // attribute-bonus sum) is one live call per implant with no batch to
+    // fall back to. Before the retry this added, a single transient failure
+    // meant the implant's row read "#9899" instead of its real name AND its
+    // perception bonus never reached the attribute chip below.
+    let typeRequests = 0;
+    server.use(
+      http.get('https://esi.evetech.net/universe/types/9899', () => {
+        typeRequests += 1;
+        if (typeRequests === 1) return HttpResponse.error();
+        return HttpResponse.json({
+          type_id: 9899,
+          name: 'Ocular Filter - Basic',
+          description: 'A basic <b>ocular filter</b> implant.',
+          group_id: 300,
+          published: true,
+          dogma_attributes: [{ attribute_id: 178, value: 3.0 }],
+        });
+      })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Ocular Filter - Basic')).toBeInTheDocument();
+    expect(screen.queryByText('#9899')).not.toBeInTheDocument();
+    expect(await screen.findByText('19 + 3 = 22')).toBeInTheDocument();
+  });
+
   it('detects a cerebral accelerator and shows it as a third term, separate from implants', async () => {
     // A legal base spread (20/20/20/20/19, sums to 99) with a uniform +4
     // booster on every attribute, plus the fixture's own +3 perception
