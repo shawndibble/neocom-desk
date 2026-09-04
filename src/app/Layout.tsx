@@ -292,6 +292,18 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
       <div className="space-y-1 pb-3">
         {/* The phone's only route to /corp: the tab bar is full at 3 + More. */}
         <CorpNavItem onClick={onClose} />
+        {/*
+          From here down, same relative order as the desktop rail's
+          Progression/Economy/Social groups (Skills and Industry lead
+          Progression there, but sit in the primary tab bar here, not this
+          sheet) — one order to learn, not two.
+        */}
+        <NavItem
+          to="/planetary-industry"
+          label={t('nav.pi')}
+          locked={locked.has('/planetary-industry')}
+          onClick={onClose}
+        />
         <NavItem
           to="/market"
           label={t('nav.market')}
@@ -305,15 +317,15 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           onClick={onClose}
         />
         <NavItem
-          to="/planetary-industry"
-          label={t('nav.pi')}
-          locked={locked.has('/planetary-industry')}
-          onClick={onClose}
-        />
-        <NavItem
           to="/assets"
           label={t('nav.assets')}
           locked={locked.has('/assets')}
+          onClick={onClose}
+        />
+        <NavItem
+          to="/contracts"
+          label={t('nav.contracts')}
+          locked={locked.has('/contracts')}
           onClick={onClose}
         />
         <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} onClick={onClose} />
@@ -321,12 +333,6 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           to="/calendar"
           label={t('nav.calendar')}
           locked={locked.has('/calendar')}
-          onClick={onClose}
-        />
-        <NavItem
-          to="/contracts"
-          label={t('nav.contracts')}
-          locked={locked.has('/contracts')}
           onClick={onClose}
         />
         <NavItem

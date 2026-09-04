@@ -118,7 +118,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(mobileNav).getByRole('button', { name: 'More' })).toBeInTheDocument();
   });
 
-  it('opens a dialog listing Wallet, Assets, Mail, Calendar and Contracts (not Styleguide)', async () => {
+  it('opens a dialog listing Wallet, Assets, Mail, Calendar and Contracts (not Orders or Styleguide)', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayout();
@@ -137,9 +137,38 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
       expect(within(sheet).getByRole('link', { name: label })).toBeInTheDocument();
     }
     expect(within(sheet).queryByRole('link', { name: 'Styleguide' })).not.toBeInTheDocument();
+    // Desktop-only for now: Orders has no primary tab-bar slot to spare here.
+    expect(within(sheet).queryByRole('link', { name: 'Orders' })).not.toBeInTheDocument();
     // Overview tabs now, reached from the Overview page rather than the sheet.
     expect(within(sheet).queryByRole('link', { name: 'Clones' })).not.toBeInTheDocument();
     expect(within(sheet).queryByRole('link', { name: 'Employment' })).not.toBeInTheDocument();
+  });
+
+  it('orders the sheet to match the desktop rail: PI, Market, Wallet, Assets, Contracts, Mail, Calendar, Contacts', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    const user = userEvent.setup();
+    renderLayout();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+    const sheet = screen.getByRole('dialog', { name: 'More' });
+
+    const labels = [
+      'Planetary Industry',
+      'Market',
+      'Wallet',
+      'Assets',
+      'Contracts',
+      'Mail',
+      'Calendar',
+      'Contacts',
+    ];
+    const links = labels.map((label) => within(sheet).getByRole('link', { name: label }));
+    for (let i = 1; i < links.length; i++) {
+      expect(
+        links[i - 1].compareDocumentPosition(links[i]) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    }
   });
 
   it('trails with a divider, then Settings and the active Character (with photo)', async () => {
