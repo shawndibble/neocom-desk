@@ -179,10 +179,10 @@ function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType
  * call failed; the delay assumes a failure surviving esiFetch's own 429/420
  * retry (up to 10s) is a real rate-limit window, not a blip. Roughly doubles
  * the worst case on a persistent failure — accepted here, but two of
- * `foregroundPoller.ts`'s callers feed the Periodic Background Sync handler
- * (`notificationText`), which has its own execution-time limits and isn't
- * currently budget-aware the way `eveNotification`'s name resolution is
- * (issue #300); worth revisiting there if background notifications start
+ * `foregroundPoller.ts`'s callers feed the notification poll's text
+ * resolution (`notificationText`), which has its own execution-time limits
+ * and isn't currently budget-aware the way `eveNotification`'s name
+ * resolution is (issue #300); worth revisiting there if notifications start
  * missing their window.
  */
 export async function loadUniverseType(typeId: number): Promise<CachedResult<UniverseType> | null> {

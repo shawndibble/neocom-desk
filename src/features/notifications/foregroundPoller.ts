@@ -303,7 +303,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   }
 }
 
-/** Exported for `backgroundPoller.ts` — the Periodic Background Sync handler renders the exact same copy the Foreground Poller does, driven by the same registry. */
+/** Exported for `backgroundPoller.ts` — the Service Worker's `push` handler renders the exact same copy the Foreground Poller does, driven by the same registry. */
 export async function notificationText(
   fire: AnyNotificationFire,
   character: CharacterRef

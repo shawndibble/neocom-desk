@@ -5,7 +5,6 @@ import { subscribeToEsiAuthFailures } from '@/stores/authFailure';
 import { subscribeToEsiActivity } from '@/stores/activityLog';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { configureEsi } from '@/esi/client';
-import { registerPeriodicSync, liveBackgroundSyncEnv } from './backgroundSync';
 import { triggerSync } from '@/sync';
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
@@ -52,12 +51,6 @@ import { useFontScale } from '@/lib/fontScale';
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
 // surfacing as an empty view in whichever feature happened to ask first.
 configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
-
-// Best-effort ask for the Periodic Background Sync handler `src/sw.ts`
-// registers a listener for (ADR 0007, issue #176) — a no-op on every
-// browser/platform without it (AC4), so unlike `configureEsi` this is fired
-// and left, never awaited by anything else at boot.
-void registerPeriodicSync(liveBackgroundSyncEnv());
 
 // Vite's BASE_URL (set by `base` in vite.config.ts, currently '/').
 const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';

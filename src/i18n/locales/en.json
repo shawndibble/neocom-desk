@@ -1446,8 +1446,8 @@
         "corpMemberLeft": "Member Left",
         "corpWalletThreshold": "Corp Wallet Threshold"
       },
-      "extractorExpiringHint": "Checked every five minutes while the app is open. With the app closed, this warning rides on background sync: the installed app on Chrome or Edge only, on a schedule the browser decides, and not at all on iPhone, iPad, or Firefox — so it can arrive late or not at all. The Planetary Industry page always shows the real expiry.",
-      "corpEventBestEffortHint": "Best-effort: fires only while the app is open, or when the browser runs a background sync (Chrome or Edge, installed, on a schedule the browser decides). It does not fire in the background at all on iOS. Not a substitute for in-game alerts.",
+      "extractorExpiringHint": "Checked every five minutes while the app is open. With the app closed, this warning does not fire. The Planetary Industry page always shows the real expiry.",
+      "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "structureFuelLowThresholdLabel": "Warn when fuel remaining drops below:",
       "structureFuelLowThresholdOption_one": "{{count}} day",
       "structureFuelLowThresholdOption_other": "{{count}} days",

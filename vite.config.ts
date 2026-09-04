@@ -22,9 +22,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      // Hand-written src/sw.ts (ADR 0007, issue #176) — only strategy that
-      // supports a custom `periodicsync` handler; generateSW's output has no
-      // room for one.
+      // Hand-written src/sw.ts (originally ADR 0007, issue #176; now ADR 0009)
+      // — only strategy that will support a custom `push` handler (future
+      // Web Push work); generateSW's output has no room for one.
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',

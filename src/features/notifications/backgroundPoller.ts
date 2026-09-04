@@ -1,6 +1,8 @@
 /**
- * Periodic Background Sync (ADR 0007, issue #176): the two `liveDependencies()`
- * pieces that don't work unchanged inside a Service Worker's global scope —
+ * SW-safe overrides for the Service Worker's `push` handler (ADR 0009; kept
+ * from the retired Periodic Background Sync work, ADR 0007/issue #176): the
+ * two `liveDependencies()` pieces that don't work unchanged inside a Service
+ * Worker's global scope —
  * `Notification` has no constructor there, and there's no `Notification.permission`
  * getter to read. Everything else (Dexie, ESI fetch, the notification-event
  * registry/diff functions from #172) is plain module code shared as-is with
@@ -39,14 +41,10 @@ export async function sendBackgroundNotification(
 
 /**
  * There is no `Notification.permission` to read from a Service Worker's
- * global scope. A registered `periodicsync` handler only ever runs for an
- * installed PWA the browser already granted periodic-background-sync
- * access to (`registerPeriodicSync`, `src/app/backgroundSync.ts`, only
- * registers after `navigator.permissions.query` confirms that) — treating
- * `showNotification`'s existence as "granted" mirrors that: it degrades to
- * a no-op via the try/catch above if the browser disagrees at call time,
- * rather than a wrong permission read blocking every event this poll would
- * otherwise have fired.
+ * global scope. Treating `showNotification`'s existence as "granted" is the
+ * closest available proxy: it degrades to a no-op via the try/catch above if
+ * the browser disagrees at call time, rather than a wrong permission read
+ * blocking every event this poll would otherwise have fired.
  */
 export function backgroundPermission(
   registration: ServiceWorkerRegistration
