@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -349,7 +349,16 @@ export function Wallet() {
         header: t('loyalty.points'),
         align: 'right',
         className: 'tabular-nums font-semibold',
-        render: (entry) => entry.loyalty_points.toLocaleString(),
+        // Opens that corporation's LP store — offers ranked by profit, with a
+        // filter for what the character can currently afford (LoyaltyStore.tsx).
+        render: (entry) => (
+          <Link
+            to={`/wallet/loyalty/${entry.corporation_id}`}
+            className="text-accent hover:underline"
+          >
+            {entry.loyalty_points.toLocaleString()}
+          </Link>
+        ),
         sortValue: (entry) => entry.loyalty_points,
       },
     ],
