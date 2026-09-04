@@ -25,6 +25,17 @@ import { loadCalendarEvents as loadCharacterCalendarEvents } from '@/features/ch
 import { loadContracts as loadCharacterContracts } from '@/features/character/contracts';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
+import {
+  loadCorporationId,
+  loadCorporationStructures,
+  MASTER_WALLET_DIVISION,
+} from '@/features/corp/boardData';
+import { toBoardStructures } from '@/features/corp/boardSources';
+import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
+import { loadCorporationMemberIds } from '@/features/corp/members';
+import { loadCorporationWallets, loadCorporationWalletJournal } from '@/features/corp/wallet';
+import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
+import { corpCapabilities, type CorpCapability } from '@/engine/corpRoles';
 import type {
   SkillQueueEntry,
   IndustryJob,
@@ -35,6 +46,7 @@ import type {
   MarketOrder,
   MarketOrderHistory,
   CharacterNotification,
+  CorporationIndustryJob,
 } from '@/esi/endpoints';
 import {
   runSkillQueueNotificationDiffs,
@@ -49,6 +61,11 @@ import {
   diffWalletBalanceChanged,
   diffMarketOrderFilled,
   diffEveNotification,
+  diffStructureFuelLow,
+  diffCorpIndustryJobReady,
+  diffCorpMemberJoined,
+  diffCorpMemberLeft,
+  diffCorpWalletThreshold,
   type NotificationFire,
   type SkillQueueEntrySnapshot,
   type SkillQueueSnapshot,
@@ -81,8 +98,23 @@ import {
   type EveNotificationEntrySnapshot,
   type EveNotificationSnapshot,
   type EveNotificationFire,
+  type StructureFuelEntrySnapshot,
+  type StructureFuelSnapshot,
+  type StructureFuelLowFire,
+  type CorpIndustryJobEntrySnapshot,
+  type CorpIndustryJobSnapshot,
+  type CorpIndustryJobNotificationFire,
+  type CorpRosterMemberSnapshot,
+  type CorpRosterSnapshot,
+  type CorpMemberJoinedFire,
+  type CorpMemberLeftFire,
+  type CorpWalletJournalEntrySnapshot,
+  type CorpWalletDivisionSnapshot,
+  type CorpWalletSnapshot,
+  type CorpWalletThresholdFire,
 } from '@/engine/notificationDiffs';
 import type { NotificationEventId } from './events';
+import { useNotificationPreferences, characterEventThresholds } from './preferences';
 import { createPollerStateStore, isSnapshotWith, type PollerState } from './pollerState';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 
@@ -98,7 +130,12 @@ export type AnyNotificationFire =
   | ContractNotificationFire
   | WalletNotificationFire
   | MarketOrderNotificationFire
-  | EveNotificationFire;
+  | EveNotificationFire
+  | StructureFuelLowFire
+  | CorpIndustryJobNotificationFire
+  | CorpMemberJoinedFire
+  | CorpMemberLeftFire
+  | CorpWalletThresholdFire;
 
 /**
  * The one diff signature every domain speaks. Most engine diffs don't take an
@@ -632,6 +669,247 @@ export const eveNotificationDomain = defineDomain<
   diffs: [gatedOn('eveNotification', diffEveNotification)],
 });
 
+/* -------------------------------------------------------------------------- */
+/* Corp domains (issue #299)                                                  */
+/* -------------------------------------------------------------------------- */
+
+const DAY_MS = 86_400_000;
+
+/**
+ * The corp gate every domain below runs before its own ESI call (AC5): CCP
+ * role-gates the corporation endpoints server-side, so a granted scope alone
+ * does not mean the Character can read the data (`engine/corpRoles.ts`). Null
+ * for "cannot fetch this poll" — corporation unknown, roles unreadable this
+ * poll, or the specific role missing — always erring toward *not* calling the
+ * endpoint rather than guessing. `loadCharacterRoles` is documented as cheap
+ * enough to run for everyone (`features/corp/roles.ts`), and this only runs
+ * for a Character whose `enabledEvents` for the domain is already non-empty.
+ */
+async function corpContextFor(
+  characterId: number,
+  capability: CorpCapability
+): Promise<{ corporationId: number } | null> {
+  const corporationId = await loadCorporationId(characterId);
+  if (corporationId === null) return null;
+  const rolesResult = await loadCharacterRoles(characterId);
+  if (rolesResult.needsReauth || rolesResult.cached === null) return null;
+  const capabilities = corpCapabilities(corpWideRoles(rolesResult.cached.data));
+  if (!capabilities[capability]) return null;
+  return { corporationId };
+}
+
+/** This Character's current threshold settings (issue #299), device-local and re-read every poll — the mechanism AC4's "without a reload" relies on. */
+async function currentThresholds(characterId: number) {
+  await useNotificationPreferences.getState().hydrate();
+  return characterEventThresholds(useNotificationPreferences.getState().value, characterId);
+}
+
+/* Structure fuel low ------------------------------------------------------- */
+
+function isStructureFuelEntrySnapshot(raw: unknown): raw is StructureFuelEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.structureId === 'number' &&
+    typeof r.name === 'string' &&
+    (r.fuelExpiresMs === null || typeof r.fuelExpiresMs === 'number') &&
+    typeof r.thresholdMs === 'number'
+  );
+}
+
+export const structureFuelDomain = defineDomain<
+  StructureFuelEntrySnapshot,
+  StructureFuelSnapshot,
+  StructureFuelLowFire
+>({
+  id: 'structureFuel',
+  eventIds: ['structureFuelLow'],
+  stateKey: 'notifications.pollerState.structureFuel',
+  entriesKey: 'entries',
+  isEntry: isStructureFuelEntrySnapshot,
+  load: async (characterId) => {
+    const context = await corpContextFor(characterId, 'canReadStructures');
+    if (context === null) return null;
+    const result = await loadCorporationStructures(characterId, context.corporationId);
+    if (result.needsReauth || result.cached === null) return null;
+    const thresholds = await currentThresholds(characterId);
+    const thresholdMs = thresholds.structureFuelLowDays * DAY_MS;
+    // Reuses the board's own ESI-to-engine adaptation (`boardSources.ts`)
+    // rather than re-parsing `fuel_expires` here — same underlying data the
+    // board already loads, per the ticket brief.
+    return toBoardStructures(result.cached.data).map((structure) => ({
+      structureId: structure.structureId,
+      name: structure.name,
+      fuelExpiresMs: structure.fuelExpiresMs,
+      thresholdMs,
+    }));
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  diffs: [gatedOn('structureFuelLow', diffStructureFuelLow)],
+});
+
+/* Corp industry jobs --------------------------------------------------------- */
+
+function isCorpIndustryJobEntrySnapshot(raw: unknown): raw is CorpIndustryJobEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.jobId === 'number' &&
+    typeof r.endMs === 'number' &&
+    typeof r.blueprintTypeId === 'number' &&
+    (r.productTypeId === null || typeof r.productTypeId === 'number') &&
+    typeof r.activityId === 'number'
+  );
+}
+
+function toCorpIndustryJobEntrySnapshot(job: CorporationIndustryJob): CorpIndustryJobEntrySnapshot {
+  return {
+    jobId: job.job_id,
+    endMs: Date.parse(job.end_date),
+    blueprintTypeId: job.blueprint_type_id,
+    productTypeId: job.product_type_id ?? null,
+    activityId: job.activity_id,
+  };
+}
+
+export const corpIndustryJobDomain = defineDomain<
+  CorporationIndustryJob,
+  CorpIndustryJobSnapshot,
+  CorpIndustryJobNotificationFire
+>({
+  id: 'corpIndustryJobs',
+  eventIds: ['corpIndustryJobReady'],
+  stateKey: 'notifications.pollerState.corpIndustryJobs',
+  entriesKey: 'entries',
+  isEntry: isCorpIndustryJobEntrySnapshot,
+  load: async (characterId) => {
+    const context = await corpContextFor(characterId, 'canReadIndustry');
+    if (context === null) return null;
+    const result = await loadCorporationIndustryJobs(characterId, context.corporationId);
+    if (result.needsReauth || result.cached === null) return null;
+    return result.cached.data;
+  },
+  toSnapshot: (jobs, nowMs) => ({ entries: jobs.map(toCorpIndustryJobEntrySnapshot), nowMs }),
+  diffs: [gatedOn('corpIndustryJobReady', diffCorpIndustryJobReady)],
+});
+
+/* Corp roster ----------------------------------------------------------------- */
+
+function isCorpRosterMemberSnapshot(raw: unknown): raw is CorpRosterMemberSnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  return typeof (raw as Record<string, unknown>).characterId === 'number';
+}
+
+/**
+ * `/members`, not `/membertracking` — the diff only needs identity, and the
+ * page that needs the richer read (`routes/CorpMembers.tsx`, #333) is a
+ * second, independent consumer of the same capability. Both answer to
+ * `canReadMembers` (Director-only, `engine/corpRoles.ts`), matching that
+ * route's existing gate rather than inventing a narrower one for this poller.
+ */
+export const corpRosterDomain = defineDomain<
+  number,
+  CorpRosterSnapshot,
+  CorpMemberJoinedFire | CorpMemberLeftFire
+>({
+  id: 'corpRoster',
+  eventIds: ['corpMemberJoined', 'corpMemberLeft'],
+  stateKey: 'notifications.pollerState.corpRoster',
+  entriesKey: 'entries',
+  isEntry: isCorpRosterMemberSnapshot,
+  load: async (characterId) => {
+    const context = await corpContextFor(characterId, 'canReadMembers');
+    if (context === null) return null;
+    const result = await loadCorporationMemberIds(characterId, context.corporationId);
+    if (result.needsReauth || result.cached === null) return null;
+    return result.cached.data;
+  },
+  toSnapshot: (memberIds, nowMs) => ({
+    entries: memberIds.map((characterId) => ({ characterId })),
+    nowMs,
+  }),
+  // Both gates are load-bearing (colonyDomain's precedent): the fetch is
+  // skipped only when both joined and left are off.
+  diffs: [
+    gatedOn('corpMemberJoined', diffCorpMemberJoined),
+    gatedOn('corpMemberLeft', diffCorpMemberLeft),
+  ],
+});
+
+/* Corp wallet threshold --------------------------------------------------- */
+
+function isCorpWalletJournalEntrySnapshot(raw: unknown): raw is CorpWalletJournalEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return typeof r.id === 'number' && (r.amount === null || typeof r.amount === 'number');
+}
+
+function isCorpWalletDivisionSnapshot(raw: unknown): raw is CorpWalletDivisionSnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.division === 'number' &&
+    typeof r.balance === 'number' &&
+    Array.isArray(r.journal) &&
+    r.journal.every(isCorpWalletJournalEntrySnapshot) &&
+    typeof r.balanceFloorIsk === 'number' &&
+    typeof r.transactionCeilingIsk === 'number'
+  );
+}
+
+/**
+ * Balance-below is checked across every division `/wallets` already returns
+ * in one call; transaction-above is checked only on the master division's
+ * journal, since ESI publishes no all-divisions journal and the seven are
+ * separately paginated and role-gated (CONTEXT.md round 43, `boardData.ts`'s
+ * `MASTER_WALLET_DIVISION` reasoning).
+ */
+export const corpWalletDomain = defineDomain<
+  CorpWalletDivisionSnapshot,
+  CorpWalletSnapshot,
+  CorpWalletThresholdFire
+>({
+  id: 'corpWallet',
+  eventIds: ['corpWalletThreshold'],
+  stateKey: 'notifications.pollerState.corpWallet',
+  entriesKey: 'divisions',
+  isEntry: isCorpWalletDivisionSnapshot,
+  load: async (characterId) => {
+    const context = await corpContextFor(characterId, 'canReadWallet');
+    if (context === null) return null;
+    const walletsResult = await loadCorporationWallets(characterId, context.corporationId);
+    if (walletsResult.needsReauth || walletsResult.cached === null) return null;
+    const journalResult = await loadCorporationWalletJournal(
+      characterId,
+      context.corporationId,
+      MASTER_WALLET_DIVISION
+    );
+    if (journalResult.needsReauth || journalResult.cached === null) return null;
+    // A truncated master-division journal could lower the high-water mark
+    // `diffCorpWalletThreshold` tracks, re-firing for entries already
+    // reported once the next complete poll sees them again (same reasoning
+    // as `walletDomain`'s truncation guard above).
+    if (journalResult.cached.truncated) return null;
+    const journalEntries = journalResult.cached.data;
+    const thresholds = await currentThresholds(characterId);
+    return walletsResult.cached.data.map((division) => ({
+      division: division.division,
+      balance: division.balance,
+      journal:
+        division.division === MASTER_WALLET_DIVISION
+          ? journalEntries.map((entry) => ({
+              id: entry.id,
+              amount: entry.amount ?? null,
+            }))
+          : [],
+      balanceFloorIsk: thresholds.corpWalletBalanceFloorIsk,
+      transactionCeilingIsk: thresholds.corpWalletTransactionCeilingIsk,
+    }));
+  },
+  toSnapshot: (divisions, nowMs) => ({ divisions: [...divisions], nowMs }),
+  diffs: [gatedOn('corpWalletThreshold', diffCorpWalletThreshold)],
+});
+
 /**
  * Every polled domain, in fetch order. One entry here is the whole cost of
  * adding a domain: `foregroundPoller.ts` names none of them.
@@ -646,4 +924,8 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   walletDomain,
   marketOrderDomain,
   eveNotificationDomain,
+  structureFuelDomain,
+  corpIndustryJobDomain,
+  corpRosterDomain,
+  corpWalletDomain,
 ];

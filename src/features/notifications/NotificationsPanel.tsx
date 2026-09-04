@@ -26,7 +26,15 @@
  */ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, Panel, EmptyState, SearchInput, Tooltip } from '@/components/ui';
+import {
+  Button,
+  Panel,
+  EmptyState,
+  SearchInput,
+  Tooltip,
+  TextInput,
+  NativeSelect,
+} from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { db } from '@/db';
 import {
@@ -47,6 +55,9 @@ import {
   withEventChannelToggled,
   withAllEventsToggledForCharacter,
   withEveNotificationTypeToggled,
+  characterEventThresholds,
+  withCharacterEventThreshold,
+  STRUCTURE_FUEL_LOW_DAY_OPTIONS,
 } from './preferences';
 import {
   isEventEnabledFor,
@@ -65,8 +76,21 @@ import {
   promptStateAfterAsk,
   notificationsBlocked,
 } from './permission';
+import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
+import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
+
+/**
+ * Every corp event (issue #299) — used to attach the best-effort disclosure
+ * to each, since search can narrow a section to just one row. Derived from
+ * `corpCapability` rather than hand-listed, so a future corp event picks up
+ * the disclosure by virtue of carrying that field, not by also being added
+ * here.
+ */
+const CORP_EVENT_IDS: ReadonlySet<NotificationEventId> = new Set(
+  NOTIFICATION_EVENTS.filter((event) => event.corpCapability !== undefined).map((event) => event.id)
+);
 
 function eventDef(eventId: NotificationEventId): NotificationEventDef {
   const def = EVENT_BY_ID.get(eventId);
@@ -128,6 +152,46 @@ export function NotificationsPanel() {
     for (const token of tokens ?? []) map.set(token.characterId, new Set(token.scopes));
     return map;
   }, [tokens]);
+
+  /**
+   * Per-stored-character corp capability (issue #299) — a departure from
+   * `useCorpAccess`'s active-character-only scope (CONTEXT.md round 37):
+   * that read backs a hot, always-mounted Settings row, while
+   * `loadCharacterRoles` is documented as cheap enough to run for everyone
+   * (`features/corp/roles.ts`) and this only runs once per Settings visit,
+   * cached an hour by the same read `/corp` itself uses.
+   *
+   * A character absent from the map (still loading, or the roles read
+   * failed) is **not** treated as capability-missing — AC5 is a poller
+   * contract, not a UI one, so an unresolved read here renders the row
+   * enabled rather than falsely locking it before the answer is in.
+   */
+  const [capabilitiesByCharacterId, setCapabilitiesByCharacterId] = useState<
+    ReadonlyMap<number, CorpCapabilities>
+  >(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    const ids = (characters ?? []).map((c) => c.characterId);
+    if (ids.length === 0) return;
+    void (async () => {
+      const entries = await Promise.all(
+        ids.map(async (characterId) => {
+          const result = await loadCharacterRoles(characterId);
+          if (result.needsReauth || result.cached === null) return null;
+          return [characterId, corpCapabilities(corpWideRoles(result.cached.data))] as const;
+        })
+      );
+      if (cancelled) return;
+      const resolved = entries.filter(
+        (entry): entry is readonly [number, CorpCapabilities] => entry !== null
+      );
+      setCapabilitiesByCharacterId(new Map(resolved));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [characters]);
 
   const eventLabels = useMemo(
     () => NOTIFICATION_EVENTS.map((event) => ({ id: event.id, label: t(event.labelKey) })),
@@ -258,11 +322,23 @@ export function NotificationsPanel() {
                   ? [...(filterResult.visibleEventIdsByCharacter.get(character.characterId) ?? [])]
                   : NOTIFICATION_EVENT_IDS;
                 const grantedScopes = scopesByCharacterId.get(character.characterId) ?? new Set();
-                const togglableEventIds = visibleEventIds.filter((eventId) =>
-                  grantedScopes.has(eventDef(eventId).scope)
-                );
+                const characterCapabilities = capabilitiesByCharacterId.get(character.characterId);
+                // A capability not yet resolved reads as held (see the
+                // capability effect's own doc comment) — never a false lock
+                // while the roles read is still in flight.
+                function hasCapability(def: NotificationEventDef): boolean {
+                  return (
+                    def.corpCapability === undefined ||
+                    (characterCapabilities?.[def.corpCapability] ?? true)
+                  );
+                }
+                const togglableEventIds = visibleEventIds.filter((eventId) => {
+                  const def = eventDef(eventId);
+                  return grantedScopes.has(def.scope) && hasCapability(def);
+                });
                 const prefs = characterEventPrefs(prefsValue, character.characterId);
                 const eveTypePrefs = characterEveTypePrefs(prefsValue, character.characterId);
+                const thresholds = characterEventThresholds(prefsValue, character.characterId);
                 const knownEveTypes = knownEveTypesForCharacter(
                   feedEntries ?? [],
                   character.characterId,
@@ -339,11 +415,13 @@ export function NotificationsPanel() {
                           {visibleEventIds.map((eventId) => {
                             const def = eventDef(eventId);
                             const hasScope = grantedScopes.has(def.scope);
+                            const capabilityMissing = !hasCapability(def);
+                            const rowEnabled = hasScope && !capabilityMissing;
                             const eventLabel = t(def.labelKey);
                             return (
                               <li key={eventId}>
                                 <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                                  <span className={hasScope ? 'text-text' : 'text-text-faint'}>
+                                  <span className={rowEnabled ? 'text-text' : 'text-text-faint'}>
                                     {eventLabel}
                                   </span>
                                   <div className="grid shrink-0 grid-cols-2 gap-x-6">
@@ -352,8 +430,15 @@ export function NotificationsPanel() {
                                         key={channel}
                                         channel={channel}
                                         eventLabel={eventLabel}
-                                        hasScope={
-                                          hasScope && !(channel === 'browser' && browserBlocked)
+                                        enabled={
+                                          rowEnabled && !(channel === 'browser' && browserBlocked)
+                                        }
+                                        disabledReason={
+                                          !hasScope
+                                            ? 'scope'
+                                            : capabilityMissing
+                                              ? 'capability'
+                                              : null
                                         }
                                         checked={isEventEnabledFor(prefs, eventId, channel)}
                                         onToggle={() =>
@@ -381,6 +466,117 @@ export function NotificationsPanel() {
                                 {eventId === 'planetaryExtractorExpiring' && (
                                   <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
                                     {t('settings.notifications.extractorExpiringHint')}
+                                  </p>
+                                )}
+                                {/*
+                                  Structure fuel's inline threshold control
+                                  (issue #299, AC4) — the first Notification
+                                  Event with a setting of its own rather than
+                                  a plain on/off. Persisted per Character and
+                                  per device (`preferences.ts`), and re-read
+                                  by the poller every 5-minute tick, which is
+                                  what "takes effect without a reload" means
+                                  here (CONTEXT.md round 43).
+                                */}
+                                {eventId === 'structureFuelLow' && rowEnabled && (
+                                  <div className="border-t border-line bg-panel/60 px-6 py-1.5">
+                                    <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
+                                      {t('settings.notifications.structureFuelLowThresholdLabel')}
+                                      <NativeSelect
+                                        size="sm"
+                                        className="w-auto"
+                                        value={thresholds.structureFuelLowDays}
+                                        onChange={(e) =>
+                                          void setPrefsValue(
+                                            withCharacterEventThreshold(
+                                              prefsValue,
+                                              character.characterId,
+                                              'structureFuelLowDays',
+                                              Number(e.target.value)
+                                            )
+                                          )
+                                        }
+                                      >
+                                        {STRUCTURE_FUEL_LOW_DAY_OPTIONS.map((days) => (
+                                          <option key={days} value={days}>
+                                            {t(
+                                              'settings.notifications.structureFuelLowThresholdOption',
+                                              {
+                                                count: days,
+                                              }
+                                            )}
+                                          </option>
+                                        ))}
+                                      </NativeSelect>
+                                    </label>
+                                    {/*
+                                      Issue #299's own words: "say so in the
+                                      UI, so nobody reads it as a second copy
+                                      of the EVE alert." CCP's own
+                                      StructureFuelAlert fires later, at its
+                                      own fixed point — this is additive
+                                      early warning, not a duplicate.
+                                    */}
+                                    <p className="mt-1 text-[0.6875rem] text-text-faint">
+                                      {t('settings.notifications.structureFuelLowNotDuplicateHint')}
+                                    </p>
+                                  </div>
+                                )}
+                                {/*
+                                  Corp wallet's two independent thresholds
+                                  (issue #299, AC4) — a division balance floor
+                                  and a single-transaction ceiling, either of
+                                  which fires. Same persistence as the fuel
+                                  control above.
+                                */}
+                                {eventId === 'corpWalletThreshold' && rowEnabled && (
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line bg-panel/60 px-6 py-1.5">
+                                    <ThresholdAmountInput
+                                      id={`corp-wallet-floor-${character.characterId}`}
+                                      label={t(
+                                        'settings.notifications.corpWalletBalanceFloorLabel'
+                                      )}
+                                      value={thresholds.corpWalletBalanceFloorIsk}
+                                      onCommit={(amount) =>
+                                        void setPrefsValue(
+                                          withCharacterEventThreshold(
+                                            prefsValue,
+                                            character.characterId,
+                                            'corpWalletBalanceFloorIsk',
+                                            amount
+                                          )
+                                        )
+                                      }
+                                    />
+                                    <ThresholdAmountInput
+                                      id={`corp-wallet-ceiling-${character.characterId}`}
+                                      label={t(
+                                        'settings.notifications.corpWalletTransactionCeilingLabel'
+                                      )}
+                                      value={thresholds.corpWalletTransactionCeilingIsk}
+                                      onCommit={(amount) =>
+                                        void setPrefsValue(
+                                          withCharacterEventThreshold(
+                                            prefsValue,
+                                            character.characterId,
+                                            'corpWalletTransactionCeilingIsk',
+                                            amount
+                                          )
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                )}
+                                {/*
+                                  The honesty requirement (issue #299): these
+                                  five events are best-effort, no server push.
+                                  Attached per row, not once per section, so
+                                  it survives a search that narrows a
+                                  character's section to a single corp row.
+                                */}
+                                {CORP_EVENT_IDS.has(eventId) && (
+                                  <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
+                                    {t('settings.notifications.corpEventBestEffortHint')}
                                   </p>
                                 )}
                                 {/*
@@ -414,9 +610,10 @@ export function NotificationsPanel() {
                                                   key={channel}
                                                   channel={channel}
                                                   eventLabel={type}
-                                                  hasScope={
+                                                  enabled={
                                                     !(channel === 'browser' && browserBlocked)
                                                   }
+                                                  disabledReason={null}
                                                   checked={isEveTypeEnabledFor(
                                                     eveTypePrefs,
                                                     type,
@@ -463,17 +660,27 @@ export function NotificationsPanel() {
  * both — "New Mail, browser notifications" — because two visually adjacent
  * checkboxes on a row are indistinguishable to a screen reader otherwise, and
  * the column caption above is not associated with them.
+ *
+ * `disabledReason` picks the tooltip when `enabled` is false: a missing
+ * scope reads "re-authorize", but a corp event a Character lacks the
+ * in-game role for cannot be fixed by re-authing at all (issue #299) — that
+ * needs its own copy, the same distinction `corpAuthFailure.ts` draws for
+ * the poller's own 403 handling. `null` (the eve-type sub-rows, which are
+ * never capability- or scope-gated of their own) falls back to the scope
+ * copy for parity with this component's pre-#299 behaviour.
  */
 function ChannelCheckbox({
   channel,
   eventLabel,
-  hasScope,
+  enabled,
+  disabledReason,
   checked,
   onToggle,
 }: {
   channel: NotificationChannel;
   eventLabel: string;
-  hasScope: boolean;
+  enabled: boolean;
+  disabledReason: 'scope' | 'capability' | null;
   checked: boolean;
   onToggle: () => void;
 }) {
@@ -482,13 +689,74 @@ function ChannelCheckbox({
   const checkbox = (
     <input
       type="checkbox"
-      checked={hasScope && checked}
-      disabled={!hasScope}
+      checked={enabled && checked}
+      disabled={!enabled}
       onChange={onToggle}
       aria-label={label}
       className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
     />
   );
-  if (hasScope) return checkbox;
-  return <Tooltip content={t('settings.notifications.reauthHint')}>{checkbox}</Tooltip>;
+  if (enabled) return checkbox;
+  const hintKey =
+    disabledReason === 'capability'
+      ? 'settings.notifications.corpCapabilityHint'
+      : 'settings.notifications.reauthHint';
+  return <Tooltip content={t(hintKey)}>{checkbox}</Tooltip>;
+}
+
+/**
+ * An ISK-amount threshold field (issue #299): local text state so a
+ * mid-typing value like "50," or an empty field never round-trips through
+ * `withCharacterEventThreshold` as `NaN`. Commits on blur, matching the
+ * pattern used elsewhere for numeric fields (`piPlan.tsx`); reverts to the
+ * last committed value on an invalid blur.
+ */
+function ThresholdAmountInput({
+  id,
+  label,
+  value,
+  onCommit,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  onCommit: (value: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  // Adjusted during render, not an effect (react-hooks/set-state-in-effect):
+  // this is React's own "store info from previous renders" pattern for
+  // resetting local state when a prop changes, not a DOM/external-system
+  // sync — an actual effect would run one render late here.
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setText(String(value));
+  }
+
+  function commit() {
+    const amount = Number(text);
+    if (Number.isFinite(amount) && amount >= 0) {
+      onCommit(Math.round(amount));
+    } else {
+      setText(String(value));
+    }
+  }
+
+  return (
+    <label htmlFor={id} className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
+      {label}
+      <TextInput
+        id={id}
+        size="sm"
+        type="number"
+        min={0}
+        step={1}
+        inputMode="numeric"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        className="w-32"
+      />
+    </label>
+  );
 }

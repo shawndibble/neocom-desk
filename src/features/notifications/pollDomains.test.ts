@@ -7,20 +7,54 @@ import {
   contractDomain,
   walletDomain,
   marketOrderDomain,
+  structureFuelDomain,
+  corpIndustryJobDomain,
+  corpRosterDomain,
+  corpWalletDomain,
   gatedOn,
   deriveMarketOrderEntries,
 } from './pollDomains';
+import { useNotificationPreferences, DEFAULT_NOTIFICATION_PREFERENCES } from './preferences';
 import { loadContracts } from '@/features/character/contracts';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
+import { loadCorporationId, loadCorporationStructures } from '@/features/corp/boardData';
+import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
+import { loadCorporationMemberIds } from '@/features/corp/members';
+import { loadCorporationWallets, loadCorporationWalletJournal } from '@/features/corp/wallet';
+import { loadCharacterRoles } from '@/features/corp/roles';
+import { db } from '@/db';
 import type { StatusResult } from '@/esi/cache';
-import type { MarketOrder, MarketOrderHistory } from '@/esi/endpoints';
+import type {
+  MarketOrder,
+  MarketOrderHistory,
+  CorporationStructure,
+  CorporationIndustryJob,
+  CorporationWalletDivision,
+  WalletJournalEntry,
+  CharacterCorporationRoles,
+} from '@/esi/endpoints';
 
 vi.mock('@/features/character/contracts', () => ({ loadContracts: vi.fn() }));
 vi.mock('@/features/character/wallet', () => ({ loadWalletJournalWithStatus: vi.fn() }));
 vi.mock('@/features/character/orders', () => ({
   loadOrders: vi.fn(),
   loadOrderHistory: vi.fn(),
+}));
+vi.mock('@/features/corp/boardData', () => ({
+  loadCorporationId: vi.fn(),
+  loadCorporationStructures: vi.fn(),
+  MASTER_WALLET_DIVISION: 1,
+}));
+vi.mock('@/features/corp/jobs', () => ({ loadCorporationIndustryJobs: vi.fn() }));
+vi.mock('@/features/corp/members', () => ({ loadCorporationMemberIds: vi.fn() }));
+vi.mock('@/features/corp/wallet', () => ({
+  loadCorporationWallets: vi.fn(),
+  loadCorporationWalletJournal: vi.fn(),
+}));
+vi.mock('@/features/corp/roles', () => ({
+  loadCharacterRoles: vi.fn(),
+  corpWideRoles: (payload: CharacterCorporationRoles | null | undefined) => payload?.roles ?? [],
 }));
 
 function statusResult<T>(data: T, truncated: boolean): StatusResult<T> {
@@ -204,5 +238,192 @@ describe('truncation guards', () => {
     vi.mocked(loadOrders).mockResolvedValue(statusResult([marketOrder({ order_id: 9 })], false));
     vi.mocked(loadOrderHistory).mockResolvedValue(statusResult([], false));
     expect(await marketOrderDomain.load(1)).toEqual([{ orderId: 9, filled: false }]);
+  });
+});
+
+function structure(overrides: Partial<CorporationStructure> = {}): CorporationStructure {
+  return {
+    structure_id: 1,
+    corporation_id: 2,
+    system_id: 3,
+    type_id: 4,
+    profile_id: 5,
+    ...overrides,
+  };
+}
+
+function corpJob(overrides: Partial<CorporationIndustryJob> = {}): CorporationIndustryJob {
+  return {
+    job_id: 1,
+    installer_id: 1,
+    activity_id: 1,
+    blueprint_id: 1,
+    blueprint_type_id: 1000,
+    blueprint_location_id: 1,
+    output_location_id: 1,
+    facility_id: 1,
+    location_id: 1,
+    runs: 1,
+    start_date: '2026-01-01T00:00:00Z',
+    end_date: '2026-01-01T01:00:00Z',
+    status: 'active',
+    ...overrides,
+  };
+}
+
+function walletDivisionRow(
+  overrides: Partial<CorporationWalletDivision> = {}
+): CorporationWalletDivision {
+  return { division: 1, balance: 1_000_000, ...overrides };
+}
+
+function journalEntry(overrides: Partial<WalletJournalEntry> = {}): WalletJournalEntry {
+  return { id: 1, date: '2026-01-01T00:00:00Z', ref_type: 'bounty', description: '', ...overrides };
+}
+
+function roles(list: readonly string[]): CharacterCorporationRoles {
+  return { roles: [...list] };
+}
+
+/**
+ * The four corp domains (issue #299) share the same shape of gate: a
+ * corporation id, then a role-derived capability, both resolved before the
+ * domain's own ESI endpoint is ever called (AC5). This covers that gate
+ * itself, not the diff logic — that is `notificationDiffs.test.ts`'s job.
+ */
+describe('corp domains', () => {
+  beforeEach(async () => {
+    vi.mocked(loadCorporationId).mockReset();
+    vi.mocked(loadCharacterRoles).mockReset();
+    vi.mocked(loadCorporationStructures).mockReset();
+    vi.mocked(loadCorporationIndustryJobs).mockReset();
+    vi.mocked(loadCorporationMemberIds).mockReset();
+    vi.mocked(loadCorporationWallets).mockReset();
+    vi.mocked(loadCorporationWalletJournal).mockReset();
+    await db.settings.clear();
+    useNotificationPreferences.setState({
+      value: DEFAULT_NOTIFICATION_PREFERENCES,
+      hydrated: true,
+    });
+  });
+
+  it('structureFuelDomain never calls the endpoint when the corporation is unknown', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(null);
+    expect(await structureFuelDomain.load(1)).toBeNull();
+    expect(loadCorporationStructures).not.toHaveBeenCalled();
+  });
+
+  it('structureFuelDomain never calls the endpoint when the Character lacks the role (AC5)', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles(['Accountant']), false));
+    expect(await structureFuelDomain.load(1)).toBeNull();
+    expect(loadCorporationStructures).not.toHaveBeenCalled();
+  });
+
+  it('structureFuelDomain fetches and embeds the current fuel threshold once the role is held', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(
+      statusResult(roles(['Station_Manager']), false)
+    );
+    vi.mocked(loadCorporationStructures).mockResolvedValue(
+      statusResult(
+        [structure({ structure_id: 9, name: 'Fortizar', fuel_expires: undefined })],
+        false
+      )
+    );
+    const entries = await structureFuelDomain.load(1);
+    expect(entries).toEqual([
+      { structureId: 9, name: 'Fortizar', fuelExpiresMs: null, thresholdMs: 7 * 86_400_000 },
+    ]);
+  });
+
+  it('structureFuelDomain grants access to a Director even with no other roles listed', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles(['Director']), false));
+    vi.mocked(loadCorporationStructures).mockResolvedValue(statusResult([], false));
+    expect(await structureFuelDomain.load(1)).toEqual([]);
+  });
+
+  it('corpIndustryJobDomain never calls the endpoint without Factory_Manager (or Director)', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles([]), false));
+    expect(await corpIndustryJobDomain.load(1)).toBeNull();
+    expect(loadCorporationIndustryJobs).not.toHaveBeenCalled();
+  });
+
+  it('corpIndustryJobDomain fetches once Factory_Manager is held', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(
+      statusResult(roles(['Factory_Manager']), false)
+    );
+    vi.mocked(loadCorporationIndustryJobs).mockResolvedValue(statusResult([corpJob()], false));
+    expect(await corpIndustryJobDomain.load(1)).toEqual([corpJob()]);
+  });
+
+  it('corpRosterDomain never calls the endpoint without Director', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(
+      statusResult(roles(['Station_Manager']), false)
+    );
+    expect(await corpRosterDomain.load(1)).toBeNull();
+    expect(loadCorporationMemberIds).not.toHaveBeenCalled();
+  });
+
+  it('corpRosterDomain fetches member ids once Director is held', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles(['Director']), false));
+    vi.mocked(loadCorporationMemberIds).mockResolvedValue(statusResult([10, 20], false));
+    expect(await corpRosterDomain.load(1)).toEqual([10, 20]);
+  });
+
+  it('corpWalletDomain never calls the endpoint without Accountant (or Junior_Accountant/Director)', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles([]), false));
+    expect(await corpWalletDomain.load(1)).toBeNull();
+    expect(loadCorporationWallets).not.toHaveBeenCalled();
+  });
+
+  it('corpWalletDomain skips the poll rather than persist a truncated master-division journal', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles(['Accountant']), false));
+    vi.mocked(loadCorporationWallets).mockResolvedValue(
+      statusResult([walletDivisionRow({ division: 1 })], false)
+    );
+    vi.mocked(loadCorporationWalletJournal).mockResolvedValue(statusResult([], true));
+    expect(await corpWalletDomain.load(1)).toBeNull();
+  });
+
+  it('corpWalletDomain carries every division balance but only the master division journal', async () => {
+    vi.mocked(loadCorporationId).mockResolvedValue(2);
+    vi.mocked(loadCharacterRoles).mockResolvedValue(statusResult(roles(['Accountant']), false));
+    vi.mocked(loadCorporationWallets).mockResolvedValue(
+      statusResult(
+        [
+          walletDivisionRow({ division: 1, balance: 1_000 }),
+          walletDivisionRow({ division: 2, balance: 2_000 }),
+        ],
+        false
+      )
+    );
+    vi.mocked(loadCorporationWalletJournal).mockResolvedValue(
+      statusResult([journalEntry({ id: 5, amount: 999 })], false)
+    );
+    const entries = await corpWalletDomain.load(1);
+    expect(entries).toEqual([
+      {
+        division: 1,
+        balance: 1_000,
+        journal: [{ id: 5, amount: 999 }],
+        balanceFloorIsk: 50_000_000,
+        transactionCeilingIsk: 100_000_000,
+      },
+      {
+        division: 2,
+        balance: 2_000,
+        journal: [],
+        balanceFloorIsk: 50_000_000,
+        transactionCeilingIsk: 100_000_000,
+      },
+    ]);
   });
 });

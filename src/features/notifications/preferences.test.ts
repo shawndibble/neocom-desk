@@ -17,6 +17,11 @@ import {
   characterEveTypePrefs,
   withEveNotificationTypeToggled,
   isEveTypeEnabledFor,
+  characterEventThresholds,
+  withCharacterEventThreshold,
+  DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+  DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+  DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
 } from './preferences';
 
 const EVENT_A = 'skillLevelComplete' satisfies NotificationEventId;
@@ -241,5 +246,82 @@ describe('characterEveTypePrefs / withEveNotificationTypeToggled', () => {
     };
     const next = withEveNotificationTypeToggled(value, 1, 'BillOutOfMoneyMsg', 'browser');
     expect(characterEveTypePrefs(next, 2)).toEqual({ AllWarDeclaredMsg: { feed: false } });
+  });
+});
+
+describe('characterEventThresholds / withCharacterEventThreshold', () => {
+  it('defaults to the documented defaults for a character with no overrides', () => {
+    expect(characterEventThresholds(DEFAULT_NOTIFICATION_PREFERENCES, 1)).toEqual({
+      structureFuelLowDays: DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+      corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+      corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+    });
+  });
+
+  it('sets one field, leaving the others at their default', () => {
+    const next = withCharacterEventThreshold(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'structureFuelLowDays',
+      3
+    );
+    expect(characterEventThresholds(next, 1)).toEqual({
+      structureFuelLowDays: 3,
+      corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+      corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+    });
+  });
+
+  it('sets a second field without disturbing the first', () => {
+    const withFuel = withCharacterEventThreshold(
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      1,
+      'structureFuelLowDays',
+      1
+    );
+    const next = withCharacterEventThreshold(withFuel, 1, 'corpWalletBalanceFloorIsk', 10_000_000);
+    expect(characterEventThresholds(next, 1)).toEqual({
+      structureFuelLowDays: 1,
+      corpWalletBalanceFloorIsk: 10_000_000,
+      corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+    });
+  });
+
+  it("does not disturb another character's thresholds", () => {
+    const value = {
+      masterEnabled: true,
+      perCharacter: {},
+      thresholdsByCharacter: { 2: { structureFuelLowDays: 1 } },
+    };
+    const next = withCharacterEventThreshold(value, 1, 'structureFuelLowDays', 3);
+    expect(characterEventThresholds(next, 2).structureFuelLowDays).toBe(1);
+  });
+
+  it('applies a persisted thresholdsByCharacter map on hydrate', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: {},
+        thresholdsByCharacter: { 1: { structureFuelLowDays: 1 } },
+      },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(
+      characterEventThresholds(useNotificationPreferences.getState().value, 1).structureFuelLowDays
+    ).toBe(1);
+  });
+
+  it('rejects a thresholdsByCharacter entry whose field is not a number', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: {},
+        thresholdsByCharacter: { 1: { structureFuelLowDays: 'nope' } },
+      },
+    });
+    await useNotificationPreferences.getState().hydrate();
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
   });
 });
