@@ -6,7 +6,8 @@
  * flipping an event off in Settings takes the matching rows off the Overview
  * immediately, instead of only suppressing future fires. That also means
  * flipping it back on restores them — a toggle is a view preference here, not
- * a destructive edit. Dismissing is the destructive one.
+ * a destructive edit. Dismissing is a `dismissedAt` flag (issue #361), also
+ * filtered here rather than deleted at write time.
  */
 import { isEventEnabledFor, isEveTypeEnabledFor } from './eventSelection';
 import {
@@ -37,6 +38,7 @@ function isEntryVisible(
   entry: NotificationFeedEntry,
   prefs: NotificationPreferencesValue
 ): boolean {
+  if (entry.dismissedAt !== undefined) return false;
   const forCharacter = characterEventPrefs(prefs, entry.characterId);
   if (!isEventEnabledFor(forCharacter, entry.eventId as NotificationEventId, 'feed')) {
     return false;

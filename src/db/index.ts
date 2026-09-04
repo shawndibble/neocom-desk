@@ -247,6 +247,15 @@ export interface NotificationFeedRecord {
    * up front (CCP adds types without notice).
    */
   eveType?: string;
+  /**
+   * Epoch ms the row was dismissed, absent while live. A flag rather than a
+   * delete: this collection carries no tombstones, so a device that comes
+   * back after `sync/merge.ts`'s 30-day TTL edge can't resurrect a row that
+   * would have been a delete's tombstone (CONTEXT.md round 45, issue #361).
+   * A row written before this field existed has no `dismissedAt` and is
+   * treated as not dismissed.
+   */
+  dismissedAt?: number;
 }
 
 export const db = new Dexie('neocom') as Dexie & {

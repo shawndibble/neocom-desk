@@ -76,7 +76,10 @@ describe('NotificationFeedPanel', () => {
 
     await waitFor(() => expect(screen.queryByText('Dismiss me')).not.toBeInTheDocument());
     expect(screen.getByText('Keep me')).toBeInTheDocument();
-    expect(await db.notificationFeed.count()).toBe(1);
+    const rows = await db.notificationFeed.toArray();
+    expect(rows).toHaveLength(2);
+    expect(rows.find((e) => e.title === 'Dismiss me')?.dismissedAt).toBeTypeOf('number');
+    expect(rows.find((e) => e.title === 'Keep me')?.dismissedAt).toBeUndefined();
   });
 
   it('dismisses every notification in bulk', async () => {
@@ -88,7 +91,9 @@ describe('NotificationFeedPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss all' }));
 
     await waitFor(() => expect(screen.getByText('No notifications yet')).toBeInTheDocument());
-    expect(await db.notificationFeed.count()).toBe(0);
+    const rows = await db.notificationFeed.toArray();
+    expect(rows).toHaveLength(2);
+    expect(rows.every((e) => typeof e.dismissedAt === 'number')).toBe(true);
   });
 
   it('renders nothing when the feed channel is switched off', async () => {
@@ -135,7 +140,9 @@ describe('NotificationFeedPanel', () => {
 
     await waitFor(() => expect(screen.getByText('No notifications yet')).toBeInTheDocument());
     const left = await db.notificationFeed.toArray();
-    expect(left.map((e) => e.characterId)).toEqual([ALT]);
+    expect(left).toHaveLength(2);
+    expect(left.find((e) => e.characterId === ACTIVE)?.dismissedAt).toBeTypeOf('number');
+    expect(left.find((e) => e.characterId === ALT)?.dismissedAt).toBeUndefined();
   });
 
   it('hides an entry as soon as its event type is switched off', async () => {

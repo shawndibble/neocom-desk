@@ -115,14 +115,17 @@ describe('legacy rows', () => {
     const feed = await readFeed();
     expect(feed).toHaveLength(1);
     expect(feed[0].id).toBe(legacyId);
+    expect(feed[0].dismissedAt).toBeUndefined();
 
     await dismissFeedEntry(legacyId);
-    expect(await readFeed()).toHaveLength(0);
+    const afterDismiss = await readFeed();
+    expect(afterDismiss).toHaveLength(1);
+    expect(afterDismiss[0].dismissedAt).toBeTypeOf('number');
   });
 });
 
 describe('dismissing', () => {
-  it('dismisses one entry, leaving the rest', async () => {
+  it('flags one entry with dismissedAt, leaving the rest untouched and every row still readable', async () => {
     await recordFeedEntry({
       id: 'a',
       characterId: 1,
@@ -144,11 +147,15 @@ describe('dismissing', () => {
     await dismissFeedEntry(newest.id);
 
     const feed = await readFeed();
-    expect(feed).toHaveLength(1);
-    expect(feed[0].title).toBe('a');
+    expect(feed).toHaveLength(2);
+    const dismissed = feed.find((e) => e.id === newest.id);
+    const untouched = feed.find((e) => e.id !== newest.id);
+    expect(dismissed?.dismissedAt).toBeTypeOf('number');
+    expect(untouched?.title).toBe('a');
+    expect(untouched?.dismissedAt).toBeUndefined();
   });
 
-  it('dismisses the given ids in bulk, leaving the others', async () => {
+  it('flags the given ids in bulk, leaving the others unflagged and every row still readable', async () => {
     for (let i = 0; i < 4; i++) {
       await recordFeedEntry({
         id: `occurrence-${i}`,
@@ -164,8 +171,43 @@ describe('dismissing', () => {
 
     await dismissFeedEntries(doomed);
 
-    const left = await readFeed();
-    expect(left).toHaveLength(1);
-    expect(left[0].characterId).toBe(3);
+    const after = await readFeed();
+    expect(after).toHaveLength(4);
+    const survivor = after.find((e) => e.characterId === 3);
+    expect(survivor?.dismissedAt).toBeUndefined();
+    for (const id of doomed) {
+      expect(after.find((e) => e.id === id)?.dismissedAt).toBeTypeOf('number');
+    }
+  });
+
+  it('the 300-row cap still trims a dismissed row once it ages past the limit', async () => {
+    for (let i = 0; i < NOTIFICATION_FEED_LIMIT; i++) {
+      await recordFeedEntry({
+        id: `occurrence-${i}`,
+        characterId: 1,
+        eventId: 'newMail',
+        title: 't',
+        body: 'b',
+        firedAt: i,
+      });
+    }
+    const oldestId = 'occurrence-0';
+    await dismissFeedEntry(oldestId);
+    expect((await readFeed()).find((e) => e.id === oldestId)?.dismissedAt).toBeTypeOf('number');
+
+    for (let i = NOTIFICATION_FEED_LIMIT; i < NOTIFICATION_FEED_LIMIT + 3; i++) {
+      await recordFeedEntry({
+        id: `occurrence-${i}`,
+        characterId: 1,
+        eventId: 'newMail',
+        title: 't',
+        body: 'b',
+        firedAt: i,
+      });
+    }
+
+    const feed = await readFeed();
+    expect(feed).toHaveLength(NOTIFICATION_FEED_LIMIT);
+    expect(feed.find((e) => e.id === oldestId)).toBeUndefined();
   });
 });
