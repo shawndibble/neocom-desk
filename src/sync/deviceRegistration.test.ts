@@ -79,6 +79,18 @@ describe('webPushSupport', () => {
     expect(webPushSupport()).toBe('requires-install');
   });
 
+  it('requires install on real non-installed iOS Safari, where Notification is undefined', () => {
+    // Non-installed iOS Safari has no `Notification` global at all — the
+    // iOS-not-installed check must win over the unsupported check, or the
+    // install-required explainer never renders on the one platform it exists
+    // for (see NotificationPermissionPrompt.tsx's own comment on this).
+    // @ts-expect-error -- test-only: real non-installed iOS Safari has no Notification global
+    globalThis.Notification = undefined;
+    setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15');
+    setStandalone(false);
+    expect(webPushSupport()).toBe('requires-install');
+  });
+
   it('is supported on iOS Safari once running standalone (installed PWA)', () => {
     setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15');
     setStandalone(true);
@@ -144,5 +156,46 @@ describe('registerDeviceForWebPush', () => {
       expect.anything(),
       expect.objectContaining({ vapidKey: 'vapid-key', serviceWorkerRegistration: registration })
     );
+  });
+
+  it('still registers the Characters whose token fetch succeeded when one fails', async () => {
+    // A stale/expired access token for one Character (e.g. not opened in a
+    // while) must not stop the others from registering — matches the
+    // backend's own per-character partial-success design in registerDevice.ts.
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+      { characterId: 2, name: 'B', ownerHash: 'h', addedAt: 0 },
+      { characterId: 3, name: 'C', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockImplementation(async (id) => {
+      if (id === 2) throw new Error('No token stored for character 2');
+      return `token-${id}`;
+    });
+
+    const result = await registerDeviceForWebPush('vapid-key', registration);
+
+    expect(call).toHaveBeenCalledWith({
+      deviceId: 'device-1',
+      fcmToken: 'fcm-token',
+      characters: [
+        { characterId: 1, accessToken: 'token-1' },
+        { characterId: 3, accessToken: 'token-3' },
+      ],
+    });
+    expect(result).toEqual({ deviceId: 'device-1', registered: [1], rejected: [] });
+  });
+
+  it('returns null without calling the callable when every Character’s token fetch fails', async () => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockRejectedValue(new Error('No token stored for character 1'));
+
+    const result = await registerDeviceForWebPush('vapid-key', registration);
+
+    expect(result).toBeNull();
+    expect(call).not.toHaveBeenCalled();
   });
 });
