@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { run, tryRun, log, printResult } from './lib.mjs';
+import { verifyHuskyHook } from '../verify-husky.mjs';
 
 const [, , issueArg, slug] = process.argv;
 if (!issueArg || !slug) {
@@ -63,6 +64,18 @@ if (!husky.ok) {
     step: 'husky-install',
     message: husky.stderr.trim().slice(-4000),
   });
+  process.exit(1);
+}
+
+// husky v9's CLI exits 0 unconditionally, even when it silently did
+// nothing (e.g. couldn't find `.git`, or the `git config core.hooksPath`
+// write itself failed) — so `husky.ok` above is not proof the hook is
+// actually live. Check the on-disk result directly and fail loudly if it
+// isn't there, rather than reporting `ready` on a worktree with no working
+// hook (see scripts/verify-husky.mjs for why, and #310/#318).
+const verify = verifyHuskyHook(worktreePath);
+if (!verify.ok) {
+  printResult({ status: 'error', step: 'husky-verify', message: verify.message });
   process.exit(1);
 }
 

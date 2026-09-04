@@ -10,8 +10,20 @@
   `X-User-Agent`; respect `X-Ratelimit-*` and `Retry-After`.
 - Refresh tokens live in Dexie only. Never send them to Firebase or logs.
 - A git pre-commit hook (husky + lint-staged) auto-fixes lint/format on
-  staged files and runs `npm run typecheck` on every commit — no manual step
-  needed for those. While iterating, use narrower checks: `npm run typecheck`
+  staged files and runs `npm run typecheck` on every commit, _once
+  installed_. `npm install`/`npm ci` install it via the `prepare` script,
+  but `prepare` (like `postinstall`) is an npm lifecycle script and is
+  silently skipped whenever `ignore-scripts` is set — true for this agent's
+  sandboxed shell, and possibly for your own global npm config too (check
+  `npm config get ignore-scripts`). husky's own CLI also exits 0
+  unconditionally even when it installed nothing, so its exit code isn't
+  proof either. Run `npm run verify-hooks -- --fix` once after any fresh
+  clone or `npm ci` to install and _confirm_ the hook is actually live — it
+  fails loudly instead of silently doing nothing (see
+  `scripts/verify-husky.mjs`). Agent worktrees get this for free:
+  `scripts/next-ticket/setup-worktree.mjs` runs the same verification and
+  fails worktree setup outright if the hook didn't really install. While
+  iterating, use narrower checks: `npm run typecheck`
   and `npx vitest run <path>` for the file(s) you're touching. **Never run
   the full suite (`npm run test:run`) or `npm run build` locally** — CI's
   `validate` job runs `lint`, `format:check`, `typecheck`, `test:run`, and
