@@ -25,6 +25,8 @@ export interface EmploymentHistoryRow {
   startDate: string;
   /** Seconds spent at this corp: gap to the next record, or to `now` for the current one. */
   tenureSeconds: number;
+  /** Whether this is the most recent (current) employer. */
+  ongoing: boolean;
 }
 
 /**
@@ -44,6 +46,7 @@ export function deriveEmploymentHistoryRows(
       corporationId: entry.corporation_id,
       startDate: entry.start_date,
       tenureSeconds: Math.max(0, (endMs - startMs) / 1000),
+      ongoing: i === 0,
     };
   });
 }

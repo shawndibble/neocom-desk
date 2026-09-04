@@ -9,7 +9,9 @@ import {
   Panel,
   ReauthBanner,
   Spinner,
+  StatChip,
   type DataTableColumn,
+  type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -41,6 +43,7 @@ interface Snapshot {
   /** Trained level of Infomorph Synchronizing; 0 when unknown/untrained. */
   infomorphLevel: number;
   implantNames: Map<number, string>;
+  /** Jump-clone and home-clone location names, keyed by `location_id`. */
   locationNames: Map<number, string>;
   /** Total/unallocated SP for the shared Character-overview header. */
   sp: CharacterSpSummary;
@@ -64,17 +67,27 @@ async function loadClonesSnapshot(
       ?.trained_skill_level ?? 0;
 
   const clones = clonesResult?.data.jump_clones ?? [];
+  const homeLocation = clonesResult?.data.home_location;
 
   // Already superseded: skip the name resolves, their results would be discarded.
   const implantTypeIds = signal.cancelled ? [] : [...new Set(clones.flatMap((c) => c.implants))];
   const implantNames = await loadTypeNames(implantTypeIds);
 
-  const stationIds = signal.cancelled
-    ? []
-    : [...new Set(clones.filter((c) => c.location_type === 'station').map((c) => c.location_id))];
-  const structureIds = signal.cancelled
-    ? []
-    : [...new Set(clones.filter((c) => c.location_type === 'structure').map((c) => c.location_id))];
+  // Ids to resolve for one location type: every jump clone of that type, plus
+  // the home clone's location if it happens to be that type too.
+  function idsForType(type: 'station' | 'structure'): number[] {
+    if (signal.cancelled) return [];
+    return [
+      ...new Set([
+        ...clones.filter((c) => c.location_type === type).map((c) => c.location_id),
+        ...(homeLocation?.location_type === type && homeLocation.location_id !== undefined
+          ? [homeLocation.location_id]
+          : []),
+      ]),
+    ];
+  }
+  const stationIds = idsForType('station');
+  const structureIds = idsForType('structure');
   const [resolvedStations, resolvedStructures] = await Promise.all([
     Promise.all(stationIds.map((id) => loadStationName(id))),
     // A 403 here means the structure is outside this character's ACL, not a
@@ -119,11 +132,26 @@ export function Clones() {
 
   const clones = clonesResult?.data.jump_clones ?? [];
   const lastCloneJumpDate = clonesResult?.data.last_clone_jump_date ?? null;
+  const homeLocation = clonesResult?.data.home_location;
+  const lastStationChangeDate = clonesResult?.data.last_station_change_date ?? null;
 
   const cooldown = useMemo(
     () => cloneJumpCooldown(lastCloneJumpDate, infomorphLevel, new Date(loadedAt)),
     [lastCloneJumpDate, infomorphLevel, loadedAt]
   );
+
+  const cooldownTone: StatChipTone = cooldown.onCooldown ? 'warning' : 'success';
+
+  const homeLocationName =
+    homeLocation?.location_id === undefined
+      ? null
+      : (locationNames.get(homeLocation.location_id) ??
+        t(
+          homeLocation.location_type === 'structure'
+            ? 'clones.structureLabel'
+            : 'clones.stationLabel',
+          { id: homeLocation.location_id }
+        ));
 
   const columns = useMemo<DataTableColumn<JumpClone>[]>(
     () => [
@@ -204,31 +232,57 @@ export function Clones() {
           </div>
         ) : error ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-        ) : !clonesResult || clones.length === 0 ? (
+        ) : !clonesResult ? (
           <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
         ) : (
           <>
-            {/* The cooldown was its own Panel; panels don't nest, so it becomes
-                this one's first row, hairline-separated from the table. */}
-            <p className="border-b border-line px-3 py-2 text-sm">
-              {cooldown.onCooldown && cooldown.readyAt
-                ? t('clones.cooldownOnCooldown', {
-                    date: cooldown.readyAt.toLocaleString(),
-                    duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
-                  })
-                : t('clones.cooldownReady')}
-            </p>
+            {/* Home clone and cooldown were their own Panel; panels don't nest,
+                so this becomes this one's first row, hairline-separated from
+                whatever follows. It renders whenever clones data loaded at
+                all, not only when there are jump clones — a character with a
+                home clone and zero jump clones still has both to show. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-3 py-2 text-sm">
+              {homeLocationName && (
+                <span>
+                  <span className="text-text-dim">{t('clones.homeLocation')}: </span>
+                  {homeLocationName}
+                </span>
+              )}
+              {lastStationChangeDate && (
+                <span className="text-text-dim">
+                  {t('clones.lastStationChange', {
+                    date: new Date(lastStationChangeDate).toLocaleString(),
+                  })}
+                </span>
+              )}
+              <StatChip
+                label={t('clones.cooldown')}
+                tone={cooldownTone}
+                value={
+                  cooldown.onCooldown && cooldown.readyAt
+                    ? t('clones.cooldownOnCooldownValue', {
+                        date: cooldown.readyAt.toLocaleString(),
+                        duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
+                      })
+                    : t('clones.cooldownReadyValue')
+                }
+              />
+            </div>
             {clonesResult.fromCache && (
               <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                 {t('common.offlineTitle')}
               </p>
             )}
-            <DataTable
-              label={t('clones.title')}
-              columns={columns}
-              rows={clones}
-              rowKey={(clone) => clone.jump_clone_id}
-            />
+            {clones.length === 0 ? (
+              <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
+            ) : (
+              <DataTable
+                label={t('clones.title')}
+                columns={columns}
+                rows={clones}
+                rowKey={(clone) => clone.jump_clone_id}
+              />
+            )}
           </>
         )}
       </Panel>

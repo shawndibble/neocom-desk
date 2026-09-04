@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
 import {
   DataAgeBadge,
   DataTable,
@@ -67,6 +69,10 @@ export function EmploymentHistory() {
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadEmploymentHistorySnapshot
   );
+  const character = useLiveQuery(
+    () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
+    [activeCharacterId]
+  );
 
   const historyResult = data?.historyResult ?? null;
   const corpNames = data?.corpNames ?? NO_NAMES;
@@ -85,7 +91,23 @@ export function EmploymentHistory() {
       {
         id: 'corporation',
         header: t('employmentHistory.corporation'),
-        render: (row) => corpNames.get(row.corporationId) ?? `#${row.corporationId}`,
+        render: (row) => {
+          const name = corpNames.get(row.corporationId) ?? `#${row.corporationId}`;
+          // Only the row that is both ongoing and matches the character's
+          // current corp links out — past corps and an ongoing row the
+          // character record hasn't caught up to yet stay plain text.
+          if (!row.ongoing || character?.corporationId !== row.corporationId) return name;
+          return (
+            <span className="inline-flex items-center gap-2">
+              <Link to="/corp" className="hover:underline">
+                {name}
+              </Link>
+              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-success uppercase">
+                {t('employmentHistory.current')}
+              </span>
+            </span>
+          );
+        },
       },
       {
         id: 'started',
@@ -101,7 +123,7 @@ export function EmploymentHistory() {
         render: (row) => formatDuration(row.tenureSeconds),
       },
     ],
-    [t, corpNames]
+    [t, corpNames, character?.corporationId]
   );
 
   if (!hydrated) {
@@ -168,6 +190,7 @@ export function EmploymentHistory() {
               columns={columns}
               rows={rows}
               rowKey={(row) => row.recordId}
+              rowClassName={(row) => (row.ongoing ? 'bg-success/5' : undefined)}
             />
           </>
         )}
