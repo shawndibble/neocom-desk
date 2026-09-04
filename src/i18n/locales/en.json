@@ -81,6 +81,9 @@
       "levelNeeded": "Level {{level}}",
       "trained": "Trained · Level {{level}}",
       "close": "Close"
+    },
+    "detail": {
+      "title": "Skill Detail"
     }
   },
   "plans": {

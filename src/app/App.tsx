@@ -43,6 +43,7 @@ import { RequireCharacter } from './RequireCharacter';
 import { ScopeGate } from './ScopeGate';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
+import { SkillDetailModal } from '@/components/SkillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -172,6 +173,7 @@ export function App() {
         <ReloadPrompt />
         <WhatsNewPanel />
         <PublicInfoModal />
+        <SkillDetailModal />
         <InstallPrompt />
       </BrowserRouter>
     </ErrorBoundary>
