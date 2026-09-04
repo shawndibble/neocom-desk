@@ -127,7 +127,12 @@ describe('Calendar', () => {
 
     render(<App />);
     await screen.findByText(/Fleet Op/);
-    expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true');
+    // Same hydration race as above: rehydrating from Dexie lands after the
+    // remounted app first paints, so this must be awaited too (CI run
+    // 33845948159 caught this one).
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true')
+    );
   });
 
   it('Month\'s "+N more" switches to Week, anchored on that day', async () => {
