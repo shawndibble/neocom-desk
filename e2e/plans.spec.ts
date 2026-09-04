@@ -60,14 +60,12 @@ test('optimize remaps shows attribute segments and savings', async ({ page }) =>
   await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
   await page.getByRole('button', { name: 'Optimize remaps' }).click();
 
-  // The verdict renders inline in the tools pane's Actions section, under
-  // the button that produced it.
-  const resultPanel = page
-    .getByRole('heading', { name: 'Actions' })
-    .locator('xpath=ancestor::section[1]');
-  await expect(resultPanel.getByText(/Remapping saves (?:\d+[dhm]\s*)+/)).toBeVisible();
-  await expect(resultPanel.getByText('Segment 1')).toBeVisible();
-  await expect(resultPanel.getByText(/remap to (?:[A-Z]{3} \d+ \/ ){4}[A-Z]{3} \d+/)).toBeVisible();
+  // The verdict opens its own Accept/Reject Modal, mirroring "Suggest
+  // reorder" — no longer inline in the tools pane's Actions section.
+  const dialog = page.getByRole('dialog', { name: 'Optimize remaps' });
+  await expect(dialog.getByText(/Remapping saves (?:\d+[dhm]\s*)+/)).toBeVisible();
+  await expect(dialog.getByText('Segment 1')).toBeVisible();
+  await expect(dialog.getByText(/remap to (?:[A-Z]{3} \d+ \/ ){4}[A-Z]{3} \d+/)).toBeVisible();
 });
 
 test('the plan summary and tools stay in view while the entries queue scrolls (#221 successor)', async ({
@@ -168,9 +166,11 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
 
   // And the summary strip stays pinned when the *window* scrolls, not just
   // when the capped list does. The entry list has its own cap, so what makes
-  // the page taller than the viewport is the sidebar: expanding an optimize
-  // result grows the Actions section, which is the real case the sticky
-  // exists for.
+  // the page taller than the viewport here is the sidebar itself (attributes,
+  // What-If Implants, Booster) — the real case the sticky exists for. Firing
+  // Optimize remaps is incidental setup at this point (its result now opens
+  // its own Modal rather than growing the sidebar), kept only so the guard
+  // below isn't the only thing exercising the click.
   await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
   await page.getByRole('button', { name: 'Optimize remaps' }).click();
   await expect(page.getByText(/^Remapping saves|^No remap improves/)).toBeVisible();

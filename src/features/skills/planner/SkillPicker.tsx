@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, SearchInput } from '@/components/ui';
 import type { SkillType } from '@/sde/types';
@@ -17,6 +17,13 @@ interface SkillPickerProps {
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
   onAdd: (entry: PlanEntry) => void;
   className?: string;
+  /**
+   * Extra view controls (e.g. group-by, column visibility) rendered beside
+   * the search box on the same row, wrapping below it on narrow screens.
+   * These act on the entries list below, not the picker itself, but the
+   * search bar is this panel's one full-width row wide enough to hold them.
+   */
+  controls?: ReactNode;
 }
 
 /**
@@ -30,6 +37,7 @@ export function SkillPicker({
   trainedSkills,
   onAdd,
   className = '',
+  controls,
 }: SkillPickerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -84,16 +92,24 @@ export function SkillPicker({
 
   return (
     <div className={className}>
-      <SearchInput
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setSelected(null);
-          setActiveGroups(new Set());
-        }}
-        placeholder={t('plans.searchPlaceholder')}
-        aria-label={t('plans.addSkill')}
-      />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <SearchInput
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSelected(null);
+            setActiveGroups(new Set());
+          }}
+          placeholder={t('plans.searchPlaceholder')}
+          aria-label={t('plans.addSkill')}
+          className="flex-1"
+        />
+        {controls && (
+          <div className="flex flex-wrap items-center gap-2 text-xs whitespace-nowrap text-text-dim">
+            {controls}
+          </div>
+        )}
+      </div>
       {groups.length > 1 && (
         <div
           className="mt-1.5 flex flex-wrap gap-1.5"

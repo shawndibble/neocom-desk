@@ -883,19 +883,19 @@ describe('SkillPlans editor: optimize remaps', () => {
     await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
 
-    // The verdict renders under the button that produced it, inside the tools
-    // pane's Actions section — it used to be a Panel of its own further down.
-    await screen.findByText(/^Remapping saves/);
-    const panel = toolsSection('Actions');
+    // A savings verdict now gets its own Accept/Reject Modal, next to the
+    // button that produced it — it used to render inline, then a Panel of
+    // its own further down before that.
+    const dialog = await screen.findByRole('dialog', { name: 'Optimize remaps' });
     // Single verdict line (UX-REVIEW #2), not the Total/Current/Savings triple.
-    expect(within(panel).getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
-    expect(within(panel).queryByText(/Total time/)).not.toBeInTheDocument();
-    expect(within(panel).queryByText(/Current attributes/)).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/^Remapping saves \d+[dhm]/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Total time/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Current attributes/)).not.toBeInTheDocument();
     // Actionable per-segment instruction (UX-REVIEW #6): the plan is
     // perception/willpower-heavy, so the remap maxes PER.
-    expect(within(panel).getByText(/Segment 1/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Segment 1/)).toBeInTheDocument();
     expect(
-      within(panel).getByText(/Before Gunnery I, remap to PER 27 \/ WIL 21 \/ /)
+      within(dialog).getByText(/Before Gunnery I, remap to PER 27 \/ WIL 21 \/ /)
     ).toBeInTheDocument();
   });
 

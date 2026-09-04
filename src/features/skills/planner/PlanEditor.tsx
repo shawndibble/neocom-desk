@@ -263,7 +263,6 @@ export function PlanEditor({
   // Panel/Modal results those same actions already produce below.
   const [optimizeConfirm, setOptimizeConfirm] = useState<string | null>(null);
   const [markerConfirm, setMarkerConfirm] = useState(false);
-  const [markersAppliedConfirm, setMarkersAppliedConfirm] = useState(false);
   const [markersOptimizeConfirm, setMarkersOptimizeConfirm] = useState<string | null>(null);
   const [reorderConfirm, setReorderConfirm] = useState(false);
   // Outcome of the last drag on the entry list. A drop that would land a
@@ -618,6 +617,10 @@ export function PlanEditor({
     }
   }
 
+  // A "saves" verdict now also opens its own Accept/Reject Modal (below),
+  // beside this beside-the-button confirmation (#222) — the same pairing
+  // "Suggest reorder" already uses: an instant toast plus the Modal that
+  // holds the actual decision.
   function handleOptimizeRemaps() {
     if (scheduled.length === 0) return;
     const result = placeRemaps(scheduled, catalog.engineSkills, {
@@ -637,24 +640,34 @@ export function PlanEditor({
   }
 
   /**
-   * "Apply as markers": turn the last Optimize Remaps result's segments into
-   * actual Remap Markers, so the user doesn't have to drag/add them by hand
-   * to match what the search already found. Replaces `plan.markers` wholesale
-   * rather than diffing — that's "move the existing one, add the missing
-   * one" in a single write.
+   * Turn a set of RemapSegments into actual Remap Markers, so the user
+   * doesn't have to drag/add them by hand to match what a search (Optimize
+   * Remaps) or a live read of the plan's existing markers (Optimize at my
+   * markers) found. Replaces `plan.markers` wholesale rather than diffing —
+   * that's "move the existing one, add the missing one" in a single write.
+   * Shared by both flows' Accept button: for Optimize at my markers this
+   * round-trips the plan's own markers back through the same conversion, so
+   * it is normally a no-op, but two markers that now delimit the same
+   * optimizer step (see markerAttributesByStepIndex below) collapse to one.
    */
-  function handleApplyOptimizedMarkers() {
-    if (!optimizeResult) return;
+  function applySegmentsAsMarkers(segments: readonly RemapSegment[]) {
     onUpdate({
-      markers: segmentsToMarkers(
-        plan.entries,
-        optimizeResult.segments,
-        catalog.engineSkills,
-        trainedSkills
-      ),
+      markers: segmentsToMarkers(plan.entries, segments, catalog.engineSkills, trainedSkills),
     });
-    setMarkersAppliedConfirm(true);
-    setTimeout(() => setMarkersAppliedConfirm(false), 2000);
+  }
+
+  /** Accept on the Optimize Remaps preview Modal. */
+  function acceptOptimizeRemaps() {
+    if (!optimizeResult) return;
+    applySegmentsAsMarkers(optimizeResult.segments);
+    setOptimizeResult(null);
+    setOptimizeVerdict(null);
+  }
+
+  /** Reject on the Optimize Remaps preview Modal: dismiss without applying. */
+  function rejectOptimizeRemaps() {
+    setOptimizeResult(null);
+    setOptimizeVerdict(null);
   }
 
   /**
@@ -663,9 +676,9 @@ export function PlanEditor({
    * the cut points are fixed by the markers rather than searched, so this is
    * one bounded per-segment allocation search per marker, not a DP over where
    * to cut), so a marker row shows its target attributes immediately: after
-   * "Apply as markers", after a drag, and on a fresh page load or another
-   * device, without a separate "Optimize at my markers" click first. That
-   * button now only reveals the panel below (`markersPanelOpen`) — an
+   * Accept on either preview Modal, after a drag, and on a fresh page load or
+   * another device, without a separate "Optimize at my markers" click first.
+   * That button now only reveals the panel below (`markersPanelOpen`) — an
    * explicit finding the user asked to see, not a second computation of what
    * this memo already holds.
    */
@@ -695,6 +708,18 @@ export function PlanEditor({
     setMarkersPanelOpen(true);
     setMarkersOptimizeConfirm(confirmRemapOutcome(markersVerdict));
     setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
+  }
+
+  /** Accept on the Optimize at my markers preview Modal. */
+  function acceptOptimizeAtMarkers() {
+    if (!markersAtCurrentPositions) return;
+    applySegmentsAsMarkers(markersAtCurrentPositions.segments);
+    setMarkersPanelOpen(false);
+  }
+
+  /** Reject on the Optimize at my markers preview Modal: dismiss, changing nothing. */
+  function rejectOptimizeAtMarkers() {
+    setMarkersPanelOpen(false);
   }
 
   /**
@@ -821,6 +846,63 @@ export function PlanEditor({
           );
         })}
       </ul>
+    );
+  }
+
+  /**
+   * Shared shape of the two Accept/Reject preview Modals below: like
+   * "Suggest reorder"'s Modal, this opens on every click, not only when
+   * there is something to accept. A `saves` verdict gets the figure, its
+   * segments, and both actions; every other verdict gets its explanatory
+   * text (and, for "Optimize at my markers", still its segments — see the
+   * caller) with a single dismiss action, since there is nothing to accept.
+   * `message` and `segments` are resolved by the caller rather than derived
+   * here: the same verdict `kind` reads differently depending on which
+   * action produced it (e.g. `noGain` blames the entry order for a search,
+   * but blames marker placement for markers already placed).
+   */
+  function renderRemapPreviewModal({
+    title,
+    open,
+    verdict,
+    segments,
+    message,
+    onAccept,
+    onClose,
+  }: {
+    title: string;
+    open: boolean;
+    verdict: OptimizeVerdict | null;
+    segments: readonly RemapSegment[] | null;
+    message: string;
+    onAccept: () => void;
+    onClose: () => void;
+  }) {
+    return (
+      <Modal open={open} onClose={onClose} title={title}>
+        {verdict && (
+          <div className="space-y-2 text-xs">
+            {verdict.kind === 'saves' ? (
+              <p className="font-semibold text-success">
+                {t('plans.remapSaves', { duration: formatDuration(verdict.savingsSeconds) })}
+              </p>
+            ) : (
+              <p className="text-text-dim">{message}</p>
+            )}
+            {segments && <div className="max-h-56 overflow-y-auto">{renderSegments(segments)}</div>}
+            <div className="flex gap-2">
+              {verdict.kind === 'saves' && (
+                <Button variant="primary" size="sm" onClick={onAccept}>
+                  {t('plans.remapAccept')}
+                </Button>
+              )}
+              <Button size="sm" onClick={onClose}>
+                {verdict.kind === 'saves' ? t('plans.remapReject') : t('plans.remapDismiss')}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     );
   }
 
@@ -958,63 +1040,6 @@ export function PlanEditor({
             })}
             {reorderConfirm && confirmation(t('plans.reorderSuggested'))}
           </div>
-
-          {/* Read-only findings from the two optimize actions, under the
-              buttons that produced them. They used to be two more panels at
-              the bottom of the page, far from their own triggers. */}
-          {optimizeResult && optimizeVerdict && (
-            <div className="border-t border-line pt-2 text-xs">
-              {/* The summary badge already discloses a capped evaluation
-                  live, before any click — repeating it here would show the
-                  same warning twice. */}
-              {optimizeVerdict.kind === 'saves' ? (
-                <div className="space-y-2">
-                  <p className="font-semibold text-success">
-                    {t('plans.remapSaves', {
-                      duration: formatDuration(optimizeVerdict.savingsSeconds),
-                    })}
-                  </p>
-                  {renderSegments(optimizeResult.segments)}
-                  <Button size="sm" onClick={handleApplyOptimizedMarkers}>
-                    {t('plans.applyAsMarkers')}
-                  </Button>
-                  {markersAppliedConfirm && confirmation(t('plans.markersApplied'))}
-                </div>
-              ) : (
-                // `remapNoGain` blames the entry order and points at
-                // "Suggest reorder" — true only when a remap was actually
-                // weighed and lost, never when there was none to spend.
-                <p className="text-text-dim">
-                  {optimizeVerdict.kind === 'noRemapsAvailable'
-                    ? t('plans.remapNoneAvailable')
-                    : t('plans.remapNoGain')}
-                </p>
-              )}
-            </div>
-          )}
-          {markersPanelOpen && markersAtCurrentPositions && markersVerdict && (
-            <div className="space-y-2 border-t border-line pt-2 text-xs">
-              {markersVerdict.kind === 'saves' ? (
-                <p className="font-semibold text-success">
-                  {t('plans.remapSaves', {
-                    duration: formatDuration(markersVerdict.savingsSeconds),
-                  })}
-                </p>
-              ) : (
-                <p className="text-text-dim">
-                  {markersVerdict.kind === 'markersAtEnd'
-                    ? t('plans.markersAtEnd')
-                    : t('plans.markersNoGain')}
-                </p>
-              )}
-              {/* Segments are the plan as the markers would train it — worth
-                  seeing even when the trade is poor, but not when no marker
-                  split anything: the lone "keep current attributes" row then
-                  reads as a contradiction of the message above it. */}
-              {markersVerdict.kind !== 'markersAtEnd' &&
-                renderSegments(markersAtCurrentPositions.segments)}
-            </div>
-          )}
         </div>
       ),
     },
@@ -1266,52 +1291,7 @@ export function PlanEditor({
         <Panel
           title={t('plans.yourEntries')}
           actions={
-            // Group-by and Columns are this list's own view controls — they
-            // took the room Import/Export left for the page header (below).
             <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
-              <label className="flex items-center gap-1">
-                {t('plans.groupBy')}
-                <NativeSelect
-                  size="sm"
-                  aria-label={t('plans.groupBy')}
-                  value={groupingMode}
-                  onChange={(e) => void setGroupingMode(e.target.value as GroupingMode)}
-                >
-                  {GROUPING_MODES.map((mode) => (
-                    <option key={mode} value={mode}>
-                      {mode === 'priority'
-                        ? t('plans.groupByPriority')
-                        : t('plans.groupByAttributePair')}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </label>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm">{t('plans.columns')}</Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {(
-                    [
-                      ['attributePair', 'plans.columnAttributePair'],
-                      ['priority', 'plans.columnPriority'],
-                      ['perLevelTime', 'plans.columnPerLevel'],
-                      ['cumulativeTime', 'plans.columnCumulative'],
-                    ] as const
-                  ).map(([key, labelKey]) => (
-                    <DropdownMenuCheckboxItem
-                      key={key}
-                      checked={columnVisibility[key]}
-                      onSelect={(event) => event.preventDefault()}
-                      onCheckedChange={(checked) =>
-                        void setColumnVisibility({ ...columnVisibility, [key]: checked })
-                      }
-                    >
-                      {t(labelKey)}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
               <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
               {planFinish && (
                 <span>{t('plans.projectedFinish', { date: formatLocalDate(planFinish) })}</span>
@@ -1325,6 +1305,56 @@ export function PlanEditor({
               catalog={catalog}
               trainedSkills={trainedSkills}
               onAdd={(entry) => update(upsertEntry(plan.entries, entry))}
+              controls={
+                // Group-by and Columns are this list's own view controls —
+                // riding the search bar's row keeps them off the page
+                // header, which Import/Export already fills.
+                <>
+                  <label className="flex items-center gap-1">
+                    {t('plans.groupBy')}
+                    <NativeSelect
+                      size="sm"
+                      aria-label={t('plans.groupBy')}
+                      value={groupingMode}
+                      onChange={(e) => void setGroupingMode(e.target.value as GroupingMode)}
+                    >
+                      {GROUPING_MODES.map((mode) => (
+                        <option key={mode} value={mode}>
+                          {mode === 'priority'
+                            ? t('plans.groupByPriority')
+                            : t('plans.groupByAttributePair')}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm">{t('plans.columns')}</Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {(
+                        [
+                          ['attributePair', 'plans.columnAttributePair'],
+                          ['priority', 'plans.columnPriority'],
+                          ['perLevelTime', 'plans.columnPerLevel'],
+                          ['cumulativeTime', 'plans.columnCumulative'],
+                        ] as const
+                      ).map(([key, labelKey]) => (
+                        <DropdownMenuCheckboxItem
+                          key={key}
+                          checked={columnVisibility[key]}
+                          onSelect={(event) => event.preventDefault()}
+                          onCheckedChange={(checked) =>
+                            void setColumnVisibility({ ...columnVisibility, [key]: checked })
+                          }
+                        >
+                          {t(labelKey)}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              }
             />
             {/* Outside the scroller, so a refusal is on screen wherever in a
                 long queue the drag happened. */}
@@ -1397,24 +1427,18 @@ export function PlanEditor({
         createPortal(
           <>
             <IconButton
-              size="sm"
-              icon={<Icon.ImportQueue size={Icon.ICON_SIZE.sm} />}
+              icon={<Icon.ImportQueue />}
               label={t('plans.importQueue')}
               onClick={() => void handleImport()}
             />
             <IconButton
-              size="sm"
-              icon={<Icon.ImportClipboard size={Icon.ICON_SIZE.sm} />}
+              icon={<Icon.ImportClipboard />}
               label={t('plans.importClipboard')}
               onClick={() => setImportOpen(true)}
             />
             <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <IconButton
-                  size="sm"
-                  icon={<Icon.Export size={Icon.ICON_SIZE.sm} />}
-                  label={t('plans.export')}
-                />
+                <IconButton icon={<Icon.Export />} label={t('plans.export')} />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
@@ -1497,6 +1521,44 @@ export function PlanEditor({
           </Button>
         </div>
       </Modal>
+
+      {renderRemapPreviewModal({
+        title: t('plans.optimizeRemaps'),
+        open: optimizeResult !== null,
+        verdict: optimizeVerdict,
+        // `remapNoGain` blames the entry order and points at "Suggest
+        // reorder" — true only when a remap was actually weighed and lost,
+        // never when there was none to spend. No segments on this branch:
+        // a search that found nothing to remap has no plan-as-trained to
+        // show, unlike the markers Modal below, which already has one.
+        segments: optimizeVerdict?.kind === 'saves' ? (optimizeResult?.segments ?? null) : null,
+        message:
+          optimizeVerdict?.kind === 'noRemapsAvailable'
+            ? t('plans.remapNoneAvailable')
+            : t('plans.remapNoGain'),
+        onAccept: acceptOptimizeRemaps,
+        onClose: rejectOptimizeRemaps,
+      })}
+
+      {renderRemapPreviewModal({
+        title: t('plans.optimizeAtMarkers'),
+        open: markersPanelOpen && markersAtCurrentPositions !== null,
+        verdict: markersVerdict,
+        // Segments are the plan as the markers would train it — worth
+        // seeing even when the trade is poor, but not when no marker split
+        // anything: the lone "keep current attributes" row would then read
+        // as a contradiction of the message above it.
+        segments:
+          markersAtCurrentPositions && markersVerdict?.kind !== 'markersAtEnd'
+            ? markersAtCurrentPositions.segments
+            : null,
+        message:
+          markersVerdict?.kind === 'markersAtEnd'
+            ? t('plans.markersAtEnd')
+            : t('plans.markersNoGain'),
+        onAccept: acceptOptimizeAtMarkers,
+        onClose: rejectOptimizeAtMarkers,
+      })}
     </>
   );
 }
