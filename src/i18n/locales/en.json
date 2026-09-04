@@ -1507,6 +1507,7 @@
     "noAccessTitle": "No corporation access",
     "noAccessHint": "This character's in-game corporation roles do not open any corp data. Settings has a Corp access row that explains what is needed.",
     "vitalsTitle": "Vitals",
+    "peopleTitle": "People",
     "board": {
       "empty": "Nothing due",
       "emptyHint": "No fuel, timers, moon chunks or deliveries are waiting on anyone.",
@@ -1541,6 +1542,12 @@
       "runwayDays_other": "{{count}} days",
       "runwayUnknown": "Unknown",
       "runwayHint": "How long division {{division}} lasts: its own balance divided by its own average daily spending over the last {{days}} days. EVE publishes no all-divisions journal, so this covers that one wallet. Income is ignored, so this is what is already banked."
+    },
+    "people": {
+      "viewRoster": "Roster",
+      "joined": "Joined",
+      "left": "Left",
+      "changeHint": "Members who joined or left since this device last opened the Members page. It keeps saying so until you open it, which is what clears the count."
     },
     "members": {
       "title": "Members",

@@ -25,10 +25,12 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, IconButton, PageHeader, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { CorpBoard } from '@/features/corp/CorpBoard';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
+import { CorpPeopleRail } from '@/features/corp/CorpPeopleRail';
 import {
   MASTER_WALLET_DIVISION,
   loadCorporationId,
@@ -44,6 +46,16 @@ import {
   loadCorporationWallets,
 } from '@/features/corp/wallet';
 import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
+// The roster reads and their boundary adaptation are #297's, used the same way
+// (#345). The People rail is a second consumer of that module, not a second
+// copy of it — same functions, so the same `corpCacheKey` rows and the same
+// `detectCorpAuthFailure` treatment of a 403.
+import {
+  loadCorporationMemberIds,
+  loadCorporationMemberTracking,
+  toMemberActivity,
+} from '@/features/corp/members';
+import { readPreviousRoster } from '@/features/corp/rosterState';
 import { walletDivisions, type WalletDivision } from '@/features/corp/divisions';
 import {
   jobTypeIds,
@@ -55,6 +67,12 @@ import {
 } from '@/features/corp/boardSources';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { buildCorpBoard } from '@/engine/corp/board';
+import {
+  EMPTY_ROSTER_DIFF,
+  diffRoster,
+  type MemberActivity,
+  type RosterDiff,
+} from '@/engine/corp/members';
 import type { VitalsJournalEntry } from '@/engine/corp/vitals';
 import type { CorpCapabilities } from '@/engine/corpRoles';
 import type {
@@ -89,6 +107,10 @@ interface CorpSnapshot {
   /** Balances joined to the corporation's own division names (#298). */
   wallets: WalletDivision[] | null;
   journal: VitalsJournalEntry[];
+  /** Tracking rows for the People rail, or `null` when unread (#345). */
+  members: MemberActivity[] | null;
+  /** Joins/leaves since this device last opened the roster — read, never consumed. */
+  rosterDiff: RosterDiff;
   typeNames: ReadonlyMap<number, string>;
   /** Oldest `fetchedAt` across the panels actually read — see `Corp` below. */
   oldestFetchedAt: Date | null;
@@ -103,6 +125,8 @@ const EMPTY_SNAPSHOT: CorpSnapshot = {
   jobs: null,
   wallets: null,
   journal: [],
+  members: null,
+  rosterDiff: EMPTY_ROSTER_DIFF,
   typeNames: new Map(),
   oldestFetchedAt: null,
   loadedAt: 0,
@@ -124,26 +148,54 @@ async function loadCorpSnapshot(
 
   // Each read is fired only for the capability that opens it, so an unheld one
   // costs no request rather than a 403.
-  const [structures, extractions, jobs, wallets, divisions, journal] = await Promise.all([
-    capabilities.canReadStructures
-      ? loadCorporationStructures(characterId, corporationId)
-      : Promise.resolve(null),
-    capabilities.canReadMoonExtractions
-      ? loadCorporationMiningExtractions(characterId, corporationId)
-      : Promise.resolve(null),
-    capabilities.canReadIndustry
-      ? loadCorporationIndustryJobs(characterId, corporationId)
-      : Promise.resolve(null),
-    capabilities.canReadWallet
-      ? loadCorporationWallets(characterId, corporationId)
-      : Promise.resolve(null),
-    capabilities.canReadWallet
-      ? loadCorporationDivisions(characterId, corporationId)
-      : Promise.resolve(null),
-    capabilities.canReadWallet
-      ? loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION)
-      : Promise.resolve(null),
-  ]);
+  const [structures, extractions, jobs, wallets, divisions, journal, roster, tracking] =
+    await Promise.all([
+      capabilities.canReadStructures
+        ? loadCorporationStructures(characterId, corporationId)
+        : Promise.resolve(null),
+      capabilities.canReadMoonExtractions
+        ? loadCorporationMiningExtractions(characterId, corporationId)
+        : Promise.resolve(null),
+      capabilities.canReadIndustry
+        ? loadCorporationIndustryJobs(characterId, corporationId)
+        : Promise.resolve(null),
+      capabilities.canReadWallet
+        ? loadCorporationWallets(characterId, corporationId)
+        : Promise.resolve(null),
+      capabilities.canReadWallet
+        ? loadCorporationDivisions(characterId, corporationId)
+        : Promise.resolve(null),
+      capabilities.canReadWallet
+        ? loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION)
+        : Promise.resolve(null),
+      capabilities.canReadMembers
+        ? loadCorporationMemberIds(characterId, corporationId)
+        : Promise.resolve(null),
+      capabilities.canReadMembers
+        ? loadCorporationMemberTracking(characterId, corporationId)
+        : Promise.resolve(null),
+    ]);
+
+  /**
+   * The baseline is read and *not* replaced. That is the whole of the summary's
+   * agreement with `/corp/members`.
+   *
+   * `rosterState.ts` stores what this device has already reported, and
+   * `CorpMembersView` reads it and records the new roster in the same pass so
+   * each change is announced exactly once. If the overview recorded too,
+   * whichever surface the user opened first would consume the change and the
+   * other would show nothing — the same failure that module's note rules out
+   * for #299's background poller.
+   *
+   * So the overview only ever asks. The figure therefore stands until the user
+   * follows the link, which is the right behaviour for a tile whose job is
+   * "should I go look": it stops saying so once you have looked, and not before.
+   */
+  const memberIds = roster?.cached?.data ?? null;
+  const rosterDiff =
+    memberIds === null
+      ? EMPTY_ROSTER_DIFF
+      : diffRoster(await readPreviousRoster(characterId, corporationId), memberIds);
 
   const jobRows = jobs?.cached?.data ?? null;
   // Only the type names this board will actually print. `loadTypeNames` reads
@@ -153,7 +205,7 @@ async function loadCorpSnapshot(
   // The oldest of the panels that were read, not the newest: the badge is a
   // promise about the whole view, and a fresh wallet must not vouch for an
   // hour-old structure list.
-  const fetchedAts = [structures, extractions, jobs, wallets, divisions, journal]
+  const fetchedAts = [structures, extractions, jobs, wallets, divisions, journal, roster, tracking]
     .map((result) => result?.cached?.fetchedAt)
     .filter((date): date is Date => date !== undefined);
   const oldestFetchedAt =
@@ -174,6 +226,17 @@ async function loadCorpSnapshot(
         ? null
         : walletDivisions(wallets.cached.data, divisions?.cached?.data ?? null),
     journal: toVitalsJournal(journal?.cached?.data ?? []),
+    // `null`, not `[]`, for the same reason every other panel here is: a
+    // tracking read that did not happen must hide the rail, where a corporation
+    // that genuinely returned no rows is a rail reading zero. The member count
+    // comes from tracking rather than from the id list because that is what
+    // `/corp/members` counts — counting the ids instead would drift from the
+    // page this links to whenever the two reads disagree.
+    members:
+      tracking?.cached === undefined || tracking.cached === null
+        ? null
+        : toMemberActivity(tracking.cached.data),
+    rosterDiff,
     typeNames,
     oldestFetchedAt,
     loadedAt,
@@ -228,6 +291,9 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
 
   if (!snapshot.hydrated) return <Spinner />;
 
+  const showVitals = capabilities.canReadWallet && data !== null;
+  const showPeople = capabilities.canReadMembers && data !== null && data.members !== null;
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -266,17 +332,35 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             </Panel>
           )}
           {/*
-            The rail is the Accountant's half of the board and simply absent
-            without that capability — no placeholder, no "you cannot see this".
-            Its own reads were never fired either (see the loader).
+            Money and People, the two halves of the side rail — each simply
+            absent without its capability, no placeholder and no "you cannot
+            see this". Their own reads were never fired either (see the loader).
+
+            The pair share the one 18rem grid cell rather than taking a cell
+            each, which is what keeps the board's own column full width. They
+            sit side by side wherever there is room for it and stack where
+            there is not — and the two-column class is conditional on both
+            actually rendering, so a wallet-only Character's rail stays exactly
+            the full-width panel it was before this pair existed.
           */}
-          {capabilities.canReadWallet && data !== null && (
-            <CorpVitalsRail
-              divisions={data.wallets ?? []}
-              journal={data.journal}
-              journalDivision={MASTER_WALLET_DIVISION}
-              nowMs={data.loadedAt}
-            />
+          {(showVitals || showPeople) && data !== null && (
+            <div className={cx('grid gap-3', showVitals && showPeople && 'sm:grid-cols-2')}>
+              {showVitals && (
+                <CorpVitalsRail
+                  divisions={data.wallets ?? []}
+                  journal={data.journal}
+                  journalDivision={MASTER_WALLET_DIVISION}
+                  nowMs={data.loadedAt}
+                />
+              )}
+              {showPeople && (
+                <CorpPeopleRail
+                  members={data.members ?? []}
+                  diff={data.rosterDiff}
+                  nowMs={data.loadedAt}
+                />
+              )}
+            </div>
           )}
         </div>
       )}
