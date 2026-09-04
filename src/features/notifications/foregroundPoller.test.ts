@@ -268,6 +268,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     permission: () => 'granted',
     notify: vi.fn(async () => {}),
     recordToFeed: vi.fn(async () => {}),
+    uploadProjection: vi.fn(async () => {}),
     ...rest,
   };
 }
@@ -1308,5 +1309,107 @@ describe('runForegroundPoll per-event channel columns', () => {
     });
     await runForegroundPoll(deps);
     expect(loadSkillQueue).not.toHaveBeenCalled();
+  });
+});
+
+describe('runForegroundPoll Scheduled Push upload (issue #358)', () => {
+  it('uploads projection rows built from this poll’s snapshot', async () => {
+    const uploadProjection = vi.fn<PollDependencies['uploadProjection']>(async () => {});
+    const now = 1_000_000;
+    const startMs = now + 1000; // within the 72-hour Projection Horizon
+    const deps = baseDeps({
+      now: () => now,
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CALENDAR_SCOPE]),
+      eventPrefsFor: async () => ({ calendarEventStarting: true }),
+      loadCalendarEvents: async () => [
+        calendarEvent({ event_id: 5, event_date: new Date(startMs).toISOString() }),
+      ],
+      uploadProjection,
+    });
+    await runForegroundPoll(deps);
+
+    expect(uploadProjection).toHaveBeenCalledTimes(1);
+    const [rowsByCharacter] = uploadProjection.mock.calls[0];
+    expect(rowsByCharacter.get(CHAR.characterId)).toEqual([
+      expect.objectContaining({ eventId: 'calendarEventStarting', characterId: CHAR.characterId }),
+    ]);
+  });
+
+  it('excludes a character this poll did not touch (no granted scope at all) from the upload map', async () => {
+    const charB: CharacterRef = { characterId: 2, name: 'Second Pilot' };
+    const uploadProjection = vi.fn<PollDependencies['uploadProjection']>(async () => {});
+    const deps = baseDeps({
+      characters: async () => [CHAR, charB],
+      grantedScopes: async (characterId) =>
+        characterId === CHAR.characterId ? new Set([SKILLQUEUE_SCOPE]) : new Set(),
+      uploadProjection,
+    });
+    await runForegroundPoll(deps);
+
+    expect(uploadProjection).toHaveBeenCalledTimes(1);
+    const [rowsByCharacter] = uploadProjection.mock.calls[0];
+    expect(rowsByCharacter.has(CHAR.characterId)).toBe(true);
+    expect(rowsByCharacter.has(charB.characterId)).toBe(false);
+  });
+
+  it('does not upload at all when the poll does nothing (master switch off)', async () => {
+    const uploadProjection = vi.fn<PollDependencies['uploadProjection']>(async () => {});
+    const deps = baseDeps({ masterEnabled: async () => false, uploadProjection });
+    await runForegroundPoll(deps);
+    expect(uploadProjection).not.toHaveBeenCalled();
+  });
+
+  it('filters projection rows to the enabled events, even for a domain whose projection emits more than one event from one snapshot', async () => {
+    // colonyDomain's projection always emits both planetaryExtractionDone and
+    // planetaryExtractorExpiring rows from one snapshot regardless of which
+    // is individually toggled — the poll's own live-fire gating already
+    // relies on `enabledEvents`, and the projection upload must apply the
+    // same filter rather than uploading a disabled event's row anyway.
+    const now = 1_000_000;
+    const expiryTimeMs = now + 20 * 3_600_000; // 20h out: extractionDone in horizon, and the 12h-lead extractorExpiring threshold in horizon too
+    const uploadProjection = vi.fn<PollDependencies['uploadProjection']>(async () => {});
+    const deps = baseDeps({
+      now: () => now,
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, PLANETS_SCOPE]),
+      eventPrefsFor: async () => ({
+        planetaryExtractorExpiring: true,
+        planetaryExtractionDone: false,
+      }),
+      loadColonyExtractors: async () => [
+        { planetId: 4001, extractors: [{ pinId: 9001, expiryTimeMs }] },
+      ],
+      uploadProjection,
+    });
+    await runForegroundPoll(deps);
+
+    expect(uploadProjection).toHaveBeenCalledTimes(1);
+    const [rowsByCharacter] = uploadProjection.mock.calls[0];
+    const rows = rowsByCharacter.get(CHAR.characterId) ?? [];
+    expect(rows.map((row) => row.eventId)).toEqual(['planetaryExtractorExpiring']);
+  });
+
+  it('does not upload a row for an event switched to feed-only — a Scheduled Push shows an OS notification, same as the browser channel', async () => {
+    // A Scheduled Push is the closed-app analog of the browser channel: it
+    // always shows an OS popup (pushHandler.ts), never a silent feed write.
+    // Uploading a feed-only event's row would bypass the user's own
+    // browser-notifications-off choice the moment the app closes.
+    const now = 1_000_000;
+    const startMs = now + 1000;
+    const uploadProjection = vi.fn<PollDependencies['uploadProjection']>(async () => {});
+    const deps = baseDeps({
+      now: () => now,
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CALENDAR_SCOPE]),
+      feedChannelEnabled: async () => true,
+      eventPrefsFor: async () => ({ calendarEventStarting: { browser: false, feed: true } }),
+      loadCalendarEvents: async () => [
+        calendarEvent({ event_id: 5, event_date: new Date(startMs).toISOString() }),
+      ],
+      uploadProjection,
+    });
+    await runForegroundPoll(deps);
+
+    expect(uploadProjection).toHaveBeenCalledTimes(1);
+    const [rowsByCharacter] = uploadProjection.mock.calls[0];
+    expect(rowsByCharacter.get(CHAR.characterId)).toEqual([]);
   });
 });

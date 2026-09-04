@@ -136,11 +136,39 @@ describe('registerDeviceForWebPush', () => {
       deviceId: 'device-1',
       fcmToken: 'fcm-token',
       characters: [
-        { characterId: 1, accessToken: 'token-1' },
-        { characterId: 2, accessToken: 'token-2' },
+        { characterId: 1, accessToken: 'token-1', projectionRows: [] },
+        { characterId: 2, accessToken: 'token-2', projectionRows: [] },
       ],
     });
     expect(result).toEqual({ deviceId: 'device-1', registered: [1], rejected: [] });
+  });
+
+  it('includes each Character’s Projection rows from the passed-in map, keyed by characterId', async () => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+      { characterId: 2, name: 'B', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockImplementation(async (id) => `token-${id}`);
+    const row = {
+      characterId: 1,
+      eventId: 'industryJobComplete' as const,
+      occurrenceKey: '1:industryJobComplete:987',
+      fireAt: 1_700_000_000_000,
+      title: 'Industry job complete',
+      body: 'done',
+    };
+
+    await registerDeviceForWebPush('vapid-key', registration, new Map([[1, [row]]]));
+
+    expect(call).toHaveBeenCalledWith({
+      deviceId: 'device-1',
+      fcmToken: 'fcm-token',
+      characters: [
+        { characterId: 1, accessToken: 'token-1', projectionRows: [row] },
+        { characterId: 2, accessToken: 'token-2', projectionRows: [] },
+      ],
+    });
   });
 
   it('requests the FCM token against the passed-in service worker registration', async () => {
@@ -179,8 +207,8 @@ describe('registerDeviceForWebPush', () => {
       deviceId: 'device-1',
       fcmToken: 'fcm-token',
       characters: [
-        { characterId: 1, accessToken: 'token-1' },
-        { characterId: 3, accessToken: 'token-3' },
+        { characterId: 1, accessToken: 'token-1', projectionRows: [] },
+        { characterId: 3, accessToken: 'token-3', projectionRows: [] },
       ],
     });
     expect(result).toEqual({ deviceId: 'device-1', registered: [1], rejected: [] });

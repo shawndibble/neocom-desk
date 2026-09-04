@@ -1,4 +1,21 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "projections",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fired", "order": "ASCENDING" },
+        { "fieldPath": "fireAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "projections",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fired", "order": "ASCENDING" },
+        { "fieldPath": "firedAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

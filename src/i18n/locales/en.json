@@ -1493,7 +1493,7 @@
         "corpMemberLeft": "Member Left",
         "corpWalletThreshold": "Corp Wallet Threshold"
       },
-      "extractorExpiringHint": "Checked every five minutes while the app is open. With the app closed, this warning does not fire. The Planetary Industry page always shows the real expiry.",
+      "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
       "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "structureFuelLowThresholdLabel": "Warn when fuel remaining drops below:",
       "structureFuelLowThresholdOption_one": "{{count}} day",
@@ -1502,7 +1502,7 @@
       "corpWalletBalanceFloorLabel": "Balance floor (ISK):",
       "corpWalletTransactionCeilingLabel": "Transaction ceiling (ISK):",
       "browserChannelLabel": "Browser notifications",
-      "browserChannelHint": "Pop-ups from your operating system. Needs permission, and only appears while the app is open on iPhone and iPad.",
+      "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
       "feedChannelLabel": "Overview notifications",
       "feedChannelHint": "A dismissible list on the Overview page. Works on every device.",
       "column": {

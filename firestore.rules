@@ -88,8 +88,18 @@ service cloud.firestore {
     // signs in as one Character (uid char:{id}) while a device registration
     // covers every Character it holds at once. No ownerHash pattern applies
     // here — deny all client access, matching the Projection collection
-    // that will land alongside it (#358).
+    // below (#358).
     match /deviceRegistrations/{deviceId} {
+      allow read, write: if false;
+    }
+
+    // Projection rows (issue #358, ADR 0010, CONTEXT.md round 45): one doc
+    // per occurrence, doc id === Occurrence Key. Written by registerDevice
+    // (upload) and dispatchProjections (fire/purge), both admin-privileged —
+    // same reasoning as deviceRegistrations above: a per-device upload covers
+    // every Character it holds at once, which the ownerHash/uid pattern
+    // cannot express. Deny all client access.
+    match /projections/{occurrenceKey} {
       allow read, write: if false;
     }
     // Everything else: implicit deny.
