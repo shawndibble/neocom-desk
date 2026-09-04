@@ -1332,6 +1332,7 @@
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",
       "noBlueprintOptions": "No blueprint options",
+      "piPlan": "PI Plan",
       "copyLocation": "Copy location",
       "copyPrice": "Copy price",
       "filterToStation": "Filter to this station"
