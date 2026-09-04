@@ -723,8 +723,15 @@ function ThresholdAmountInput({
   onCommit: (value: number) => void;
 }) {
   const [text, setText] = useState(String(value));
-
-  useEffect(() => setText(String(value)), [value]);
+  // Adjusted during render, not an effect (react-hooks/set-state-in-effect):
+  // this is React's own "store info from previous renders" pattern for
+  // resetting local state when a prop changes, not a DOM/external-system
+  // sync — an actual effect would run one render late here.
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setText(String(value));
+  }
 
   function commit() {
     const amount = Number(text);
