@@ -6,11 +6,11 @@
  * journal per division — there is no all-divisions journal, and the seven are
  * separately role-gated in game.
  *
- * Every key goes through `corpCacheKey` (issue #293), and the journal's key
- * carries the division as well: without it the seven journals would overwrite
- * each other in a single row and a division switch would show the previous
- * one's entries. A 403 is the in-game role gate, not a re-login — see
- * `corpAuthFailure.ts`.
+ * Every key goes through `corpRead.ts`'s corp-scoped wrapper (issue #293), and
+ * the journal's key carries the division as well: without it the seven
+ * journals would overwrite each other in a single row and a division switch
+ * would show the previous one's entries. A 403 is the in-game role gate, not a
+ * re-login — see `corpAuthFailure.ts`.
  *
  * Note what is *not* here: ESI publishes a corp wallet *transactions* endpoint,
  * but #295 registered only the journal, and `esi/scopes.ts` derives everything
@@ -25,13 +25,8 @@ import {
   type CorporationWalletDivision,
   type WalletJournalEntry,
 } from '@/esi/endpoints';
-import {
-  corpCacheKey,
-  loadPaginatedWithCacheStatus,
-  loadWithCacheStatus,
-  type StatusResult,
-} from '@/esi/cache';
-import { detectCorpAuthFailure } from './corpAuthFailure';
+import type { StatusResult } from '@/esi/cache';
+import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './corpRead';
 
 export const KEYS = {
   wallets: 'wallet:balances',
@@ -40,18 +35,16 @@ export const KEYS = {
   journal: (division: number) => `wallet:journal:${division}`,
 } as const;
 
-const CORP_OPTIONS = { detectAuthFailure: detectCorpAuthFailure };
-
 /** The corporation's seven wallet divisions and their balances. */
 export function loadCorporationWallets(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationWalletDivision[]>> {
-  return loadWithCacheStatus(
+  return loadCorpWithCacheStatus(
     characterId,
-    corpCacheKey(corporationId, KEYS.wallets),
-    async () => (await getCorporationWallets(characterId, corporationId)).data,
-    CORP_OPTIONS
+    corporationId,
+    KEYS.wallets,
+    async () => (await getCorporationWallets(characterId, corporationId)).data
   );
 }
 
@@ -60,11 +53,11 @@ export function loadCorporationDivisions(
   characterId: number,
   corporationId: number
 ): Promise<StatusResult<CorporationDivisions>> {
-  return loadWithCacheStatus(
+  return loadCorpWithCacheStatus(
     characterId,
-    corpCacheKey(corporationId, KEYS.divisions),
-    async () => (await getCorporationDivisions(characterId, corporationId)).data,
-    CORP_OPTIONS
+    corporationId,
+    KEYS.divisions,
+    async () => (await getCorporationDivisions(characterId, corporationId)).data
   );
 }
 
@@ -74,10 +67,7 @@ export function loadCorporationWalletJournal(
   corporationId: number,
   division: number
 ): Promise<StatusResult<WalletJournalEntry[]>> {
-  return loadPaginatedWithCacheStatus(
-    characterId,
-    corpCacheKey(corporationId, KEYS.journal(division)),
-    () => getCorporationWalletJournal(characterId, corporationId, division),
-    CORP_OPTIONS
+  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEYS.journal(division), () =>
+    getCorporationWalletJournal(characterId, corporationId, division)
   );
 }
