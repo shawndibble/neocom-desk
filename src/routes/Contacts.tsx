@@ -91,10 +91,17 @@ export function Contacts() {
   // `contactsResult`/`countByCategory`) until the new load lands — remember
   // the last successful counts so the filter chips (and the user's active
   // selection) stay on screen through a refresh instead of disappearing.
+  // Switching character bumps the same epoch, so the remembered counts must
+  // be dropped there too — otherwise the outgoing character's chips would
+  // linger under the incoming one until its own load lands.
   const [lastGoodCounts, setLastGoodCounts] = useState<Record<StandingCategory, number> | null>(
     null
   );
-  if (contactsResult && !contactsNeedsReauth && lastGoodCounts !== countByCategory) {
+  const [lastGoodCharacterId, setLastGoodCharacterId] = useState(activeCharacterId);
+  if (activeCharacterId !== lastGoodCharacterId) {
+    setLastGoodCharacterId(activeCharacterId);
+    setLastGoodCounts(null);
+  } else if (contactsResult && !contactsNeedsReauth && lastGoodCounts !== countByCategory) {
     setLastGoodCounts(countByCategory);
   }
 

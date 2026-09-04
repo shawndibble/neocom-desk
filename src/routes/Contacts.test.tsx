@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -26,7 +26,24 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 const CHAR_ID = 91;
+const CHAR_ID_2 = 92;
 const ESI = 'https://esi.evetech.net';
+
+async function addSecondCharacter() {
+  await db.characters.put({
+    characterId: CHAR_ID_2,
+    name: 'Pilot Two',
+    ownerHash: 'oh2',
+    addedAt: 2,
+  });
+  await db.tokens.put({
+    characterId: CHAR_ID_2,
+    accessToken: 'access-token-2',
+    refreshToken: 'refresh-2',
+    expiresAt: Date.now() + 3_600_000,
+    scopes: ['esi-characters.read_contacts.v1'],
+  });
+}
 
 const contactsPayload = [
   { contact_id: 1001, contact_type: 'character' as const, standing: 10, is_watched: true },
@@ -186,6 +203,46 @@ describe('Contacts standing filter chips (issue #403)', () => {
 
     resolveRefresh();
     await waitFor(() => expect(screen.getByText('Good Friend')).toBeInTheDocument());
+  });
+
+  it("does not carry the outgoing character's counts onto the incoming character", async () => {
+    await addSecondCharacter();
+    let resolveSecondContacts!: () => void;
+    const secondContactsGate = new Promise<void>((resolve) => {
+      resolveSecondContacts = resolve;
+    });
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID_2}/contacts`, async () => {
+        await secondContactsGate;
+        return HttpResponse.json([
+          { contact_id: 2001, contact_type: 'character' as const, standing: 5 },
+        ]);
+      }),
+      http.post(`${ESI}/universe/names`, () =>
+        HttpResponse.json([
+          { id: 1001, name: 'Good Friend', category: 'character' },
+          { id: 1002, name: 'Neutral Corp', category: 'corporation' },
+          { id: 1003, name: 'Bad Alliance', category: 'alliance' },
+          { id: 2001, name: 'Second Pilot Friend', category: 'character' },
+        ])
+      )
+    );
+
+    render(<App />);
+    await screen.findByText('Good Friend');
+    expect(screen.getByRole('group', { name: 'Standing' })).toBeInTheDocument();
+
+    await act(async () => {
+      await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
+    });
+
+    // The second character's contacts are still loading — the first
+    // character's stale chip counts must not linger under the new character.
+    expect(screen.queryByRole('group', { name: 'Standing' })).not.toBeInTheDocument();
+
+    resolveSecondContacts();
+    expect(await screen.findByText('Second Pilot Friend')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Standing' })).toBeInTheDocument();
   });
 });
 
