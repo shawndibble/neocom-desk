@@ -7,12 +7,14 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { error as logError } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import {
   verifyEveAccessToken,
   verifyOptionsFromEnv,
   uidForCharacter,
   type EveTokenClaims,
 } from './verifyEveToken.js';
+import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
 
 initializeApp();
 
@@ -48,3 +50,36 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
     return { token, uid, ownerHash: claims.ownerHash };
   }
 );
+
+// registerDevice: register one device's FCM token against every Character it
+// holds, in one call — see registerDevice.ts and issue #356. Firestore rules
+// deny all client access to `deviceRegistrations`; this admin write is the
+// only path in. The doc is a wholesale `set` keyed by the device's own
+// (client-generated, device-local) id, never a token-keyed doc — that is what
+// makes re-registering after an FCM token rotation replace the entry instead
+// of accumulating one per token.
+export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (request) => {
+  let input;
+  try {
+    input = parseRegisterDeviceInput(request.data);
+  } catch (err) {
+    throw new HttpsError(
+      'invalid-argument',
+      err instanceof Error ? err.message : 'Invalid request body'
+    );
+  }
+
+  const { registration, rejected } = await buildDeviceRegistration(input, verifyOptions, logError);
+
+  if (registration.characterIds.length === 0) {
+    throw new HttpsError('unauthenticated', 'No character access token could be verified');
+  }
+
+  await getFirestore().collection('deviceRegistrations').doc(input.deviceId).set({
+    fcmToken: registration.fcmToken,
+    characterIds: registration.characterIds,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  return { deviceId: input.deviceId, registered: registration.characterIds, rejected };
+});

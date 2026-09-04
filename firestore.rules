@@ -79,6 +79,16 @@ service cloud.firestore {
         allow update: if isOwner() && hashMatches() && incomingHashMatches();
       }
     }
+
+    // Device registrations (issue #356, ADR 0010): written only by the
+    // registerDevice callable using admin privileges, because syncAuth.ts
+    // signs in as one Character (uid char:{id}) while a device registration
+    // covers every Character it holds at once. No ownerHash pattern applies
+    // here — deny all client access, matching the Projection collection
+    // that will land alongside it (#358).
+    match /deviceRegistrations/{deviceId} {
+      allow read, write: if false;
+    }
     // Everything else: implicit deny.
   }
 }
