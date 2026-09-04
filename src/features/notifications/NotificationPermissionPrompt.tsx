@@ -6,10 +6,11 @@ import { db } from '@/db';
 import {
   useNotificationPromptState,
   useNotificationPermission,
-  requestNotificationPermission,
   promptStateAfterAsk,
   shouldShowPermissionExplainer,
 } from './permission';
+import { webPushSupport } from '@/sync/deviceRegistration';
+import { enableWebPush } from './webPush';
 
 /**
  * The one-time notification explainer (issue #171). Mounted in `Layout`, so it
@@ -41,8 +42,16 @@ export function NotificationPermissionPrompt() {
   });
   if (!visible) return null;
 
+  // iOS delivers Web Push only to an installed PWA — requesting permission
+  // here would either do nothing or grant a permission that can never
+  // deliver anything, so this state skips the browser prompt and explains
+  // why instead (issue #356 AC1).
+  const installRequired = webPushSupport() === 'requires-install';
+
+  const dismiss = () => void setValue({ seen: true, outcome: value.outcome });
   const enable = async () => {
-    await setValue(promptStateAfterAsk(await requestNotificationPermission()));
+    const { permission: outcome } = await enableWebPush();
+    await setValue(promptStateAfterAsk(outcome));
   };
 
   return (
@@ -53,14 +62,20 @@ export function NotificationPermissionPrompt() {
       className="fixed inset-x-4 bottom-28 z-50 space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-16 md:left-auto md:max-w-sm"
     >
       <p className="font-medium text-text">{t('notifications.prompt.title')}</p>
-      <p className="text-xs text-text-dim">{t('notifications.prompt.body')}</p>
+      <p className="text-xs text-text-dim">
+        {t(
+          installRequired ? 'notifications.prompt.installRequiredBody' : 'notifications.prompt.body'
+        )}
+      </p>
       <div className="flex justify-end gap-2">
-        <Button size="sm" onClick={() => void setValue({ seen: true, outcome: value.outcome })}>
+        <Button size="sm" onClick={dismiss}>
           {t('notifications.prompt.dismiss')}
         </Button>
-        <Button size="sm" variant="primary" onClick={() => void enable()}>
-          {t('notifications.prompt.enable')}
-        </Button>
+        {!installRequired && (
+          <Button size="sm" variant="primary" onClick={() => void enable()}>
+            {t('notifications.prompt.enable')}
+          </Button>
+        )}
       </div>
     </div>
   );

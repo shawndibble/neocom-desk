@@ -75,10 +75,11 @@ import { refreshAppBadge } from './appBadge';
 import {
   useNotificationPermission,
   useNotificationPromptState,
-  requestNotificationPermission,
   promptStateAfterAsk,
   notificationsBlocked,
 } from './permission';
+import { webPushSupport } from '@/sync/deviceRegistration';
+import { enableWebPush } from './webPush';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 
@@ -128,10 +129,15 @@ export function NotificationsPanel() {
   // Records the ask here too, so someone who ignored the one-time explainer and
   // came to Settings instead is not offered it again on the next load.
   async function enableNotifications() {
-    const outcome = await requestNotificationPermission();
+    const { permission: outcome } = await enableWebPush();
     await setPromptState(promptStateAfterAsk(outcome));
     refreshPermission();
   }
+
+  // iOS delivers Web Push only to an installed PWA (issue #356 AC1) — the
+  // Enable button would either do nothing or grant a permission that can
+  // never deliver anything, so this state shows why instead of the button.
+  const installRequired = webPushSupport() === 'requires-install';
 
   const [search, setSearch] = useState('');
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
@@ -232,7 +238,15 @@ export function NotificationsPanel() {
             {t('settings.notifications.blockedNotice')}
           </p>
         )}
-        {permission === 'default' && (
+        {permission === 'default' && installRequired && (
+          <p
+            role="status"
+            className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim"
+          >
+            {t('settings.notifications.installRequiredNotice')}
+          </p>
+        )}
+        {permission === 'default' && !installRequired && (
           <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
             <p className="min-w-0 flex-1 text-xs text-text-dim">
               {t('settings.notifications.enableHint')}
