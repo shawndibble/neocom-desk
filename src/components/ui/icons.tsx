@@ -38,6 +38,7 @@ import {
   Export as ExportIcon,
   Factory,
   Flag,
+  Gauge,
   GraduationCap,
   Hammer,
   MagnifyingGlass,
@@ -165,6 +166,8 @@ export const Market = withWeight(ChartLineUp);
 export const Wallet = withWeight(WalletGlyph);
 /** Colonies and extraction timers. */
 export const Planetary = withWeight(Planet);
+/** An extractor program's live telemetry — the one PI card with real-time data. */
+export const Extraction = withWeight(Gauge);
 /** Mail, calendar and contacts, grouped as one row. */
 export const Social = withWeight(EnvelopeSimple);
 /** Jump clones and implants. */

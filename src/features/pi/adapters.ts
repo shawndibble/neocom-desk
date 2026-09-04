@@ -12,8 +12,19 @@ export type PinRole = 'extractor' | 'factory' | 'other';
 
 export function pinRole(pin: PlanetPin): PinRole {
   if (pin.extractor_details) return 'extractor';
-  if (pin.factory_details) return 'factory';
+  if (pin.factory_details || pin.schematic_id !== undefined) return 'factory';
   return 'other';
+}
+
+/**
+ * A factory pin's assigned schematic, wherever ESI put it: nested under
+ * `factory_details.schematic_id` (the documented shape) or on the pin's own
+ * top-level `schematic_id` (what live ESI actually sends — observed on a
+ * mid-cycle Industry Facility with no `factory_details` object at all).
+ * Undefined for anything that isn't a factory pin.
+ */
+export function factorySchematicId(pin: PlanetPin): number | undefined {
+  return pin.factory_details?.schematic_id ?? pin.schematic_id;
 }
 
 /**
@@ -65,6 +76,32 @@ export function extractorProgramsFromPins(pins: readonly PlanetPin[]): Extractor
     });
   }
   return programs;
+}
+
+export interface FactoryPinGroup {
+  /** `undefined` groups every factory pin whose schematic couldn't be resolved. */
+  schematicId: number | undefined;
+  count: number;
+}
+
+/**
+ * Factory pins collapsed to one entry per distinct schematic, in the order
+ * each schematic first appears, for the production card's "N facilities
+ * running" rows. Filters on `pinRole` rather than `factorySchematicId`
+ * alone, so a pin `pinRole` calls an extractor (it has `extractor_details`)
+ * never turns up here even if it also carries a stray top-level
+ * `schematic_id` — the two functions must agree on what counts as a factory.
+ */
+export function groupFactoryPins(pins: readonly PlanetPin[]): FactoryPinGroup[] {
+  const order: (number | undefined)[] = [];
+  const counts = new Map<number | undefined, number>();
+  for (const pin of pins) {
+    if (pinRole(pin) !== 'factory') continue;
+    const schematicId = factorySchematicId(pin);
+    if (!counts.has(schematicId)) order.push(schematicId);
+    counts.set(schematicId, (counts.get(schematicId) ?? 0) + 1);
+  }
+  return order.map((schematicId) => ({ schematicId, count: counts.get(schematicId) ?? 0 }));
 }
 
 /**

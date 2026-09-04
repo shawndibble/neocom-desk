@@ -1,9 +1,8 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
-  DataTable,
   EmptyState,
   IconButton,
   InfoTooltip,
@@ -13,7 +12,7 @@ import {
   Spinner,
   StatChip,
   Tabs,
-  type DataTableColumn,
+  type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -22,11 +21,12 @@ import { ExtractorTimeline } from '@/features/pi/ExtractorTimeline';
 import { PlanPanel } from '@/features/pi/PlanPanel';
 import { loadPiRosterSnapshot, type PiRosterSnapshot } from '@/features/pi/roster';
 import { loadPlanetName, loadSchematicName } from '@/features/pi/names';
-import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
 import {
   extractorExpiryMs,
   extractorProgramsFromPins,
+  factorySchematicId,
+  groupFactoryPins,
   hasUnverifiedExtractors,
   pinRole,
 } from '@/features/pi/adapters';
@@ -59,7 +59,6 @@ interface ActiveColonies {
   planetsNeedsReauth: boolean;
   details: Map<number, StatusResult<CharacterPlanetDetail>>;
   planetNames: Map<number, string>;
-  systemNames: Map<number, string>;
   pinTypeNames: Map<number, string>;
   productNames: Map<number, string>;
   schematicNames: Map<number, string>;
@@ -86,7 +85,6 @@ async function loadActiveColonies(
     planetsNeedsReauth,
     details: new Map(),
     planetNames: new Map(),
-    systemNames: new Map(),
     pinTypeNames: new Map(),
     productNames: new Map(),
     schematicNames: new Map(),
@@ -94,13 +92,12 @@ async function loadActiveColonies(
   };
   if (signal.cancelled || planets.length === 0) return empty;
 
-  const [details, planetNameEntries, systemNames] = await Promise.all([
+  const [details, planetNameEntries] = await Promise.all([
     loadAllColonyDetails(
       characterId,
       planets.map((planet) => planet.planet_id)
     ),
     Promise.all(planets.map((planet) => loadPlanetName(planet.planet_id))),
-    resolveNames(planets.map((planet) => planet.solar_system_id)),
   ]);
   const planetNames = new Map<number, string>();
   planets.forEach((planet, i) => {
@@ -108,7 +105,7 @@ async function loadActiveColonies(
     if (name) planetNames.set(planet.planet_id, name);
   });
 
-  if (signal.cancelled) return { ...empty, details, planetNames, systemNames };
+  if (signal.cancelled) return { ...empty, details, planetNames };
 
   const allPins = [...details.values()].flatMap((result) => result.cached?.data.pins ?? []);
   const pinTypeIds = [...new Set(allPins.map((pin) => pin.type_id))];
@@ -120,11 +117,7 @@ async function loadActiveColonies(
     ),
   ];
   const schematicIds = [
-    ...new Set(
-      allPins
-        .map((pin) => pin.factory_details?.schematic_id)
-        .filter((id): id is number => id !== undefined)
-    ),
+    ...new Set(allPins.map(factorySchematicId).filter((id): id is number => id !== undefined)),
   ];
 
   const [pinTypeNames, productNames, schematicNameEntries] = await Promise.all([
@@ -143,7 +136,6 @@ async function loadActiveColonies(
     planetsNeedsReauth,
     details,
     planetNames,
-    systemNames,
     pinTypeNames,
     productNames,
     schematicNames,
@@ -189,10 +181,10 @@ const ATTENTION_TONE: Record<
   unknown: 'default',
 };
 
-const STATE_CLASS: Record<'active' | 'expiring-soon' | 'expired', string> = {
-  active: 'text-success',
-  'expiring-soon': 'text-warning',
-  expired: 'text-danger',
+const STATE_TONE: Record<'active' | 'expiring-soon' | 'expired', StatChipTone> = {
+  active: 'success',
+  'expiring-soon': 'warning',
+  expired: 'danger',
 };
 
 const DAY_MS = 86_400_000;
@@ -214,12 +206,170 @@ function resetGainPerDay(program: ExtractorYieldProgram, nowMs: number): number 
   return Math.max(0, (peak - current) * (DAY_MS / program.cycleTimeMs));
 }
 
+/** The pin type's own name (e.g. "Storm Extractor Control Unit"), falling back to its numeric type id. */
+function pinTypeName(pin: PlanetPin, pinTypeNames: ReadonlyMap<number, string>): string {
+  return pinTypeNames.get(pin.type_id) ?? `Type #${pin.type_id}`;
+}
+
+/**
+ * A `panel-2`-filled header + body, styled like `Panel` but never rendering
+ * one: `Panel`'s own doc comment says "don't nest them — use `panel-2`
+ * fills inside", and a colony's role cards nest inside the colony's own
+ * outer `Panel`.
+ */
+function RoleCard({
+  title,
+  actions,
+  padded = true,
+  className = '',
+  children,
+}: {
+  title: ReactNode;
+  actions?: ReactNode;
+  padded?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`rounded-xs border border-line ${className}`}>
+      <div className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
+        <h3 className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {title}
+        </h3>
+        {actions && <div className="flex items-center gap-1">{actions}</div>}
+      </div>
+      <div className={padded ? 'p-3' : ''}>{children}</div>
+    </div>
+  );
+}
+
+/** A label/value pair inside a card body — the hero card's Expires/Banked/Reset now row. */
+function CardStat({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: ReactNode;
+  accent?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
+        {label}
+      </div>
+      <div className={`text-sm font-medium tabular-nums ${accent ? 'text-accent' : 'text-text'}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+interface ExtractionCardProps {
+  pin: PlanetPin;
+  pinTypeNames: ReadonlyMap<number, string>;
+  productNames: ReadonlyMap<number, string>;
+  program: ExtractorYieldProgram | undefined;
+  loadedAt: number;
+}
+
+/**
+ * One extractor pin's live telemetry: product, status, a banked-share
+ * progress bar, and the Expires/Banked/Reset now stats already computed by
+ * `engine/pi/extraction` for the old table's columns — same numbers, read as
+ * a card instead of a row. Bordered/tinted in accent (docs/DESIGN.md's
+ * accent = interactive/live-data convention) since this is the one card with
+ * genuine per-cycle telemetry; Production and Infrastructure below never get
+ * this treatment.
+ */
+function ExtractionCard({
+  pin,
+  pinTypeNames,
+  productNames,
+  program,
+  loadedAt,
+}: ExtractionCardProps) {
+  const { t } = useTranslation();
+  const productId = pin.extractor_details?.product_type_id;
+  const productName =
+    productId !== undefined
+      ? (productNames.get(productId) ?? t('pi.unknownProduct'))
+      : t('pi.unknownProduct');
+
+  const expiryMs = extractorExpiryMs(pin);
+  const state = expiryMs === null ? null : extractorState(expiryMs, loadedAt);
+  const total = program ? programTotalYield(program) : 0;
+  const banked = program && total > 0 ? yieldBankedBy(program, loadedAt) : null;
+  const percent = banked === null ? null : Math.round((banked / total) * 100);
+
+  return (
+    <RoleCard
+      title={
+        <>
+          <Icon.Extraction size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          {productName}
+        </>
+      }
+      actions={
+        <StatChip
+          label={t('pi.extraction.statusLabel')}
+          value={state === null ? t('pi.programDataUnavailable') : t(`pi.state.${state}`)}
+          tone={state === null ? 'default' : STATE_TONE[state]}
+        />
+      }
+      className="border-accent-dim bg-gradient-to-b from-accent/10 to-transparent"
+    >
+      <p className="mb-2 text-xs text-text-dim">{pinTypeName(pin, pinTypeNames)}</p>
+      <div
+        role="progressbar"
+        aria-label={t('pi.extraction.progressLabel', { product: productName })}
+        aria-valuenow={percent ?? 0}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="h-1.5 overflow-hidden rounded-full bg-panel-2"
+      >
+        <div className="h-full bg-accent" style={{ width: `${percent ?? 0}%` }} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+        <CardStat
+          label={t('pi.extraction.expiresLabel')}
+          value={
+            expiryMs === null
+              ? '—'
+              : expiryMs <= loadedAt
+                ? t('pi.expired')
+                : t('pi.expiresIn', { duration: formatDuration((expiryMs - loadedAt) / 1000) })
+          }
+        />
+        <CardStat
+          label={t('pi.yield.bankedColumn')}
+          value={
+            banked === null
+              ? '—'
+              : t('pi.yield.bankedValue', { amount: Math.round(banked).toLocaleString(), percent })
+          }
+        />
+        <CardStat
+          label={t('pi.yield.resetGainColumn')}
+          value={
+            program
+              ? t('pi.yield.resetGainValue', {
+                  amount: Math.round(resetGainPerDay(program, loadedAt)).toLocaleString(),
+                })
+              : '—'
+          }
+          accent
+        />
+      </div>
+    </RoleCard>
+  );
+}
+
 interface ColonyPanelProps {
   planet: CharacterPlanet;
   detail: CharacterPlanetDetail | null;
   status: ColonyStatus;
   planetNames: ReadonlyMap<number, string>;
-  systemNames: ReadonlyMap<number, string>;
   pinTypeNames: ReadonlyMap<number, string>;
   productNames: ReadonlyMap<number, string>;
   schematicNames: ReadonlyMap<number, string>;
@@ -231,7 +381,6 @@ function ColonyPanel({
   detail,
   status,
   planetNames,
-  systemNames,
   pinTypeNames,
   productNames,
   schematicNames,
@@ -246,128 +395,37 @@ function ColonyPanel({
       ? 'unknown'
       : colonyAttention(status, loadedAt);
 
-  // Keyed by pin so a table cell can find its own program without re-parsing
-  // ESI timestamps per render. Only programs with a complete install-time
-  // baseline go in: a pin missing one is listed with an em dash, never a zero.
+  // `detail` in the deps array, not `detail?.pins` — the latter is a fresh
+  // array reference every render even when the underlying data hasn't
+  // changed, which would defeat every memo below.
+  const pins = useMemo(() => detail?.pins ?? [], [detail]);
+
+  // Keyed by pin so a card can find its own program without re-parsing ESI
+  // timestamps per render. Only programs with a complete install-time
+  // baseline go in: a pin missing one renders its Banked/Reset now stats as
+  // an em dash, never a zero.
   const yieldProgramsByPin = useMemo(() => {
     const map = new Map<number, ExtractorYieldProgram>();
-    for (const program of extractorProgramsFromPins(detail?.pins ?? [])) {
+    for (const program of extractorProgramsFromPins(pins)) {
       if (hasYieldBaseline(program)) map.set(program.pinId, program);
     }
     return map;
-  }, [detail]);
+  }, [pins]);
 
-  const columns = useMemo<DataTableColumn<PlanetPin>[]>(
-    () => [
-      {
-        id: 'pin',
-        header: t('pi.column.pin'),
-        render: (pin) => pinTypeNames.get(pin.type_id) ?? `Type #${pin.type_id}`,
-      },
-      {
-        id: 'role',
-        header: t('pi.column.role'),
-        render: (pin) => t(`pi.role.${pinRole(pin)}`),
-      },
-      {
-        id: 'detail',
-        header: t('pi.column.detail'),
-        // Titles the card below `sm` (docs/DESIGN.md §4a): the pin column
-        // reads "Extractor Control Unit" on every extractor row, so the
-        // product is what actually identifies a card.
-        primary: true,
-        render: (pin) => {
-          const role = pinRole(pin);
-          if (role === 'extractor') {
-            const productId = pin.extractor_details?.product_type_id;
-            return productId !== undefined
-              ? (productNames.get(productId) ?? t('pi.unknownProduct'))
-              : t('pi.unknownProduct');
-          }
-          if (role === 'factory') {
-            const schematicId = pin.factory_details?.schematic_id;
-            return schematicId !== undefined
-              ? (schematicNames.get(schematicId) ?? t('pi.unknownSchematic'))
-              : t('pi.unknownSchematic');
-          }
-          return '—';
-        },
-      },
-      {
-        id: 'status',
-        header: t('pi.column.status'),
-        cellClassName: (pin) => {
-          const expiryMs = extractorExpiryMs(pin);
-          return expiryMs === null ? undefined : STATE_CLASS[extractorState(expiryMs, loadedAt)];
-        },
-        render: (pin) => {
-          if (pinRole(pin) !== 'extractor') return '—';
-          const expiryMs = extractorExpiryMs(pin);
-          return expiryMs === null
-            ? t('pi.programDataUnavailable')
-            : t(`pi.state.${extractorState(expiryMs, loadedAt)}`);
-        },
-      },
-      {
-        id: 'expires',
-        header: t('pi.column.expires'),
-        className: 'tabular-nums',
-        render: (pin) => {
-          const expiryMs = extractorExpiryMs(pin);
-          if (expiryMs === null) return '—';
-          return expiryMs <= loadedAt
-            ? t('pi.expired')
-            : t('pi.expiresIn', { duration: formatDuration((expiryMs - loadedAt) / 1000) });
-        },
-      },
-      {
-        id: 'banked',
-        header: t('pi.yield.bankedColumn'),
-        align: 'right',
-        className: 'tabular-nums',
-        // No self-rendered alignment: `align: 'right'` is the column prop
-        // `.dt-stack` already overrides below `sm` (docs/DESIGN.md §4a), and
-        // the amount and its percentage are one interpolated string rather
-        // than a `justify-end` pair that would hug the card's edge.
-        render: (pin) => {
-          const program = yieldProgramsByPin.get(pin.pin_id);
-          if (!program) return '—';
-          const total = programTotalYield(program);
-          if (total <= 0) return '—';
-          const banked = yieldBankedBy(program, loadedAt);
-          return t('pi.yield.bankedValue', {
-            amount: Math.round(banked).toLocaleString(),
-            percent: Math.round((banked / total) * 100),
-          });
-        },
-      },
-      {
-        id: 'resetGain',
-        header: t('pi.yield.resetGainColumn'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (pin) => {
-          const program = yieldProgramsByPin.get(pin.pin_id);
-          if (!program) return '—';
-          return t('pi.yield.resetGainValue', {
-            amount: Math.round(resetGainPerDay(program, loadedAt)).toLocaleString(),
-          });
-        },
-      },
-    ],
-    [t, pinTypeNames, productNames, schematicNames, yieldProgramsByPin, loadedAt]
-  );
+  // A colony has no fixed extractor count — zero, one, or (in principle)
+  // several — so this maps rather than assuming "the" extractor.
+  const extractorPins = useMemo(() => pins.filter((pin) => pinRole(pin) === 'extractor'), [pins]);
+  const factoryGroups = useMemo(() => groupFactoryPins(pins), [pins]);
+  const infrastructurePins = useMemo(() => pins.filter((pin) => pinRole(pin) === 'other'), [pins]);
 
   const planetName =
     planetNames.get(planet.planet_id) ?? t('pi.planetLabel', { id: planet.planet_id });
-  const systemName =
-    systemNames.get(planet.solar_system_id) ?? t('pi.systemLabel', { id: planet.solar_system_id });
 
   return (
     <Panel
-      title={`${planetName} — ${systemName}`}
+      title={planetName}
       actions={
-        <>
+        <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5">
           <StatChip
             label={t('pi.attentionLabel')}
             value={t(`pi.attention.${attention}`)}
@@ -385,7 +443,7 @@ function ColonyPanel({
             value={new Date(planet.last_update).toLocaleString()}
             tooltip={t('pi.lastUpdateTooltip')}
           />
-        </>
+        </div>
       }
       padded={false}
     >
@@ -395,12 +453,57 @@ function ColonyPanel({
         <span>{t('pi.pinCount', { count: planet.num_pins })}</span>
       </div>
       {detail && detail.pins.length > 0 ? (
-        <DataTable
-          label={t('pi.pinTableLabel', { planet: planetName })}
-          columns={columns}
-          rows={detail.pins}
-          rowKey={(pin) => pin.pin_id}
-        />
+        <div className="space-y-3 p-3">
+          {extractorPins.map((pin) => (
+            <ExtractionCard
+              key={pin.pin_id}
+              pin={pin}
+              pinTypeNames={pinTypeNames}
+              productNames={productNames}
+              program={yieldProgramsByPin.get(pin.pin_id)}
+              loadedAt={loadedAt}
+            />
+          ))}
+          {factoryGroups.length > 0 && (
+            <RoleCard title={t('pi.production.title')} padded={false}>
+              {factoryGroups.map((group) => (
+                <div
+                  key={String(group.schematicId)}
+                  className="flex items-center gap-2 border-b border-line px-3 py-2 text-sm last:border-b-0"
+                >
+                  <Icon.Industry
+                    size={Icon.ICON_SIZE.sm}
+                    className="shrink-0 text-text-dim"
+                    aria-hidden="true"
+                  />
+                  <span className="flex-1 font-medium">
+                    {group.schematicId !== undefined
+                      ? (schematicNames.get(group.schematicId) ?? t('pi.unknownSchematic'))
+                      : t('pi.unknownSchematic')}
+                  </span>
+                  <span className="text-xs text-text-dim">
+                    {t('pi.production.facilitiesRunning', { count: group.count })}
+                  </span>
+                </div>
+              ))}
+            </RoleCard>
+          )}
+          {infrastructurePins.length > 0 && (
+            <RoleCard title={t('pi.infrastructure.title')}>
+              <div className="flex flex-wrap gap-2">
+                {infrastructurePins.map((pin) => (
+                  <span
+                    key={pin.pin_id}
+                    className="inline-flex items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2.5 py-1 text-xs text-text-dim"
+                  >
+                    <Icon.Container size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                    {pinTypeName(pin, pinTypeNames)}
+                  </span>
+                ))}
+              </div>
+            </RoleCard>
+          )}
+        </div>
       ) : (
         <EmptyState title={t('pi.noPinsTitle')} className="py-6" />
       )}
@@ -460,7 +563,6 @@ export function PlanetaryIndustry() {
   const planetsNeedsReauth = data?.planetsNeedsReauth ?? false;
   const details = data?.details ?? NO_DETAILS;
   const planetNames = data?.planetNames ?? NO_NAMES;
-  const systemNames = data?.systemNames ?? NO_NAMES;
   const pinTypeNames = data?.pinTypeNames ?? NO_NAMES;
   const productNames = data?.productNames ?? NO_NAMES;
   const schematicNames = data?.schematicNames ?? NO_NAMES;
@@ -579,7 +681,6 @@ export function PlanetaryIndustry() {
                     detail={details.get(planet.planet_id)?.cached?.data ?? null}
                     status={statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS}
                     planetNames={planetNames}
-                    systemNames={systemNames}
                     pinTypeNames={pinTypeNames}
                     productNames={productNames}
                     schematicNames={schematicNames}
