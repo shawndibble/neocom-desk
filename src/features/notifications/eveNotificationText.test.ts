@@ -471,7 +471,7 @@ describe('eveNotificationText — wars and applications', () => {
 });
 
 describe('eveNotificationText — the rendered set stays deliberately small', () => {
-  it('covers exactly the types issue #300 named', () => {
+  it('covers exactly the types issue #300 and #353 named', () => {
     expect([...EVE_NOTIFICATION_RENDERED_TYPES].sort()).toEqual(
       [
         'AllWarDeclaredMsg',
@@ -479,19 +479,224 @@ describe('eveNotificationText — the rendered set stays deliberately small', ()
         'CorpAllBillMsg',
         'CorpAppNewMsg',
         'CorpBecameWarEligible',
+        'CorpKicked',
         'CorpOfficeExpirationMsg',
+        'InfrastructureHubBillAboutToExpire',
         'MoonminingAutomaticFracture',
         'MoonminingExtractionFinished',
+        'OrbitalAttacked',
+        'OrbitalReinforced',
+        'StructureDestroyed',
         'StructureFuelAlert',
         'StructureImpendingAbandonmentAssetsAtRisk',
         'StructureLostArmor',
         'StructureLostShields',
+        'StructureLowReagentsAlert',
+        'StructureNoReagentsAlert',
         'StructureServicesOffline',
         'StructureUnderAttack',
         'StructureWentHighPower',
         'StructureWentLowPower',
+        'StructuresJobsCancelled',
+        'StructuresJobsPaused',
         'WarDeclared',
       ].sort()
     );
+  });
+});
+
+describe('eveNotificationText — structures (tranche 2)', () => {
+  const STRUCTURE_PAYLOAD =
+    'solarsystemID: 31000671\nstructureID: &id001 1032717532381\nstructureTypeID: 35835\n';
+  const NAMES: EveNotificationNames = { structure: "Athanor 'Chunk Line 3'" };
+
+  it('StructureDestroyed names the structure', () => {
+    const { title, body } = eveNotificationText(
+      fire({ type: 'StructureDestroyed', text: STRUCTURE_PAYLOAD }),
+      CHARACTER,
+      NAMES
+    );
+    expect(title).toBe('Structure destroyed');
+    expect(body).toContain("Athanor 'Chunk Line 3'");
+    expect(body).toContain('destroyed');
+  });
+
+  it('StructureDestroyed falls back to the structure id when the name has not resolved', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'StructureDestroyed', text: STRUCTURE_PAYLOAD }),
+      CHARACTER
+    );
+    expect(body).toContain('structure #1032717532381');
+  });
+
+  it('StructuresJobsPaused names the structure when a structureID is present', () => {
+    const { title, body } = eveNotificationText(
+      fire({ type: 'StructuresJobsPaused', text: STRUCTURE_PAYLOAD }),
+      CHARACTER,
+      NAMES
+    );
+    expect(title).toBe('Industry jobs paused');
+    expect(body).toContain("Athanor 'Chunk Line 3'");
+    expectNotTheGenericBody(body, 'StructuresJobsPaused');
+  });
+
+  it('StructuresJobsPaused still says what happened when CCP sends no fields at all', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'StructuresJobsPaused', text: '' }),
+      CHARACTER
+    );
+    expect(body).toContain('paused');
+    expectNotTheGenericBody(body, 'StructuresJobsPaused');
+  });
+
+  it('StructuresJobsCancelled names the structure when a structureID is present', () => {
+    const { title, body } = eveNotificationText(
+      fire({ type: 'StructuresJobsCancelled', text: STRUCTURE_PAYLOAD }),
+      CHARACTER,
+      NAMES
+    );
+    expect(title).toBe('Industry jobs cancelled');
+    expect(body).toContain("Athanor 'Chunk Line 3'");
+  });
+
+  it('StructuresJobsCancelled still says what happened when CCP sends no fields at all', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'StructuresJobsCancelled', text: '' }),
+      CHARACTER
+    );
+    expect(body).toContain('cancelled');
+    expectNotTheGenericBody(body, 'StructuresJobsCancelled');
+  });
+
+  it('StructureLowReagentsAlert names the structure', () => {
+    const { title, body } = eveNotificationText(
+      fire({ type: 'StructureLowReagentsAlert', text: STRUCTURE_PAYLOAD }),
+      CHARACTER,
+      NAMES
+    );
+    expect(title).toBe('Structure low on reagents');
+    expect(body).toContain("Athanor 'Chunk Line 3'");
+    expect(body).toContain('reagents');
+  });
+
+  it('StructureNoReagentsAlert names the structure and differs from the low-reagents body', () => {
+    const low = eveNotificationText(
+      fire({ type: 'StructureLowReagentsAlert', text: STRUCTURE_PAYLOAD }),
+      CHARACTER,
+      NAMES
+    );
+    const none = eveNotificationText(
+      fire({ type: 'StructureNoReagentsAlert', text: STRUCTURE_PAYLOAD }),
+      CHARACTER,
+      NAMES
+    );
+    expect(none.body).toContain("Athanor 'Chunk Line 3'");
+    expect(none.body).not.toBe(low.body);
+  });
+});
+
+describe('eveNotificationText — customs offices (pi)', () => {
+  const ORBITAL_PAYLOAD = [
+    'aggressorAllianceID: 434243723',
+    'aggressorCorpID: 98749616',
+    'aggressorID: 2117204642',
+    'planetID: 40121487',
+    'planetTypeID: 2017',
+    'shieldLevel: 0.6',
+    'solarSystemID: 30001901',
+    'typeID: 2233',
+    '',
+  ].join('\n');
+
+  it('OrbitalAttacked names the planet and the aggressor', () => {
+    const { title, body } = eveNotificationText(
+      fire({ type: 'OrbitalAttacked', text: ORBITAL_PAYLOAD }),
+      CHARACTER,
+      { entities: new Map([[2117204642, 'Hostile Pilot']]) }
+    );
+    expect(title).toBe('Customs office attacked');
+    expect(body).toContain('planet #40121487');
+    expect(body).toContain('Hostile Pilot');
+  });
+
+  it('OrbitalAttacked falls back to the aggressor id rather than waiting on a name', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'OrbitalAttacked', text: ORBITAL_PAYLOAD }),
+      CHARACTER
+    );
+    expect(body).toContain('#2117204642');
+    expectNotTheGenericBody(body, 'OrbitalAttacked');
+  });
+
+  it('OrbitalAttacked still names the planet when the payload carries no aggressor', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'OrbitalAttacked', text: 'planetID: 40121487\n' }),
+      CHARACTER
+    );
+    expect(body).toContain('planet #40121487');
+    expect(body).toContain('under attack');
+  });
+
+  it('OrbitalReinforced names the planet and when the reinforcement timer ends', () => {
+    const { title, body } = eveNotificationText(
+      fire({
+        type: 'OrbitalReinforced',
+        text: 'planetID: 40121487\nreinforceExitTime: 134259524910000000\n',
+      }),
+      CHARACTER
+    );
+    expect(title).toBe('Customs office reinforced');
+    expect(body).toContain('planet #40121487');
+    expect(body).toMatch(/2026-06-1[45]/);
+  });
+
+  it('OrbitalReinforced drops only the timer when the payload has no reinforceExitTime', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'OrbitalReinforced', text: 'planetID: 40121487\n' }),
+      CHARACTER
+    );
+    expect(body).toContain('planet #40121487');
+    expectNotTheGenericBody(body, 'OrbitalReinforced');
+  });
+});
+
+describe('eveNotificationText — corp governance and bills (tranche 2)', () => {
+  it('CorpKicked names the corporation kicked from the alliance', () => {
+    const { title, body } = eveNotificationText(
+      fire({ type: 'CorpKicked', text: 'corpID: 2001\n' }),
+      CHARACTER,
+      { entities: new Map([[2001, 'Kicked Corp']]) }
+    );
+    expect(title).toBe('Corporation kicked from alliance');
+    expect(body).toContain('Kicked Corp');
+    expect(body).toContain('alliance');
+  });
+
+  it('CorpKicked falls back to the corp id when the name has not resolved', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'CorpKicked', text: 'corpID: 2001\n' }),
+      CHARACTER
+    );
+    expect(body).toContain('#2001');
+  });
+
+  it('InfrastructureHubBillAboutToExpire names the due date, with no amount field', () => {
+    const { title, body } = eveNotificationText(
+      fire({
+        type: 'InfrastructureHubBillAboutToExpire',
+        text: 'billID: 5001\ncorpID: 2001\ndueDate: 132936019800000000\n',
+      }),
+      CHARACTER
+    );
+    expect(title).toBe('Infrastructure hub bill about to expire');
+    expect(body).toContain('2022-04-0');
+  });
+
+  it('InfrastructureHubBillAboutToExpire falls back to the generic body without a due date', () => {
+    const { body } = eveNotificationText(
+      fire({ type: 'InfrastructureHubBillAboutToExpire', text: 'corpID: 2001\n' }),
+      CHARACTER
+    );
+    expect(body).toContain('InfrastructureHubBillAboutToExpire');
   });
 });

@@ -105,7 +105,7 @@ export type NotificationFamily = (typeof NOTIFICATION_FAMILIES)[number];
  * either delivery channel or any name-resolution work, rather than opted out
  * from a much larger catalog after the fact (round 34's model — the live ESI
  * catalog turned out to hold 254 types, not the ~100 that assumed). This is
- * the first tranche: the 17 types that already have hand-written bodies in
+ * tranches one and two: the 26 types that already have hand-written bodies in
  * `notifications.fired.eveNotification.types` (`src/i18n/locales/en.json`).
  *
  * A type's Family lives beside it here (issue #352, AC5), not in a separate
@@ -120,15 +120,24 @@ const EVE_ALLOWED_TYPE_ENTRIES: readonly { type: string; family: NotificationFam
   { type: 'StructureWentHighPower', family: 'structures' },
   { type: 'StructureServicesOffline', family: 'structures' },
   { type: 'StructureImpendingAbandonmentAssetsAtRisk', family: 'structures' },
+  { type: 'StructureDestroyed', family: 'structures' },
+  { type: 'StructuresJobsPaused', family: 'structures' },
+  { type: 'StructuresJobsCancelled', family: 'structures' },
+  { type: 'StructureLowReagentsAlert', family: 'structures' },
+  { type: 'StructureNoReagentsAlert', family: 'structures' },
   { type: 'MoonminingExtractionFinished', family: 'moonMining' },
   { type: 'MoonminingAutomaticFracture', family: 'moonMining' },
   { type: 'CorpAllBillMsg', family: 'bills' },
   { type: 'BillOutOfMoneyMsg', family: 'bills' },
   { type: 'CorpOfficeExpirationMsg', family: 'bills' },
+  { type: 'InfrastructureHubBillAboutToExpire', family: 'bills' },
   { type: 'WarDeclared', family: 'war' },
   { type: 'AllWarDeclaredMsg', family: 'war' },
   { type: 'CorpBecameWarEligible', family: 'war' },
   { type: 'CorpAppNewMsg', family: 'corpGovernance' },
+  { type: 'CorpKicked', family: 'corpGovernance' },
+  { type: 'OrbitalAttacked', family: 'pi' },
+  { type: 'OrbitalReinforced', family: 'pi' },
 ];
 
 export const EVE_ALLOWED_TYPES: readonly string[] = EVE_ALLOWED_TYPE_ENTRIES.map((e) => e.type);
@@ -152,11 +161,13 @@ export function isEveTypeAllowed(type: string): boolean {
  * Default is **feed-on / browser-off**, the opposite of every other event's
  * default-on-both above: these are still numerous relative to other events
  * and mostly informational, so a type has to be opted *up* to a browser
- * notification rather than opted down from one. The three structure-under-
- * attack types are the exception — losing a structure is worth interrupting
- * someone for, so they default browser-on too. Because these defaults differ
- * from `isEventEnabledFor`'s, they must be expressed here explicitly per
- * channel rather than reused from the "absence means enabled" idiom.
+ * notification rather than opted down from one.
+ * `EVE_TYPES_BROWSER_ON_BY_DEFAULT` below is the exception list — losing a
+ * structure, an attack on a customs office, or a corp getting kicked from
+ * its alliance is worth interrupting someone for, so those default
+ * browser-on too. Because these defaults differ from `isEventEnabledFor`'s,
+ * they must be expressed here explicitly per channel rather than reused from
+ * the "absence means enabled" idiom.
  */
 export const EVE_TYPE_DEFAULT: Readonly<Record<NotificationChannel, boolean>> = {
   browser: false,
@@ -170,6 +181,10 @@ const EVE_TYPES_BROWSER_ON_BY_DEFAULT: ReadonlySet<string> = new Set([
   'StructureUnderAttack',
   'StructureLostShields',
   'StructureLostArmor',
+  'StructureDestroyed',
+  'OrbitalAttacked',
+  'OrbitalReinforced',
+  'CorpKicked',
 ]);
 
 function eveTypeDefaultFor(type: string, channel: NotificationChannel): boolean {
