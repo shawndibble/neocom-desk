@@ -874,7 +874,8 @@
       "notLoaded": "Not loaded yet, so their programs aren't listed: {{names}}. Switch to a character and refresh to cache its colonies.",
       "coloniesNotLoaded": "{{count}} listed colonies have no cached detail yet, so their programs aren't listed.",
       "noColonies": "No colonies: {{names}}.",
-      "skipped": "Skipped, no planetary access granted: {{names}}."
+      "skipped": "Skipped, no planetary access granted: {{names}}.",
+      "peakShareValue": "{{percent}}% of peak"
     }
   },
   "piPlan": {
