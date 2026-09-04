@@ -26,6 +26,7 @@ import { POLL_DOMAINS, type AnyNotificationFire, type PollDomain } from './pollD
 import { withCharacterSnapshot, type PollerState } from './pollerState';
 import {
   useNotificationPreferences,
+  hydrateNotificationPreferences,
   characterEventPrefs,
   characterEveTypePrefs,
   isBrowserChannelEnabled,
@@ -539,6 +540,12 @@ async function hydratedValue<T>(store: LocalSettingStore<T>): Promise<T> {
   return store.getState().value;
 }
 
+/** Same shape as {@link hydratedValue}, but also splices in synced feed data (issue #363) on every call. */
+async function currentNotificationPreferences() {
+  await hydrateNotificationPreferences();
+  return useNotificationPreferences.getState().value;
+}
+
 /** Real dependencies, wired against Dexie/ESI/the browser Notification API. */
 export function liveDependencies(): PollDependencies {
   return {
@@ -556,15 +563,14 @@ export function liveDependencies(): PollDependencies {
       prev: () => hydratedValue(domain.store),
       save: (state) => domain.store.getState().setValue(state),
     }),
-    masterEnabled: async () => (await hydratedValue(useNotificationPreferences)).masterEnabled,
+    masterEnabled: async () => (await currentNotificationPreferences()).masterEnabled,
     browserChannelEnabled: async () =>
-      isBrowserChannelEnabled(await hydratedValue(useNotificationPreferences)),
-    feedChannelEnabled: async () =>
-      isFeedChannelEnabled(await hydratedValue(useNotificationPreferences)),
+      isBrowserChannelEnabled(await currentNotificationPreferences()),
+    feedChannelEnabled: async () => isFeedChannelEnabled(await currentNotificationPreferences()),
     eventPrefsFor: async (characterId) =>
-      characterEventPrefs(await hydratedValue(useNotificationPreferences), characterId),
+      characterEventPrefs(await currentNotificationPreferences(), characterId),
     eveTypePrefsFor: async (characterId) =>
-      characterEveTypePrefs(await hydratedValue(useNotificationPreferences), characterId),
+      characterEveTypePrefs(await currentNotificationPreferences(), characterId),
     permission: () => readNotificationPermission(),
     notify: sendBrowserNotification,
     recordToFeed: recordFeedNotification,

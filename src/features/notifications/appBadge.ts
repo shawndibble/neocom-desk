@@ -12,7 +12,11 @@
 import { setAppBadgeCount } from './badge';
 import { readFeed } from './feed';
 import { visibleFeedEntries } from './feedSelection';
-import { useNotificationPreferences, isFeedChannelEnabled } from './preferences';
+import {
+  useNotificationPreferences,
+  hydrateNotificationPreferences,
+  isFeedChannelEnabled,
+} from './preferences';
 
 /**
  * Re-derives the badge from what the Overview would actually show: the same
@@ -25,7 +29,7 @@ import { useNotificationPreferences, isFeedChannelEnabled } from './preferences'
  * there.
  */
 export async function refreshAppBadge(): Promise<void> {
-  await useNotificationPreferences.getState().hydrate();
+  await hydrateNotificationPreferences();
   const prefs = useNotificationPreferences.getState().value;
   if (!prefs.masterEnabled || !isFeedChannelEnabled(prefs)) {
     await setAppBadgeCount(0);

@@ -27,20 +27,23 @@ import { formatAge } from '@/lib/age';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { readFeed, dismissFeedEntry, dismissFeedEntries } from './feed';
 import { refreshAppBadge } from './appBadge';
-import { useNotificationPreferences, isFeedChannelEnabled } from './preferences';
+import {
+  useNotificationPreferences,
+  hydrateNotificationPreferences,
+  isFeedChannelEnabled,
+} from './preferences';
 import { visibleFeedEntries, entriesForCharacter, otherCharacterAlerts } from './feedSelection';
 
 export function NotificationFeedPanel() {
   const { t } = useTranslation();
   const prefsValue = useNotificationPreferences((state) => state.value);
-  const hydratePrefs = useNotificationPreferences((state) => state.hydrate);
   const hydrated = useNotificationPreferences((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
 
   useEffect(() => {
-    void hydratePrefs();
-  }, [hydratePrefs]);
+    void hydrateNotificationPreferences();
+  }, []);
 
   // Entry writes refresh the badge themselves (`feed.ts`); this covers the
   // other direction — a channel or event toggle changing what counts as

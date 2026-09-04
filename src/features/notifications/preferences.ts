@@ -1,11 +1,19 @@
 /**
- * Notification preferences: device-local (CONTEXT.md round 20, same category
- * as font scale / Market's Location Mode) — never synced, since the browser
- * permission this eventually gates is itself per-device. One master switch
- * gates everything; below it, every Notification Event is independently
- * toggleable per Character, on by default (absence from a character's map
- * means enabled — see `eventSelection.ts`).
+ * Notification preferences: device-local by default (CONTEXT.md round 20,
+ * same category as font scale / Market's Location Mode), since the browser
+ * permission the master switch and browser channel eventually gate is itself
+ * per-device. One master switch gates everything; below it, every
+ * Notification Event is independently toggleable per Character, on by
+ * default (absence from a character's map means enabled — see
+ * `eventSelection.ts`).
+ *
+ * The **feed** half of those per-Character toggles, plus the structure-fuel
+ * and corp-wallet thresholds, are the exception (CONTEXT.md round 44/45,
+ * issue #363): nothing about the feed is device-gated, so those sync —
+ * `hydrateNotificationPreferences` below splices the synced slice in on top
+ * of this store's own local row. See `syncedPreferences.ts`.
  */
+import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import {
   isEventEnabledFor,
@@ -20,6 +28,10 @@ import {
   type NotificationChannel,
 } from './eventSelection';
 import type { NotificationEventId } from './events';
+import {
+  SYNCED_NOTIFICATION_FEED_PREFS_KEY,
+  withSyncedFeedPrefsApplied,
+} from './syncedPreferences';
 
 export const NOTIFICATION_PREFS_SETTING_KEY = 'notificationPreferences';
 
@@ -55,9 +67,9 @@ export interface NotificationPreferencesValue {
    * structure fuel's lead time and the corp wallet's balance floor /
    * transaction ceiling. Keyed separately from `perCharacter` for the same
    * reason `eveNotificationTypesByCharacter` is — a different value shape,
-   * not an on/off map. Device-local like the rest of this store (this
-   * module's own doc comment): AC4 asks for "per Character and per device",
-   * which is exactly what a `createLocalSetting`-backed field already is.
+   * not an on/off map. Synced (issue #363): a threshold that determines the
+   * `fireAt` of an uploaded Projection is an input to shared state, not a
+   * device preference — see `syncedPreferences.ts`.
    */
   thresholdsByCharacter?: Record<number, CharacterEventThresholds>;
 }
@@ -171,6 +183,38 @@ export const useNotificationPreferences = createLocalSetting<NotificationPrefere
   defaultValue: DEFAULT_NOTIFICATION_PREFERENCES,
   parse: (raw) => (isNotificationPreferencesValue(raw) ? raw : null),
 });
+
+/**
+ * Hydrates the local preferences row, then splices in whatever synced feed
+ * data (issue #363) sits in Dexie under `SYNCED_NOTIFICATION_FEED_PREFS_KEY`
+ * — every reader of `useNotificationPreferences` should hydrate through this
+ * rather than the store's own `hydrate()` directly, so a value pulled by a
+ * sync (which writes straight to Dexie, bypassing this store) is reflected
+ * the next time anything reads preferences, not just after a reload.
+ */
+export async function hydrateNotificationPreferences(): Promise<void> {
+  await useNotificationPreferences.getState().hydrate();
+  let record: { value: unknown } | undefined;
+  try {
+    record = await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY);
+  } catch {
+    return;
+  }
+  if (record === undefined) return;
+  const current = useNotificationPreferences.getState().value;
+  const merged = withSyncedFeedPrefsApplied(current, record.value);
+  // withSyncedFeedPrefsApplied rebuilds a fresh object graph for every
+  // Character present in the synced blob even when nothing actually
+  // changed, so `merged !== current` is true on nearly every call — a
+  // reference check here would call setValue every time this runs, and
+  // both NotificationsPanel and NotificationFeedPanel re-run this (via
+  // refreshAppBadge) from a `useEffect` keyed on the store's value,
+  // which would then loop without end. A content comparison is what
+  // actually tells "unchanged" from "changed".
+  if (JSON.stringify(merged) !== JSON.stringify(current)) {
+    await useNotificationPreferences.getState().setValue(merged);
+  }
+}
 
 export function characterEventPrefs(
   value: NotificationPreferencesValue,
