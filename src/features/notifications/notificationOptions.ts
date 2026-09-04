@@ -45,6 +45,13 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // the app — the Overview fallback is a deliberate choice for this event,
   // not an inherited default.
   eveNotification: '/overview',
+  // Corp events (issue #299): the board and the roster are the only two
+  // corp routes the app serves (`app/routeScopes.ts`).
+  structureFuelLow: '/corp',
+  corpIndustryJobReady: '/corp',
+  corpMemberJoined: '/corp/members',
+  corpMemberLeft: '/corp/members',
+  corpWalletThreshold: '/corp',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/overview';

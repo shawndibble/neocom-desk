@@ -49,7 +49,35 @@ export interface NotificationPreferencesValue {
    * toggled for this character yet", not "everything off".
    */
   eveNotificationTypesByCharacter?: Record<number, EveTypeEnabledMap>;
+  /**
+   * The threshold controls the two corp events carry inline (issue #299):
+   * structure fuel's lead time and the corp wallet's balance floor /
+   * transaction ceiling. Keyed separately from `perCharacter` for the same
+   * reason `eveNotificationTypesByCharacter` is — a different value shape,
+   * not an on/off map. Device-local like the rest of this store (this
+   * module's own doc comment): AC4 asks for "per Character and per device",
+   * which is exactly what a `createLocalSetting`-backed field already is.
+   */
+  thresholdsByCharacter?: Record<number, CharacterEventThresholds>;
 }
+
+/** One Character's threshold settings. Absent fields read as their default (below). */
+export interface CharacterEventThresholds {
+  /** Days of fuel remaining that trigger `structureFuelLow` — one of `STRUCTURE_FUEL_LOW_DAY_OPTIONS`. */
+  structureFuelLowDays?: number;
+  /** ISK balance at or under which `corpWalletThreshold` fires its `balanceBelow` half. */
+  corpWalletBalanceFloorIsk?: number;
+  /** ISK amount a single journal entry must exceed to fire `corpWalletThreshold`'s `transactionAbove` half. */
+  corpWalletTransactionCeilingIsk?: number;
+}
+
+/** The three lead times `structureFuelLow`'s inline control offers (issue #299) — CCP's own alert fires separately and later. */
+export const STRUCTURE_FUEL_LOW_DAY_OPTIONS: readonly number[] = [7, 3, 1];
+
+/** A week's warning is the issue's own justification: "a director planning a fuel run wants a week's warning." */
+export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
+export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
+export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferencesValue = {
   masterEnabled: true,
@@ -102,6 +130,27 @@ function isOptionalBoolean(raw: unknown): boolean {
   return raw === undefined || typeof raw === 'boolean';
 }
 
+function isOptionalFiniteNumber(raw: unknown): boolean {
+  return raw === undefined || (typeof raw === 'number' && Number.isFinite(raw));
+}
+
+function isCharacterEventThresholds(raw: unknown): raw is CharacterEventThresholds {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    isOptionalFiniteNumber(r.structureFuelLowDays) &&
+    isOptionalFiniteNumber(r.corpWalletBalanceFloorIsk) &&
+    isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk)
+  );
+}
+
+function isThresholdsByCharacter(raw: unknown): raw is Record<number, CharacterEventThresholds> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
+  return Object.entries(raw as Record<string, unknown>).every(
+    ([key, value]) => !Number.isNaN(Number(key)) && isCharacterEventThresholds(value)
+  );
+}
+
 function isNotificationPreferencesValue(raw: unknown): raw is NotificationPreferencesValue {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
@@ -111,7 +160,8 @@ function isNotificationPreferencesValue(raw: unknown): raw is NotificationPrefer
     isOptionalBoolean(r.feedEnabled) &&
     isPerCharacterMap(r.perCharacter) &&
     (r.eveNotificationTypesByCharacter === undefined ||
-      isEveNotificationTypesByCharacter(r.eveNotificationTypesByCharacter))
+      isEveNotificationTypesByCharacter(r.eveNotificationTypesByCharacter)) &&
+    (r.thresholdsByCharacter === undefined || isThresholdsByCharacter(r.thresholdsByCharacter))
   );
 }
 
@@ -210,6 +260,38 @@ export function withEveNotificationTypeToggled(
     eveNotificationTypesByCharacter: {
       ...value.eveNotificationTypesByCharacter,
       [characterId]: toggleEveTypeChannel(prefs, type, channel),
+    },
+  };
+}
+
+/** One Character's thresholds, defaulted (issue #299) — the shape both the settings row and the poller read. */
+export function characterEventThresholds(
+  value: NotificationPreferencesValue,
+  characterId: number
+): Required<CharacterEventThresholds> {
+  const raw = value.thresholdsByCharacter?.[characterId] ?? {};
+  return {
+    structureFuelLowDays: raw.structureFuelLowDays ?? DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+    corpWalletBalanceFloorIsk:
+      raw.corpWalletBalanceFloorIsk ?? DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+    corpWalletTransactionCeilingIsk:
+      raw.corpWalletTransactionCeilingIsk ?? DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+  };
+}
+
+/** Sets one threshold field for one Character, preserving the others (issue #299). */
+export function withCharacterEventThreshold<K extends keyof CharacterEventThresholds>(
+  value: NotificationPreferencesValue,
+  characterId: number,
+  key: K,
+  amount: number
+): NotificationPreferencesValue {
+  const existing = value.thresholdsByCharacter?.[characterId] ?? {};
+  return {
+    ...value,
+    thresholdsByCharacter: {
+      ...value.thresholdsByCharacter,
+      [characterId]: { ...existing, [key]: amount },
     },
   };
 }

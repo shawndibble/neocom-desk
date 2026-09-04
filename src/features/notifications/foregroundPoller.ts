@@ -15,6 +15,7 @@
 import { db } from '@/db';
 import { loadUniverseType } from '@/features/skills/data';
 import { loadPlanetName } from '@/features/pi/names';
+import { resolveNames } from '@/features/character/names';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import { formatIsk } from '@/lib/isk';
 import i18n from '@/i18n';
@@ -50,6 +51,7 @@ export const POLL_INTERVAL_MS = 5 * 60 * 1000;
 const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.scope]));
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
+const DAY_MS = 86_400_000;
 
 export interface CharacterRef {
   characterId: number;
@@ -396,6 +398,60 @@ export async function notificationText(
     return {
       title: i18n.t('notifications.fired.characterNotTraining.title'),
       body: i18n.t('notifications.fired.characterNotTraining.body', { character: character.name }),
+    };
+  }
+  if (fire.eventId === 'structureFuelLow') {
+    return {
+      title: i18n.t('notifications.fired.structureFuelLow.title'),
+      body: i18n.t('notifications.fired.structureFuelLow.body', {
+        character: character.name,
+        structure: fire.structureName,
+        days: Math.round(fire.thresholdMs / DAY_MS),
+      }),
+    };
+  }
+  if (fire.eventId === 'corpIndustryJobReady') {
+    const itemTypeId = fire.productTypeId ?? fire.blueprintTypeId;
+    const itemType = await loadUniverseType(itemTypeId);
+    const itemName = itemType?.data.name ?? `#${itemTypeId}`;
+    return {
+      title: i18n.t('notifications.fired.corpIndustryJobReady.title'),
+      body: i18n.t('notifications.fired.corpIndustryJobReady.body', {
+        character: character.name,
+        item: itemName,
+      }),
+    };
+  }
+  if (fire.eventId === 'corpMemberJoined' || fire.eventId === 'corpMemberLeft') {
+    const names = await resolveNames([fire.memberCharacterId]);
+    const memberName = names.get(fire.memberCharacterId) ?? `#${fire.memberCharacterId}`;
+    return {
+      title: i18n.t(`notifications.fired.${fire.eventId}.title`),
+      body: i18n.t(`notifications.fired.${fire.eventId}.body`, {
+        character: character.name,
+        member: memberName,
+      }),
+    };
+  }
+  if (fire.eventId === 'corpWalletThreshold') {
+    const title = i18n.t('notifications.fired.corpWalletThreshold.title');
+    if (fire.kind === 'balanceBelow') {
+      return {
+        title,
+        body: i18n.t('notifications.fired.corpWalletThreshold.balanceBelowBody', {
+          character: character.name,
+          division: fire.division,
+          balance: formatIsk(fire.balance, 2),
+        }),
+      };
+    }
+    return {
+      title,
+      body: i18n.t('notifications.fired.corpWalletThreshold.transactionAboveBody', {
+        character: character.name,
+        division: fire.division,
+        amount: formatIsk(Math.abs(fire.amount), 2),
+      }),
     };
   }
   // Only NotificationFire's other member left: skillLevelComplete.
