@@ -9,7 +9,7 @@ import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi, loadSkills } from '@/sde/loadSde';
-import type { PiData } from '@/sde/types';
+import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
 
 vi.mock('@/sde/loadMarketSde', () => ({
@@ -306,7 +306,7 @@ describe('ItemDetailModal', () => {
 
 describe('ItemDetailModal planetary production', () => {
   const REACTIVE_METALS = 2398;
-  const SCHEMATICS: PiData = {
+  const SCHEMATICS = piFixture({
     schematics: {
       '2398': {
         schematicId: 133,
@@ -314,6 +314,8 @@ describe('ItemDetailModal planetary production', () => {
         cycleTime: 1800,
         quantity: 20,
         volume: 0.19,
+        facility: 'basic',
+        planetTypes: ['barren', 'lava', 'plasma'],
         inputs: [{ typeID: 2267, quantity: 3000, name: 'Base Metals' }],
       },
     },
@@ -325,7 +327,7 @@ describe('ItemDetailModal planetary production', () => {
         planetTypes: ['barren', 'gas', 'lava', 'plasma', 'storm'],
       },
     ],
-  };
+  });
 
   function serveType(typeId: number, name: string) {
     server.use(
