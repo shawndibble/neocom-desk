@@ -55,6 +55,7 @@ import {
   withEventChannelToggled,
   withAllEventsToggledForCharacter,
   withEveNotificationTypeToggled,
+  withAllEveTypesToggledForCharacter,
   characterEventThresholds,
   withCharacterEventThreshold,
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
@@ -63,8 +64,10 @@ import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
   selectionStateForEvents,
+  selectionStateForEveTypes,
   NOTIFICATION_CHANNELS,
-  EVE_ALLOWED_TYPES,
+  NOTIFICATION_FAMILIES,
+  eveTypesByFamily,
   type NotificationChannel,
 } from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
@@ -573,53 +576,99 @@ export function NotificationsPanel() {
                                 {/*
                                   Per-type opt-out underneath the single
                                   eveNotification event (issue #274, AC3).
-                                  Enumerated from the closed allow-list
-                                  (`EVE_ALLOWED_TYPES`) rather than discovered
-                                  from the feed, so every type is toggle-able
-                                  immediately rather than only after it has
-                                  fired once.
+                                  Enumerated from the closed allow-list,
+                                  grouped by Notification Family (issue #352),
+                                  rather than discovered from the feed, so
+                                  every type is toggle-able immediately rather
+                                  than only after it has fired once.
                                 */}
                                 {eventId === 'eveNotification' && hasScope && (
                                   <div className="border-t border-line bg-panel/60 pl-3">
                                     <p className="px-3 py-1.5 text-[0.6875rem] text-text-dim">
                                       {t('settings.notifications.eveTypesHint')}
                                     </p>
-                                    <ul className="divide-y divide-line/60">
-                                      {EVE_ALLOWED_TYPES.map((type) => (
-                                        <li
-                                          key={type}
-                                          className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
-                                        >
-                                          <span className="truncate text-text-dim">{type}</span>
-                                          <div className="grid shrink-0 grid-cols-2 gap-x-6">
-                                            {NOTIFICATION_CHANNELS.map((channel) => (
-                                              <ChannelCheckbox
-                                                key={channel}
-                                                channel={channel}
-                                                eventLabel={type}
-                                                enabled={!(channel === 'browser' && browserBlocked)}
-                                                disabledReason={null}
-                                                checked={isEveTypeEnabledFor(
-                                                  eveTypePrefs,
-                                                  type,
-                                                  channel
-                                                )}
-                                                onToggle={() =>
-                                                  void setPrefsValue(
-                                                    withEveNotificationTypeToggled(
-                                                      prefsValue,
-                                                      character.characterId,
-                                                      type,
-                                                      channel
+                                    {NOTIFICATION_FAMILIES.map((family) => {
+                                      const familyTypes = eveTypesByFamily(family);
+                                      if (familyTypes.length === 0) return null;
+                                      const familyLabel = t(
+                                        `settings.notifications.family.${family}`
+                                      );
+                                      return (
+                                        <div key={family}>
+                                          <div className="flex items-center justify-between gap-3 border-t border-line/60 bg-panel/40 px-3 py-1">
+                                            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                                              {familyLabel}
+                                            </span>
+                                            <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                                              {NOTIFICATION_CHANNELS.map((channel) => (
+                                                <SelectionCheckbox
+                                                  key={channel}
+                                                  state={selectionStateForEveTypes(
+                                                    familyTypes,
+                                                    eveTypePrefs,
+                                                    channel
+                                                  )}
+                                                  onToggle={() =>
+                                                    void setPrefsValue(
+                                                      withAllEveTypesToggledForCharacter(
+                                                        prefsValue,
+                                                        character.characterId,
+                                                        familyTypes,
+                                                        channel
+                                                      )
                                                     )
-                                                  )
-                                                }
-                                              />
-                                            ))}
+                                                  }
+                                                  label={t(
+                                                    `settings.notifications.selectAllFamily.${channel}`,
+                                                    { family: familyLabel }
+                                                  )}
+                                                />
+                                              ))}
+                                            </div>
                                           </div>
-                                        </li>
-                                      ))}
-                                    </ul>
+                                          <ul className="divide-y divide-line/60">
+                                            {familyTypes.map((type) => (
+                                              <li
+                                                key={type}
+                                                className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
+                                              >
+                                                <span className="truncate text-text-dim">
+                                                  {type}
+                                                </span>
+                                                <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                                                  {NOTIFICATION_CHANNELS.map((channel) => (
+                                                    <ChannelCheckbox
+                                                      key={channel}
+                                                      channel={channel}
+                                                      eventLabel={type}
+                                                      enabled={
+                                                        !(channel === 'browser' && browserBlocked)
+                                                      }
+                                                      disabledReason={null}
+                                                      checked={isEveTypeEnabledFor(
+                                                        eveTypePrefs,
+                                                        type,
+                                                        channel
+                                                      )}
+                                                      onToggle={() =>
+                                                        void setPrefsValue(
+                                                          withEveNotificationTypeToggled(
+                                                            prefsValue,
+                                                            character.characterId,
+                                                            type,
+                                                            channel
+                                                          )
+                                                        )
+                                                      }
+                                                    />
+                                                  ))}
+                                                </div>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </li>

@@ -1471,7 +1471,19 @@
         "feed": "{{event}}, Overview list"
       },
       "columnEvent": "Event",
-      "eveTypesHint": "This curated set of structure, war, bill, and corp notifications defaults to the Overview list only, except the three structure-under-attack alerts, which also default to a browser notification — flip any type up or down per channel."
+      "eveTypesHint": "This curated set of notifications, grouped by family below, defaults to the Overview list only, except the three structure-under-attack alerts, which also default to a browser notification — flip any type up or down per channel.",
+      "family": {
+        "structures": "Structures",
+        "war": "War",
+        "corpGovernance": "Corp Governance",
+        "bills": "Bills",
+        "moonMining": "Moon Mining",
+        "pi": "PI"
+      },
+      "selectAllFamily": {
+        "browser": "Toggle all browser notifications for {{family}}",
+        "feed": "Toggle all Overview notifications for {{family}}"
+      }
     }
   },
   "shortcuts": {

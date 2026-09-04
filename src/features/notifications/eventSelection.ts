@@ -85,6 +85,21 @@ export function toggleAllEventsOnChannel(
 }
 
 /**
+ * A presentation grouping over the Notification Allow-List (CONTEXT.md round
+ * 44) — carries no defaults, gates no delivery. Exists so Settings can be
+ * enumerated up front and bulk-toggled by coherent set (issue #352).
+ */
+export const NOTIFICATION_FAMILIES = [
+  'structures',
+  'war',
+  'corpGovernance',
+  'bills',
+  'moonMining',
+  'pi',
+] as const;
+export type NotificationFamily = (typeof NOTIFICATION_FAMILIES)[number];
+
+/**
  * The closed Notification Allow-List (CONTEXT.md round 44): a `type` outside
  * it is dropped at the poller (`foregroundPoller.ts`) before it reaches
  * either delivery channel or any name-resolution work, rather than opted out
@@ -92,28 +107,38 @@ export function toggleAllEventsOnChannel(
  * catalog turned out to hold 254 types, not the ~100 that assumed). This is
  * the first tranche: the 17 types that already have hand-written bodies in
  * `notifications.fired.eveNotification.types` (`src/i18n/locales/en.json`).
+ *
+ * A type's Family lives beside it here (issue #352, AC5), not in a separate
+ * table, so adding a type is one change, not two.
  */
-export const EVE_ALLOWED_TYPES: readonly string[] = [
-  'StructureUnderAttack',
-  'StructureLostShields',
-  'StructureLostArmor',
-  'StructureFuelAlert',
-  'StructureWentLowPower',
-  'StructureWentHighPower',
-  'StructureServicesOffline',
-  'StructureImpendingAbandonmentAssetsAtRisk',
-  'MoonminingExtractionFinished',
-  'MoonminingAutomaticFracture',
-  'CorpAllBillMsg',
-  'BillOutOfMoneyMsg',
-  'CorpOfficeExpirationMsg',
-  'WarDeclared',
-  'AllWarDeclaredMsg',
-  'CorpBecameWarEligible',
-  'CorpAppNewMsg',
+const EVE_ALLOWED_TYPE_ENTRIES: readonly { type: string; family: NotificationFamily }[] = [
+  { type: 'StructureUnderAttack', family: 'structures' },
+  { type: 'StructureLostShields', family: 'structures' },
+  { type: 'StructureLostArmor', family: 'structures' },
+  { type: 'StructureFuelAlert', family: 'structures' },
+  { type: 'StructureWentLowPower', family: 'structures' },
+  { type: 'StructureWentHighPower', family: 'structures' },
+  { type: 'StructureServicesOffline', family: 'structures' },
+  { type: 'StructureImpendingAbandonmentAssetsAtRisk', family: 'structures' },
+  { type: 'MoonminingExtractionFinished', family: 'moonMining' },
+  { type: 'MoonminingAutomaticFracture', family: 'moonMining' },
+  { type: 'CorpAllBillMsg', family: 'bills' },
+  { type: 'BillOutOfMoneyMsg', family: 'bills' },
+  { type: 'CorpOfficeExpirationMsg', family: 'bills' },
+  { type: 'WarDeclared', family: 'war' },
+  { type: 'AllWarDeclaredMsg', family: 'war' },
+  { type: 'CorpBecameWarEligible', family: 'war' },
+  { type: 'CorpAppNewMsg', family: 'corpGovernance' },
 ];
 
+export const EVE_ALLOWED_TYPES: readonly string[] = EVE_ALLOWED_TYPE_ENTRIES.map((e) => e.type);
+
 const EVE_ALLOWED_TYPES_SET: ReadonlySet<string> = new Set(EVE_ALLOWED_TYPES);
+
+/** The allow-listed types belonging to one Family, in allow-list order. */
+export function eveTypesByFamily(family: NotificationFamily): readonly string[] {
+  return EVE_ALLOWED_TYPE_ENTRIES.filter((e) => e.family === family).map((e) => e.type);
+}
 
 /** Whether `type` is on the closed allow-list — the poller's drop gate. */
 export function isEveTypeAllowed(type: string): boolean {
@@ -175,4 +200,38 @@ export function toggleEveTypeChannel(
   for (const c of NOTIFICATION_CHANNELS) next[c] = isEveTypeEnabledFor(map, type, c);
   next[channel] = !next[channel];
   return { ...map, [type]: next };
+}
+
+/** Family header select-all/none state (issue #352) — same shape as `selectionStateForEvents`. */
+export function selectionStateForEveTypes(
+  types: readonly string[],
+  map: EveTypeEnabledMap,
+  channel: NotificationChannel
+): SelectionState {
+  if (types.length === 0) return 'unchecked';
+  const enabledCount = types.filter((type) => isEveTypeEnabledFor(map, type, channel)).length;
+  if (enabledCount === 0) return 'unchecked';
+  return enabledCount === types.length ? 'checked' : 'indeterminate';
+}
+
+/**
+ * Family header select-all/none toggle (issue #352) — same cascade semantics
+ * as `toggleAllEventsOnChannel`: fills a partial column to fully enabled;
+ * only a fully-enabled column clears. The other channel is carried through.
+ */
+export function toggleAllEveTypesOnChannel(
+  types: readonly string[],
+  map: EveTypeEnabledMap,
+  channel: NotificationChannel
+): EveTypeEnabledMap {
+  const allEnabled =
+    types.length > 0 && types.every((type) => isEveTypeEnabledFor(map, type, channel));
+  const next: EveTypeEnabledMap = { ...map };
+  for (const type of types) {
+    const flags: EveTypeChannelState = {};
+    for (const c of NOTIFICATION_CHANNELS) flags[c] = isEveTypeEnabledFor(map, type, c);
+    flags[channel] = !allEnabled;
+    next[type] = flags;
+  }
+  return next;
 }
