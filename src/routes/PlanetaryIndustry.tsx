@@ -517,8 +517,9 @@ type PiTab = 'colonies' | 'plan' | 'advisor';
 
 const PI_TABS: readonly PiTab[] = ['colonies', 'plan', 'advisor'];
 
+/** An unknown tab silently becomes the default, same as an unknown type does. */
 function parseTab(value: string | null): PiTab {
-  return PI_TABS.includes(value as PiTab) && value !== 'colonies' ? (value as PiTab) : 'colonies';
+  return PI_TABS.includes(value as PiTab) ? (value as PiTab) : 'colonies';
 }
 
 function parsePositiveInt(value: string | null): number | null {

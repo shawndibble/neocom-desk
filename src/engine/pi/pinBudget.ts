@@ -6,8 +6,10 @@
  * The question this module answers is the one a planner actually faces: six
  * pins of P1, or fewer pins pushed up to P2? The game does not settle it with
  * a pin limit — it settles it with a **budget**. A Command Center supplies a
- * fixed CPU and Powergrid allowance (scaled by the pilot's Command Center
- * Upgrades skill), every pin draws a fixed amount of both, and the colony
+ * fixed CPU and Powergrid allowance (scaled by the colony's own Command Center
+ * Upgrades level, which the pilot's skill only caps — `scripts/build-sde.mjs`
+ * records why conflating the two overstates every colony), every pin draws a
+ * fixed amount of both, and the colony
  * holds whatever fits. So the answer is an arithmetic fit against two
  * independent ceilings, not a lookup, and the interesting output is *which
  * ceiling binds*: Powergrid almost always does, because an Extractor Control
@@ -20,7 +22,8 @@
  * Command Center Upgrades rows above level 0, which the dump does not hold;
  * that one table is hand-maintained there with its sourcing recorded, and the
  * build asserts its level-0 row against the dump. This module reads what it
- * is given.
+ * is given. The one number written here is `EXTRACTOR_HEADS_MAX`, which no
+ * payload carries and which is banner-flagged below as hand-maintained.
  *
  * ## The overhead / block split
  *
@@ -79,12 +82,25 @@ export type {
 /**
  * Extractor heads one Extractor Control Unit can carry.
  *
- * Not in the SDE: the ECU's own dogma attributes cover its cost, its cycle,
- * its depletion range and its per-head cost, but not how many heads it takes.
+ * UNLIKE EVERY OTHER PI NUMBER THIS ENGINE TOUCHES THIS ONE IS NOT DERIVED
+ * FROM THE SDE DUMP, and no payload carries it — it is hand-maintained here
+ * and can drift out from under a `latest` dump without any download or build
+ * check noticing. The ECU's own dogma attributes cover its CPU, its Powergrid,
+ * its cycle, its depletion range and its per-head cost, but nothing in the
+ * dump says how many heads it takes.
+ *
  * Source: EVE University wiki, "Planetary Industry"
- * (https://wiki.eveuniversity.org/Planetary_Industry), read 2026-09-04. Used
- * only to reject an impossible head count, never to assume one — a real
- * colony's head count is read off the pin's own `extractor_details.heads`.
+ * (https://wiki.eveuniversity.org/Planetary_Industry), read 2026-09-04.
+ * Secondary-source only; there is no primary to assert it against, which is
+ * the second reason it is used only as an upper bound.
+ *
+ * It answers "is this head count impossible", never "how many heads are
+ * there": a real colony's count is read off the pin's own
+ * `extractor_details.heads`, so a stale value here rejects a legitimate layout
+ * at worst and never invents one. The sibling hand-maintained tables carry the
+ * same banner in `scripts/build-sde.mjs` (`CC_UPGRADE_LEVELS`,
+ * `P0_PLANET_TYPES`); this one stays in the engine because it constrains a
+ * parameter rather than shaping a payload.
  */
 export const EXTRACTOR_HEADS_MAX = 10;
 
@@ -231,6 +247,55 @@ export function pinsLoad(
   return { cpu, powergrid };
 }
 
+/**
+ * Whole repeats of one cost that fit in what is left of each axis, and which
+ * axis stopped it there.
+ *
+ * Shared by `fitColony` (repeats of a ratio block) and `spareCapacity`
+ * (repeats of one pin) so the two cannot read an unbounded axis two different
+ * ways — they used to disagree on the same input, one calling it unbounded and
+ * the other reporting no room. One reading, in one place:
+ *
+ * - Zero on one axis is genuinely unbounded there, and the other axis decides.
+ * - Zero on *both* is not a colony that fits infinitely many; it is cost data
+ *   claiming a pin is free. `Infinity` repeats would scale the pin counts to
+ *   `NaN` and a silent `0` would read as "no room", so neither is answered.
+ * - A non-finite anywhere is caller error for the same reason: `NaN` slips
+ *   past every comparison below and would surface as `blocks: NaN` with
+ *   nothing in `limitedBy`, which is the shape reserved for "the overhead
+ *   alone overruns".
+ *
+ * `what` names the offending cost, because on a bad payload the only useful
+ * part of the failure is which pin kind carries it.
+ */
+function axisFit(
+  left: PinLoad,
+  cost: PinLoad,
+  what: string
+): { blocks: number; limitedBy: ('cpu' | 'powergrid')[] } {
+  if (!Number.isFinite(left.cpu) || !Number.isFinite(left.powergrid)) {
+    throw new Error(
+      `fitting ${what} needs a finite CPU and Powergrid remainder, got ${left.cpu} tf / ${left.powergrid} MW`
+    );
+  }
+  if (!Number.isFinite(cost.cpu) || !Number.isFinite(cost.powergrid)) {
+    throw new Error(
+      `${what} draws a non-finite ${!Number.isFinite(cost.cpu) ? 'CPU' : 'Powergrid'}; its cost data is wrong`
+    );
+  }
+  if (cost.cpu <= 0 && cost.powergrid <= 0) {
+    throw new Error(`${what} draws no CPU and no Powergrid, so nothing bounds how many fit`);
+  }
+
+  const byCpu = cost.cpu > 0 ? left.cpu / cost.cpu : Infinity;
+  const byPowergrid = cost.powergrid > 0 ? left.powergrid / cost.powergrid : Infinity;
+  const blocks = floorBlocks(Math.min(byCpu, byPowergrid));
+  const limitedBy: ('cpu' | 'powergrid')[] = [];
+  if (floorBlocks(byCpu) === blocks) limitedBy.push('cpu');
+  if (floorBlocks(byPowergrid) === blocks) limitedBy.push('powergrid');
+  return { blocks, limitedBy };
+}
+
 function scale(counts: PinCounts, factor: number): PinCounts {
   const out: Partial<Record<PiPinKind, number>> = {};
   for (const [kind, count] of Object.entries(counts) as [PiPinKind, number][]) {
@@ -270,6 +335,23 @@ export function fitColony(opts: FitColonyOptions): ColonyFit {
     );
   }
 
+  // A budget axis that is not a finite, non-negative number is caller error,
+  // not a fit: there is no honest block count to return for it, and `NaN`
+  // would come back as `blocks: NaN` with an empty `limitedBy` — the shape
+  // that means "the overhead alone overruns" and must mean nothing else. So
+  // this joins the impossible head count and the empty block as a refusal
+  // rather than becoming a fourth reading of the same result shape.
+  if (
+    !Number.isFinite(budget.cpu) ||
+    !Number.isFinite(budget.powergrid) ||
+    budget.cpu < 0 ||
+    budget.powergrid < 0
+  ) {
+    throw new Error(
+      `fitColony needs a finite, non-negative budget, got ${budget.cpu} tf / ${budget.powergrid} MW`
+    );
+  }
+
   // An empty block has no scale to solve for, and letting one through would
   // return zero blocks with nothing limiting them — which is exactly the
   // signal reserved for "the overhead alone overruns". Two different answers
@@ -297,16 +379,15 @@ export function fitColony(opts: FitColonyOptions): ColonyFit {
   const blockLoad = pinsLoad(block, infrastructure, {
     extractorHeads: (block.extractorControlUnit ?? 0) * headsPerExtractor,
   });
-  // A block that draws nothing on an axis is not limited by it; treating
-  // "divide by zero" as unbounded is the honest reading. Both axes unbounded
-  // is impossible here — the block has a pin, and every pin costs something.
-  const cpuBlocks = blockLoad.cpu > 0 ? cpuLeft / blockLoad.cpu : Infinity;
-  const powergridBlocks = blockLoad.powergrid > 0 ? powergridLeft / blockLoad.powergrid : Infinity;
-  const blocks = floorBlocks(Math.min(cpuBlocks, powergridBlocks));
-
-  const limitedBy: ('cpu' | 'powergrid')[] = [];
-  if (floorBlocks(cpuBlocks) === blocks) limitedBy.push('cpu');
-  if (floorBlocks(powergridBlocks) === blocks) limitedBy.push('powergrid');
+  // `axisFit` owns what an unbounded or unusable axis means, so a block priced
+  // at nothing and a pin kind priced at nothing get the same answer here and
+  // in `spareCapacity`. A non-finite overhead cost lands here too, since a
+  // remainder is only as finite as the pin costs it was subtracted from.
+  const { blocks, limitedBy } = axisFit(
+    { cpu: cpuLeft, powergrid: powergridLeft },
+    blockLoad,
+    'this ratio block'
+  );
 
   const pins = merge(overheadPins, scale(block, blocks));
   return {
@@ -352,18 +433,25 @@ export function spareCapacity(
     const extraCpu = kind === 'extractorControlUnit' ? infrastructure.extractorHead.cpu * heads : 0;
     const extraPowergrid =
       kind === 'extractorControlUnit' ? infrastructure.extractorHead.powergrid * heads : 0;
-    const cpu = spec.cpu + extraCpu;
-    const powergrid = spec.powergrid + extraPowergrid;
-    const byCpu = cpu > 0 ? cpuLeft / cpu : Infinity;
-    const byPowergrid = powergrid > 0 ? powergridLeft / powergrid : Infinity;
-    const fits = Math.min(byCpu, byPowergrid);
-    out[kind] = Number.isFinite(fits) ? floorBlocks(fits) : 0;
+    // Same `axisFit` as the colony fit, so an unbounded axis cannot mean
+    // "unbounded" there and "no room" here on identical cost data. Which axis
+    // bound the count is not reported: per kind it is always the tighter of
+    // two, and a caller comparing kinds gets that from the numbers themselves.
+    out[kind] = axisFit(
+      { cpu: cpuLeft, powergrid: powergridLeft },
+      { cpu: spec.cpu + extraCpu, powergrid: spec.powergrid + extraPowergrid },
+      `pin kind ${kind}`
+    ).blocks;
   }
   return out;
 }
 
 export interface CheckThroughputOptions {
-  /** Ratio blocks the colony runs — the scale `fitColony` arrived at. */
+  /**
+   * Ratio blocks the colony runs — the scale `fitColony` arrived at. Positive:
+   * a colony that fits none has no flow to check and would pass every test
+   * here on a zero flow.
+   */
   blocks: number;
   /** The colony's whole pin set, whose launchpad and storage supply the buffer. */
   pins: PinCounts;
@@ -392,6 +480,15 @@ export function checkThroughput(
   opts: CheckThroughputOptions
 ): ThroughputCheck {
   const { blocks, pins, infrastructure, sourcingFloor, linkCapacityPerHour, bufferHours } = opts;
+  // A colony that fits no block moves nothing, and nothing that moves nothing
+  // overflows a buffer or saturates a link — so every verdict this function
+  // could reach at zero blocks would be `ok`, about a layout that cannot
+  // exist. There is no honest verdict for it, so there is no verdict: the
+  // scale has to be a real one, and `planColony` answers `does-not-fit`
+  // instead of asking.
+  if (!Number.isFinite(blocks) || blocks <= 0) {
+    throw new Error(`checkThroughput needs a positive block count, got ${blocks}`);
+  }
   const floorTier = SOURCING_FLOOR_TIER[sourcingFloor];
   const rawVolume = new Map(pi.raw.map((resource) => [resource.typeID, resource.volume]));
 
@@ -446,6 +543,16 @@ export type PlanColonyResult =
       fit: ColonyFit;
       throughput: ThroughputCheck;
     }
+  /**
+   * The budget hosts no whole block, so there is no colony to check the
+   * throughput of. Deliberately carries no `throughput` at all, the same way
+   * `ChainCostNeedsExtractionRate` carries no cost: zero blocks move zero
+   * material, which overflows nothing and saturates nothing, so any verdict
+   * here would read as `ok` about a layout that cannot be built. `fit` still
+   * comes back — which ceiling bound, and against what budget, is the whole
+   * answer to "why not", and it is what a caller renders instead.
+   */
+  | { status: 'does-not-fit'; chain: PiChain; block: PinCounts; fit: ColonyFit }
   | (Extract<ChainBlockResult, { status: 'needs-extraction-rate' }> & { chain: PiChain })
   /** `typeId` is a P0 resource, or absent from the payload: no factory makes it, so there is no layout to plan. */
   | { status: 'not-a-product' };
@@ -456,7 +563,9 @@ export type PlanColonyResult =
  *
  * The three steps compose only one way — expand at one factory's rate, size
  * the block, fit it, then check the throughput at the scale the fit arrived at
- * — and the extraction-rate refusal has to be honoured before any of it. Left
+ * — and both refusals have to be honoured on the way: the extraction rate
+ * before any of it, and a fit of zero blocks before the throughput, which has
+ * no colony to measure and would pass one that cannot be built. Left
  * as three exported functions, every call site would re-derive that order and
  * unwrap that refusal by hand, which is where a caller silently plans a
  * colony against a guessed rate. So this is the entry point; the pieces stay
@@ -477,6 +586,8 @@ export function planColony(typeId: number, pi: PiData, opts: PlanColonyOptions):
     block: sized.pins,
     headsPerExtractor: opts.headsPerExtractor,
   });
+  if (fit.blocks <= 0) return { status: 'does-not-fit', chain, block: sized.pins, fit };
+
   const throughput = checkThroughput(chain, pi, {
     blocks: fit.blocks,
     pins: fit.pins,

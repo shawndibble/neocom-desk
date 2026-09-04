@@ -31,6 +31,8 @@ import type {
 } from '@/esi/endpoints';
 import type { PiData, PiRawResource } from '@/sde/types';
 import { hasYieldBaseline, sustainedRatePerHour } from '@/engine/pi/extraction';
+import type { PinLoad } from '@/engine/pi/types';
+import { colonyBudget } from './colonyBudget';
 import {
   colonyPinLoad,
   extractorExpiryMs,
@@ -46,8 +48,14 @@ export interface SystemPlanet {
   planetId: number;
   /** `/universe/planets` name, or null while it is still unresolved. */
   name: string | null;
-  /** The planet's own typeID, which `PiData.planetTypeByTypeId` turns into a `PlanetType`. */
-  typeId: number;
+  /**
+   * The planet's own typeID, which `PiData.planetTypeByTypeId` turns into a
+   * `PlanetType`. `null` when the lookup has not resolved — which is a
+   * different answer from a typeID the payload maps to nothing, and must stay
+   * different: the first means "we don't know yet", the second means "no
+   * colony can go here".
+   */
+  typeId: number | null;
 }
 
 export interface MeasuredExtractor {
@@ -64,7 +72,15 @@ export interface MeasuredExtractor {
 }
 
 export interface BuiltColonyAdvice {
+  /** The colony's own Command Center upgrade level, from ESI. */
   upgradeLevel: number;
+  /**
+   * What this colony's Command Center supplies at that level — measured, per
+   * colony, never the pilot's skill ceiling. See `colonyBudget.ts` for why
+   * that distinction is the difference between a headroom figure that holds
+   * and one that overstates.
+   */
+  budget: PinLoad;
   /** ESI's own last-update stamp for the colony. */
   lastUpdate: string;
   /** False when the colony's detail never loaded, so the pins below are empty for want of data rather than for want of pins. */
@@ -98,7 +114,14 @@ export type PlanetAdvice =
       localResources: PiRawResource[];
     })
   /** A planet no colony can be placed on — Shattered, Scorched Barren — which the payload maps to no `PlanetType`. */
-  | { kind: 'uncolonisable'; planetId: number; name: string | null; planetType: null };
+  | { kind: 'uncolonisable'; planetId: number; name: string | null; planetType: null }
+  /**
+   * The planet's type has not resolved, so nothing can be said about it yet.
+   * Deliberately not folded into `uncolonisable`: that card asserts "no
+   * colony can be placed here", which would be a confident false claim about
+   * a planet whose `/universe/planets` read simply failed.
+   */
+  | { kind: 'unknown-type'; planetId: number; name: string | null; planetType: null };
 
 export interface SystemAdviceInput {
   /** Every planet in the system, from `/universe/systems/{id}`. */
@@ -149,6 +172,7 @@ function builtAdvice(
 
   return {
     upgradeLevel: planet.upgrade_level,
+    budget: colonyBudget(planet.upgrade_level, pi).budget,
     lastUpdate: planet.last_update,
     detailLoaded: detail !== undefined,
     pinLoad: colonyPinLoad(pins, pi),
@@ -166,7 +190,8 @@ function builtAdvice(
 const KIND_ORDER: Record<PlanetAdvice['kind'], number> = {
   built: 0,
   unbuilt: 1,
-  uncolonisable: 2,
+  'unknown-type': 2,
+  uncolonisable: 3,
 };
 
 export function systemAdvice(input: SystemAdviceInput, pi: PiData): PlanetAdvice[] {
@@ -174,9 +199,19 @@ export function systemAdvice(input: SystemAdviceInput, pi: PiData): PlanetAdvice
 
   const advice = input.planets.map((planet): PlanetAdvice => {
     const colony = colonyByPlanet.get(planet.planetId);
-    // The colony's own `planet_type` is preferred over the typeID lookup: it
-    // is what ESI says about a planet it knows the character owns, and the
-    // lookup only exists for planets it says nothing about.
+    // An owned colony carries its own `planet_type`, so it never depends on
+    // the planet lookup succeeding. An unresolved typeID therefore only
+    // matters for a planet ESI says nothing about — and it has to stay
+    // distinct from a typeID that resolves to no planet type, because those
+    // are "we don't know yet" and "no colony can go here", not one state.
+    if (!colony && planet.typeId === null) {
+      return {
+        kind: 'unknown-type',
+        planetId: planet.planetId,
+        name: planet.name,
+        planetType: null,
+      };
+    }
     const planetType = colony?.planet_type ?? pi.planetTypeByTypeId[String(planet.typeId)] ?? null;
     if (planetType === null) {
       return { kind: 'uncolonisable', planetId: planet.planetId, name: planet.name, planetType };

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { PiData, PiInfrastructure } from '@/sde/types';
+import type { PiData, PiInfrastructure, PiPinKind } from '@/sde/types';
+import { piTier } from './chain';
 import {
   EXTRACTOR_HEADS_MAX,
   chainBlockPins,
@@ -52,6 +53,9 @@ const FIXTURE_INFRASTRUCTURE: PiInfrastructure = {
     2562: 'storage',
     2256: 'launchpad',
   },
+  // Temperate and Barren only; the real payload carries all eight, one per
+  // planet type, which the snapshot block below asserts.
+  commandCenterTypeIds: [2254, 2524],
   extractorHead: { cpu: 110, powergrid: 550 },
   commandCenterUpgrades: [
     { level: 0, cpu: 1_675, powergrid: 6_000 },
@@ -64,6 +68,12 @@ const FIXTURE_INFRASTRUCTURE: PiInfrastructure = {
 };
 
 const LEVEL_4 = { cpu: 21_315, powergrid: 17_000 };
+
+/** A payload claiming a Basic Industry Facility is free — nothing then bounds a fit. */
+const FREE_BASIC_INFRASTRUCTURE: PiInfrastructure = {
+  ...FIXTURE_INFRASTRUCTURE,
+  pins: { ...FIXTURE_INFRASTRUCTURE.pins, basic: { cpu: 0, powergrid: 0, capacity: 0 } },
+};
 
 describe('singleFactoryRate', () => {
   it('reads one factory’s hourly output off the schematic, not a tier table', () => {
@@ -133,6 +143,83 @@ describe('chainBlockPins', () => {
     const result = chainBlockPins(p4!, pi, { sourcingFloor: 'P3' });
     expect(result).toEqual({ status: 'sized', pins: { highTech: 1 } });
   });
+});
+
+/**
+ * `chainBlockPins` filters `chain.nodes` by `tier > floorTier` where
+ * `chainCost` re-walks the graph against the same floor. The two agree because
+ * every schematic input sits at a strictly lower tier than the schematic that
+ * consumes it, so nothing above the floor is reachable except through nodes
+ * above the floor — but that is an argument, and the shortcut deserves a
+ * measurement. The P4s that consume a P1 directly are where the graph stops
+ * being neatly layered and so where the shortcut would fail first; they are
+ * found by filtering the payload rather than listed, so a recipe change moves
+ * the test with it.
+ */
+describe('chainBlockPins against an independent re-walk', () => {
+  const p1FedP4s = Object.keys(pi.schematics)
+    .map(Number)
+    .filter(
+      (typeId) =>
+        piTier(typeId, pi) === 4 &&
+        pi.schematics[String(typeId)].inputs.some((input) => piTier(input.typeID, pi) === 1)
+    );
+
+  /** Walks the recipe graph itself, stopping at the floor. Never calls the function under test. */
+  const rewalkPins = (typeId: number, floorTier: number): Partial<Record<PiPinKind, number>> => {
+    const demand = new Map<number, number>();
+    const walk = (id: number, perHour: number): void => {
+      demand.set(id, (demand.get(id) ?? 0) + perHour);
+      if (piTier(id, pi) <= floorTier) return;
+      const schematic = pi.schematics[String(id)];
+      for (const input of schematic.inputs) {
+        walk(input.typeID, (perHour * input.quantity) / schematic.quantity);
+      }
+    };
+    walk(typeId, singleFactoryRate(typeId, pi)!);
+
+    // Demand is accumulated across every path before it is ceiled, because two
+    // factories each wanting half a unit share one pin, not two.
+    const pins: Partial<Record<PiPinKind, number>> = {};
+    for (const [id, perHour] of demand) {
+      if (piTier(id, pi) <= floorTier) continue;
+      const schematic = pi.schematics[String(id)];
+      const outputPerHour = (schematic.quantity * 3_600) / schematic.cycleTime;
+      const factories = Math.ceil(perHour / outputPerHour - 1e-9);
+      pins[schematic.facility] = (pins[schematic.facility] ?? 0) + factories;
+    }
+    return pins;
+  };
+
+  it('finds three P4 schematics taking a P1 input directly, all High-Tech', () => {
+    expect(p1FedP4s).toHaveLength(3);
+    expect(p1FedP4s.map((id) => pi.schematics[String(id)].facility)).toEqual([
+      'highTech',
+      'highTech',
+      'highTech',
+    ]);
+  });
+
+  for (const [floor, floorTier] of [
+    ['P1', 1],
+    ['P2', 2],
+    ['P3', 3],
+  ] as const) {
+    it(`counts the same pins as a re-walk at the ${floor} floor`, () => {
+      expect(p1FedP4s.length).toBeGreaterThan(0);
+      for (const typeId of p1FedP4s) {
+        const result = chainBlockPins(singleFactoryChain(typeId, pi)!, pi, {
+          sourcingFloor: floor,
+        });
+        expect(result.status).toBe('sized');
+        if (result.status !== 'sized') throw new Error('unreachable');
+        expect({ target: typeId, pins: result.pins }).toEqual({
+          target: typeId,
+          pins: rewalkPins(typeId, floorTier),
+        });
+      }
+    });
+  }
 });
 
 describe('pinsLoad', () => {
@@ -237,6 +324,66 @@ describe('fitColony', () => {
     // branch and read as the same answer.
     expect(() => fitColony({ ...options, block: {} })).toThrowError(/block/i);
   });
+
+  it('rejects a budget that is not a finite, non-negative pair', () => {
+    // A NaN axis passes every comparison, so it used to come back as
+    // `blocks: NaN` with an empty `limitedBy` — the shape that means "the
+    // overhead alone overruns" and nothing else.
+    expect(() =>
+      fitColony({ ...options, budget: { cpu: Number.NaN, powergrid: 17_000 } })
+    ).toThrowError(/budget/i);
+    expect(() =>
+      fitColony({ ...options, budget: { cpu: 21_315, powergrid: Number.POSITIVE_INFINITY } })
+    ).toThrowError(/budget/i);
+    expect(() => fitColony({ ...options, budget: { cpu: -1, powergrid: 17_000 } })).toThrowError(
+      /budget/i
+    );
+  });
+
+  it('rejects overhead costs that are not numbers rather than reporting a dead end', () => {
+    const brokenLaunchpad: PiInfrastructure = {
+      ...FIXTURE_INFRASTRUCTURE,
+      pins: {
+        ...FIXTURE_INFRASTRUCTURE.pins,
+        launchpad: { cpu: Number.NaN, powergrid: 700, capacity: 0 },
+      },
+    };
+    expect(() => fitColony({ ...options, infrastructure: brokenLaunchpad })).toThrowError(
+      /finite/i
+    );
+  });
+
+  it('rejects a block whose pins cost nothing instead of fitting infinitely many', () => {
+    // floorBlocks(Infinity) is Infinity, which then scales the pin counts to
+    // NaN. "Every pin costs something" is true of the shipped payload and an
+    // assumption about a parameter, so it is checked rather than trusted.
+    expect(() =>
+      fitColony({
+        ...options,
+        infrastructure: FREE_BASIC_INFRASTRUCTURE,
+        block: { basic: 1 },
+        headsPerExtractor: 0,
+      })
+    ).toThrowError(/CPU|Powergrid/);
+  });
+
+  it('rejects a pin cost with a non-finite axis, which lands in the same reserved shape', () => {
+    const brokenBasic: PiInfrastructure = {
+      ...FIXTURE_INFRASTRUCTURE,
+      pins: {
+        ...FIXTURE_INFRASTRUCTURE.pins,
+        basic: { cpu: 200, powergrid: Number.NaN, capacity: 0 },
+      },
+    };
+    expect(() =>
+      fitColony({
+        ...options,
+        infrastructure: brokenBasic,
+        block: { basic: 1 },
+        headsPerExtractor: 0,
+      })
+    ).toThrowError(/finite/i);
+  });
 });
 
 describe('checkThroughput', () => {
@@ -318,6 +465,19 @@ describe('checkThroughput', () => {
     });
     expect(three.flowPerHourM3).toBeCloseTo(3 * one.flowPerHourM3, 6);
   });
+
+  it('refuses to verdict a colony that fits no block, whose zero flow would read as ok', () => {
+    expect(() =>
+      checkThroughput(chain, pi, {
+        blocks: 0,
+        pins: { launchpad: 1 },
+        infrastructure: FIXTURE_INFRASTRUCTURE,
+        sourcingFloor: 'P1',
+        linkCapacityPerHour: 40_000,
+        bufferHours: 24,
+      })
+    ).toThrowError(/block/i);
+  });
 });
 
 describe('planColony', () => {
@@ -382,10 +542,29 @@ describe('planColony', () => {
       budget: FIXTURE_INFRASTRUCTURE.commandCenterUpgrades[0],
       sourcingFloor: 'P1',
     });
-    expect(result.status).toBe('planned');
-    if (result.status !== 'planned') throw new Error('unreachable');
+    // Not `planned`, and carrying no throughput verdict at all: a colony that
+    // fits nothing moves nothing, and nothing that moves nothing overflows, so
+    // a verdict here could only ever have said `ok` about a colony that cannot
+    // exist.
+    expect(result.status).toBe('does-not-fit');
+    if (result.status !== 'does-not-fit') throw new Error('unreachable');
     expect(result.fit.blocks).toBe(0);
     expect(result.fit.limitedBy).toEqual([]);
+    expect('throughput' in result).toBe(false);
+  });
+
+  it('reports a dead end for a block that does not fit even once, ceiling named', () => {
+    // Level 0 hosts the launchpad but not one High-Tech Production Plant
+    // beside it, which is a scaling limit and still not a plan.
+    const result = planColony(BROADCAST_NODE, pi, {
+      ...base,
+      budget: { cpu: 3_600 + 1_000, powergrid: 6_000 },
+      sourcingFloor: 'P3',
+    });
+    expect(result.status).toBe('does-not-fit');
+    if (result.status !== 'does-not-fit') throw new Error('unreachable');
+    expect(result.fit.blocks).toBe(0);
+    expect(result.fit.limitedBy).toEqual(['cpu']);
   });
 });
 
@@ -401,6 +580,20 @@ describe('the shipped snapshot', () => {
     // is deliberately not a pin kind.
     expect(byTypeId['2254']).toBeUndefined();
     expect(new Set(Object.values(byTypeId))).toEqual(new Set(Object.keys(pi.infrastructure.pins)));
+    // Not one of the eight Command Centers is a pin kind, and the feature layer
+    // now leans on that separation to recognise the one pin every colony has
+    // without giving it a cost row.
+    for (const typeId of pi.infrastructure.commandCenterTypeIds) {
+      expect(byTypeId[String(typeId)]).toBeUndefined();
+    }
+  });
+
+  it('names a Command Center typeID per planet type, none of them a pin kind', () => {
+    const ids = pi.infrastructure.commandCenterTypeIds;
+    expect(ids).toHaveLength(8);
+    expect(new Set(ids).size).toBe(8);
+    expect(ids).toContain(2254);
+    expect(ids.some((id) => id in pi.infrastructure.pinKindByTypeId)).toBe(false);
   });
 
   it('carries the ESI-confirmed pin costs the fixture above asserts', () => {
@@ -475,5 +668,14 @@ describe('spareCapacity', () => {
     // 20,000 MW / 2,600 bare, against 20,000 / (2,600 + 10 x 550).
     expect(bare.extractorControlUnit).toBe(7);
     expect(loaded.extractorControlUnit).toBe(2);
+  });
+
+  it('reads a cost-free pin the way fitColony does — as bad cost data, not as no room', () => {
+    // The two used to disagree on the same input: fitColony called an
+    // unbounded axis unbounded, this one reported 0. Naming the kind is what
+    // makes a payload fault diagnosable.
+    expect(() =>
+      spareCapacity({ cpu: 0, powergrid: 0 }, LEVEL_4, FREE_BASIC_INFRASTRUCTURE)
+    ).toThrowError(/basic/);
   });
 });

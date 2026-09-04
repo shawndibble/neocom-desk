@@ -131,10 +131,12 @@ export interface ColonyPinLoad {
    */
   load: PinLoad;
   /**
-   * Pin typeIDs the payload names no kind for, in the order seen. A Command
-   * Center is always here and is not a problem — it supplies the budget and
-   * draws nothing from it. Anything else means the snapshot is behind the
-   * game and the meter is missing a real cost.
+   * Pin typeIDs the payload names no kind for, in the order seen, deduped.
+   * Command Centers are excluded — every colony has one, it supplies the
+   * budget and draws nothing from it, so listing it here would fire "the
+   * meter understates this colony" on every colony and bury the real signal.
+   * Anything that does land here means the snapshot is behind the game and
+   * the meter is missing a real cost.
    */
   unknownTypeIds: number[];
 }
@@ -154,12 +156,15 @@ export interface ColonyPinLoad {
 export function colonyPinLoad(pins: readonly PlanetPin[], pi: PiData): ColonyPinLoad {
   const counts: Partial<Record<PiPinKind, number>> = {};
   const unknownTypeIds: number[] = [];
+  const commandCenters = new Set(pi.infrastructure.commandCenterTypeIds);
   let extractorHeads = 0;
 
   for (const pin of pins) {
     const kind = pi.infrastructure.pinKindByTypeId[String(pin.type_id)];
     if (!kind) {
-      if (!unknownTypeIds.includes(pin.type_id)) unknownTypeIds.push(pin.type_id);
+      if (!commandCenters.has(pin.type_id) && !unknownTypeIds.includes(pin.type_id)) {
+        unknownTypeIds.push(pin.type_id);
+      }
       continue;
     }
     counts[kind] = (counts[kind] ?? 0) + 1;

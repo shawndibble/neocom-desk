@@ -53,16 +53,18 @@ Historical note: ESI also still serves now-**unpublished** (`published: false`)
 type IDs like "Limited Barren Command Center" (2129), which carries `powerOutput:
 9000, cpuOutput: 7057` — https://esi.evetech.net/latest/universe/types/2129/.
 These numbers exactly match the "Level 1" row of the EVE University CPU/PG
-table (below), confirming that before some past consolidation, each
-Command-Center-Upgrades skill level corresponded to a separate deployable
-item (Limited/Standard/Improved/Advanced/Elite), later folded into a single
-per-planet-type item whose output is scaled dynamically by the pilot's skill
-level rather than by swapping dogma-attribute-bearing types. This also
-explains why ESI's static per-type dogma attributes only ever show the
-level-0/Basic profile — the skill-scaled numbers are not encoded as
+table (below), confirming that before some past consolidation, each **Command
+Center upgrade level** corresponded to a separate deployable item
+(Limited/Standard/Improved/Advanced/Elite) — a per-colony thing you deploy,
+not a per-character stat — later folded into a single per-planet-type item
+whose output is scaled dynamically by the colony's own upgrade level rather
+than by swapping dogma-attribute-bearing types. The pilot's Command Center
+Upgrades **skill** only gates how high that level may go, per colony (see
+§2). This also explains why ESI's static per-type dogma attributes only ever
+show the level-0/Basic profile — the per-level numbers are not encoded as
 alternate SDE types anymore (see Open Questions).
 
-## 2. Command Center Upgrades skill — CPU/PG effect per level
+## 2. Command Center upgrade level — CPU/PG effect per level (the skill is only the ceiling)
 
 Skill type ID **2505**, confirmed via ESI:
 https://esi.evetech.net/latest/universe/types/2505/
@@ -70,27 +72,49 @@ Description (verbatim from ESI): _"Each level in this skill improves the
 quality of command facility available to you, in turn allowing for a greater
 number of connected facilities on that planet."_
 
-ESI's response for this type carries **no `dogma_effects` entries** — the
-skill's CPU/Powergrid scaling is not exposed as an attribute modifier via the
-dogma-effects mechanism the way, say, a ship module's attribute bonus would
-be. This means the per-level CPU/PG numbers below could not be independently
-derived from ESI/dogma alone; they come from EVE University's wiki table
-(secondary source, unconfirmed against a CCP primary source):
+ESI's response for this type carries **no `dogma_effects` entries** —
+consistent with the skill acting as a gate on how far a colony's own Command
+Center may be upgraded, rather than as a direct CPU/Powergrid modifier
+itself. That absence also means the underlying mechanism cannot be traced
+through dogma at all: neither the skill's own effect list nor the deployed
+Command Center type's static attributes (which only ever show the level-0
+profile, per §1) expose how upgrade level scales output. So the per-level
+CPU/PG numbers below could not be independently derived from ESI/dogma
+alone; they come from EVE University's wiki table (secondary source,
+unconfirmed against a CCP primary source):
 
-| CC-Upgrades skill level    | CPU Provided | Power Provided | Upgrade cost (ISK) |
-| -------------------------- | ------------ | -------------- | ------------------ |
-| 0 (Basic, no skill needed) | 1,675 tf     | 6,000 MW       | —                  |
-| 1                          | 7,057 tf     | 9,000 MW       | 580,000            |
-| 2                          | 12,136 tf    | 12,000 MW      | 930,000            |
-| 3                          | 17,215 tf    | 15,000 MW      | 1,200,000          |
-| 4                          | 21,315 tf    | 17,000 MW      | 1,500,000          |
-| 5                          | 25,415 tf    | 19,000 MW      | 2,100,000          |
+| Command Center upgrade level | CPU Provided | Power Provided | Upgrade cost (ISK) |
+| ---------------------------- | ------------ | -------------- | ------------------ |
+| 0 (Basic, no upgrade)        | 1,675 tf     | 6,000 MW       | —                  |
+| 1                            | 7,057 tf     | 9,000 MW       | 580,000            |
+| 2                            | 12,136 tf    | 12,000 MW      | 930,000            |
+| 3                            | 17,215 tf    | 15,000 MW      | 1,200,000          |
+| 4                            | 21,315 tf    | 17,000 MW      | 1,500,000          |
+| 5                            | 25,415 tf    | 19,000 MW      | 2,100,000          |
 
 Source: https://wiki.eveuniversity.org/Planetary_buildings ("Command Center
 Properties" table). Level-0 and level-1 rows are independently corroborated
 by ESI's live/legacy type data above (2254 → level 0 numbers; 2129 → level 1
 numbers exactly), which gives fairly high confidence in the rest of the
 table even though it's not ESI-sourced end to end.
+
+**This table is indexed by the colony's own Command Center upgrade level, not
+by the pilot's skill level** — ESI reports the per-colony figure as
+`CharacterPlanet.upgrade_level`. ESI publishes **no description at all** for
+that field, so reading it as this table's index is an inference rather than
+a documented fact, but a well-supported one: (1) the table's own **Upgrade
+cost (ISK)** column is the tell — skills are trained once per character with
+skill points and are never bought repeatedly with ISK, while a Command
+Center is upgraded per colony, for ISK, exactly as this column prices; (2)
+§1's historical note, that each level used to correspond to a separate
+deployable item — a per-colony thing you deploy, not a per-character stat;
+(3) the skill's own ESI description above, which reads as a gate ("allowing
+for a greater number of connected facilities") rather than as the thing
+supplying CPU/Powergrid. The skill still matters — it is the **ceiling** on
+how far any one colony's upgrade level may go — but the budget itself
+belongs to the colony, not the character. This is also the conservative
+reading: treating the skill level as the budget would overstate the
+headroom of every colony not yet upgraded to the pilot's trained maximum.
 
 **Mechanic characterized from this table (not a simple formula):** the
 per-level increase is **not** a flat percentage and **not** additive in a
@@ -304,8 +328,12 @@ or a pin-ratio formula.
 ## Open questions / gaps
 
 - **STILL OPEN, and the one number the shipped code leans on: the Command
-  Center Upgrades skill's per-level CPU/PG table (§2) is not independently
-  confirmed from a CCP primary source.** It is now hand-maintained in
+  Center's own per-upgrade-level CPU/PG table (§2) is not independently
+  confirmed from a CCP primary source.** (Separately, that the table indexes
+  by the colony's `upgrade_level` rather than the pilot's skill level is
+  itself an inference, not a documented fact — see §2's own confidence note;
+  this bullet is only about the numeric values, not that indexing question.)
+  It is now hand-maintained in
   `scripts/build-sde.mjs` as `CC_UPGRADE_LEVELS`, with the same loud
   not-from-the-dump banner `P0_PLANET_TYPES` carries. The build asserts its
   level-0 row against the dump's own Command Center output, so a base-number

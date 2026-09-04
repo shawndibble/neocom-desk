@@ -227,7 +227,13 @@ export interface PinOverhead {
 }
 
 export interface FitColonyOptions {
-  /** What the Command Center supplies at the character's CC-Upgrades level. */
+  /**
+   * What the Command Center supplies at the colony's CC-Upgrades level (ESI's
+   * per-colony `upgrade_level`, not the pilot's skill, which only caps it).
+   * Finite and non-negative on both axes; anything else is caller error and
+   * throws, because a `NaN` axis has no block count and would take the one
+   * result shape `limitedBy` reserves for a dead end.
+   */
   budget: PinLoad;
   /** Per-pin costs — `PiData.infrastructure`, passed in, never imported. */
   infrastructure: PiInfrastructure;
@@ -257,7 +263,9 @@ export interface ColonyFit {
    * they bind at once. Empty means the overhead alone does not fit, which is
    * a dead end rather than a scaling limit: the fix is a Command Center
    * Upgrades level, not fewer factories. A block that does not fit even once
-   * still names its ceiling, so empty is that one answer and nothing else.
+   * still names its ceiling, so empty is that one answer and nothing else —
+   * which is why a budget or a pin cost that is not a finite number throws
+   * rather than arriving here with `blocks: NaN`.
    */
   limitedBy: readonly ('cpu' | 'powergrid')[];
 }

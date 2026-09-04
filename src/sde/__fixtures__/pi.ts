@@ -33,6 +33,8 @@ const INFRASTRUCTURE: PiInfrastructure = {
     2562: 'storage',
     2256: 'launchpad',
   },
+  // Temperate and Barren; the real payload carries all eight.
+  commandCenterTypeIds: [2254, 2524],
   extractorHead: { cpu: 110, powergrid: 550 },
   commandCenterUpgrades: [
     { level: 0, cpu: 1_675, powergrid: 6_000 },

@@ -130,9 +130,14 @@ export interface PiPinSpec {
   capacity: number;
 }
 
-/** What a Command Center supplies at one Command Center Upgrades skill level. */
+/** What a Command Center supplies at one of its own upgrade levels. */
 export interface PiCommandCenterLevel {
-  /** Command Center Upgrades skill level, 0 (untrained) through 5. */
+  /**
+   * The Command Center's own upgrade level, 0-5 — what ESI reports per colony
+   * as `CharacterPlanet.upgrade_level`, not the pilot's Command Center
+   * Upgrades skill. The skill caps how far a colony may be upgraded; each
+   * level is then bought per colony with ISK.
+   */
   level: number;
   /** tf of CPU the colony's whole pin set is budgeted against. */
   cpu: number;
@@ -156,16 +161,24 @@ export interface PiInfrastructure {
    */
   pinKindByTypeId: Record<string, PiPinKind>;
   /**
+   * The eight Command Center typeIDs, one per planet type. Every colony has
+   * exactly one, and it is deliberately absent from `pinKindByTypeId` — a
+   * Command Center supplies the budget and draws nothing from it, so it has
+   * no cost row. It still has to be recognisable, or a reader of a live
+   * colony's pins reports the one pin every colony has as unrecognised.
+   */
+  commandCenterTypeIds: number[];
+  /**
    * One Extractor Control Unit head's own draw, on top of the ECU's
    * (attributes 1690/1691). A head is fitted per resource-reach, so its cost
    * scales with how many the user places rather than being part of the ECU.
    */
   extractorHead: { cpu: number; powergrid: number };
   /**
-   * CPU/Powergrid the Command Center supplies, indexed by Command Center
-   * Upgrades skill level — `commandCenterUpgrades[3]` is level 3. Level 0 is
-   * the only row the SDE carries; see `scripts/build-sde.mjs` for where the
-   * rest come from and what the build asserts about them.
+   * CPU/Powergrid the Command Center supplies, indexed by its own upgrade
+   * level — `commandCenterUpgrades[3]` is level 3. Level 0 is the only row the
+   * SDE carries; see `scripts/build-sde.mjs` for where the rest come from and
+   * what the build asserts about them.
    */
   commandCenterUpgrades: PiCommandCenterLevel[];
 }

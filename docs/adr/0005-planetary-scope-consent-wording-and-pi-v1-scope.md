@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted (2026-09-01)
+Accepted (2026-09-01). Superseded in part by ADR 0011 (2026-09-04): the "No
+new SDE payload" and throughput-deferral decisions below no longer hold. The
+consent-wording and colony-health-only staleness discipline are unaffected —
+see ADR 0011's Consequences for exactly which parts stand.
 
 ## Context
 

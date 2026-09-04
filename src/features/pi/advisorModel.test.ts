@@ -93,6 +93,9 @@ describe('systemAdvice', () => {
       launchpad: 1,
     });
     expect(advice.colony.pinLoad.extractorHeads).toBe(4);
+    // The colony's own upgrade level, never the pilot's skill ceiling.
+    expect(advice.colony.upgradeLevel).toBe(4);
+    expect(advice.colony.budget).toEqual({ cpu: 21_315, powergrid: 17_000 });
     // 1,874,985 units over 336 hours, from the decay curve — never
     // qty_per_cycle, which would say 13,930.
     expect(advice.colony.extractedPerHour).toEqual([
@@ -164,6 +167,63 @@ describe('systemAdvice', () => {
       'Aqueous Liquids',
       'Base Metals',
     ]);
+  });
+
+  it('sizes each colony against its own Command Center, not one shared budget', () => {
+    // Two colonies in one system at different upgrade levels. Reading the
+    // budget off the character's skill would give both the same number and
+    // overstate the un-upgraded one.
+    const advice = systemAdvice(
+      {
+        planets: [
+          { planetId: 40_000_001, name: 'Ashab III', typeId: 11 },
+          { planetId: 40_000_004, name: 'Ashab IV', typeId: 2014 },
+        ],
+        colonies: [
+          colony(40_000_001, 'temperate'),
+          { ...colony(40_000_004, 'oceanic'), upgrade_level: 1 },
+        ],
+        details: new Map([
+          [40_000_001, detail([extractorPin(1, 2073)])],
+          [40_000_004, detail([extractorPin(2, 2073)])],
+        ]),
+      },
+      pi
+    );
+    const budgets = advice.map((a) => (a.kind === 'built' ? a.colony.budget.powergrid : null));
+    expect(budgets).toEqual([17_000, 9_000]);
+  });
+
+  it('keeps a planet whose type never resolved distinct from one that takes no colony', () => {
+    const advice = systemAdvice(
+      {
+        planets: [
+          // Type lookup failed — we do not know what this is.
+          { planetId: 40_000_007, name: 'Ashab VII', typeId: null },
+          // Type resolved to Planet (Shattered), which maps to no PlanetType.
+          { planetId: 40_000_003, name: 'Ashab X', typeId: 30_889 },
+        ],
+        colonies: [],
+        details: new Map(),
+      },
+      pi
+    );
+    expect(advice.map((a) => a.kind)).toEqual(['unknown-type', 'uncolonisable']);
+  });
+
+  it('still types a built colony whose planet lookup failed, from ESI’s own field', () => {
+    // `/characters/{id}/planets` carries `planet_type` directly, so an owned
+    // colony never depends on the /universe/planets lookup succeeding.
+    const [advice] = systemAdvice(
+      {
+        planets: [{ planetId: 40_000_001, name: null, typeId: null }],
+        colonies: [colony(40_000_001, 'temperate')],
+        details: new Map([[40_000_001, detail([extractorPin(1, 2073)])]]),
+      },
+      pi
+    );
+    expect(advice.kind).toBe('built');
+    expect(advice.planetType).toBe('temperate');
   });
 
   it('marks a planet no colony can be placed on rather than calling it unbuilt', () => {

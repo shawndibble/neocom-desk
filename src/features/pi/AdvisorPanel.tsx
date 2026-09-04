@@ -32,15 +32,18 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, NativeSelect, Panel, Spinner, StatChip } from '@/components/ui';
+import { EmptyState, NativeSelect, Panel, ReauthBanner, Spinner, StatChip } from '@/components/ui';
+import { beginEveLogin } from '@/app/loginFlow';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData, PiPinKind } from '@/sde/types';
-import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
-import { spareCapacity } from '@/engine/pi/pinBudget';
+import type { CharacterPlanet, CharacterPlanetDetail, PlanetType } from '@/esi/endpoints';
+import { EXTRACTOR_HEADS_MAX, spareCapacity } from '@/engine/pi/pinBudget';
+import type { PinLoad } from '@/engine/pi/types';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadSystemName, loadSystemPlanetIds } from '@/features/character/systemSecurity';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterPlanets, loadAllColonyDetails } from './data';
-import { colonyBudget, loadCommandCenterUpgrades, type ColonyBudget } from './colonyBudget';
+import { loadCommandCenterUpgrades, maxColonyBudget, type MaxColonyBudget } from './colonyBudget';
 import { loadPlanetInfo, loadSchematicName } from './names';
 import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorModel';
 
@@ -56,11 +59,11 @@ const HEADROOM_KINDS: readonly PiPinKind[] = [
 
 /**
  * Heads assumed when costing a *hypothetical* extra extractor for the
- * headroom row. A full complement is the honest assumption for "could I add
- * an extractor": an ECU fitted with fewer heads reaches less, so quoting the
- * cheap end would promise room for an extractor nobody would actually build.
+ * headroom row: a full complement. An ECU fitted with fewer heads reaches
+ * less, so quoting the cheap end would promise room for an extractor nobody
+ * would actually build.
  */
-const HEADROOM_EXTRACTOR_HEADS = 10;
+const HEADROOM_EXTRACTOR_HEADS = EXTRACTOR_HEADS_MAX;
 
 interface SystemGroup {
   systemId: number;
@@ -73,14 +76,17 @@ interface Snapshot {
   systems: SystemGroup[];
   details: Map<number, CharacterPlanetDetail>;
   planetsBySystem: Map<number, SystemPlanet[]>;
-  budget: ColonyBudget;
+  /** The most any colony here could supply, for unbuilt planets and the header. Built cards use their own. */
+  ceiling: MaxColonyBudget;
+  /** True when the planets read came back 403 — a missing scope, not an empty colony list. */
+  needsReauth: boolean;
   schematicNames: Map<number, string>;
   typeNames: Map<number, string>;
 }
 
 async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   const nowMs = Date.now();
-  const [pi, { cached }, ccLevel] = await Promise.all([
+  const [pi, { cached, needsReauth }, ccLevel] = await Promise.all([
     loadPi(),
     loadCharacterPlanets(characterId),
     loadCommandCenterUpgrades(characterId, nowMs),
@@ -104,27 +110,38 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     Promise.all(systemIds.map((systemId) => loadSystemPlanetIds(systemId))),
   ]);
 
-  // One `/universe/planets` read per planet in each of the character's own
-  // systems — the same cached row the Colonies tab already warms for owned
-  // planets, so the new traffic is only the planets they have not colonised.
-  const planetsBySystem = new Map<number, SystemPlanet[]>();
-  await Promise.all(
-    systemIds.map(async (systemId, i) => {
-      const ids = planetIdLists[i];
-      const infos = await Promise.all(ids.map((planetId) => loadPlanetInfo(planetId)));
-      planetsBySystem.set(
-        systemId,
-        ids.map((planetId, j) => ({
-          planetId,
-          name: infos[j]?.name ?? null,
-          // -1 rather than 0: an unresolved planet matches no typeID in the
-          // payload, so it reads as uncolonisable, which is the honest state
-          // for a planet whose type never loaded.
-          typeId: infos[j]?.typeId ?? -1,
-        }))
-      );
-    })
+  // One `/universe/planets` read per planet across every system the character
+  // has a colony in — six systems of eight planets is ~48 reads on a cold
+  // cache. Capped, and capped over ONE flat list rather than per system:
+  // wrapping each system's own loop would still let systems x cap run at
+  // once, which is the shape `src/lib/concurrency.ts` exists to prevent.
+  // Rows are static (a planet is never renamed), so this is a first-visit
+  // cost only.
+  const lookups = systemIds.flatMap((systemId, i) =>
+    planetIdLists[i].map((planetId) => ({ systemId, planetId }))
   );
+  const planetInfo = new Map<number, { name: string; typeId: number } | null>();
+  await mapWithConcurrencyLimit(lookups, ESI_FANOUT_CONCURRENCY, async ({ planetId }) => {
+    planetInfo.set(planetId, await loadPlanetInfo(planetId));
+  });
+
+  const planetsBySystem = new Map<number, SystemPlanet[]>();
+  systemIds.forEach((systemId, i) => {
+    planetsBySystem.set(
+      systemId,
+      planetIdLists[i].map((planetId) => {
+        const info = planetInfo.get(planetId) ?? null;
+        return {
+          planetId,
+          name: info?.name ?? null,
+          // `null`, never a sentinel: a failed lookup means the type is
+          // unknown, which the model keeps distinct from a planet that takes
+          // no colony. A stand-in id would collapse the two.
+          typeId: info?.typeId ?? null,
+        };
+      })
+    );
+  });
 
   const flatDetails = new Map<number, CharacterPlanetDetail>();
   for (const [planetId, result] of details) {
@@ -166,7 +183,8 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     })),
     details: flatDetails,
     planetsBySystem,
-    budget: colonyBudget(ccLevel, pi),
+    ceiling: maxColonyBudget(ccLevel, pi),
+    needsReauth,
     schematicNames,
     typeNames,
   };
@@ -214,6 +232,48 @@ function BudgetBar({
   );
 }
 
+/**
+ * The card shell every planet card shares: name (falling back to the planet
+ * id) and, when known, the planet type. Three cards repeated this markup
+ * before; the only thing that varied was the body.
+ */
+function PlanetCard({
+  planetId,
+  name,
+  planetType,
+  dashed = false,
+  dim = false,
+  children,
+}: {
+  planetId: number;
+  name: string | null;
+  planetType: PlanetType | null;
+  dashed?: boolean;
+  dim?: boolean;
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div
+      className={`flex flex-col rounded-xs border bg-panel ${
+        dashed ? 'border-dashed border-line-bright' : 'border-line'
+      } ${dim ? 'opacity-70' : ''}`}
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-2">
+        <span className="text-sm font-semibold">
+          {name ?? t('pi.planetLabel', { id: planetId })}
+        </span>
+        {planetType && (
+          <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
+            {t(`pi.planetType.${planetType}`)}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-3 p-3">{children}</div>
+    </div>
+  );
+}
+
 /** A card body's small label/value line. */
 function CardLine({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -228,39 +288,33 @@ function CardLine({ label, children }: { label: string; children: React.ReactNod
 
 function BuiltCard({
   advice,
-  budget,
   pi,
   schematicNames,
   typeNames,
 }: {
   advice: Extract<PlanetAdvice, { kind: 'built' }>;
-  budget: ColonyBudget;
   pi: PiData;
   schematicNames: ReadonlyMap<number, string>;
   typeNames: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
   const { colony } = advice;
+  // This colony's own Command Center budget, from its own upgrade level —
+  // not the pilot's skill ceiling, which would overstate the headroom of
+  // every colony not upgraded to it.
+  const budget: PinLoad = colony.budget;
   const headroom = useMemo(
     () =>
-      spareCapacity(colony.pinLoad.load, budget.budget, pi.infrastructure, {
+      spareCapacity(colony.pinLoad.load, budget, pi.infrastructure, {
         headsPerExtractor: HEADROOM_EXTRACTOR_HEADS,
       }),
-    [colony.pinLoad.load, budget.budget, pi.infrastructure]
+    [colony.pinLoad.load, budget, pi.infrastructure]
   );
   const room = HEADROOM_KINDS.filter((kind) => (headroom[kind] ?? 0) > 0);
 
   return (
-    <div className="flex flex-col rounded-xs border border-line bg-panel">
-      <div className="flex items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-2">
-        <span className="text-sm font-semibold">
-          {advice.name ?? t('pi.planetLabel', { id: advice.planetId })}
-        </span>
-        <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
-          {t(`pi.planetType.${advice.planetType}`)}
-        </span>
-      </div>
-      <div className="flex flex-1 flex-col gap-3 p-3">
+    <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType}>
+      <>
         {!colony.detailLoaded ? (
           <p className="text-xs text-warning">{t('piAdvisor.detailUnavailable')}</p>
         ) : null}
@@ -311,13 +365,13 @@ function BuiltCard({
           <BudgetBar
             label={t('piAdvisor.cpu')}
             used={colony.pinLoad.load.cpu}
-            budget={budget.budget.cpu}
+            budget={budget.cpu}
             unit={t('piAdvisor.cpuUnit')}
           />
           <BudgetBar
             label={t('piAdvisor.powergrid')}
             used={colony.pinLoad.load.powergrid}
-            budget={budget.budget.powergrid}
+            budget={budget.powergrid}
             unit={t('piAdvisor.powergridUnit')}
           />
         </div>
@@ -346,32 +400,39 @@ function BuiltCard({
             )}
           </CardLine>
         </div>
-      </div>
-    </div>
+      </>
+    </PlanetCard>
   );
 }
 
 function UnbuiltCard({ advice }: { advice: Extract<PlanetAdvice, { kind: 'unbuilt' }> }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col rounded-xs border border-dashed border-line-bright bg-panel">
-      <div className="flex items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-2">
-        <span className="text-sm font-semibold">
-          {advice.name ?? t('pi.planetLabel', { id: advice.planetId })}
-        </span>
-        <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
-          {t(`pi.planetType.${advice.planetType}`)}
-        </span>
-      </div>
-      <div className="flex flex-1 flex-col gap-3 p-3">
+    <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType} dashed>
+      <>
         <CardLine label={t('piAdvisor.couldExtractLabel')}>
           <span className="text-text-dim">
             {advice.localResources.map((resource) => resource.name).join(', ')}
           </span>
         </CardLine>
         <p className="mt-auto text-[0.6875rem] text-text-dim">{t('piAdvisor.needsScanHint')}</p>
-      </div>
-    </div>
+      </>
+    </PlanetCard>
+  );
+}
+
+/**
+ * A planet whose `/universe/planets` read has not resolved. Says so, rather
+ * than borrowing the uncolonisable card's "no colony can be placed here" —
+ * that would be a confident false claim about a planet we simply failed to
+ * look up.
+ */
+function UnknownTypeCard({ advice }: { advice: Extract<PlanetAdvice, { kind: 'unknown-type' }> }) {
+  const { t } = useTranslation();
+  return (
+    <PlanetCard planetId={advice.planetId} name={advice.name} planetType={null} dashed>
+      <p className="text-xs text-text-dim">{t('piAdvisor.unknownTypeHint')}</p>
+    </PlanetCard>
   );
 }
 
@@ -382,12 +443,9 @@ function UncolonisableCard({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col rounded-xs border border-dashed border-line bg-panel opacity-70">
-      <div className="border-b border-line bg-panel-2 px-3 py-2 text-sm font-semibold">
-        {advice.name ?? t('pi.planetLabel', { id: advice.planetId })}
-      </div>
-      <p className="p-3 text-xs text-text-dim">{t('piAdvisor.uncolonisableHint')}</p>
-    </div>
+    <PlanetCard planetId={advice.planetId} name={advice.name} planetType={null} dashed dim>
+      <p className="text-xs text-text-dim">{t('piAdvisor.uncolonisableHint')}</p>
+    </PlanetCard>
   );
 }
 
@@ -408,9 +466,16 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     void (async () => {
       try {
         const next = await loadAdvisorSnapshot(characterId);
-        if (!cancelled) setSnapshot(next);
+        if (cancelled) return;
+        // Both reset on every run, not just on success: without this one
+        // failure pins the error state forever, so a later character that
+        // loads fine still renders the failure.
+        setFailed(false);
+        setSnapshot(next);
       } catch {
-        if (!cancelled) setFailed(true);
+        if (cancelled) return;
+        setSnapshot(null);
+        setFailed(true);
       }
     })();
     return () => {
@@ -443,23 +508,40 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
       </div>
     );
   }
+  // A 403 is a missing scope, not an empty colony list — offering "place a
+  // colony" to someone who just needs to log in again would be the wrong
+  // instruction entirely.
+  if (snapshot.needsReauth) {
+    return (
+      <ReauthBanner
+        title={t('pi.reauthTitle')}
+        hint={t('pi.reauthHint')}
+        actionLabel={t('pi.reauthAction')}
+        onLogin={() => void beginEveLogin()}
+      />
+    );
+  }
   if (!activeSystem) {
     return <EmptyState title={t('piAdvisor.emptyTitle')} hint={t('piAdvisor.emptyHint')} />;
   }
 
   const builtCount = advice.filter((entry) => entry.kind === 'built').length;
-  const colonisable = advice.filter((entry) => entry.kind !== 'uncolonisable').length;
+  const colonisable = advice.filter(
+    (entry) => entry.kind === 'built' || entry.kind === 'unbuilt'
+  ).length;
 
-  // The budget chip reads two ways — a trained level, or an assumed untrained
-  // one — and must never present the second as the first.
-  const budgetNumbers = t('piAdvisor.ccUpgradesValue', {
-    level: snapshot.budget.level,
-    cpu: snapshot.budget.budget.cpu.toLocaleString(),
-    powergrid: snapshot.budget.budget.powergrid.toLocaleString(),
+  // The header chip states the pilot's *ceiling*, not any colony's budget —
+  // each built card reads its own Command Center's upgrade level. It reads
+  // two ways, a trained level or an assumed untrained one, and must never
+  // present the second as the first.
+  const ceilingNumbers = t('piAdvisor.ccUpgradesValue', {
+    level: snapshot.ceiling.level,
+    cpu: snapshot.ceiling.budget.cpu.toLocaleString(),
+    powergrid: snapshot.ceiling.budget.powergrid.toLocaleString(),
   });
-  const budgetChipValue = snapshot.budget.assumed
-    ? t('piAdvisor.ccUpgradesAssumed', { numbers: budgetNumbers })
-    : budgetNumbers;
+  const ceilingChipValue = snapshot.ceiling.assumed
+    ? t('piAdvisor.ccUpgradesAssumed', { numbers: ceilingNumbers })
+    : ceilingNumbers;
 
   return (
     <div className="space-y-3">
@@ -483,11 +565,13 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
           <div className="flex flex-wrap gap-2">
             <StatChip
               label={t('piAdvisor.ccUpgrades')}
-              value={budgetChipValue}
+              value={ceilingChipValue}
               tooltip={
-                snapshot.budget.assumed ? t('piAdvisor.ccUpgradesAssumedTooltip') : undefined
+                snapshot.ceiling.assumed
+                  ? t('piAdvisor.ccUpgradesAssumedTooltip')
+                  : t('piAdvisor.ccUpgradesTooltip')
               }
-              tone={snapshot.budget.assumed ? 'warning' : 'accent'}
+              tone={snapshot.ceiling.assumed ? 'warning' : 'accent'}
             />
             <StatChip
               label={t('piAdvisor.colonised')}
@@ -506,13 +590,14 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               <BuiltCard
                 key={entry.planetId}
                 advice={entry}
-                budget={snapshot.budget}
                 pi={snapshot.pi}
                 schematicNames={snapshot.schematicNames}
                 typeNames={snapshot.typeNames}
               />
             ) : entry.kind === 'unbuilt' ? (
               <UnbuiltCard key={entry.planetId} advice={entry} />
+            ) : entry.kind === 'unknown-type' ? (
+              <UnknownTypeCard key={entry.planetId} advice={entry} />
             ) : (
               <UncolonisableCard key={entry.planetId} advice={entry} />
             )

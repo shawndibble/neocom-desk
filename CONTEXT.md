@@ -2309,8 +2309,9 @@ rather than each inventing its own:
   pins pushed to P2" is an arithmetic fit against two independent ceilings,
   and which ceiling binds is the useful half of the answer (Powergrid, almost
   always: an Extractor Control Unit and its heads are Powergrid-hungry and
-  CPU-cheap, a Launchpad the reverse). Scales with the **Command Center
-  Upgrades** skill.
+  CPU-cheap, a Launchpad the reverse). Scales with the colony's own **Command
+  Center upgrade level**, bought per colony with ISK — the **Command Center
+  Upgrades** skill is only the ceiling on how far that level can go.
 - **Ratio Block**: The smallest whole-pin set that runs a chain once — one
   Advanced Industry Facility making a P2 fed by exactly two Basic Industry
   Facilities, because one P1 factory's 40/hr is precisely what one P2 factory
@@ -2341,9 +2342,13 @@ rather than each inventing its own:
   question, so the Advisor is the surface for it.
 - **Every number on the Advisor is measured; the estimate is deliberately
   absent.** A built colony's pins are read off ESI, its extraction rates come
-  from each program's own decay curve, and its budget from the character's
-  trained Command Center Upgrades. An unbuilt planet gets its type and the P0
-  resources that type yields, and stops there — no ISK figure, no yield.
+  from each program's own decay curve, and its budget from the colony's own
+  Command Center `upgrade_level` — also read off ESI, not assumed from the
+  pilot's trained skill. The header's own ceiling stat is the one figure that
+  does read the trained skill, since it answers a different question ("how
+  far could a colony here go") — see the last bullet below. An unbuilt planet
+  gets its type and the P0 resources that type yields, and stops there — no
+  ISK figure, no yield.
 - **The rank-order richness input is not built, and this is a deferral with a
   reason, not an omission.** ESI carries no per-planet resource richness at
   all (already recorded in `engine/pi/chain.ts`'s own header), and the in-game
@@ -2387,15 +2392,24 @@ rather than each inventing its own:
   mapping is in the dump and agreement is a fact about today's recipes rather
   than a rule. Pin costs are read across all eight planet-type variants and
   asserted to agree, so "one representative per kind" is a checked conclusion.
-- **The one table the dump cannot supply is the Command Center Upgrades
-  skill's per-level output**, since the skill (type 2505) carries no dogma
-  effect that scales a deployed Command Center. It is hand-maintained in
-  `scripts/build-sde.mjs` with the same loud not-from-the-dump banner
-  `P0_PLANET_TYPES` carries, and the build asserts its level-0 row against
-  the dump's own Command Center output — so a dump whose base numbers move
-  fails the build rather than shipping a table that disagrees with its own
-  first row. Levels 1-5 remain secondary-source (EVE University) and are
-  flagged as such in `docs/research/pi-cpu-power-mechanics.md`.
+- **Two tables in this feature are hand-maintained rather than dump-derived,
+  and only one is checked at build time.** The Command Center's own
+  per-upgrade-level CPU/Powergrid output (indexed by the colony's own
+  `upgrade_level`, not the pilot's skill — see the Pin Budget glossary entry)
+  has no dogma effect to derive it from, since skill type 2505 carries none.
+  It is hand-maintained in `scripts/build-sde.mjs` with the same loud
+  not-from-the-dump banner `P0_PLANET_TYPES` carries, and the build asserts
+  its level-0 row against the dump's own Command Center output — so a dump
+  whose base numbers move fails the build rather than shipping a table that
+  disagrees with its own first row. Levels 1-5 remain secondary-source (EVE
+  University) and are flagged as such in
+  `docs/research/pi-cpu-power-mechanics.md`. `EXTRACTOR_HEADS_MAX`
+  (`engine/pi/pinBudget.ts`) is the second hand-maintained, EVE-University-
+  sourced constant — no dogma attribute states an Extractor Control Unit's
+  head cap either — but unlike the Command Center table it has **no
+  build-time assertion behind it at all**; the only guard on it is
+  `fitColony` throwing at runtime on an out-of-range head count, which
+  validates a caller's input, not the constant itself against a source.
 - **Link capacity is a parameter with `null` as a first-class value.** A basic
   link moves 1,250 m3/hr and each upgrade level doubles it to 40,000 at V,
   but whether that upgrade axis is the _same_ skill as the Pin Budget table
@@ -2413,3 +2427,26 @@ rather than each inventing its own:
   fact — the same distinction `customsRateSource` draws for the customs rate
   and the colony `unknown` state draws for health. The chip says "(assumed)"
   and its tooltip says every card below understates its headroom.
+- **The designed pin-budget algorithm has seven steps; this round ships five.**
+  1. budget from the colony's own upgrade level, 2) fixed overhead, 3) ratio
+     block from the recipe graph, 4) scale against both ceilings, 5) throughput
+     check — all shipped, tested, reachable from the Advisor. 6) score each
+     candidate stop tier by margin/hour through the existing `chainCost()`, and
+  2. pick the best that also clears step 5 — neither shipped. So the Advisor
+     reports what a planet is doing and what it has room for, but never "build up
+     to P2 here", which was part of the tab's own stated purpose. Tracked as
+     #426, blocked by #425. The block is real, not just deferred effort: scoring
+     needs a price per candidate product, and the candidate _set_ for an unbuilt
+     planet depends on the same deferred richness ordering the rank-order bullet
+     above already accounts for. What that bullet does not account for is a
+     _built_ colony — it already has a measured sustained rate and could be
+     scored today; what stops it is the same missing price wiring, and whether
+     shipping tier advice on built cards alone is worth doing ahead of #425 is
+     #426's own open triage question, not a settled no.
+- **Most of `pinBudget.ts` therefore ships with no production caller.**
+  `planColony`, `fitColony`, `checkThroughput`, `singleFactoryChain` and
+  `chainBlockPins` are reached only by their own tests; the app reaches just
+  `pinsLoad` (`features/pi/adapters.ts`) and `spareCapacity`
+  (`AdvisorPanel.tsx`). That is the honest cost of shipping steps 1-5 ahead of
+  6-7 rather than a sign anything is wrong today — but if #426 is ever closed
+  as wontfix, that unused surface should be deleted rather than left in place.

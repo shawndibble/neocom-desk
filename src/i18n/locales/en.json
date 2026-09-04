@@ -988,10 +988,10 @@
     "controlsTitle": "Advisor",
     "system": "System",
     "systemLabel": "System #{{id}}",
-    "ccUpgrades": "CC-Upgrades",
-    "ccUpgradesValue": "{{level}} — {{cpu}} tf / {{powergrid}} MW per planet",
+    "ccUpgrades": "Max upgrade",
+    "ccUpgradesValue": "Level {{level}} — {{cpu}} tf / {{powergrid}} MW",
     "ccUpgradesAssumed": "{{numbers}} (assumed)",
-    "ccUpgradesAssumedTooltip": "No skill data for this character yet, so untrained is assumed. The real budget is higher at every trained level, so every card below understates its headroom.",
+    "ccUpgradesAssumedTooltip": "No skill data for this character yet, so untrained is assumed. Your real ceiling is higher at every trained level.",
     "colonised": "Colonised",
     "colonisedValue": "{{built}} / {{total}} planets",
     "cpu": "CPU",
@@ -1027,7 +1027,9 @@
       "storage": "storage",
       "launchpad": "launchpad"
     },
-    "measuredOnlyHint": "Every number here is measured, never estimated: pins and extraction rates come from ESI, and each rate is the whole program averaged over its decay curve rather than its opening cycle. Extractor headroom assumes a full ten heads."
+    "measuredOnlyHint": "Every number here is measured, never estimated: pins and extraction rates come from ESI, and each rate is the whole program averaged over its decay curve rather than its opening cycle. Extractor headroom assumes a full ten heads.",
+    "ccUpgradesTooltip": "The highest Command Center upgrade your Command Center Upgrades skill allows, and what it would supply. Each colony below is measured against its own Command Center’s current level, which may be lower — upgrading one costs ISK per colony.",
+    "unknownTypeHint": "This planet’s type has not loaded, so nothing can be said about it yet. Refresh once you are back online."
   },
   "employmentHistory": {
     "title": "Employment",

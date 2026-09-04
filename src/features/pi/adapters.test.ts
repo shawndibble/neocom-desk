@@ -336,14 +336,26 @@ describe('colonyPinLoad', () => {
     });
   });
 
-  it('names a pin it cannot classify instead of dropping it silently', () => {
+  it('does not flag the Command Center every colony has', () => {
     // A Command Center is a real pin ESI reports and deliberately not a kind:
-    // it supplies the budget rather than drawing on it. A typeID the payload
-    // has never heard of lands here too, and either way the caller can say
-    // the meter is incomplete rather than showing it as measured.
-    const result = colonyPinLoad([pin(1, 2254), pin(2, 999_999), pin(3, 2256)], pi);
+    // it supplies the budget rather than drawing on it, so it has no cost row
+    // and costs the meter nothing. Reporting it as unrecognised would fire
+    // "the meter understates this colony" on 100% of colonies and bury the
+    // real signal.
+    const result = colonyPinLoad([pin(1, 2254), pin(2, 2256)], pi);
     expect(result.counts).toEqual({ launchpad: 1 });
-    expect(result.unknownTypeIds).toEqual([2254, 999999]);
+    expect(result.unknownTypeIds).toEqual([]);
+  });
+
+  it('names a pin it genuinely cannot classify instead of dropping it silently', () => {
+    const result = colonyPinLoad([pin(1, 999_999), pin(2, 2256)], pi);
+    expect(result.counts).toEqual({ launchpad: 1 });
+    expect(result.unknownTypeIds).toEqual([999999]);
+  });
+
+  it('reports a repeated unknown typeID once', () => {
+    const result = colonyPinLoad([pin(1, 999_999), pin(2, 999_999)], pi);
+    expect(result.unknownTypeIds).toEqual([999999]);
   });
 
   it('charges no heads for an extractor pin ESI sent without any', () => {

@@ -133,8 +133,15 @@ const PLANET_RESTRICTION_ATTR = 1632; // planetRestriction: the planet typeID a 
 const ECU_HEAD_CPU_ATTR = 1690; // ecuExtractorHeadCPU
 const ECU_HEAD_POWER_ATTR = 1691; // ecuExtractorHeadPower
 
-// CPU/Powergrid a Command Center supplies at each Command Center Upgrades
-// skill level.
+// CPU/Powergrid a Command Center supplies at each of its **own** upgrade
+// levels, 0-5.
+//
+// Indexed by the colony's Command Center upgrade level — what ESI reports as
+// `CharacterPlanet.upgrade_level`, per colony — and NOT by the pilot's
+// Command Center Upgrades skill. The skill sets the *ceiling* a colony may be
+// upgraded to; reaching each level is then bought per colony with ISK, which
+// is why the wiki table this comes from prices every row. Confusing the two
+// overstates the budget of every colony not upgraded to the pilot's maximum.
 //
 // UNLIKE THE PIN COSTS THIS TABLE IS NOT DERIVED FROM THE SDE DUMP. The skill
 // (type 2505) carries no dogma effect that scales a deployed Command Center's
@@ -147,12 +154,14 @@ const ECU_HEAD_POWER_ATTR = 1691; // ecuExtractorHeadPower
 // 2026-09-04. Levels 0 and 1 are independently corroborated by ESI's own
 // live and legacy type data (2254 carries the level-0 row; the unpublished
 // legacy "Limited Barren Command Center", 2129, carries the level-1 row
-// exactly). Levels 2-5 are secondary-source only.
+// exactly) — and those legacy types were themselves the separate deployable
+// items each level used to correspond to, which is the other reason to read
+// this as a per-colony upgrade rather than a per-character skill. Levels 2-5
+// are secondary-source only.
 //
 // The level-0 row is asserted against the dump-derived Command Center output
-// in the sanity checks below, so a dump whose base numbers move fails the
-// build instead of shipping a table that silently disagrees with its own
-// first row.
+// before anything is written, so a dump whose base numbers move fails the
+// build instead of shipping a table that disagrees with its own first row.
 const CC_UPGRADE_LEVELS = [
   { level: 0, cpu: 1675, powergrid: 6000 },
   { level: 1, cpu: 7057, powergrid: 9000 },
@@ -610,6 +619,11 @@ async function main() {
   };
   const piPinSpecs = {};
   const piPinKindByTypeId = {}; // pin typeID -> kind, for reading a live colony's own pins
+  // Command Centers, which every colony has exactly one of. Deliberately not a
+  // pin kind — a CC supplies the budget and draws nothing from it, so it has
+  // no cost row to look up — but a reader of a live colony's pins still has to
+  // recognise it, or it lands in "pins we don't recognise" on every colony.
+  const piCommandCenterTypeIds = [];
   const piPinsByKind = new Map(); // kind -> [{ typeID, name, cpu, powergrid, capacity }]
   const piPinPlanetTypes = new Map(); // pin typeID -> PlanetType
   const piUnclassifiedPins = [];
@@ -625,6 +639,7 @@ async function main() {
       if (planetType) piPinPlanetTypes.set(typeID, planetType);
 
       if (PI_PIN_GROUPS[t.groupID] === 'commandCenter') {
+        piCommandCenterTypeIds.push(typeID);
         // The Command Center supplies the budget and draws nothing from it —
         // it carries powerOutput/cpuOutput and no load attributes at all.
         const output = {
@@ -830,11 +845,61 @@ async function main() {
     infrastructure: {
       pins: Object.fromEntries(PIN_KINDS.map((kind) => [kind, piPinSpecs[kind]])),
       pinKindByTypeId: piPinKindByTypeId,
+      commandCenterTypeIds: piCommandCenterTypeIds.sort((a, b) => a - b),
       extractorHead: piExtractorHead,
       commandCenterUpgrades: CC_UPGRADE_LEVELS,
     },
     planetTypeByTypeId: piPlanetTypeByTypeId,
   };
+
+  // Structural invariants, checked BEFORE anything is written.
+  //
+  // The reporting checks further down set `process.exitCode = 1` but run after
+  // the write, so on their own a failing build still leaves a bad payload on
+  // disk — and `src/sde/types.ts` declares these fields non-nullable, so
+  // `tsc` would go on vouching for a shape the emitter had just violated.
+  // These throw instead: nothing is written unless the payload can satisfy
+  // the types that describe it.
+  {
+    const problems = [];
+    if (piCcLevel0Mismatch) problems.push(`Command Center level 0: ${piCcLevel0Mismatch}`);
+    if (piBadFacilities.length)
+      problems.push(
+        `schematics whose factory pins resolve to more than one facility kind: ${piBadFacilities.join('; ')}`
+      );
+    if (piMissingPinKinds.length)
+      problems.push(`no pin found for: ${piMissingPinKinds.join(', ')}`);
+    if (piMissingPlanetTypes.length)
+      problems.push(`no planet typeID maps to: ${piMissingPlanetTypes.join(', ')}`);
+    if (!piCommandCenterTypeIds.length) problems.push('no Command Center types found');
+    // Positive on both axes, not merely present. `engine/pi/pinBudget.ts`
+    // refuses a pin priced at nothing rather than reading it as "no room",
+    // and that refusal is a throw on a render path (`spareCapacity` runs
+    // inside a card's `useMemo`). Guaranteeing it here is what keeps that
+    // throw unreachable instead of a crash waiting on a payload regression.
+    for (const [kind, spec] of Object.entries(pi.infrastructure.pins)) {
+      if (!spec) {
+        problems.push(`pin kind ${kind} has no cost row`);
+      } else if (!(spec.cpu > 0) || !(spec.powergrid > 0)) {
+        problems.push(
+          `pin kind ${kind} is priced at ${spec.cpu} tf / ${spec.powergrid} MW; every pin costs something`
+        );
+      }
+    }
+    if (!(piExtractorHead?.cpu > 0) || !(piExtractorHead?.powergrid > 0)) {
+      problems.push('extractor head is priced at nothing');
+    }
+    for (const [typeID, schematic] of Object.entries(piSchematics)) {
+      if (!schematic.facility) problems.push(`schematic ${typeID} has no facility`);
+      if (!schematic.planetTypes.length)
+        problems.push(`schematic ${typeID} runs on no planet type`);
+    }
+    if (problems.length) {
+      throw new Error(
+        `pi.json would be structurally invalid, so nothing was written:\n  - ${problems.join('\n  - ')}`
+      );
+    }
+  }
 
   // --- market/groups.json: invMarketGroups -> MarketGroupNode[] ---
   const marketGroups = [];
@@ -1111,28 +1176,6 @@ async function main() {
   if (piDisagreeingPins.length) {
     console.error(
       `  FAIL: planet-type variants of one pin kind disagree on cost, so no representative can stand for the kind: ${piDisagreeingPins.join('; ')}`
-    );
-    process.exitCode = 1;
-  }
-  if (piMissingPinKinds.length) {
-    console.error(`  FAIL: no pin found for kinds: ${piMissingPinKinds.join(', ')}`);
-    process.exitCode = 1;
-  }
-  if (piBadFacilities.length) {
-    console.error(
-      `  FAIL: schematics whose factory pins do not resolve to exactly one facility kind: ${piBadFacilities.join('; ')}`
-    );
-    process.exitCode = 1;
-  }
-  if (piCcLevel0Mismatch) {
-    console.error(
-      `  FAIL: CC_UPGRADE_LEVELS[0] disagrees with the dump's own Command Center output — ${piCcLevel0Mismatch}. The rest of that table is secondary-source and cannot be checked here, so a level-0 mismatch means the whole table needs re-reading.`
-    );
-    process.exitCode = 1;
-  }
-  if (piMissingPlanetTypes.length) {
-    console.error(
-      `  FAIL: no planet typeID maps to: ${piMissingPlanetTypes.join(', ')} — /universe/planets lookups for those planet types would come back unknown`
     );
     process.exitCode = 1;
   }
