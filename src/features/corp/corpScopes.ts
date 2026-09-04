@@ -55,7 +55,19 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
     'esi-corporations.read_corporation_membership.v1',
   ],
   canReadIndustry: ['esi-industry.read_corporation_jobs.v1'],
-  canReadAssets: ['esi-assets.read_corporation_assets.v1'],
+  /**
+   * `read_divisions` too, not `canReadWallet`'s alone (#330, CONTEXT.md round
+   * 44): naming a division ("SRP") rather than a number needs the `hangar`
+   * half of the same read the wallet rail already uses for its `wallet` half
+   * (`features/corp/divisions.ts`), and without this a Director-only assets
+   * surface would want a scope this map never admitted to needing. It costs
+   * no one a re-grant — `canReadAssets` answers to `Director` alone
+   * (`engine/corpRoles.ts`), and a Director already holds `canReadWallet` too
+   * (`corpCapabilities` grants every capability to a Director), so the scope
+   * was already required through that entry for every Character who can
+   * reach this surface at all.
+   */
+  canReadAssets: ['esi-assets.read_corporation_assets.v1', 'esi-corporations.read_divisions.v1'],
 };
 
 /**

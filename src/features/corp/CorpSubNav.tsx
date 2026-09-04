@@ -16,8 +16,7 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
 /**
  * The Corp section's frame, not the Overview page's chrome.
  *
- * It carries two entries today and is built for more: the events view (#299)
- * hangs off it next. Real navigation (routes) rather than a `Tabs` widget,
+ * It carries three entries today and is built for more. Real navigation (routes) rather than a `Tabs` widget,
  * matching `SkillsSubNav` and `OverviewSubNav` — it sits in the same slot and
  * reads as the same control, so it borrows their classes rather than
  * approximating them.
@@ -45,6 +44,11 @@ export function CorpSubNav() {
       {capabilities.canReadMembers && (
         <NavLink to="/corp/members" end className={subNavClass}>
           {t('corp.membersTab')}
+        </NavLink>
+      )}
+      {capabilities.canReadAssets && (
+        <NavLink to="/corp/assets" end className={subNavClass}>
+          {t('corp.assetsTab')}
         </NavLink>
       )}
     </nav>

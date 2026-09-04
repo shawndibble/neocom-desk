@@ -48,4 +48,17 @@ describe('CorpSubNav (AC1)', () => {
     expect(screen.queryByRole('link', { name: 'Members' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument();
   });
+
+  it('offers Assets to a character with the assets capability', () => {
+    mockedAccess.mockReturnValue(access({ canReadAssets: true }));
+    renderNav();
+    expect(screen.getByRole('link', { name: 'Assets' })).toHaveAttribute('href', '/corp/assets');
+  });
+
+  /** Same hide rule as Members, one level down: canReadAssets is Director-only. */
+  it('hides Assets from a ready character without it', () => {
+    mockedAccess.mockReturnValue(access({ canReadWallet: true }));
+    renderNav();
+    expect(screen.queryByRole('link', { name: 'Assets' })).not.toBeInTheDocument();
+  });
 });
