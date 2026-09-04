@@ -94,11 +94,31 @@ const detailPayload = {
 };
 
 const PRODUCT_ID = 2288;
+const FACTORY_TYPE_ID = 3001;
+const STORAGE_TYPE_ID = 3002;
+const SCHEMATIC_ID = 131;
 
 const NAMES: Record<number, { name: string; category: string }> = {
   [SYSTEM_ID]: { name: 'Jita', category: 'solar_system' },
   2848: { name: 'Extractor Control Unit', category: 'inventory_type' },
   [PRODUCT_ID]: { name: 'Felsic Magma', category: 'inventory_type' },
+  [FACTORY_TYPE_ID]: { name: 'Basic Industry Facility', category: 'inventory_type' },
+  [STORAGE_TYPE_ID]: { name: 'Storage Facility', category: 'inventory_type' },
+};
+
+/**
+ * No extractor at all — two factory pins sharing a schematic, one storage
+ * pin — for the Production/Infrastructure cards, which the base
+ * `detailPayload` (a lone extractor) never exercises.
+ */
+const roleCardsDetailPayload = {
+  links: [],
+  routes: [],
+  pins: [
+    { pin_id: 10, type_id: FACTORY_TYPE_ID, latitude: 0, longitude: 0, schematic_id: SCHEMATIC_ID },
+    { pin_id: 11, type_id: FACTORY_TYPE_ID, latitude: 0, longitude: 0, schematic_id: SCHEMATIC_ID },
+    { pin_id: 12, type_id: STORAGE_TYPE_ID, latitude: 0, longitude: 0 },
+  ],
 };
 
 /**
@@ -335,7 +355,7 @@ describe('PlanetaryIndustry', () => {
     expect(within(panel).queryByText('Decayed')).not.toBeInTheDocument();
   });
 
-  it('titles each stacked pin card by its product, not by the pin type on every row', async () => {
+  it('titles the extraction card by its product, not by the extractor pin type', async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
         HttpResponse.json(decayedDetailPayload)
@@ -343,13 +363,43 @@ describe('PlanetaryIndustry', () => {
     );
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
-    // `dt-primary` is what `.dt-stack` hoists as the card title below `sm`
-    // (docs/DESIGN.md §4a) — "Extractor Control Unit" reads identically on
-    // every extractor row and identifies nothing.
-    expect(within(panel).getByText('Felsic Magma').closest('td')).toHaveClass('dt-primary');
-    expect(within(panel).getByText('Extractor Control Unit').closest('td')).not.toHaveClass(
-      'dt-primary'
+    // "Extractor Control Unit" (the pin type) reads identically on every
+    // extractor and identifies nothing; the resolved product is what
+    // actually names the card, so it — not the pin type — is the heading.
+    expect(within(panel).getByText('Felsic Magma').closest('h3')).toBeInTheDocument();
+    expect(within(panel).getByText('Extractor Control Unit').closest('h3')).not.toBeInTheDocument();
+  });
+
+  it('groups factory pins into one Production row per schematic, with a facility count', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
+        HttpResponse.json(roleCardsDetailPayload)
+      ),
+      http.get(`${ESI}/universe/schematics/${SCHEMATIC_ID}`, () =>
+        HttpResponse.json({ schematic_name: 'Plasmoids', cycle_time: 1800 })
+      )
     );
+    render(<App />);
+    const panel = await colonyPanelFor(/Jita IV/);
+    // Two Basic Industry Facility pins running the same schematic collapse
+    // into one row, not two identical dashed rows.
+    expect(within(panel).getByText('Plasmoids')).toBeInTheDocument();
+    expect(within(panel).getByText('2 facilities running')).toBeInTheDocument();
+  });
+
+  it('lists infrastructure pins as chips labeled with no per-cycle data, not dashed rows', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
+        HttpResponse.json(roleCardsDetailPayload)
+      ),
+      http.get(`${ESI}/universe/schematics/${SCHEMATIC_ID}`, () =>
+        HttpResponse.json({ schematic_name: 'Plasmoids', cycle_time: 1800 })
+      )
+    );
+    render(<App />);
+    const panel = await colonyPanelFor(/Jita IV/);
+    expect(within(panel).getByText('Infrastructure · no per-cycle data')).toBeInTheDocument();
+    expect(within(panel).getByText('Storage Facility')).toBeInTheDocument();
   });
 
   it('shows an unknown status rather than a confident Healthy when a colony detail failed to load', async () => {

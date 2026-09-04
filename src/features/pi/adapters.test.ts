@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { pinRole, extractorProgramsFromPins, hasUnverifiedExtractors } from './adapters';
+import {
+  pinRole,
+  extractorProgramsFromPins,
+  hasUnverifiedExtractors,
+  factorySchematicId,
+  groupFactoryPins,
+} from './adapters';
 import type { PlanetPin } from '@/esi/endpoints';
 
 const extractorHeads = [{ head_id: 1, latitude: 0, longitude: 0 }];
@@ -30,6 +36,50 @@ describe('pinRole', () => {
   it('falls back to other for storage/command-center pins', () => {
     const pin: PlanetPin = { pin_id: 3, type_id: 102, latitude: 0, longitude: 0 };
     expect(pinRole(pin)).toBe('other');
+  });
+
+  // Live ESI (2026) puts the running schematic on the pin's own top-level
+  // `schematic_id`, not inside `factory_details` — `factory_details` was
+  // observed absent even for an Industry Facility mid-cycle. Both shapes must
+  // resolve to 'factory' since which one ESI sends isn't ours to assume.
+  it('identifies a factory pin from a top-level schematic_id with no factory_details', () => {
+    const pin: PlanetPin = {
+      pin_id: 4,
+      type_id: 2481,
+      latitude: 0,
+      longitude: 0,
+      schematic_id: 131,
+    };
+    expect(pinRole(pin)).toBe('factory');
+  });
+});
+
+describe('factorySchematicId', () => {
+  it('reads the nested factory_details.schematic_id when present', () => {
+    const pin: PlanetPin = {
+      pin_id: 1,
+      type_id: 101,
+      latitude: 0,
+      longitude: 0,
+      factory_details: { schematic_id: 5 },
+    };
+    expect(factorySchematicId(pin)).toBe(5);
+  });
+
+  it('falls back to the top-level schematic_id when factory_details is absent', () => {
+    const pin: PlanetPin = {
+      pin_id: 4,
+      type_id: 2481,
+      latitude: 0,
+      longitude: 0,
+      schematic_id: 131,
+    };
+    expect(factorySchematicId(pin)).toBe(131);
+  });
+
+  it('is undefined for a pin with neither', () => {
+    const pin: PlanetPin = { pin_id: 3, type_id: 102, latitude: 0, longitude: 0 };
+    expect(factorySchematicId(pin)).toBeUndefined();
   });
 });
 
@@ -133,6 +183,79 @@ describe('extractorProgramsFromPins', () => {
       extractor_details: { heads: extractorHeads },
     };
     expect(extractorProgramsFromPins([pin])).toEqual([]);
+  });
+});
+
+describe('groupFactoryPins', () => {
+  // `factory_details: {}` (no nested `schematic_id`, despite the field being
+  // typed required) is how ESI has been observed to send a factory pin
+  // whose schematic isn't resolvable — the same "live ESI ignores its own
+  // documented shape" precedent `pinRole`'s top-level `schematic_id` fallback
+  // exists for. Cast past the type since it's declared required in the
+  // normal case.
+  const factory = (id: number, schematicId?: number): PlanetPin => ({
+    pin_id: id,
+    type_id: 2481,
+    latitude: 0,
+    longitude: 0,
+    factory_details:
+      schematicId !== undefined
+        ? { schematic_id: schematicId }
+        : ({} as PlanetPin['factory_details']),
+  });
+
+  it('collapses two pins running the same schematic into one group with count 2', () => {
+    expect(groupFactoryPins([factory(1, 5), factory(2, 5)])).toEqual([
+      { schematicId: 5, count: 2 },
+    ]);
+  });
+
+  it('keeps distinct schematics as separate groups in first-appearance order', () => {
+    expect(groupFactoryPins([factory(1, 7), factory(2, 5), factory(3, 7)])).toEqual([
+      { schematicId: 7, count: 2 },
+      { schematicId: 5, count: 1 },
+    ]);
+  });
+
+  it('groups pins with no resolvable schematic id together under undefined, not dropped', () => {
+    expect(groupFactoryPins([factory(1), factory(2, 5), factory(3)])).toEqual([
+      { schematicId: undefined, count: 2 },
+      { schematicId: 5, count: 1 },
+    ]);
+  });
+
+  it('excludes extractor and other-role pins entirely', () => {
+    const extractor: PlanetPin = {
+      pin_id: 9,
+      type_id: 100,
+      latitude: 0,
+      longitude: 0,
+      extractor_details: { heads: extractorHeads },
+    };
+    const other: PlanetPin = { pin_id: 10, type_id: 102, latitude: 0, longitude: 0 };
+    expect(groupFactoryPins([extractor, other, factory(1, 5)])).toEqual([
+      { schematicId: 5, count: 1 },
+    ]);
+  });
+
+  it('excludes a pin with extractor_details even if it also carries a stray top-level schematic_id', () => {
+    // pinRole gives extractor_details priority over schematic_id (see pinRole
+    // above) — this group must agree, or such a pin would silently vanish
+    // from both the extraction and production reads.
+    const oddPin: PlanetPin = {
+      pin_id: 11,
+      type_id: 100,
+      latitude: 0,
+      longitude: 0,
+      extractor_details: { heads: extractorHeads },
+      schematic_id: 5,
+    };
+    expect(groupFactoryPins([oddPin])).toEqual([]);
+  });
+
+  it('returns an empty array for pins with no factories', () => {
+    const other: PlanetPin = { pin_id: 1, type_id: 102, latitude: 0, longitude: 0 };
+    expect(groupFactoryPins([other])).toEqual([]);
   });
 });
 

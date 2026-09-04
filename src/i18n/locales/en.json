@@ -836,21 +836,7 @@
     "upgradeLevel": "Upgrade level {{level}}",
     "pinCount": "{{count}} pins",
     "planetLabel": "Planet #{{id}}",
-    "systemLabel": "System #{{id}}",
-    "pinTableLabel": "Pins on {{planet}}",
     "noPinsTitle": "No pin data cached for this colony",
-    "column": {
-      "pin": "Pin",
-      "role": "Role",
-      "detail": "Detail",
-      "status": "Status",
-      "expires": "Expires"
-    },
-    "role": {
-      "extractor": "Extractor",
-      "factory": "Factory",
-      "other": "Other"
-    },
     "state": {
       "active": "Active",
       "expiring-soon": "Expiring soon",
@@ -861,6 +847,18 @@
     "unknownSchematic": "Unknown schematic",
     "expired": "Expired",
     "expiresIn": "in {{duration}}",
+    "extraction": {
+      "statusLabel": "Status",
+      "expiresLabel": "Expires",
+      "progressLabel": "{{product}} banked share of program total"
+    },
+    "production": {
+      "title": "Production",
+      "facilitiesRunning": "{{count}} facilities running"
+    },
+    "infrastructure": {
+      "title": "Infrastructure · no per-cycle data"
+    },
     "yield": {
       "bankedColumn": "Banked",
       "bankedValue": "{{amount}} ({{percent}}%)",
