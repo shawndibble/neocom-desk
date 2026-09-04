@@ -52,6 +52,7 @@ import {
   planTombstonesKey,
   quickbarTombstonesKey,
   stationPinTombstonesKey,
+  readTombstones,
 } from './localBookkeeping';
 import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
@@ -93,11 +94,6 @@ const SETTINGS_TOMBSTONES_KEY = `${INTERNAL_PREFIX}settingsTombstones`;
 
 function isSyncedSettingKey(key: string): boolean {
   return key.startsWith(SYNCED_PREFIX) && !key.startsWith(INTERNAL_PREFIX);
-}
-
-async function readTombstones(key: string): Promise<LocalTombstone[]> {
-  const record = await db.settings.get(key);
-  return Array.isArray(record?.value) ? (record.value as LocalTombstone[]) : [];
 }
 
 async function writeTombstones(key: string, tombstones: LocalTombstone[]): Promise<void> {

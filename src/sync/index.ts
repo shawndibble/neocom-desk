@@ -12,6 +12,8 @@ export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } f
 export { uidForCharacter } from './uid';
 export { TOMBSTONE_TTL_MS } from './merge';
 export { clearCharacterSyncBookkeeping } from './localBookkeeping';
+// Touches Dexie only — no Firebase — so it needs no lazy-import wrapper.
+export { backfillAccountWideData } from './accountWideBackfill';
 
 /**
  * Run a sync now. Coalesced per character and serialized globally (planSync.ts).
