@@ -35,13 +35,14 @@ interface CorpPeopleRailProps {
   /** Tracking rows, already adapted — `features/corp/members.ts`. */
   members: readonly MemberActivity[];
   /**
-   * Who joined and left since this device last *opened the roster*.
+   * Who joined and left since this device last *opened the roster*, or `null`
+   * when the member-id list could not be read at all.
    *
    * The overview reads that baseline and deliberately does not replace it
    * (`Corp.tsx`), so this figure stands until the user follows the link — the
    * "should I go look" is still true right up until they do.
    */
-  diff: RosterDiff;
+  diff: RosterDiff | null;
   /** Captured by the loader — `Date.now()` in render is impure and React forbids it. */
   nowMs: number;
 }
@@ -84,19 +85,28 @@ export function CorpPeopleRail({ members, diff, nowMs }: CorpPeopleRailProps) {
           while this is a rail of standing figures and "0 joined" is the answer
           to the question the rail is always asking. A chip that came and went
           would also reflow the rail on every visit.
+
+          A `null` diff is the one case that does drop them, and for the
+          opposite reason: the id list could not be read, so "0 joined" would
+          not be a standing figure but a claim. `/corp/members` shows no
+          summary there either.
         */}
-        <StatChip
-          label={t('corp.people.joined')}
-          value={diff.joined.length}
-          tone={diff.joined.length > 0 ? 'success' : 'default'}
-          tooltip={t('corp.people.changeHint')}
-        />
-        <StatChip
-          label={t('corp.people.left')}
-          value={diff.left.length}
-          tone={diff.left.length > 0 ? 'warning' : 'default'}
-          tooltip={t('corp.people.changeHint')}
-        />
+        {diff !== null && (
+          <>
+            <StatChip
+              label={t('corp.people.joined')}
+              value={diff.joined.length}
+              tone={diff.joined.length > 0 ? 'success' : 'default'}
+              tooltip={t('corp.people.changeHint')}
+            />
+            <StatChip
+              label={t('corp.people.left')}
+              value={diff.left.length}
+              tone={diff.left.length > 0 ? 'warning' : 'default'}
+              tooltip={t('corp.people.changeHint')}
+            />
+          </>
+        )}
       </div>
     </Panel>
   );

@@ -534,6 +534,29 @@ describe('the People rail (#345)', () => {
   });
 
   /**
+   * The other half of AC2's no-drift rule, on the failed-read branch.
+   *
+   * Tracking fine, id list refused: `/corp/members` renders no summary at
+   * all there (`isEmptyRosterDiff`), so a confident "Joined 0 / Left 0"
+   * here would be the rail stating something it does not know. The two
+   * figures it does know still show.
+   */
+  it('drops the change figures, not the rail, when the id list cannot be read', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    giveDirectorARoster();
+    mocked.loadCorporationMemberIds.mockResolvedValue({ cached: null, needsReauth: false });
+
+    renderCorp();
+
+    await waitFor(() => expect(statValue('Members')).toBe('5'));
+    expect(statValue('Dark 30d+')).toBe('1');
+    expect(peopleRail().queryByText('Joined')).not.toBeInTheDocument();
+    expect(peopleRail().queryByText('Left')).not.toBeInTheDocument();
+    // The baseline is still not consumed on the failed branch either.
+    expect(mockedRoster.recordRoster).not.toHaveBeenCalled();
+  });
+
+  /**
    * A tracking read that produced nothing is "could not read", not "a
    * corporation of zero people" — the `null`-never-`[]` rule the rest of this
    * route already follows. A 403 lands here, swallowed by
