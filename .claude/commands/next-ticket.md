@@ -322,6 +322,11 @@ it is not 5 conflict rounds plus 5 CI rounds):
     finished (or hadn't registered yet and the internal grace period ran
     out) — genuinely still in flight, not a failure and not a diagnosis
     target. Wait a bit and restart this round, same as `missing-checks`.
+    If it persists across rounds with no progress, it may not actually be
+    running anymore — check `gh pr checks <pr>` for a `cancel` or
+    `skipping` bucket on that context (e.g. a superseding push cancelled
+    it); that won't resolve by waiting, so push again or otherwise get a
+    fresh run started instead of burning the remaining rounds on it.
   - `{"status":"checks-failed","failedRunIds":[<run-id>, ...]}` — for each
     id, within the same round budget:
     1. Diagnose in a **sub-agent** — CI logs run to tens of thousands of
