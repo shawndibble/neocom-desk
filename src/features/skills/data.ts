@@ -131,10 +131,31 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Distinct from typeNames.ts's `type:${id}` — that module caches a plain
+ * `string` (just the resolved name) under that key, while this one caches a
+ * full `UniverseType` object (name, description, dogma_attributes). The two
+ * used to share the `type:${id}` key: whichever wrote first "won", and under
+ * `STALE_AFTER.static`'s long window the loser was stuck reading a
+ * wrong-shaped row far into the future with no live re-fetch to correct it.
+ * In practice: visiting Clones (or Wallet/Orders/Assets/Corp — anything
+ * feeding typeNames.ts's loadTypeNames) for an implant type before Skills
+ * ever loaded it live cached that id's row as a bare string. Skills.tsx then
+ * read `row.value as UniverseType`, got a string, and `info?.name` /
+ * `info?.dogma_attributes` both came back `undefined` — the implant showed
+ * as its bare `#typeId` with its attribute bonus silently dropped, and
+ * because the row read as "fresh", `loadUniverseType`'s own retry (below)
+ * never even fired: `loadUniverseTypeOnce` returned a truthy (if
+ * wrong-shaped) result on the very first pass.
+ */
+function universeTypeCacheKey(typeId: number): string {
+  return `universeType:${typeId}`;
+}
+
 function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType> | null> {
   return loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
-    `type:${typeId}`,
+    universeTypeCacheKey(typeId),
     async () => (await getUniverseType(typeId)).data,
     // An item type's name, description and dogma attributes change only when
     // CCP patches them — not on the app's 10-minute cadence.

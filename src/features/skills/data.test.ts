@@ -325,7 +325,7 @@ describe('loadUniverseType', () => {
     const result = await loadUniverseType(9899);
 
     expect(result?.data).toEqual(type);
-    const cached = await db.esiCache.get([0, 'type:9899']);
+    const cached = await db.esiCache.get([0, 'universeType:9899']);
     expect(cached?.value).toEqual(type);
   });
 
@@ -337,7 +337,7 @@ describe('loadUniverseType', () => {
       group_id: 300,
       published: true,
     };
-    await db.esiCache.put({ characterId: 0, key: 'type:9899', value: type, fetchedAt: 42 });
+    await db.esiCache.put({ characterId: 0, key: 'universeType:9899', value: type, fetchedAt: 42 });
     server.use(http.get(`${ESI_BASE_URL}/universe/types/9899`, () => HttpResponse.error()));
 
     const result = await loadUniverseType(9899);
@@ -389,6 +389,41 @@ describe('loadUniverseType', () => {
 
     expect(await loadUniverseType(10209)).toBeNull();
     expect(requests).toBe(2);
+  });
+
+  it('is not poisoned by typeNames.ts caching a plain string under the same-looking key', async () => {
+    // typeNames.ts (features/character/typeNames.ts) resolves item names for
+    // Wallet/Orders/Assets/Corp/Clones and caches each one as a plain string
+    // under `type:${id}` in the same esiCache table. Visiting any of those
+    // views for this same implant type before Skills.tsx ever loaded it live
+    // used to leave `db.esiCache` at key `type:10209` holding a bare string —
+    // loadUniverseType read it back as `CachedResult<UniverseType>`, so
+    // `.data.name` and `.data.dogma_attributes` were both `undefined` even
+    // though the row was "fresh". loadUniverseType now writes under
+    // `universeType:${id}` instead, so the two caches can't collide.
+    await db.esiCache.put({
+      characterId: 0,
+      key: 'type:10209',
+      value: 'Memory Augmentation - Improved',
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/10209`, () =>
+        HttpResponse.json({
+          type_id: 10209,
+          name: 'Memory Augmentation - Improved',
+          description: '',
+          group_id: 745,
+          published: true,
+          dogma_attributes: [{ attribute_id: 177, value: 5.0 }],
+        })
+      )
+    );
+
+    const result = await loadUniverseType(10209);
+
+    expect(result?.data.name).toBe('Memory Augmentation - Improved');
+    expect(result?.data.dogma_attributes).toEqual([{ attribute_id: 177, value: 5.0 }]);
   });
 });
 
