@@ -19,6 +19,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel, StatChip } from '@/components/ui';
 import { extractorState, colonyStatus, sortColoniesByAttention } from '@/engine/pi/colonyStatus';
+import { fractionOfFirstDayRate, hasYieldBaseline } from '@/engine/pi/extraction';
 import type { ColonyStatus, ExtractorState } from '@/engine/pi/types';
 import { formatDuration } from '@/lib/duration';
 import type { PiRosterSnapshot, RosterCharacter, TimelineProgram } from './roster';
@@ -65,14 +66,33 @@ function ProgramRow({ row, nowMs }: TimelineRowProps) {
   // is spelled out in the time column, and the two states that outrank a
   // healthy program in the sort — expiring-soon and decayed — say so in words,
   // so a row's position in the list is always explained by its own text.
-  // `decayed` is only shown once the program is not already more urgent than
-  // that, matching `colonyAttention`'s precedence.
+  // Mirrors `colonyAttention`'s idle → expiring-soon → decayed precedence:
+  // an expired program is this row's "idle" (the time column already says
+  // "Expired"), so it is checked first and short-circuits before either of
+  // the other two — an expired-and-decayed program never doubles up as
+  // "Expired · Decayed".
   const tag =
-    state === 'expiring-soon'
-      ? t('pi.state.expiring-soon')
-      : status.decayed === true
-        ? t('pi.attention.decayed')
-        : null;
+    state === 'expired'
+      ? null
+      : state === 'expiring-soon'
+        ? t('pi.state.expiring-soon')
+        : status.decayed === true
+          ? t('pi.attention.decayed')
+          : null;
+
+  // Bar length alone reads as the only signal, but output decays hard over a
+  // program's life (100/55/38/30/24/20/17...9% across 14 days) — a bar with
+  // days left can be nearly dead while one with little time left is still
+  // the most productive planet on the account. This is the trailing day's
+  // output over the program's own first day (`fractionOfFirstDayRate`,
+  // #316), i.e. how far this program has fallen from its own peak, not an
+  // absolute quantity. Absent a baseline the program carries no such
+  // reading at all — never rendered as a misleading 0%.
+  const yieldText = hasYieldBaseline(entry.program)
+    ? t('pi.timeline.peakShareValue', {
+        percent: Math.round(fractionOfFirstDayRate(entry.program, nowMs) * 100),
+      })
+    : null;
 
   return (
     <li className="grid grid-cols-1 gap-x-3 gap-y-1 py-1 sm:grid-cols-[minmax(0,15rem)_1fr] sm:items-center">
@@ -83,11 +103,19 @@ function ProgramRow({ row, nowMs }: TimelineRowProps) {
           <span className="truncate text-[0.6875rem] text-text-dim">{entry.productName}</span>
         )}
       </div>
-      <div className="flex min-w-0 items-center gap-2">
+      {/*
+        `flex-wrap` (already the label row's pattern above) is what lets a
+        third data point — the yield read — drop to its own line rather than
+        forcing horizontal scroll at 390px: the track keeps a small `min-w`
+        of its own instead of `min-w-0`, so once the row runs out of room the
+        browser wraps the overflow item rather than squeezing the track to
+        nothing.
+      */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
         <div
           // `overflow-hidden` is a second guard on the clamp: even if the
           // percentage were ever wrong, the bar cannot escape its track.
-          className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-xs bg-panel-2"
+          className="relative h-2 min-w-[2rem] flex-1 overflow-hidden rounded-xs bg-panel-2"
           aria-hidden="true"
         >
           <div
@@ -105,6 +133,9 @@ function ProgramRow({ row, nowMs }: TimelineRowProps) {
           <span className="shrink-0 text-[0.6875rem] tracking-wide text-text-dim uppercase">
             {tag}
           </span>
+        )}
+        {yieldText && (
+          <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">{yieldText}</span>
         )}
       </div>
     </li>

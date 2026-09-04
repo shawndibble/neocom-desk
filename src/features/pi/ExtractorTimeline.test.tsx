@@ -98,6 +98,81 @@ describe('ExtractorTimeline', () => {
     expect(screen.getByRole('listitem')).toHaveTextContent(/Expiring soon/i);
   });
 
+  it('never doubles up as "Expired · Decayed" — expired takes precedence, matching colonyAttention', () => {
+    // CCP's own worked 14-day example (extraction.test.ts), evaluated at its
+    // own expiry: by day 14 the trailing-day rate is ~8.8% of day 1, well
+    // under the 0.35 decayed threshold, and the program is also expired.
+    const installTimeMs = NOW - 20 * DAY_MS;
+    const expiryTimeMs = installTimeMs + 14 * DAY_MS;
+    render(
+      <ExtractorTimeline
+        nowMs={NOW}
+        snapshot={snapshot({
+          colonyCount: 1,
+          programs: [
+            program({
+              expiryTimeMs,
+              program: {
+                pinId: 1,
+                expiryTimeMs,
+                installTimeMs,
+                cycleTimeMs: 1_800_000,
+                qtyPerCycle: 6965,
+              },
+            }),
+          ],
+        })}
+      />
+    );
+
+    const row = screen.getByRole('listitem');
+    expect(row).toHaveTextContent('Expired');
+    expect(row).not.toHaveTextContent(/decayed/i);
+  });
+
+  it("shows a productivity read as a share of the program's own peak, not just time left", () => {
+    // Four days into CCP's worked 14-day example, the trailing-day rate is
+    // 29.9579% of day 1's — a bar reading "10d left" that is already this
+    // far down its own curve, per the ticket's motivating example.
+    const installTimeMs = NOW - 4 * DAY_MS;
+    const expiryTimeMs = installTimeMs + 14 * DAY_MS;
+    render(
+      <ExtractorTimeline
+        nowMs={NOW}
+        snapshot={snapshot({
+          colonyCount: 1,
+          programs: [
+            program({
+              expiryTimeMs,
+              program: {
+                pinId: 1,
+                expiryTimeMs,
+                installTimeMs,
+                cycleTimeMs: 1_800_000,
+                qtyPerCycle: 6965,
+              },
+            }),
+          ],
+        })}
+      />
+    );
+
+    expect(screen.getByRole('listitem')).toHaveTextContent('30% of peak');
+  });
+
+  it('renders no yield read for a program with no install-time baseline (never a misleading 0%)', () => {
+    render(
+      <ExtractorTimeline
+        nowMs={NOW}
+        snapshot={snapshot({
+          colonyCount: 1,
+          programs: [program({ expiryTimeMs: NOW + 5 * DAY_MS })],
+        })}
+      />
+    );
+    expect(screen.getByRole('listitem')).not.toHaveTextContent('%');
+  });
+
   it('distinguishes "not loaded yet" from "no colonies" and from "skipped"', () => {
     render(
       <ExtractorTimeline
