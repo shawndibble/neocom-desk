@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -13,6 +13,8 @@ import {
 import * as boardData from '@/features/corp/boardData';
 import * as corpWallet from '@/features/corp/wallet';
 import * as corpJobs from '@/features/corp/jobs';
+import * as corpMembers from '@/features/corp/members';
+import * as rosterState from '@/features/corp/rosterState';
 import { Corp } from './Corp';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -25,6 +27,20 @@ vi.mock('@/features/corp/boardData', async (importOriginal) => ({
 // The wallet and jobs reads belong to #298's modules; the board is a consumer.
 vi.mock('@/features/corp/wallet');
 vi.mock('@/features/corp/jobs');
+// The roster reads are #297's modules; the People rail is a second consumer.
+// Spread the original so `toMemberActivity` stays the real boundary adaptation —
+// the rail's figures have to be the ones `/corp/members` computes.
+vi.mock('@/features/corp/members', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/corp/members')>()),
+  loadCorporationMemberIds: vi.fn(),
+  loadCorporationMemberTracking: vi.fn(),
+}));
+// Replaced outright rather than spread: the real module builds a persisted
+// store at module scope, and this route only ever reads from it.
+vi.mock('@/features/corp/rosterState', () => ({
+  readPreviousRoster: vi.fn(),
+  recordRoster: vi.fn(),
+}));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(
     async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Type ${id}`]))
@@ -37,7 +53,9 @@ const mocked = {
   ...vi.mocked(boardData),
   ...vi.mocked(corpWallet),
   ...vi.mocked(corpJobs),
+  ...vi.mocked(corpMembers),
 };
+const mockedRoster = vi.mocked(rosterState);
 
 const CHARACTER_ID = 42;
 const CORPORATION_ID = 98000001;
@@ -94,6 +112,9 @@ beforeEach(() => {
   mocked.loadCorporationWallets.mockImplementation(forbidden('wallets'));
   mocked.loadCorporationDivisions.mockImplementation(forbidden('divisions'));
   mocked.loadCorporationWalletJournal.mockImplementation(forbidden('journal'));
+  mocked.loadCorporationMemberIds.mockImplementation(forbidden('memberIds'));
+  mocked.loadCorporationMemberTracking.mockImplementation(forbidden('tracking'));
+  mockedRoster.readPreviousRoster.mockResolvedValue(undefined);
   mockedAccess.mockReturnValue(accessOf('ready', {}));
 });
 
@@ -393,5 +414,140 @@ describe('an unknown corporation', () => {
     renderCorp();
     await waitFor(() => expect(screen.getByText('Nothing due')).toBeInTheDocument());
     expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The People half of the side rail (#345) — the panel the Directorate design
+ * study always had beside Money, and which fell out of #296's scoping.
+ */
+describe('the People rail (#345)', () => {
+  /** The People panel's own subtree: "Members" is also the sub-nav's tab label. */
+  function peopleRail() {
+    const panel = screen.getByRole('heading', { name: 'People' }).closest('section');
+    if (panel === null) throw new Error('the People rail rendered without a panel');
+    return within(panel);
+  }
+
+  /** A `StatChip`'s value, reached through its label — the value span is last. */
+  function statValue(label: string): string {
+    return peopleRail().getByText(label).parentElement?.lastElementChild?.textContent ?? '';
+  }
+
+  function giveDirectorARoster() {
+    mocked.loadCorporationMemberIds.mockResolvedValue(cached([1, 2, 3, 4, 5]));
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        { character_id: 1, logoff_date: at(-2 * DAY) },
+        // The one member past `DARK_AFTER_DAYS`.
+        { character_id: 2, logoff_date: at(-40 * DAY) },
+        { character_id: 3, logoff_date: at(-5 * DAY) },
+        { character_id: 4, logoff_date: at(-DAY) },
+        { character_id: 5, logoff_date: at(-3 * HOUR) },
+      ])
+    );
+    // 3, 4 and 5 are new since the baseline; 9 and 10 have gone.
+    mockedRoster.readPreviousRoster.mockResolvedValue([1, 2, 9, 10]);
+  }
+
+  /**
+   * AC1/AC2: the four figures, and every one of them the number
+   * `/corp/members` prints for the same roster — same `DARK_AFTER_MS`, same
+   * `diffRoster`, and a total counted from the tracking rows the roster table
+   * lists rather than from the id list.
+   */
+  it('summarises the roster beside Money, on the roster page own figures', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true, canReadWallet: true }));
+    mocked.loadCorporationWallets.mockResolvedValue(cached([{ division: 1, balance: 1_000_000 }]));
+    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
+    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
+    giveDirectorARoster();
+
+    renderCorp();
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'People' })).toBeInTheDocument()
+    );
+    // Beside Money, not instead of it.
+    expect(screen.getByText('Vitals')).toBeInTheDocument();
+    expect(statValue('Members')).toBe('5');
+    expect(statValue('Dark 30d+')).toBe('1');
+    expect(statValue('Joined')).toBe('3');
+    expect(statValue('Left')).toBe('2');
+  });
+
+  /** It answers "should I go look"; the roster page answers "at what". */
+  it('links to the roster rather than repeating it', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    giveDirectorARoster();
+
+    renderCorp();
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'People' })).toBeInTheDocument()
+    );
+    expect(peopleRail().getByRole('link', { name: 'Roster' })).toHaveAttribute(
+      'href',
+      '/corp/members'
+    );
+    // No table, no names — the rail resolved nobody.
+    expect(peopleRail().queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  /**
+   * The agreement that keeps AC2 true over time.
+   *
+   * `rosterState.ts` holds what this device has already *reported*, and
+   * `/corp/members` reads and replaces it in one pass so a change is announced
+   * once. If the overview replaced it too, whichever surface was opened first
+   * would eat the change and the other would show nothing — the failure that
+   * module's note rules out for #299's poller. So the overview only asks.
+   */
+  it('reads the roster baseline without consuming it', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    giveDirectorARoster();
+
+    renderCorp();
+
+    await waitFor(() => expect(statValue('Joined')).toBe('3'));
+    expect(mockedRoster.readPreviousRoster).toHaveBeenCalledWith(CHARACTER_ID, CORPORATION_ID);
+    expect(mockedRoster.recordRoster).not.toHaveBeenCalled();
+  });
+
+  /**
+   * AC3, the same shape as the wallet rail's own gate: no panel, and no
+   * request either — `membertracking` answers to Director alone, so an
+   * ungated read here buys a guaranteed 403.
+   */
+  it('gives a non-Director no People rail and fires no roster read', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
+    mocked.loadCorporationWallets.mockResolvedValue(cached([{ division: 1, balance: 1_000_000 }]));
+    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
+    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
+
+    renderCorp();
+
+    await waitFor(() => expect(screen.getByText('Vitals')).toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: 'People' })).not.toBeInTheDocument();
+    expect(mocked.loadCorporationMemberIds).not.toHaveBeenCalled();
+    expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A tracking read that produced nothing is "could not read", not "a
+   * corporation of zero people" — the `null`-never-`[]` rule the rest of this
+   * route already follows. A 403 lands here, swallowed by
+   * `detectCorpAuthFailure` inside the loader, and must not become a rail
+   * confidently reporting no members.
+   */
+  it('hides the rail when the roster could not be read at all', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    mocked.loadCorporationMemberIds.mockResolvedValue({ cached: null, needsReauth: false });
+    mocked.loadCorporationMemberTracking.mockResolvedValue({ cached: null, needsReauth: false });
+
+    renderCorp();
+
+    await waitFor(() => expect(mocked.loadCorporationMemberTracking).toHaveBeenCalled());
+    expect(screen.queryByRole('heading', { name: 'People' })).not.toBeInTheDocument();
   });
 });
