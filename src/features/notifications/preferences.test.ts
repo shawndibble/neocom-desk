@@ -3,6 +3,7 @@ import { db } from '@/db';
 import type { NotificationEventId } from './events';
 import {
   useNotificationPreferences,
+  hydrateNotificationPreferences,
   NOTIFICATION_PREFS_SETTING_KEY,
   DEFAULT_NOTIFICATION_PREFERENCES,
   characterEventPrefs,
@@ -24,6 +25,7 @@ import {
   DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
 } from './preferences';
+import { SYNCED_NOTIFICATION_FEED_PREFS_KEY } from './syncedPreferences';
 
 const EVENT_A = 'skillLevelComplete' satisfies NotificationEventId;
 const EVENT_B = 'newMail' satisfies NotificationEventId;
@@ -349,5 +351,68 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
     });
     await useNotificationPreferences.getState().hydrate();
     expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+});
+
+describe('hydrateNotificationPreferences', () => {
+  it('splices synced feed data on top of the local row', async () => {
+    await db.settings.put({
+      key: NOTIFICATION_PREFS_SETTING_KEY,
+      value: {
+        masterEnabled: true,
+        perCharacter: { 1: { [EVENT_A]: { browser: true, feed: true } } },
+      },
+    });
+    await db.settings.put({
+      key: SYNCED_NOTIFICATION_FEED_PREFS_KEY,
+      value: {
+        perCharacter: { 1: { [EVENT_A]: false } },
+        eveNotificationTypesByCharacter: {},
+        thresholdsByCharacter: {},
+      },
+    });
+    await hydrateNotificationPreferences();
+    expect(
+      isEventEnabledFor(
+        characterEventPrefs(useNotificationPreferences.getState().value, 1),
+        EVENT_A,
+        'feed'
+      )
+    ).toBe(false);
+    // The browser flag came from the local row and must survive the merge untouched.
+    expect(
+      isEventEnabledFor(
+        characterEventPrefs(useNotificationPreferences.getState().value, 1),
+        EVENT_A,
+        'browser'
+      )
+    ).toBe(true);
+  });
+
+  /**
+   * Regression test for a bug caught in review: `withSyncedFeedPrefsApplied`
+   * rebuilds a fresh object graph for every Character present in the synced
+   * blob even when nothing changed, so a naive reference check
+   * (`merged !== current`) is true on nearly every call. Both
+   * NotificationsPanel and NotificationFeedPanel re-run this (via
+   * `refreshAppBadge`) from a `useEffect` keyed on the store's value — a
+   * reference check there would call `setValue` every time, looping without
+   * end. This asserts the store's value reference is stable across repeated
+   * calls when the synced blob hasn't actually changed.
+   */
+  it('does not re-apply (or re-persist) an unchanged synced value on repeated calls', async () => {
+    await db.settings.put({
+      key: SYNCED_NOTIFICATION_FEED_PREFS_KEY,
+      value: {
+        perCharacter: { 1: { [EVENT_A]: false } },
+        eveNotificationTypesByCharacter: {},
+        thresholdsByCharacter: {},
+      },
+    });
+    await hydrateNotificationPreferences();
+    const afterFirstCall = useNotificationPreferences.getState().value;
+
+    await hydrateNotificationPreferences();
+    expect(useNotificationPreferences.getState().value).toBe(afterFirstCall);
   });
 });

@@ -8,8 +8,19 @@
 // offline past that window never sees the delete and re-pushes its stale copy.
 // That is the known, accepted edge — the same one Skill Plans carry.
 //
-// There are no synced settings in production yet, so this list is empty.
-export const SYNCED_SETTING_KEYS: readonly string[] = [];
+// sync.notificationFeedPrefs (issue #363): the feed half of Notification
+// Preferences' per-Character event/eve-type toggles, plus the structure-fuel
+// and corp-wallet thresholds. One key for every Character, not one per
+// Character — see src/features/notifications/syncedPreferences.ts's doc
+// comment for why (mergeSettings is whole-value LWW per key, and this
+// allow-list is an exact-match Set, not a prefix match).
+//
+// Never deleted via deleteSyncedSetting: toggles are updates, not deletes
+// (the issue's own words), and the key stays a valid, if empty, blob for as
+// long as the account has any Character — the same "never deleted, only
+// emptied" shape the Quickbar's local row already carries. So the tombstone
+// edge above doesn't bite this key.
+export const SYNCED_SETTING_KEYS: readonly string[] = ['sync.notificationFeedPrefs'];
 
 const allowed = new Set(SYNCED_SETTING_KEYS);
 

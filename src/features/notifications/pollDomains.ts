@@ -125,7 +125,11 @@ import { loadUniverseType } from '@/features/skills/data';
 import { loadPlanetName } from '@/features/pi/names';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { NotificationEventId } from './events';
-import { useNotificationPreferences, characterEventThresholds } from './preferences';
+import {
+  useNotificationPreferences,
+  hydrateNotificationPreferences,
+  characterEventThresholds,
+} from './preferences';
 import { createPollerStateStore, isSnapshotWith, type PollerState } from './pollerState';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 
@@ -783,9 +787,9 @@ async function corpContextFor(
   return { corporationId };
 }
 
-/** This Character's current threshold settings (issue #299), device-local and re-read every poll — the mechanism AC4's "without a reload" relies on. */
+/** This Character's current threshold settings (issue #299, synced since #363), re-read every poll — the mechanism AC4's "without a reload" relies on. */
 async function currentThresholds(characterId: number) {
-  await useNotificationPreferences.getState().hydrate();
+  await hydrateNotificationPreferences();
   return characterEventThresholds(useNotificationPreferences.getState().value, characterId);
 }
 

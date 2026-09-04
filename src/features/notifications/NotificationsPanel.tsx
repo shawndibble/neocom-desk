@@ -45,6 +45,7 @@ import {
 } from './events';
 import {
   useNotificationPreferences,
+  hydrateNotificationPreferences,
   characterEventPrefs,
   characterEveTypePrefs,
   withMasterEnabled,
@@ -59,7 +60,9 @@ import {
   characterEventThresholds,
   withCharacterEventThreshold,
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
+  type NotificationPreferencesValue,
 } from './preferences';
+import { SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs } from './syncedPreferences';
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -72,6 +75,7 @@ import {
 } from './eventSelection';
 import { filterNotificationSections } from './notificationSearch';
 import { refreshAppBadge } from './appBadge';
+import { setSyncedSetting, scheduleSync } from '@/sync';
 import {
   useNotificationPermission,
   useNotificationPromptState,
@@ -107,12 +111,38 @@ export function NotificationsPanel() {
   const tokens = useLiveQuery(() => db.tokens.toArray());
 
   const prefsValue = useNotificationPreferences((state) => state.value);
-  const hydratePrefs = useNotificationPreferences((state) => state.hydrate);
   const setPrefsValue = useNotificationPreferences((state) => state.setValue);
 
   useEffect(() => {
-    void hydratePrefs();
-  }, [hydratePrefs]);
+    void hydrateNotificationPreferences();
+  }, []);
+
+  /**
+   * Per-Character writes (event/eve-type toggles, thresholds) also push the
+   * feed-only slice to the synced setting (issue #363) and schedule a sync —
+   * `setSyncedSetting` itself leaves scheduling to the caller. The
+   * device-local-only writes below (master switch, browser/feed channel
+   * gates) go straight through `setPrefsValue` instead, since none of that
+   * belongs on the wire.
+   *
+   * `channel` names which delivery channel this particular write touched, for
+   * the calls that come from a per-channel control (a threshold write has no
+   * channel — it always syncs). A `'browser'` write must skip the sync push
+   * entirely, not just contribute nothing to `toSyncedFeedPrefs`: pushing
+   * still stamps `sync.notificationFeedPrefs`' LWW `updatedAt`, so a
+   * browser-only edit would otherwise be able to clobber a genuine, still
+   * unsynced feed edit made concurrently on another device.
+   */
+  async function updatePrefs(
+    characterId: number,
+    next: NotificationPreferencesValue,
+    channel?: NotificationChannel
+  ) {
+    await setPrefsValue(next);
+    if (channel === 'browser') return;
+    await setSyncedSetting(SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs(next));
+    scheduleSync(characterId);
+  }
 
   // The Overview panel refreshes the app-icon badge when preferences change,
   // but it is unmounted while the user is on Settings — which is the only
@@ -368,13 +398,15 @@ export function NotificationsPanel() {
                             key={channel}
                             state={selectionStateForEvents(togglableEventIds, prefs, channel)}
                             onToggle={() =>
-                              void setPrefsValue(
+                              void updatePrefs(
+                                character.characterId,
                                 withAllEventsToggledForCharacter(
                                   prefsValue,
                                   character.characterId,
                                   togglableEventIds,
                                   channel
-                                )
+                                ),
+                                channel
                               )
                             }
                             label={t(`settings.notifications.selectAll.${channel}`, {
@@ -435,13 +467,15 @@ export function NotificationsPanel() {
                                         }
                                         checked={isEventEnabledFor(prefs, eventId, channel)}
                                         onToggle={() =>
-                                          void setPrefsValue(
+                                          void updatePrefs(
+                                            character.characterId,
                                             withEventChannelToggled(
                                               prefsValue,
                                               character.characterId,
                                               eventId,
                                               channel
-                                            )
+                                            ),
+                                            channel
                                           )
                                         }
                                       />
@@ -481,7 +515,8 @@ export function NotificationsPanel() {
                                         className="w-auto"
                                         value={thresholds.structureFuelLowDays}
                                         onChange={(e) =>
-                                          void setPrefsValue(
+                                          void updatePrefs(
+                                            character.characterId,
                                             withCharacterEventThreshold(
                                               prefsValue,
                                               character.characterId,
@@ -532,7 +567,8 @@ export function NotificationsPanel() {
                                       )}
                                       value={thresholds.corpWalletBalanceFloorIsk}
                                       onCommit={(amount) =>
-                                        void setPrefsValue(
+                                        void updatePrefs(
+                                          character.characterId,
                                           withCharacterEventThreshold(
                                             prefsValue,
                                             character.characterId,
@@ -549,7 +585,8 @@ export function NotificationsPanel() {
                                       )}
                                       value={thresholds.corpWalletTransactionCeilingIsk}
                                       onCommit={(amount) =>
-                                        void setPrefsValue(
+                                        void updatePrefs(
+                                          character.characterId,
                                           withCharacterEventThreshold(
                                             prefsValue,
                                             character.characterId,
@@ -609,13 +646,15 @@ export function NotificationsPanel() {
                                                     channel
                                                   )}
                                                   onToggle={() =>
-                                                    void setPrefsValue(
+                                                    void updatePrefs(
+                                                      character.characterId,
                                                       withAllEveTypesToggledForCharacter(
                                                         prefsValue,
                                                         character.characterId,
                                                         familyTypes,
                                                         channel
-                                                      )
+                                                      ),
+                                                      channel
                                                     )
                                                   }
                                                   label={t(
@@ -651,13 +690,15 @@ export function NotificationsPanel() {
                                                         channel
                                                       )}
                                                       onToggle={() =>
-                                                        void setPrefsValue(
+                                                        void updatePrefs(
+                                                          character.characterId,
                                                           withEveNotificationTypeToggled(
                                                             prefsValue,
                                                             character.characterId,
                                                             type,
                                                             channel
-                                                          )
+                                                          ),
+                                                          channel
                                                         )
                                                       }
                                                     />
