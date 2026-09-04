@@ -29,8 +29,9 @@ describe('idsBeyondLimit', () => {
 });
 
 describe('recordFeedEntry / readFeed', () => {
-  it('stores an entry and reads it back', async () => {
+  it('stores an entry, keyed by the caller-supplied id, and reads it back', async () => {
     await recordFeedEntry({
+      id: 'occurrence-1',
       characterId: 1,
       eventId: 'newMail',
       title: 'New mail',
@@ -39,13 +40,18 @@ describe('recordFeedEntry / readFeed', () => {
     });
     const feed = await readFeed();
     expect(feed).toHaveLength(1);
-    expect(feed[0]).toMatchObject({ characterId: 1, eventId: 'newMail', firedAt: 1000 });
-    expect(feed[0].id).toEqual(expect.any(String));
+    expect(feed[0]).toMatchObject({
+      id: 'occurrence-1',
+      characterId: 1,
+      eventId: 'newMail',
+      firedAt: 1000,
+    });
   });
 
   it('reads newest first', async () => {
     for (const firedAt of [1000, 3000, 2000]) {
       await recordFeedEntry({
+        id: `occurrence-${firedAt}`,
         characterId: 1,
         eventId: 'newMail',
         title: 't',
@@ -59,6 +65,7 @@ describe('recordFeedEntry / readFeed', () => {
   it('trims the oldest entries past the cap', async () => {
     for (let i = 0; i < NOTIFICATION_FEED_LIMIT + 3; i++) {
       await recordFeedEntry({
+        id: `occurrence-${i}`,
         characterId: 1,
         eventId: 'newMail',
         title: 't',
@@ -70,11 +77,54 @@ describe('recordFeedEntry / readFeed', () => {
     expect(feed).toHaveLength(NOTIFICATION_FEED_LIMIT);
     expect(feed[feed.length - 1].firedAt).toBe(3);
   });
+
+  it('recording the same occurrence twice collapses to one feed row (issue #348)', async () => {
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'First observer',
+      body: 'b',
+      firedAt: 1000,
+    });
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'Second observer',
+      body: 'b',
+      firedAt: 1500,
+    });
+    const feed = await readFeed();
+    expect(feed).toHaveLength(1);
+    expect(feed[0].title).toBe('Second observer');
+  });
+});
+
+describe('legacy rows', () => {
+  it('a feed row written with a pre-#348 random-UUID id stays readable and dismissible', async () => {
+    const legacyId = crypto.randomUUID();
+    await db.notificationFeed.put({
+      id: legacyId,
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'Old row',
+      body: 'b',
+      firedAt: 1000,
+    });
+    const feed = await readFeed();
+    expect(feed).toHaveLength(1);
+    expect(feed[0].id).toBe(legacyId);
+
+    await dismissFeedEntry(legacyId);
+    expect(await readFeed()).toHaveLength(0);
+  });
 });
 
 describe('dismissing', () => {
   it('dismisses one entry, leaving the rest', async () => {
     await recordFeedEntry({
+      id: 'a',
       characterId: 1,
       eventId: 'newMail',
       title: 'a',
@@ -82,6 +132,7 @@ describe('dismissing', () => {
       firedAt: 1,
     });
     await recordFeedEntry({
+      id: 'b',
       characterId: 1,
       eventId: 'newMail',
       title: 'c',
@@ -100,6 +151,7 @@ describe('dismissing', () => {
   it('dismisses the given ids in bulk, leaving the others', async () => {
     for (let i = 0; i < 4; i++) {
       await recordFeedEntry({
+        id: `occurrence-${i}`,
         characterId: i,
         eventId: 'newMail',
         title: 't',

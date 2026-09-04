@@ -25,7 +25,14 @@ afterEach(() => {
 });
 
 async function seed(characterId: number, eventId: string) {
-  await recordFeedEntry({ characterId, eventId, title: 't', body: 'b', firedAt: Date.now() });
+  await recordFeedEntry({
+    id: crypto.randomUUID(),
+    characterId,
+    eventId,
+    title: 't',
+    body: 'b',
+    firedAt: Date.now(),
+  });
 }
 
 /** Seeding writes entries, and every write refreshes the badge — so forget those calls. */

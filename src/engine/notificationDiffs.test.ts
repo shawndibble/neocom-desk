@@ -86,7 +86,7 @@ describe('diffSkillLevelComplete', () => {
       T0 + 2000
     );
     expect(diffSkillLevelComplete(7, prev, next)).toEqual([
-      { eventId: 'skillLevelComplete', characterId: 7, skillId: 1, level: 3 },
+      { eventId: 'skillLevelComplete', characterId: 7, skillId: 1, level: 3, finishMs: T0 + 1000 },
     ]);
   });
 
@@ -147,8 +147,8 @@ describe('diffSkillLevelComplete', () => {
       T0 + 300
     );
     expect(diffSkillLevelComplete(7, prev, next)).toEqual([
-      { eventId: 'skillLevelComplete', characterId: 7, skillId: 1, level: 1 },
-      { eventId: 'skillLevelComplete', characterId: 7, skillId: 2, level: 2 },
+      { eventId: 'skillLevelComplete', characterId: 7, skillId: 1, level: 1, finishMs: T0 + 100 },
+      { eventId: 'skillLevelComplete', characterId: 7, skillId: 2, level: 2, finishMs: T0 + 200 },
     ]);
   });
 });
@@ -163,7 +163,13 @@ describe('diffCharacterNotTraining', () => {
     const prev = snapshot([entry({ skillId: 1, queuePosition: 0, finishMs: T0 + 1000 })], T0);
     const next = snapshot([], T0 + 2000);
     expect(diffCharacterNotTraining(7, prev, next)).toEqual([
-      { eventId: 'characterNotTraining', characterId: 7, skillId: null, level: null },
+      {
+        eventId: 'characterNotTraining',
+        characterId: 7,
+        skillId: null,
+        level: null,
+        finishMs: null,
+      },
     ]);
   });
 
@@ -171,7 +177,13 @@ describe('diffCharacterNotTraining', () => {
     const prev = snapshot([entry({ skillId: 1, queuePosition: 0, finishMs: T0 + 1000 })], T0);
     const next = snapshot([entry({ skillId: 1, queuePosition: 0, finishMs: null })], T0 + 2000);
     expect(diffCharacterNotTraining(7, prev, next)).toEqual([
-      { eventId: 'characterNotTraining', characterId: 7, skillId: null, level: null },
+      {
+        eventId: 'characterNotTraining',
+        characterId: 7,
+        skillId: null,
+        level: null,
+        finishMs: null,
+      },
     ]);
   });
 
@@ -197,7 +209,13 @@ describe('diffCharacterNotTraining', () => {
       T0 + FIVE_MIN
     );
     expect(diffCharacterNotTraining(7, wasTraining, stalledAgain)).toEqual([
-      { eventId: 'characterNotTraining', characterId: 7, skillId: null, level: null },
+      {
+        eventId: 'characterNotTraining',
+        characterId: 7,
+        skillId: null,
+        level: null,
+        finishMs: null,
+      },
     ]);
   });
 });
@@ -217,7 +235,15 @@ describe('SKILL_QUEUE_NOTIFICATION_DIFFS / runSkillQueueNotificationDiffs', () =
     expect(runSkillQueueNotificationDiffs(7, prev, next, new Set())).toEqual([]);
     expect(
       runSkillQueueNotificationDiffs(7, prev, next, new Set(['characterNotTraining']))
-    ).toEqual([{ eventId: 'characterNotTraining', characterId: 7, skillId: null, level: null }]);
+    ).toEqual([
+      {
+        eventId: 'characterNotTraining',
+        characterId: 7,
+        skillId: null,
+        level: null,
+        finishMs: null,
+      },
+    ]);
   });
 });
 
@@ -336,7 +362,7 @@ describe('diffPlanetaryExtractionDone', () => {
     const prev = planetarySnapshot([colonyEntry(1, [T0 + 1000])], T0);
     const next = planetarySnapshot([colonyEntry(1, [T0 + 1000])], T0 + 2000);
     expect(diffPlanetaryExtractionDone(7, prev, next)).toEqual([
-      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1 },
+      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1, expiryTimeMs: T0 + 1000 },
     ]);
   });
 
@@ -365,7 +391,7 @@ describe('diffPlanetaryExtractionDone', () => {
       T0 + 2000
     );
     expect(diffPlanetaryExtractionDone(7, prev, next)).toEqual([
-      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1 },
+      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1, expiryTimeMs: T0 - 1000 },
     ]);
   });
 
@@ -376,8 +402,8 @@ describe('diffPlanetaryExtractionDone', () => {
       T0 + 300
     );
     expect(diffPlanetaryExtractionDone(7, prev, next)).toEqual([
-      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1 },
-      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 2 },
+      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1, expiryTimeMs: T0 + 100 },
+      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 2, expiryTimeMs: T0 + 200 },
     ]);
   });
 });
@@ -396,9 +422,17 @@ function expiringFire(
   characterId: number,
   planetId: number,
   pinId: number,
-  thresholdMs: number
+  thresholdMs: number,
+  expiryTimeMs: number
 ): ExtractorExpiringFire {
-  return { eventId: 'planetaryExtractorExpiring', characterId, planetId, pinId, thresholdMs };
+  return {
+    eventId: 'planetaryExtractorExpiring',
+    characterId,
+    planetId,
+    pinId,
+    thresholdMs,
+    expiryTimeMs,
+  };
 }
 
 describe('diffPlanetaryExtractorExpiring', () => {
@@ -438,7 +472,7 @@ describe('diffPlanetaryExtractorExpiring', () => {
     const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
     const next = planetarySnapshot([colonyEntry(1, [expiryMs])], T0 + FIVE_MIN);
     expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
-      expiringFire(7, 1, 1, 24 * HOUR),
+      expiringFire(7, 1, 1, 24 * HOUR, expiryMs),
     ]);
   });
 
@@ -447,7 +481,7 @@ describe('diffPlanetaryExtractorExpiring', () => {
     const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
     const next = planetarySnapshot([colonyEntry(1, [expiryMs])], T0 + 1);
     expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
-      expiringFire(7, 1, 1, 24 * HOUR),
+      expiringFire(7, 1, 1, 24 * HOUR, expiryMs),
     ]);
   });
 
@@ -466,7 +500,7 @@ describe('diffPlanetaryExtractorExpiring', () => {
       expiryMs - 12 * HOUR - FIVE_MIN
     );
     expect(diffPlanetaryExtractorExpiring(7, beforeCrossing, crossing)).toEqual([
-      expiringFire(7, 1, 1, 12 * HOUR),
+      expiringFire(7, 1, 1, 12 * HOUR, expiryMs),
     ]);
 
     const after = planetarySnapshot([colonyEntry(1, [expiryMs])], expiryMs - 12 * HOUR + FIVE_MIN);
@@ -481,8 +515,8 @@ describe('diffPlanetaryExtractorExpiring', () => {
     const prev = planetarySnapshot([colonyEntry(1, [expiryMs])], T0);
     const next = planetarySnapshot([colonyEntry(1, [expiryMs])], expiryMs - HOUR);
     expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
-      expiringFire(7, 1, 1, 24 * HOUR),
-      expiringFire(7, 1, 1, 12 * HOUR),
+      expiringFire(7, 1, 1, 24 * HOUR, expiryMs),
+      expiringFire(7, 1, 1, 12 * HOUR, expiryMs),
     ]);
   });
 
@@ -494,7 +528,7 @@ describe('diffPlanetaryExtractorExpiring', () => {
       T0 + FIVE_MIN
     );
     expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
-      expiringFire(7, 1, 42, 24 * HOUR),
+      expiringFire(7, 1, 42, 24 * HOUR, expiryMs),
     ]);
   });
 
@@ -506,7 +540,7 @@ describe('diffPlanetaryExtractorExpiring', () => {
       T0 + FIVE_MIN
     );
     expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
-      expiringFire(7, 1, 1, 24 * HOUR),
+      expiringFire(7, 1, 1, 24 * HOUR, expiryMs),
     ]);
   });
 
@@ -524,7 +558,7 @@ describe('diffPlanetaryExtractorExpiring', () => {
       T0 + FIVE_MIN
     );
     expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
-      expiringFire(7, 1, 5, 24 * HOUR),
+      expiringFire(7, 1, 5, 24 * HOUR, T0 + 20 * HOUR),
     ]);
   });
 
@@ -550,8 +584,8 @@ describe('diffPlanetaryExtractorExpiring', () => {
       T0 + FIVE_MIN
     );
     expect(diffPlanetaryExtractorExpiring(7, prev, next)).toEqual([
-      expiringFire(7, 1, 1, 24 * HOUR),
-      expiringFire(7, 1, 2, 24 * HOUR),
+      expiringFire(7, 1, 1, 24 * HOUR, T0 + 24 * HOUR + FIVE_MIN),
+      expiringFire(7, 1, 2, 24 * HOUR, T0 + 24 * HOUR + FIVE_MIN),
     ]);
   });
 });
@@ -953,6 +987,7 @@ describe('diffStructureFuelLow', () => {
         structureId: 1,
         structureName: 'Fortizar',
         thresholdMs: 7 * DAY,
+        fuelExpiresMs: T0 + 8 * DAY,
       },
     ]);
   });
@@ -988,6 +1023,7 @@ describe('diffStructureFuelLow', () => {
         structureId: 1,
         structureName: 'Fortizar',
         thresholdMs: 7 * DAY,
+        fuelExpiresMs: T0 + 2 * DAY,
       },
     ]);
   });
@@ -1014,6 +1050,7 @@ describe('diffStructureFuelLow', () => {
         structureId: 1,
         structureName: 'Fortizar',
         thresholdMs: 7 * DAY,
+        fuelExpiresMs: T0 + 3 * DAY,
       },
     ]);
   });
@@ -1052,6 +1089,7 @@ describe('diffStructureFuelLow', () => {
         structureId: 1,
         structureName: 'Fortizar',
         thresholdMs: 7 * DAY,
+        fuelExpiresMs: T0 + 5 * DAY,
       },
     ]);
   });
@@ -1281,6 +1319,7 @@ describe('diffCorpWalletThreshold', () => {
         division: 1,
         amount: 250_000_000,
         thresholdIsk: 100_000_000,
+        journalEntryId: 2,
       },
     ]);
   });
@@ -1320,6 +1359,7 @@ describe('diffCorpWalletThreshold', () => {
         division: 1,
         amount: -250_000_000,
         thresholdIsk: 100_000_000,
+        journalEntryId: 2,
       },
     ]);
   });

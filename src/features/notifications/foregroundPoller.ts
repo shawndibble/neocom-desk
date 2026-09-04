@@ -13,6 +13,7 @@
  * drives all live in `pollDomains.ts`; this file names none of them (#273).
  */
 import { db } from '@/db';
+import { occurrenceKey } from '@/engine/occurrenceKey';
 import { loadUniverseType } from '@/features/skills/data';
 import { loadPlanetName } from '@/features/pi/names';
 import { resolveNames } from '@/features/character/names';
@@ -507,13 +508,15 @@ async function recordFeedNotification(
 ): Promise<void> {
   try {
     const { title, body } = await notificationText(fire, character);
+    const firedAt = Date.now();
     await recordFeedEntry({
+      id: occurrenceKey(fire, firedAt),
       characterId: character.characterId,
       eventId: fire.eventId,
       eveType: fire.eventId === 'eveNotification' ? fire.type : undefined,
       title,
       body,
-      firedAt: Date.now(),
+      firedAt,
     });
   } catch {
     // Same fire-and-forget contract as sendBrowserNotification: pollerState

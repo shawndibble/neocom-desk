@@ -38,6 +38,8 @@ export interface NotificationFire {
   characterId: number;
   skillId: number | null;
   level: number | null;
+  /** The completed entry's `finish_date` (issue #348: Occurrence Key input), null for `characterNotTraining`. */
+  finishMs: number | null;
 }
 
 function orderedByQueuePosition(
@@ -85,6 +87,7 @@ export function diffSkillLevelComplete(
       characterId,
       skillId: current.skillId,
       level: current.finishedLevel,
+      finishMs: current.finishMs,
     });
   }
   return fires;
@@ -113,7 +116,9 @@ export function diffCharacterNotTraining(
   if (!prev) return [];
   if (headStatus(next) !== 'notTraining') return [];
   if (headStatus(prev) === 'notTraining') return [];
-  return [{ eventId: 'characterNotTraining', characterId, skillId: null, level: null }];
+  return [
+    { eventId: 'characterNotTraining', characterId, skillId: null, level: null, finishMs: null },
+  ];
 }
 
 export interface IndustryJobEntrySnapshot {
@@ -224,6 +229,13 @@ export interface PlanetaryNotificationFire {
   eventId: 'planetaryExtractionDone';
   characterId: number;
   planetId: number;
+  /**
+   * Soonest `expiry_time` across the colony's extractors (issue #348:
+   * Occurrence Key input) — fixed at program install, so it identifies which
+   * extractor's expiry actually crossed the colony into idle regardless of
+   * which poll observed it.
+   */
+  expiryTimeMs: number;
 }
 
 function colonyIdle(entry: ColonySnapshotEntry, nowMs: number): boolean {
@@ -255,7 +267,12 @@ export function diffPlanetaryExtractionDone(
     if (!colonyIdle(colony, next.nowMs)) continue;
     const prevColony = prevByPlanet.get(colony.planetId);
     if (prevColony && colonyIdle(prevColony, prev.nowMs)) continue;
-    fires.push({ eventId: 'planetaryExtractionDone', characterId, planetId: colony.planetId });
+    fires.push({
+      eventId: 'planetaryExtractionDone',
+      characterId,
+      planetId: colony.planetId,
+      expiryTimeMs: Math.min(...colony.extractors.map((e) => e.expiryTimeMs)),
+    });
   }
   return fires;
 }
@@ -280,6 +297,8 @@ export interface ExtractorExpiringFire {
   pinId: number;
   /** Which lead-time window was crossed, in ms — one of `EXTRACTOR_EXPIRY_WARNING_MS`. */
   thresholdMs: number;
+  /** The program's `expiry_time` (issue #348: Occurrence Key input) — fixed for the program's life. */
+  expiryTimeMs: number;
 }
 
 /**
@@ -333,6 +352,7 @@ export function diffPlanetaryExtractorExpiring(
           planetId: colony.planetId,
           pinId: extractor.pinId,
           thresholdMs,
+          expiryTimeMs: extractor.expiryTimeMs,
         });
       }
     }
@@ -700,6 +720,13 @@ export interface StructureFuelLowFire {
   structureId: number;
   structureName: string;
   thresholdMs: number;
+  /**
+   * The structure's `fuel_expires` at fire time (issue #348: Occurrence Key
+   * input) — this diff's own re-fire identity is `(structureId,
+   * fuelExpiresMs)`, not `structureId` alone: a refuel starts a new
+   * countdown, distinct from the one that already fired.
+   */
+  fuelExpiresMs: number;
 }
 
 /**
@@ -762,6 +789,7 @@ export function diffStructureFuelLow(
       structureId: entry.structureId,
       structureName: entry.name,
       thresholdMs: entry.thresholdMs,
+      fuelExpiresMs: entry.fuelExpiresMs,
     });
   }
   return fires;
@@ -918,6 +946,8 @@ export type CorpWalletThresholdFire =
       division: number;
       amount: number;
       thresholdIsk: number;
+      /** The journal entry's own id (issue #348: Occurrence Key input) — this diff's own natural id for this case (see below). */
+      journalEntryId: number;
     };
 
 /**
@@ -986,6 +1016,7 @@ export function diffCorpWalletThreshold(
         division: division.division,
         amount: entry.amount,
         thresholdIsk: division.transactionCeilingIsk,
+        journalEntryId: entry.id,
       });
     }
   }

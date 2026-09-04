@@ -9,9 +9,12 @@
  * constraint: whatever the poller diffed while the app was open is here,
  * whether or not the OS ever drew a bubble for it.
  *
- * De-duplication is `pollerState.ts`'s job, not this module's — a fire only
- * reaches here once the poller has decided it is new, so ids are generated
- * rather than derived from the fire's contents.
+ * Per-device de-duplication is `pollerState.ts`'s job, not this module's — a
+ * fire only reaches here once the poller has decided it is new locally. This
+ * module's row id is the caller-supplied Occurrence Key (issue #348,
+ * `engine/occurrenceKey.ts`), not a minted one: a `put` with the same id
+ * upserts, which is what makes a second device or the Scheduled Push backend
+ * recording the same occurrence collapse into the one row instead of two.
  */
 import { db, type NotificationFeedRecord } from '@/db';
 import { refreshAppBadge } from './appBadge';
@@ -28,8 +31,8 @@ export const NOTIFICATION_FEED_LIMIT = 300;
 
 export type NotificationFeedEntry = NotificationFeedRecord;
 
-/** What `recordFeedEntry` needs; the id is minted for you. */
-export type NewNotificationFeedEntry = Omit<NotificationFeedEntry, 'id'>;
+/** What `recordFeedEntry` needs, including its id — the caller's Occurrence Key. */
+export type NewNotificationFeedEntry = NotificationFeedEntry;
 
 /**
  * Which ids fall outside the cap, given the feed newest-first. Pure so the
@@ -45,7 +48,7 @@ export async function readFeed(): Promise<NotificationFeedEntry[]> {
 }
 
 export async function recordFeedEntry(entry: NewNotificationFeedEntry): Promise<void> {
-  await db.notificationFeed.put({ ...entry, id: crypto.randomUUID() });
+  await db.notificationFeed.put(entry);
   const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT);
   if (stale.length > 0) await db.notificationFeed.bulkDelete(stale);
   await refreshAppBadge();
