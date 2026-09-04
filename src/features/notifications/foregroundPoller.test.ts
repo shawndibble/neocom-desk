@@ -569,6 +569,7 @@ describe('runForegroundPoll', () => {
       eventId: 'planetaryExtractionDone',
       characterId: CHAR.characterId,
       planetId: 40000001,
+      expiryTimeMs: 2000,
     });
     expect(character).toEqual(CHAR);
   });

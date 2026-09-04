@@ -29,7 +29,14 @@ beforeEach(async () => {
 });
 
 async function seed(title: string, body: string, firedAt: number, characterId = ACTIVE) {
-  await recordFeedEntry({ characterId, eventId: 'newMail', title, body, firedAt });
+  await recordFeedEntry({
+    id: crypto.randomUUID(),
+    characterId,
+    eventId: 'newMail',
+    title,
+    body,
+    firedAt,
+  });
 }
 
 function renderPanel() {
