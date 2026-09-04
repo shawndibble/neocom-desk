@@ -26,12 +26,13 @@
  * — `src/engine` stays free of Dexie/fetch/DOM (and, since Cloud Functions
  * import this module directly per ADR 0010, free of `src/i18n`'s React
  * coupling too) — the caller resolves names at the feature-layer boundary
- * (ARCHITECTURE.md) and hands them in. For the same reason the English copy
- * below is written out directly rather than pulled from
- * `src/i18n/locales/en.json`'s `notifications.fired.*` keys (which
- * `foregroundPoller.ts`'s `notificationText` renders for the *live* path);
- * the two intentionally read the same today — keep them in sync by hand if
- * either wording changes, since nothing enforces that automatically.
+ * (ARCHITECTURE.md) and hands them in. For the same reason the six shared
+ * events' English copy below is rendered from `notificationWording.ts`'s
+ * `SHARED_NOTIFICATION_WORDING` rather than written out here a second time
+ * — `src/i18n/index.ts` splices the same templates into
+ * `notifications.fired.*` for `foregroundPoller.ts`'s `notificationText` to
+ * render on the *live* path, so the two now read from one place instead of
+ * being kept in sync by hand.
  *
  * 8 of the 17 Notification Events carry a timestamp fixed far enough in
  * advance to be worth projecting; the rest are inherently "as it happens"
@@ -59,6 +60,15 @@ import {
 } from './notificationDiffs';
 import { reinforcementExitMs, parseEveNotificationPayload } from './eveNotificationPayload';
 import { occurrenceKey, type OccurrenceFire } from './occurrenceKey';
+import {
+  SHARED_NOTIFICATION_WORDING,
+  renderWording,
+  type SharedWordingEventId,
+} from './notificationWording';
+
+/** Matches the Roman-numeral formatting every skill-level display in the app uses. */
+const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
+const romanLevel = (level: number): string => ROMAN[level - 1] ?? String(level);
 
 export type ProjectableEventId =
   | 'skillLevelComplete'
@@ -163,36 +173,36 @@ function buildRow(
   };
 }
 
+function renderShared(
+  eventId: SharedWordingEventId,
+  vars: Readonly<Record<string, string | number>>
+): { title: string; body: string } {
+  const template = SHARED_NOTIFICATION_WORDING[eventId];
+  return { title: template.title, body: renderWording(template.body, vars) };
+}
+
 function skillLevelCompleteText(characterName: string, skillName: string, level: number) {
   assertWording('skillLevelComplete', 'assert');
-  return {
-    title: 'Skill training complete',
-    body: `${characterName} finished training ${skillName} ${level}.`,
-  };
+  return renderShared('skillLevelComplete', {
+    character: characterName,
+    skill: skillName,
+    level: romanLevel(level),
+  });
 }
 
 function characterNotTrainingText(characterName: string) {
   assertWording('characterNotTraining', 'assert');
-  return {
-    title: 'Not training',
-    body: `${characterName} has no skill in training.`,
-  };
+  return renderShared('characterNotTraining', { character: characterName });
 }
 
 function industryJobCompleteText(characterName: string, itemName: string) {
   assertWording('industryJobComplete', 'assert');
-  return {
-    title: 'Industry job complete',
-    body: `${characterName}'s industry job for ${itemName} is complete.`,
-  };
+  return renderShared('industryJobComplete', { character: characterName, item: itemName });
 }
 
 function planetaryExtractionDoneText(characterName: string, planetName: string) {
   assertWording('planetaryExtractionDone', 'assert');
-  return {
-    title: 'Extraction done',
-    body: `${characterName}'s extraction on ${planetName} has stopped.`,
-  };
+  return renderShared('planetaryExtractionDone', { character: characterName, planet: planetName });
 }
 
 function planetaryExtractorExpiringText(
@@ -202,18 +212,16 @@ function planetaryExtractorExpiringText(
 ) {
   assertWording('planetaryExtractorExpiring', 'assert');
   const hours = Math.round(thresholdMs / 3_600_000);
-  return {
-    title: 'Extractor expiring',
-    body: `${characterName}'s extractor on ${planetName} expires in under ${hours} hours.`,
-  };
+  return renderShared('planetaryExtractorExpiring', {
+    character: characterName,
+    planet: planetName,
+    hours,
+  });
 }
 
 function calendarEventStartingText(characterName: string) {
   assertWording('calendarEventStarting', 'assert');
-  return {
-    title: 'Calendar event starting',
-    body: `${characterName}'s calendar event is starting.`,
-  };
+  return renderShared('calendarEventStarting', { character: characterName });
 }
 
 /**
