@@ -108,6 +108,15 @@ export interface PollDependencies {
   ) => Promise<void>;
   recordToFeed: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
   /**
+   * Whether a Notification Feed row already exists for this Occurrence Key
+   * (issue #360) — evidence that Web Push, or another device/tab syncing the
+   * feed, already delivered this occurrence. Independent of this device's
+   * feed channel/event preferences: the row can exist purely because push
+   * wrote it, regardless of whether this device would itself record to the
+   * feed for that event.
+   */
+  alreadyDelivered: (occurrenceKey: string) => Promise<boolean>;
+  /**
    * This poll's Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round
    * 45): every Character updated this poll, mapped to its whole 72-hour
    * Projection window. Called once per poll — "every app open and every
@@ -344,6 +353,30 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       (fire) => fire.eventId !== 'eveNotification' || isEveTypeAllowed(fire.type)
     );
 
+    // Browser: grouped, and checked against the feed *before* the feed loop
+    // below writes anything (issue #360). Web Push, or another device/tab
+    // syncing the feed, may have already delivered this exact occurrence —
+    // `deps.alreadyDelivered` is what lets the poller suppress its own
+    // redundant bubble for it. This must run before this device's own feed
+    // loop: that loop's `recordToFeed` writes a row keyed by the very same
+    // Occurrence Key, and for the common case of an event with both channels
+    // enabled, checking after that write would make every occurrence appear
+    // "already delivered" by itself. Checked per fire, by Occurrence Key, not
+    // by comparing rendered copy — grouping (`groupIdenticalFires`) happens
+    // after, on whatever survives.
+    const browserFires: AnyNotificationFire[] = [];
+    for (const fire of allowedFires) {
+      if (
+        !browserEnabled ||
+        !isEventEnabledFor(update.eventPrefs, fire.eventId, 'browser') ||
+        !eveTypeAllowsChannel(fire, update.eveTypePrefs, 'browser')
+      ) {
+        continue;
+      }
+      if (await deps.alreadyDelivered(occurrenceKey(fire, deps.now()))) continue;
+      browserFires.push(fire);
+    }
+
     // Feed: one row per actual occurrence, never grouped — each fire's own
     // Occurrence Key (`@/engine/occurrenceKey`) is what lets the Scheduled
     // Push backend, independently observing the same occurrence, agree with
@@ -362,21 +395,6 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
         await deps.recordToFeed(fire, character);
       }
     }
-
-    // Browser: grouped. A burst of fires that render identical copy (three
-    // market orders filling in one poll, none of which name an order) is
-    // what `groupIdenticalFires` collapses into a single "...x3" toast
-    // instead of three back-to-back near-duplicate ones (grouped on the
-    // rendered copy itself, not the fires' own fields, since the differing
-    // field is often not part of the copy at all — see `groupFires.ts`).
-    // Toasts are ephemeral and per-device, with no Occurrence Key contract
-    // to preserve, unlike the feed loop above.
-    const browserFires = allowedFires.filter(
-      (fire) =>
-        browserEnabled &&
-        isEventEnabledFor(update.eventPrefs, fire.eventId, 'browser') &&
-        eveTypeAllowsChannel(fire, update.eveTypePrefs, 'browser')
-    );
     const rendered: RenderedFire<AnyNotificationFire>[] = [];
     for (const fire of browserFires) {
       rendered.push({ fire, ...(await notificationText(fire, character)) });
@@ -660,6 +678,7 @@ export function liveDependencies(): PollDependencies {
     permission: () => readNotificationPermission(),
     notify: sendBrowserNotification,
     recordToFeed: recordFeedNotification,
+    alreadyDelivered: async (key) => (await db.notificationFeed.get(key)) !== undefined,
     uploadProjection: uploadProjectionRows,
   };
 }

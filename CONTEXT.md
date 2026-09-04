@@ -548,9 +548,13 @@
   enabled Notification Event's underlying ESI data while the app is open and
   the tab/window is visible; paused via the Page Visibility API when
   backgrounded, with an immediate catch-up check on regaining visibility. It
-  is the only delivery path today — Periodic Background Sync, once its
-  best-effort supplement, is retired (round 45); Scheduled Push (round 45) is
-  its eventual replacement for timestamped events.
+  is the fast path for an open app, not the sole guarantee of delivery —
+  Periodic Background Sync, once its best-effort supplement, is retired
+  (round 45); Scheduled Push (round 45) now covers timestamped events for a
+  closed or backgrounded app. The two can independently observe the same
+  occurrence, so the poller suppresses its own browser notification for one
+  the Notification Feed already shows as delivered (Occurrence Key, round
+  44/#360).
 
 ## Scope decisions (round 20) — Install prompt & notifications
 

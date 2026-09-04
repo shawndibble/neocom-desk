@@ -28,6 +28,7 @@ import type {
   EveNotificationSnapshot,
 } from '@/engine/notificationDiffs';
 import type { PollerState } from './pollerState';
+import { occurrenceKey } from '@/engine/occurrenceKey';
 
 // The eight per-domain state types the poller used to carry as named
 // dependencies. They are now one generic shape (`PollerState<T>`); these
@@ -273,6 +274,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     permission: () => 'granted',
     notify: vi.fn(async () => {}),
     recordToFeed: vi.fn(async () => {}),
+    alreadyDelivered: vi.fn(async () => false),
     uploadProjection: vi.fn(async () => {}),
     ...rest,
   };
@@ -1348,6 +1350,99 @@ describe('runForegroundPoll delivery channels', () => {
     await runForegroundPoll(deps);
     await runForegroundPoll(deps);
     expect(deps.recordToFeed).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('runForegroundPoll browser suppression against pushed occurrences (issue #360)', () => {
+  /** A poll whose skill queue went empty between two polls: fires characterNotTraining once. */
+  function firingDeps(
+    overrides: Partial<PollDependencies> & DomainOverrides = {}
+  ): PollDependencies {
+    return baseDeps({
+      now: () => 3000,
+      prevState: async () => ({
+        [CHAR.characterId]: {
+          entries: [{ skillId: 100, finishedLevel: 1, queuePosition: 0, finishMs: 2000 }],
+          nowMs: 1000,
+        },
+      }),
+      loadSkillQueue: async () => [],
+      ...overrides,
+    });
+  }
+
+  it('does not raise a browser notification for an occurrence the feed already has (AC1)', async () => {
+    const deps = firingDeps({ alreadyDelivered: async () => true });
+    await runForegroundPoll(deps);
+    expect(deps.notify).not.toHaveBeenCalled();
+  });
+
+  it('still raises a browser notification for an occurrence the feed does not have (AC2)', async () => {
+    const deps = firingDeps({ alreadyDelivered: async () => false });
+    await runForegroundPoll(deps);
+    expect(deps.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks by Occurrence Key, not by rendered title/body (AC3)', async () => {
+    const alreadyDelivered = vi.fn(async () => false);
+    const deps = firingDeps({ alreadyDelivered });
+    await runForegroundPoll(deps);
+    expect(alreadyDelivered).toHaveBeenCalledWith(
+      occurrenceKey(
+        {
+          eventId: 'characterNotTraining',
+          characterId: CHAR.characterId,
+          skillId: null,
+          level: null,
+          finishMs: null,
+        },
+        deps.now()
+      )
+    );
+  });
+
+  it('does not suppress a new occurrence that lands in a different day bucket than a previously-delivered one (AC4)', async () => {
+    // Same event/character, but `now` (and so the day bucket the Occurrence
+    // Key derives from) has moved on — `alreadyDelivered` reflects that by
+    // only recognizing the earlier key, proving the poller still asks per
+    // poll rather than caching a permanent "already handled" verdict.
+    const earlierKey = occurrenceKey(
+      {
+        eventId: 'characterNotTraining',
+        characterId: CHAR.characterId,
+        skillId: null,
+        level: null,
+        finishMs: null,
+      },
+      3000
+    );
+    const deps = firingDeps({
+      now: () => 86_400_000 + 3000,
+      alreadyDelivered: async (key) => key === earlierKey,
+    });
+    await runForegroundPoll(deps);
+    expect(deps.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('still raises a browser notification for an occurrence this same poll also just recorded to the feed, when both channels are on', async () => {
+    // `recordToFeed` and `alreadyDelivered` share one backing store here, the
+    // way `liveDependencies()` wires them both against `db.notificationFeed`
+    // — this is what catches the poller checking `alreadyDelivered` *after*
+    // its own feed loop already wrote the row for this exact occurrence,
+    // which would make every occurrence with both channels on (the default
+    // for every event but `eveNotification`'s sub-types) look
+    // self-delivered and wrongly suppress its own first browser toast.
+    const delivered = new Set<string>();
+    const deps = firingDeps({
+      feedChannelEnabled: async () => true,
+      recordToFeed: vi.fn(async (fire) => {
+        delivered.add(occurrenceKey(fire, deps.now()));
+      }),
+      alreadyDelivered: vi.fn(async (key) => delivered.has(key)),
+    });
+    await runForegroundPoll(deps);
+    expect(deps.recordToFeed).toHaveBeenCalledTimes(1);
+    expect(deps.notify).toHaveBeenCalledTimes(1);
   });
 });
 
