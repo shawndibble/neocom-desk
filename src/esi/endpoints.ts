@@ -1206,6 +1206,32 @@ export function getCharacterLoyaltyPoints(
   });
 }
 
+// --- GET /loyalty/stores/{corporation_id}/offers/ (public) ---
+
+export interface LoyaltyStoreRequiredItem {
+  quantity: number;
+  type_id: number;
+}
+
+export interface LoyaltyStoreOffer {
+  isk_cost: number;
+  lp_cost: number;
+  offer_id: number;
+  quantity: number;
+  required_items: LoyaltyStoreRequiredItem[];
+  type_id: number;
+}
+
+export function getLoyaltyStoreOffers(
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<LoyaltyStoreOffer[]>> {
+  return esiFetch<LoyaltyStoreOffer[]>(`/loyalty/stores/${corporationId}/offers/`, {
+    ...options,
+    endpointId: 'getLoyaltyStoreOffers',
+  });
+}
+
 // --- GET /characters/{character_id}/location (esi-location.read_location.v1) ---
 
 export interface CharacterLocation {
