@@ -505,6 +505,7 @@
   "callback": {
     "completing": "Completing login…",
     "errorTitle": "Login failed",
+    "errorMessage": "Something went wrong signing you in. Please try again.",
     "retry": "Try again"
   },
   "characters": {
