@@ -4,6 +4,7 @@ import {
   EVE_NOTIFICATION_RENDERED_TYPES,
   type EveNotificationNames,
 } from './eveNotificationText';
+import { EVE_ALLOWED_TYPES } from './eventSelection';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
 
 function fire(overrides: Partial<EveNotificationFire> = {}): EveNotificationFire {
@@ -44,11 +45,18 @@ describe('eveNotificationText', () => {
   });
 
   it('renders generically for a type this catalog has never heard of, without throwing (AC2)', () => {
+    // In production `foregroundPoller.ts` drops anything off the allow-list
+    // before it reaches here, so this type can't actually occur — but the
+    // function stays defensive rather than assuming its caller.
     expect(() =>
       eveNotificationText(fire({ type: 'SomeBrandNewMsgType6041' }), CHARACTER)
     ).not.toThrow();
     const { body } = eveNotificationText(fire({ type: 'SomeBrandNewMsgType6041' }), CHARACTER);
     expect(body).toContain('SomeBrandNewMsgType6041');
+  });
+
+  it('has exactly one renderer per allow-listed type — no extra, no missing', () => {
+    expect([...EVE_NOTIFICATION_RENDERED_TYPES].sort()).toEqual([...EVE_ALLOWED_TYPES].sort());
   });
 });
 

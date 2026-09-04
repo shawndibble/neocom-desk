@@ -1,23 +1,24 @@
 /**
  * Renderer for EVE's own notifications (issue #274), kept separate from
- * `foregroundPoller.ts`'s `notificationText` if-chain because this one has a
- * different exhaustiveness shape: that chain is closed over a fixed
- * `NotificationEventId` union, while this domain covers roughly a hundred
- * open-ended `type` strings CCP can add to without notice
- * (esi/esi-issues#1380).
+ * `foregroundPoller.ts`'s `notificationText` if-chain because this one is
+ * keyed by ESI's raw `type` string rather than a `NotificationEventId`.
+ * Every `type` reaching this module is already a member of the closed
+ * Notification Allow-List (`EVE_ALLOWED_TYPES`, `eventSelection.ts`) —
+ * `foregroundPoller.ts` drops anything else before it gets here, so
+ * `TYPE_RENDERERS` below has an entry for every type this function will ever
+ * see in production.
  *
- * #274 shipped one generic body — the raw type plus the character — for every
- * type. Issue #300 gives the corp-critical handful a real body (the structure
+ * Each entry gives the corp-critical handful a real body: the structure
  * under attack, the bill's amount and due date, the war's aggressor, the
- * applicant) while leaving that generic body as the floor for everything else.
+ * applicant.
  *
- * **The generic body is a floor, not a legacy path.** Every route through this
- * module ends at `genericText`: an unknown type, a payload missing the field a
- * body needs, a payload the parser could make nothing of, a missing i18n key,
- * and — via the `try` around the whole dispatch — anything that throws on the
- * way. A renderer that threw or returned nothing would be a regression against
- * #274's AC2 even though it looks like an improvement, because the delivery
- * loop's caller treats a throw as "drop this notification".
+ * **The generic body is still a floor.** Every route through this module ends
+ * at `genericText`: a payload missing the field a body needs, a payload the
+ * parser could make nothing of, a missing i18n key, and — via the `try`
+ * around the whole dispatch — anything that throws on the way, including a
+ * `type` this catalog has no renderer for. A renderer that threw or returned
+ * nothing would drop the notification entirely, because the delivery loop's
+ * caller treats a throw as "drop this notification".
  *
  * **Rendering stays synchronous.** Name lookups happen in
  * `eveNotificationNames.ts` and arrive here already resolved (or absent), so a
@@ -132,9 +133,12 @@ function fixedBody(): BodyChoice {
 }
 
 /**
- * The deliberately small set from issue #300: each entry costs real property
- * or is time-critical. Everything absent from this record — including a type
- * CCP ships tomorrow — renders generically, which is the point.
+ * One entry per type on the closed Notification Allow-List
+ * (`EVE_ALLOWED_TYPES`, `eventSelection.ts`) — the two lists are kept in
+ * lockstep deliberately, enforced by an invariant test. A payload this
+ * renderer can't make a body from still falls back to `genericText`, but a
+ * `type` outside the allow-list can no longer reach here at all:
+ * `foregroundPoller.ts` drops it first.
  */
 const TYPE_RENDERERS: Readonly<Record<string, (ctx: RenderContext) => BodyChoice>> = {
   StructureUnderAttack: (ctx) => {
@@ -212,8 +216,10 @@ export function eveNotificationText(
   character: EveNotificationTextCharacter,
   names: EveNotificationNames = {}
 ): { title: string; body: string } {
-  const render = TYPE_RENDERERS[fire.type];
-  if (render === undefined) return genericText(fire, character);
+  // A `type` with no entry here folds into the same `choice === null` path as
+  // a known type whose payload didn't parse, rather than a separate early
+  // return — one fallback path, not two.
+  const render = TYPE_RENDERERS[fire.type] ?? (() => null);
   try {
     const choice = render({ fire, payload: parseEveNotificationPayload(fire.text), names });
     if (choice === null) return genericText(fire, character);
