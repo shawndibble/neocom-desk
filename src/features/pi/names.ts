@@ -49,12 +49,43 @@ export async function readCachedPlanetNames(
   return names;
 }
 
+function schematicKey(schematicId: number): string {
+  return `schematic:${schematicId}`;
+}
+
 export async function loadSchematicName(schematicId: number): Promise<string | null> {
   const result = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
-    `schematic:${schematicId}`,
+    schematicKey(schematicId),
     async () => (await getUniverseSchematic(schematicId)).data,
     STATIC
   );
   return result?.data.schematic_name ?? null;
+}
+
+/**
+ * Schematic names from `esiCache` only — never a fetch. Same rationale as
+ * `readCachedPlanetNames`: for a fan-out over colonies this page never fetched
+ * (the alt-colonies toggle), resolving through `loadSchematicName` would turn
+ * a display-only read into one live call per unresolved schematic. An
+ * unresolved id is simply absent, and the caller falls back to its own
+ * "Unknown schematic" label.
+ */
+export async function readCachedSchematicNames(
+  schematicIds: readonly number[]
+): Promise<Map<number, string>> {
+  const unique = [...new Set(schematicIds)];
+  const names = new Map<number, string>();
+  await Promise.all(
+    unique.map(async (schematicId) => {
+      // `loadWithCache` stores the full ESI schematic object, not a bare
+      // string — same shape `loadSchematicName` reads `.schematic_name` off.
+      const info = await readCached<{ schematic_name?: string }>(
+        GLOBAL_CACHE_CHARACTER_ID,
+        schematicKey(schematicId)
+      );
+      if (info?.schematic_name) names.set(schematicId, info.schematic_name);
+    })
+  );
+  return names;
 }

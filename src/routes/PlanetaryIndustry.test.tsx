@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -248,23 +248,40 @@ async function addAlt(characterId: number, name: string, scopes: string[]) {
 }
 
 /**
- * The per-colony panel for a planet, found by its own heading.
+ * The per-colony row+drilldown wrapper for a planet, found by its own
+ * heading and expanded (clicked open) if it wasn't already — the Colonies
+ * panel is Concept C, summary-then-drill-down: a collapsed row carries only
+ * status/expiry/product/pin-count text, and the extraction/production/
+ * infrastructure cards a lot of these assertions check only mount once the
+ * row's drilldown region is open.
  *
- * The cross-character timeline above these panels names the same planets,
- * products and states, so a page-wide `getByText` is ambiguous here by
- * design — the two surfaces really do say the same words about the same
+ * The cross-character timeline above the colonies panel names the same
+ * planets, products and states, so a page-wide `getByText` is ambiguous here
+ * by design — the two surfaces really do say the same words about the same
  * colony. An assertion about the pin table therefore says which panel it
  * means rather than loosening its counts.
  */
 async function colonyPanelFor(name: RegExp): Promise<HTMLElement> {
   const heading = await screen.findByRole('heading', { name });
-  const panel = heading.closest('section');
+  const panel = heading.closest('div');
   if (!(panel instanceof HTMLElement)) throw new Error(`no colony panel for ${String(name)}`);
+  // Scoped to the heading itself (the `<h3>`), not the whole panel: an
+  // already-expanded region carries its own `InfoTooltip` button(s) (Last
+  // Update, and Status for unknown/decayed), so a panel-wide
+  // `getByRole('button')` is only unambiguous before expansion. The `<h3>`
+  // wraps nothing but the summary row's trigger.
+  const trigger = within(heading).getByRole('button');
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
+  await within(panel).findByRole('region');
   return panel;
 }
 
-function timeline(): HTMLElement {
-  return screen.getByRole('list', { name: /needing attention first/i });
+/** The whole Colonies panel (every character's rows once the toggle is on), found by its own "N colony/colonies" header — as opposed to `colonyPanelFor`'s single-colony wrapper. */
+function coloniesPanel(): HTMLElement {
+  const heading = screen.getByRole('heading', { name: /colon(y|ies)$/i });
+  const panel = heading.closest('section');
+  if (!(panel instanceof HTMLElement)) throw new Error('no colonies panel found');
+  return panel;
 }
 
 describe('PlanetaryIndustry', () => {
@@ -273,9 +290,10 @@ describe('PlanetaryIndustry', () => {
     const panel = await colonyPanelFor(/Jita IV/);
     expect(within(panel).getByText('Extractor Control Unit')).toBeInTheDocument();
     expect(within(panel).getByText('Idle')).toBeInTheDocument();
-    // Both the per-pin Status column and the Expires column read "Expired"
-    // for an already-expired extractor.
-    expect(within(panel).getAllByText('Expired')).toHaveLength(2);
+    // The summary row's own expiry cell, the extraction card's Status chip,
+    // and its Expires field all read "Expired" for an already-expired
+    // extractor.
+    expect(within(panel).getAllByText('Expired')).toHaveLength(3);
   });
 
   it('explains the staleness rule in the UI', async () => {
@@ -302,13 +320,61 @@ describe('PlanetaryIndustry', () => {
     expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
   });
 
+  it('shows the alt-colonies toggle alongside the re-login prompt, not instead of it, when an alt has cached colonies', async () => {
+    // The active Character's own live load 403s...
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    // ...but an alt's colonies are already cached from a prior visit as that
+    // character — exactly the case a cross-character surface exists for.
+    const ALT_ID = 92;
+    const ALT_PLANET_ID = 40000002;
+    await addAlt(ALT_ID, 'Alt Two', [PLANETS_SCOPE]);
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: 'planets',
+      value: [{ ...planetsPayload[0], planet_id: ALT_PLANET_ID, owner_id: ALT_ID }],
+      fetchedAt: Date.now(),
+    });
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: `planet:${ALT_PLANET_ID}`,
+      value: detailPayload,
+      fetchedAt: Date.now(),
+    });
+
+    render(<App />);
+
+    // The banner is not a substitute for the panel: both render.
+    expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
+    const toggle = await screen.findByRole('button', { name: /show alt colonies/i });
+
+    const user = userEvent.setup();
+    await user.click(toggle);
+    // No `universe/planets/{id}` mock is registered for the alt's planet in
+    // this test, so it renders its "Planet #id" fallback — a real row for a
+    // real (if unnamed) colony, not an error state.
+    const altRow = screen.getByRole('button', { name: new RegExp(`Planet #${ALT_PLANET_ID}`) });
+    expect(altRow).toHaveAttribute('aria-expanded', 'false');
+
+    // Expanding an alt's row exercises the composite `${characterId}:${planetId}`
+    // key and DOM ids end to end, not just that the row renders collapsed.
+    await user.click(altRow);
+    expect(altRow).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('region')).toBeInTheDocument();
+  });
+
   it('leaves both yield columns blank for an extractor with no install-time baseline', async () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
     // The fixture's pin has an expiry but no qty_per_cycle/cycle_time/
-    // install_time, so Banked and Reset now are the only em-dashed cells —
-    // never a zero, which would read as "this program has produced nothing".
-    expect(within(panel).getAllByText('—')).toHaveLength(2);
+    // install_time, so Banked and Reset now are em-dashed — never a zero,
+    // which would read as "this program has produced nothing" — and the
+    // summary row's own product cell is a third dash, since this fixture has
+    // no factory pins at all.
+    expect(within(panel).getAllByText('—')).toHaveLength(3);
     expect(within(panel).queryByText('0 (0%)')).not.toBeInTheDocument();
   });
 
@@ -322,7 +388,12 @@ describe('PlanetaryIndustry', () => {
     const panel = await colonyPanelFor(/Jita IV/);
     expect(within(panel).getByText('513,262 (27%)')).toBeInTheDocument();
     expect(within(panel).getByText('+793,859/day')).toBeInTheDocument();
-    expect(within(panel).queryByText('—')).not.toBeInTheDocument();
+    // Scoped to the drilldown region, not the whole row: the summary row's
+    // own product cell reads "—" too, since this fixture has no factory
+    // pins — this assertion is about the extraction card having no blanks,
+    // not about the row.
+    const region = within(panel).getByRole('region');
+    expect(within(region).queryByText('—')).not.toBeInTheDocument();
   });
 
   it('flags a colony whose extractors are all past the efficient window as decayed', async () => {
@@ -453,13 +524,16 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
 
-    const rows = within(timeline()).getAllByRole('listitem');
-    expect(rows).toHaveLength(2);
-    // Worst first: the active character's extractor has already expired, the
-    // alt's runs for another five days.
-    expect(rows[0]).toHaveTextContent('Pilot One');
-    expect(rows[1]).toHaveTextContent('Alt Two');
+    // Grouped by character: the active Character's own group heading plus
+    // the alt's, each above that character's colony rows. Scoped to the
+    // colonies panel — "Pilot One" is also the active Character's own name
+    // in the nav rail.
+    const panel = coloniesPanel();
+    expect(within(panel).getByText('Pilot One')).toBeInTheDocument();
+    expect(within(panel).getByText('Alt Two')).toBeInTheDocument();
     expect(altPlanetsFetch).not.toHaveBeenCalled();
   });
 
@@ -476,6 +550,8 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
 
     expect(scopelessFetch).not.toHaveBeenCalled();
     expect(screen.getByText(/Scopeless Alt/)).toHaveTextContent(/no planetary access/i);
@@ -549,6 +625,8 @@ describe('PlanetaryIndustry', () => {
 
     render(<App />);
     await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
 
     const unread = screen.getByText(/Unread Alt/);
     const empty = screen.getByText(/Empty Alt/);

@@ -1,14 +1,15 @@
 /**
- * Every authenticated Character's extractor programs in one list, for the
- * cross-character timeline. A composition layer, not new infrastructure —
- * same shape as `features/character/roster.ts`: nothing here talks to ESI, it
- * reads the rows the per-character read-through loaders in `./data` already
- * write (docs/ARCHITECTURE.md §7 step 3: never reimplement read-through).
+ * Every OTHER authenticated Character's colonies, cache-only — the data
+ * behind the Colonies panel's "Show alt colonies" toggle. A composition
+ * layer, not new infrastructure — same shape as `features/character/roster.ts`:
+ * nothing here talks to ESI, it reads the rows the per-character read-through
+ * loaders in `./data` already write (docs/ARCHITECTURE.md §7 step 3: never
+ * reimplement read-through).
  *
  * **Cache-only, deliberately.** `loadAllColonyDetails` is one live call per
  * planet at concurrency 3 on the shared `char-industry` bucket. Multiplying
  * that by every authenticated Character on page open would be a rate-limit
- * problem for a panel that is glanceable, not authoritative — so page open
+ * problem for a toggle that is glanceable, not authoritative — so page open
  * costs zero ESI calls here and the active Character's live load (already
  * done by the route) is what keeps its own rows fresh. An explicit Refresh
  * re-runs that live load; this still only reads what it left behind.
@@ -20,22 +21,25 @@
  * nothing caches it, so the same Character trips it again every visit.
  * Characters without the scope go in `skipped` and are never read or fetched.
  *
- * Four Character outcomes are kept apart because they are four different
- * facts, and a panel that renders them alike is lying about one of them:
- * `skipped` (no scope), `notLoaded` (scope, but nothing cached yet),
- * `noColonies` (a cached list that is genuinely empty), and contributing
- * programs. Pure of `Date.now()`: ordering and expiry live at the display
- * seam, which already carries the loader's `loadedAt`.
+ * The active Character is excluded (by `activeCharacterId`, not filtered by
+ * the caller): its own colonies already come from the route's live load, so
+ * a cache-only copy here would at best duplicate that and at worst show a
+ * staler version beside it.
+ *
+ * Four other-Character outcomes are kept apart because they are four
+ * different facts, and a panel that renders them alike is lying about one of
+ * them: `skipped` (no scope), `notLoaded` (scope, but nothing cached yet),
+ * `noColonies` (a cached list that is genuinely empty), and colonies (listed,
+ * with or without cached pin detail — `detail` is `null` rather than the
+ * colony being dropped when detail isn't cached, so a character with
+ * colonies but no detail yet still shows up instead of reading as having
+ * none). Pure of `Date.now()`: ordering and expiry live at the display seam.
  */
 import { db, type CharacterRecord } from '@/db';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { readCachedRows } from '@/esi/cache';
-import type { CharacterPlanet } from '@/esi/endpoints';
-import type { ExtractorProgram } from '@/engine/pi/types';
-import { readCachedTypeNames } from '@/features/character/typeNames';
-import { extractorProgramsFromPins } from './adapters';
+import type { CharacterPlanet, CharacterPlanetDetail } from '@/esi/endpoints';
 import { KEYS, readCachedColonyDetails } from './data';
-import { readCachedPlanetNames } from './names';
 
 const PLANETS_SCOPE = ESI_REGISTRY.getCharacterPlanets.scope;
 
@@ -45,28 +49,17 @@ export interface RosterCharacter {
   name: string;
 }
 
-/** One extractor program, carrying the identity needed to act on it. */
-export interface TimelineProgram {
+/** One other Character's colony, for the alt-colonies toggle. */
+export interface RosterColony {
   characterId: number;
   characterName: string;
-  planetId: number;
-  solarSystemId: number;
-  /** Null when the public planet lookup isn't cached — never a fetch to fill it. */
-  planetName: string | null;
-  /** Null when the extractor declares no product, or its name isn't cached. */
-  productName: string | null;
-  program: ExtractorProgram;
+  planet: CharacterPlanet;
+  /** Null when this colony's pin detail isn't cached yet — listed, but unknown. */
+  detail: CharacterPlanetDetail | null;
 }
 
 export interface PiRosterSnapshot {
-  programs: TimelineProgram[];
-  /** Colonies whose pins were readable, across every Character. */
-  colonyCount: number;
-  /**
-   * Colonies listed but whose pin detail isn't cached: their programs are
-   * unknown, so a count taken from `programs` alone is a lower bound.
-   */
-  coloniesWithoutDetail: number;
+  colonies: RosterColony[];
   /** Token lacks the planets scope. Never read, never fetched, never a 403. */
   skipped: RosterCharacter[];
   /** Scope granted, but no colony list cached yet — unknown, not empty. */
@@ -76,9 +69,7 @@ export interface PiRosterSnapshot {
 }
 
 const EMPTY_SNAPSHOT: PiRosterSnapshot = {
-  programs: [],
-  colonyCount: 0,
-  coloniesWithoutDetail: 0,
+  colonies: [],
   skipped: [],
   notLoaded: [],
   noColonies: [],
@@ -88,16 +79,10 @@ function ref({ characterId, name }: CharacterRecord): RosterCharacter {
   return { characterId, name };
 }
 
-/** One colony's readable pins, flattened to programs with their identity attached. */
-interface ColonyPins {
-  character: CharacterRecord;
-  planet: CharacterPlanet;
-  programs: ExtractorProgram[];
-  productTypeIdByPin: Map<number, number>;
-}
-
-export async function loadPiRosterSnapshot(): Promise<PiRosterSnapshot> {
-  const characters = await db.characters.toArray();
+export async function loadPiRosterSnapshot(activeCharacterId: number): Promise<PiRosterSnapshot> {
+  const characters = (await db.characters.toArray()).filter(
+    (character) => character.characterId !== activeCharacterId
+  );
   if (characters.length === 0) return EMPTY_SNAPSHOT;
 
   const granted = await Promise.all(
@@ -126,8 +111,7 @@ export async function loadPiRosterSnapshot(): Promise<PiRosterSnapshot> {
     else withColonies.push({ character, planets });
   }
 
-  let coloniesWithoutDetail = 0;
-  const colonies: ColonyPins[] = [];
+  const colonies: RosterColony[] = [];
   await Promise.all(
     withColonies.map(async ({ character, planets }) => {
       const details = await readCachedColonyDetails(
@@ -135,52 +119,15 @@ export async function loadPiRosterSnapshot(): Promise<PiRosterSnapshot> {
         planets.map((planet) => planet.planet_id)
       );
       for (const planet of planets) {
-        const detail = details.get(planet.planet_id)?.data;
-        if (!detail) {
-          coloniesWithoutDetail += 1;
-          continue;
-        }
-        const productTypeIdByPin = new Map<number, number>();
-        for (const pin of detail.pins) {
-          const productTypeId = pin.extractor_details?.product_type_id;
-          if (productTypeId !== undefined) productTypeIdByPin.set(pin.pin_id, productTypeId);
-        }
         colonies.push({
-          character,
+          characterId: character.characterId,
+          characterName: character.name,
           planet,
-          programs: extractorProgramsFromPins(detail.pins),
-          productTypeIdByPin,
+          detail: details.get(planet.planet_id)?.data ?? null,
         });
       }
     })
   );
 
-  const [planetNames, productNames] = await Promise.all([
-    readCachedPlanetNames(colonies.map((colony) => colony.planet.planet_id)),
-    readCachedTypeNames(colonies.flatMap((colony) => [...colony.productTypeIdByPin.values()])),
-  ]);
-
-  const programs = colonies.flatMap(({ character, planet, programs, productTypeIdByPin }) =>
-    programs.map((program): TimelineProgram => {
-      const productTypeId = productTypeIdByPin.get(program.pinId);
-      return {
-        characterId: character.characterId,
-        characterName: character.name,
-        planetId: planet.planet_id,
-        solarSystemId: planet.solar_system_id,
-        planetName: planetNames.get(planet.planet_id) ?? null,
-        productName: productTypeId === undefined ? null : (productNames.get(productTypeId) ?? null),
-        program,
-      };
-    })
-  );
-
-  return {
-    programs,
-    colonyCount: colonies.length,
-    coloniesWithoutDetail,
-    skipped,
-    notLoaded,
-    noColonies,
-  };
+  return { colonies, skipped, notLoaded, noColonies };
 }
