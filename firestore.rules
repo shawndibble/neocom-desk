@@ -70,14 +70,27 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
-      // No delete rule: this collection carries no tombstones (dismissal is a
-      // flag — issue #362), so a client never deletes a row here.
+      // This collection carries no tombstones (dismissal is a flag — issue
+      // #362), so nothing in the sync path ever deletes a row here. `delete`
+      // is still granted uid-only, like every sibling collection above, so
+      // characterPurge.ts can clear a dropped Character's rows.
       match /notificationFeed/{occurrenceKey} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();
         allow create: if isOwner() && incomingHashMatches();
         allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
       }
+    }
+
+    // Device registrations (issue #356, ADR 0010): written only by the
+    // registerDevice callable using admin privileges, because syncAuth.ts
+    // signs in as one Character (uid char:{id}) while a device registration
+    // covers every Character it holds at once. No ownerHash pattern applies
+    // here — deny all client access, matching the Projection collection
+    // that will land alongside it (#358).
+    match /deviceRegistrations/{deviceId} {
+      allow read, write: if false;
     }
     // Everything else: implicit deny.
   }

@@ -402,9 +402,12 @@ describe('mergeFeed', () => {
     expect(result.pullDismiss).toEqual([]);
   });
 
-  it('does not push a dismissal outside the push window', () => {
+  it('pushes a dismissal even when the row has aged out of the create-push window', () => {
+    // The push window only gates whether a *new* row starts syncing (pushCreate);
+    // once the remote side already has the row, a dismissal correction must
+    // still reach it regardless of whether the row is still push-eligible today.
     const result = mergeFeed([feedRow({ dismissedAt: NOW - 10 })], new Set(), [remoteFeedRow()]);
-    expect(result.pushDismiss).toEqual([]);
+    expect(result.pushDismiss.map((r) => r.id)).toEqual(['occ-1']);
     expect(result.pullDismiss).toEqual([]);
   });
 

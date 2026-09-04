@@ -1112,6 +1112,7 @@
     "prompt": {
       "title": "Turn on notifications?",
       "body": "NeoCom can notify you about skill training, mail, industry jobs, and more. You choose exactly what, per character, in Settings.",
+      "installRequiredBody": "On iPhone and iPad, notifications only work once NeoCom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
       "enable": "Enable",
       "dismiss": "Not now"
     },
@@ -1460,6 +1461,7 @@
     "notifications": {
       "hint": "Choose how you'd like to be told, and what about, per character. App sends a browser notification; List adds it to the Overview page. Stays on this device.",
       "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
+      "installRequiredNotice": "On iPhone and iPad, notifications only work once NeoCom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
       "enableHint": "This device hasn't granted notification permission yet.",
       "enableButton": "Turn on browser notifications",
       "masterSwitchLabel": "Enable notifications",
