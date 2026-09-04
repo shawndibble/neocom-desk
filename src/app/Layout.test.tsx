@@ -142,7 +142,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(sheet).queryByRole('link', { name: 'Employment' })).not.toBeInTheDocument();
   });
 
-  it('leads with a Character disclosure holding Characters and Settings', async () => {
+  it('trails with a divider, then Settings and the active Character (with photo)', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     await db.characters.put({
       characterId: CHARACTER_ID,
@@ -158,26 +158,27 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
-    const disclosure = await within(sheet).findByRole('button', { name: 'Pilot One' });
-    // First control in the sheet — Settings has no other route on a phone.
+    const contacts = within(sheet).getByRole('link', { name: 'Contacts' });
+    const divider = within(sheet).getByRole('separator');
+    const settings = await within(sheet).findByRole('link', { name: 'Settings' });
+    const character = within(sheet).getByRole('link', { name: 'Pilot One' });
+
+    expect(settings).toHaveAttribute('href', '/settings');
+    expect(character).toHaveAttribute('href', '/characters');
+    // Settings and the Character are plain links now, not a disclosure — no
+    // submenu to expand.
+    expect(within(sheet).queryByRole('button', { name: 'Pilot One' })).not.toBeInTheDocument();
+
+    // Reading order: ..., Contacts, divider, Settings, Character.
     expect(
-      disclosure.compareDocumentPosition(within(sheet).getByRole('link', { name: 'Market' })) &
-        Node.DOCUMENT_POSITION_FOLLOWING
+      contacts.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-
-    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
-    expect(within(sheet).queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
-
-    await user.click(disclosure);
-    expect(disclosure).toHaveAttribute('aria-expanded', 'true');
-    expect(within(sheet).getByRole('link', { name: 'Characters' })).toHaveAttribute(
-      'href',
-      '/characters'
-    );
-    expect(within(sheet).getByRole('link', { name: 'Settings' })).toHaveAttribute(
-      'href',
-      '/settings'
-    );
+    expect(
+      divider.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      settings.compareDocumentPosition(character) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('closes on Escape and returns focus to the More trigger', async () => {
@@ -292,7 +293,7 @@ describe('Layout desktop rail domain grouping', () => {
     });
     useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
     renderLayout();
-    const trigger = await screen.findByRole('button', { name: 'Pilot One' });
+    const trigger = await screen.findByRole('link', { name: 'Pilot One' });
 
     const rail = screen.getAllByRole('navigation')[0];
     // The trigger must follow the nav landmark in document order — it is
@@ -300,7 +301,7 @@ describe('Layout desktop rail domain grouping', () => {
     expect(rail.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('opens the pinned character menu onto Characters and Settings', async () => {
+  it('puts Settings just above the Character link, both below the nav', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     await db.characters.put({
       characterId: CHARACTER_ID,
@@ -309,26 +310,23 @@ describe('Layout desktop rail domain grouping', () => {
       addedAt: 0,
     });
     useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
-    const user = userEvent.setup();
     renderLayout();
 
-    // Both routes left the rail proper; this menu is now their only pointer
-    // affordance on desktop.
+    // Both left the scrollable nav proper; the footer is now their only
+    // pointer affordance on desktop.
     const rail = screen.getAllByRole('navigation')[0];
     expect(within(rail).queryByRole('link', { name: 'Characters' })).not.toBeInTheDocument();
     expect(within(rail).queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
 
-    await user.click(await screen.findByRole('button', { name: 'Pilot One' }));
-
-    const menu = await screen.findByRole('menu');
-    expect(within(menu).getByRole('menuitem', { name: 'Characters' })).toHaveAttribute(
-      'href',
-      '/characters'
-    );
-    expect(within(menu).getByRole('menuitem', { name: 'Settings' })).toHaveAttribute(
-      'href',
-      '/settings'
-    );
+    const settings = await screen.findByRole('link', { name: 'Settings' });
+    const character = await screen.findByRole('link', { name: 'Pilot One' });
+    expect(settings).toHaveAttribute('href', '/settings');
+    expect(character).toHaveAttribute('href', '/characters');
+    // Clicking the character no longer opens a menu — it goes straight to
+    // the Characters page, with Settings sitting just above it.
+    expect(
+      settings.compareDocumentPosition(character) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('labels the Overview link "Overview", not "Home"', () => {

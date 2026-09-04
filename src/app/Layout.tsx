@@ -8,17 +8,7 @@ import { usePrefetch, isPrefetching } from '@/stores/prefetch';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
-import {
-  CharacterAvatar,
-  characterAvatarBoxClassName,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  LogoMark,
-  Modal,
-} from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { CharacterAvatar, characterAvatarBoxClassName, LogoMark, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { useLockedRoutes } from './useGrantedScopes';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
@@ -88,7 +78,8 @@ function mobileNavClass({ isActive }: { isActive: boolean }): string {
  * answers for all of them at once. `/clones` and `/employment-history` left
  * with the rail — they are Overview tabs now and `OverviewSubNav` asks for
  * their state itself. `/characters` and `/settings` are UNGATED
- * (routeScopes.ts), so the character menu has no marker to render.
+ * (routeScopes.ts), so the footer's Settings item and `CharacterFooterLink`
+ * have no marker to render.
  *
  * `/corp` is deliberately absent: this list is what draws the amber lock dot,
  * and corp UI hides rather than locks (CONTEXT.md round 35). Its entry is
@@ -184,13 +175,14 @@ interface ActiveCharacter {
 }
 
 /**
- * Trigger face shared by the rail menu and the sheet's disclosure. The control
- * renders through the gap where `activeCharacter` is still undefined — that is
- * just the Dexie lookup resolving on a cold load, and hiding it would leave
- * Characters and Settings, which appear nowhere else now, briefly unreachable.
+ * Content of `CharacterFooterLink`, shared by the rail and the sheet. It
+ * renders through the gap where `activeCharacter` is still undefined — that
+ * is just the Dexie lookup resolving on a cold load, and hiding it would
+ * leave the Characters route, which appears nowhere else now, briefly
+ * unreachable.
  *
- * Through that gap it holds the avatar's footprint so the rail doesn't jump,
- * and carries no text: the trigger's name comes from `aria-label` instead
+ * Through that gap it holds the avatar's footprint so the layout doesn't
+ * jump, and carries no text: the link's name comes from `aria-label` instead
  * (see `characterTriggerLabel`). A visible "Switch character" placeholder
  * would collide with the identically-worded shortcut description Settings
  * lists, which is a real ambiguity for a screen reader, not just for a test.
@@ -232,92 +224,45 @@ function characterTriggerLabel(
   return activeCharacter ? undefined : t('nav.switchCharacter');
 }
 
-/**
- * What the character menu opens onto, in one place: the rail renders these as
- * `DropdownMenuItem`s and the sheet as `NavItem`s, and only the mechanism
- * differs between them. Both are UNGATED (routeScopes.ts), so neither
- * rendering carries a missing-scope marker.
- */
-const CHARACTER_MENU_DESTINATIONS = [
-  { to: '/characters', labelKey: 'nav.characters' },
-  { to: '/settings', labelKey: 'nav.settings' },
-] as const satisfies readonly { to: AppRoutePath; labelKey: string }[];
-
 const CHARACTER_TRIGGER =
   'flex w-full items-center gap-2 p-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
 
 /**
- * Desktop rail footer: the active Character, opening onto the two views that
- * used to sit in the rail proper. The name *is* the accessible name — Radix
- * adds `aria-haspopup="menu"`, so an extra label would only rewrite it into
- * something less useful than the pilot's own name. Items are `asChild` links
- * so they stay real anchors (middle-click, "open in new tab").
+ * The active Character, as a plain link to `/characters` — the only way to
+ * switch or add a Character, rather than a menu opening onto Characters *and*
+ * Settings. Settings is now its own ordinary nav item (`NavItem`) sitting
+ * just above this on both surfaces, so the trigger no longer needs to carry
+ * it. The name *is* the accessible name (`characterTriggerLabel`) once the
+ * Character is known, so a real link — not a button — is both simpler and
+ * gives middle-click/"open in new tab" for free.
  */
-function RailCharacterMenu({ activeCharacter }: { activeCharacter: ActiveCharacter | undefined }) {
+function CharacterFooterLink({
+  activeCharacter,
+  size,
+  className = '',
+  onClick,
+}: {
+  activeCharacter: ActiveCharacter | undefined;
+  size?: 'sm';
+  className?: string;
+  onClick?: () => void;
+}) {
   const { t } = useTranslation();
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={characterTriggerLabel(activeCharacter, t)}
-        className={`${CHARACTER_TRIGGER} shrink-0 border-t border-line`}
-      >
-        <CharacterTriggerFace activeCharacter={activeCharacter} />
-      </DropdownMenuTrigger>
-      {/* Anchored upward: the trigger is pinned to the bottom of the viewport. */}
-      <DropdownMenuContent side="top" align="start" className="w-44">
-        {CHARACTER_MENU_DESTINATIONS.map(({ to, labelKey }) => (
-          // `asChild` so each item stays a real anchor — middle-click and
-          // "open in new tab" keep working.
-          <DropdownMenuItem key={to} asChild>
-            <Link to={to}>{t(labelKey)}</Link>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Link
+      to="/characters"
+      onClick={onClick}
+      aria-label={characterTriggerLabel(activeCharacter, t)}
+      className={`${CHARACTER_TRIGGER} ${className}`}
+    >
+      <CharacterTriggerFace activeCharacter={activeCharacter} size={size} />
+    </Link>
   );
 }
 
-/**
- * The sheet's equivalent of `RailCharacterMenu`, as an inline disclosure
- * rather than a `DropdownMenu`: `DropdownMenuContent` portals to `document.body`,
- * which sits *outside* the top-layer `<dialog>` the sheet opens with
- * `showModal()` — and everything outside it is inert, so the menu would render
- * and then refuse every click. `Modal` mounts its children only while open, so
- * the expanded state resets with the sheet and never reopens pre-expanded.
- */
-function SheetCharacterMenu({
-  activeCharacter,
-  onNavigate,
-}: {
-  activeCharacter: ActiveCharacter | undefined;
-  onNavigate: () => void;
-}) {
-  const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div>
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-label={characterTriggerLabel(activeCharacter, t)}
-        onClick={() => setExpanded((open) => !open)}
-        className={`${CHARACTER_TRIGGER} min-h-11 rounded-xs`}
-      >
-        <CharacterTriggerFace activeCharacter={activeCharacter} size="sm" />
-        <span aria-hidden="true" className="ml-auto shrink-0 text-text-faint">
-          {expanded ? <Icon.Expanded /> : <Icon.Descend />}
-        </span>
-      </button>
-      {expanded && (
-        <div className="ml-3 space-y-1 border-l border-line pl-2">
-          {CHARACTER_MENU_DESTINATIONS.map(({ to, labelKey }) => (
-            <NavItem key={to} to={to} label={t(labelKey)} locked={false} onClick={onNavigate} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
+/** A plain rule, styled like the Radix menu separators elsewhere in the app (`DropdownMenuSeparator` et al.) but usable outside a menu. */
+function FooterDivider() {
+  return <div role="separator" aria-orientation="horizontal" className="my-1 h-px bg-line" />;
 }
 
 const MORE_SHEET_ID = 'mobile-more-sheet';
@@ -332,11 +277,12 @@ interface MobileMoreSheetProps {
 /**
  * Mobile-only overflow sheet: the Character-section views that don't fit as
  * primary bottom-tab items, plus Market (which isn't Character-scoped, but the
- * tab bar is full at 3 + More). The Character disclosure leads, mirroring the
- * rail's pinned menu — it is the only route to Settings on a phone. A real
- * modal, not a drawer: it covers the viewport, so the tab bar underneath must
- * not stay reachable — hence the shared `Modal` and its dismissal contract.
- * Links close it on click so it never hangs over the next route.
+ * tab bar is full at 3 + More). Settings and the active Character trail the
+ * list, below a divider — Settings has no other route on a phone, and the
+ * Character link is the only way to switch or add one. A real modal, not a
+ * drawer: it covers the viewport, so the tab bar underneath must not stay
+ * reachable — hence the shared `Modal` and its dismissal contract. Links
+ * close it on click so it never hangs over the next route.
  */
 function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreSheetProps) {
   const { t } = useTranslation();
@@ -344,7 +290,6 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
   return (
     <Modal open={open} id={MORE_SHEET_ID} onClose={onClose} title={t('nav.more')} placement="sheet">
       <div className="space-y-1 pb-3">
-        <SheetCharacterMenu activeCharacter={activeCharacter} onNavigate={onClose} />
         {/* The phone's only route to /corp: the tab bar is full at 3 + More. */}
         <CorpNavItem onClick={onClose} />
         <NavItem
@@ -388,6 +333,14 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           to="/contacts"
           label={t('nav.contacts')}
           locked={locked.has('/contacts')}
+          onClick={onClose}
+        />
+        <FooterDivider />
+        <NavItem to="/settings" label={t('nav.settings')} locked={false} onClick={onClose} />
+        <CharacterFooterLink
+          activeCharacter={activeCharacter}
+          size="sm"
+          className="min-h-11 rounded-xs"
           onClick={onClose}
         />
       </div>
@@ -477,7 +430,16 @@ export function Layout() {
           <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
           <NavItem to="/contacts" label={t('nav.contacts')} locked={locked.has('/contacts')} />
         </nav>
-        <RailCharacterMenu activeCharacter={activeCharacter} />
+        {/*
+          Footer: Settings then the active Character, in that reading order —
+          Settings sits just above the Character link, which is the very
+          bottom of the rail. Its own `border-t` is what visually separates
+          this from the scrollable nav above.
+        */}
+        <div className="shrink-0 border-t border-line p-2">
+          <NavItem to="/settings" label={t('nav.settings')} locked={false} />
+        </div>
+        <CharacterFooterLink activeCharacter={activeCharacter} />
       </aside>
 
       <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
