@@ -2262,3 +2262,51 @@ offeredScopes: Record<number, readonly Scope[]> }`. Round 37's "offered once
   `notificationOptions.test.ts`'s route-table check similarly strips a query
   string before checking a route is real, since `ROUTE_REQUIREMENTS` keys are
   bare paths.
+
+## Scope decisions (round 49) — Shared Public Info Modal
+
+- **A single, cross-feature `PublicInfoModal` (`src/components/PublicInfoModal.tsx`)
+  replaces "link to Contacts" as the way a view lets you look up another
+  Character, Corporation, or Alliance you are not necessarily tracking as a
+  Contact.** Contacts, Corp Members, and Contracts (separate follow-up
+  tickets) each currently have no sane target for "who is this?" unless the
+  entity already happens to be a saved Contact — this modal is the general
+  answer, opened by id + kind (`character` | `corporation` | `alliance`) from
+  any feature via `openPublicInfoModal(kind, id)` /
+  `usePublicInfoModal().open(kind, id)` (`src/stores/publicInfoModal.ts`).
+  A feature adopting this rule swaps its "open Contacts" affordance for
+  "open this modal" — it does not require the looked-up entity to become a
+  Contact as a side effect.
+- **Global Zustand signal store, not local `selected` state.** Every other
+  detail modal in this repo (`ContractDetailModal`, `ItemDetailModal`,
+  `EventDetailModal`) is opened by one route's own local state, because only
+  that route ever opens it. This modal is opened from several unrelated
+  features sharing one instance, so it follows `stores/authFailure.ts`'s
+  shape instead: a store holds `request: { kind, id } | null`, and
+  `PublicInfoModal` — mounted once in `App.tsx` beside `WhatsNewPanel` — is
+  the only place that renders it.
+- **No new ESI scope, no registry entry.** `/characters/{id}`,
+  `/corporations/{id}`, and `/alliances/{id}` were already registered as
+  `PUBLIC` (unauthenticated) endpoints before this round; the modal calls
+  them exactly as `getCharacterPublicInfo`/`getCorporationPublicInfo`/
+  `getAlliancePublicInfo` already existed.
+- **Cached like `stations.ts`, not like `stores/publicInfo.ts`.** The
+  existing `publicInfo.ts` store only caches `{ corporationName,
+allianceName }` strings for the signed-in Character's own header and is
+  not reused here — this modal needs the fuller record (ticker, member
+  count, CEO) for an arbitrary looked-up entity. The new
+  `features/character/publicInfoData.ts` instead read-throughs
+  `esi/cache.ts` under the global cache sentinel with `STALE_AFTER.static`,
+  the same choice already made for other public, rarely-changing lookups
+  (station/structure names).
+- **CEO name resolves via `resolveNames` (`POST /universe/names`)**, not a
+  second `getCharacterPublicInfo` call — `CorporationPublicInfo` only carries
+  `ceo_id`, and a name is all the Corporation tab needs.
+- **Opening by character id resolves the whole chain (character → its corp →
+  its alliance) in one pass; opening directly by corporation or alliance id
+  skips straight to that tab.** A tab only appears once its kind has actually
+  entered the chain, so an alliance-less character (or corporation) never
+  shows an Alliance tab at all — not a tab with an error state. Switching
+  tabs never re-fetches: each tab's data is kept in local component state for
+  the lifetime of one open `request`, cleared only when a new `open()` call
+  changes the kind/id.

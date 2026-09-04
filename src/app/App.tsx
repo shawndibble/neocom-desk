@@ -42,6 +42,7 @@ import { BootScreen } from './BootScreen';
 import { RequireCharacter } from './RequireCharacter';
 import { ScopeGate } from './ScopeGate';
 import { AuthFailureRedirect } from './AuthFailureNotice';
+import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -170,6 +171,7 @@ export function App() {
         </Routes>
         <ReloadPrompt />
         <WhatsNewPanel />
+        <PublicInfoModal />
         <InstallPrompt />
       </BrowserRouter>
     </ErrorBoundary>
