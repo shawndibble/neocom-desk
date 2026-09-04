@@ -166,8 +166,18 @@ export const ROUTE_REQUIREMENTS = {
     endpoints: ['getCharacterClones'],
     strings: 'clones',
   },
+  // The three public reads add no scope — planet and schematic names, and the
+  // Advisor tab's planet list for a system — but are listed for the same
+  // reason /assets lists its universe reads: the table is meant to say what a
+  // route actually calls.
   '/planetary-industry': {
-    endpoints: ['getCharacterPlanets', 'getCharacterPlanet'],
+    endpoints: [
+      'getCharacterPlanets',
+      'getCharacterPlanet',
+      'getUniversePlanet',
+      'getUniverseSchematic',
+      'getUniverseSystem',
+    ],
     strings: 'pi',
   },
   // Reached only from Wallet's Loyalty Points table (an LP amount), which

@@ -66,6 +66,15 @@ export interface PiInput {
   name: string;
 }
 
+/**
+ * Which planetary factory pin runs a schematic. Derived from the SDE's own
+ * `planetSchematicsPinMap`, never from the schematic's tier: the two agree
+ * today (basic makes P1, advanced makes P2 and P3, high-tech makes P4) but
+ * that agreement is a fact about the current recipe set, not a rule, and the
+ * mapping is in the dump so there is nothing to infer.
+ */
+export type PiFactoryKind = 'basic' | 'advanced' | 'highTech';
+
 /** One planetary schematic, keyed in pi.json by the typeID it produces. */
 export interface PiSchematic {
   schematicId: number;
@@ -77,6 +86,15 @@ export interface PiSchematic {
   quantity: number;
   /** m3 of one unit, from invTypes.volume. */
   volume: number;
+  /** The factory pin this schematic runs in — see `PiFactoryKind`. */
+  facility: PiFactoryKind;
+  /**
+   * Planet types carrying a factory that can run this schematic, sorted
+   * alphabetically. Same strings as `PiRawResource.planetTypes`. Almost every
+   * schematic runs on all eight; the P4s do not, because the High-Tech
+   * Production Plant exists on Barren and Temperate only.
+   */
+  planetTypes: PlanetType[];
   inputs: PiInput[];
 }
 
@@ -99,10 +117,86 @@ export interface PiRawResource {
   planetTypes: PlanetType[];
 }
 
+/** Every kind of pin a colony's CPU/Powergrid budget pays for. */
+export type PiPinKind = 'extractorControlUnit' | PiFactoryKind | 'storage' | 'launchpad';
+
+/** What one pin costs a colony, and what it holds. */
+export interface PiPinSpec {
+  /** tf drawn from the colony's CPU budget (dogma `cpuLoad`, attribute 49). */
+  cpu: number;
+  /** MW drawn from the colony's Powergrid budget (dogma `powerLoad`, attribute 15). */
+  powergrid: number;
+  /** m3 the pin holds, from invTypes.capacity. Zero for pins that hold nothing. */
+  capacity: number;
+}
+
+/** What a Command Center supplies at one of its own upgrade levels. */
+export interface PiCommandCenterLevel {
+  /**
+   * The Command Center's own upgrade level, 0-5 — what ESI reports per colony
+   * as `CharacterPlanet.upgrade_level`, not the pilot's Command Center
+   * Upgrades skill. The skill caps how far a colony may be upgraded; each
+   * level is then bought per colony with ISK.
+   */
+  level: number;
+  /** tf of CPU the colony's whole pin set is budgeted against. */
+  cpu: number;
+  /** MW of Powergrid the colony's whole pin set is budgeted against. */
+  powergrid: number;
+}
+
+/**
+ * The colony budget and the pin costs it pays for — the numbers a pin-layout
+ * plan is sized against, all of them the same for every planet type.
+ */
+export interface PiInfrastructure {
+  /** Per-pin CPU/Powergrid cost and capacity, one entry per `PiPinKind`. */
+  pins: Record<PiPinKind, PiPinSpec>;
+  /**
+   * Pin typeID -> its kind. Every pin is planet-type-specific — a Temperate
+   * Basic Industry Facility and a Storm one are different typeIDs at the same
+   * cost — so this is how a live colony's own `pins[]` is read: the ESI pin
+   * carries a `type_id` and nothing else that says what it is. Command
+   * Centers are absent: they supply the budget and draw nothing from it.
+   */
+  pinKindByTypeId: Record<string, PiPinKind>;
+  /**
+   * The eight Command Center typeIDs, one per planet type. Every colony has
+   * exactly one, and it is deliberately absent from `pinKindByTypeId` — a
+   * Command Center supplies the budget and draws nothing from it, so it has
+   * no cost row. It still has to be recognisable, or a reader of a live
+   * colony's pins reports the one pin every colony has as unrecognised.
+   */
+  commandCenterTypeIds: number[];
+  /**
+   * One Extractor Control Unit head's own draw, on top of the ECU's
+   * (attributes 1690/1691). A head is fitted per resource-reach, so its cost
+   * scales with how many the user places rather than being part of the ECU.
+   */
+  extractorHead: { cpu: number; powergrid: number };
+  /**
+   * CPU/Powergrid the Command Center supplies, indexed by its own upgrade
+   * level — `commandCenterUpgrades[3]` is level 3. Level 0 is the only row the
+   * SDE carries; see `scripts/build-sde.mjs` for where the rest come from and
+   * what the build asserts about them.
+   */
+  commandCenterUpgrades: PiCommandCenterLevel[];
+}
+
 /** public/data/pi.json: how planetary commodities are made. */
 export interface PiData {
   /** Produced typeID -> its schematic. */
   schematics: Record<string, PiSchematic>;
   /** P0 resources, sorted by typeID ascending. */
   raw: PiRawResource[];
+  /** CPU/Powergrid budget and per-pin costs — see `PiInfrastructure`. */
+  infrastructure: PiInfrastructure;
+  /**
+   * Planet typeID -> the `PlanetType` string ESI reports for a colony. Keyed
+   * by the typeID `/universe/planets/{id}` returns, which is how a planet in
+   * a system the character has no colony on is identified at all. Several
+   * typeIDs map to one planet type, and a planet whose typeID is absent
+   * (Shattered, Scorched Barren) supports no colony.
+   */
+  planetTypeByTypeId: Record<string, PlanetType>;
 }

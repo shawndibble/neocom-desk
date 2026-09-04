@@ -17,6 +17,8 @@ import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry
 import { loadMarketSnapshot, type MarketSnapshot } from '@/features/industry/marketData';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
+import { loadTypeNames } from '@/features/character/typeNames';
+import { usePriceBasis } from './priceBasis';
 import { useDetectedOwnedStock } from '@/features/industry/useDetectedOwnedStock';
 import type { MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
@@ -43,6 +45,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const hubId = useMarketHub((s) => s.value);
   const hubHydrated = useMarketHub((s) => s.hydrated);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  const priceBasis = usePriceBasis((s) => s.value);
 
   const [corpName, setCorpName] = useState<string | null>(null);
   const [offers, setOffers] = useState<LoyaltyStoreOffer[] | null>(null);
@@ -52,6 +55,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const [playerLp, setPlayerLp] = useState(0);
   const [skills, setSkills] = useState<SkillLevels>({});
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
+  const [itemNames, setItemNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [useOwnMaterialsFor, setUseOwnMaterialsFor] = useState<ReadonlySet<number>>(new Set());
 
   useEffect(() => {
@@ -130,6 +134,24 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     return [...ids];
   }, [offers, catalog]);
 
+  // Every offer's own item name — resolved via `loadTypeNames` (SDE snapshot
+  // first, then a batched ESI call for whatever it doesn't cover) rather than
+  // `blueprintCatalog`'s `typesById`, which only carries types some blueprint
+  // or skill references. LP stores hand out plenty that neither ever does
+  // (implants, Mindlinks, SKINs) — see offerRows.ts's `itemNames`.
+  const offerTypeIds = useMemo(() => (offers ?? []).map((offer) => offer.type_id), [offers]);
+
+  useEffect(() => {
+    if (offerTypeIds.length === 0) return;
+    let cancelled = false;
+    void loadTypeNames(offerTypeIds).then((names) => {
+      if (!cancelled) setItemNames(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [offerTypeIds]);
+
   const { stock } = useDetectedOwnedStock(materialTypeIds);
 
   const materialSourcing = useMemo<MaterialSourcingMap | undefined>(() => {
@@ -165,14 +187,26 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       offers,
       catalog,
       hubPrices: snapshot.hubPrices,
+      revenueHubPrices: priceBasis === 'buy' ? snapshot.hubBuyPrices : snapshot.hubPrices,
       adjustedPrices: snapshot.adjustedPrices,
       systemCostIndex: snapshot.systemCostIndex,
       skills,
       materialSourcing,
+      itemNames,
       useOwnMaterialsFor,
       playerLp,
     });
-  }, [offers, catalog, snapshot, skills, materialSourcing, useOwnMaterialsFor, playerLp]);
+  }, [
+    offers,
+    catalog,
+    snapshot,
+    priceBasis,
+    skills,
+    materialSourcing,
+    itemNames,
+    useOwnMaterialsFor,
+    playerLp,
+  ]);
 
   function toggleUseOwnMaterials(offerId: number): void {
     setUseOwnMaterialsFor((prev) => {

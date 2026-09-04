@@ -33,6 +33,7 @@ const FILES = [
   'invMetaTypes.csv',
   'planetSchematics.csv',
   'planetSchematicsTypeMap.csv',
+  'planetSchematicsPinMap.csv',
   'invMetaGroups.csv',
   'mapRegions.csv',
   'mapSolarSystems.csv',
@@ -99,6 +100,75 @@ const ESI_PLANET_TYPES = [
   'plasma',
   'storm',
   'temperate',
+];
+
+// --- Planetary pin infrastructure (pi.json's `infrastructure` block) ---
+//
+// Every number here is read out of the dump, not typed in: the CPU/Powergrid
+// a pin draws and a Command Center supplies are ordinary dogma attributes.
+// The one exception is CC_UPGRADE_LEVELS below, which is flagged as such.
+const PLANET_GROUP_ID = 7;
+const PI_PIN_GROUPS = {
+  1027: 'commandCenter',
+  1028: 'processor', // split into basic/advanced/highTech by name below
+  1029: 'storage',
+  1030: 'launchpad',
+  1063: 'extractorControlUnit',
+};
+// Which Processor a name is. The three are separate pins with different costs,
+// and the SDE has no column saying which is which, so the name is the only
+// discriminator the dump offers. Checked for exhaustive coverage below.
+const PROCESSOR_KINDS = [
+  ['High-Tech Production Plant', 'highTech'],
+  ['Advanced Industry Facility', 'advanced'],
+  ['Basic Industry Facility', 'basic'],
+];
+const PIN_KINDS = ['extractorControlUnit', 'basic', 'advanced', 'highTech', 'storage', 'launchpad'];
+// Dogma attribute IDs (verified against dgmAttributeTypes.csv):
+const POWER_OUTPUT_ATTR = 11; // powerOutput, what a Command Center supplies
+const POWER_LOAD_ATTR = 15; // powerLoad, what a pin draws
+const CPU_OUTPUT_ATTR = 48; // cpuOutput
+const CPU_LOAD_ATTR = 49; // cpuLoad
+const PLANET_RESTRICTION_ATTR = 1632; // planetRestriction: the planet typeID a pin belongs to
+const ECU_HEAD_CPU_ATTR = 1690; // ecuExtractorHeadCPU
+const ECU_HEAD_POWER_ATTR = 1691; // ecuExtractorHeadPower
+
+// CPU/Powergrid a Command Center supplies at each of its **own** upgrade
+// levels, 0-5.
+//
+// Indexed by the colony's Command Center upgrade level — what ESI reports as
+// `CharacterPlanet.upgrade_level`, per colony — and NOT by the pilot's
+// Command Center Upgrades skill. The skill sets the *ceiling* a colony may be
+// upgraded to; reaching each level is then bought per colony with ISK, which
+// is why the wiki table this comes from prices every row. Confusing the two
+// overstates the budget of every colony not upgraded to the pilot's maximum.
+//
+// UNLIKE THE PIN COSTS THIS TABLE IS NOT DERIVED FROM THE SDE DUMP. The skill
+// (type 2505) carries no dogma effect that scales a deployed Command Center's
+// output, so the per-level numbers are nowhere in the dump; a deployed CC's
+// static attributes only ever show the level-0 profile. See
+// docs/research/pi-cpu-power-mechanics.md §1-2 for the full trace.
+//
+// Source: EVE University wiki, "Planetary buildings" ("Command Center
+// Properties"), https://wiki.eveuniversity.org/Planetary_buildings, read
+// 2026-09-04. Levels 0 and 1 are independently corroborated by ESI's own
+// live and legacy type data (2254 carries the level-0 row; the unpublished
+// legacy "Limited Barren Command Center", 2129, carries the level-1 row
+// exactly) — and those legacy types were themselves the separate deployable
+// items each level used to correspond to, which is the other reason to read
+// this as a per-colony upgrade rather than a per-character skill. Levels 2-5
+// are secondary-source only.
+//
+// The level-0 row is asserted against the dump-derived Command Center output
+// before anything is written, so a dump whose base numbers move fails the
+// build instead of shipping a table that disagrees with its own first row.
+const CC_UPGRADE_LEVELS = [
+  { level: 0, cpu: 1675, powergrid: 6000 },
+  { level: 1, cpu: 7057, powergrid: 9000 },
+  { level: 2, cpu: 12136, powergrid: 12000 },
+  { level: 3, cpu: 17215, powergrid: 15000 },
+  { level: 4, cpu: 21315, powergrid: 17000 },
+  { level: 5, cpu: 25415, powergrid: 19000 },
 ];
 
 // Which planet types yield each P0 resource, keyed by invTypes.typeName.
@@ -351,6 +421,9 @@ async function main() {
         description: r[h.description] ?? '',
         groupID: Number(r[h.groupID]),
         volume: num(r[h.volume]) ?? 0,
+        // What the type holds, not what it takes up: a Launchpad's 10,000 m3
+        // and a Storage Facility's 12,000 are the colony's whole buffer.
+        capacity: num(r[h.capacity]) ?? 0,
         published: r[h.published] === '1',
         marketGroupID: r[h.marketGroupID] === '' ? null : Number(r[h.marketGroupID]),
       });
@@ -365,7 +438,13 @@ async function main() {
     if (g && g.categoryID === SKILL_CATEGORY_ID) skillTypeIds.add(typeID);
   }
 
-  // --- dgmTypeAttributes: attrs for skill types only ---
+  // --- Planetary pin type IDs: published types in the six pin groups ---
+  const piPinTypeIds = new Set();
+  for (const [typeID, t] of types) {
+    if (t.published && PI_PIN_GROUPS[t.groupID]) piPinTypeIds.add(typeID);
+  }
+
+  // --- dgmTypeAttributes: attrs for skill types and planetary pins ---
   const attrsByType = new Map(); // typeID -> Map(attrID -> value)
   {
     const rows = raw['dgmTypeAttributes.csv'];
@@ -377,7 +456,7 @@ async function main() {
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
       const typeID = Number(r[iType]);
-      if (!skillTypeIds.has(typeID)) continue;
+      if (!skillTypeIds.has(typeID) && !piPinTypeIds.has(typeID)) continue;
       const value = r[iInt] !== '' ? Number(r[iInt]) : num(r[iFloat]);
       let m = attrsByType.get(typeID);
       if (!m) {
@@ -509,12 +588,133 @@ async function main() {
   // looked up in types.json: that map only carries types some blueprint or
   // skill references, and most planetary commodities are made by a schematic
   // and consumed by another one, so 42 of them are absent from it.
+  //
+  // Alongside the recipes it carries the colony's CPU/Powergrid budget and
+  // the per-pin costs that budget pays for, so the pin-layout planner
+  // (src/engine/pi/pinBudget.ts) can size a planet without hardcoding a
+  // single game constant of its own.
   const piSchematics = {};
   const piRaw = [];
   let piUnpublished = 0;
+
+  // Planet typeID -> the PlanetType string ESI reports for a colony. The
+  // planet types are unpublished types in group 7 named "Planet (Temperate)"
+  // and so on; several typeIDs share one planet type, and the ones ESI has no
+  // colony string for (Shattered, Scorched Barren) are left out rather than
+  // mapped to a plausible neighbour.
+  const piPlanetTypeByTypeId = {};
+  for (const [typeID, t] of types) {
+    if (t.groupID !== PLANET_GROUP_ID) continue;
+    const inner = /^Planet \((.+)\)$/.exec(t.name)?.[1]?.toLowerCase();
+    if (inner && ESI_PLANET_TYPES.includes(inner)) piPlanetTypeByTypeId[typeID] = inner;
+  }
+
+  // Pin costs, keyed by kind. Every planet-type variant of a kind is read and
+  // asserted to agree, so "one representative per kind" is a checked
+  // conclusion rather than an assumption.
+  const piPinKindOf = (t) => {
+    const group = PI_PIN_GROUPS[t.groupID];
+    if (group !== 'processor') return group;
+    return PROCESSOR_KINDS.find(([suffix]) => t.name.endsWith(suffix))?.[1];
+  };
+  const piPinSpecs = {};
+  const piPinKindByTypeId = {}; // pin typeID -> kind, for reading a live colony's own pins
+  // Command Centers, which every colony has exactly one of. Deliberately not a
+  // pin kind — a CC supplies the budget and draws nothing from it, so it has
+  // no cost row to look up — but a reader of a live colony's pins still has to
+  // recognise it, or it lands in "pins we don't recognise" on every colony.
+  const piCommandCenterTypeIds = [];
+  const piPinsByKind = new Map(); // kind -> [{ typeID, name, cpu, powergrid, capacity }]
+  const piPinPlanetTypes = new Map(); // pin typeID -> PlanetType
+  const piUnclassifiedPins = [];
+  const piDisagreeingPins = [];
+  let piCommandCenterOutput = null;
+  let piExtractorHead = null;
+  {
+    for (const typeID of [...piPinTypeIds].sort((a, b) => a - b)) {
+      const t = types.get(typeID);
+      const attrs = attrsByType.get(typeID) ?? new Map();
+      const planetTypeId = attrs.get(PLANET_RESTRICTION_ATTR);
+      const planetType = piPlanetTypeByTypeId[planetTypeId];
+      if (planetType) piPinPlanetTypes.set(typeID, planetType);
+
+      if (PI_PIN_GROUPS[t.groupID] === 'commandCenter') {
+        piCommandCenterTypeIds.push(typeID);
+        // The Command Center supplies the budget and draws nothing from it —
+        // it carries powerOutput/cpuOutput and no load attributes at all.
+        const output = {
+          cpu: attrs.get(CPU_OUTPUT_ATTR),
+          powergrid: attrs.get(POWER_OUTPUT_ATTR),
+        };
+        if (output.cpu == null || output.powergrid == null) {
+          piUnclassifiedPins.push(`${t.name} (${typeID}): no CPU/Powergrid output`);
+        } else if (piCommandCenterOutput == null) {
+          piCommandCenterOutput = output;
+        } else if (
+          piCommandCenterOutput.cpu !== output.cpu ||
+          piCommandCenterOutput.powergrid !== output.powergrid
+        ) {
+          piDisagreeingPins.push(`${t.name} (${typeID}): Command Center output differs`);
+        }
+        continue;
+      }
+
+      const kind = piPinKindOf(t);
+      if (!kind) {
+        piUnclassifiedPins.push(`${t.name} (${typeID}): no pin kind`);
+        continue;
+      }
+      const spec = {
+        cpu: attrs.get(CPU_LOAD_ATTR),
+        powergrid: attrs.get(POWER_LOAD_ATTR),
+        capacity: t.capacity,
+      };
+      if (spec.cpu == null || spec.powergrid == null) {
+        piUnclassifiedPins.push(`${t.name} (${typeID}): no CPU/Powergrid load`);
+        continue;
+      }
+      const list = piPinsByKind.get(kind) ?? [];
+      list.push({ typeID, name: t.name, ...spec });
+      piPinsByKind.set(kind, list);
+      piPinKindByTypeId[typeID] = kind;
+
+      if (kind === 'extractorControlUnit') {
+        const head = {
+          cpu: attrs.get(ECU_HEAD_CPU_ATTR),
+          powergrid: attrs.get(ECU_HEAD_POWER_ATTR),
+        };
+        if (head.cpu == null || head.powergrid == null) {
+          piUnclassifiedPins.push(`${t.name} (${typeID}): no extractor-head CPU/Powergrid`);
+        } else if (piExtractorHead == null) {
+          piExtractorHead = head;
+        } else if (
+          piExtractorHead.cpu !== head.cpu ||
+          piExtractorHead.powergrid !== head.powergrid
+        ) {
+          piDisagreeingPins.push(`${t.name} (${typeID}): extractor-head cost differs`);
+        }
+      }
+    }
+    for (const [kind, list] of piPinsByKind) {
+      const [first, ...rest] = list;
+      for (const other of rest) {
+        if (
+          other.cpu !== first.cpu ||
+          other.powergrid !== first.powergrid ||
+          other.capacity !== first.capacity
+        ) {
+          piDisagreeingPins.push(
+            `${other.name} (${other.typeID}) disagrees with ${first.name} (${first.typeID}) on ${kind}`
+          );
+        }
+      }
+      piPinSpecs[kind] = { cpu: first.cpu, powergrid: first.powergrid, capacity: first.capacity };
+    }
+  }
   // Populated while walking the P0s, reported in the sanity checks below.
   const piUnmappedP0 = [];
   const piMappedP0Names = new Set();
+  const piBadFacilities = [];
   {
     const meta = new Map();
     {
@@ -548,6 +748,22 @@ async function main() {
         }
       }
     }
+    // Which factory pin runs each schematic, straight out of the dump: one
+    // row per (schematic, pin type) pair, one pin type per planet variant.
+    // The facility kind and the planet types a schematic can run on both fall
+    // out of it, so neither is inferred from the schematic's tier.
+    const schematicPins = new Map();
+    {
+      const rows = raw['planetSchematicsPinMap.csv'];
+      const h = indexHeader(rows);
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const schematicID = Number(r[h.schematicID]);
+        const list = schematicPins.get(schematicID) ?? [];
+        list.push(Number(r[h.pinTypeID]));
+        schematicPins.set(schematicID, list);
+      }
+    }
     const piName = (typeID) => types.get(typeID)?.name ?? `#${typeID}`;
     // invTypes.volume, not packagedVolume: the two are identical for every
     // planetary commodity (verified against the current dump) and `volume` is
@@ -560,12 +776,23 @@ async function main() {
         piUnpublished++;
         continue;
       }
+      const pins = schematicPins.get(schematicID) ?? [];
+      const facilities = [
+        ...new Set(pins.map((pinTypeID) => piPinKindOf(types.get(pinTypeID) ?? {}))),
+      ];
+      if (facilities.length !== 1 || !facilities[0]) {
+        piBadFacilities.push(`${info.name} (${schematicID}): ${JSON.stringify(facilities)}`);
+      }
       piSchematics[output.typeID] = {
         schematicId: schematicID,
         name: info.name,
         cycleTime: info.cycleTime,
         quantity: output.quantity,
         volume: piVolume(output.typeID),
+        facility: facilities[0] ?? null,
+        planetTypes: [
+          ...new Set(pins.map((pinTypeID) => piPinPlanetTypes.get(pinTypeID)).filter(Boolean)),
+        ].sort(),
         inputs: (schematicInputs.get(schematicID) ?? [])
           .map((line) => ({ ...line, name: piName(line.typeID) }))
           .sort((a, b) => a.name.localeCompare(b.name)),
@@ -598,7 +825,81 @@ async function main() {
       .map(([typeID]) => Number(typeID)),
     ...piRaw.filter((r) => !(r.volume > 0)).map((r) => r.typeID),
   ];
-  const pi = { schematics: piSchematics, raw: piRaw };
+  const piMissingPinKinds = PIN_KINDS.filter((kind) => !piPinSpecs[kind]);
+  // The hand-maintained CC-Upgrades table's own first row, checked against
+  // what the dump says a Command Center supplies untrained. A dump whose base
+  // numbers move fails the build rather than shipping a table that disagrees
+  // with its own level 0 — the only row the SDE can vouch for.
+  const piCcLevel0Mismatch =
+    piCommandCenterOutput == null
+      ? 'no Command Center output found in the dump'
+      : piCommandCenterOutput.cpu !== CC_UPGRADE_LEVELS[0].cpu ||
+          piCommandCenterOutput.powergrid !== CC_UPGRADE_LEVELS[0].powergrid
+        ? `dump says ${piCommandCenterOutput.cpu} tf / ${piCommandCenterOutput.powergrid} MW, CC_UPGRADE_LEVELS[0] says ${CC_UPGRADE_LEVELS[0].cpu} / ${CC_UPGRADE_LEVELS[0].powergrid}`
+        : null;
+  const piPlanetTypeCoverage = new Set(Object.values(piPlanetTypeByTypeId));
+  const piMissingPlanetTypes = ESI_PLANET_TYPES.filter((p) => !piPlanetTypeCoverage.has(p));
+  const pi = {
+    schematics: piSchematics,
+    raw: piRaw,
+    infrastructure: {
+      pins: Object.fromEntries(PIN_KINDS.map((kind) => [kind, piPinSpecs[kind]])),
+      pinKindByTypeId: piPinKindByTypeId,
+      commandCenterTypeIds: piCommandCenterTypeIds.sort((a, b) => a - b),
+      extractorHead: piExtractorHead,
+      commandCenterUpgrades: CC_UPGRADE_LEVELS,
+    },
+    planetTypeByTypeId: piPlanetTypeByTypeId,
+  };
+
+  // Structural invariants, checked BEFORE anything is written.
+  //
+  // The reporting checks further down set `process.exitCode = 1` but run after
+  // the write, so on their own a failing build still leaves a bad payload on
+  // disk — and `src/sde/types.ts` declares these fields non-nullable, so
+  // `tsc` would go on vouching for a shape the emitter had just violated.
+  // These throw instead: nothing is written unless the payload can satisfy
+  // the types that describe it.
+  {
+    const problems = [];
+    if (piCcLevel0Mismatch) problems.push(`Command Center level 0: ${piCcLevel0Mismatch}`);
+    if (piBadFacilities.length)
+      problems.push(
+        `schematics whose factory pins resolve to more than one facility kind: ${piBadFacilities.join('; ')}`
+      );
+    if (piMissingPinKinds.length)
+      problems.push(`no pin found for: ${piMissingPinKinds.join(', ')}`);
+    if (piMissingPlanetTypes.length)
+      problems.push(`no planet typeID maps to: ${piMissingPlanetTypes.join(', ')}`);
+    if (!piCommandCenterTypeIds.length) problems.push('no Command Center types found');
+    // Positive on both axes, not merely present. `engine/pi/pinBudget.ts`
+    // refuses a pin priced at nothing rather than reading it as "no room",
+    // and that refusal is a throw on a render path (`spareCapacity` runs
+    // inside a card's `useMemo`). Guaranteeing it here is what keeps that
+    // throw unreachable instead of a crash waiting on a payload regression.
+    for (const [kind, spec] of Object.entries(pi.infrastructure.pins)) {
+      if (!spec) {
+        problems.push(`pin kind ${kind} has no cost row`);
+      } else if (!(spec.cpu > 0) || !(spec.powergrid > 0)) {
+        problems.push(
+          `pin kind ${kind} is priced at ${spec.cpu} tf / ${spec.powergrid} MW; every pin costs something`
+        );
+      }
+    }
+    if (!(piExtractorHead?.cpu > 0) || !(piExtractorHead?.powergrid > 0)) {
+      problems.push('extractor head is priced at nothing');
+    }
+    for (const [typeID, schematic] of Object.entries(piSchematics)) {
+      if (!schematic.facility) problems.push(`schematic ${typeID} has no facility`);
+      if (!schematic.planetTypes.length)
+        problems.push(`schematic ${typeID} runs on no planet type`);
+    }
+    if (problems.length) {
+      throw new Error(
+        `pi.json would be structurally invalid, so nothing was written:\n  - ${problems.join('\n  - ')}`
+      );
+    }
+  }
 
   // --- market/groups.json: invMarketGroups -> MarketGroupNode[] ---
   const marketGroups = [];
@@ -839,6 +1140,9 @@ async function main() {
   console.log(
     `  planetary schematics: ${Object.keys(piSchematics).length} (+${piRaw.length} raw resources, ${piUnpublished} unpublished skipped)`
   );
+  console.log(
+    `  planetary pins: ${[...piPinsByKind].map(([kind, list]) => `${kind} x${list.length}`).join(', ')}; ${Object.keys(piPlanetTypeByTypeId).length} planet typeIDs mapped`
+  );
   if (Object.keys(piSchematics).length === 0 || piRaw.length === 0) {
     console.error('  FAIL: the planetary industry payload came out empty');
     process.exitCode = 1;
@@ -863,6 +1167,16 @@ async function main() {
   }
   if (piZeroVolume.length) {
     console.error(`  FAIL: planetary types with no volume: ${piZeroVolume.join(', ')}`);
+    process.exitCode = 1;
+  }
+  if (piUnclassifiedPins.length) {
+    console.error(`  FAIL: planetary pins missing cost data: ${piUnclassifiedPins.join('; ')}`);
+    process.exitCode = 1;
+  }
+  if (piDisagreeingPins.length) {
+    console.error(
+      `  FAIL: planet-type variants of one pin kind disagree on cost, so no representative can stand for the kind: ${piDisagreeingPins.join('; ')}`
+    );
     process.exitCode = 1;
   }
   console.log(`  prereqs pointing outside skills.json: ${badPrereq}`);

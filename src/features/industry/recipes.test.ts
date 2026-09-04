@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import type { BlueprintMap, PiData, TypeMap } from '@/sde/types';
+import type { BlueprintMap, TypeMap } from '@/sde/types';
+import { piFixture } from '@/sde/__fixtures__/pi';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 
 const BLUEPRINTS: BlueprintMap = {
@@ -17,7 +18,7 @@ const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
 };
 
-const PI: PiData = {
+const PI = piFixture({
   schematics: {
     '2398': {
       schematicId: 133,
@@ -25,6 +26,8 @@ const PI: PiData = {
       cycleTime: 1800,
       quantity: 20,
       volume: 0.19,
+      facility: 'basic',
+      planetTypes: ['barren', 'lava', 'plasma'],
       inputs: [{ typeID: 2267, quantity: 3000, name: 'Base Metals' }],
     },
   },
@@ -36,7 +39,7 @@ const PI: PiData = {
       planetTypes: ['barren', 'gas', 'lava', 'plasma', 'storm'],
     },
   ],
-};
+});
 
 vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
