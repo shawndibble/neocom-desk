@@ -15,6 +15,7 @@
  */
 import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
+import { setSyncedSetting, scheduleSync } from '@/sync';
 import {
   isEventEnabledFor,
   toggleEventChannel,
@@ -31,6 +32,7 @@ import type { NotificationEventId } from './events';
 import {
   SYNCED_NOTIFICATION_FEED_PREFS_KEY,
   withSyncedFeedPrefsApplied,
+  toSyncedFeedPrefs,
 } from './syncedPreferences';
 
 export const NOTIFICATION_PREFS_SETTING_KEY = 'notificationPreferences';
@@ -218,6 +220,34 @@ export async function hydrateNotificationPreferences(): Promise<void> {
   if (JSON.stringify(merged) !== JSON.stringify(current)) {
     await useNotificationPreferences.getState().setValue(merged);
   }
+}
+
+/**
+ * Writes a preference change and, unless it only touched the device-local
+ * browser channel, pushes the feed-only slice to the synced setting (issue
+ * #363) and schedules a sync. `setSyncedSetting` itself leaves scheduling to
+ * the caller.
+ *
+ * `channel` names which delivery channel this particular write touched, for
+ * callers driven by a per-channel control (a threshold write has no channel
+ * — it always syncs). A `'browser'` write must skip the sync push entirely,
+ * not just contribute nothing to `toSyncedFeedPrefs`: pushing still stamps
+ * `sync.notificationFeedPrefs`'s LWW `updatedAt`, so a browser-only edit
+ * would otherwise be able to clobber a genuine, still-unsynced feed edit
+ * made concurrently on another device.
+ *
+ * Shared by `NotificationsPanel` (Settings) and `NotificationContextMenu`
+ * (issue #364) so the sync-vs-local branching lives in one place.
+ */
+export async function updateNotificationPrefs(
+  characterId: number,
+  next: NotificationPreferencesValue,
+  channel?: NotificationChannel
+): Promise<void> {
+  await useNotificationPreferences.getState().setValue(next);
+  if (channel === 'browser') return;
+  await setSyncedSetting(SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs(next));
+  scheduleSync(characterId);
 }
 
 export function characterEventPrefs(

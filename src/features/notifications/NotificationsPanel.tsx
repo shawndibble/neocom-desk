@@ -46,6 +46,7 @@ import {
 import {
   useNotificationPreferences,
   hydrateNotificationPreferences,
+  updateNotificationPrefs as updatePrefs,
   characterEventPrefs,
   characterEveTypePrefs,
   withMasterEnabled,
@@ -60,9 +61,7 @@ import {
   characterEventThresholds,
   withCharacterEventThreshold,
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
-  type NotificationPreferencesValue,
 } from './preferences';
-import { SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs } from './syncedPreferences';
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -76,7 +75,6 @@ import {
 import { filterNotificationSections } from './notificationSearch';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
-import { setSyncedSetting, scheduleSync } from '@/sync';
 import {
   useNotificationPermission,
   useNotificationPromptState,
@@ -119,32 +117,12 @@ export function NotificationsPanel() {
     void hydrateNotificationPreferences();
   }, []);
 
-  /**
-   * Per-Character writes (event/eve-type toggles, thresholds) also push the
-   * feed-only slice to the synced setting (issue #363) and schedule a sync —
-   * `setSyncedSetting` itself leaves scheduling to the caller. The
-   * device-local-only writes below (master switch, browser/feed channel
-   * gates) go straight through `setPrefsValue` instead, since none of that
-   * belongs on the wire.
-   *
-   * `channel` names which delivery channel this particular write touched, for
-   * the calls that come from a per-channel control (a threshold write has no
-   * channel — it always syncs). A `'browser'` write must skip the sync push
-   * entirely, not just contribute nothing to `toSyncedFeedPrefs`: pushing
-   * still stamps `sync.notificationFeedPrefs`' LWW `updatedAt`, so a
-   * browser-only edit would otherwise be able to clobber a genuine, still
-   * unsynced feed edit made concurrently on another device.
-   */
-  async function updatePrefs(
-    characterId: number,
-    next: NotificationPreferencesValue,
-    channel?: NotificationChannel
-  ) {
-    await setPrefsValue(next);
-    if (channel === 'browser') return;
-    await setSyncedSetting(SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs(next));
-    scheduleSync(characterId);
-  }
+  // Per-Character writes (event/eve-type toggles, thresholds) go through
+  // `updatePrefs` (preferences.ts) — it also pushes the feed-only slice to
+  // the synced setting and schedules a sync (issue #363). The
+  // device-local-only writes below (master switch, browser/feed channel
+  // gates) go straight through `setPrefsValue` instead, since none of that
+  // belongs on the wire.
 
   // The Overview panel refreshes the app-icon badge when preferences change,
   // but it is unmounted while the user is on Settings — which is the only
