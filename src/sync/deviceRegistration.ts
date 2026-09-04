@@ -49,8 +49,12 @@ function isStandalone(): boolean {
  * will never deliver anything.
  */
 export function webPushSupport(): WebPushSupport {
-  if (typeof Notification === 'undefined' || !navigator.serviceWorker) return 'unsupported';
+  // Checked before the Notification/serviceWorker probe below: real
+  // non-installed iOS Safari has no `Notification` global at all, so that
+  // check alone would misreport 'unsupported' and this branch would never
+  // be reached on the one platform it exists for.
   if (isIos() && !isStandalone()) return 'requires-install';
+  if (typeof Notification === 'undefined' || !navigator.serviceWorker) return 'unsupported';
   return 'supported';
 }
 
@@ -71,12 +75,23 @@ export async function registerDeviceForWebPush(
   const characters = await db.characters.toArray();
   if (characters.length === 0) return null;
 
-  const withAccessTokens = await Promise.all(
+  // A stale/expired token for one Character must not stop the others from
+  // registering — settle each independently rather than Promise.all, which
+  // would reject (and register nobody) on the first failure. Mirrors the
+  // backend's own per-character partial-success design (registerDevice.ts).
+  const tokenAttempts = await Promise.allSettled(
     characters.map(async (character) => ({
       characterId: character.characterId,
       accessToken: await getValidAccessToken(character.characterId),
     }))
   );
+  const withAccessTokens = tokenAttempts
+    .filter(
+      (attempt): attempt is PromiseFulfilledResult<{ characterId: number; accessToken: string }> =>
+        attempt.status === 'fulfilled'
+    )
+    .map((attempt) => attempt.value);
+  if (withAccessTokens.length === 0) return null;
 
   const call = httpsCallable<
     {
