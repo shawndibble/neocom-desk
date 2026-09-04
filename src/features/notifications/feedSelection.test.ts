@@ -51,6 +51,16 @@ describe('visibleFeedEntries', () => {
     expect(visibleFeedEntries(entries, ALL_ON).map((e) => e.id)).toEqual(['a']);
   });
 
+  it('hides a dismissed entry', () => {
+    const entries = [entry({ id: 'a', dismissedAt: 1500 }), entry({ id: 'b' })];
+    expect(visibleFeedEntries(entries, ALL_ON).map((e) => e.id)).toEqual(['b']);
+  });
+
+  it('keeps a legacy entry with no dismissedAt field', () => {
+    const entries = [entry({ id: 'a', dismissedAt: undefined })];
+    expect(visibleFeedEntries(entries, ALL_ON).map((e) => e.id)).toEqual(['a']);
+  });
+
   it('hides an eveNotification entry whose specific type the character opted out of on feed', () => {
     const prefs: NotificationPreferencesValue = {
       masterEnabled: true,

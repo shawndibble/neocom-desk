@@ -54,8 +54,13 @@ export async function recordFeedEntry(entry: NewNotificationFeedEntry): Promise<
   await refreshAppBadge();
 }
 
+/**
+ * A flag rather than a delete, so this collection carries no tombstones —
+ * see `dismissedAt` on `NotificationFeedRecord` for why that matters once
+ * the feed syncs (issue #361).
+ */
 export async function dismissFeedEntry(id: string): Promise<void> {
-  await db.notificationFeed.delete(id);
+  await db.notificationFeed.update(id, { dismissedAt: Date.now() });
   await refreshAppBadge();
 }
 
@@ -66,6 +71,9 @@ export async function dismissFeedEntry(id: string): Promise<void> {
  * the other-Characters row is counting.
  */
 export async function dismissFeedEntries(ids: readonly string[]): Promise<void> {
-  await db.notificationFeed.bulkDelete([...ids]);
+  await db.notificationFeed
+    .where('id')
+    .anyOf([...ids])
+    .modify({ dismissedAt: Date.now() });
   await refreshAppBadge();
 }
