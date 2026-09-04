@@ -18,6 +18,13 @@ import type { AdjustedPrices, HubPrices } from '@/engine/industry/types';
 export interface MarketSnapshot {
   /** Lowest sell at the hub, materials + product. Missing key = unpriceable at this hub. */
   hubPrices: HubPrices;
+  /**
+   * Highest buy at the hub, same type IDs as `hubPrices`. Unused by Build
+   * Plan (buying materials is always priced at `hubPrices`, the sell side);
+   * the LP store's "instant-sell to buy orders" revenue basis is what reads
+   * this (`src/features/loyalty/offerRows.ts`'s `revenueHubPrices`).
+   */
+  hubBuyPrices: HubPrices;
   /** Global adjusted prices (job-cost EIV). Null when the live ESI call failed. */
   adjustedPrices: AdjustedPrices | null;
   /** Manufacturing cost index for the hub's system. Null when the live ESI call failed. */
@@ -59,8 +66,10 @@ export async function loadMarketSnapshot(
 ): Promise<MarketSnapshot> {
   const hubAggregates = await getHubPrices(hub, typeIds);
   const hubPrices: HubPrices = {};
+  const hubBuyPrices: HubPrices = {};
   for (const [typeId, aggregate] of hubAggregates) {
     if (aggregate.sellMin !== null) hubPrices[typeId] = aggregate.sellMin;
+    if (aggregate.buyMax !== null) hubBuyPrices[typeId] = aggregate.buyMax;
   }
 
   let adjustedPrices: AdjustedPrices | null;
@@ -77,5 +86,5 @@ export async function loadMarketSnapshot(
   const costIndices = await loadSystemCostIndices();
   const systemCostIndex = costIndices?.get(hub.systemId) ?? null;
 
-  return { hubPrices, adjustedPrices, systemCostIndex };
+  return { hubPrices, hubBuyPrices, adjustedPrices, systemCostIndex };
 }

@@ -16,6 +16,13 @@ export interface DataTableColumn<T> {
   className?: string;
   /** Row-dependent cell classes, for per-value tones (`iskToneClass`, status tones). */
   cellClassName?: (row: T) => string | undefined;
+  /**
+   * Static header classes — for a short multi-word header (e.g. "ISK / LP")
+   * that should stay on one line rather than wrap when its column is
+   * squeezed. Separate from `className` (cell-only) since a cell tone like
+   * `text-text-dim` has no business on the header.
+   */
+  headerClassName?: string;
   render: (row: T) => ReactNode;
   /**
    * Declares the column sortable and extracts its comparable value.
@@ -128,7 +135,12 @@ export function DataTable<T>({
   // Per-column classes are invariant across rows, so they are built once
   // rather than per cell — a 1,000-row journal is 5,000 cells.
   const headerTextClass = columns.map((column) =>
-    cx(headerPadding, 'font-semibold uppercase', column.align === 'right' && 'text-right')
+    cx(
+      headerPadding,
+      'font-semibold uppercase',
+      column.align === 'right' && 'text-right',
+      column.headerClassName
+    )
   );
   const headerClass = columns.map((column, i) => cx(column.sortValue ? 'p-0' : headerTextClass[i]));
   // Which cell titles the card once the rows stack. Marked on every row's
