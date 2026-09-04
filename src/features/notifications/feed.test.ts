@@ -7,6 +7,9 @@ import {
   readFeed,
   dismissFeedEntry,
   dismissFeedEntries,
+  rowsWithinSyncWindow,
+  FEED_SYNC_WINDOW_MAX_ROWS,
+  FEED_SYNC_WINDOW_MS,
 } from './feed';
 
 beforeEach(async () => {
@@ -25,6 +28,31 @@ describe('idsBeyondLimit', () => {
 
   it('drops everything when the cap is zero', () => {
     expect(idsBeyondLimit([{ id: 'a' }], 0)).toEqual(['a']);
+  });
+});
+
+describe('rowsWithinSyncWindow', () => {
+  const NOW = 1_756_000_000_000;
+
+  it('keeps recent rows under the row cap', () => {
+    const rows = [{ firedAt: NOW - 1 }, { firedAt: NOW - 2 }];
+    expect(rowsWithinSyncWindow(rows, NOW)).toEqual(rows);
+  });
+
+  it('drops rows older than the 30-day window', () => {
+    const recent = { firedAt: NOW - 1000 };
+    const stale = { firedAt: NOW - FEED_SYNC_WINDOW_MS - 1 };
+    expect(rowsWithinSyncWindow([recent, stale], NOW)).toEqual([recent]);
+  });
+
+  it('caps at 100 rows even when all are within 30 days', () => {
+    const rows = Array.from({ length: 150 }, (_, i) => ({ firedAt: NOW - i }));
+    expect(rowsWithinSyncWindow(rows, NOW)).toHaveLength(FEED_SYNC_WINDOW_MAX_ROWS);
+  });
+
+  it('a row exactly at the 30-day boundary is included', () => {
+    const boundary = { firedAt: NOW - FEED_SYNC_WINDOW_MS };
+    expect(rowsWithinSyncWindow([boundary], NOW)).toEqual([boundary]);
   });
 });
 

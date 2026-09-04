@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { SkillPlanRecord } from '@/db';
 import {
+  mergeFeed,
   mergeRecords,
   mergeSettings,
   TOMBSTONE_TTL_MS,
+  type FeedRow,
   type LocalTombstone,
+  type RemoteFeedDoc,
   type RemotePlanDoc,
   type SyncedSettingTombstone,
 } from './merge';
@@ -353,5 +356,84 @@ describe('mergeSettings', () => {
     expect(result.pushTombstones).toEqual([tombstone]);
     expect(result.pull).toEqual([]);
     expect(result.clearLocalTombstones).toEqual([]);
+  });
+});
+
+function feedRow(overrides: Partial<FeedRow> = {}): FeedRow {
+  return { id: 'occ-1', firedAt: NOW - 1000, ...overrides };
+}
+
+function remoteFeedRow(overrides: Partial<RemoteFeedDoc> = {}): RemoteFeedDoc {
+  return { id: 'occ-1', firedAt: NOW - 1000, ownerHash: HASH, ...overrides };
+}
+
+describe('mergeFeed', () => {
+  it('pushes a row that only exists locally, when within the push window', () => {
+    const result = mergeFeed([feedRow()], new Set(['occ-1']), []);
+    expect(result.pushCreate.map((r) => r.id)).toEqual(['occ-1']);
+    expect(result.pushDismiss).toEqual([]);
+    expect(result.pullCreate).toEqual([]);
+    expect(result.pullDismiss).toEqual([]);
+  });
+
+  it('does not push a local-only row outside the push window', () => {
+    // An old row still in the local archive (cap 300) but past the 30-day/100-row
+    // sync window (CONTEXT.md round 45) is left alone, not pushed.
+    const result = mergeFeed([feedRow()], new Set(), []);
+    expect(result.pushCreate).toEqual([]);
+  });
+
+  it('pulls a row that only exists remotely', () => {
+    const result = mergeFeed([], new Set(), [remoteFeedRow()]);
+    expect(result.pullCreate.map((r) => r.id)).toEqual(['occ-1']);
+    expect(result.pushCreate).toEqual([]);
+  });
+
+  it('does nothing when both sides have the row undismissed', () => {
+    const result = mergeFeed([feedRow()], new Set(['occ-1']), [remoteFeedRow()]);
+    expect(result).toEqual({ pushCreate: [], pushDismiss: [], pullCreate: [], pullDismiss: [] });
+  });
+
+  it('pushes a dismissal newer than the remote copy, within the push window', () => {
+    const result = mergeFeed([feedRow({ dismissedAt: NOW - 10 })], new Set(['occ-1']), [
+      remoteFeedRow(),
+    ]);
+    expect(result.pushDismiss.map((r) => r.id)).toEqual(['occ-1']);
+    expect(result.pullDismiss).toEqual([]);
+  });
+
+  it('does not push a dismissal outside the push window', () => {
+    const result = mergeFeed([feedRow({ dismissedAt: NOW - 10 })], new Set(), [remoteFeedRow()]);
+    expect(result.pushDismiss).toEqual([]);
+    expect(result.pullDismiss).toEqual([]);
+  });
+
+  it('pulls a dismissal newer than the local copy, regardless of the local push window', () => {
+    // The row has aged out of this device's push window but a dismissal from
+    // another device must still win — see mergeFeed's doc comment.
+    const result = mergeFeed([feedRow()], new Set(), [remoteFeedRow({ dismissedAt: NOW - 10 })]);
+    expect(result.pullDismiss.map((r) => r.id)).toEqual(['occ-1']);
+    expect(result.pushDismiss).toEqual([]);
+  });
+
+  it('never regresses a local dismissal that is newer than a stale remote copy', () => {
+    const result = mergeFeed([feedRow({ dismissedAt: NOW - 10 })], new Set(['occ-1']), [
+      remoteFeedRow({ dismissedAt: NOW - 5000 }),
+    ]);
+    expect(result.pushDismiss.map((r) => r.id)).toEqual(['occ-1']);
+    expect(result.pullDismiss).toEqual([]);
+  });
+
+  it('produces no duplicate rows for the same Occurrence Key regardless of side', () => {
+    const result = mergeFeed([feedRow({ dismissedAt: NOW - 10 })], new Set(['occ-1']), [
+      remoteFeedRow(),
+    ]);
+    const touchedIds = [
+      ...result.pushCreate,
+      ...result.pushDismiss,
+      ...result.pullCreate,
+      ...result.pullDismiss,
+    ].map((r) => r.id);
+    expect(new Set(touchedIds).size).toBe(touchedIds.length);
   });
 });

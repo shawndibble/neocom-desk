@@ -29,12 +29,20 @@ import {
   db,
   type BuildPlanRecord,
   type CharacterRecord,
+  type NotificationFeedRecord,
   type QuickbarRecord,
   type SkillPlanRecord,
   type StationPinRecord,
 } from '@/db';
 import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
+import {
+  idsBeyondLimit,
+  NOTIFICATION_FEED_LIMIT,
+  readFeed,
+  rowsWithinSyncWindow,
+} from '@/features/notifications/feed';
+import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { retryPendingRemotePurge } from './characterPurge';
 import { getSyncFirestore } from './firebaseApp';
 import {
@@ -48,11 +56,13 @@ import {
 import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
 import {
+  mergeFeed,
   mergeRecords,
   mergeSettings,
   type LocalTombstone,
   type RemoteBuildPlanDoc,
   type RemoteDoc,
+  type RemoteFeedDoc,
   type RemotePlanDoc,
   type RemoteQuickbarDoc,
   type RemoteStationPinDoc,
@@ -378,7 +388,7 @@ interface SyncContext {
   now: number;
 }
 
-async function fetchOwnedDocs<R extends RemoteDoc>(
+async function fetchOwnedDocs<R extends { ownerHash: string }>(
   col: CollectionReference,
   ownerHash: string
 ): Promise<R[]> {
@@ -559,6 +569,93 @@ const stationPinSpec: CollectionSpec<StationPinRecord, RemoteStationPinDoc> = {
   bulkDeleteLocal: (ids) => db.stationPins.bulkDelete(ids),
 };
 
+// ---------------------------------------------------------------------------
+// Notification Feed sync (issue #362)
+//
+// Deliberate departure from CollectionSpec: this collection has no
+// tombstones (dismissal is a flag — see NotificationFeedRecord.dismissedAt)
+// and its LWW field is `dismissedAt` alone, not a whole-record `updatedAt`
+// (content never changes once a row is fired). merge.ts's `mergeFeed` encodes
+// that directly rather than forcing it through mergeRecords' delete-aware
+// shape.
+//
+// CONTEXT.md round 45 describes device-detected rows as eventually uploading
+// through the same callable Scheduled Push Projections use (issue #358),
+// once that callable exists. It doesn't yet (#358 is still open, gated on
+// #356/#357). Until then this uses the same ownerHash two-way sync every
+// other Editable-Data-shaped collection here uses — the backend (once #358
+// ships) can still write pushed rows into this same
+// characters/{uid}/notificationFeed collection with admin privileges, which
+// bypasses these rules entirely, so the two approaches aren't in conflict.
+// ---------------------------------------------------------------------------
+
+const NOTIFICATION_FEED_COLLECTION = 'notificationFeed';
+
+/** Remote Firestore doc at /characters/{uid}/notificationFeed/{id}. */
+interface RemoteNotificationFeedDoc extends RemoteFeedDoc {
+  characterId: number;
+  eventId: string;
+  title: string;
+  body: string;
+  eveType?: string;
+}
+
+function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record<string, unknown> {
+  return {
+    id: row.id,
+    characterId: row.characterId,
+    eventId: row.eventId,
+    title: row.title,
+    body: row.body,
+    firedAt: row.firedAt,
+    ...(row.eveType !== undefined ? { eveType: row.eveType } : {}),
+    ...(row.dismissedAt !== undefined ? { dismissedAt: row.dismissedAt } : {}),
+    ownerHash,
+  };
+}
+
+function toLocalFeedRecord(remote: RemoteNotificationFeedDoc): NotificationFeedRecord {
+  return {
+    id: remote.id,
+    characterId: remote.characterId,
+    eventId: remote.eventId,
+    title: remote.title,
+    body: remote.body,
+    firedAt: remote.firedAt,
+    ...(remote.eveType !== undefined ? { eveType: remote.eveType } : {}),
+    ...(remote.dismissedAt !== undefined ? { dismissedAt: remote.dismissedAt } : {}),
+  };
+}
+
+async function syncFeed(ctx: SyncContext): Promise<void> {
+  const col = collection(ctx.firestore, 'characters', ctx.uid, NOTIFICATION_FEED_COLLECTION);
+  const remote = await fetchOwnedDocs<RemoteNotificationFeedDoc>(col, ctx.ownerHash);
+  // Feed rows for every Character share one local table (NotificationFeedPanel
+  // shows them together); only this Character's own rows sync to its uid.
+  const local = (await readFeed()).filter((row) => row.characterId === ctx.characterId);
+  const pushEligible = new Set(rowsWithinSyncWindow(local, ctx.now).map((row) => row.id));
+
+  const plan = mergeFeed<NotificationFeedRecord, RemoteNotificationFeedDoc>(
+    local,
+    pushEligible,
+    remote
+  );
+
+  await Promise.all(
+    [...plan.pushCreate, ...plan.pushDismiss].map((row) =>
+      setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash))
+    )
+  );
+
+  const pulled = [...plan.pullCreate, ...plan.pullDismiss].map(toLocalFeedRecord);
+  if (pulled.length > 0) {
+    await db.notificationFeed.bulkPut(pulled);
+    const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT);
+    if (stale.length > 0) await db.notificationFeed.bulkDelete(stale);
+    await refreshAppBadge();
+  }
+}
+
 async function syncCharacter(characterId: number): Promise<void> {
   const character = await db.characters.get(characterId);
   if (!character) throw new Error(`Unknown character ${characterId}`);
@@ -578,6 +675,7 @@ async function syncCharacter(characterId: number): Promise<void> {
   await syncEditableCollection(buildPlanSpec, ctx);
   await syncEditableCollection(quickbarSpec, ctx);
   await syncEditableCollection(stationPinSpec, ctx);
+  await syncFeed(ctx);
 
   // ---- Synced settings ----
   const settingsCol = collection(firestore, 'characters', uid, 'settings');

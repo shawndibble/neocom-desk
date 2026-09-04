@@ -3,12 +3,14 @@ import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
 import {
   db,
   type BuildPlanRecord,
+  type NotificationFeedRecord,
   type QuickbarRecord,
   type SkillPlanRecord,
   type StationPinRecord,
 } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
+import { FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
 import { remotePurgePendingKey } from './characterPurge';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
@@ -109,6 +111,7 @@ const BUILD_PLANS_PATH = 'characters/char:1/buildPlans';
 const QUICKBARS_PATH = 'characters/char:1/quickbars';
 const STATION_PINS_PATH = 'characters/char:1/stationPins';
 const SETTINGS_PATH = 'characters/char:1/settings';
+const NOTIFICATION_FEED_PATH = 'characters/char:1/notificationFeed';
 const HASH = 'hash-a';
 
 function plan(overrides: Partial<SkillPlanRecord> = {}): SkillPlanRecord {
@@ -178,6 +181,24 @@ function remoteStationPinDoc(overrides: DocData = {}): DocData {
   return { ...stationPin(), ownerHash: HASH, deleted: false, ...overrides };
 }
 
+const FEED_ROW_FIRED_AT = Date.now() - 1000;
+
+function feedRow(overrides: Partial<NotificationFeedRecord> = {}): NotificationFeedRecord {
+  return {
+    id: 'occ-1',
+    characterId: 1,
+    eventId: 'newMail',
+    title: 'New mail',
+    body: 'Pilot has new mail.',
+    firedAt: FEED_ROW_FIRED_AT,
+    ...overrides,
+  };
+}
+
+function remoteFeedDoc(overrides: DocData = {}): DocData {
+  return { ...feedRow(), ownerHash: HASH, ...overrides };
+}
+
 function seedRemote(path: string, docs: DocData[]): void {
   remoteStore.set(path, new Map(docs.map((d) => [String(d.id ?? d.key), d])));
 }
@@ -216,6 +237,7 @@ beforeEach(async () => {
     db.stationPins.clear(),
     db.settings.clear(),
     db.esiCache.clear(),
+    db.notificationFeed.clear(),
   ]);
   await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: HASH, addedAt: 1 });
 });
@@ -434,8 +456,9 @@ describe('triggerSync: plans', () => {
 describe('triggerSync: ownerHash-scoped reads', () => {
   it('queries every collection filtered by the character ownerHash', async () => {
     await triggerSync(1);
-    // plans + buildPlans + quickbars + stationPins + settings, each read through a where clause.
-    expect(vi.mocked(where)).toHaveBeenCalledTimes(5);
+    // plans + buildPlans + quickbars + stationPins + notificationFeed + settings,
+    // each read through a where clause.
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(6);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
       expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
@@ -784,6 +807,74 @@ describe('triggerSync: station pins', () => {
   });
 });
 
+describe('triggerSync: notification feed', () => {
+  it('pushes a local-only row within the sync window', async () => {
+    await db.notificationFeed.put(feedRow());
+    await triggerSync(1);
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')).toEqual(remoteFeedDoc());
+  });
+
+  it('does not push a row older than the 30-day/100-row sync window', async () => {
+    await db.notificationFeed.put(feedRow({ firedAt: Date.now() - FEED_SYNC_WINDOW_MS - 60_000 }));
+    await triggerSync(1);
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBeFalsy();
+  });
+
+  it('pulls a remote-only row into Dexie without the ownerHash field', async () => {
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc()]);
+    await triggerSync(1);
+    expect(await db.notificationFeed.get('occ-1')).toEqual(feedRow());
+  });
+
+  it('never syncs another Character’s feed rows onto this uid', async () => {
+    await db.notificationFeed.put(feedRow({ id: 'other-char', characterId: 2 }));
+    await triggerSync(1);
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('other-char')).toBeFalsy();
+  });
+
+  it('a dismissal on one device propagates to the other (push direction)', async () => {
+    const dismissedAt = Date.now() - 10;
+    await db.notificationFeed.put(feedRow({ dismissedAt }));
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc()]);
+    await triggerSync(1);
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')?.dismissedAt).toBe(dismissedAt);
+  });
+
+  it('a dismissal on the other device propagates here (pull direction)', async () => {
+    const dismissedAt = Date.now() - 10;
+    await db.notificationFeed.put(feedRow());
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc({ dismissedAt })]);
+    await triggerSync(1);
+    expect((await db.notificationFeed.get('occ-1'))?.dismissedAt).toBe(dismissedAt);
+  });
+
+  it('a dismissal pulls in even for a row that has aged out of the local push window', async () => {
+    const firedAt = Date.now() - FEED_SYNC_WINDOW_MS - 60_000;
+    const dismissedAt = Date.now() - 10;
+    await db.notificationFeed.put(feedRow({ firedAt }));
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc({ firedAt, dismissedAt })]);
+    await triggerSync(1);
+    expect((await db.notificationFeed.get('occ-1'))?.dismissedAt).toBe(dismissedAt);
+  });
+
+  it('writes no tombstone and never deletes a remote row', async () => {
+    await db.notificationFeed.put(feedRow({ dismissedAt: Date.now() }));
+    await triggerSync(1);
+    expect(deleteDoc).not.toHaveBeenCalled();
+  });
+
+  it('a pulled row never exceeds the local NOTIFICATION_FEED_LIMIT cap', async () => {
+    const now = Date.now();
+    await db.notificationFeed.bulkPut(
+      Array.from({ length: 300 }, (_, i) => feedRow({ id: `local-${i}`, firedAt: now - i }))
+    );
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc({ id: 'incoming', firedAt: now + 1 })]);
+    await triggerSync(1);
+    expect(await db.notificationFeed.count()).toBe(300);
+    expect(await db.notificationFeed.get('incoming')).toBeDefined();
+  });
+});
+
 describe('triggerSync: settings', () => {
   it('pushes synced settings with timestamp and ownerHash', async () => {
     await seedLocalSetting('sync.tradeHub', 'jita');
@@ -973,7 +1064,7 @@ describe('sync orchestration', () => {
 
     release();
     await Promise.all([p1, p2]);
-    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(5);
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(6);
   });
 
   it('a queued sync still runs after the previous one fails', async () => {
@@ -988,10 +1079,11 @@ describe('sync orchestration', () => {
     scheduleSync(1, 20);
     scheduleSync(1, 20);
     scheduleSync(1, 20);
-    // One sync = one getDocs per collection (plans + buildPlans + quickbars + stationPins + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(5));
+    // One sync = one getDocs per collection (plans + buildPlans + quickbars +
+    // stationPins + notificationFeed + settings).
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(6));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(5);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(6);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
   });
 });
