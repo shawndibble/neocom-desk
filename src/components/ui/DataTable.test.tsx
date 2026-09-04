@@ -99,6 +99,26 @@ describe('DataTable', () => {
     expect(cells[0]).not.toHaveClass('text-right');
   });
 
+  it("applies headerClassName to a non-sortable column's header, without touching its cells", () => {
+    renderTable({
+      columns: [{ ...columns[0], headerClassName: 'whitespace-nowrap' }, columns[1]],
+    });
+    expect(screen.getByRole('columnheader', { name: 'Item' })).toHaveClass('whitespace-nowrap');
+    expect(screen.getAllByRole('cell')[0]).not.toHaveClass('whitespace-nowrap');
+  });
+
+  it("applies headerClassName to a sortable column's header button (ISK / LP shouldn't wrap when its column is squeezed)", () => {
+    render(
+      <DataTable
+        columns={[sortColumns[0], { ...sortColumns[1], headerClassName: 'whitespace-nowrap' }]}
+        rows={sortRows}
+        rowKey={(row) => row.id}
+        label="Sortable"
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Value' })).toHaveClass('whitespace-nowrap');
+  });
+
   it('defaults to comfortable header and cell padding', () => {
     renderTable();
     expect(screen.getByRole('columnheader', { name: 'Item' })).toHaveClass('px-3', 'py-2');

@@ -1073,6 +1073,7 @@
     "emptyHint": "Reconnect to fetch this character's loyalty point balances.",
     "corporation": "Corporation",
     "points": "Loyalty Points",
+    "viewStore": "View {{corporation}} LP store",
     "reauthTitle": "Log in again to see your loyalty points",
     "reauthHint": "Log in again to fetch this character's loyalty point balances.",
     "reauthAction": "Log in again with EVE Online"
@@ -1088,7 +1089,7 @@
     "offersShown": "Offers shown",
     "colItem": "Item",
     "colProfit": "Profit",
-    "colIskPerLp": "ISK / LP",
+    "colIskPerLp": "ISK / LP",
     "emptyTitle": "No offers cached",
     "emptyHint": "Reconnect to fetch this corporation's LP store.",
     "noMatchTitle": "No offers match these filters",

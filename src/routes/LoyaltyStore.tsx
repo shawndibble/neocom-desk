@@ -311,6 +311,7 @@ export function LoyaltyStore() {
       id: 'iskPerLp',
       header: t('loyaltyStore.colIskPerLp'),
       align: 'right',
+      headerClassName: 'whitespace-nowrap',
       sortValue: (row) => row.profit.iskPerLp ?? undefined,
       cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(row.profit.iskPerLp)}`,
       render: (row) => (row.profit.iskPerLp === null ? '—' : row.profit.iskPerLp.toFixed(1)),
@@ -403,7 +404,7 @@ export function LoyaltyStore() {
         >
           {TRADE_HUBS.map((h) => (
             <option key={h.id} value={h.id}>
-              {h.name}
+              {h.systemName}
             </option>
           ))}
         </NativeSelect>
