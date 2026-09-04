@@ -373,6 +373,34 @@ describe('PlanEditor tools pane', () => {
     expect(onUpdate).toHaveBeenCalledWith({ markers: [1] });
   });
 
+  it('shows the new marker\'s target attributes immediately, without a separate "Optimize at my markers" click', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await user.click(screen.getByRole('button', { name: 'Apply as markers' }));
+
+    // remapInstruction's own format: five "XXX N" terms joined by " / ",
+    // which only a marker row's attribute spread renders — asserting it
+    // appeared here means the row already gave way to the spread instead of
+    // sitting on the plain divider until a second, separate optimize click.
+    const entriesPanel = screen.getByRole('heading', { name: 'Your entries' }).closest('section')!;
+    expect(
+      within(entriesPanel).getByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)
+    ).toBeInTheDocument();
+  });
+
+  it("shows a marker's target attributes on first mount too, not only after an explicit optimize click", () => {
+    // A plan reopened fresh (a reload, or the plan synced onto another
+    // device) has no in-memory "Optimize at my markers" result yet — the
+    // marker's attributes must still resolve from `plan.markers` itself, not
+    // sit on the plain divider until that button is clicked once by hand.
+    renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
+
+    expect(screen.getByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)).toBeInTheDocument();
+  });
+
   it('gives two markers that delimit the same optimizer step the same attribute display, not one shifted onto the wrong segment', async () => {
     // Skill C sits between markers 0 and 1 already trained to its target
     // level, so it contributes zero steps: entry positions 1 (before C) and

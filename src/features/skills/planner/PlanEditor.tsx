@@ -241,13 +241,18 @@ export function PlanEditor({
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [optimizeResult, setOptimizeResult] = useState<PlaceRemapsResult | null>(null);
-  const [markersResult, setMarkersResult] = useState<PlaceRemapsResult | null>(null);
+  // Whether the "Optimize at my markers" savings/segments panel is showing.
+  // The computation itself is no longer state — `markersAtCurrentPositions`
+  // below derives it live from `plan.markers` so marker rows always have
+  // their target attributes on hand — this flag exists purely to keep that
+  // panel an explicit, click-revealed finding rather than something that
+  // pops up unasked the moment a plan happens to carry any markers.
+  const [markersPanelOpen, setMarkersPanelOpen] = useState(false);
   // Why each result came out the way it did (optimizeVerdict.ts). Held
   // beside the result rather than derived at render: the verdict depends on
   // the Remaps Available the run actually used, and the user can edit that
   // input afterwards without invalidating the result itself.
   const [optimizeVerdict, setOptimizeVerdict] = useState<OptimizeVerdict | null>(null);
-  const [markersVerdict, setMarkersVerdict] = useState<OptimizeVerdict | null>(null);
   const [reorderPreview, setReorderPreview] = useState<PlanStep[] | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
@@ -436,9 +441,8 @@ export function PlanEditor({
     setPrevEntries(plan.entries);
     setPrevMarkers(plan.markers);
     setOptimizeResult(null);
-    setMarkersResult(null);
+    setMarkersPanelOpen(false);
     setOptimizeVerdict(null);
-    setMarkersVerdict(null);
     setReorderPreview(null);
     setOptimizeConfirm(null);
     setMarkersOptimizeConfirm(null);
@@ -653,45 +657,71 @@ export function PlanEditor({
     setTimeout(() => setMarkersAppliedConfirm(false), 2000);
   }
 
-  function handleOptimizeAtMarkers() {
-    if (scheduled.length === 0) return;
-    const result = optimizeAtMarkers(scheduled, catalog.engineSkills, {
+  /**
+   * What each marker resolves to right now — kept in sync with `plan.markers`
+   * itself (a plain derivation, not state, and cheap: unlike `placeRemaps`,
+   * the cut points are fixed by the markers rather than searched, so this is
+   * one bounded per-segment allocation search per marker, not a DP over where
+   * to cut), so a marker row shows its target attributes immediately: after
+   * "Apply as markers", after a drag, and on a fresh page load or another
+   * device, without a separate "Optimize at my markers" click first. That
+   * button now only reveals the panel below (`markersPanelOpen`) — an
+   * explicit finding the user asked to see, not a second computation of what
+   * this memo already holds.
+   */
+  const markersAtCurrentPositions = useMemo(() => {
+    if (!plan.markers || plan.markers.length === 0) return null;
+    return optimizeAtMarkers(scheduled, catalog.engineSkills, {
       markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
       currentAttributes: attributes,
       implants: effectiveImplants,
     });
-    const verdict = markerVerdict(result);
-    setMarkersResult(result);
-    setMarkersVerdict(verdict);
-    setMarkersOptimizeConfirm(confirmRemapOutcome(verdict));
+  }, [
+    plan.markers,
+    plan.entries,
+    scheduled,
+    catalog.engineSkills,
+    trainedSkills,
+    attributes,
+    effectiveImplants,
+  ]);
+  const markersVerdict = useMemo(
+    () => (markersAtCurrentPositions ? markerVerdict(markersAtCurrentPositions) : null),
+    [markersAtCurrentPositions]
+  );
+
+  function handleOptimizeAtMarkers() {
+    if (scheduled.length === 0 || !markersVerdict) return;
+    setMarkersPanelOpen(true);
+    setMarkersOptimizeConfirm(confirmRemapOutcome(markersVerdict));
     setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
   }
 
   /**
-   * A marker's target attributes, once "Optimize at my markers" has run.
-   * Keyed by STEP INDEX, not by ordinal position: `optimizeAtMarkers` dedupes
-   * its cut points (`[...new Set(...)]`), so two distinct markers collapse
-   * into one remap segment whenever an entry between them contributes no
-   * step (already trained, or missing from the catalog) — the two then sit
-   * at the same step index. Indexing the remapped segments by ordinal
-   * position would misattribute every marker after such a collision to the
-   * wrong segment; both colliding markers correctly show the one segment
-   * they actually share. `markersResult` is cleared alongside `plan.markers`
-   * whenever entries/markers change, so a stale result never applies to the
-   * wrong marker.
+   * A marker's target attributes, keyed by STEP INDEX, not by ordinal
+   * position: `optimizeAtMarkers` dedupes its cut points
+   * (`[...new Set(...)]`), so two distinct markers collapse into one remap
+   * segment whenever an entry between them contributes no step (already
+   * trained, or missing from the catalog) — the two then sit at the same
+   * step index. Indexing the remapped segments by ordinal position would
+   * misattribute every marker after such a collision to the wrong segment;
+   * both colliding markers correctly show the one segment they actually
+   * share.
    */
   const markerAttributesByStepIndex = useMemo(() => {
-    if (!markersResult) return null;
+    if (!markersAtCurrentPositions) return null;
     return new Map(
-      markersResult.segments.filter((s) => s.remap).map((s) => [s.startIndex, s.attributes])
+      markersAtCurrentPositions.segments
+        .filter((s) => s.remap)
+        .map((s) => [s.startIndex, s.attributes])
     );
-  }, [markersResult]);
+  }, [markersAtCurrentPositions]);
   const markerStepIndicesForResult = useMemo(
     () =>
-      markersResult
+      markersAtCurrentPositions
         ? markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills)
         : null,
-    [markersResult, plan.entries, plan.markers, catalog.engineSkills, trainedSkills]
+    [markersAtCurrentPositions, plan.entries, plan.markers, catalog.engineSkills, trainedSkills]
   );
   function markerAttributesFor(markerIndex: number): Attributes | undefined {
     const stepIndex = markerStepIndicesForResult?.[markerIndex];
@@ -962,7 +992,7 @@ export function PlanEditor({
               )}
             </div>
           )}
-          {markersResult && markersVerdict && (
+          {markersPanelOpen && markersAtCurrentPositions && markersVerdict && (
             <div className="space-y-2 border-t border-line pt-2 text-xs">
               {markersVerdict.kind === 'saves' ? (
                 <p className="font-semibold text-success">
@@ -981,7 +1011,8 @@ export function PlanEditor({
                   seeing even when the trade is poor, but not when no marker
                   split anything: the lone "keep current attributes" row then
                   reads as a contradiction of the message above it. */}
-              {markersVerdict.kind !== 'markersAtEnd' && renderSegments(markersResult.segments)}
+              {markersVerdict.kind !== 'markersAtEnd' &&
+                renderSegments(markersAtCurrentPositions.segments)}
             </div>
           )}
         </div>
