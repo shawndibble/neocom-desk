@@ -312,6 +312,32 @@ it is not 5 conflict rounds plus 5 CI rounds):
     procedure above (the commit runs through the pre-commit hook — see
     "Pre-commit hook, then CI"), push, and restart this round.
   - `{"status":"green","mergeable":true}` — proceed to step 9.
+  - `{"status":"missing-checks","missing":[<context>, ...]}` — one or more
+    contexts the branch ruleset requires (typically `validate` and/or
+    `e2e`) never reported a check run at all. `drive-ci.mjs` already waits
+    out a short internal grace period (~45s) for ordinary registration lag
+    before returning this, so seeing it means that grace period already
+    elapsed — there's nothing failing to diagnose and nothing to fix on
+    the branch. Do not spend a sub-agent diagnosing this — there are no CI
+    logs to fetch. Just wait a bit longer and restart this round. If this
+    status persists across rounds, GitHub Actions likely never triggered
+    for that context (a path filter, a workflow-name mismatch, etc.)
+    rather than something actually failing — closing and reopening the PR
+    has been observed to make GitHub create the check suite fresh, with no
+    new commit needed (re-arm auto-merge afterwards if you do this, since
+    closing disarms it). If still missing after 5 rounds, this falls under
+    the same "still not green" exhaustion handling below — say explicitly
+    in the PR/issue comment that the required check(s) never ran, not that
+    they failed.
+  - `{"status":"pending"}` — a required context is present but hasn't
+    finished (or hadn't registered yet and the internal grace period ran
+    out) — genuinely still in flight, not a failure and not a diagnosis
+    target. Wait a bit and restart this round, same as `missing-checks`.
+    If it persists across rounds with no progress, it may not actually be
+    running anymore — check `gh pr checks <pr>` for a `cancel` or
+    `skipping` bucket on that context (e.g. a superseding push cancelled
+    it); that won't resolve by waiting, so push again or otherwise get a
+    fresh run started instead of burning the remaining rounds on it.
   - `{"status":"checks-failed","failedRunIds":[<run-id>, ...]}` — for each
     id, within the same round budget:
     1. Diagnose in a **sub-agent** — CI logs run to tens of thousands of
