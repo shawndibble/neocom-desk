@@ -15,6 +15,8 @@ import type { PiData } from '@/sde/types';
 
 /** The ticket's worked example, and the Plan tab's own default product. */
 const BROADCAST_NODE = 2867;
+/** A P2 inside that chain, and deliberately *not* the default — see the deep-link test. */
+const TRANSMITTER = 9840;
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -459,6 +461,18 @@ describe('PlanetaryIndustry', () => {
     await screen.findByRole('heading', { name: 'Verdict' });
     expect(screen.getByRole('tab', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByLabelText('Product')).toHaveValue(String(BROADCAST_NODE));
+  });
+
+  it('plans the commodity the URL names, not the tier-4 default', async () => {
+    // Broadcast Node, in the test above, is also `PlanPanel`'s own fallback
+    // for an unrecognised `type`, so only a commodity that isn't the default
+    // proves the param is read at all. This is the far end of the item
+    // context menu's "PI Plan" link — the two must agree on `?tab=plan&type=`.
+    window.history.pushState({}, '', `/planetary-industry?tab=plan&type=${TRANSMITTER}`);
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Verdict' });
+    expect(await screen.findByLabelText('Product')).toHaveValue(String(TRANSMITTER));
   });
 
   it('falls back to the colony view rather than crashing on a tab it does not know', async () => {

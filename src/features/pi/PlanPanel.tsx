@@ -30,7 +30,7 @@ import {
   TextInput,
   buttonClassName,
 } from '@/components/ui';
-import { expandChain, piTier, type ChainLayout, type SourcingFloor } from '@/engine/pi/chain';
+import { expandChain, type ChainLayout, type SourcingFloor } from '@/engine/pi/chain';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
@@ -43,6 +43,7 @@ import {
 } from './customsRate';
 import { loadPlanPrices, type PlanPrices } from './planPrices';
 import { costPlan, factoryPinsAbove, planRows, sensitivityGrid, validFloors } from './planModel';
+import { productOptions } from './products';
 import { PlanChainTable, PlanSensitivity, PlanVerdict } from './PlanResults';
 
 const HOURS_PER_DAY = 24;
@@ -54,29 +55,6 @@ const LAYOUTS: readonly ChainLayout[] = ['single-planet', 'planet-per-tier'];
 
 /** Stable identity so the cost memos don't re-run on every render before prices land. */
 const NO_PRICES: Readonly<Record<number, number>> = {};
-
-interface ProductOption {
-  typeId: number;
-  name: string;
-  tier: 1 | 2 | 3 | 4;
-}
-
-/** Every commodity `pi.json` has a schematic for, tiered off the graph rather than a table. */
-function productOptions(pi: PiData): ProductOption[] {
-  const options: ProductOption[] = [];
-  for (const [key, schematic] of Object.entries(pi.schematics)) {
-    const typeId = Number(key);
-    let tier: number;
-    try {
-      tier = piTier(typeId, pi);
-    } catch {
-      continue;
-    }
-    if (tier < 1 || tier > 4) continue;
-    options.push({ typeId, name: schematic.name, tier: tier as 1 | 2 | 3 | 4 });
-  }
-  return options.sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
-}
 
 function parsePositive(text: string): number | null {
   const value = Number.parseFloat(text);

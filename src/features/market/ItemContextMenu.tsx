@@ -14,6 +14,7 @@ import {
 } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { parseMarketParams, buildMarketParams } from '@/engine/market/urlState';
+import { usePiPlannable } from '@/features/pi/usePiPlannable';
 import { useCompareSet } from './compareSet';
 
 export interface ItemContextMenuProps {
@@ -31,7 +32,19 @@ export interface ItemContextMenuProps {
   children: ReactElement;
 }
 
-/** Item context menu: add to Quickbar, show info, add to Compare, view in Market, copy name, jump to Build Plan. */
+/**
+ * Item context menu: add to Quickbar, show info, add to Compare, view in
+ * Market, copy name, jump to a Build Plan, jump to a PI Plan.
+ *
+ * The PI action asks for itself rather than taking a prop the way
+ * `blueprintTypeID` does: `pi.json` is 15KB against `blueprints.json`'s
+ * 1.4MB, so there is nothing to defend by making five call sites load it and
+ * thread it down. It is also rendered only when the answer is yes — a
+ * permanently-disabled row on every item in the game buys nothing, where the
+ * Build Plan row's disabled state is telling the user something they might
+ * have expected otherwise. Nothing renders while the answer is unknown, so
+ * the row never appears under a cursor already in the menu.
+ */
 export function ItemContextMenu({
   typeId,
   itemName,
@@ -47,6 +60,7 @@ export function ItemContextMenu({
   const navigate = useNavigate();
   const location = useLocation();
   const addToCompare = useCompareSet((state) => state.add);
+  const piPlannable = usePiPlannable(typeId);
 
   const buildPlanLabel =
     blueprintTypeID === undefined
@@ -110,6 +124,11 @@ export function ItemContextMenu({
         >
           {buildPlanLabel}
         </ContextMenuItem>
+        {piPlannable && (
+          <ContextMenuItem onSelect={() => navigate(`/planetary-industry?tab=plan&type=${typeId}`)}>
+            {t('market.contextMenu.piPlan')}
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );
