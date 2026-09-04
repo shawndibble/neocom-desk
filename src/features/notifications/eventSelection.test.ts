@@ -200,6 +200,12 @@ describe('selectionStateForEveTypes', () => {
   it('reports unchecked for an empty list', () => {
     expect(selectionStateForEveTypes([], {}, 'browser')).toBe('unchecked');
   });
+
+  it('is indeterminate on the real structures family, which mixes browser-on and browser-off defaults', () => {
+    const structures = eveTypesByFamily('structures');
+    expect(selectionStateForEveTypes(structures, {}, 'browser')).toBe('indeterminate');
+    expect(selectionStateForEveTypes(structures, {}, 'feed')).toBe('checked');
+  });
 });
 
 describe('toggleAllEveTypesOnChannel', () => {
