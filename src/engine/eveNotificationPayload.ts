@@ -78,6 +78,16 @@ export interface EveNotificationPayload {
   daysUntilAbandon?: number;
   /** Link text of `warHQ` (`<b>Amamake - Test Structure Alpha</b>`). */
   warHqName?: string;
+  /** `planetID` — the customs office's planet, on the two Orbital types. */
+  planetId?: number;
+  /** `aggressorID` — the attacking pilot, on the two Orbital types. */
+  aggressorId?: number;
+  /** `aggressorCorpID`. */
+  aggressorCorpId?: number;
+  /** `aggressorAllianceID` — absent for an unallied attacker. */
+  aggressorAllianceId?: number;
+  /** `reinforceExitTime`, converted from EVE ticks to epoch ms — an instant, not a duration. */
+  reinforceExitMs?: number;
 }
 
 /** Drops a matching pair of surrounding quotes, leaving an unbalanced one alone. */
@@ -197,5 +207,10 @@ export function parseEveNotificationPayload(text: string): EveNotificationPayloa
     timeLeftMs: ticksToDurationMs(num(fields, 'timeleft')),
     daysUntilAbandon: num(fields, 'daysuntilabandon'),
     warHqName: linkText(fields.get('warhq')),
+    planetId: num(fields, 'planetid'),
+    aggressorId: num(fields, 'aggressorid'),
+    aggressorCorpId: num(fields, 'aggressorcorpid'),
+    aggressorAllianceId: num(fields, 'aggressorallianceid'),
+    reinforceExitMs: ticksToEpochMs(num(fields, 'reinforceexittime')),
   };
 }

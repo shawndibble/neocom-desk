@@ -92,9 +92,9 @@ const TYPE_A = 'BillOutOfMoneyMsg';
 const TYPE_B = 'AllWarDeclaredMsg';
 
 describe('EVE_ALLOWED_TYPES / isEveTypeAllowed', () => {
-  it('holds exactly the 17 types with hand-written bodies', () => {
-    expect(EVE_ALLOWED_TYPES).toHaveLength(17);
-    expect(new Set(EVE_ALLOWED_TYPES).size).toBe(17);
+  it('holds exactly the 26 types with hand-written bodies', () => {
+    expect(EVE_ALLOWED_TYPES).toHaveLength(26);
+    expect(new Set(EVE_ALLOWED_TYPES).size).toBe(26);
   });
 
   it('allows every type on the list', () => {
@@ -129,6 +129,31 @@ describe('isEveTypeEnabledFor', () => {
   it('defaults the three structure-attack types to browser-on as well as feed-on', () => {
     for (const type of ['StructureUnderAttack', 'StructureLostShields', 'StructureLostArmor']) {
       expect(isEveTypeEnabledFor({}, type, 'browser')).toBe(true);
+      expect(isEveTypeEnabledFor({}, type, 'feed')).toBe(true);
+    }
+  });
+
+  it('defaults the four tranche-2 browser-on types to browser-on as well as feed-on', () => {
+    for (const type of [
+      'StructureDestroyed',
+      'OrbitalAttacked',
+      'OrbitalReinforced',
+      'CorpKicked',
+    ]) {
+      expect(isEveTypeEnabledFor({}, type, 'browser')).toBe(true);
+      expect(isEveTypeEnabledFor({}, type, 'feed')).toBe(true);
+    }
+  });
+
+  it('defaults the rest of tranche 2 to feed-on, browser-off', () => {
+    for (const type of [
+      'StructuresJobsPaused',
+      'StructuresJobsCancelled',
+      'StructureLowReagentsAlert',
+      'StructureNoReagentsAlert',
+      'InfrastructureHubBillAboutToExpire',
+    ]) {
+      expect(isEveTypeEnabledFor({}, type, 'browser')).toBe(false);
       expect(isEveTypeEnabledFor({}, type, 'feed')).toBe(true);
     }
   });
@@ -175,8 +200,8 @@ describe('NOTIFICATION_FAMILIES / eveTypesByFamily', () => {
     expect([...grouped].sort()).toEqual([...EVE_ALLOWED_TYPES].sort());
   });
 
-  it('lets a family with no allow-listed types yet come back empty', () => {
-    expect(eveTypesByFamily('pi')).toEqual([]);
+  it('groups the pi family (customs-office types only)', () => {
+    expect(eveTypesByFamily('pi')).toEqual(['OrbitalAttacked', 'OrbitalReinforced']);
   });
 
   it('groups the structures family correctly', () => {

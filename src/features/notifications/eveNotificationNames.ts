@@ -27,7 +27,11 @@ import { parseEveNotificationPayload } from '@/engine/eveNotificationPayload';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
 import { loadStructureName } from '@/features/character/structures';
 import { resolveNames } from '@/features/character/names';
-import { EVE_NOTIFICATION_RENDERED_TYPES, type EveNotificationNames } from './eveNotificationText';
+import {
+  EVE_NOTIFICATION_RENDERED_TYPES,
+  orbitalAggressorId,
+  type EveNotificationNames,
+} from './eveNotificationText';
 
 const RENDERED_TYPES = new Set(EVE_NOTIFICATION_RENDERED_TYPES);
 
@@ -51,6 +55,14 @@ function entityIdsToResolve(
     case 'StructureUnderAttack':
       if (payload.corpName !== undefined || payload.allianceName !== undefined) return [];
       return payload.charId === undefined ? [] : [payload.charId];
+    case 'CorpKicked':
+      return payload.corpId === undefined ? [] : [payload.corpId];
+    case 'OrbitalAttacked': {
+      // Same precedence as the renderer, reused directly: pilot, then corp,
+      // then alliance — whichever one it would actually show.
+      const id = orbitalAggressorId(payload);
+      return id === undefined ? [] : [id];
+    }
     default:
       return [];
   }

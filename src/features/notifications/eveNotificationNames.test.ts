@@ -151,6 +151,38 @@ describe('resolveEveNotificationNames — only looks up what a body will use', (
     expect(resolveNames).toHaveBeenCalledWith([1011]);
     expect(names.entities?.get(1011)).toBe('Bad Pilot');
   });
+
+  it('resolves the corp CorpKicked names', async () => {
+    resolveNames.mockResolvedValue(new Map([[2001, 'Kicked Corp']]));
+    const names = await resolveEveNotificationNames(
+      fire({ type: 'CorpKicked', text: 'corpID: 2001\n' })
+    );
+    expect(resolveNames).toHaveBeenCalledWith([2001]);
+    expect(names.entities?.get(2001)).toBe('Kicked Corp');
+  });
+
+  it('resolves the OrbitalAttacked aggressor pilot over their corp or alliance', async () => {
+    resolveNames.mockResolvedValue(new Map([[2117204642, 'Hostile Pilot']]));
+    const names = await resolveEveNotificationNames(
+      fire({
+        type: 'OrbitalAttacked',
+        text: 'aggressorAllianceID: 434243723\naggressorCorpID: 98749616\naggressorID: 2117204642\nplanetID: 40121487\n',
+      })
+    );
+    expect(resolveNames).toHaveBeenCalledWith([2117204642]);
+    expect(names.entities?.get(2117204642)).toBe('Hostile Pilot');
+  });
+
+  it('falls back to the OrbitalAttacked corp id when the payload names no pilot', async () => {
+    resolveNames.mockResolvedValue(new Map([[98749616, 'Hostile Corp']]));
+    await resolveEveNotificationNames(
+      fire({
+        type: 'OrbitalAttacked',
+        text: 'aggressorCorpID: 98749616\nplanetID: 40121487\n',
+      })
+    );
+    expect(resolveNames).toHaveBeenCalledWith([98749616]);
+  });
 });
 
 /**

@@ -276,4 +276,88 @@ describe('parseEveNotificationPayload — real payload samples', () => {
     expect(payload.charId).toBe(1011);
     expect(payload.corpId).toBe(2001);
   });
+
+  it('reads StructureDestroyed: the structure, no aggressor spelled out', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'isAbandoned: false',
+        'ownerCorpLinkData:',
+        '- showinfo',
+        '- 2',
+        '- 1000001',
+        'ownerCorpName: Doomheim',
+        'solarsystemID: 31000671',
+        'structureID: &id001 1032717532381',
+        'structureShowInfoData:',
+        '- showinfo',
+        '- 35835',
+        '- *id001',
+        'structureTypeID: 35835',
+        '',
+      ].join('\n')
+    );
+    expect(payload.structureId).toBe(1_032_717_532_381);
+    expect(payload.structureTypeId).toBe(35835);
+  });
+
+  it('reads OrbitalAttacked: the planet, the customs office type, and the aggressor', () => {
+    const payload = parseEveNotificationPayload(
+      [
+        'aggressorAllianceID: 434243723',
+        'aggressorCorpID: 98749616',
+        'aggressorID: 2117204642',
+        'planetID: 40121487',
+        'planetTypeID: 2017',
+        'shieldLevel: 0.6',
+        'solarSystemID: 30001901',
+        'typeID: 2233',
+        '',
+      ].join('\n')
+    );
+    expect(payload.planetId).toBe(40121487);
+    expect(payload.aggressorId).toBe(2117204642);
+    expect(payload.aggressorCorpId).toBe(98749616);
+    expect(payload.aggressorAllianceId).toBe(434243723);
+  });
+
+  it('reads OrbitalReinforced: the planet and the reinforcement exit instant', () => {
+    // Real sample: reinforceExitTime 134259524910000000 ticks.
+    const payload = parseEveNotificationPayload(
+      [
+        'aggressorCorpID: 98749616',
+        'aggressorID: 2117204642',
+        'planetID: 40121487',
+        'planetTypeID: 2017',
+        'reinforceExitTime: 134259524910000000',
+        'solarSystemID: 30001901',
+        'typeID: 2233',
+        '',
+      ].join('\n')
+    );
+    expect(payload.planetId).toBe(40121487);
+    // 134259524910000000 ticks (100ns since 1601-01-01) converts to this instant.
+    expect(payload.reinforceExitMs).toBe(Date.parse('2026-06-14T23:14:51.000Z'));
+  });
+
+  it('reads OrbitalAttacked with no aggressor alliance (unallied attacker)', () => {
+    const payload = parseEveNotificationPayload(
+      'aggressorCorpID: 98749616\naggressorID: 2117204642\nplanetID: 40121487\n'
+    );
+    expect(payload.aggressorAllianceId).toBeUndefined();
+    expect(payload.aggressorId).toBe(2117204642);
+  });
+
+  it('reads CorpKicked: the corporation kicked from the alliance', () => {
+    const payload = parseEveNotificationPayload('corpID: 2001\n');
+    expect(payload.corpId).toBe(2001);
+  });
+
+  it('reads InfrastructureHubBillAboutToExpire: the corp and the due date, no amount field', () => {
+    const payload = parseEveNotificationPayload(
+      'billID: 5001\ncorpID: 2001\ndueDate: 132936019800000000\nsolarSystemID: 30001901\n'
+    );
+    expect(payload.corpId).toBe(2001);
+    expect(payload.dueDateMs).toBe(Date.parse('2022-04-05T03:13:00Z'));
+    expect(payload.amount).toBeUndefined();
+  });
 });

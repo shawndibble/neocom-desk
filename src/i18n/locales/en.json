@@ -1187,6 +1187,7 @@
         "body": "{{character}} received a new EVE notification ({{type}}).",
         "structureById": "structure #{{id}}",
         "entityById": "#{{id}}",
+        "planetById": "planet #{{id}}",
         "types": {
           "StructureUnderAttack": {
             "title": "Structure under attack",
@@ -1264,6 +1265,46 @@
           "CorpAppNewMsg": {
             "title": "New corporation application",
             "body": "{{character}}: {{applicant}} has applied to join the corporation."
+          },
+          "StructureDestroyed": {
+            "title": "Structure destroyed",
+            "body": "{{character}}: {{structure}} was destroyed."
+          },
+          "StructuresJobsPaused": {
+            "title": "Industry jobs paused",
+            "body": "{{character}}: a structure entering reinforcement paused its industry jobs.",
+            "bodyWithStructure": "{{character}}: {{structure}} entered reinforcement and paused its industry jobs."
+          },
+          "StructuresJobsCancelled": {
+            "title": "Industry jobs cancelled",
+            "body": "{{character}}: a structure entering reinforcement cancelled its industry jobs.",
+            "bodyWithStructure": "{{character}}: {{structure}} entered reinforcement and cancelled its industry jobs."
+          },
+          "StructureLowReagentsAlert": {
+            "title": "Structure low on reagents",
+            "body": "{{character}}: {{structure}} is running low on reagents."
+          },
+          "StructureNoReagentsAlert": {
+            "title": "Structure out of reagents",
+            "body": "{{character}}: {{structure}} has run out of reagents."
+          },
+          "OrbitalAttacked": {
+            "title": "Customs office attacked",
+            "body": "{{character}}: your customs office at {{planet}} is under attack.",
+            "bodyWithAggressor": "{{character}}: your customs office at {{planet}} is under attack by {{aggressor}}."
+          },
+          "OrbitalReinforced": {
+            "title": "Customs office reinforced",
+            "body": "{{character}}: your customs office at {{planet}} was reinforced.",
+            "bodyWithTimer": "{{character}}: your customs office at {{planet}} was reinforced. Timer ends {{timer}}."
+          },
+          "CorpKicked": {
+            "title": "Corporation kicked from alliance",
+            "body": "{{character}}: {{corp}} was kicked from the alliance."
+          },
+          "InfrastructureHubBillAboutToExpire": {
+            "title": "Infrastructure hub bill about to expire",
+            "body": "{{character}}: an infrastructure hub bill is due {{due}}."
           }
         }
       }

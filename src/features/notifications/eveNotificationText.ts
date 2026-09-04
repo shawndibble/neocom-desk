@@ -101,6 +101,28 @@ function timerEnd({ fire, payload }: RenderContext): string | null {
   return formatLocalDateTime(new Date(firedAtMs + payload.timeLeftMs));
 }
 
+/** `planet #<id>`, or `null` when the payload carries no `planetID` at all. */
+function planetLabel(payload: EveNotificationPayload): string | null {
+  if (payload.planetId === undefined) return null;
+  return i18n.t(`${BASE}.planetById`, { id: payload.planetId });
+}
+
+/**
+ * The most specific attacker id an Orbital payload names, preferring the
+ * pilot over their corp over their alliance. CCP does not spell any of these
+ * names out here the way `StructureUnderAttack` gets `corpName`/`allianceName`
+ * for free, so whichever id is picked still needs a lookup.
+ */
+export function orbitalAggressorId(payload: EveNotificationPayload): number | undefined {
+  return payload.aggressorId ?? payload.aggressorCorpId ?? payload.aggressorAllianceId;
+}
+
+/** `OrbitalReinforced`'s exit time is an absolute instant already, unlike `timeLeft`'s duration. */
+function reinforceExitEnd(payload: EveNotificationPayload): string | null {
+  if (payload.reinforceExitMs === undefined) return null;
+  return formatLocalDateTime(new Date(payload.reinforceExitMs));
+}
+
 /** Body for a type whose whole payload contribution is "which structure". */
 function structureOnly(ctx: RenderContext): BodyChoice {
   const structure = structureLabel(ctx);
@@ -130,6 +152,20 @@ function warDeclared(withHq: boolean) {
 /** Types whose body carries no payload field at all, so nothing can make them fall back. */
 function fixedBody(): BodyChoice {
   return { key: 'body', vars: {} };
+}
+
+/**
+ * `StructuresJobsPaused`/`StructuresJobsCancelled`: CCP publishes no payload
+ * schema for either, so this reads `structureID` opportunistically (the one
+ * field every other structure-flavoured type carries) and says the plain
+ * thing when it is absent, rather than guessing at a job or reagent id with
+ * no evidence — the same posture as `CorpOfficeExpirationMsg` above.
+ */
+function structureChange(ctx: RenderContext): BodyChoice {
+  const structure = structureLabel(ctx);
+  return structure === null
+    ? { key: 'body', vars: {} }
+    : { key: 'bodyWithStructure', vars: { structure } };
 }
 
 /**
@@ -205,6 +241,38 @@ const TYPE_RENDERERS: Readonly<Record<string, (ctx: RenderContext) => BodyChoice
   CorpAppNewMsg: ({ payload, names }) => {
     if (payload.charId === undefined) return null;
     return { key: 'body', vars: { applicant: entityLabel(payload.charId, names) } };
+  },
+  StructureDestroyed: structureOnly,
+  StructuresJobsPaused: structureChange,
+  StructuresJobsCancelled: structureChange,
+  StructureLowReagentsAlert: structureOnly,
+  StructureNoReagentsAlert: structureOnly,
+  OrbitalAttacked: (ctx) => {
+    const { payload, names } = ctx;
+    const planet = planetLabel(payload);
+    if (planet === null) return null;
+    const aggressorId = orbitalAggressorId(payload);
+    const aggressor = aggressorId === undefined ? undefined : entityLabel(aggressorId, names);
+    return aggressor === undefined
+      ? { key: 'body', vars: { planet } }
+      : { key: 'bodyWithAggressor', vars: { planet, aggressor } };
+  },
+  OrbitalReinforced: (ctx) => {
+    const { payload } = ctx;
+    const planet = planetLabel(payload);
+    if (planet === null) return null;
+    const timer = reinforceExitEnd(payload);
+    return timer === null
+      ? { key: 'body', vars: { planet } }
+      : { key: 'bodyWithTimer', vars: { planet, timer } };
+  },
+  CorpKicked: ({ payload, names }) => {
+    if (payload.corpId === undefined) return null;
+    return { key: 'body', vars: { corp: entityLabel(payload.corpId, names) } };
+  },
+  InfrastructureHubBillAboutToExpire: ({ payload }) => {
+    if (payload.dueDateMs === undefined) return null;
+    return { key: 'body', vars: { due: formatLocalDate(new Date(payload.dueDateMs)) } };
   },
 };
 
