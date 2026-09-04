@@ -676,7 +676,15 @@ export function PlanEditor({
       currentAttributes: attributes,
       implants: effectiveImplants,
     });
-  }, [plan.markers, plan.entries, scheduled, catalog.engineSkills, trainedSkills, attributes, effectiveImplants]);
+  }, [
+    plan.markers,
+    plan.entries,
+    scheduled,
+    catalog.engineSkills,
+    trainedSkills,
+    attributes,
+    effectiveImplants,
+  ]);
   const markersVerdict = useMemo(
     () => (markersAtCurrentPositions ? markerVerdict(markersAtCurrentPositions) : null),
     [markersAtCurrentPositions]

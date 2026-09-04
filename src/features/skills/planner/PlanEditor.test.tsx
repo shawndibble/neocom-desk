@@ -398,9 +398,7 @@ describe('PlanEditor tools pane', () => {
     // sit on the plain divider until that button is clicked once by hand.
     renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
 
-    expect(
-      screen.getByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)).toBeInTheDocument();
   });
 
   it('gives two markers that delimit the same optimizer step the same attribute display, not one shifted onto the wrong segment', async () => {
