@@ -10,8 +10,10 @@ import {
   PageHeader,
   Panel,
   ReauthBanner,
+  SearchInput,
   Spinner,
   Tabs,
+  TextInput,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -34,6 +36,12 @@ import {
 import { formatIsk } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
+import {
+  EMPTY_WALLET_JOURNAL_FILTER,
+  filterWalletJournal,
+  journalRefTypes,
+  type WalletJournalFilter,
+} from '@/features/character/walletJournalFilter';
 import type {
   CharacterLoyaltyPoints,
   CorporationDivisions,
@@ -41,8 +49,123 @@ import type {
   WalletJournalEntry,
 } from '@/esi/endpoints';
 
+/** Newest first — the one order both the table (`defaultSort`) and CSV exports agree on. */
+function byDateDesc(a: WalletJournalEntry, b: WalletJournalEntry): number {
+  return b.date.localeCompare(a.date);
+}
+
+interface JournalFilterBarProps {
+  filter: WalletJournalFilter;
+  onChange: (filter: WalletJournalFilter) => void;
+  refTypeOptions: string[];
+}
+
+/** The ref-type / date-range / text filter row above a journal table (issue #413). */
+function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBarProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+      <SearchInput
+        value={filter.text}
+        onChange={(event) => onChange({ ...filter, text: event.target.value })}
+        placeholder={t('wallet.journalSearchPlaceholder')}
+        className="min-w-48 flex-1"
+      />
+      <NativeSelect
+        className="w-44"
+        aria-label={t('wallet.refTypeFilterLabel')}
+        value={filter.refType ?? ''}
+        onChange={(event) =>
+          onChange({ ...filter, refType: event.target.value === '' ? null : event.target.value })
+        }
+      >
+        <option value="">{t('wallet.refTypeFilterAll')}</option>
+        {refTypeOptions.map((refType) => (
+          <option key={refType} value={refType}>
+            {humanizeRefType(refType)}
+          </option>
+        ))}
+      </NativeSelect>
+      <label className="flex items-center gap-1 text-xs text-text-dim">
+        {t('wallet.dateFromLabel')}
+        <TextInput
+          type="date"
+          className="w-36"
+          value={filter.startDate ?? ''}
+          onChange={(event) =>
+            onChange({
+              ...filter,
+              startDate: event.target.value === '' ? null : event.target.value,
+            })
+          }
+        />
+      </label>
+      <label className="flex items-center gap-1 text-xs text-text-dim">
+        {t('wallet.dateToLabel')}
+        <TextInput
+          type="date"
+          className="w-36"
+          value={filter.endDate ?? ''}
+          onChange={(event) =>
+            onChange({ ...filter, endDate: event.target.value === '' ? null : event.target.value })
+          }
+        />
+      </label>
+    </div>
+  );
+}
+
+interface JournalTableProps {
+  filter: WalletJournalFilter;
+  onFilterChange: (filter: WalletJournalFilter) => void;
+  refTypeOptions: string[];
+  filteredJournal: readonly WalletJournalEntry[];
+  journalColumns: DataTableColumn<WalletJournalEntry>[];
+  label: string;
+}
+
+/** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
+function JournalTable({
+  filter,
+  onFilterChange,
+  refTypeOptions,
+  filteredJournal,
+  journalColumns,
+  label,
+}: JournalTableProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <JournalFilterBar filter={filter} onChange={onFilterChange} refTypeOptions={refTypeOptions} />
+      {filteredJournal.length === 0 ? (
+        <EmptyState title={t('wallet.journalNoFilterMatches')} className="py-8" />
+      ) : (
+        <DataTable
+          label={label}
+          columns={journalColumns}
+          rows={filteredJournal}
+          rowKey={(entry) => entry.id}
+          defaultSort={{ columnId: 'date', direction: 'desc' }}
+        />
+      )}
+    </>
+  );
+}
+
+/** Shared by the personal and corp journal panels: filter, then memoize the result. */
+function useJournalFilterResult(
+  journal: readonly WalletJournalEntry[],
+  filter: WalletJournalFilter
+): { filteredJournal: WalletJournalEntry[]; refTypeOptions: string[] } {
+  const filteredJournal = useMemo(() => filterWalletJournal(journal, filter), [journal, filter]);
+  const refTypeOptions = useMemo(() => journalRefTypes(journal), [journal]);
+  return { filteredJournal, refTypeOptions };
+}
+
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+/** Stable identity, so a missing journal doesn't invalidate its dependent memos every render. */
+const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 
 interface Snapshot {
   balanceResult: CachedResult<number> | null;
@@ -107,10 +230,12 @@ interface CorpWalletViewProps {
   balances: CorpBalancesSnapshot | null;
   balancesLoading: boolean;
   journalResult: CachedResult<WalletJournalEntry[]> | null;
-  journal: WalletJournalEntry[];
+  journal: readonly WalletJournalEntry[];
   journalLoading: boolean;
   /** The page's own journal columns — the corp journal is the same table, not a second one. */
   journalColumns: DataTableColumn<WalletJournalEntry>[];
+  journalFilter: WalletJournalFilter;
+  onJournalFilterChange: (filter: WalletJournalFilter) => void;
   division: WalletDivision | null;
   divisionLabel: (entry: WalletDivision) => string;
   offlineTitleKey: string;
@@ -132,11 +257,16 @@ function CorpWalletView({
   journal,
   journalLoading,
   journalColumns,
+  journalFilter,
+  onJournalFilterChange,
   division,
   divisionLabel,
   offlineTitleKey,
 }: CorpWalletViewProps) {
   const { t } = useTranslation();
+  // Called unconditionally, above the tab branch below — a hook can't follow
+  // an early return.
+  const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalFilter);
 
   if (tab === 'balance') {
     const walletsResult = balances?.walletsResult.cached ?? null;
@@ -168,6 +298,8 @@ function CorpWalletView({
     );
   }
 
+  const divisionQualifier = division ? divisionLabel(division) : undefined;
+
   return (
     <Panel
       padded={false}
@@ -179,14 +311,15 @@ function CorpWalletView({
               size="sm"
               icon={<Icon.Download />}
               label={t('wallet.exportCsvJournal')}
-              disabled={journal.length === 0}
+              disabled={filteredJournal.length === 0}
               onClick={() =>
                 downloadCsv(
                   'corp-wallet-journal',
-                  journal,
+                  [...filteredJournal].sort(byDateDesc),
                   walletJournalCsvColumns(t),
                   new Date(),
-                  journalResult.truncated
+                  journalResult.truncated,
+                  divisionQualifier
                 )
               }
             />
@@ -199,7 +332,15 @@ function CorpWalletView({
         <div className="flex justify-center py-8">
           <Spinner label={t('common.loading')} />
         </div>
-      ) : !journalResult || journal.length === 0 ? (
+      ) : journalResult === null ? (
+        // No cache and the read didn't come back — offline, or a 403 the role
+        // gate swallowed (CONTEXT.md's `/corp/assets` split, same axis here).
+        <EmptyState
+          title={t('common.loadFailedTitle')}
+          hint={t('common.loadFailedHint')}
+          className="py-8"
+        />
+      ) : journal.length === 0 ? (
         <EmptyState
           title={t('wallet.corpJournalEmptyTitle')}
           hint={t('wallet.corpJournalEmptyHint')}
@@ -214,15 +355,16 @@ function CorpWalletView({
           )}
           {journalResult.truncated && (
             <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')}
+              {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
             </p>
           )}
-          <DataTable
+          <JournalTable
+            filter={journalFilter}
+            onFilterChange={onJournalFilterChange}
+            refTypeOptions={refTypeOptions}
+            filteredJournal={filteredJournal}
+            journalColumns={journalColumns}
             label={t('wallet.journalTab')}
-            columns={journalColumns}
-            rows={journal}
-            rowKey={(entry) => entry.id}
-            defaultSort={{ columnId: 'date', direction: 'desc' }}
           />
         </>
       )}
@@ -297,12 +439,27 @@ export function Wallet() {
   const selectedDivision = divisions.find((entry) => entry.division === effectiveDivision) ?? null;
 
   // Its own key, division included: ESI publishes no all-divisions journal and
-  // each division caches separately (features/corp/wallet.ts). Gated on the tab
-  // as well, so opening the corp side on Balance doesn't page a whole journal
-  // nobody asked to see.
+  // each division caches separately (features/corp/wallet.ts). Gated on the
+  // tab as well, so opening the corp side on Balance doesn't page a whole
+  // journal nobody asked to see — but only until the Journal tab has been
+  // opened once for this division. After that, `visitedJournalKey` keeps this
+  // key alive across a tab toggle so flipping back to Balance and back to
+  // Journal doesn't re-page a journal already fetched this session (issue
+  // #413). A division or corporation change still resets it, same as before.
+  const corpJournalBaseKey = showingCorp
+    ? `${activeCharacterId}:${corporationId}:${effectiveDivision}`
+    : null;
+  const [visitedJournalKey, setVisitedJournalKey] = useState<string | null>(null);
+  if (
+    tab === 'journal' &&
+    corpJournalBaseKey !== null &&
+    visitedJournalKey !== corpJournalBaseKey
+  ) {
+    setVisitedJournalKey(corpJournalBaseKey);
+  }
   const corpJournal = useCorpSnapshot<StatusResult<WalletJournalEntry[]> | null>(
-    showingCorp && tab === 'journal'
-      ? `${activeCharacterId}:${corporationId}:${effectiveDivision}`
+    corpJournalBaseKey !== null && (tab === 'journal' || visitedJournalKey === corpJournalBaseKey)
+      ? corpJournalBaseKey
       : null,
     async () =>
       activeCharacterId === null || corporationId === null
@@ -434,16 +591,29 @@ export function Wallet() {
     [t]
   );
 
-  const journal = useMemo(
-    () => [...(journalResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
-    [journalResult]
-  );
-
+  // Unsorted: `DataTable`'s own `defaultSort` below is the one place these
+  // rows get ordered — sorting here too was a redundant second pass over the
+  // same array on every render (issue #413). CSV export sorts its own copy at
+  // export time instead, since it bypasses `DataTable` entirely.
+  const journal = journalResult?.data ?? EMPTY_JOURNAL;
   const corpJournalResult = corpJournal.data?.cached ?? null;
-  const corpJournalEntries = useMemo(
-    () => [...(corpJournalResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
-    [corpJournalResult]
+  const corpJournalEntries = corpJournalResult?.data ?? EMPTY_JOURNAL;
+
+  // Local, per-visit filter state (not URL-synced), same shape as the tab
+  // control itself — see CONTEXT.md round 48 on Wallet's tabs. Reset on a
+  // switch of *which* journal is showing (owner, or corp division) — the
+  // ref-type dropdown is built from that journal's own values, so carrying a
+  // filter across the switch could pin a selection that journal never had.
+  const [journalFilter, setJournalFilter] = useState<WalletJournalFilter>(
+    EMPTY_WALLET_JOURNAL_FILTER
   );
+  const journalFilterScope = showingCorp ? `corp:${effectiveDivision}` : 'personal';
+  const [lastJournalFilterScope, setLastJournalFilterScope] = useState(journalFilterScope);
+  if (lastJournalFilterScope !== journalFilterScope) {
+    setLastJournalFilterScope(journalFilterScope);
+    setJournalFilter(EMPTY_WALLET_JOURNAL_FILTER);
+  }
+  const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalFilter);
 
   if (!hydrated) {
     return (
@@ -522,6 +692,8 @@ export function Wallet() {
           journal={corpJournalEntries}
           journalLoading={corpJournal.loading}
           journalColumns={journalColumns}
+          journalFilter={journalFilter}
+          onJournalFilterChange={setJournalFilter}
           division={selectedDivision}
           divisionLabel={divisionLabel}
           offlineTitleKey={
@@ -542,7 +714,7 @@ export function Wallet() {
             title={t('wallet.balanceTab')}
             actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
           >
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('wallet.isk')}
@@ -623,11 +795,11 @@ export function Wallet() {
                   size="sm"
                   icon={<Icon.Download />}
                   label={t('wallet.exportCsvJournal')}
-                  disabled={journal.length === 0}
+                  disabled={filteredJournal.length === 0}
                   onClick={() =>
                     downloadCsv(
                       'wallet-journal',
-                      journal,
+                      [...filteredJournal].sort(byDateDesc),
                       walletJournalCsvColumns(t),
                       new Date(),
                       journalTruncated
@@ -654,15 +826,16 @@ export function Wallet() {
               )}
               {journalTruncated && (
                 <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                  {t('common.incompleteTitle')}
+                  {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
                 </p>
               )}
-              <DataTable
+              <JournalTable
+                filter={journalFilter}
+                onFilterChange={setJournalFilter}
+                refTypeOptions={refTypeOptions}
+                filteredJournal={filteredJournal}
+                journalColumns={journalColumns}
                 label={t('wallet.journalTab')}
-                columns={journalColumns}
-                rows={journal}
-                rowKey={(entry) => entry.id}
-                defaultSort={{ columnId: 'date', direction: 'desc' }}
               />
             </>
           )}

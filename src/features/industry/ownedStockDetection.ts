@@ -125,9 +125,13 @@ type Translate = (key: string, opts?: Record<string, unknown>) => string;
  * One placement's location label. Falls back to the same id-based labels the
  * Assets page uses - a structure name is ACL-checked and can fail to resolve
  * even for a Character with assets sitting in it.
+ *
+ * Takes only the two fields it reads, not a whole `OwnedStockPlacement` -
+ * `OwnedStockScopeControl` (issue #454) labels bare `OwnedStockLocation`s,
+ * which carry no `quantity`, and this way it never has to fabricate one.
  */
 export function stockLocationLabel(
-  placement: OwnedStockPlacement,
+  placement: Pick<OwnedStockPlacement, 'locationId' | 'locationType'>,
   names: ReadonlyMap<number, string>,
   t: Translate
 ): string {
@@ -145,10 +149,18 @@ export function stockLocationLabel(
 
 /** Everything `MaterialsTable` needs to render detection, bundled so the table takes one optional prop. */
 export interface OwnedStockDetection {
+  /** Every placement, galaxy-wide — never filtered by the plan's owned-stock scope. Feeds the breakdown popover, which always shows the full picture. */
   stockFor: (typeID: number) => DetectedOwnedStock | undefined;
+  /**
+   * The total "use detected" offers for this material: `stockFor`'s quantity
+   * narrowed to the plan's `ownedStockScope` (issue #454). Equal to
+   * `stockFor(typeID)?.quantity ?? 0` when the scope is absent or
+   * `everywhere` — today's only behavior before this existed.
+   */
+  scopedQuantityFor: (typeID: number) => number;
   /** True when any Character's list was incomplete: every total renders as a lower bound. */
   lowerBound: boolean;
   incompleteCharacters: readonly string[];
   characterNameFor: (characterId: number) => string;
-  locationLabelFor: (placement: OwnedStockPlacement) => string;
+  locationLabelFor: (placement: Pick<OwnedStockPlacement, 'locationId' | 'locationType'>) => string;
 }

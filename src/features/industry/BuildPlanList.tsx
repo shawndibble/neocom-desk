@@ -127,15 +127,13 @@ function PlanRow({
         label={`${t('industry.delete')} ${plan.name}`}
         tooltip={t('industry.delete')}
         tone="danger"
-        onClick={() => {
-          if (window.confirm(t('industry.deleteConfirm'))) onDelete(plan.id);
-        }}
+        onClick={() => onDelete(plan.id)}
       />
     </li>
   );
 }
 
-/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete (confirm), rename inline. Also owns Compare mode's row checkboxes (issue #453) — the comparison itself renders in `Industry.tsx`'s detail pane. */
+/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete, rename inline. Also owns Compare mode's row checkboxes (issue #453) — the comparison itself renders in `Industry.tsx`'s detail pane. */
 export function BuildPlanList({
   plans,
   catalog,

@@ -11,6 +11,7 @@ import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -194,7 +195,6 @@ beforeEach(async () => {
     scopes: ['esi-skills.read_skillqueue.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
 
   window.history.pushState({}, '', '/industry');
 });
@@ -214,6 +214,12 @@ describe('Industry: Build Plan CRUD', () => {
     expect(stored).toHaveLength(1);
     expect(stored[0].blueprintTypeID).toBe(638);
     expect(stored[0].name).toBe('Rifter');
+    // No prior plan to default from: falls back to the historical hardcoded defaults (#456).
+    expect(stored[0].facility).toBe('npcStation');
+    expect(stored[0].rigLevel).toBe('none');
+    expect(stored[0].security).toBe('highsec');
+    expect(stored[0].hubId).toBe(DEFAULT_TRADE_HUB.id);
+    expect(stored[0].facilityTaxPct).toBeUndefined();
 
     await user.click(screen.getByRole('button', { name: 'Rename Rifter' }));
     const renameInput = screen.getByRole('textbox', { name: 'Rename' });
@@ -243,7 +249,58 @@ describe('Industry: Build Plan CRUD', () => {
     const remaining = await db.buildPlans.where('characterId').equals(CHAR_ID).toArray();
     expect(remaining).toHaveLength(1);
     expect(remaining[0].name).toBe('Rifter run (copy)');
-    expect(window.confirm).toHaveBeenCalled();
+  });
+
+  it('defaults facility/rig/security/hub/tax on a new plan from the most-recently-updated existing plan (#456)', async () => {
+    // Older plan first: its (wrong) settings must lose to the newer one below,
+    // proving the defaulting picks the most-recently-updated plan, not just
+    // "some" existing plan.
+    await db.buildPlans.add(
+      seedPlan({
+        id: 'bp-old',
+        name: 'Old run',
+        blueprintTypeID: 9841,
+        facility: 'azbel',
+        rigLevel: 't1',
+        security: 'nullsec',
+        hubId: 'rens',
+        facilityTaxPct: 0.1,
+        updatedAt: 3,
+      })
+    );
+    await db.buildPlans.add(
+      seedPlan({
+        id: 'bp-parts',
+        name: 'Parts run',
+        blueprintTypeID: 9841,
+        facility: 'raitaru',
+        rigLevel: 't2',
+        security: 'lowsec',
+        hubId: 'amarr',
+        facilityTaxPct: 0.25,
+        updatedAt: 5,
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('button', { name: 'Parts run' });
+    await user.click(screen.getByRole('button', { name: 'New plan' }));
+    const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
+    await user.type(search, 'Rift');
+    await user.click(await screen.findByRole('button', { name: /Rifter/ }));
+
+    await screen.findByRole('button', { name: 'Rifter' });
+    const created = await db.buildPlans
+      .where('characterId')
+      .equals(CHAR_ID)
+      .and((p) => p.blueprintTypeID === 638)
+      .first();
+    expect(created?.facility).toBe('raitaru');
+    expect(created?.rigLevel).toBe('t2');
+    expect(created?.security).toBe('lowsec');
+    expect(created?.hubId).toBe('amarr');
+    expect(created?.facilityTaxPct).toBe(0.25);
   });
 });
 
@@ -319,8 +376,10 @@ describe('Industry: owned-blueprint prefill', () => {
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 
     await screen.findByRole('button', { name: 'Rifter' });
-    expect(screen.getByLabelText('ME %')).toHaveValue(8);
-    expect(screen.getByLabelText('TE %')).toHaveValue(16);
+    // Text fields now (issue #455's commit-on-blur fix), not `type="number"`
+    // spinbuttons — `toHaveValue` compares against the DOM string value.
+    expect(screen.getByLabelText('ME %')).toHaveValue('8');
+    expect(screen.getByLabelText('TE %')).toHaveValue('16');
     expect(screen.getByText('Owned, ME 8% / TE 16%')).toBeInTheDocument();
 
     const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).first();
@@ -751,5 +810,38 @@ describe('Industry: hide fully-owned material rows (#409)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
 
     expect(screen.getByText('Tritanium')).toBeInTheDocument();
+  });
+});
+
+describe('Industry: owned-stock scope (#454)', () => {
+  it('defaults to Everywhere, and persists Selected locations to the plan', async () => {
+    const plan = seedPlan();
+    await db.buildPlans.add(plan);
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    const select = screen.getByLabelText('Count owned stock from') as HTMLSelectElement;
+    expect(select).toHaveValue('everywhere');
+
+    await userEvent.selectOptions(select, 'Selected locations');
+    expect(select).toHaveValue('selected');
+
+    // No Characters are authenticated in this test, so there is no detected
+    // stock to choose locations from yet.
+    expect(
+      screen.getByText('No detected owned stock yet to choose locations from.')
+    ).toBeInTheDocument();
+
+    await waitFor(async () => {
+      expect((await db.buildPlans.get(plan.id))?.ownedStockScope).toEqual({
+        mode: 'selected',
+        locations: [],
+      });
+    });
+
+    await userEvent.selectOptions(select, 'Everywhere');
+    await waitFor(async () => {
+      expect((await db.buildPlans.get(plan.id))?.ownedStockScope).toBeUndefined();
+    });
   });
 });

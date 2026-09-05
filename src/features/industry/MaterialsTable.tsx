@@ -58,6 +58,13 @@ interface SourcingInputProps {
    * a price of nothing.
    */
   placeholder?: string;
+  /**
+   * Pairs with an external `<label htmlFor>` for callers that don't wrap the
+   * input in a `<label>`. Only for click-to-focus — `aria-label` above (set
+   * from `label`) always wins the accessible name over an id/for
+   * association, so this id changes nothing a screen reader announces.
+   */
+  id?: string;
   parse: (raw: string) => number | undefined;
   onCommit: (value: number | undefined) => void;
 }
@@ -80,12 +87,13 @@ interface SourcingInputProps {
  * already suppressed on a phone, Enter still commits, and `unmaskNumber`
  * accepts the separators a pasted number brings with it.
  */
-function SourcingInput({
+export function SourcingInput({
   value,
   label,
   inputMode,
   widthClassName,
   placeholder,
+  id,
   parse,
   onCommit,
 }: SourcingInputProps) {
@@ -93,6 +101,7 @@ function SourcingInput({
   const [editing, setEditing] = useState(false);
   return (
     <TextInput
+      id={id}
       size="sm"
       type="text"
       inputMode={inputMode}
@@ -255,13 +264,17 @@ export function MaterialsTable({
         header: t('industry.ownedQuantity'),
         align: 'right',
         render: (material) => {
+          // Unfiltered — the breakdown popover always shows every placement,
+          // galaxy-wide, regardless of the plan's owned-stock scope.
           const stock = detection?.stockFor(material.typeID);
           const owned = sourcing?.[material.typeID]?.ownedQuantity;
-          // A row already holding what the action would write has nothing left
+          // The offer respects the plan's owned-stock scope (issue #454): a
+          // row already holding what the action would write has nothing left
           // to apply — compared against the clamped suggestion, not the raw
           // detected total, or the affordance would linger on every row whose
           // requirement is smaller than the stock behind it.
-          const suggestion = stock ? suggestedOwnedQuantity(stock.quantity, material.quantity) : 0;
+          const scopedQuantity = detection?.scopedQuantityFor(material.typeID) ?? 0;
+          const suggestion = stock ? suggestedOwnedQuantity(scopedQuantity, material.quantity) : 0;
           return (
             <span className="flex flex-col items-start gap-0.5 sm:items-end">
               <SourcingInput
@@ -276,10 +289,15 @@ export function MaterialsTable({
               {stock && detection && (
                 <OwnedStockHint
                   stock={stock}
+                  scopedQuantity={scopedQuantity}
                   detection={detection}
                   materialName={nameFor(material.typeID)}
                   suggestion={suggestion}
-                  canApply={owned !== suggestion}
+                  // Scoping (issue #454) can leave a material with real
+                  // galaxy-wide stock but nothing inside the plan's selected
+                  // locations — `suggestion` is then 0, and "use 0" is not a
+                  // real offer to make regardless of what the row holds.
+                  canApply={owned !== suggestion && suggestion > 0}
                   onApply={() => onSourcingChange(material.typeID, { ownedQuantity: suggestion })}
                 />
               )}

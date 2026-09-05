@@ -149,30 +149,28 @@ describe('Market top-level tabs', () => {
     await user.click(screen.getByRole('tab', { name: 'History' }));
     expect(await screen.findByText('expired')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'Transactions' }));
+    // The second view is picked from the table's own header, not a nested tab.
+    await user.selectOptions(screen.getByLabelText('History view'), 'transactions');
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
-  it('keeps History selected on its Transactions view, and re-clicking History leaves it there', async () => {
+  it('opens the Transactions view from a deep link, with History still the selected tab', async () => {
     window.history.pushState({}, '', '/market?section=transactions');
     const user = userEvent.setup();
     render(<App />);
 
-    // Both views are the character's past, so the top tab stays History and
-    // the inner pair says which of the two is showing.
+    // Both views are the character's past, so the tab stays History and the
+    // header's select says which of the two is showing.
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Transactions' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
-    expect(screen.getByRole('tab', { name: 'Orders' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByLabelText('History view')).toHaveValue('transactions');
+    expect(
+      screen.getByRole('button', { name: 'About Orders and Transactions' })
+    ).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'History' }));
-    expect(screen.getByText('Pyerite')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('tab', { name: 'Orders' }));
+    await user.selectOptions(screen.getByLabelText('History view'), 'history');
     expect(await screen.findByText('expired')).toBeInTheDocument();
+    expect(screen.getByLabelText('History view')).toHaveValue('history');
   });
 });
 
@@ -279,7 +277,7 @@ describe('Market Transactions tab', () => {
     expect(buyTotal.className).toContain('text-isk-neg');
   });
 
-  it('warns that transactions stop at the page cap when every call comes back full (D4)', async () => {
+  it('stops paging at the cap, and says nothing about it (D4)', async () => {
     let calls = 0;
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, () => {
@@ -289,8 +287,12 @@ describe('Market Transactions tab', () => {
     );
     window.history.pushState({}, '', '/market?section=transactions');
     render(<App />);
-    expect(await screen.findByText(/recent transactions only/i)).toBeInTheDocument();
+
+    // Five identical Tritanium fills come back, one per page.
+    expect((await screen.findAllByText('Tritanium')).length).toBeGreaterThan(1);
     expect(calls).toBe(5);
+    // The cap is how far back this view goes, not a fault to warn about.
+    expect(screen.queryByText(/recent transactions only/i)).not.toBeInTheDocument();
   });
 
   it('distinguishes a failed manual Refresh from the initial-load offline banner (UX-REVIEW #10)', async () => {

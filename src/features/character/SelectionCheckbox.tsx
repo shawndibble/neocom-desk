@@ -22,7 +22,7 @@ export function SelectionCheckbox({ state, onToggle, label }: SelectionCheckboxP
       onChange={onToggle}
       onClick={(e) => e.stopPropagation()}
       aria-label={label}
-      className="size-4 shrink-0 cursor-pointer accent-accent"
+      className="size-4 shrink-0 cursor-pointer accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     />
   );
 }
