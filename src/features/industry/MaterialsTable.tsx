@@ -3,11 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { DataTable, IconButton, TextInput, Tooltip, type DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
-import type {
-  MaterialCostLine,
-  MaterialSourcing,
-  MaterialSourcingMap,
-} from '@/engine/industry/types';
+import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
@@ -29,7 +25,7 @@ interface MaterialsTableProps {
   /** ESI-detected owned stock (issue #181); omitted where no detection ran. Never written by itself. */
   detection?: OwnedStockDetection;
   /** Wraps each row in the shared item context menu; omitted where the caller has no menu to offer. */
-  rowContextMenu?: (material: MaterialCostLine, tr: ReactElement) => ReactElement;
+  rowContextMenu?: (material: MaterialTableRow, tr: ReactElement) => ReactElement;
   /** Make-or-buy verdicts by material typeID. A material with no entry has no advice to show; omitted entirely where the caller can't price recipes. */
   makeOrBuy?: ReadonlyMap<number, MakeOrBuy>;
   /**
@@ -152,24 +148,17 @@ export function SourcingInput({
   );
 }
 
+/** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
+type Translate = (key: string, opts?: Record<string, unknown>) => string;
+
 /**
- * The row's make-or-buy verdict (CONTEXT.md round 29). Distinct glyphs
- * rather than one glyph in several tones: the verdict has to survive greyscale
- * and a screen reader (docs/DESIGN.md §7), so the shape carries it and the
- * label spells it out with both prices. Deliberately not a control — it has
- * nothing to click, so it takes no tab stop from the sourcing inputs on the
- * same row.
- *
- * The house `Tooltip` reads that same label on hover or touch-and-hold —
- * never a bare `title`, which every other pointer-revealed hint in the app
- * already avoids (docs/DESIGN.md's component table). `Tooltip`'s trigger
- * only needs `asChild`, not focusability: Radix reveals it on pointer
- * movement regardless of tab order, and only wires up its `onFocus` handler,
- * which never fires without a `tabIndex` to focus onto. So wrapping the span
- * costs nothing of the "no tab stop" rule above — there's a test pinning it.
+ * The prose behind a make-or-buy verdict: both unit prices, at ME, and — when
+ * there is a remainder left to spend the difference on — what it's worth.
+ * Shared by the advice-only marker below and the build-here toggle in the
+ * materials column, so a row's tooltip and its control never say something
+ * different about the same number.
  */
-function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: number }) {
-  const { t } = useTranslation();
+function makeOrBuyLabel(advice: MakeOrBuy, remaining: number, t: Translate): string {
   const building = advice.verdict === 'build';
   const method = advice.method === 'manufacturing' ? 'Manufacturing' : 'Planetary';
   const sentences = [
@@ -192,7 +181,30 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
       })
     );
   }
-  const label = sentences.join(' ');
+  return sentences.join(' ');
+}
+
+/**
+ * The row's make-or-buy verdict (CONTEXT.md round 29). Distinct glyphs
+ * rather than one glyph in several tones: the verdict has to survive greyscale
+ * and a screen reader (docs/DESIGN.md §7), so the shape carries it and the
+ * label spells it out with both prices. Deliberately not a control — it has
+ * nothing to click, so it takes no tab stop from the sourcing inputs on the
+ * same row. (A material something here can build gets the interactive
+ * version of this same glyph instead — see the materials column below.)
+ *
+ * The house `Tooltip` reads that same label on hover or touch-and-hold —
+ * never a bare `title`, which every other pointer-revealed hint in the app
+ * already avoids (docs/DESIGN.md's component table). `Tooltip`'s trigger
+ * only needs `asChild`, not focusability: Radix reveals it on pointer
+ * movement regardless of tab order, and only wires up its `onFocus` handler,
+ * which never fires without a `tabIndex` to focus onto. So wrapping the span
+ * costs nothing of the "no tab stop" rule above — there's a test pinning it.
+ */
+function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: number }) {
+  const { t } = useTranslation();
+  const building = advice.verdict === 'build';
+  const label = makeOrBuyLabel(advice, remaining, t);
   // Three glyphs, not two: "build" covers two different errands. A hammer sends
   // the player to an industry slot, a planet sends them to a colony, and the
   // two are not interchangeable — nothing about the manufacturing icon told a
@@ -270,48 +282,67 @@ export function MaterialsTable({
           const advice = makeOrBuy?.get(material.typeID);
           const name = nameFor(material.typeID);
           const building = material.subBuild !== undefined;
+          // Never offered on an indented row. That is what holds the feature
+          // to one level: a recipe input may well have a blueprint of its
+          // own, but expanding it would push the list toward raw planetary
+          // resources no market sells (docs/context/decisions).
+          const toggle =
+            !material.isSubInput && canBuildHere?.(material.typeID) ? onToggleBuildHere : undefined;
+          const actionLabel = t(building ? 'industry.buyInsteadFor' : 'industry.buildHereFor', {
+            material: name,
+          });
+          // Carries the same price rationale the advice-only marker shows,
+          // appended after the action so a screen reader hears what clicking
+          // does first. This is also the tooltip text (no separate `tooltip`
+          // override), so the visible bubble matches what gets announced.
+          const label = advice
+            ? `${actionLabel}. ${makeOrBuyLabel(advice, material.remainingQuantity, t)}`
+            : actionLabel;
           return (
             // Indented when the row only exists because something above it is
-            // being built. The indent is the glance; the tag beside the name is
-            // what a screen reader and a narrow card get, since neither has a
-            // column edge to measure the offset against.
+            // being built — a sighted reader on a wide-enough screen gets that
+            // from the offset alone, same as any other tree.
             <span
               className={cx('inline-flex items-center gap-1.5', material.isSubInput && 'sm:pl-4')}
             >
-              {advice && <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />}
-              {name}
-              {material.isSubInput && (
-                <span className="text-[0.6875rem] text-text-dim">
-                  {t('industry.subBuildInput')}
-                </span>
-              )}
-              {/*
-                Never offered on an indented row. That is what holds the
-                feature to one level: a recipe input may well have a blueprint
-                of its own, but expanding it would push the list toward raw
-                planetary resources no market sells (docs/context/decisions).
-              */}
-              {!material.isSubInput && canBuildHere?.(material.typeID) && onToggleBuildHere && (
-                // Hammer to start building it, cart to go back to buying it —
-                // the same two glyphs the make-or-buy marker already uses for
-                // those two errands, so the control reads as "switch this row
-                // to that" rather than as a third vocabulary.
+              {toggle ? (
+                // The marker slot itself is the control on a material
+                // something here can produce — hammer to start building it,
+                // cart to go back to buying it, the same two glyphs and tones
+                // the advice-only marker uses for those two errands: the
+                // hammer is always green and the cart always dim, the same
+                // way regardless of which one this row currently shows — the
+                // colour rides with the glyph, not with the row's toggle
+                // state, so it stays a fixed "this action means build" /
+                // "this action means buy" cue rather than flipping meaning
+                // from row to row. Set on this inner span so it wins over the
+                // button's own default text colour regardless of Tailwind's
+                // utility ordering. There is nothing left to say in a second,
+                // separate icon once this one already reads as "switch this
+                // row to that": the plan's own context menu
+                // (`ItemContextMenu`'s "Add material components") reaches the
+                // identical toggle for a right-click or long-press.
                 <IconButton
                   size="sm"
                   variant="plain"
                   icon={
                     building ? (
-                      <Icon.Buy size={Icon.ICON_SIZE.sm} />
+                      <span className="text-text-dim">
+                        <Icon.Buy size={Icon.ICON_SIZE.sm} />
+                      </span>
                     ) : (
-                      <Icon.Build size={Icon.ICON_SIZE.sm} />
+                      <span className="text-isk-pos">
+                        <Icon.Build size={Icon.ICON_SIZE.sm} />
+                      </span>
                     )
                   }
-                  label={t(building ? 'industry.buyInsteadFor' : 'industry.buildHereFor', {
-                    material: name,
-                  })}
-                  onClick={() => onToggleBuildHere(material.typeID)}
+                  label={label}
+                  onClick={() => toggle(material.typeID)}
                 />
+              ) : (
+                advice && <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />
               )}
+              {name}
             </span>
           );
         },
@@ -449,20 +480,16 @@ export function MaterialsTable({
         render: (material) => {
           // The job replaces the line total, because the money moved: this
           // row's cost is now the indented inputs plus a fee counted once in
-          // the panel footer, and repeating either here would double it.
+          // the panel footer, and repeating either here would double it. Runs
+          // is the one number worth a glance here — the per-run yield and
+          // spare units it implies are already recoverable from the runs
+          // count and the indented inputs below, so a second line spelling
+          // them out is more to read without being more to know.
           if (material.subBuild) {
-            const { runs, outputPerRun, unitsMade, spare } = material.subBuild;
+            const { runs } = material.subBuild;
             return (
               <span className="flex flex-col items-start sm:items-end">
                 <span>{t('industry.subBuildRuns', { runs: runs.toLocaleString() })}</span>
-                <span className="text-[0.6875rem] text-text-dim">
-                  {t('industry.subBuildYield', {
-                    output: outputPerRun.toLocaleString(),
-                    made: unitsMade.toLocaleString(),
-                  })}
-                  {spare > 0 &&
-                    ` ${t('industry.subBuildSpare', { spare: spare.toLocaleString() })}`}
-                </span>
               </span>
             );
           }

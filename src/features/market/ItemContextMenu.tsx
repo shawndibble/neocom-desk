@@ -30,6 +30,18 @@ export interface ItemContextMenuProps {
   onCompareVariations?: () => void;
   /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
   onViewInIndustryAsMaterial?: () => void;
+  /**
+   * Switches this material between being bought and being produced in the
+   * Build Plan the row belongs to — the same toggle a Build Plan's own
+   * materials table offers inline for a row something here can manufacture.
+   * Present only from that table, and only on a material with a recipe;
+   * omitted everywhere else the menu appears, and on a row that only exists
+   * because another build already introduced it (one level deep,
+   * docs/context/decisions).
+   */
+  onToggleBuildHere?: () => void;
+  /** Picks the toggle's label. Meaningless without `onToggleBuildHere`. */
+  buildingHere?: boolean;
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }
@@ -56,6 +68,8 @@ export function ItemContextMenu({
   onShowInfo,
   onCompareVariations,
   onViewInIndustryAsMaterial,
+  onToggleBuildHere,
+  buildingHere,
   onOpenChange,
   children,
 }: ItemContextMenuProps) {
@@ -116,6 +130,15 @@ export function ItemContextMenu({
         {onViewInIndustryAsMaterial && (
           <ContextMenuItem onSelect={onViewInIndustryAsMaterial}>
             {t('market.contextMenu.viewInIndustryAsMaterial')}
+          </ContextMenuItem>
+        )}
+        {onToggleBuildHere && (
+          <ContextMenuItem onSelect={onToggleBuildHere}>
+            {t(
+              buildingHere
+                ? 'market.contextMenu.buyInsteadOfBuilding'
+                : 'market.contextMenu.addMaterialComponents'
+            )}
           </ContextMenuItem>
         )}
         {piPlannable && (

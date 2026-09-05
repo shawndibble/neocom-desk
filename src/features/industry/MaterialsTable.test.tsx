@@ -863,13 +863,16 @@ describe('MaterialsTable make-or-buy marker', () => {
     expect(marker).toHaveAttribute('aria-describedby', tooltip.id);
   });
 
-  it('never takes a tab stop — a marker has nothing to click', async () => {
+  it('never takes a tab stop on a material nothing here can produce — a marker has nothing to click', async () => {
     // `fireEvent.focus` fires React's handler on whatever node it targets,
     // focusable or not, so it can't tell this apart from a real tab stop —
     // it would pass just as well on a `<button>`, which is the mistake this
     // guards against (every other `Tooltip` call in the app wraps one).
     // `userEvent.tab()` walks focus the way a browser actually does, landing
-    // only on elements the platform considers focusable.
+    // only on elements the platform considers focusable. No `canBuildHere` is
+    // passed here, so the marker slot stays the plain advisory glyph — see
+    // the "build-here control" describe block below for the case where it is
+    // a real button instead.
     const user = userEvent.setup();
     renderTable(advise(buildIt));
     const marker = within(row('Mechanical Parts')).getByRole('img');
@@ -921,6 +924,21 @@ describe('MaterialsTable build-here control', () => {
     expect(within(row('Tritanium')).queryByRole('button', { name: /Build/ })).toBeNull();
   });
 
+  it('is a real tab stop — the marker slot is the control here, not just a status glyph', async () => {
+    const user = userEvent.setup();
+    renderTable({ canBuildHere: buildable, onToggleBuildHere: vi.fn() });
+    const control = within(row('Mechanical Parts')).getByRole('button', {
+      name: 'Build Mechanical Parts here instead of buying it',
+    });
+
+    let reached = false;
+    for (let i = 0; i < 6 && !reached; i++) {
+      await user.tab();
+      reached = document.activeElement === control;
+    }
+    expect(reached).toBe(true);
+  });
+
   it('shows no control at all when the caller cannot look recipes up', () => {
     renderTable();
 
@@ -947,14 +965,58 @@ describe('MaterialsTable build-here control', () => {
     ).toBeInTheDocument();
   });
 
+  it('colours the hammer green and the cart dim, fixed to the glyph rather than the row', () => {
+    // Not yet building: the toggle shows the hammer, green.
+    renderTable({ canBuildHere: buildable, onToggleBuildHere: vi.fn() });
+    const hammerControl = within(row('Mechanical Parts')).getByRole('button', {
+      name: 'Build Mechanical Parts here instead of buying it',
+    });
+    expect(hammerControl.querySelector('svg')?.parentElement).toHaveClass('text-isk-pos');
+
+    // Already building: the toggle shows the cart, dim — not green, even
+    // though this is the row actually being built.
+    const buildingRow = renderTable({
+      materials: building(),
+      canBuildHere: buildable,
+      onToggleBuildHere: vi.fn(),
+    });
+    const cartControl = within(
+      within(buildingRow.container).getByText('Mechanical Parts').closest('tr')!
+    ).getByRole('button', { name: 'Buy Mechanical Parts instead of building it' });
+    expect(cartControl.querySelector('svg')?.parentElement).toHaveClass('text-text-dim');
+  });
+
+  it('carries the make-or-buy price rationale into the toggle, so hovering still says why', () => {
+    const advice: MakeOrBuy = {
+      method: 'manufacturing',
+      verdict: 'build',
+      makeUnitPrice: 42.96,
+      buyUnitPrice: 50,
+      savings: 70.4,
+      me: 0,
+    };
+    renderTable({
+      canBuildHere: buildable,
+      onToggleBuildHere: vi.fn(),
+      makeOrBuy: new Map([[9840, advice]]),
+    });
+
+    const control = within(row('Mechanical Parts')).getByRole('button', {
+      name: /^Build Mechanical Parts here instead of buying it\. Cheaper to build: 42\.96/,
+    });
+    expect(control).toHaveAccessibleName(/Worth 70 across the 10 units still to buy/);
+  });
+
   it('replaces a built material’s price with the job that produces it', () => {
     renderTable({ materials: building(), canBuildHere: buildable, onToggleBuildHere: vi.fn() });
     const built = row('Mechanical Parts');
 
-    // 10 needed at 4 a run is 3 runs, which makes 12.
+    // 10 needed at 4 a run is 3 runs; the per-run yield and spare units that
+    // implies are recoverable from the runs count and the indented inputs
+    // below, so they no longer get a line of their own.
     expect(within(built).getByText('3 runs')).toBeInTheDocument();
-    expect(within(built).getByText(/4 per run, makes 12/)).toBeInTheDocument();
-    expect(within(built).getByText(/2 spare/)).toBeInTheDocument();
+    expect(within(built).queryByText(/per run/)).not.toBeInTheDocument();
+    expect(within(built).queryByText(/spare/)).not.toBeInTheDocument();
     expect(within(built).getByText('Built')).toBeInTheDocument();
     // Nothing to price: the cost is the inputs below plus the job fee.
     expect(within(built).queryByLabelText(/^Price for/)).toBeNull();
@@ -973,6 +1035,6 @@ describe('MaterialsTable build-here control', () => {
     // Both of the plan's own materials offer it; the indented input does not.
     expect(screen.getAllByRole('button', { name: /here instead of buying it$/ })).toHaveLength(2);
     expect(within(row('Pyerite')).queryByRole('button', { name: /Build/ })).toBeNull();
-    expect(screen.getAllByText('to build')).toHaveLength(1);
+    expect(screen.getByText('Pyerite')).toHaveClass('sm:pl-4');
   });
 });

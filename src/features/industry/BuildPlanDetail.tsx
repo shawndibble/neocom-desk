@@ -14,7 +14,6 @@ import * as Icon from '@/components/ui/icons';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type {
-  EffectiveMaterial,
   FacilityKind,
   MaterialSourcing,
   RigLevel,
@@ -37,7 +36,7 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
 import { hasShoppingList, shoppingListText } from './shoppingList';
-import { expandBuildPlan, subBuildTableRows } from './subBuildPlan';
+import { expandBuildPlan, subBuildTableRows, type MaterialTableRow } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
@@ -401,6 +400,60 @@ export function BuildPlanDetail({
     [result, expanded]
   );
 
+  /**
+   * Make-or-buy verdicts for the indented rows a build introduced — the same
+   * advice a plan's own materials get, computed separately from `advice`
+   * above rather than by widening `recipeFor`'s reach: that memo's whole job
+   * is to answer "nothing produces this" for a type outside the blueprint's
+   * own materials, which is what keeps the build-here control off an
+   * indented row (its doc comment). This one only ever feeds the
+   * informational marker — cart, hammer or planet, telling the player
+   * whether that recipe input is itself worth building, even though nothing
+   * here lets them act on it a second level down (docs/context/decisions).
+   */
+  const subInputAdvice = useMemo(() => {
+    const verdicts = new Map<number, MakeOrBuy>();
+    if (!snapshot || snapshot.adjustedPrices === null || snapshot.systemCostIndex === null) {
+      return verdicts;
+    }
+    const own = new Set((result?.materials ?? []).map((material) => material.typeID));
+    const context = {
+      facility: facilityPreset,
+      rig: plan.rigLevel,
+      security: plan.security,
+      facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
+      systemCostIndex: snapshot.systemCostIndex,
+      adjustedPrices: snapshot.adjustedPrices,
+      hubPrices: snapshot.hubPrices,
+      skills,
+    };
+    for (const material of expanded.materials) {
+      if (own.has(material.typeID)) continue;
+      const recipe = materialRecipe(material.typeID, { catalog, pi, ownedBlueprints });
+      const verdict = makeOrBuy(material, recipe, context);
+      if (verdict) verdicts.set(material.typeID, verdict);
+    }
+    return verdicts;
+  }, [
+    expanded,
+    result,
+    snapshot,
+    facilityPreset,
+    plan.rigLevel,
+    plan.security,
+    plan.facilityTaxPct,
+    skills,
+    catalog,
+    pi,
+    ownedBlueprints,
+  ]);
+
+  /** `advice` plus `subInputAdvice`, so the table and the CSV export never disagree about which rows have a verdict. */
+  const materialAdvice = useMemo(
+    () => new Map([...advice, ...subInputAdvice]),
+    [advice, subInputAdvice]
+  );
+
   /** Wall-clock the sub-jobs add before the main run can even be installed. */
   const subBuildSeconds = useMemo(() => {
     let seconds = 0;
@@ -451,8 +504,13 @@ export function BuildPlanDetail({
    * the action lands back here with `?product=`, creating or selecting that
    * material's own plan so its build-vs-buy read can be compared with this one.
    */
-  function materialContextMenu(material: EffectiveMaterial, tr: ReactElement) {
+  function materialContextMenu(material: MaterialTableRow, tr: ReactElement) {
     const name = nameForType(catalog, material.typeID);
+    // Same one-level-deep rule the inline marker in `MaterialsTable` follows:
+    // never offered on a row that only exists because another build already
+    // introduced it (docs/context/decisions).
+    const buildable =
+      !material.isSubInput && recipeFor(material.typeID)?.method === 'manufacturing';
     return (
       <ItemContextMenu
         typeId={material.typeID}
@@ -461,6 +519,8 @@ export function BuildPlanDetail({
         onAddToQuickbar={onAddToQuickbar}
         quickbarAvailable={quickbarAvailable}
         onShowInfo={onShowInfo}
+        onToggleBuildHere={buildable ? () => toggleBuildHere(material.typeID) : undefined}
+        buildingHere={material.subBuild !== undefined}
       >
         {tr}
       </ItemContextMenu>
@@ -500,7 +560,7 @@ export function BuildPlanDetail({
         (typeID) => nameForType(catalog, typeID),
         plan.materialSourcing,
         pricesReady,
-        advice
+        materialAdvice
       )
     );
   }
@@ -781,7 +841,7 @@ export function BuildPlanDetail({
               onSourcingChange={onSourcingChange}
               detection={detection}
               rowContextMenu={materialContextMenu}
-              makeOrBuy={advice}
+              makeOrBuy={materialAdvice}
               canBuildHere={(typeID) => recipeFor(typeID)?.method === 'manufacturing'}
               onToggleBuildHere={toggleBuildHere}
             />

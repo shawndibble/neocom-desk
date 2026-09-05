@@ -64,7 +64,10 @@ export interface MaterialTableRow extends MaterialCostLine {
 
 /**
  * The materials table's rows: the plan's own materials in their original
- * order, then whatever the sub-jobs added.
+ * order, each immediately followed by whatever its own sub-job introduced —
+ * not every new input dumped at the bottom of the list. A player who just
+ * chose to build a component wants its inputs next to it, not scrolled past
+ * every other row on the plan to find them.
  *
  * An expanded material keeps its row rather than vanishing — it is still being
  * acquired, just by a job instead of a purchase, and a row that disappeared on
@@ -73,7 +76,10 @@ export interface MaterialTableRow extends MaterialCostLine {
  * A recipe input is listed once, not once per parent, because it is bought
  * once: three components that each consume the same fibre are one order. When
  * the plan already buys that input directly, the swapped-in units simply join
- * that existing row instead of starting an indented one.
+ * that existing row instead of starting an indented one. When two *built*
+ * materials both consume it, the merged row is placed once, under whichever
+ * of the two comes first in the plan's own order — showing it twice would
+ * double-count a quantity that is already summed onto one line.
  *
  * An expanded row deliberately carries its own unmerged line rather than the
  * merged one. It is excluded from the merge — its quantity is what the job
@@ -87,15 +93,23 @@ export function subBuildTableRows(
 ): MaterialTableRow[] {
   const mergedByType = new Map(expanded.materials.map((m) => [m.typeID, m]));
   const own = new Set(materials.map((m) => m.typeID));
+  const placed = new Set<number>();
 
-  const rows: MaterialTableRow[] = materials.map((material) => {
+  const rows: MaterialTableRow[] = [];
+  for (const material of materials) {
     const sub = expanded.subBuilds.get(material.typeID);
-    if (sub) return { ...material, subBuild: sub };
-    return { ...(mergedByType.get(material.typeID) ?? material) };
-  });
-
-  for (const merged of expanded.materials) {
-    if (!own.has(merged.typeID)) rows.push({ ...merged, isSubInput: true });
+    if (!sub) {
+      rows.push({ ...(mergedByType.get(material.typeID) ?? material) });
+      continue;
+    }
+    rows.push({ ...material, subBuild: sub });
+    for (const input of sub.inputs) {
+      if (own.has(input.typeID) || placed.has(input.typeID)) continue;
+      const merged = mergedByType.get(input.typeID);
+      if (!merged) continue;
+      rows.push({ ...merged, isSubInput: true });
+      placed.add(input.typeID);
+    }
   }
 
   return rows;
