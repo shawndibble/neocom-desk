@@ -16,9 +16,31 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invalidateFreshness } from '@/esi/cache';
+import { readRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
+
+export interface CorpSnapshotOptions {
+  /**
+   * Retain this view's last result across unmounts, in
+   * `lib/routeSnapshotCache.ts` — the same fix `useRouteSnapshot`'s own
+   * `cacheKey` applies, for the same reason: this hook's `useState` dies when
+   * the route unmounts, so the corp side of a page spun on every visit even
+   * with its rows already in Dexie.
+   *
+   * Both are required or neither retains anything. `name` distinguishes one
+   * view from another (`key` alone repeats across pages — it is just ids);
+   * `characterId` is what a consent purge forgets by, so a snapshot with no
+   * owner must not be stored at all.
+   */
+  name?: string;
+  characterId?: number | null;
+}
 
 export interface CorpSnapshot<T> {
-  /** The current key's result, or null while loading, failed, or disabled. */
+  /**
+   * The current key's result, or null while loading, failed, or disabled —
+   * except that with a retained snapshot this is the previous visit's result
+   * while the reload runs. Views spin on `loading && data === null`.
+   */
   data: T | null;
   /** False while disabled (`key === null`) — there is nothing being waited on. */
   loading: boolean;
@@ -33,7 +55,16 @@ interface Lifecycle {
   refreshCount: number;
 }
 
-export function useCorpSnapshot<T>(key: string | null, load: () => Promise<T>): CorpSnapshot<T> {
+export function useCorpSnapshot<T>(
+  key: string | null,
+  load: () => Promise<T>,
+  options?: CorpSnapshotOptions
+): CorpSnapshot<T> {
+  // The `key` is folded in, not replaced: it already carries the corporation
+  // and (on Wallet) the division, so two divisions retain separately and a
+  // corp change cannot read the previous corporation's rows back out.
+  const { name, characterId = null } = options ?? {};
+  const retainAs = name !== undefined && key !== null ? `${name}|${key}` : null;
   const [lifecycle, setLifecycle] = useState<Lifecycle>({ key, epoch: 0, refreshCount: 0 });
   const [snapshot, setSnapshot] = useState<{ epoch: number; data: T | null } | null>(null);
 
@@ -56,7 +87,12 @@ export function useCorpSnapshot<T>(key: string | null, load: () => Promise<T>): 
     void (async () => {
       try {
         const data = await loadRef.current();
-        if (!cancelled) setSnapshot({ epoch, data });
+        if (!cancelled) {
+          setSnapshot({ epoch, data });
+          if (retainAs !== null && characterId !== null) {
+            writeRouteSnapshot(retainAs, characterId, data);
+          }
+        }
       } catch {
         // Stamping the failure is what clears `loading`; the corp data modules
         // already swallow offline into a null result, so this is only reached
@@ -68,12 +104,16 @@ export function useCorpSnapshot<T>(key: string | null, load: () => Promise<T>): 
     return () => {
       cancelled = true;
     };
-  }, [activeKey, epoch]);
+  }, [activeKey, epoch, retainAs, characterId]);
 
   const current = snapshot?.epoch === epoch ? snapshot : null;
+  // Read during render, not in an effect: an effect would still cost the one
+  // spinner frame this exists to remove.
+  const retained =
+    retainAs !== null && characterId !== null ? readRouteSnapshot<T>(retainAs, characterId) : null;
 
   return {
-    data: current?.data ?? null,
+    data: current?.data ?? retained,
     loading: activeKey !== null && current === null,
     refreshCount: lifecycle.refreshCount,
     refresh: useCallback(() => {

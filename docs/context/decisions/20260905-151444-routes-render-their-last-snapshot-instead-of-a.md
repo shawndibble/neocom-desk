@@ -24,13 +24,25 @@ _Recorded 2026-09-05._
   only "what did this tab render last time", so a page reload rightly starts
   empty.
 
+- **`useCorpSnapshot` gets the same treatment, opt-in the same way.** It is a
+  second copy of the same `useState`-dies-on-unmount defect, behind Wallet's
+  and Industry's corp switch. It takes `{ name, characterId }` and folds its
+  existing `key` (character + corporation + division) into the retained name,
+  so two divisions retain separately and a corp change cannot read the previous
+  corporation's rows back out.
+
 - **The purge has one trigger, not two.** `esi/cachePurge.ts` gained an
   `onCachePurged` signal in the same publish/subscribe shape as
   `onCacheRevalidated` — `esi` publishes, the React layer subscribes — so
   whatever revokes consent for a character's Dexie rows (scope removed, owner
   changed, character removed) takes the in-memory copies of those same rows
   with it. Without it a purge would leave the previous owner's wallet on screen
-  until a reload.
+  until a reload. `purgeCorpScopedCache` emits it too, and just as bluntly: it
+  deletes only the `corp:` prefix in Dexie, but a retained snapshot is a whole
+  rendered board, so a surgical forget is not expressible — and forgetting too
+  much costs one Dexie re-read, while forgetting too little puts the previous
+  corporation's board, roster and assets back on screen. The `db.esiCache.clear()`
+  fallback tier emits `null`, meaning every Character.
 
 - **A failed load keeps the retained rows and reports the error.** Same
   contract `staleWhileRevalidate` already had for a failed refresh: the views

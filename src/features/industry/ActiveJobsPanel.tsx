@@ -111,7 +111,8 @@ export function ActiveJobsPanel({
   const corp = useCorpSnapshot<CorpJobsLoadResult | null>(
     showingCorp ? `${characterId}:${corporationId}` : null,
     async () =>
-      corporationId === null ? null : loadCorporationIndustryJobs(characterId, corporationId)
+      corporationId === null ? null : loadCorporationIndustryJobs(characterId, corporationId),
+    { name: 'industry:corp-jobs', characterId }
   );
 
   useEffect(() => {

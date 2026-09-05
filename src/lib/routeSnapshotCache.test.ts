@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { db } from '@/db';
+import { purgeCharacterCache, purgeCorpScopedCache } from '@/esi/cachePurge';
 import {
   readRouteSnapshot,
   writeRouteSnapshot,
@@ -9,8 +11,9 @@ import {
 const CHAR_A = 91;
 const CHAR_B = 92;
 
-beforeEach(() => {
+beforeEach(async () => {
   resetRouteSnapshots();
+  await db.esiCache.clear();
 });
 
 describe('routeSnapshotCache', () => {
@@ -40,11 +43,30 @@ describe('routeSnapshotCache', () => {
     expect(readRouteSnapshot('wallet', CHAR_B)).toEqual({ balance: 2 });
   });
 
-  it('does not forget a character whose id merely ends with the purged one', () => {
-    // Keys are `${cacheKey}:${characterId}`, so a suffix match must not treat
-    // 191 as 91.
+  it('forgets only the purged character, not one whose id merely contains it', () => {
     writeRouteSnapshot('wallet', 191, { balance: 1 });
     forgetRouteSnapshots(91);
     expect(readRouteSnapshot('wallet', 191)).toEqual({ balance: 1 });
+  });
+
+  it('forgets a character when its cached rows are purged', async () => {
+    writeRouteSnapshot('wallet', CHAR_A, { balance: 1 });
+    await purgeCharacterCache(CHAR_A);
+    expect(readRouteSnapshot('wallet', CHAR_A)).toBeNull();
+  });
+
+  it('forgets the corp views when only the corp-scoped rows are purged', async () => {
+    // A corp change deletes just the `corp:` prefix in Dexie, but a retained
+    // snapshot is a whole rendered board — so the blunt signal is what keeps
+    // the previous corporation's rows off the screen.
+    writeRouteSnapshot('corp', CHAR_A, { board: 'old corp' });
+    writeRouteSnapshot('corp-members', CHAR_A, { roster: 'old corp' });
+    writeRouteSnapshot('corp', CHAR_B, { board: 'untouched' });
+
+    await purgeCorpScopedCache(CHAR_A);
+
+    expect(readRouteSnapshot('corp', CHAR_A)).toBeNull();
+    expect(readRouteSnapshot('corp-members', CHAR_A)).toBeNull();
+    expect(readRouteSnapshot('corp', CHAR_B)).toEqual({ board: 'untouched' });
   });
 });

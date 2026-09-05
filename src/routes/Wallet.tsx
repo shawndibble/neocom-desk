@@ -456,7 +456,8 @@ export function Wallet() {
     async () =>
       activeCharacterId === null || corporationId === null
         ? null
-        : loadCorpBalances(activeCharacterId, corporationId)
+        : loadCorpBalances(activeCharacterId, corporationId),
+    { name: 'wallet:corp-balances', characterId: activeCharacterId }
   );
 
   const divisions = useMemo<WalletDivision[]>(
@@ -507,7 +508,8 @@ export function Wallet() {
     async () =>
       activeCharacterId === null || corporationId === null
         ? null
-        : loadCorporationWalletJournal(activeCharacterId, corporationId, effectiveDivision)
+        : loadCorporationWalletJournal(activeCharacterId, corporationId, effectiveDivision),
+    { name: 'wallet:corp-journal', characterId: activeCharacterId }
   );
 
   const divisionLabel = (entry: WalletDivision) =>
@@ -732,10 +734,10 @@ export function Wallet() {
         <CorpWalletView
           tab={tab}
           balances={corpBalances.data}
-          balancesLoading={corpBalances.loading}
+          balancesLoading={corpBalances.loading && corpBalances.data === null}
           journalResult={corpJournalResult}
           journal={corpJournalEntries}
-          journalLoading={corpJournal.loading}
+          journalLoading={corpJournal.loading && corpJournal.data === null}
           journalColumns={journalColumns}
           journalFilter={journalFilter}
           onJournalFilterChange={setJournalFilter}

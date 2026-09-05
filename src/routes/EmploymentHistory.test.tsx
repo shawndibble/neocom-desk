@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { writeRouteSnapshot } from '@/lib/routeSnapshotCache';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -202,6 +203,53 @@ describe('EmploymentHistory', () => {
     // name may or may not have resolved yet.
     const rows = screen.getAllByRole('row');
     expect(rows[1]).toHaveTextContent(/#200|Current Corp/);
+  });
+
+  it("renders the previous visit's rows immediately, with no spinner, while it re-reads", async () => {
+    // The retained snapshot `useRouteSnapshot`'s `cacheKey` writes on a
+    // successful load. Seeded directly here because it only exists on a
+    // *second* mount, and the global `resetRouteSnapshots` in `vitest.setup.ts`
+    // rightly empties it before every test.
+    writeRouteSnapshot('employment-history', CHAR_ID, {
+      historyResult: {
+        data: history,
+        fetchedAt: new Date(STALE_FETCHED_AT),
+        fromCache: false,
+        truncated: false,
+      },
+      corpNames: new Map([
+        [200, 'Current Corp'],
+        [100, 'Past Corp'],
+      ]),
+      sp: { totalSp: null, unallocatedSp: null },
+      loadedAt: Date.parse('2026-06-01T00:00:00Z'),
+    });
+    // Held open for the duration of the assertions, so anything on screen can
+    // only be the retained snapshot. Released before the test ends rather than
+    // left hanging: `esi/cache.ts` keys an in-flight read in `inFlightLoads`,
+    // and a promise that never settles would still be there for the next test
+    // to dedupe onto.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/corporationhistory`, async () => {
+        await held;
+        return HttpResponse.json(history);
+      })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Past Corp')).toBeInTheDocument();
+    // The whole point: a load really is in flight, and no spinner is shown.
+    expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull();
+    // Refresh still reports the in-flight load honestly.
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
+
+    release();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh' })).not.toBeDisabled());
   });
 
   it('shows the empty state when there is no data at all', async () => {

@@ -128,8 +128,13 @@ first frame after a navigation already has rows. Views spin on
 `loading && !data`, never `loading` alone — `loading` stays honest for the
 Refresh button. The key is an explicit string because several call sites pass
 an inline loader whose identity changes every render. `esi/cachePurge.ts`
-publishes `onCachePurged`, which this store subscribes to, so a consent purge
-takes the in-memory copies with it.
+publishes `onCachePurged` (a character id, or `null` for the cache-wide
+fallback tier), which this store subscribes to, so a consent purge takes the
+in-memory copies with it — `purgeCorpScopedCache` included, since a retained
+snapshot is a whole rendered board and cannot be forgotten by `corp:` prefix.
+`features/corp/useCorpSnapshot.ts` opts in the same way via
+`{ name, characterId }`, folding its own key (character + corporation +
+division) into the retained name.
 
 **Boot prefetch.** `app/prefetch.ts` warms every granted surface into
 `esiCache` on app start and on each character switch, wired from the same

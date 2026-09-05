@@ -1,6 +1,6 @@
 /**
- * Session-lived store of the last snapshot each route loaded, keyed by route
- * and Character.
+ * Session-lived store of the last snapshot each view loaded, keyed by
+ * Character and then by view.
  *
  * `useRouteSnapshot` keeps its snapshot in `useState`, so it dies with the
  * component — and React Router unmounts a route on navigation. That made every
@@ -11,49 +11,61 @@
  *
  * In memory only, never Dexie: `esiCache` is already the durable copy, and a
  * second persisted copy would need its own purge and freshness rules. This is
- * just "what this tab rendered last time", and a reload rightly starts empty.
+ * just "what this view rendered last time", and a reload rightly starts empty.
  *
  * The same shape as `stores/characterSp.ts` and `stores/publicInfo.ts` —
- * session-only cross-view caches — but keyed generically so one entry per route
- * costs no per-route module.
+ * session-only cross-view caches — but keyed generically so one entry per view
+ * costs no per-view module.
  */
 import { onCachePurged } from '@/esi/cachePurge';
 
-/** `${cacheKey}:${characterId}` → the last snapshot that route loaded for that Character. */
-const snapshots = new Map<string, unknown>();
+/**
+ * Character id → view name → that view's last snapshot.
+ *
+ * Nested rather than one flat `name:characterId` key so a purge is an outer
+ * `delete`, with no string parsing to get subtly wrong for one id that happens
+ * to end with another.
+ */
+const byCharacter = new Map<number, Map<string, unknown>>();
 
-function storeKey(cacheKey: string, characterId: number): string {
-  return `${cacheKey}:${characterId}`;
-}
-
-export function readRouteSnapshot<T>(cacheKey: string, characterId: number): T | null {
-  const found = snapshots.get(storeKey(cacheKey, characterId));
+export function readRouteSnapshot<T>(name: string, characterId: number): T | null {
+  const found = byCharacter.get(characterId)?.get(name);
   return found === undefined ? null : (found as T);
 }
 
-export function writeRouteSnapshot<T>(cacheKey: string, characterId: number, data: T): void {
-  snapshots.set(storeKey(cacheKey, characterId), data);
+export function writeRouteSnapshot<T>(name: string, characterId: number, data: T): void {
+  let views = byCharacter.get(characterId);
+  if (views === undefined) {
+    views = new Map<string, unknown>();
+    byCharacter.set(characterId, views);
+  }
+  views.set(name, data);
 }
 
 /**
- * Drop every route's retained snapshot for one Character.
+ * Drop every view's retained snapshot for one Character.
  *
- * Wired to the `esiCache` purge below, so the privacy rule has one trigger:
- * whatever revokes consent for the Dexie rows (scope removed, owner changed,
- * character removed) takes the in-memory copies of those same rows with it.
- * Without this a purge would leave the previous owner's wallet on screen until
- * a reload.
+ * Blunt on purpose, exactly as `purgeCharacterCache` is: over-forgetting costs
+ * one Dexie re-read, under-forgetting is a privacy bug. That matters most for
+ * `purgeCorpScopedCache`, which deletes only the `corp:` rows — forgetting
+ * just as bluntly there is what keeps a previous corporation's board, roster
+ * and assets off the screen after a corp change.
  */
 export function forgetRouteSnapshots(characterId: number): void {
-  const suffix = `:${characterId}`;
-  for (const key of snapshots.keys()) {
-    if (key.endsWith(suffix)) snapshots.delete(key);
-  }
+  byCharacter.delete(characterId);
+}
+
+/** Every Character's, for the cache-wide `db.esiCache.clear()` fallback tier. */
+export function forgetAllRouteSnapshots(): void {
+  byCharacter.clear();
 }
 
 /** Test seam: module state otherwise outlives a `beforeEach` that only clears Dexie. */
 export function resetRouteSnapshots(): void {
-  snapshots.clear();
+  byCharacter.clear();
 }
 
-onCachePurged(forgetRouteSnapshots);
+onCachePurged((characterId) => {
+  if (characterId === null) forgetAllRouteSnapshots();
+  else forgetRouteSnapshots(characterId);
+});
