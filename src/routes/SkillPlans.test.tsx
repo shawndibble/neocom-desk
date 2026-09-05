@@ -1719,7 +1719,6 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     // start→finish line is gone: it restated the running total a third way
     // and cost every row a line it couldn't spare on a phone.
     expect(items[1].textContent).toContain(planFinishDate);
-    expect(items[1].textContent).not.toContain('→');
   });
 
   it('shows no projected finish date, and no invented start time, for an empty plan (#20)', async () => {

@@ -7,7 +7,14 @@
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
-export const COLUMN_VISIBILITY_SETTING_KEY = 'planColumnVisibility';
+/**
+ * Versioned key. The stored shape is unchanged, so a device that already has
+ * `planColumnVisibility` would replay its old value — including the priority
+ * column this now leaves off — and never see the new defaults. Bumping the
+ * key retires that row and lets every device read the defaults once; anyone
+ * who wants priority back turns it on in "Columns", and that choice sticks.
+ */
+export const COLUMN_VISIBILITY_SETTING_KEY = 'planColumnVisibility.v2';
 
 export interface ColumnVisibility {
   attributePair: boolean;
