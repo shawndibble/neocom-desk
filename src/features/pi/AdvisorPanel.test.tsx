@@ -39,6 +39,8 @@ const loadSystemName = vi.fn();
 const loadPlanetInfo = vi.fn();
 const loadSchematicName = vi.fn();
 const loadTypeNames = vi.fn();
+const loadSystemSecurity = vi.fn();
+const loadCustomsCodeExpertise = vi.fn();
 
 const loadPiPlanetRadius = vi.fn<() => Promise<Record<string, number>>>();
 vi.mock('@/sde/loadSde', () => ({
@@ -53,12 +55,7 @@ vi.mock('@/sync', () => ({
   setPlanetRichness: (planetId: number, order: number[]) => setPlanetRichness(planetId, order),
   clearPlanetRichness: (planetId: number) => clearPlanetRichness(planetId),
 }));
-const loadPlanPrices = vi.fn(async () => ({
-  prices: { [BASE_METALS]: 12 },
-  unpriced: [],
-  failed: false,
-  fetchedAt: new Date(),
-}));
+const loadPlanPrices = vi.fn<() => Promise<import('./planPrices').PlanPrices>>();
 vi.mock('./planPrices', () => ({ loadPlanPrices: () => loadPlanPrices() }));
 
 vi.mock('./data', () => ({
@@ -74,6 +71,12 @@ vi.mock('./colonyBudget', async (importOriginal) => ({
 vi.mock('@/features/character/systemSecurity', () => ({
   loadSystemPlanetIds: (...args: unknown[]) => loadSystemPlanetIds(...args),
   loadSystemName: (...args: unknown[]) => loadSystemName(...args),
+  loadSystemSecurity: (...args: unknown[]) => loadSystemSecurity(...args),
+}));
+
+vi.mock('./customsRate', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./customsRate')>()),
+  loadCustomsCodeExpertise: (...args: unknown[]) => loadCustomsCodeExpertise(...args),
 }));
 
 vi.mock('./names', () => ({
@@ -156,9 +159,22 @@ beforeEach(() => {
     loadPlanetInfo,
     loadSchematicName,
     loadTypeNames,
+    loadSystemSecurity,
+    loadCustomsCodeExpertise,
+    loadPlanPrices,
   ]) {
     mock.mockReset();
   }
+  loadPlanPrices.mockResolvedValue({
+    prices: { [BASE_METALS]: 12 },
+    unpriced: [],
+    failed: false,
+    fetchedAt: new Date(),
+  });
+  // Ashab is highsec, and the character has Customs Code Expertise IV — so
+  // every chain below is costed at the 6% these two imply.
+  loadSystemSecurity.mockResolvedValue(0.5);
+  loadCustomsCodeExpertise.mockResolvedValue(4);
   loadCharacterPlanets.mockResolvedValue({
     cached: { data: [colony(40_000_001, 'temperate')], fetchedAt: new Date(), fromCache: false },
     needsReauth: false,
@@ -517,5 +533,96 @@ describe('resource ranking (#425)', () => {
 
     expect(await screen.findByText(/no rate of your own to project from/)).toBeInTheDocument();
     expect(screen.queryByText('Est.')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Ashab III is a Temperate colony, so its candidates are the five P0 a
+ * Temperate planet yields and what can be made from them alone. Its measured
+ * rate is the fixture's own 5,580/hr.
+ */
+describe('AdvisorPanel build advice', () => {
+  const MICROORGANISMS = 2073;
+  const AQUEOUS_LIQUIDS = 2268;
+  const COMPLEX_ORGANISMS = 2287;
+  const CARBON_COMPOUNDS = 2288;
+  const AUTOTROPHS = 2305;
+  const BACTERIA = 2393;
+  const WATER = 3645;
+
+  function priceEverything(overrides: Record<number, number> = {}) {
+    loadPlanPrices.mockResolvedValue({
+      prices: {
+        [MICROORGANISMS]: 5,
+        [AQUEOUS_LIQUIDS]: 5,
+        [COMPLEX_ORGANISMS]: 5,
+        [CARBON_COMPOUNDS]: 5,
+        [AUTOTROPHS]: 5,
+        [BACTERIA]: 1_000,
+        [WATER]: 1_000,
+        ...overrides,
+      },
+      unpriced: [],
+      failed: false,
+      fetchedAt: new Date(),
+    });
+  }
+
+  it('recommends a made tier once it out-earns selling the ore', async () => {
+    // At 10,000 ISK a unit, one Basic Industry Facility of Bacteria beats
+    // three extractors' worth of raw Microorganisms.
+    priceEverything({ [BACTERIA]: 10_000 });
+    renderPanel();
+    expect(await screen.findByText('Bacteria (P1)')).toBeInTheDocument();
+    expect(screen.getByText('Build up to')).toBeInTheDocument();
+  });
+
+  it('recommends selling the ore when no made tier beats it', async () => {
+    // Bacteria at 1,000 does not cover the 150 units of Microorganisms it
+    // eats plus the extractor capacity it costs, so the raw floor wins.
+    priceEverything();
+    renderPanel();
+    expect(await screen.findByText('Keep selling Microorganisms raw')).toBeInTheDocument();
+  });
+
+  it('states the derived customs rate rather than costing at a silent default', async () => {
+    priceEverything();
+    renderPanel();
+    // Ashab at 0.5 security is highsec: the 10% NPC base less 1% per level of
+    // Customs Code Expertise IV.
+    expect(await screen.findByText('6%')).toBeInTheDocument();
+  });
+
+  it('says the hub is the gap when nothing is quoted, not that the planet is poor', async () => {
+    loadPlanPrices.mockResolvedValue({
+      prices: {},
+      unpriced: [],
+      failed: false,
+      fetchedAt: new Date(),
+    });
+    renderPanel();
+    expect(await screen.findByText(/reference hub quotes no price/)).toBeInTheDocument();
+  });
+
+  it('gives no build advice on a colony with no measurable extractor', async () => {
+    priceEverything();
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: { ...detail, pins: [detail.pins[1], detail.pins[2]] },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+    expect(
+      await screen.findByText(/no rate of its own to size a chain against/)
+    ).toBeInTheDocument();
   });
 });

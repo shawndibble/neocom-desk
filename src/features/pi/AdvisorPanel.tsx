@@ -11,15 +11,18 @@
  * a colony by budget, not by pin count — so the Advisor is the surface for
  * `engine/pi/pinBudget.ts` and its per-kind headroom.
  *
- * ## Measured only, and the estimate is deliberately absent
+ * ## Measured first, and everything projected from it says so
  *
  * Every number on a built card is read: the pins from ESI, the extraction rate
- * from each program's own decay curve, the budget from the character's trained
- * Command Center Upgrades. An unbuilt planet gets its type and the P0
- * resources that type yields, and then stops — see `advisorModel.ts` for why
- * an ISK estimate would need a richness figure no ESI field carries and a
- * resource ranking this app does not yet store. A card that says "we do not
- * know" is worth more than one that says a plausible number.
+ * from each program's own decay curve, the budget from the colony's own
+ * Command Center level. Two figures are projections rather than readings, and
+ * both are labelled where they appear — an unbuilt planet's estimated value
+ * (#425), which rests on the pilot's own ranking and their own colonies'
+ * average rate, and a built colony's "build up to" recommendation (#426),
+ * which fits candidate layouts against that colony's own measured budget,
+ * links and extraction rate. Neither is ever a number with a caveat beside
+ * it: where an input is missing, the card names the input instead. A card that
+ * says "we do not know" is worth more than one that says a plausible number.
  *
  * ## The system picker offers systems the character has colonies in
  *
@@ -52,12 +55,25 @@ import type { CharacterPlanet, CharacterPlanetDetail, PlanetType } from '@/esi/e
 import { EXTRACTOR_HEADS_MAX, spareCapacity } from '@/engine/pi/pinBudget';
 import type { PinLoad } from '@/engine/pi/types';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { loadSystemName, loadSystemPlanetIds } from '@/features/character/systemSecurity';
+import { securityBand } from '@/engine/securityStatus';
+import {
+  loadSystemName,
+  loadSystemPlanetIds,
+  loadSystemSecurity,
+} from '@/features/character/systemSecurity';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterPlanets, loadAllColonyDetails } from './data';
 import { loadCommandCenterUpgrades, maxColonyBudget, type MaxColonyBudget } from './colonyBudget';
 import { loadPlanetInfo, loadSchematicName } from './names';
 import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorModel';
+import { colonyStopTierAdvice } from './stopTierModel';
+import {
+  customsRateSource,
+  defaultCustomsRate,
+  loadCustomsCodeExpertise,
+  type ColonySpace,
+  type CustomsRateSource,
+} from './customsRate';
 
 /** The kinds worth offering as headroom, in the order a planner reaches for them. */
 const HEADROOM_KINDS: readonly PiPinKind[] = [
@@ -85,6 +101,28 @@ interface SystemGroup {
   systemId: number;
   name: string | null;
   colonies: CharacterPlanet[];
+  /**
+   * The customs rate a chain here is costed at, derived from the system's own
+   * security band and the character's Customs Code Expertise — not asked for.
+   * The Plan tab asks because it answers for no particular system; the Advisor
+   * knows exactly which system it is showing.
+   */
+  customsRate: number;
+  customsSource: CustomsRateSource;
+}
+
+/**
+ * The band that sets a system's default customs rate.
+ *
+ * An unresolved security status falls back to highsec, which is the only
+ * assumption that cannot understate what a customs office will charge — the
+ * same rule `customsRate.ts` applies to a character with no skill data.
+ * Wormhole space is not detectable from security status and is not offered
+ * here; a J-space colony reads as nullsec, whose 0% default is right for a
+ * player-owned office anyway.
+ */
+function colonySpaceFor(security: number | null): ColonySpace {
+  return security === null ? 'highsec' : securityBand(security);
 }
 
 interface Snapshot {
@@ -103,16 +141,19 @@ interface Snapshot {
   /** Planet radius in km by planetId, for costing links (#440). */
   planetRadiusKm: Map<number, number>;
   /**
-   * Hub prices for every P0 the character's systems can yield, so an unbuilt
-   * planet's estimate can be valued. A type the hub does not quote is absent,
-   * never zero — `estimateUnbuiltPlanet` refuses rather than pricing at nothing.
+   * Hub prices for every planetary commodity there is — every P0 and every
+   * schematic output. One call for the whole payload, not one per card: the
+   * set is fixed at about eighty types whatever the character owns, so this is
+   * a constant, not a fan-out that grows with the system. A type the hub does
+   * not quote is absent, never zero — both `estimateUnbuiltPlanet` and
+   * `recommendStopTier` refuse rather than pricing at nothing.
    */
-  p0Prices: Record<number, number>;
+  prices: Record<number, number>;
 }
 
 async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   const nowMs = Date.now();
-  const [pi, planetRadiusRaw, { cached, needsReauth }, ccLevel] = await Promise.all([
+  const [pi, planetRadiusRaw, { cached, needsReauth }, ccLevel, customsSkill] = await Promise.all([
     loadPi(),
     // Its own payload, and a big one, so a failure here must not take the tab
     // down: an unresolved radius leaves that colony's link cost unknown, which
@@ -120,6 +161,9 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     loadPiPlanetRadius().catch(() => ({}) as Record<string, number>),
     loadCharacterPlanets(characterId),
     loadCommandCenterUpgrades(characterId, nowMs),
+    // Null is a real answer — no skill data at all — and stays distinct from a
+    // trained zero, so `customsRateSource` can say which it is.
+    loadCustomsCodeExpertise(characterId, nowMs).catch(() => null),
   ]);
   const colonies = cached?.data ?? [];
 
@@ -131,13 +175,14 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   }
   const systemIds = [...bySystem.keys()];
 
-  const [details, systemNames, planetIdLists] = await Promise.all([
+  const [details, systemNames, planetIdLists, securities] = await Promise.all([
     loadAllColonyDetails(
       characterId,
       colonies.map((colony) => colony.planet_id)
     ),
     Promise.all(systemIds.map((systemId) => loadSystemName(systemId))),
     Promise.all(systemIds.map((systemId) => loadSystemPlanetIds(systemId))),
+    Promise.all(systemIds.map((systemId) => loadSystemSecurity(systemId).catch(() => null))),
   ]);
 
   // One `/universe/planets` read per planet across every system the character
@@ -183,10 +228,18 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     ])
   );
 
-  const p0TypeIds = [...new Set(pi.raw.map((resource) => resource.typeID))];
-  // Failure here is not fatal: an unpriced estimate refuses with
+  // Every planetary commodity, P0 and made alike, in one request. The list is
+  // the whole payload rather than the types this character happens to touch,
+  // which is what keeps it a fixed cost as cards come and go.
+  const piTypeIds = [
+    ...new Set([
+      ...pi.raw.map((resource) => resource.typeID),
+      ...Object.keys(pi.schematics).map(Number),
+    ]),
+  ];
+  // Failure here is not fatal: an unpriced candidate refuses with
   // `needs-price` rather than taking the whole panel down with it.
-  const p0Prices = await loadPlanPrices(DEFAULT_TRADE_HUB, p0TypeIds)
+  const prices = await loadPlanPrices(DEFAULT_TRADE_HUB, piTypeIds)
     .then((result) => result.prices)
     .catch(() => ({}) as Record<number, number>);
 
@@ -223,11 +276,16 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
 
   return {
     pi,
-    systems: systemIds.map((systemId, i) => ({
-      systemId,
-      name: systemNames[i],
-      colonies: bySystem.get(systemId) ?? [],
-    })),
+    systems: systemIds.map((systemId, i) => {
+      const space = colonySpaceFor(securities[i]);
+      return {
+        systemId,
+        name: systemNames[i],
+        colonies: bySystem.get(systemId) ?? [],
+        customsRate: defaultCustomsRate(space, customsSkill),
+        customsSource: customsRateSource(space, customsSkill),
+      };
+    }),
     details: flatDetails,
     planetsBySystem,
     ceiling: maxColonyBudget(ccLevel, pi),
@@ -235,7 +293,7 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     schematicNames,
     typeNames,
     richness,
-    p0Prices,
+    prices,
     planetRadiusKm: new Map(
       Object.entries(planetRadiusRaw).map(([planetId, km]) => [Number(planetId), km])
     ),
@@ -338,16 +396,97 @@ function CardLine({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
+/**
+ * "Build up to P2 here" — the recommendation, or the one input that stops it.
+ *
+ * Deliberately a quiet line rather than a banner: it sits under the measured
+ * numbers, not over them. Every refusal names the missing input instead of
+ * printing a figure with a caveat beside it, the same rule the unbuilt card's
+ * estimate follows.
+ */
+function StopTierLine({
+  advice,
+  pi,
+  prices,
+  taxRate,
+}: {
+  advice: Extract<PlanetAdvice, { kind: 'built' }>;
+  pi: PiData;
+  prices: Readonly<Record<number, number>>;
+  taxRate: number;
+}) {
+  const { t } = useTranslation();
+  const result = useMemo(
+    () =>
+      colonyStopTierAdvice({
+        colony: advice.colony,
+        planetType: advice.planetType,
+        pi,
+        prices,
+        taxRate,
+      }),
+    [advice.colony, advice.planetType, pi, prices, taxRate]
+  );
+
+  const framed = (body: React.ReactNode) => <div className="border-t border-line pt-2">{body}</div>;
+  const quiet = (message: string) => <p className="text-[0.6875rem] text-text-dim">{message}</p>;
+
+  // The card's headroom line already says when a radius did not load, so a
+  // link-cost refusal says nothing here rather than repeating that sentence.
+  if (result.status === 'needs-link-cost') return null;
+  if (result.status === 'needs-measured-extraction') {
+    return framed(quiet(t('piAdvisor.stopTierNeedsRate')));
+  }
+  if (result.advice.kind === 'nothing-to-score') return null;
+  if (result.advice.kind === 'no-profitable-tier') {
+    // "The hub quotes none of this" and "none of this pays" are different
+    // answers, and only the second is about the planet. Saying the first as
+    // the second would send a pilot to re-scan a planet that is fine.
+    // Candidates the budget could not host are set aside first: they say
+    // nothing about prices either way, and on a small colony most of the
+    // deeper chains land there.
+    const fitted = result.advice.entries.filter((entry) => entry.status !== 'does-not-fit');
+    const unpriced = fitted.length > 0 && fitted.every((entry) => entry.status === 'needs-price');
+    return framed(
+      quiet(t(unpriced ? 'piAdvisor.stopTierNoPrices' : 'piAdvisor.stopTierNoneProfitable'))
+    );
+  }
+
+  const { best } = result.advice;
+  return framed(
+    <CardLine label={t('piAdvisor.stopTierLabel')}>
+      <span className="text-text">
+        {best.tier === 0
+          ? t('piAdvisor.stopTierSellRaw', { name: best.name })
+          : t('piAdvisor.stopTierMake', { name: best.name, tier: best.tier })}
+      </span>
+      <div className="text-text-dim">
+        {t('piAdvisor.stopTierValue', {
+          isk: formatIsk(best.marginPerHour),
+          units: Math.round(best.unitsPerHour).toLocaleString(),
+        })}
+      </div>
+      <p className="mt-1 text-[0.6875rem] text-text-faint">
+        {t('piAdvisor.stopTierBasis', { count: best.blocks })}
+      </p>
+    </CardLine>
+  );
+}
+
 function BuiltCard({
   advice,
   pi,
   schematicNames,
   typeNames,
+  prices,
+  taxRate,
 }: {
   advice: Extract<PlanetAdvice, { kind: 'built' }>;
   pi: PiData;
   schematicNames: ReadonlyMap<number, string>;
   typeNames: ReadonlyMap<number, string>;
+  prices: Readonly<Record<number, number>>;
+  taxRate: number;
 }) {
   const { t } = useTranslation();
   const { colony } = advice;
@@ -478,6 +617,8 @@ function BuiltCard({
             </CardLine>
           )}
         </div>
+
+        <StopTierLine advice={advice} pi={pi} prices={prices} taxRate={taxRate} />
       </>
     </PlanetCard>
   );
@@ -756,6 +897,31 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               label={t('piAdvisor.colonised')}
               value={t('piAdvisor.colonisedValue', { built: builtCount, total: colonisable })}
             />
+            {/*
+              The rate every recommendation below is costed at, stated rather
+              than left implicit: it is derived from this system's security
+              band and the character's Customs Code Expertise, and a derived
+              number that does not say so reads as a measured one.
+            */}
+            <StatChip
+              label={t('piAdvisor.customsRate')}
+              value={t('piAdvisor.customsRateValue', {
+                percent: Math.round(activeSystem.customsRate * 10_000) / 100,
+              })}
+              tooltip={t(`piAdvisor.customsRateSource.${activeSystem.customsSource.kind}`, {
+                level:
+                  activeSystem.customsSource.kind === 'highsec-skill'
+                    ? activeSystem.customsSource.level
+                    : 0,
+                space:
+                  activeSystem.customsSource.kind === 'player-poco'
+                    ? t(`piPlan.spaceOption.${activeSystem.customsSource.space}`)
+                    : '',
+              })}
+              tone={
+                activeSystem.customsSource.kind === 'highsec-unknown-skill' ? 'warning' : undefined
+              }
+            />
           </div>
         </div>
       </Panel>
@@ -772,6 +938,8 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 pi={snapshot.pi}
                 schematicNames={snapshot.schematicNames}
                 typeNames={snapshot.typeNames}
+                prices={snapshot.prices}
+                taxRate={activeSystem.customsRate}
               />
             ) : entry.kind === 'unbuilt' ? (
               <UnbuiltCard
@@ -779,7 +947,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 advice={entry}
                 order={richness.get(entry.planetId) ?? EMPTY_ORDER}
                 rate={assumedRate}
-                prices={snapshot.p0Prices}
+                prices={snapshot.prices}
                 onOrderChange={handleOrderChange}
               />
             ) : entry.kind === 'unknown-type' ? (
