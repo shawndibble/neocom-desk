@@ -841,6 +841,12 @@
     "labelsFilterLabel": "Labels",
     "loadMore": "Load more",
     "backToList": "Back",
+    "searchLabel": "Search subject or sender",
+    "searchPlaceholder": "Search subject or sender…",
+    "markRead": "Mark read",
+    "markUnread": "Mark unread",
+    "hideRead": "Hide read",
+    "capNotice": "Showing the most recent {{count}} matching mails — narrow with a tab, label, or search to see more.",
     "reauthTitle": "Log in again to see your mail",
     "reauthHint": "Log in again to fetch this character's mail.",
     "reauthAction": "Log in again with EVE Online"
@@ -873,6 +879,15 @@
     "csvDate": "Date",
     "csvTitle": "Title",
     "csvResponse": "Response",
+    "jumpToDate": "Jump to date",
+    "noEventsThisMonth": "No events this month.",
+    "noEventsThisWeek": "No events this week.",
+    "downloadIcs": "Download .ics",
+    "addToGoogleCalendar": "Add to Google Calendar",
+    "contextMenu": {
+      "copyEventId": "Copy event ID",
+      "addToMonthView": "Add to Month view"
+    },
     "reauthTitle": "Log in again to see your calendar",
     "reauthHint": "Log in again to fetch this character's calendar.",
     "reauthAction": "Log in again with EVE Online"

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import { buildMonthGrid, groupByDayKey, weekdayLabels } from '@/lib/calendarGrid';
 import { RESPONSE_BORDER_TONE } from './calendarResponseTone';
+import { EventContextMenu } from './EventContextMenu';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
 const MAX_CHIPS_PER_DAY = 3;
@@ -29,9 +30,22 @@ export function CalendarMonthView({
     () => groupByDayKey(events, (event) => new Date(event.event_date)),
     [events]
   );
+  // Whether any cell actually on screen has an event — distinct from "no
+  // events ever" (the route's own empty state, which gates before this
+  // component renders at all): if we got this far, at least one event exists
+  // somewhere, just not necessarily inside this month (issue #416).
+  const hasEventsInView = useMemo(
+    () => days.some((day) => (grouped.get(day.key)?.length ?? 0) > 0),
+    [days, grouped]
+  );
 
   return (
     <Panel padded={false} className="overflow-hidden">
+      {!hasEventsInView && (
+        <p className="border-b border-line px-3 py-2 text-xs text-text-dim">
+          {t('calendar.noEventsThisMonth')}
+        </p>
+      )}
       <div
         role="region"
         aria-label={t('calendar.monthGridLabel')}
@@ -68,14 +82,19 @@ export function CalendarMonthView({
                 {day.date.getDate()}
               </p>
               {visible.map((event) => (
-                <button
+                <EventContextMenu
                   key={event.event_id}
-                  type="button"
-                  onClick={() => onSelectEvent(event)}
-                  className={`block w-full truncate rounded-xs border-l-2 bg-panel-2/60 px-1 py-0.5 text-left text-[0.625rem] transition-colors hover:bg-panel-2 ${RESPONSE_BORDER_TONE[event.event_response]}`}
+                  eventId={event.event_id}
+                  eventDate={new Date(event.event_date)}
                 >
-                  {event.title}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => onSelectEvent(event)}
+                    className={`block w-full truncate rounded-xs border-l-2 bg-panel-2/60 px-1 py-0.5 text-left text-[0.625rem] transition-colors hover:bg-panel-2 ${RESPONSE_BORDER_TONE[event.event_response]}`}
+                  >
+                    {event.title}
+                  </button>
+                </EventContextMenu>
               ))}
               {overflow > 0 && (
                 <button

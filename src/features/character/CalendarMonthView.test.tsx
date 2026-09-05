@@ -1,9 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { CalendarMonthView } from './CalendarMonthView';
+import { configureClipboard } from '@/lib/clipboard';
 import type { CalendarEventSummary } from '@/esi/endpoints';
+
+afterEach(() => configureClipboard(null));
 
 const MONTH_ANCHOR = new Date(2026, 8, 1); // September 2026
 
@@ -64,7 +67,7 @@ describe('CalendarMonthView', () => {
     expect(calledWith.getMonth()).toBe(8);
   });
 
-  it('does not render events outside the visible month grid', () => {
+  it('does not render events outside the visible month grid, and shows "no events this month"', () => {
     const event = eventOn(1, '2026-11-01T09:00:00', 'Far Future');
     render(
       <CalendarMonthView
@@ -75,5 +78,40 @@ describe('CalendarMonthView', () => {
       />
     );
     expect(screen.queryByText('Far Future')).not.toBeInTheDocument();
+    expect(screen.getByText('No events this month.')).toBeInTheDocument();
+  });
+
+  it('does not show "no events this month" when an event is in the visible grid', () => {
+    const event = eventOn(1, '2026-09-15T18:00:00', 'Fleet Op');
+    render(
+      <CalendarMonthView
+        monthAnchor={MONTH_ANCHOR}
+        events={[event]}
+        onSelectEvent={() => {}}
+        onExpandDay={() => {}}
+      />
+    );
+    expect(screen.queryByText('No events this month.')).not.toBeInTheDocument();
+  });
+
+  it('offers "Copy event ID" on an event chip\'s context menu', async () => {
+    const user = userEvent.setup();
+    const writer = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(writer);
+    const event = eventOn(42, '2026-09-15T18:00:00', 'Fleet Op');
+    render(
+      <CalendarMonthView
+        monthAnchor={MONTH_ANCHOR}
+        events={[event]}
+        onSelectEvent={() => {}}
+        onExpandDay={() => {}}
+      />
+    );
+    await user.pointer({ keys: '[MouseRight]', target: screen.getByText('Fleet Op') });
+    const copyItem = await screen.findByText('Copy event ID');
+    await user.click(copyItem);
+    expect(writer).toHaveBeenCalledWith('42');
+    // Month view is already Month view — no "Add to Month view" item on its own chips.
+    expect(screen.queryByText('Add to Month view')).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -169,6 +169,23 @@ describe('Calendar', () => {
     await user.click(await screen.findByText('Fleet Op'));
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Fleet Op' })).toBeInTheDocument();
+  });
+
+  it('offers .ics download and Google Calendar export in the detail modal', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet Op'));
+    await screen.findByText('Bring your ship');
+    expect(screen.getByRole('button', { name: 'Download .ics' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add to Google Calendar' })).toBeInTheDocument();
+  });
+
+  it('jumps Month view to a typed date', async () => {
+    render(<App />);
+    await screen.findByText('Fleet Op');
+    const jumpInput = screen.getByLabelText('Jump to date');
+    fireEvent.change(jumpInput, { target: { value: '2030-01-15' } });
+    await waitFor(() => expect(screen.getByText(/January 2030/)).toBeInTheDocument());
   });
 
   it('strips EVE markup from the event detail text (BUG #4)', async () => {
