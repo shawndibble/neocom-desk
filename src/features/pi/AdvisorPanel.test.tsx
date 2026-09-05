@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type {
@@ -29,6 +29,7 @@ const LAUNCHPAD = 2256;
 const REACTIVE_METALS_SCHEMATIC = 133;
 /** Base Metals, the P0 it eats. */
 const BASE_METALS = 2267;
+const NOBLE_METALS = 2270;
 
 const loadCharacterPlanets = vi.fn();
 const loadAllColonyDetails = vi.fn();
@@ -40,6 +41,19 @@ const loadSchematicName = vi.fn();
 const loadTypeNames = vi.fn();
 
 vi.mock('@/sde/loadSde', () => ({ loadPi: vi.fn(async () => pi) }));
+const setPlanetRichness = vi.fn<(planetId: number, order: number[]) => Promise<void>>();
+const clearPlanetRichness = vi.fn<(planetId: number) => Promise<void>>();
+vi.mock('@/sync', () => ({
+  setPlanetRichness: (planetId: number, order: number[]) => setPlanetRichness(planetId, order),
+  clearPlanetRichness: (planetId: number) => clearPlanetRichness(planetId),
+}));
+const loadPlanPrices = vi.fn(async () => ({
+  prices: { [BASE_METALS]: 12 },
+  unpriced: [],
+  failed: false,
+  fetchedAt: new Date(),
+}));
+vi.mock('./planPrices', () => ({ loadPlanPrices: () => loadPlanPrices() }));
 
 vi.mock('./data', () => ({
   loadCharacterPlanets: (...args: unknown[]) => loadCharacterPlanets(...args),
@@ -296,7 +310,7 @@ describe('AdvisorPanel', () => {
     const heading = await screen.findByText('Ashab II');
     const card = heading.closest('div')?.parentElement as HTMLElement;
     expect(within(card).getByText('Could extract')).toBeInTheDocument();
-    expect(within(card).getByText(/Base Metals/)).toBeInTheDocument();
+    expect(within(card).getAllByText(/Base Metals/).length).toBeGreaterThan(0);
     expect(within(card).getByText(/No ISK figure here/)).toBeInTheDocument();
   });
 
@@ -391,5 +405,67 @@ describe('AdvisorPanel', () => {
     const select = await screen.findByLabelText('System');
     await userEvent.selectOptions(select, '30000002');
     expect(onSystemIdChange).toHaveBeenCalledWith(30_000_002);
+  });
+});
+
+describe('resource ranking (#425)', () => {
+  it('saves a ranking account-wide when a resource is added', async () => {
+    renderPanel();
+    const add = await screen.findByRole('button', { name: '+ Base Metals' });
+    fireEvent.click(add);
+
+    // Fanned out by the sync layer, so the call carries the planet and order
+    // only — there is no per-Character variant to pass.
+    expect(setPlanetRichness).toHaveBeenCalledWith(40_000_002, [BASE_METALS]);
+  });
+
+  it('prices the top-ranked resource, and marks the figure an estimate', async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: '+ Base Metals' }));
+
+    // 6,965 a cycle over 30-minute cycles decays to a measured sustained rate;
+    // the estimate projects one extractor at that rate against the hub price.
+    // What matters here is that it is labelled, not what it rounds to.
+    expect(await screen.findByText('Est.')).toBeInTheDocument();
+    expect(screen.getByText(/Estimated, not measured/)).toBeInTheDocument();
+  });
+
+  it('reorders without a reload, and the estimate follows the new top rank', async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: '+ Base Metals' }));
+    fireEvent.click(await screen.findByRole('button', { name: '+ Noble Metals' }));
+
+    expect(setPlanetRichness).toHaveBeenLastCalledWith(40_000_002, [BASE_METALS, NOBLE_METALS]);
+
+    // Rendered from the layered edit, with no reload and no second snapshot
+    // read: the list is in the pilot's chosen order, numbered from one.
+    const list = await screen.findByRole('list', { name: 'Resource ranking, richest first' });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent)
+    ).toEqual([expect.stringContaining('1'), expect.stringContaining('2')]);
+    expect(within(list).getAllByRole('listitem')[0]).toHaveTextContent('Base Metals');
+    expect(within(list).getAllByRole('listitem')[1]).toHaveTextContent('Noble Metals');
+  });
+
+  it('clears a ranking through the tombstoned path, not a bare delete', async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: '+ Base Metals' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear ranking' }));
+
+    expect(clearPlanetRichness).toHaveBeenCalledWith(40_000_002);
+  });
+
+  it('refuses to price a ranked planet when nothing of the pilot’s is measurable', async () => {
+    // No colony detail means no measured extractor, so there is no rate of the
+    // pilot's own to project from — and the card says exactly that instead of
+    // reaching for a default.
+    loadAllColonyDetails.mockResolvedValue(new Map());
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: '+ Base Metals' }));
+
+    expect(await screen.findByText(/no rate of your own to project from/)).toBeInTheDocument();
+    expect(screen.queryByText('Est.')).not.toBeInTheDocument();
   });
 });
