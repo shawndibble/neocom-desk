@@ -13,9 +13,31 @@ describe('securityBand', () => {
   });
 
   it('classifies below 0.1 as nullsec', () => {
-    expect(securityBand(0.05)).toBe('nullsec');
     expect(securityBand(0.0)).toBe('nullsec');
     expect(securityBand(-0.5)).toBe('nullsec');
+  });
+
+  /**
+   * ESI publishes the raw float; the game rounds it to one decimal and bands
+   * the rounded value. Balle really is 0.4608891 in ESI and really is a 0.5
+   * highsec system in game, with CONCORD in it. Banding the raw number called
+   * it lowsec, which also picked the 1.9x lowsec rig multiplier for an
+   * industry job that is entitled to the 1x highsec one.
+   */
+  it('bands the rounded status, the way the game displays and enforces it', () => {
+    expect(securityBand(0.4608891010284424)).toBe('highsec'); // Balle, shown as 0.5
+    expect(securityBand(0.45)).toBe('highsec');
+    expect(securityBand(0.4499)).toBe('lowsec');
+    expect(securityBand(0.05)).toBe('lowsec'); // rounds to 0.1
+    expect(securityBand(0.0499)).toBe('nullsec');
+  });
+
+  it('leaves the real systems either side of every boundary where the game puts them', () => {
+    expect(securityBand(0.9459131360054016)).toBe('highsec'); // Jita 0.9
+    expect(securityBand(0.6587472558021545)).toBe('highsec'); // Badivefi 0.7
+    expect(securityBand(0.5054402947425842)).toBe('highsec'); // Uedama 0.5
+    expect(securityBand(0.2825556993484497)).toBe('lowsec'); // Tama 0.3
+    expect(securityBand(-0.99)).toBe('nullsec'); // J-space
   });
 });
 

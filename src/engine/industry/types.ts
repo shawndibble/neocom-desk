@@ -113,6 +113,22 @@ export const RIG_SECURITY_MULTIPLIER: Record<SecurityBand, number> = {
   nullsec: 2.1,
 };
 
+/**
+ * Upwell structure typeID -> the facility preset it manufactures as.
+ *
+ * Engineering Complexes only, which is the whole list of structures that can
+ * fit a Manufacturing Plant service module. Verified against ESI
+ * `/universe/types/{id}` on 2026-09-05: 35825/35826/35827 are Raitaru, Azbel
+ * and Sotiyo, all group 1404 (Engineering Complex). Citadels (group 1657) and
+ * Refineries (1406) cannot host a manufacturing job and are deliberately
+ * absent, so a lookup that misses is "not a manufacturing structure".
+ */
+export const FACILITY_KIND_BY_STRUCTURE_TYPE_ID: Readonly<Record<number, FacilityKind>> = {
+  35825: 'raitaru',
+  35826: 'azbel',
+  35827: 'sotiyo',
+};
+
 /** SCC surcharge on every industry job, percent of EIV (wiki "Manufacturing"). */
 export const SCC_SURCHARGE_PCT = 4;
 

@@ -1,0 +1,119 @@
+/**
+ * The picker's own behaviour, with the corp gate and the structure load mocked.
+ * The end-to-end corp path (scopes, roles, MSW) is already pinned by
+ * `ActiveJobsPanel.corp.test.tsx`; what matters here is the hide rule, the
+ * opt-in fetch, and that picking fills every field in one edit.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@/i18n';
+import { BuildLocationPicker } from './BuildLocationPicker';
+import type { BuildStructureOption } from './buildStructures';
+
+const corpOwner = vi.hoisted(() => ({
+  value: {
+    owner: 'personal' as const,
+    setOwner: vi.fn(),
+    available: true,
+    corporationId: 98 as number | null,
+  },
+}));
+vi.mock('@/features/corp/owner', () => ({ useCorpOwner: () => corpOwner.value }));
+vi.mock('@/stores/activeCharacter', () => ({
+  useActiveCharacter: (select: (s: { activeCharacterId: number | null }) => unknown) =>
+    select({ activeCharacterId: 91 }),
+}));
+
+const loadBuildStructureOptions = vi.hoisted(() => vi.fn());
+vi.mock('./loadBuildStructures', () => ({ loadBuildStructureOptions }));
+
+const AZBEL: BuildStructureOption = {
+  structureId: 1035,
+  name: 'K2-18 R&D',
+  facility: 'azbel',
+  systemId: 30003888,
+  systemName: 'Badivefi',
+  security: 'highsec',
+};
+
+beforeEach(() => {
+  corpOwner.value = { owner: 'personal', setOwner: vi.fn(), available: true, corporationId: 98 };
+  loadBuildStructureOptions.mockReset();
+  loadBuildStructureOptions.mockResolvedValue([AZBEL]);
+});
+
+function renderPicker(onPick = vi.fn()) {
+  render(
+    <BuildLocationPicker summary="NPC station · Jita · Highsec" onPick={onPick}>
+      <label>
+        Facility
+        <input />
+      </label>
+    </BuildLocationPicker>
+  );
+  return onPick;
+}
+
+describe('BuildLocationPicker', () => {
+  it('states what the plan is set to, with the fields tucked behind a link', () => {
+    renderPicker();
+
+    expect(screen.getByText(/NPC station · Jita · Highsec/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Facility')).toBeNull();
+  });
+
+  it('reveals the fields on Override these, and hides them again', async () => {
+    const user = userEvent.setup();
+    renderPicker();
+
+    await user.click(screen.getByRole('button', { name: 'Override these' }));
+    expect(screen.getByLabelText('Facility')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Hide these' }));
+    expect(screen.queryByLabelText('Facility')).toBeNull();
+  });
+
+  it('fetches nothing until the pilot asks — the corp read is opt-in', () => {
+    renderPicker();
+
+    expect(loadBuildStructureOptions).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Fill from a corp structure' })).toBeInTheDocument();
+  });
+
+  it('fills facility, security and build system in a single edit', async () => {
+    const user = userEvent.setup();
+    const onPick = renderPicker();
+
+    await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
+    await user.selectOptions(await screen.findByLabelText('Build location'), '1035');
+
+    expect(onPick).toHaveBeenCalledExactlyOnceWith(AZBEL);
+  });
+
+  it('says so when the corp owns no manufacturing structure', async () => {
+    const user = userEvent.setup();
+    loadBuildStructureOptions.mockResolvedValue([]);
+    renderPicker();
+
+    await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
+
+    expect(
+      await screen.findByText('No manufacturing structures in this corp.')
+    ).toBeInTheDocument();
+  });
+
+  it('renders no corp control at all for a Character without the capability', () => {
+    // The hide rule (CONTEXT.md round 35): no lock, no disabled button, nothing.
+    corpOwner.value = {
+      owner: 'personal',
+      setOwner: vi.fn(),
+      available: false,
+      corporationId: null,
+    };
+    renderPicker();
+
+    expect(screen.queryByRole('button', { name: 'Fill from a corp structure' })).toBeNull();
+    expect(screen.getByText(/NPC station · Jita/)).toBeInTheDocument();
+  });
+});
