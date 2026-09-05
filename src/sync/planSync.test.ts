@@ -629,6 +629,18 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
 });
 
 describe('triggerSync: build plans', () => {
+  it('drops a half-written build system rather than syncing an unlabelled one', async () => {
+    // The id is what the fee is charged at and the name is what labels it, so
+    // syncing one without the other would put a Badivefi fee under a Jita
+    // heading. Neither travels unless both do.
+    await db.buildPlans.put(buildPlan({ buildSystemId: 30003888 }));
+    await triggerSync(1);
+    const remote = remoteStore.get(BUILD_PLANS_PATH)?.get('b1');
+    expect(remote).toBeDefined();
+    expect(remote).not.toHaveProperty('buildSystemId');
+    expect(remote).not.toHaveProperty('buildSystemName');
+  });
+
   it('pushes a local-only build plan with ownerHash and deleted: false', async () => {
     const p = buildPlan({ facilityTaxPct: 1.5 });
     await db.buildPlans.put(p);

@@ -495,6 +495,20 @@ describe('BuildPlanDetail build system', () => {
     });
   });
 
+  it('builds at the hub when the plan holds only half the id/name pair', async () => {
+    // A half-pair is what a partial sync or a hand-edited record can leave
+    // behind. Charging the fee at one system while labelling it another is
+    // worse than not having a build system at all.
+    render(<Harness plan={{ buildSystemId: 30003888 }} />);
+
+    expect(await screen.findByText('Cost index (Jita)')).toBeInTheDocument();
+    expect(loadMarketSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'jita' }),
+      expect.anything(),
+      undefined
+    );
+  });
+
   it('does not call ESI when the field is committed unchanged', async () => {
     const user = userEvent.setup();
     render(<Harness plan={{ buildSystemId: 30003888, buildSystemName: 'Badivefi' }} />);

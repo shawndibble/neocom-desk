@@ -182,7 +182,14 @@ export function BuildPlanDetail({
   // refresh), in the same commit rather than the effect's next tick — same
   // derived-and-cleared-during-render shape as PlanEditor's stale-result
   // clear above.
-  const snapshotKey = `${hub.id}:${plan.buildSystemId ?? hub.systemId}:${typeIds.join(',')}:${refreshTick}`;
+  // One source for both the index that is fetched and the name that labels it,
+  // so the two can never disagree. A plan holding only half the pair (an id
+  // with no name, or the reverse) builds at its hub — see `BuildPlanRecord`.
+  const buildSystem =
+    plan.buildSystemId !== undefined && plan.buildSystemName !== undefined
+      ? { id: plan.buildSystemId, name: plan.buildSystemName }
+      : null;
+  const snapshotKey = `${hub.id}:${buildSystem?.id ?? hub.systemId}:${typeIds.join(',')}:${refreshTick}`;
   const [prevSnapshotKey, setPrevSnapshotKey] = useState(snapshotKey);
   if (prevSnapshotKey !== snapshotKey) {
     setPrevSnapshotKey(snapshotKey);
@@ -192,7 +199,7 @@ export function BuildPlanDetail({
   useEffect(() => {
     if (!blueprint || typeIds.length === 0) return;
     let cancelled = false;
-    void loadMarketSnapshot(hub, typeIds, plan.buildSystemId).then((snap) => {
+    void loadMarketSnapshot(hub, typeIds, buildSystem?.id).then((snap) => {
       if (cancelled) return;
       setSnapshot(snap);
       setFetchedAt(new Date());
@@ -205,7 +212,7 @@ export function BuildPlanDetail({
     // entry per blueprintTypeID), so this only refires on a real hub, build-system or
     // blueprint change, plus the manual-refresh tick. `catalog`/`pi` land together in one
     // state update on the route, so widening typeIds above cannot make this fire twice.
-  }, [hub, typeIds, blueprint, refreshTick, plan.buildSystemId]);
+  }, [hub, typeIds, blueprint, refreshTick, buildSystem?.id]);
 
   const ownedMatch = useMemo(
     () => findOwnedBlueprint(ownedBlueprints, plan.blueprintTypeID),
@@ -620,7 +627,7 @@ export function BuildPlanDetail({
               </label>
 
               <BuildSystemInput
-                systemName={plan.buildSystemName}
+                systemName={buildSystem?.name}
                 hubSystemName={hub.systemName}
                 onChange={(system) =>
                   update({
@@ -784,7 +791,7 @@ export function BuildPlanDetail({
             productQuantity={
               blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null
             }
-            costIndexSystemName={plan.buildSystemName ?? hub.systemName}
+            costIndexSystemName={buildSystem?.name ?? hub.systemName}
           />
         </Panel>
       )}
