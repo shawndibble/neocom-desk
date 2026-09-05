@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import { formatIsk } from '@/lib/isk';
+import { typeIconUrl } from '@/lib/eveImages';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -98,7 +99,8 @@ export function VariationsTable({
       // the old card strip, where clicking anywhere on a card re-anchored
       // the page, not just its name.
       render: (row) => (
-        <span className="font-medium text-accent">
+        <span className="flex items-center gap-1.5 font-medium text-accent">
+          <img src={typeIconUrl(row.typeId, 32)} alt="" className="h-4 w-4 shrink-0" />
           {row.name}
           <span aria-hidden="true"> ›</span>
         </span>
