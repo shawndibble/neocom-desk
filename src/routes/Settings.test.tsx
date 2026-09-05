@@ -284,10 +284,10 @@ describe('Settings — Notifications (issue #170)', () => {
       screen.getByRole('checkbox', { name: 'Wallet Balance Changed, Overview list' })
     ).toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Market Order Filled, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Sell Order Filled, browser notifications' })
     ).not.toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Market Order Filled, Overview list' })
+      screen.getByRole('checkbox', { name: 'Sell Order Filled, Overview list' })
     ).toBeChecked();
   });
 
