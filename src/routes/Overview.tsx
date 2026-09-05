@@ -234,6 +234,7 @@ export function Overview() {
             <>
               {walletData?.result && <DataAgeBadge date={walletData.result.fetchedAt} />}
               <IconButton
+                size="sm"
                 icon={<Icon.Refresh />}
                 label={t('overview.refreshWallet')}
                 onClick={walletSnapshot.refresh}
@@ -292,6 +293,7 @@ export function Overview() {
               <>
                 {queueResult && <DataAgeBadge date={queueResult.fetchedAt} />}
                 <IconButton
+                  size="sm"
                   icon={<Icon.Refresh />}
                   label={t('overview.refreshQueue')}
                   onClick={skillsQueueSnapshot.refresh}
