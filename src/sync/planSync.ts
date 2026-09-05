@@ -585,6 +585,10 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
       ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
       ...(materialSourcing !== undefined ? { materialSourcing } : {}),
       ...(p.ownedStockScope !== undefined ? { ownedStockScope: p.ownedStockScope } : {}),
+      // An empty selection is omitted rather than pushed as [], so a plan that
+      // expanded a row and collapsed it again is byte-identical to one that
+      // never did — the same rule materialSourcing follows above.
+      ...(p.buildHere !== undefined && p.buildHere.length > 0 ? { buildHere: p.buildHere } : {}),
       updatedAt: p.updatedAt,
       ownerHash,
       deleted: false,
@@ -605,6 +609,7 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     ...(r.facilityTaxPct !== undefined ? { facilityTaxPct: r.facilityTaxPct } : {}),
     ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
     ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),
+    ...(r.buildHere !== undefined ? { buildHere: r.buildHere } : {}),
     updatedAt: r.updatedAt,
   }),
   bulkPutLocal: (records) => db.buildPlans.bulkPut(records),

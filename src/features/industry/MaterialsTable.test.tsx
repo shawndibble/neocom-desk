@@ -18,6 +18,8 @@ import type {
 import type { OwnedStockPlacement } from '@/engine/industry/ownedStock';
 import type { PiData } from '@/sde/types';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
+import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { planSubBuild } from '@/engine/industry/subBuild';
 import { applySourcingPatch } from './sourcingEdits';
 import { MaterialsTable } from './MaterialsTable';
 import type { OwnedStockDetection } from './ownedStockDetection';
@@ -877,5 +879,100 @@ describe('MaterialsTable make-or-buy marker', () => {
       await user.tab();
       expect(document.activeElement).not.toBe(marker);
     }
+  });
+});
+
+describe('MaterialsTable build-here control', () => {
+  const PARTS_BLUEPRINT = {
+    name: 'Mechanical Parts Blueprint',
+    time: 1800,
+    materials: [{ typeID: 35, quantity: 5 }],
+    products: [{ typeID: 9840, quantity: 4 }],
+  };
+
+  /** A real planned job, so the row renders the numbers the engine would give it. */
+  function sub(material: MaterialCostLine) {
+    return (
+      planSubBuild(material, PARTS_BLUEPRINT, 0, {
+        facility: FACILITY_PRESETS.npcStation,
+        rig: 'none',
+        security: 'highsec',
+        systemCostIndex: 0.05,
+        adjustedPrices: {},
+        skills: {},
+      }) ?? undefined
+    );
+  }
+
+  const buildable = (typeID: number) => typeID === 9840;
+
+  /** MENU_LINES with the parts row switched to being produced rather than bought. */
+  const building = () =>
+    MENU_LINES.map((line) => (line.typeID === 9840 ? { ...line, subBuild: sub(line) } : line));
+
+  it('offers the control only on a material something can produce', () => {
+    renderTable({ canBuildHere: buildable, onToggleBuildHere: vi.fn() });
+
+    expect(
+      within(row('Mechanical Parts')).getByRole('button', {
+        name: 'Build Mechanical Parts here instead of buying it',
+      })
+    ).toBeInTheDocument();
+    expect(within(row('Tritanium')).queryByRole('button', { name: /Build/ })).toBeNull();
+  });
+
+  it('shows no control at all when the caller cannot look recipes up', () => {
+    renderTable();
+
+    expect(screen.queryByRole('button', { name: /Build .* here/ })).toBeNull();
+  });
+
+  it('reports which material was switched', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    renderTable({ canBuildHere: buildable, onToggleBuildHere: onToggle });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Build Mechanical Parts here instead of buying it' })
+    );
+
+    expect(onToggle).toHaveBeenCalledWith(9840);
+  });
+
+  it('offers the way back once a material is being built', () => {
+    renderTable({ materials: building(), canBuildHere: buildable, onToggleBuildHere: vi.fn() });
+
+    expect(
+      screen.getByRole('button', { name: 'Buy Mechanical Parts instead of building it' })
+    ).toBeInTheDocument();
+  });
+
+  it('replaces a built material’s price with the job that produces it', () => {
+    renderTable({ materials: building(), canBuildHere: buildable, onToggleBuildHere: vi.fn() });
+    const built = row('Mechanical Parts');
+
+    // 10 needed at 4 a run is 3 runs, which makes 12.
+    expect(within(built).getByText('3 runs')).toBeInTheDocument();
+    expect(within(built).getByText(/4 per run, makes 12/)).toBeInTheDocument();
+    expect(within(built).getByText(/2 spare/)).toBeInTheDocument();
+    expect(within(built).getByText('Built')).toBeInTheDocument();
+    // Nothing to price: the cost is the inputs below plus the job fee.
+    expect(within(built).queryByLabelText(/^Price for/)).toBeNull();
+  });
+
+  it('never offers to build an input that only exists because of another build', () => {
+    const rows = [
+      ...MENU_LINES,
+      {
+        ...materialCostLines([{ typeID: 35, baseQuantity: 15, quantity: 15 }], {})[0],
+        isSubInput: true,
+      },
+    ];
+    renderTable({ materials: rows, canBuildHere: () => true, onToggleBuildHere: vi.fn() });
+
+    // Both of the plan's own materials offer it; the indented input does not.
+    expect(screen.getAllByRole('button', { name: /here instead of buying it$/ })).toHaveLength(2);
+    expect(within(row('Pyerite')).queryByRole('button', { name: /Build/ })).toBeNull();
+    expect(screen.getAllByText('to build')).toHaveLength(1);
   });
 });

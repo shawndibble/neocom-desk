@@ -209,6 +209,17 @@ export interface BuildPlanRecord {
    * `materialSourcing` above — no schema version bump needed.
    */
   ownedStockScope?: OwnedStockScope;
+  /**
+   * Material typeIDs the player chose to produce rather than buy, one level
+   * deep: each one is replaced in the materials table and the shopping list by
+   * the inputs its own job consumes. Manufacturing only — a planetary material
+   * listed here is ignored, since its inputs are grown, not installed.
+   *
+   * Additive and unindexed, same as `materialSourcing` above — no schema
+   * version bump needed. Absent means "buy every material", which is how every
+   * plan behaved before this existed.
+   */
+  buildHere?: number[];
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -32,9 +32,23 @@ const BLUEPRINT: BlueprintType = {
   skills: [],
 };
 
+/**
+ * Gives Tritanium a producer, so the plan has one material the panel can offer
+ * to build. Four a run, so the sub-job's run count is visibly not its unit
+ * count — the whole point of sizing a sub-build in runs.
+ */
+const TRITANIUM_BLUEPRINT: BlueprintType = {
+  name: 'Tritanium Blueprint',
+  time: 600,
+  materials: [{ typeID: 35, quantity: 5 }],
+  products: [{ typeID: 34, quantity: 4 }],
+  skills: [],
+};
+
 const TYPES: TypeMap = {
   '587': { name: 'Rifter', groupID: 25, volume: 27289 },
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
+  '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
 };
 
 const ENTRY: BlueprintCatalogEntry = {
@@ -45,10 +59,24 @@ const ENTRY: BlueprintCatalogEntry = {
   productNameLower: 'rifter',
 };
 
+const TRITANIUM_ENTRY: BlueprintCatalogEntry = {
+  blueprintTypeID: 639,
+  blueprint: TRITANIUM_BLUEPRINT,
+  productTypeID: 34,
+  productName: 'Tritanium',
+  productNameLower: 'tritanium',
+};
+
 const CATALOG: BlueprintCatalog = {
-  entries: [ENTRY],
-  byBlueprintTypeID: new Map([[638, ENTRY]]),
-  byProductTypeID: new Map([[587, ENTRY]]),
+  entries: [ENTRY, TRITANIUM_ENTRY],
+  byBlueprintTypeID: new Map([
+    [638, ENTRY],
+    [639, TRITANIUM_ENTRY],
+  ]),
+  byProductTypeID: new Map([
+    [587, ENTRY],
+    [34, TRITANIUM_ENTRY],
+  ]),
   typesById: TYPES,
 };
 
@@ -280,5 +308,93 @@ describe('BuildPlanDetail shopping list', () => {
     render(<Harness plan={{ runs: 10, materialSourcing: { 34: { ownedQuantity: 1000 } } }} />);
 
     expect(copyButton()).toBeDisabled();
+  });
+});
+
+describe('BuildPlanDetail sub-builds', () => {
+  const buildButton = () =>
+    screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' });
+
+  afterEach(() => configureClipboard(null));
+
+  it('offers to build a material a blueprint produces, even with no prices to quote it', async () => {
+    // `loadMarketSnapshot` is mocked to an empty price map, so no make-or-buy
+    // verdict can be reached. The run count and input quantities need no
+    // prices, so the offer must survive that.
+    render(<Harness />);
+
+    expect(await screen.findByRole('button', { name: /Build Tritanium here/ })).toBeInTheDocument();
+  });
+
+  it('records the choice on the plan', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness onUpdate={onUpdate} />);
+
+    await user.click(buildButton());
+
+    expect(onUpdate).toHaveBeenCalledWith({ buildHere: [34] });
+  });
+
+  it('swaps the material for what its job consumes, sized in runs', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+
+    await user.click(buildButton());
+
+    // 1000 Tritanium at 4 a run is 250 runs, each eating 5 Pyerite.
+    expect(await screen.findByText('250 runs')).toBeInTheDocument();
+    const pyerite = screen.getByText('Pyerite').closest('tr');
+    expect(within(pyerite as HTMLElement).getByText('1,250')).toBeInTheDocument();
+  });
+
+  it('puts the recipe inputs on the shopping list in place of what they make', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    render(<Harness plan={{ runs: 10 }} />);
+
+    await user.click(buildButton());
+    await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
+
+    expect(writeText).toHaveBeenCalledWith('Pyerite\t1250');
+  });
+
+  it('sizes the job against what is still needed, never rebuilding owned stock', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    // 1000 needed, 200 in hand: the job covers 800, which is 200 runs.
+    render(<Harness plan={{ runs: 10, materialSourcing: { 34: { ownedQuantity: 200 } } }} />);
+
+    await user.click(buildButton());
+    await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
+
+    expect(writeText).toHaveBeenCalledWith('Pyerite\t1000');
+  });
+
+  it('puts the material back on the list when the choice is undone', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    render(<Harness plan={{ runs: 10 }} />);
+
+    await user.click(buildButton());
+    await user.click(screen.getByRole('button', { name: 'Buy Tritanium instead of building it' }));
+    await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
+
+    expect(writeText).toHaveBeenCalledWith('Tritanium\t1000');
+  });
+
+  it('never offers to expand an input a sub-build introduced — the feature is one level deep', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+
+    await user.click(buildButton());
+
+    // Pyerite has no producer in the catalog, but the guard that matters is
+    // that indented rows are never offered the control at all.
+    await screen.findByText('Pyerite');
+    expect(screen.queryByRole('button', { name: /Build Pyerite here/ })).toBeNull();
   });
 });
