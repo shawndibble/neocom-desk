@@ -168,7 +168,12 @@ describe('Settings', () => {
       });
     });
 
-    const table = screen.getByRole('table', { name: /activity log/i });
+    // `findByRole`, not `getByRole`: the heading awaited above is the page
+    // title, which arrives before the Activity Log section below it. A
+    // synchronous query here has no retry, so on a loaded machine it throws
+    // against a table that is only a tick away — which is exactly how this
+    // failed in CI while passing locally.
+    const table = await screen.findByRole('table', { name: /activity log/i });
     expect(
       await within(table).findByText(new Date(timestamp).toLocaleString())
     ).toBeInTheDocument();
@@ -189,7 +194,11 @@ describe('Settings', () => {
         outcome: 'success',
       });
     });
-    await within(screen.getByRole('table', { name: /activity log/i })).findByText('Pilot One');
+    // Awaited for the same reason as the test above: the table follows the
+    // page heading rather than arriving with it.
+    await within(await screen.findByRole('table', { name: /activity log/i })).findByText(
+      'Pilot One'
+    );
 
     const clearButton = screen.getByRole('button', { name: /clear log/i });
     expect(clearButton).toBeEnabled();
