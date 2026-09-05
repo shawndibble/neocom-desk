@@ -5,6 +5,7 @@ import {
   orderExpiry,
   filterOrdersByLocation,
   summarizeOrderBook,
+  isNpcStationOrder,
 } from './orderBook';
 
 interface Order {
@@ -131,6 +132,18 @@ describe('summarizeOrderBook', () => {
       spread: null,
       availableVolume: 0,
     });
+  });
+});
+
+describe('isNpcStationOrder', () => {
+  const npcStations = new Map([[60003760, { name: 'Jita IV - Moon 4', systemId: 30000142 }]]);
+
+  it('is true for an order at a known NPC station', () => {
+    expect(isNpcStationOrder({ location_id: 60003760 }, npcStations)).toBe(true);
+  });
+
+  it('is false for an order at an unresolved player structure', () => {
+    expect(isNpcStationOrder({ location_id: 1035466617946 }, npcStations)).toBe(false);
   });
 });
 

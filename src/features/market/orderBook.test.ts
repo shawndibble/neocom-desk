@@ -89,4 +89,39 @@ describe('getOrderBook', () => {
     await getOrderBook(REGION_ID, TYPE_ID);
     expect(hits.count).toBe(2);
   });
+
+  it('clearOrderBookCache(region, type) only invalidates that one entry, leaving others cached', async () => {
+    const OTHER_TYPE_ID = 35;
+    const hitsByType = new Map<string, number>();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${REGION_ID}/orders`, ({ request }) => {
+        const typeId = new URL(request.url).searchParams.get('type_id') ?? '';
+        hitsByType.set(typeId, (hitsByType.get(typeId) ?? 0) + 1);
+        return HttpResponse.json([], { headers: { 'X-Pages': '1' } });
+      })
+    );
+
+    await getOrderBook(REGION_ID, TYPE_ID);
+    await getOrderBook(REGION_ID, OTHER_TYPE_ID);
+    expect(hitsByType.get(String(TYPE_ID))).toBe(1);
+    expect(hitsByType.get(String(OTHER_TYPE_ID))).toBe(1);
+
+    clearOrderBookCache(REGION_ID, TYPE_ID);
+    await getOrderBook(REGION_ID, TYPE_ID); // cleared: refetches
+    await getOrderBook(REGION_ID, OTHER_TYPE_ID); // untouched: still cached
+    expect(hitsByType.get(String(TYPE_ID))).toBe(2);
+    expect(hitsByType.get(String(OTHER_TYPE_ID))).toBe(1);
+  });
+
+  it('coalesces concurrent calls for the same region/type into one ESI request', async () => {
+    const hits = { count: 0 };
+    server.use(ordersHandler(hits));
+
+    const [first, second] = await Promise.all([
+      getOrderBook(REGION_ID, TYPE_ID),
+      getOrderBook(REGION_ID, TYPE_ID),
+    ]);
+    expect(hits.count).toBe(1);
+    expect(first).toEqual(second);
+  });
 });

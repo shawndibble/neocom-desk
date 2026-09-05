@@ -103,9 +103,8 @@ export interface BuiltColonyAdvice {
    * for none of it, because the distance term needs a per-planet radius no
    * data source in this app carries.
    *
-   * So this is not decoration: a colony with links has a load that is
-   * understated and a headroom that is overstated, and a card must say so
-   * rather than print a figure it cannot stand behind.
+   * Charged for since #440, whenever the planet's radius resolved —
+   * `pinLoad.linkLoad` carries what they draw, and is null when it did not.
    */
   linkCount: number;
   /** True when an extractor pin had to be dropped for missing data, so the numbers above are incomplete. */
@@ -142,6 +141,11 @@ export interface SystemAdviceInput {
   colonies: readonly CharacterPlanet[];
   /** Colony detail by planet id; a missing entry is a detail that did not load. */
   details: ReadonlyMap<number, CharacterPlanetDetail>;
+  /**
+   * Planet radius in km, for costing links. A missing entry leaves that
+   * colony's link cost unknown rather than free — see `engine/pi/linkCost.ts`.
+   */
+  planetRadiusKm?: ReadonlyMap<number, number>;
 }
 
 function measureExtractors(pins: readonly PlanetPin[]): MeasuredExtractor[] {
@@ -165,7 +169,8 @@ function measureExtractors(pins: readonly PlanetPin[]): MeasuredExtractor[] {
 function builtAdvice(
   planet: CharacterPlanet,
   detail: CharacterPlanetDetail | undefined,
-  pi: PiData
+  pi: PiData,
+  planetRadiusKm: number | null
 ): BuiltColonyAdvice {
   const pins = detail?.pins ?? [];
   const extractors = measureExtractors(pins);
@@ -187,7 +192,7 @@ function builtAdvice(
     budget: colonyBudget(planet.upgrade_level, pi).budget,
     lastUpdate: planet.last_update,
     detailLoaded: detail !== undefined,
-    pinLoad: colonyPinLoad(pins, pi),
+    pinLoad: colonyPinLoad(pins, pi, detail?.links ?? [], planetRadiusKm),
     extractors,
     extractedPerHour: order.map((typeId) => ({
       typeId,
@@ -235,7 +240,12 @@ export function systemAdvice(input: SystemAdviceInput, pi: PiData): PlanetAdvice
         planetId: planet.planetId,
         name: planet.name,
         planetType,
-        colony: builtAdvice(colony, input.details.get(planet.planetId), pi),
+        colony: builtAdvice(
+          colony,
+          input.details.get(planet.planetId),
+          pi,
+          input.planetRadiusKm?.get(planet.planetId) ?? null
+        ),
       };
     }
     return {

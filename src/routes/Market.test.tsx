@@ -45,6 +45,11 @@ const SDE_TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
 };
 
+// Price History's date-range control (issue #412) defaults to the last 30
+// days — a literal fixture date would age out of that window and silently
+// stop reaching the (mocked) chart the longer this suite exists.
+const RECENT_DATE = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
   loadTypes: vi.fn(async () => SDE_TYPES),
@@ -344,6 +349,22 @@ describe('Market Browser', () => {
     expect(screen.queryByText('Ore')).not.toBeInTheDocument();
   });
 
+  it('shows a "type more" hint below the search threshold instead of silently showing the full tree (issue #412)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByText('Ships');
+    await user.type(screen.getByRole('searchbox'), 'ri');
+
+    expect(screen.getByText('Type 3+ characters to search.')).toBeInTheDocument();
+    expect(screen.getByText('Ships')).toBeInTheDocument();
+    expect(screen.getByText('Ore')).toBeInTheDocument(); // full, unfiltered tree — still explicit about why
+
+    await user.type(screen.getByRole('searchbox'), 'ft');
+    expect(await screen.findByText('Rifter')).toBeInTheDocument();
+    expect(screen.queryByText('Type 3+ characters to search.')).not.toBeInTheDocument();
+  });
+
   it('lets a matched group be collapsed and re-expanded while a search is active', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -433,7 +454,7 @@ describe('Price History tab (issue #11)', () => {
       historyHandler(historyHits, RIFTER_REGION_ID, {
         587: [
           {
-            date: '2026-08-01',
+            date: RECENT_DATE,
             average: 5,
             highest: 5.5,
             lowest: 4.5,
@@ -473,7 +494,7 @@ describe('Price History tab (issue #11)', () => {
       historyHandler(historyHits, RIFTER_REGION_ID, {
         587: [
           {
-            date: '2026-08-01',
+            date: RECENT_DATE,
             average: 5,
             highest: 5.5,
             lowest: 4.5,
@@ -483,7 +504,7 @@ describe('Price History tab (issue #11)', () => {
         ],
         34: [
           {
-            date: '2026-08-01',
+            date: RECENT_DATE,
             average: 6,
             highest: 6.5,
             lowest: 5.5,
@@ -808,6 +829,32 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
       expect(within(table).queryByText('1,500,000.00')).not.toBeInTheDocument();
     });
     expect(within(table).getAllByText('No orders').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('filters sell/buy orders by structure vs. NPC station (issue #412)', async () => {
+    server.use(destroyerOrdersHandler(new Map()));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    await user.click(screen.getByRole('button', { name: 'Region' })); // reveal both of Merlin's orders
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('900,000.00')).toBeInTheDocument(); // NPC station
+    expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument(); // player structure
+
+    await user.click(screen.getByRole('button', { name: 'NPC Stations' }));
+    expect(within(sellTable).getByText('900,000.00')).toBeInTheDocument();
+    expect(within(sellTable).queryByText('850,000.00')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Structures' }));
+    expect(within(sellTable).queryByText('900,000.00')).not.toBeInTheDocument();
+    expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'All' }));
+    expect(within(sellTable).getByText('900,000.00')).toBeInTheDocument();
+    expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument();
   });
 
   it('an item whose Market Group has no other members shows nothing, not an empty table', async () => {

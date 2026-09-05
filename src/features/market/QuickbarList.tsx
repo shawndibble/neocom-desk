@@ -22,6 +22,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { typeIconUrl } from '@/lib/eveImages';
 import type { QuickbarItem } from '@/db';
 
 interface QuickbarRowProps {
@@ -59,11 +60,12 @@ function QuickbarRow({ item, selected, onSelect, onRemove }: QuickbarRowProps) {
         type="button"
         onClick={() => onSelect(item.typeId)}
         aria-current={selected ? 'true' : undefined}
-        className={`flex-1 truncate text-left hover:text-accent ${
+        className={`flex flex-1 items-center gap-1.5 truncate text-left hover:text-accent ${
           selected ? 'text-accent' : 'text-text-dim'
         }`}
       >
-        {item.name}
+        <img src={typeIconUrl(item.typeId, 32)} alt="" className="h-4 w-4 shrink-0" />
+        <span className="truncate">{item.name}</span>
       </button>
       <IconButton
         size="sm"

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { selectionStateForIds, toggleSelection, namesForSelection } from './assetSelection';
+import {
+  selectionStateForIds,
+  toggleSelection,
+  selectAll,
+  namesForSelection,
+} from './assetSelection';
 
 describe('selectionStateForIds', () => {
   it('is unchecked for an empty id list', () => {
@@ -44,6 +49,26 @@ describe('toggleSelection', () => {
   it('is a no-op for an empty id list', () => {
     const next = toggleSelection(new Set([1]), []);
     expect([...next]).toEqual([1]);
+  });
+});
+
+describe('selectAll', () => {
+  it('selects every id when none are currently selected', () => {
+    expect([...selectAll(new Set(), [1, 2])].sort()).toEqual([1, 2]);
+  });
+
+  it('adds to an existing selection rather than replacing it', () => {
+    expect([...selectAll(new Set([9]), [1, 2])].sort()).toEqual([1, 2, 9]);
+  });
+
+  it('is a no-op — never deselects — when every id is already selected', () => {
+    expect([...selectAll(new Set([1, 2]), [1, 2])].sort()).toEqual([1, 2]);
+  });
+
+  it('does not mutate the input set', () => {
+    const input = new Set([1]);
+    selectAll(input, [1, 2]);
+    expect([...input]).toEqual([1]);
   });
 });
 
