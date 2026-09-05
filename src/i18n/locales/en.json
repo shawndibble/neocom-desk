@@ -277,7 +277,11 @@
     "rename": "Rename",
     "delete": "Delete",
     "deleteConfirm": "Delete this saved comparison? This can't be undone.",
-    "someRemoved": "Some characters in this comparison have been removed and are no longer shown."
+    "cancel": "Cancel",
+    "someRemoved": "Some characters in this comparison have been removed and are no longer shown.",
+    "differingOnly": "Differing only",
+    "differingOnlyEmptyHint": "No differing skills — the compared characters match on everything trained.",
+    "groupColumnToggle": "Group column"
   },
   "industry": {
     "title": "Build Plans",
