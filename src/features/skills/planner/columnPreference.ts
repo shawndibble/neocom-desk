@@ -16,9 +16,16 @@ export interface ColumnVisibility {
   cumulativeTime: boolean;
 }
 
+/**
+ * Priority is off by default: it is an editing control, not a reading one, and
+ * a per-row control on every row read as the loudest thing in a list whose job
+ * is to be scanned. The other three are readouts, so they stay on — including
+ * the finish date, which replaced both a running-total duration and a separate
+ * start/finish line, so the default row now shows fewer numbers than before.
+ */
 export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
   attributePair: true,
-  priority: true,
+  priority: false,
   perLevelTime: true,
   cumulativeTime: true,
 };
