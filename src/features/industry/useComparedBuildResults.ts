@@ -22,7 +22,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshot } from './marketData';
-import { recipeInputTypeIds } from './recipes';
+import { buildPlanTypeIds } from './recipes';
 
 export interface ComparedBuildRow {
   planId: string;
@@ -59,19 +59,6 @@ function placeholderRow(plan: BuildPlanRecord, catalog: BlueprintCatalog): Compa
   };
 }
 
-/** Same material/product/recipe-input type-id widening `BuildPlanDetail.tsx` does before pricing. */
-function typeIdsFor(
-  blueprint: ReturnType<typeof toIndustryBlueprint>,
-  catalog: BlueprintCatalog,
-  pi: PiData | null
-): number[] {
-  const ids = new Set(blueprint.materials.map((m) => m.typeID));
-  const product = blueprint.products[0];
-  if (product) ids.add(product.typeID);
-  for (const id of recipeInputTypeIds([...ids], { catalog, pi })) ids.add(id);
-  return [...ids];
-}
-
 async function computeRow(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,
@@ -95,7 +82,7 @@ async function computeRow(
   const hub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
 
   try {
-    const snapshot = await loadMarketSnapshot(hub, typeIdsFor(blueprint, catalog, pi));
+    const snapshot = await loadMarketSnapshot(hub, buildPlanTypeIds(blueprint, { catalog, pi }));
     const { result, error } = computeBuildPlan({
       plan,
       blueprint,

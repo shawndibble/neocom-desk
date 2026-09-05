@@ -40,6 +40,28 @@ function numericCell(
   return format(value);
 }
 
+/**
+ * Why a row's profit/margin/ISK-per-hour/break-even cells read "—": either
+ * the plan couldn't be computed at all (`row.error` — missing blueprint, or
+ * the market-snapshot/compute call threw), or it computed fine but priced as
+ * unpriceable (`row.result.unpriceable` — a material or the product itself
+ * has no hub price). Both must surface an explanation, not just the missing
+ * numbers, per issue #453's "shows as such rather than being dropped
+ * silently" — mirrors `ResultsSummary.tsx`'s own unpriceable warning text.
+ */
+function unresolvedReason(
+  row: ComparedBuildRow,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string | null {
+  if (row.error) return row.error;
+  if (row.result?.unpriceable) {
+    return row.result.unpricedMaterials.length > 0
+      ? t('industry.unpricedMaterialsWarning', { count: row.result.unpricedMaterials.length })
+      : t('industry.productUnpriced', { name: row.productName });
+  }
+  return null;
+}
+
 export function BuildPlanCompare({ plans, catalog, pi, skills, onDone }: BuildPlanCompareProps) {
   const { t } = useTranslation();
   const rows = useComparedBuildResults({ plans, catalog, pi, skills });
@@ -51,17 +73,20 @@ export function BuildPlanCompare({ plans, catalog, pi, skills, onDone }: BuildPl
       header: t('industry.comparePlanColumn'),
       primary: true,
       sortValue: (row) => row.planName,
-      render: (row) => (
-        <span className="flex items-center gap-1.5">
-          {row.planName}
-          {!row.loading && row.error && (
-            <InfoTooltip
-              label={t('industry.compareUnresolvedFor', { plan: row.planName })}
-              content={row.error}
-            />
-          )}
-        </span>
-      ),
+      render: (row) => {
+        const reason = row.loading ? null : unresolvedReason(row, t);
+        return (
+          <span className="flex items-center gap-1.5">
+            {row.planName}
+            {reason && (
+              <InfoTooltip
+                label={t('industry.compareUnresolvedFor', { plan: row.planName })}
+                content={reason}
+              />
+            )}
+          </span>
+        );
+      },
     },
     {
       id: 'product',

@@ -132,6 +132,29 @@ describe('BuildPlanCompare', () => {
     expect(screen.getByRole('button', { name: "Orphan couldn't be priced" })).toBeInTheDocument();
   });
 
+  it('shows an unpriceable-but-computed plan with a tooltip, not just a silent "—"', () => {
+    renderCompare([
+      row({
+        planId: 'a',
+        planName: 'Rare hull',
+        productName: 'Exotic component',
+        result: {
+          ...RESULT,
+          profit: null,
+          marginPct: null,
+          iskPerHour: null,
+          unpriceable: true,
+          unpricedMaterials: [34],
+        },
+      }),
+    ]);
+
+    expect(screen.getByText('Rare hull')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: "Rare hull couldn't be priced" })
+    ).toBeInTheDocument();
+  });
+
   it('shows a loading indicator for a row still fetching', () => {
     renderCompare([row({ planId: 'a', planName: 'Loading plan', loading: true })]);
     expect(screen.getAllByText('…').length).toBeGreaterThan(0);

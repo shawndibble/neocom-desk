@@ -47,7 +47,7 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 const { loadBlueprintCatalog } = await import('./blueprintCatalog');
-const { materialRecipe, recipeInputTypeIds } = await import('./recipes');
+const { buildPlanTypeIds, materialRecipe, recipeInputTypeIds } = await import('./recipes');
 
 const catalog = await loadBlueprintCatalog();
 
@@ -126,5 +126,33 @@ describe('recipeInputTypeIds', () => {
 
   it('is empty when nothing in the list is produced by anything', () => {
     expect(recipeInputTypeIds([34], { catalog, pi: PI })).toEqual([]);
+  });
+});
+
+describe('buildPlanTypeIds', () => {
+  // A plain blueprint, not from the fixture catalog: its material (2398) is a
+  // planetary schematic's output, and its product (9840) is itself
+  // manufactured by fixture blueprint 9841 — so the one-level widening below
+  // exercises both the manufacturing and planetary recipe paths at once,
+  // same as `BuildPlanDetail.tsx`'s price fetch (shared via this function,
+  // issue #453 — the Compare table widens its own fetch identically).
+  const blueprint = {
+    name: 'Widening test blueprint',
+    time: 60,
+    materials: [{ typeID: 2398, quantity: 1 }],
+    products: [{ typeID: 9840, quantity: 1 }],
+  };
+
+  it('adds the product to materials, then one level of recipe inputs for each', () => {
+    const ids = buildPlanTypeIds(blueprint, { catalog, pi: PI });
+    // 2398 (material) -> planetary input 2267; 9840 (product) -> manufacturing input 34.
+    expect(ids.sort((a, b) => a - b)).toEqual([34, 2267, 2398, 9840]);
+  });
+
+  it('skips the planetary widening when pi.json is unavailable', () => {
+    const ids = buildPlanTypeIds(blueprint, { catalog, pi: null });
+    // No pi means no schematic for 2398, so 2267 never gets added; the
+    // manufacturing side (9840 -> 34) is unaffected.
+    expect(ids.sort((a, b) => a - b)).toEqual([34, 2398, 9840]);
   });
 });
