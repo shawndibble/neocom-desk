@@ -135,6 +135,57 @@ describe('searchBuildLocations', () => {
     ]);
   });
 
+  it('caps the lookups across both categories, not once each', async () => {
+    // 20 stations and 20 structures used to mean 30 lookups; now it is 15
+    // total, interleaved so neither category can crowd the other out.
+    const many = (base: number) => Array.from({ length: 20 }, (_, i) => base + i);
+    let lookups = 0;
+    server.use(
+      searchHandler({ station: many(60000000), structure: many(1035000000000) }),
+      http.get(`${ESI_BASE_URL}/universe/stations/:id`, ({ params }) => {
+        lookups += 1;
+        return HttpResponse.json({
+          station_id: Number(params.id),
+          name: `Station ${params.id}`,
+          type_id: 1529,
+          system_id: 30000142,
+        });
+      }),
+      http.get(`${ESI_BASE_URL}/universe/structures/:id`, ({ params }) => {
+        lookups += 1;
+        return HttpResponse.json({
+          name: `Structure ${params.id}`,
+          owner_id: 98,
+          solar_system_id: 30003888,
+          type_id: 35826,
+        });
+      }),
+      systemHandler
+    );
+
+    const found = await searchBuildLocations(CHAR_ID, 'Common');
+
+    expect(lookups).toBe(15);
+    expect(found).toHaveLength(15);
+    // Both categories survive the cap.
+    expect(found.some((o) => o.facility === 'npcStation')).toBe(true);
+    expect(found.some((o) => o.facility === 'azbel')).toBe(true);
+  });
+
+  it('passes the abort signal through, so a superseded query stops fetching', async () => {
+    const controller = new AbortController();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/search`, async () => {
+        controller.abort();
+        return HttpResponse.json({ structure: [AZBEL_ID] });
+      }),
+      structureHandler,
+      systemHandler
+    );
+
+    await expect(searchBuildLocations(CHAR_ID, 'K2-18', controller.signal)).rejects.toThrow();
+  });
+
   it('never calls ESI below the three-character floor ESI itself enforces', async () => {
     // No handler registered: onUnhandledRequest 'error' fails on any call.
     expect(await searchBuildLocations(CHAR_ID, 'K2')).toEqual([]);

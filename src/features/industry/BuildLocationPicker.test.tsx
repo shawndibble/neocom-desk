@@ -9,7 +9,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { BuildLocationPicker } from './BuildLocationPicker';
-import type { BuildStructureOption } from './buildStructures';
+import type { BuildLocationOption } from './buildLocations';
 
 const grant = vi.hoisted(() => ({
   scopes: ['esi-search.search_structures.v1'] as string[] | undefined,
@@ -26,7 +26,7 @@ vi.mock('@/app/loginFlow', () => ({ beginEveLogin }));
 const searchBuildLocations = vi.hoisted(() => vi.fn());
 vi.mock('./searchBuildLocations', () => ({ searchBuildLocations, MIN_SEARCH_LENGTH: 3 }));
 
-const AZBEL: BuildStructureOption = {
+const AZBEL: BuildLocationOption = {
   structureId: 1035,
   name: 'K2-18 R&D',
   facility: 'azbel',
@@ -125,7 +125,8 @@ describe('BuildLocationPicker', () => {
     await user.type(searchBox(), 'K2-18');
     await screen.findByText('K2-18 R&D');
 
-    expect(searchBuildLocations).toHaveBeenCalledExactlyOnceWith(91, 'K2-18');
+    expect(searchBuildLocations).toHaveBeenCalledOnce();
+    expect(searchBuildLocations).toHaveBeenCalledWith(91, 'K2-18', expect.any(AbortSignal));
   });
 
   it('hands over every field in one call, and clears itself', async () => {
@@ -138,6 +139,19 @@ describe('BuildLocationPicker', () => {
     expect(onPick).toHaveBeenCalledExactlyOnceWith(AZBEL);
     expect((searchBox() as HTMLInputElement).value).toBe('');
     expect(screen.queryByText('K2-18 R&D')).toBeNull();
+  });
+
+  it('says the search failed rather than pretending nothing matched', async () => {
+    const user = userEvent.setup();
+    searchBuildLocations.mockRejectedValue(new Error('offline'));
+    renderPicker();
+
+    await user.type(searchBox(), 'K2-18');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Search failed. Check your connection and try again.'
+    );
+    expect(screen.queryByText('Nothing found. Try more of the name.')).toBeNull();
   });
 
   it('says so when the search finds nothing', async () => {

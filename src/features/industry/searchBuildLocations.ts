@@ -8,59 +8,79 @@
  * cached for a structure. Both are `STALE_AFTER.static` rows shared with the
  * Assets tree, so searching for the same place twice costs one request.
  *
- * Behind the `search` scope group: nobody who never opens a Build Plan is
- * asked at sign-in to let the app search their structures.
+ * `esi-search.search_structures.v1` is in the base grant, so a Character added
+ * since it was added can search straight away; one added before it holds a
+ * token without it, and `BuildLocationPicker` offers the re-auth rather than
+ * calling this and taking a 403.
  */
 import { getCharacterSearch } from '@/esi/endpoints';
 import { loadStationSummary } from '@/features/character/stations';
 import { loadStructureSummary } from '@/features/character/structures';
 import { loadSystemName, loadSystemSecurity } from '@/features/character/systemSecurity';
 import {
-  buildStructureOptions,
-  type BuildStructureOption,
+  buildLocationOptions,
+  type BuildLocationOption,
   type LocatablePlace,
   type SystemSummary,
-} from './buildStructures';
+} from './buildLocations';
 
 /** ESI's own floor. Below it the endpoint 400s, so it is never called. */
 export const MIN_SEARCH_LENGTH = 3;
 
 /**
- * Capped before any lookup, not after: a two-letter-common name can match
- * dozens of places, and each one resolved is a request. A pilot who cannot see
- * their structure in the first fifteen types more of its name.
+ * One cap across both categories, applied before any lookup: every id kept is
+ * a further ESI request, and a common fragment matches dozens of places. The
+ * two categories are interleaved rather than concatenated, so a name matching
+ * forty NPC stations cannot crowd out the structure the pilot is looking for —
+ * which capping per category, then truncating after the sort, did.
  */
 const MAX_RESULTS = 15;
 
+/** Alternates the two lists so neither can fill the cap on its own. */
+function interleave(stations: readonly number[], structures: readonly number[]): number[] {
+  const ids: number[] = [];
+  for (let i = 0; i < Math.max(stations.length, structures.length); i += 1) {
+    if (i < structures.length) ids.push(structures[i]);
+    if (i < stations.length) ids.push(stations[i]);
+  }
+  return ids;
+}
+
 export async function searchBuildLocations(
   characterId: number,
-  query: string
-): Promise<BuildStructureOption[]> {
+  query: string,
+  signal?: AbortSignal
+): Promise<BuildLocationOption[]> {
   const trimmed = query.trim();
   if (trimmed.length < MIN_SEARCH_LENGTH) return [];
 
-  const hits = (await getCharacterSearch(characterId, ['station', 'structure'], trimmed)).data;
+  const hits = (
+    await getCharacterSearch(characterId, ['station', 'structure'], trimmed, { signal })
+  ).data;
   if (!hits) return [];
 
-  const stationIds = (hits.station ?? []).slice(0, MAX_RESULTS);
-  const structureIds = (hits.structure ?? []).slice(0, MAX_RESULTS);
+  const stationIds = new Set(hits.station ?? []);
+  const wanted = interleave(hits.station ?? [], hits.structure ?? []).slice(0, MAX_RESULTS);
 
-  const places: LocatablePlace[] = [];
-  const npcStationIds = new Set<number>();
-  const resolved = await Promise.all([
-    ...stationIds.map(async (id) => {
-      const station = await loadStationSummary(id);
-      if (station) npcStationIds.add(station.typeId);
-      return station === null ? null : { id, ...toPlace(station) };
-    }),
-    // A 403 here is ordinary: the search is ACL-filtered but a structure can
-    // leave the ACL between the two calls.
-    ...structureIds.map(async (id) => {
-      const structure = await loadStructureSummary(characterId, id);
-      return structure === null ? null : { id, ...toPlace(structure) };
-    }),
-  ]);
-  for (const place of resolved) if (place) places.push(place);
+  const resolved = await Promise.all(
+    wanted.map(async (id): Promise<LocatablePlace | null> => {
+      // A 403 on a structure is ordinary: the search is ACL-filtered, but a
+      // structure can leave the ACL between the two calls.
+      const summary = stationIds.has(id)
+        ? await loadStationSummary(id)
+        : await loadStructureSummary(characterId, id);
+      return summary === null
+        ? null
+        : {
+            id,
+            name: summary.name,
+            typeId: summary.typeId,
+            systemId: summary.systemId,
+            npcStation: stationIds.has(id),
+          };
+    })
+  );
+  const places = resolved.filter((place) => place !== null);
 
   const systems = new Map<number, SystemSummary>();
   await Promise.all(
@@ -71,12 +91,5 @@ export async function searchBuildLocations(
     })
   );
 
-  return buildStructureOptions(places, systems, (typeId) => npcStationIds.has(typeId)).slice(
-    0,
-    MAX_RESULTS
-  );
-}
-
-function toPlace(summary: { name: string; systemId: number; typeId: number }) {
-  return { name: summary.name, systemId: summary.systemId, typeId: summary.typeId };
+  return buildLocationOptions(places, systems);
 }

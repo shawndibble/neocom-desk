@@ -61,6 +61,27 @@ describe('resolveSolarSystem', () => {
     return expect(resolveSolarSystem('Badivefi')).resolves.toMatchObject({ security: 'highsec' });
   });
 
+  it('does not cache a resolution whose band failed, so the next edit retries', async () => {
+    let securityCalls = 0;
+    server.use(
+      idsHandler({ systems: [{ id: 30003888, name: 'Badivefi' }] }),
+      http.get(`${ESI_BASE_URL}/universe/systems/:id`, ({ params }) => {
+        securityCalls += 1;
+        return securityCalls === 1
+          ? HttpResponse.error()
+          : HttpResponse.json({
+              system_id: Number(params.id),
+              name: 'Badivefi',
+              security_status: 0.6587,
+            });
+      })
+    );
+
+    expect(await resolveSolarSystem('Badivefi')).toMatchObject({ security: null });
+    await db.esiCache.clear();
+    expect(await resolveSolarSystem('Badivefi')).toMatchObject({ security: 'highsec' });
+  });
+
   it('resolves the system with a null band when the security lookup fails', async () => {
     // The name is still good; the caller keeps the band it has rather than
     // guessing a rig multiplier from nothing.

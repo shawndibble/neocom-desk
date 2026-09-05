@@ -35,10 +35,17 @@ export interface LocatablePlace {
   name: string | null;
   typeId: number;
   systemId: number;
+  /**
+   * True for an NPC station, which always qualifies whatever its typeID. Set
+   * by whoever resolved the place — the search knows which category ESI
+   * returned an id under — rather than inferred from the typeID here, so one
+   * place's qualification never depends on what else came back beside it.
+   */
+  npcStation: boolean;
 }
 
 /** One pickable location, already carrying every field choosing it would set. */
-export interface BuildStructureOption {
+export interface BuildLocationOption {
   /** Station id or structure id — only ever used as a React key and a select value. */
   structureId: number;
   /**
@@ -53,14 +60,13 @@ export interface BuildStructureOption {
   security: SecurityBand;
 }
 
-export function buildStructureOptions(
+export function buildLocationOptions(
   places: readonly LocatablePlace[],
-  systems: ReadonlyMap<number, SystemSummary>,
-  isNpcStation: (typeId: number) => boolean = () => false
-): BuildStructureOption[] {
-  const options: BuildStructureOption[] = [];
+  systems: ReadonlyMap<number, SystemSummary>
+): BuildLocationOption[] {
+  const options: BuildLocationOption[] = [];
   for (const place of places) {
-    const facility = isNpcStation(place.typeId)
+    const facility = place.npcStation
       ? 'npcStation'
       : FACILITY_KIND_BY_STRUCTURE_TYPE_ID[place.typeId];
     if (!facility) continue;

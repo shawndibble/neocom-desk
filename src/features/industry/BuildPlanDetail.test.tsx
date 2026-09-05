@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -35,6 +35,18 @@ const resolveSolarSystem = vi.hoisted(() =>
   )
 );
 vi.mock('@/market/systemLookup', () => ({ resolveSolarSystem }));
+
+// The band is reconciled on load against `/universe/systems/{id}`.
+const loadSystemSecurity = vi.hoisted(() =>
+  // Badivefi 0.6587 (highsec), Tama 0.2825 (lowsec); anything else unresolvable.
+  vi.fn(async (systemId: number) =>
+    systemId === 30003888 ? 0.6587 : systemId === 30002813 ? 0.2825 : null
+  )
+);
+vi.mock('@/features/character/systemSecurity', () => ({
+  loadSystemSecurity,
+  loadSystemName: vi.fn(async () => null),
+}));
 
 const BLUEPRINT: BlueprintType = {
   name: 'Rifter Blueprint',
@@ -113,6 +125,7 @@ function makePlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
 interface HarnessProps {
   plan?: Partial<BuildPlanRecord>;
   onUpdate?: (patch: PlanPatch) => void;
+  onDerivedFix?: (patch: PlanPatch) => void;
 }
 
 /**
@@ -120,7 +133,7 @@ interface HarnessProps {
  * `onUpdate` patches to it, so a committed edit is visible in the next
  * render the way it would be against the real store.
  */
-function Harness({ plan: planOverrides, onUpdate }: HarnessProps) {
+function Harness({ plan: planOverrides, onUpdate, onDerivedFix }: HarnessProps) {
   const [plan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
   return (
     <MemoryRouter>
@@ -133,6 +146,10 @@ function Harness({ plan: planOverrides, onUpdate }: HarnessProps) {
         ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
         onUpdate={(patch) => {
           onUpdate?.(patch);
+          setPlan((p) => ({ ...p, ...patch }));
+        }}
+        onDerivedFix={(patch) => {
+          onDerivedFix?.(patch);
           setPlan((p) => ({ ...p, ...patch }));
         }}
         onSourcingChange={vi.fn()}
@@ -432,6 +449,45 @@ describe('BuildPlanDetail build system', () => {
   afterEach(() => {
     loadMarketSnapshot.mockClear();
     resolveSolarSystem.mockClear();
+    loadSystemSecurity.mockClear();
+  });
+
+  it('corrects a stored band that disagrees with the build system', async () => {
+    // A plan saved before the Security select was removed can carry any band,
+    // and it still drives the 1x/1.9x/2.1x rig multiplier. Nothing on screen
+    // could fix it, so the panel reconciles it on load.
+    const onDerivedFix = vi.fn();
+    render(
+      <Harness
+        plan={{ security: 'nullsec', buildSystemId: 30003888, buildSystemName: 'Badivefi' }}
+        onDerivedFix={onDerivedFix}
+      />
+    );
+
+    await waitFor(() => expect(onDerivedFix).toHaveBeenCalledWith({ security: 'highsec' }));
+  });
+
+  it('falls a plan with no build system back to its hub band', async () => {
+    const onDerivedFix = vi.fn();
+    render(<Harness plan={{ security: 'lowsec', hubId: 'jita' }} onDerivedFix={onDerivedFix} />);
+
+    // No request for this one — a hub's band is a constant on the hub record.
+    await waitFor(() => expect(onDerivedFix).toHaveBeenCalledWith({ security: 'highsec' }));
+    expect(loadSystemSecurity).not.toHaveBeenCalled();
+  });
+
+  it('leaves the stored band alone when the lookup cannot be reached', async () => {
+    const onDerivedFix = vi.fn();
+    loadSystemSecurity.mockResolvedValueOnce(null);
+    render(
+      <Harness
+        plan={{ security: 'nullsec', buildSystemId: 30003888, buildSystemName: 'Badivefi' }}
+        onDerivedFix={onDerivedFix}
+      />
+    );
+
+    await waitFor(() => expect(loadSystemSecurity).toHaveBeenCalled());
+    expect(onDerivedFix).not.toHaveBeenCalled();
   });
 
   it('states the security band under the field rather than offering it as a choice', async () => {
@@ -439,9 +495,7 @@ describe('BuildPlanDetail build system', () => {
     // disagree with it.
     const user = userEvent.setup();
     render(
-      <Harness
-        plan={{ security: 'lowsec', buildSystemId: 30003888, buildSystemName: 'Badivefi' }}
-      />
+      <Harness plan={{ security: 'lowsec', buildSystemId: 30002813, buildSystemName: 'Tama' }} />
     );
     await openOverride(user);
 

@@ -51,6 +51,7 @@ import { ResultsSummary } from './ResultsSummary';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationPatch } from './buildLocationPatch';
+import { useDerivedSecurityBand } from './useDerivedSecurityBand';
 
 /** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
 export type PlanPatch = Partial<
@@ -92,6 +93,13 @@ interface BuildPlanDetailProps {
    */
   ownedStockSnapshot: OwnedStockSnapshot;
   onUpdate: (patch: PlanPatch) => void;
+  /**
+   * A correction the panel derived rather than the pilot made — persisted
+   * without counting as an edit, so opening a plan never bumps its
+   * `updatedAt`. Today: a security band brought back into line with the
+   * plan's build system.
+   */
+  onDerivedFix: (patch: PlanPatch) => void;
   /**
    * One material row’s sourcing edit. Separate from `onUpdate` because it is a
    * read-modify-write of a nested map rather than a whole field, so it has to
@@ -140,6 +148,7 @@ export function BuildPlanDetail({
   skills,
   ownedStockSnapshot,
   onUpdate,
+  onDerivedFix,
   onSourcingChange,
   onSourcingChangeMany,
   onAddToQuickbar,
@@ -190,6 +199,13 @@ export function BuildPlanDetail({
     plan.buildSystemId !== undefined && plan.buildSystemName !== undefined
       ? { id: plan.buildSystemId, name: plan.buildSystemName }
       : null;
+  // The band is derived, not typed, so it is reconciled here rather than only
+  // on edit — otherwise a plan saved before the Security field went away keeps
+  // a band nothing can correct, and still drives the rig multiplier.
+  useDerivedSecurityBand(buildSystem?.id, hub.security, plan.security, (security) =>
+    onDerivedFix({ security })
+  );
+
   const snapshotKey = `${hub.id}:${buildSystem?.id ?? hub.systemId}:${typeIds.join(',')}:${refreshTick}`;
   const [prevSnapshotKey, setPrevSnapshotKey] = useState(snapshotKey);
   if (prevSnapshotKey !== snapshotKey) {

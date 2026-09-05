@@ -7,14 +7,14 @@ import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import { MIN_SEARCH_LENGTH, searchBuildLocations } from './searchBuildLocations';
-import type { BuildStructureOption } from './buildStructures';
+import type { BuildLocationOption } from './buildLocations';
 
 interface BuildLocationPickerProps {
   /** What the plan is set to right now, already translated. Always the plan's own values. */
   summary: string;
   /** Facility and build system — revealed by "Override". */
   children: ReactNode;
-  onPick: (option: BuildStructureOption) => void;
+  onPick: (option: BuildLocationOption) => void;
 }
 
 /** Read off the registry rather than spelled out here — this file stays hand-edit-free. */
@@ -57,8 +57,12 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
   const granted = useGrantedScopes();
   const [overriding, setOverriding] = useState(false);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<BuildStructureOption[] | null>(null);
+  const [results, setResults] = useState<BuildLocationOption[] | null>(null);
   const [searching, setSearching] = useState(false);
+  // Distinct from "no results": a 403, a 500 and being offline all used to
+  // render "Nothing found. Try more of the name.", which sends the pilot off
+  // retyping a name that was never the problem.
+  const [failed, setFailed] = useState(false);
 
   // In the base grant, so every Character signing in from now on has it. A
   // Character who signed in before it existed holds a token without it, and
@@ -76,6 +80,7 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
   if (prevSearchKey !== searchKey) {
     setPrevSearchKey(searchKey);
     setResults(null);
+    setFailed(false);
     setSearching(searchKey !== '');
   }
 
@@ -85,20 +90,26 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
   useEffect(() => {
     if (searchKey === '' || characterId === null) return;
     const ticket = ++latest.current;
+    // Aborted on cleanup as well as ignored: without it a superseded query
+    // still finishes its whole fan-out of per-hit lookups.
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      void searchBuildLocations(characterId, searchKey)
+      void searchBuildLocations(characterId, searchKey, controller.signal)
         .then((found) => {
           if (ticket !== latest.current) return;
           setResults(found);
           setSearching(false);
         })
         .catch(() => {
-          if (ticket !== latest.current) return;
-          setResults([]);
+          if (ticket !== latest.current || controller.signal.aborted) return;
+          setFailed(true);
           setSearching(false);
         });
     }, DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [searchKey, characterId]);
 
   const searchBox =
@@ -116,7 +127,12 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
             <Spinner size="sm" label={t('industry.buildLocationSearching')} />
           </span>
         )}
-        {!searching && results !== null && results.length === 0 && (
+        {!searching && failed && (
+          <span role="alert" className="text-danger">
+            {t('industry.buildLocationFailed')}
+          </span>
+        )}
+        {!searching && !failed && results !== null && results.length === 0 && (
           <span className="text-text-dim">{t('industry.buildLocationNoResults')}</span>
         )}
         {!searching && results !== null && results.length > 0 && (

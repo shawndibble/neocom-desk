@@ -120,6 +120,16 @@ const server = setupServer(
       },
     ])
   ),
+  // The plan panel reconciles its security band against the system it builds
+  // in (`useDerivedSecurityBand`). Tama is lowsec, Badivefi highsec.
+  http.get('https://esi.evetech.net/universe/systems/:id', ({ params }) => {
+    const id = Number(params.id);
+    return HttpResponse.json(
+      id === 30002813
+        ? { system_id: id, name: 'Tama', security_status: 0.2825 }
+        : { system_id: id, name: 'Badivefi', security_status: 0.6587 }
+    );
+  }),
   fuzzworkHandler()
 );
 
@@ -274,7 +284,11 @@ describe('Industry: Build Plan CRUD', () => {
         blueprintTypeID: 9841,
         facility: 'raitaru',
         rigLevel: 't2',
+        // Lowsec because it builds in Tama, not because anyone typed it — the
+        // band follows the build system now, so the fixture has to name one.
         security: 'lowsec',
+        buildSystemId: 30002813,
+        buildSystemName: 'Tama',
         hubId: 'amarr',
         facilityTaxPct: 0.25,
         updatedAt: 5,

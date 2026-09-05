@@ -60,11 +60,12 @@ export async function resolveSolarSystem(name: string): Promise<SolarSystemRef |
       // `/universe/systems/{id}` row the Assets badge and the corp structure
       // picker already share, so a system named twice costs one request.
       const status = await loadSystemSecurity(match.id);
-      found = {
-        id: match.id,
-        name: match.name,
-        security: status === null ? null : securityBand(status),
-      };
+      // An unreachable security lookup is the same kind of failure as an
+      // unreachable `/universe/ids`, so it gets the same answer: return what we
+      // have and cache nothing, or a band that failed once would stay null for
+      // the rest of the session with no way to re-derive it.
+      if (status === null) return { id: match.id, name: match.name, security: null };
+      found = { id: match.id, name: match.name, security: securityBand(status) };
     }
   } catch {
     // An unreachable ESI is not a wrong name: leave it uncached so the next

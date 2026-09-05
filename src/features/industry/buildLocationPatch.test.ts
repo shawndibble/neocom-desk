@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import { jobFee } from '@/engine/industry/jobCost';
 import { buildLocationPatch } from './buildLocationPatch';
-import type { BuildStructureOption } from './buildStructures';
+import type { BuildLocationOption } from './buildLocations';
 
-function option(over: Partial<BuildStructureOption> = {}): BuildStructureOption {
+function option(over: Partial<BuildLocationOption> = {}): BuildLocationOption {
   return {
     structureId: 1,
     name: 'K2-18 R&D',

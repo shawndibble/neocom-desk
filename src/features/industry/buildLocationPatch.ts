@@ -7,7 +7,7 @@
  */
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { BuildPlanRecord } from '@/db';
-import type { BuildStructureOption } from './buildStructures';
+import type { BuildLocationOption } from './buildLocations';
 
 type BuildLocationPatch = Pick<
   BuildPlanRecord,
@@ -15,7 +15,7 @@ type BuildLocationPatch = Pick<
 > &
   Partial<Pick<BuildPlanRecord, 'rigLevel' | 'facilityTaxPct'>>;
 
-export function buildLocationPatch(option: BuildStructureOption): BuildLocationPatch {
+export function buildLocationPatch(option: BuildLocationOption): BuildLocationPatch {
   return {
     facility: option.facility,
     security: option.security,
