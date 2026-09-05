@@ -732,7 +732,7 @@ describe('MaterialsTable make-or-buy marker', () => {
   it('marks a material worth building, spelling out both prices', () => {
     renderTable(advise(buildIt));
     const marker = within(row('Mechanical Parts')).getByRole('img');
-    expect(marker).toHaveAccessibleName(/^Cheaper to build: 42\.96 a unit to manufacture at ME0/);
+    expect(marker).toHaveAccessibleName(/^Cheaper to build: 42\.96 a unit to manufacture at ME 0%/);
     expect(marker).toHaveAccessibleName(/against 50\.00 to buy/);
     expect(marker).toHaveAccessibleName(/Worth 70 across the 10 units still to buy/);
   });
