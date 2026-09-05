@@ -44,6 +44,7 @@ import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { loadCalendarEvents } from '@/features/character/calendar';
 import { loadContacts } from '@/features/character/contacts';
 import { loadCharacterClones } from '@/features/character/clones';
+import { loadEmploymentHistory } from '@/features/character/employmentHistory';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
@@ -124,6 +125,14 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
     id: 'clones',
     endpoints: ['getCharacterClones'],
     run: loadCharacterClones,
+  },
+  {
+    // Public, so every Character has it — and the Character overview's
+    // Employment tab has no other read, which made it the one tab that was
+    // cold on first open no matter how long the session had been running.
+    id: 'employment-history',
+    endpoints: ['getCharacterCorporationHistory'],
+    run: loadEmploymentHistory,
   },
   {
     id: 'contacts',

@@ -63,7 +63,7 @@ interface TransactionsPanelProps {
 export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
-    useRouteSnapshot(loadTransactionsSnapshot);
+    useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
 
   // A manual Refresh that still falls back to cache is a more alarming case
   // than the initial load finding cache first — same banner, different copy.
@@ -137,7 +137,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label={t('common.loading')} />

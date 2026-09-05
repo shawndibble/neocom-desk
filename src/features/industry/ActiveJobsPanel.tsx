@@ -93,7 +93,8 @@ export function ActiveJobsPanel({
   const [completingSoonOnly, setCompletingSoonOnly] = useState(false);
   const { data, loading, refreshCount, refresh } = useRouteSnapshot(
     loadActiveJobsSnapshot,
-    characterId
+    characterId,
+    { cacheKey: 'industry:active-jobs' }
   );
 
   const {
@@ -125,7 +126,9 @@ export function ActiveJobsPanel({
   const result: JobsLoadResult | CorpJobsLoadResult | null = showingCorp
     ? corp.data
     : (data?.result ?? null);
-  const listLoading = showingCorp ? corp.loading : loading;
+  // `&& !…data`: with a retained snapshot the panel keeps its rows while the
+  // re-read runs, so the spinner is only for having nothing at all to show.
+  const listLoading = showingCorp ? corp.loading && corp.data === null : loading && !data;
   const listRefreshCount = showingCorp ? corp.refreshCount : refreshCount;
   const listRefresh = showingCorp ? corp.refresh : refresh;
 

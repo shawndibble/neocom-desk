@@ -117,6 +117,20 @@ lands in `revalidationFailures` (keyed like `inFlightLoads`), which
 the signal cannot loop. No substitution happens for a manual refresh (it must
 report what actually happened) or for `STALE_AFTER.static` keys.
 
+**Retained route snapshots.** All of the above kept the _rows_ local; it did
+not keep them _rendered_. `useRouteSnapshot` holds its result in `useState`,
+which React Router discards when it unmounts a route, so every tab visit
+restarted at `data === null` with `loading` true. `lib/routeSnapshotCache.ts`
+is the in-memory, session-only store that closes that gap: pass
+`{ cacheKey: '<view>' }` and the hook writes each successful snapshot under
+`` `${cacheKey}:${characterId}` `` and reads it back _during render_, so the
+first frame after a navigation already has rows. Views spin on
+`loading && !data`, never `loading` alone — `loading` stays honest for the
+Refresh button. The key is an explicit string because several call sites pass
+an inline loader whose identity changes every render. `esi/cachePurge.ts`
+publishes `onCachePurged`, which this store subscribes to, so a consent purge
+takes the in-memory copies with it.
+
 **Boot prefetch.** `app/prefetch.ts` warms every granted surface into
 `esiCache` on app start and on each character switch, wired from the same
 `App.tsx` effect shape as `triggerSync`. It is a thin orchestrator over the

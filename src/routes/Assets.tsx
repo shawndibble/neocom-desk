@@ -552,8 +552,11 @@ function isUnresolvedParent(
 export function Assets() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadAssetsSnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadAssetsSnapshot,
+    undefined,
+    { cacheKey: 'assets' }
+  );
 
   // "Where am I" lives in the URL (`/assets/:stationId/*`), not in state, so
   // the browser/Android back button steps up one level instead of leaving the
@@ -1440,7 +1443,7 @@ export function Assets() {
         }
       />
 
-      {!loading && assetsResult && !assetsNeedsReauth && (
+      {assetsResult && !assetsNeedsReauth && (
         <SearchInput
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -1481,7 +1484,7 @@ export function Assets() {
         </div>
       )}
 
-      {loading ? (
+      {loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

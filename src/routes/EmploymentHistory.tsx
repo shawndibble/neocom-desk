@@ -64,7 +64,9 @@ async function loadEmploymentHistorySnapshot(
 export function EmploymentHistory() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
-    loadEmploymentHistorySnapshot
+    loadEmploymentHistorySnapshot,
+    undefined,
+    { cacheKey: 'employment-history' }
   );
   const character = useLiveQuery(
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
@@ -167,7 +169,7 @@ export function EmploymentHistory() {
         }
         padded={false}
       >
-        {loading ? (
+        {loading && !data ? (
           <div className="flex justify-center py-16">
             <Spinner label={t('common.loading')} />
           </div>

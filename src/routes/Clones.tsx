@@ -116,8 +116,11 @@ async function loadClonesSnapshot(
 /** Clones: jump clones, their locations and implants, plus the current jump cooldown. */
 export function Clones() {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadClonesSnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadClonesSnapshot,
+    undefined,
+    { cacheKey: 'clones' }
+  );
 
   const clonesResult = data?.clonesResult ?? null;
   const clonesNeedsReauth = data?.clonesNeedsReauth ?? false;
@@ -218,7 +221,7 @@ export function Clones() {
         }
         padded={false}
       >
-        {loading ? (
+        {loading && !data ? (
           <div className="flex justify-center py-16">
             <Spinner label={t('common.loading')} />
           </div>

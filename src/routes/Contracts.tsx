@@ -137,8 +137,11 @@ function ContractsFilterBar({
 /** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadContractsSnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadContractsSnapshot,
+    undefined,
+    { cacheKey: 'contracts' }
+  );
 
   const contractsResult = data?.contractsResult ?? null;
   const contractsNeedsReauth = data?.contractsNeedsReauth ?? false;
@@ -272,7 +275,7 @@ export function Contracts() {
         }
       />
 
-      {loading ? (
+      {loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

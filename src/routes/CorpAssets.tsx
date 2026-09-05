@@ -293,6 +293,7 @@ function CorpAssetsView() {
   const snapshot = useRouteSnapshot<AssetsSnapshot>(loadAssetsSnapshot, undefined, {
     // Keeps the asset list on screen during a manual refresh (issue #418).
     staleWhileRevalidate: true,
+    cacheKey: 'corp-assets',
   });
   const data = snapshot.data;
   const corporationId = data?.corporationId ?? null;

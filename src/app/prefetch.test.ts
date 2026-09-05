@@ -26,10 +26,12 @@ beforeEach(async () => {
 });
 
 describe('prefetchTasksFor', () => {
-  it('runs nothing for a Character with no granted scopes', () => {
+  it('runs only the unscoped tasks for a Character with no granted scopes', () => {
     // Not "everything": an unfiltered warm-up 403s its way to a spurious
     // app-wide re-auth banner at boot, which is the whole point of the gate.
-    expect(prefetchTasksFor([])).toEqual([]);
+    // A task on a public endpoint (employment history) has no grant to be
+    // missing, so it is exactly what should survive an empty scope set.
+    expect(prefetchTasksFor([]).map((task) => task.id)).toEqual(['employment-history']);
   });
 
   it('runs every task for a Character that granted every scope', () => {

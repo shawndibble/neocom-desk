@@ -140,6 +140,7 @@ function CorpMembersView() {
   const snapshot = useRouteSnapshot<MembersSnapshot>(loadMembersSnapshot, undefined, {
     // Keeps the roster on screen during a manual refresh (issue #418).
     staleWhileRevalidate: true,
+    cacheKey: 'corp-members',
   });
   const data = snapshot.data;
 

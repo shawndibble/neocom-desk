@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 import { configure } from '@testing-library/react';
+import { beforeEach } from 'vitest';
+import { resetRouteSnapshots } from '@/lib/routeSnapshotCache';
 
 /**
  * Default is 1000ms. Under the CPU contention of several `/next-ticket`
@@ -156,3 +158,14 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
       dispatchEvent: () => false,
     }) as unknown as MediaQueryList;
 }
+
+/**
+ * `lib/routeSnapshotCache.ts` is module state deliberately outliving a
+ * component, so it also outlives a test. Without this, one route test's
+ * loaded rows would be on screen for the next test's very first frame — the
+ * assertions that survive that are the ones that were never testing the
+ * loading path in the first place.
+ */
+beforeEach(() => {
+  resetRouteSnapshots();
+});

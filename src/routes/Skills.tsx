@@ -136,8 +136,11 @@ async function loadSkillsSnapshot(
 /** Trained skills for the active character: grouped by SDE group, with SP + attributes/implants. */
 export function Skills() {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadSkillsSnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadSkillsSnapshot,
+    undefined,
+    { cacheKey: 'skills' }
+  );
 
   const catalog = data?.catalog ?? null;
   const skillsResult = data?.skillsResult ?? null;
@@ -287,7 +290,7 @@ export function Skills() {
         />
       </div>
 
-      {loading ? (
+      {loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

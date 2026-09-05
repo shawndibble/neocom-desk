@@ -67,8 +67,11 @@ async function loadContactsSnapshot(
 /** Contacts: standings, blocked/watched state, filterable by standing category. */
 export function Contacts() {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadContactsSnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadContactsSnapshot,
+    undefined,
+    { cacheKey: 'contacts' }
+  );
 
   const [standingFilter, setStandingFilter] = useState<ReadonlySet<StandingCategory>>(
     () => new Set(STANDING_CATEGORIES)
@@ -226,7 +229,7 @@ export function Contacts() {
         </div>
       )}
 
-      {loading ? (
+      {loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

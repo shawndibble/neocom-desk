@@ -430,7 +430,7 @@ export function Wallet() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
-    useRouteSnapshot(loadWalletSnapshot);
+    useRouteSnapshot(loadWalletSnapshot, undefined, { cacheKey: 'wallet' });
 
   // A notification's `?tab=` deep link (`notificationOptions.ts`) picks the
   // opening tab; read once on mount, same as the `Tabs` control's own local
@@ -747,7 +747,7 @@ export function Wallet() {
               : 'common.offlineTitle'
           }
         />
-      ) : loading ? (
+      ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

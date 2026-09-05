@@ -129,8 +129,11 @@ interface OrderHistoryPanelProps {
 /** Market's History tab, Orders view: a character's completed/expired/cancelled market orders. */
 export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadOrderHistorySnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadOrderHistorySnapshot,
+    undefined,
+    { cacheKey: 'market:order-history' }
+  );
 
   const historyResult = data?.historyResult ?? null;
   const historyNeedsReauth = data?.historyNeedsReauth ?? false;
@@ -211,7 +214,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label={t('common.loading')} />
