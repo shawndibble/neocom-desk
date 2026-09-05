@@ -30,7 +30,7 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
-import { materialRecipe, recipeInputTypeIds } from './recipes';
+import { buildPlanTypeIds, materialRecipe } from './recipes';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -145,16 +145,14 @@ export function BuildPlanDetail({
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
 
+  // One level deeper than the plan itself needs: the make-or-buy marker
+  // quotes each material's own recipe, and a quote is only as good as the
+  // inputs it can price. Same batched Fuzzwork call either way. Shared with
+  // `useComparedBuildResults.ts` (issue #453) via `buildPlanTypeIds`, so the
+  // Compare table widens its price fetch exactly the same way this does.
   const typeIds = useMemo(() => {
     if (!blueprint) return [] as number[];
-    const ids = new Set(blueprint.materials.map((m) => m.typeID));
-    const product = blueprint.products[0];
-    if (product) ids.add(product.typeID);
-    // One level deeper than the plan itself needs: the make-or-buy marker
-    // quotes each material's own recipe, and a quote is only as good as the
-    // inputs it can price. Same batched Fuzzwork call either way.
-    for (const id of recipeInputTypeIds([...ids], { catalog, pi })) ids.add(id);
-    return [...ids];
+    return buildPlanTypeIds(blueprint, { catalog, pi });
   }, [blueprint, catalog, pi]);
 
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
