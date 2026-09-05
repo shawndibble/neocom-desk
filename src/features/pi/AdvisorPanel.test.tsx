@@ -253,7 +253,7 @@ describe('AdvisorPanel', () => {
     expect(screen.queryByText('No colonies yet')).not.toBeInTheDocument();
   });
 
-  it('says what the leftover budget still holds', async () => {
+  it('says what the leftover budget still holds, for a colony with no links', async () => {
     renderPanel();
     // 16,675 tf and 10,700 MW left of the colony's own level-4 budget.
     // Powergrid binds: 13 basic (800 MW), 15 advanced or storage (700), and
@@ -261,6 +261,34 @@ describe('AdvisorPanel', () => {
     const room = await screen.findByText(/1x extractor/);
     expect(room).toHaveTextContent('13x basic factory');
     expect(room).toHaveTextContent('15x advanced factory');
+  });
+
+  it('refuses to state headroom for a colony whose links it cannot cost', async () => {
+    // The bug this guards, reported from a live colony: every planet was full,
+    // and the card still offered "room for 13x basic factory". Links draw CPU
+    // and Powergrid that nothing here charges for, so the load is understated
+    // and the headroom overstated. A card that cannot measure says so.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                ...detail,
+                links: [{ source_pin_id: 1, destination_pin_id: 2, link_level: 0 }],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+
+    expect(await screen.findByText(/Headroom unknown/)).toBeInTheDocument();
+    expect(screen.queryByText(/13x basic factory/)).not.toBeInTheDocument();
   });
 
   it('names an unbuilt planet’s resources and refuses to price them', async () => {
