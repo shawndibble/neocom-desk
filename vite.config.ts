@@ -1,5 +1,5 @@
-/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -9,6 +9,40 @@ import { readFileSync } from 'node:fs';
 const { version } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
 ) as { version: string };
+
+/**
+ * Plain `.test.ts` files that need a real `document`/`window` even though
+ * nothing in them is `.tsx` — either `@testing-library/react`'s `renderHook`
+ * (which mounts into a real `document`), or a browser global the module
+ * under test reaches for directly (`sessionStorage`/`localStorage`,
+ * `DOMParser`, `document.documentElement`, an `<a>` element for a download
+ * link). None of these exist in a plain Node environment, so these files
+ * stay on `jsdom` while every other `.test.ts` file (pure logic, verified by
+ * actually running the full suite under `node` and fixing up whatever
+ * failed) moves to `node` below for its per-file startup cost instead of
+ * jsdom's.
+ */
+const DOM_TS_TESTS = [
+  // renderHook
+  'src/features/corp/owner.test.ts',
+  'src/features/corp/useCorpAccess.test.ts',
+  'src/features/corp/useCorpRouteGate.test.ts',
+  'src/features/corp/useCorpSnapshot.test.ts',
+  'src/features/industry/useComparedBuildResults.test.ts',
+  'src/features/industry/useDetectedOwnedStock.test.ts',
+  'src/features/market/useCompareRows.test.ts',
+  // sessionStorage / localStorage
+  'src/app/loginFlow.test.ts',
+  'src/auth/session.test.ts',
+  'src/sync/deviceId.test.ts',
+  // document / window
+  'src/lib/download.test.ts',
+  'src/lib/fontScale.test.ts',
+  'src/sync/deviceRegistration.test.ts',
+  // DOMParser
+  'src/features/skills/planner/planXmlDocument.test.ts',
+  'src/features/skills/planner/planXmlImport.test.ts',
+];
 
 export default defineConfig({
   base: '/',
@@ -66,7 +100,6 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   test: {
-    environment: 'jsdom',
     globals: true,
     // Tests run in UTC, matching the CI runners, so a suite that passes here
     // passes there and vice versa.
@@ -87,7 +120,6 @@ export default defineConfig({
     // happens to run the suite.
     env: { TZ: 'UTC' },
     setupFiles: ['./vitest.setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     // Default 5000ms. A test can chain several `findBy*`/`waitFor` calls,
     // each now with up to 5000ms of its own headroom (vitest.setup.ts) for
     // CPU contention under parallel `/next-ticket` runs — give the overall
@@ -109,5 +141,30 @@ export default defineConfig({
     // `github-actions` has to be re-added here or CI's PR-diff annotations
     // (on by default, undocumented in this config until now) disappear.
     reporters: process.env.GITHUB_ACTIONS === 'true' ? ['agent', 'github-actions'] : ['agent'],
+    // Split by environment rather than one `jsdom` run for everything: jsdom
+    // instantiation is real, per-file overhead (measured ~0.9s/file on this
+    // repo's engine tests alone — see the /code-review test-speed
+    // investigation) that plain logic tests get zero benefit from and 283 of
+    // this repo's 388 test files never touch a DOM at all. `extends: true`
+    // on both projects inherits every other option above unchanged.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: ['src/**/*.{test,spec}.ts'],
+          exclude: [...configDefaults.exclude, ...DOM_TS_TESTS],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'dom',
+          environment: 'jsdom',
+          include: ['src/**/*.{test,spec}.tsx', ...DOM_TS_TESTS],
+        },
+      },
+    ],
   },
 });
