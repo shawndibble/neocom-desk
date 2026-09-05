@@ -650,7 +650,6 @@
     "journalEmptyHint": "Reconnect to fetch this character's wallet journal.",
     "transactionsEmptyTitle": "No transactions cached",
     "transactionsEmptyHint": "Reconnect to fetch this character's recent transactions.",
-    "transactionsCapped": "Recent transactions only — older history was not fetched",
     "date": "Date",
     "amount": "Amount",
     "balanceCol": "Balance",
