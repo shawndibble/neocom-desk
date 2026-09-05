@@ -1,8 +1,10 @@
 /**
  * Pure character-grouping and sort helpers for the Overview character wall.
  * No Dexie, no fetch — storage lives in overviewGroups.ts, this module only
- * shuffles arrays.
+ * shuffles arrays. `RosterEntry` is a type-only import (roster.ts does the
+ * actual Dexie/ESI reads); this module stays dependency-free.
  */
+import type { RosterEntry } from './roster';
 
 export interface CharacterGroup {
   id: string;
@@ -13,10 +15,40 @@ export interface CharacterGroup {
 export type CharacterSortKey = 'name' | 'skillPoints' | 'wallet';
 export type SortDirection = 'asc' | 'desc';
 
+/**
+ * Flat, not nested `{value, fetchedAt}` pairs: `sortCharacterIds` indexes
+ * `stats[key]` directly, and a flat shape keeps that untouched. `*FetchedAt`
+ * is undefined exactly when its value is — never show a badge for a value
+ * that isn't there (#483).
+ */
 export interface CharacterSortStats {
   name: string;
   skillPoints?: number;
+  skillPointsFetchedAt?: Date;
   wallet?: number;
+  walletFetchedAt?: Date;
+}
+
+/**
+ * Roster snapshot -> the map both the sort control and the character card
+ * read from — one pass over `loadRosterSnapshot()`'s result, no second fetch.
+ * SP's age is the underlying `/skills` read's `fetchedAt`: `correctedTotalSp`
+ * is that same row's total_sp adjusted by queue data in hand, not a fetch of
+ * its own.
+ */
+export function rosterSortStats(entries: readonly RosterEntry[]): Map<number, CharacterSortStats> {
+  return new Map(
+    entries.map((entry) => [
+      entry.characterId,
+      {
+        name: entry.name,
+        skillPoints: entry.correctedTotalSp ?? undefined,
+        skillPointsFetchedAt: entry.correctedTotalSp === null ? undefined : entry.skills?.fetchedAt,
+        wallet: entry.wallet?.data,
+        walletFetchedAt: entry.wallet?.fetchedAt,
+      },
+    ])
+  );
 }
 
 /** Drops character ids no longer on this device. A group is kept even if emptied. */

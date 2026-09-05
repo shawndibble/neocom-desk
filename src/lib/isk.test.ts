@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatIsk, parseIskAmount } from './isk';
+import { formatIsk, formatIskCompact, parseIskAmount } from './isk';
 
 describe('formatIsk', () => {
   describe('default (0 decimals — Industry/Market Browser)', () => {
@@ -35,6 +35,16 @@ describe('formatIsk', () => {
   it('clamps exact negative zero regardless of precision', () => {
     expect(formatIsk(-0)).toBe('0');
     expect(formatIsk(-0, 2)).toBe('0.00');
+  });
+});
+
+describe('formatIskCompact', () => {
+  it('abbreviates large balances', () => {
+    expect(formatIskCompact(5_234_000)).toBe('5.2M');
+  });
+
+  it('clamps a rounding-noise negative near zero to "0" instead of "-0"', () => {
+    expect(formatIskCompact(-0.3)).toBe('0');
   });
 });
 
