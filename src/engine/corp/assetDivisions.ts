@@ -46,6 +46,18 @@ const FLAG_GROUP_ORDER: readonly CorpAssetFlagKind[] = [
   'assetSafety',
 ];
 
+/**
+ * Every `CorpAssetGroupId` this module knows about, for a caller that needs
+ * to validate one (`assetsExpandPreference.ts`'s stored-value parser) without
+ * re-enumerating the union by hand — an 8th division or a new flag kind then
+ * only has to be added here.
+ */
+export const ALL_CORP_ASSET_GROUP_IDS: readonly CorpAssetGroupId[] = [
+  ...HANGAR_DIVISIONS,
+  ...FLAG_GROUP_ORDER,
+  'other',
+];
+
 const HANGAR_FLAG_PATTERN = /^CorpSAG([1-7])$/;
 
 const FLAG_KIND_BY_LOCATION_FLAG: Readonly<Record<string, CorpAssetFlagKind>> = {
@@ -123,4 +135,33 @@ export function groupCorpAssets(assets: readonly CorpAssetInput[]): CorpAssetGro
   }
 
   return groups;
+}
+
+/**
+ * The same "resolved name, else the raw id" text the item column, the search
+ * filter below, and the row context menu all print — one place so the three
+ * cannot drift apart from each other.
+ */
+export function corpAssetItemName(typeId: number, typeNames: ReadonlyMap<number, string>): string {
+  return typeNames.get(typeId) ?? `#${typeId}`;
+}
+
+/**
+ * Search-time row filter (issue #420). Groups are never dropped, even to
+ * zero rows — the view decides what a zero-row group means (a match found
+ * elsewhere, or genuinely nothing here), this only narrows each group's rows.
+ */
+export function filterCorpAssetGroups(
+  groups: readonly CorpAssetGroup[],
+  typeNames: ReadonlyMap<number, string>,
+  query: string
+): CorpAssetGroup[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...groups];
+  return groups.map((group) => ({
+    id: group.id,
+    rows: group.rows.filter((row) =>
+      corpAssetItemName(row.typeId, typeNames).toLowerCase().includes(q)
+    ),
+  }));
 }

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { corpAssetGroupId, groupCorpAssets, HANGAR_DIVISIONS } from './assetDivisions';
+import {
+  corpAssetGroupId,
+  filterCorpAssetGroups,
+  groupCorpAssets,
+  HANGAR_DIVISIONS,
+} from './assetDivisions';
 
 describe('corpAssetGroupId', () => {
   it('reads CorpSAG1..CorpSAG7 as division numbers 1..7', () => {
@@ -84,5 +89,40 @@ describe('groupCorpAssets', () => {
     const groups = groupCorpAssets([asset({ itemId: 5, quantity: 3, locationId: 60003760 })]);
     const row = groups.find((g) => g.id === 1)?.rows[0];
     expect(row).toEqual({ itemId: 5, typeId: 100, quantity: 3, locationId: 60003760 });
+  });
+});
+
+describe('filterCorpAssetGroups', () => {
+  const typeNames = new Map([
+    [100, 'Tritanium'],
+    [200, 'Pyerite'],
+  ]);
+
+  it('returns every group unchanged when the query is empty', () => {
+    const groups = groupCorpAssets([asset({ itemId: 1, locationFlag: 'CorpSAG1' })]);
+    expect(filterCorpAssetGroups(groups, typeNames, '')).toEqual(groups);
+    expect(filterCorpAssetGroups(groups, typeNames, '   ')).toEqual(groups);
+  });
+
+  it('keeps only rows whose resolved name matches the query, case-insensitively', () => {
+    const groups = groupCorpAssets([
+      asset({ itemId: 1, typeId: 100, locationFlag: 'CorpSAG1' }),
+      asset({ itemId: 2, typeId: 200, locationFlag: 'CorpSAG1' }),
+    ]);
+    const filtered = filterCorpAssetGroups(groups, typeNames, 'TRI');
+    expect(filtered.find((g) => g.id === 1)?.rows.map((r) => r.itemId)).toEqual([1]);
+  });
+
+  it('matches against the raw-id fallback when the type name has not resolved', () => {
+    const groups = groupCorpAssets([asset({ itemId: 1, typeId: 999, locationFlag: 'CorpSAG1' })]);
+    const filtered = filterCorpAssetGroups(groups, new Map(), '999');
+    expect(filtered.find((g) => g.id === 1)?.rows.map((r) => r.itemId)).toEqual([1]);
+  });
+
+  it('never drops a group entirely — an unmatched division just ends up with no rows', () => {
+    const groups = groupCorpAssets([asset({ itemId: 1, typeId: 100, locationFlag: 'CorpSAG1' })]);
+    const filtered = filterCorpAssetGroups(groups, typeNames, 'nothing matches this');
+    expect(filtered.map((g) => g.id)).toEqual(groups.map((g) => g.id));
+    expect(filtered.find((g) => g.id === 1)?.rows).toEqual([]);
   });
 });

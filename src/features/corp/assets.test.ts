@@ -5,6 +5,7 @@ import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { corpCacheKey } from '@/esi/cache';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { db } from '@/db';
+import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { CorporationAsset } from '@/esi/endpoints';
 import {
   CORP_ASSETS_KEY,
@@ -228,5 +229,51 @@ describe('loadCorpAssetLabels', () => {
     const labels = await loadCorpAssetLabels(CHAR_ID, assets);
 
     expect(labels.locations.has(STRUCTURE_ID)).toBe(false);
+  });
+
+  /**
+   * Issue #420: a large corp can hold assets scattered across many Upwell
+   * structures, each resolved with its own `/universe/structures/{id}` call
+   * (no bulk endpoint exists for them). A bare `Promise.all` over all of them
+   * risks 429s; `src/lib/concurrency.ts` is the repo's one fan-out policy for
+   * exactly this, so this pins the cap rather than trusting the shape of the
+   * code.
+   */
+  it('caps the per-structure name-resolution fan-out instead of firing every request at once', async () => {
+    const FLOOR = 1_000_000_000_000;
+    const structureIds = Array.from({ length: ESI_FANOUT_CONCURRENCY + 5 }, (_, i) => FLOOR + i);
+    const assets = structureIds.map((locationId, i): CorporationAsset => ({
+      item_id: 3000 + i,
+      type_id: 34,
+      quantity: 1,
+      location_id: locationId,
+      location_type: 'other',
+      location_flag: 'CorpSAG1',
+      is_singleton: false,
+    }));
+
+    let inFlight = 0;
+    let peak = 0;
+    server.use(
+      ...structureIds.map((id) =>
+        http.get(`${ESI_BASE_URL}/universe/structures/${id}`, async () => {
+          inFlight += 1;
+          peak = Math.max(peak, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          inFlight -= 1;
+          return HttpResponse.json({
+            name: `Structure ${id}`,
+            owner_id: 1,
+            solar_system_id: 30000001,
+          });
+        })
+      )
+    );
+
+    const labels = await loadCorpAssetLabels(CHAR_ID, assets);
+
+    expect(labels.locations.size).toBe(structureIds.length);
+    expect(peak).toBeLessThanOrEqual(ESI_FANOUT_CONCURRENCY);
+    expect(peak).toBeGreaterThan(1);
   });
 });
