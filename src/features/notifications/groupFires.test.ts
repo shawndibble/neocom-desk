@@ -22,6 +22,7 @@ describe('groupIdenticalFires', () => {
     expect(groups).toEqual([
       {
         fire: { eventId: 'marketOrderFilled', orderId: 1 },
+        fires: [{ eventId: 'marketOrderFilled', orderId: 1 }],
         title: 'Market order filled',
         body: 'Your order was filled.',
         count: 1,
@@ -50,11 +51,43 @@ describe('groupIdenticalFires', () => {
     expect(groups).toEqual([
       {
         fire: { eventId: 'marketOrderFilled', orderId: 1 },
+        fires: [
+          { eventId: 'marketOrderFilled', orderId: 1 },
+          { eventId: 'marketOrderFilled', orderId: 2 },
+          { eventId: 'marketOrderFilled', orderId: 3 },
+        ],
         title: 'Market order filled',
         body: 'Your order was filled.',
         count: 3,
       },
     ]);
+  });
+
+  it('carries every fire in the group, so a caller can act on all of them at once', () => {
+    // The Notification Feed needs this: its row collapses several stored
+    // entries, and dismissing that row has to dismiss every entry behind it,
+    // not just the one the row happens to render.
+    const groups = groupIdenticalFires([
+      rendered({ eventId: 'marketOrderFilled', orderId: 1 }, 'Market order filled', 'Filled.'),
+      rendered({ eventId: 'newMail' }, 'New mail', 'You have new mail.'),
+      rendered({ eventId: 'marketOrderFilled', orderId: 2 }, 'Market order filled', 'Filled.'),
+    ]);
+
+    expect(groups[0].fires).toEqual([
+      { eventId: 'marketOrderFilled', orderId: 1 },
+      { eventId: 'marketOrderFilled', orderId: 2 },
+    ]);
+    expect(groups[1].fires).toEqual([{ eventId: 'newMail' }]);
+  });
+
+  it('keeps count and the member list in step', () => {
+    const groups = groupIdenticalFires([
+      rendered({ eventId: 'marketOrderFilled', orderId: 1 }, 'Market order filled', 'Filled.'),
+      rendered({ eventId: 'marketOrderFilled', orderId: 2 }, 'Market order filled', 'Filled.'),
+      rendered({ eventId: 'newMail' }, 'New mail', 'Mail.'),
+    ]);
+
+    for (const group of groups) expect(group.count).toBe(group.fires.length);
   });
 
   it('keeps the first fire of the group as the representative, not the last', () => {

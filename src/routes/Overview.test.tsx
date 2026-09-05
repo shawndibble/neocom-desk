@@ -192,6 +192,47 @@ describe('Overview', () => {
     expect(screen.queryByText('5,000,000')).not.toBeInTheDocument();
   });
 
+  it('gives the wallet and queue panels a common bottom edge when they share a row', async () => {
+    render(<App />);
+    await screen.findByText(/1,234,567\.89/);
+
+    // Asserted on the classes rather than on measured heights: jsdom has no
+    // layout engine, so every box it reports is 0 tall and a height comparison
+    // would pass no matter what these panels did.
+    const wallet = screen.getByRole('heading', { name: 'Wallet' }).closest('section');
+    const queue = screen.getByRole('heading', { name: 'Training queue' }).closest('section');
+    const grid = wallet?.parentElement;
+
+    // The default `stretch` is what equalises them; `items-start` would let
+    // each panel keep its own content height.
+    expect(grid?.className).not.toMatch(/items-start/);
+    // The grid stretches the queue's aria-live wrapper, not the panel inside
+    // it, so the panel has to be told to fill that wrapper.
+    expect(queue?.className).toMatch(/h-full/);
+    expect(queue?.parentElement?.className).toMatch(/h-full/);
+  });
+
+  it('centres the wallet balance in the taller card rather than stranding it at the top', async () => {
+    render(<App />);
+    const balance = await screen.findByText(/1,234,567\.89/);
+
+    // The whole flex chain has to hold, so it is walked rather than spot-
+    // checked: the box holding the balance centres it, the panel's content
+    // wrapper grows to give it room, and the section is the column that
+    // wrapper grows inside. Any one link missing puts the balance back at the
+    // top, and jsdom reports every height as 0, so position cannot be measured.
+    const centred = balance.parentElement;
+    expect(centred?.className).toMatch(/justify-center/);
+    expect(centred?.className).toMatch(/flex-1/);
+
+    const contentWrapper = centred?.parentElement;
+    expect(contentWrapper?.className).toMatch(/flex-1/);
+
+    const section = contentWrapper?.parentElement;
+    expect(section?.tagName).toBe('SECTION');
+    expect(section?.className).toMatch(/flex-col/);
+  });
+
   it('keeps the block above the tabs to identity and SP alone', async () => {
     render(<App />);
     await screen.findByText(/1,234,567\.89/);

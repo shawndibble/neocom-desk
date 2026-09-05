@@ -25,7 +25,7 @@ import { Button, EmptyState, IconButton, Panel, buttonClassName } from '@/compon
 import { Close } from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { readFeed, dismissFeedEntry, dismissFeedEntries } from './feed';
+import { readFeed, dismissFeedEntries } from './feed';
 import { refreshAppBadge } from './appBadge';
 import { NotificationContextMenu } from './NotificationContextMenu';
 import { notificationUrlFor } from './notificationOptions';
@@ -35,6 +35,7 @@ import {
   isFeedChannelEnabled,
 } from './preferences';
 import { visibleFeedEntries, entriesForCharacter, otherCharacterAlerts } from './feedSelection';
+import { groupIdenticalFires } from './groupFires';
 
 export function NotificationFeedPanel() {
   const { t } = useTranslation();
@@ -72,6 +73,28 @@ export function NotificationFeedPanel() {
     new Map(characters.map((c) => [c.characterId, c.name]))
   );
 
+  /*
+   * Rows that read identically are collapsed into one carrying a count, the
+   * same way a burst of them is collapsed into a single browser toast — same
+   * function, same key (eventId + title + body), so the two channels can never
+   * disagree about what counts as a duplicate.
+   *
+   * Collapsed here at render, never at write: the feed stores one row per
+   * occurrence on purpose (`foregroundPoller.ts`), because an Occurrence Key
+   * is what lets the Scheduled Push backend and this device agree on which row
+   * an occurrence belongs to. Merging at write would lose the others for good;
+   * merging here is only a way of showing them, and a dismissal still reaches
+   * every row behind the one on screen.
+   *
+   * Grouping is global rather than run-length: ten filled orders interrupted
+   * by one wallet change are still ten of the same thing, and leaving the
+   * eleventh stranded below would be exactly the clutter this removes. A group
+   * sits where its newest member sat, so the list stays newest-first.
+   */
+  const groups = groupIdenticalFires(
+    mine.map((entry) => ({ fire: entry, title: entry.title, body: entry.body }))
+  );
+
   return (
     <Panel
       title={t('overview.notifications')}
@@ -101,34 +124,48 @@ export function NotificationFeedPanel() {
         />
       ) : (
         <ul className="divide-y divide-line">
-          {mine.map((entry) => (
-            <NotificationContextMenu key={entry.id} entry={entry}>
-              <li className="flex items-start gap-3 py-2 first:pt-0">
-                {/*
-                  The same route a browser notification's own click lands on
-                  (`notificationOptions.ts`'s `NOTIFICATION_ROUTES`) — the feed
-                  is this app's other delivery channel for the same fires, so a
-                  tap here should go to the same place a tap on the OS bubble
-                  would (issue: notification click-through).
-                */}
-                <Link
-                  to={notificationUrlFor(entry.eventId)}
-                  className="min-w-0 flex-1 rounded-xs focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-                >
-                  <p className="text-sm font-medium hover:underline">{entry.title}</p>
-                  <p className="text-xs text-text-dim">{entry.body}</p>
-                </Link>
-                <FiredAt firedAt={entry.firedAt} />
-                <IconButton
-                  icon={<Close />}
-                  label={t('overview.notificationsDismiss', { title: entry.title })}
-                  variant="plain"
-                  size="sm"
-                  onClick={() => void dismissFeedEntry(entry.id)}
-                />
-              </li>
-            </NotificationContextMenu>
-          ))}
+          {groups.map((group) => {
+            const entry = group.fire;
+            // The count belongs in the title, not beside it: the dismiss
+            // control and the context menu both name the row by its title, and
+            // a count kept out of that name would have them offering to
+            // dismiss "Market order filled" while ten of them sit there.
+            const title =
+              group.count > 1
+                ? t('notifications.groupedTitle', { title: entry.title, count: group.count })
+                : entry.title;
+            return (
+              <NotificationContextMenu key={entry.id} entry={entry}>
+                <li className="flex items-start gap-3 py-2 first:pt-0">
+                  {/*
+                    The same route a browser notification's own click lands on
+                    (`notificationOptions.ts`'s `NOTIFICATION_ROUTES`) — the feed
+                    is this app's other delivery channel for the same fires, so a
+                    tap here should go to the same place a tap on the OS bubble
+                    would (issue: notification click-through).
+                  */}
+                  <Link
+                    to={notificationUrlFor(entry.eventId)}
+                    className="min-w-0 flex-1 rounded-xs focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                  >
+                    <p className="text-sm font-medium hover:underline">{title}</p>
+                    <p className="text-xs text-text-dim">{entry.body}</p>
+                  </Link>
+                  {/* The newest member's age: `readFeed` hands the rows over
+                      newest-first, and the grouper keeps the first one it saw
+                      as the representative. */}
+                  <FiredAt firedAt={entry.firedAt} />
+                  <IconButton
+                    icon={<Close />}
+                    label={t('overview.notificationsDismiss', { title })}
+                    variant="plain"
+                    size="sm"
+                    onClick={() => void dismissFeedEntries(group.fires.map((e) => e.id))}
+                  />
+                </li>
+              </NotificationContextMenu>
+            );
+          })}
         </ul>
       )}
 
