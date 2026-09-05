@@ -152,6 +152,28 @@ describe('Market top-level tabs', () => {
     await user.click(screen.getByRole('tab', { name: 'Transactions' }));
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
+
+  it('keeps History selected on its Transactions view, and re-clicking History leaves it there', async () => {
+    window.history.pushState({}, '', '/market?section=transactions');
+    const user = userEvent.setup();
+    render(<App />);
+
+    // Both views are the character's past, so the top tab stays History and
+    // the inner pair says which of the two is showing.
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: 'Transactions' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByRole('tab', { name: 'Orders' })).toHaveAttribute('aria-selected', 'false');
+
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Orders' }));
+    expect(await screen.findByText('expired')).toBeInTheDocument();
+  });
 });
 
 describe('Market Open Orders tab', () => {

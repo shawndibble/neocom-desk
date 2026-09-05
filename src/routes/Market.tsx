@@ -101,14 +101,28 @@ const ROW_CAP = 15;
 
 /**
  * The page's own top-level tabs: Market Browser plus a character's Open
- * Orders, order History and Transactions — previously the separate
- * `/orders` route (open + history) and Wallet's Transactions tab. Distinct
- * from `itemTab` below, which is the *selected item's* own Market Data /
- * Price History split and has nothing to do with this.
+ * orders and History — previously the separate `/orders` route (open +
+ * history) and Wallet's Transactions tab. Distinct from `itemTab` below,
+ * which is the *selected item's* own Market Data / Price History split and
+ * has nothing to do with this.
+ *
+ * `history` and `transactions` are one tab wearing two hats: both are the
+ * character's past, they overlap on item and side, and they answer the same
+ * question from either end — which orders ended, and which fills paid out.
+ * So History is the tab and they are its two views. They stay separate
+ * `section` values rather than a nested param because that keeps every
+ * existing `?section=` link working and lets each view keep its own
+ * `useRouteSnapshot`, so opening one never fetches the other.
  */
 type MarketSection = 'browser' | 'orders' | 'history' | 'transactions';
 function parseMarketSection(value: string | null): MarketSection {
   return value === 'orders' || value === 'history' || value === 'transactions' ? value : 'browser';
+}
+
+/** The two views behind the History tab. `history` is the one it opens on. */
+type HistoryView = Extract<MarketSection, 'history' | 'transactions'>;
+function isHistoryView(section: MarketSection): section is HistoryView {
+  return section === 'history' || section === 'transactions';
 }
 
 /**
@@ -1026,19 +1040,36 @@ export function Market() {
 
       <Tabs
         label={t('market.title')}
-        value={section}
-        onChange={(id) => handleSectionChange(id as MarketSection)}
+        value={isHistoryView(section) ? 'history' : section}
+        // Clicking History while already inside it would otherwise throw away
+        // the chosen view and snap back to the orders one.
+        onChange={(id) => {
+          if (id === 'history' && isHistoryView(section)) return;
+          handleSectionChange(id as MarketSection);
+        }}
         tabs={[
           { id: 'browser', label: t('market.sections.browser') },
           { id: 'orders', label: t('market.sections.openOrders') },
           { id: 'history', label: t('market.sections.history') },
-          { id: 'transactions', label: t('market.sections.transactions') },
         ]}
       />
 
       {section === 'orders' && <OpenOrdersPanel />}
-      {section === 'history' && <OrderHistoryPanel />}
-      {section === 'transactions' && <TransactionsPanel />}
+
+      {isHistoryView(section) && (
+        <>
+          <Tabs
+            label={t('market.sections.historyViews')}
+            value={section}
+            onChange={(id) => handleSectionChange(id as MarketSection)}
+            tabs={[
+              { id: 'history', label: t('market.sections.historyOrders') },
+              { id: 'transactions', label: t('market.sections.transactions') },
+            ]}
+          />
+          {section === 'history' ? <OrderHistoryPanel /> : <TransactionsPanel />}
+        </>
+      )}
 
       {section === 'browser' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
