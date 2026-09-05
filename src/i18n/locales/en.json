@@ -308,7 +308,6 @@
     "copySuffix": "{{name}} (copy)",
     "duplicate": "Duplicate",
     "delete": "Delete",
-    "deleteConfirm": "Delete this build plan? This can't be undone.",
     "rename": "Rename",
     "emptyTitle": "No build plans yet",
     "emptyHint": "Create a plan to price out a manufacturing job.",
