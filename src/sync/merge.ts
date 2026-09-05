@@ -17,6 +17,7 @@ import type {
   QuickbarRecord,
   SkillPlanRecord,
   StationPinRecord,
+  PlanetRichnessRecord,
   WhatIfImplantSelection,
 } from '@/db';
 import type { Attributes } from '@/engine/types';
@@ -57,6 +58,9 @@ export type RemoteQuickbarDoc = QuickbarRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/stationPins/{id}. */
 export type RemoteStationPinDoc = StationPinRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/planetRichness/{id} (issue #425). */
+export type RemotePlanetRichnessDoc = PlanetRichnessRecord & RemoteDoc;
 
 /** Locally recorded deletion awaiting propagation to the remote store. */
 export interface LocalTombstone {

@@ -38,9 +38,11 @@ describe('Tooltip', () => {
     );
     fireEvent.pointerMove(screen.getByRole('button', { name: 'Trigger' }));
 
+    // Only a cap, never a fixed width: Radix's popper wrapper shrink-wraps
+    // the bubble, so `w-56` was what padded "Delete" out to 14rem.
     const tooltip = await screen.findByRole('tooltip');
-    expect(tooltip.className).toContain('w-fit');
     expect(tooltip.className).toContain('max-w-56');
+    expect(tooltip.className).not.toMatch(/(^|\s)w-\d/);
   });
 
   it('merges a caller-supplied className onto the trigger element', () => {

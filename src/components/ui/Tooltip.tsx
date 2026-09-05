@@ -93,7 +93,7 @@ export function Tooltip({ content, children, className = '' }: TooltipProps) {
             sideOffset={4}
             collisionPadding={8}
             onPointerDownOutside={dismissTouch}
-            className="pointer-events-none z-50 w-fit max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
+            className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
           >
             {content}
           </TooltipPrimitive.Content>
