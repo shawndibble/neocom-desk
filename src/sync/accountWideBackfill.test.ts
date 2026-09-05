@@ -41,7 +41,12 @@ async function seedTombstone(
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  await Promise.all([db.characters.clear(), db.stationPins.clear(), db.settings.clear()]);
+  await Promise.all([
+    db.characters.clear(),
+    db.stationPins.clear(),
+    db.planetRichness.clear(),
+    db.settings.clear(),
+  ]);
 });
 
 describe('backfillAccountWideData', () => {
@@ -210,5 +215,59 @@ describe('backfillAccountWideData', () => {
     await backfillAccountWideData(2);
 
     expect((await db.stationPins.get('2:60003760'))?.updatedAt).toBe(500);
+  });
+});
+
+describe('planet richness (#425) — the second collection', () => {
+  async function seedRichness(
+    characterId: number,
+    planetId: number,
+    order: number[],
+    updatedAt = 100
+  ) {
+    await db.planetRichness.put({
+      id: `${characterId}:${planetId}`,
+      characterId,
+      planetId,
+      order,
+      updatedAt,
+    });
+  }
+
+  it('copies a ranking onto a Character added later', async () => {
+    await seedCharacter(1);
+    await seedRichness(1, 40_000_001, [2073, 2268]);
+    await seedCharacter(2);
+
+    expect(await backfillAccountWideData(2)).toBe(true);
+    expect(await db.planetRichness.get('2:40000001')).toMatchObject({
+      characterId: 2,
+      planetId: 40_000_001,
+      order: [2073, 2268],
+      updatedAt: 100,
+    });
+  });
+
+  it('gives the copy its own array, so reordering one does not reorder the other', async () => {
+    await seedCharacter(1);
+    await seedRichness(1, 40_000_001, [2073, 2268]);
+    await seedCharacter(2);
+    await backfillAccountWideData(2);
+
+    const copied = await db.planetRichness.get('2:40000001');
+    copied!.order.reverse();
+
+    expect((await db.planetRichness.get('1:40000001'))?.order).toEqual([2073, 2268]);
+  });
+
+  it('backfills both collections in one pass', async () => {
+    await seedCharacter(1);
+    await seedPin(1, 60_003_760, 'account');
+    await seedRichness(1, 40_000_001, [2073]);
+    await seedCharacter(2);
+
+    expect(await backfillAccountWideData(2)).toBe(true);
+    expect(await db.stationPins.get('2:60003760')).toBeDefined();
+    expect(await db.planetRichness.get('2:40000001')).toBeDefined();
   });
 });

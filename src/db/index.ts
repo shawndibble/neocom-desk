@@ -227,6 +227,39 @@ export interface StationPinRecord {
 }
 
 /**
+ * A pilot's own best-to-worst ranking of the P0 resources on one planet
+ * (issue #425, CONTEXT.md round 51/52).
+ *
+ * ESI carries no per-planet resource richness at all, and the in-game scan
+ * overlay shows a colour map rather than a number — so an ordering is the only
+ * honest thing a pilot can record, and a percentage would be invention. The
+ * ranking is knowledge they paid probe time for, which is why it is synced
+ * Editable Data rather than a device-local preference.
+ *
+ * Account-wide, and account-wide is the *only* scope: a planet's richness is a
+ * property of the planet, identical for every Character in the account, so
+ * there is no per-Character reading to offer and nothing to elevate. Unlike
+ * `StationPinRecord` it therefore carries no `scope` field — it fans out to
+ * every Character the same way, one row each, synced under that Character's
+ * own ownerHash (round 7, parity plan §5.7).
+ */
+export interface PlanetRichnessRecord {
+  /** Always `${characterId}:${planetId}` — one record per Character per planet. */
+  id: string;
+  characterId: number;
+  planetId: number;
+  /**
+   * P0 typeIDs, richest first. Only the resources that planet type actually
+   * yields, and a resource the pilot has not ranked is simply absent rather
+   * than sorted to the end — "I have not scanned this" and "this is worst"
+   * are different claims.
+   */
+  order: number[];
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
+/**
  * One notification the Foreground Poller fired, kept so the Overview's
  * Notification Feed can show what was missed (CONTEXT.md round 20). Device-
  * local and never synced, like the preferences that gate it: the poller runs
@@ -278,6 +311,7 @@ export const db = new Dexie('neocom') as Dexie & {
   buildPlans: EntityTable<BuildPlanRecord, 'id'>;
   quickbars: EntityTable<QuickbarRecord, 'id'>;
   stationPins: EntityTable<StationPinRecord, 'id'>;
+  planetRichness: EntityTable<PlanetRichnessRecord, 'id'>;
   notificationFeed: EntityTable<NotificationFeedRecord, 'id'>;
 };
 
@@ -358,5 +392,21 @@ db.version(7).stores({
   buildPlans: 'id, characterId',
   quickbars: 'id, characterId',
   stationPins: 'id, characterId, locationId',
+  notificationFeed: 'id, characterId, firedAt',
+});
+
+// Additive: v7 stores unchanged, plus the per-planet resource ranking
+// (issue #425). Indexed by planetId as well as characterId, because the
+// Advisor reads one system's planets at a time.
+db.version(8).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
   notificationFeed: 'id, characterId, firedAt',
 });
