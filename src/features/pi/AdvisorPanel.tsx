@@ -126,7 +126,7 @@ function customsTooltip(source: CustomsRateSource, t: TFunction): string {
       return t('piAdvisor.customsRateSource.highsec-unknown-skill');
     case 'player-poco':
       return t('piAdvisor.customsRateSource.player-poco', {
-        space: t(`piAdvisor.spaceOption.${source.space}`),
+        space: t(`common.spaceOption.${source.space}`),
       });
   }
 }
@@ -181,6 +181,19 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   }
   const systemIds = [...bySystem.keys()];
 
+  // Started here rather than awaited in sequence below: it needs only `pi`,
+  // which is already in hand, so it runs alongside the colony detail and the
+  // per-planet lookups instead of after them. It is the widest read on this
+  // tab — every planetary commodity there is — and nothing between here and
+  // the await depends on it.
+  const pricesPromise = loadPlanPrices(DEFAULT_TRADE_HUB, [
+    ...new Set([...pi.raw.map((resource) => resource.typeID), ...plannableTypeIds(pi)]),
+  ])
+    // Failure is not fatal: an unpriced candidate refuses with `needs-price`
+    // rather than taking the whole panel down with it.
+    .then((result) => result.prices)
+    .catch(() => ({}) as Record<number, number>);
+
   const [details, systemNames, planetIdLists, securities] = await Promise.all([
     loadAllColonyDetails(
       characterId,
@@ -234,15 +247,6 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     ])
   );
 
-  const piTypeIds = [
-    ...new Set([...pi.raw.map((resource) => resource.typeID), ...plannableTypeIds(pi)]),
-  ];
-  // Failure here is not fatal: an unpriced candidate refuses with
-  // `needs-price` rather than taking the whole panel down with it.
-  const prices = await loadPlanPrices(DEFAULT_TRADE_HUB, piTypeIds)
-    .then((result) => result.prices)
-    .catch(() => ({}) as Record<number, number>);
-
   const flatDetails = new Map<number, CharacterPlanetDetail>();
   for (const [planetId, result] of details) {
     const data = result.cached?.data;
@@ -264,9 +268,10 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
         .filter((id): id is number => id !== undefined)
     ),
   ];
-  const [schematicNameList, typeNames] = await Promise.all([
+  const [schematicNameList, typeNames, prices] = await Promise.all([
     Promise.all(schematicIds.map((id) => loadSchematicName(id))),
     loadTypeNames(productTypeIds),
+    pricesPromise,
   ]);
   const schematicNames = new Map<number, string>();
   schematicIds.forEach((id, i) => {

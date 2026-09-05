@@ -635,7 +635,13 @@
       "days": "{{count}}d ago"
     },
     "loadFailedTitle": "Could not load",
-    "loadFailedHint": "Something went wrong fetching this. Try Refresh."
+    "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
+    "spaceOption": {
+      "highsec": "Highsec",
+      "lowsec": "Lowsec",
+      "nullsec": "Nullsec",
+      "wormhole": "Wormhole"
+    }
   },
   "wallet": {
     "title": "Wallet",
@@ -952,12 +958,6 @@
     "outputPerDay": "Output per day",
     "hub": "Trade hub",
     "space": "Colony space",
-    "spaceOption": {
-      "highsec": "Highsec",
-      "lowsec": "Lowsec",
-      "nullsec": "Nullsec",
-      "wormhole": "Wormhole"
-    },
     "spaceHint": "Sets the starting customs rate only. It never changes yield — per-planet richness is scanner-only and is not in ESI.",
     "customsRate": "Customs rate (%)",
     "customsRateReset": "Use the default for this space",
@@ -1124,12 +1124,6 @@
       "throughput": "No build advice: everything that fits here would fill its launchpad and storage faster than a day, so nothing it could run would keep running.",
       "unprofitable": "No build advice: nothing this planet can extract covers its own customs tax at current hub prices.",
       "mixed": "No build advice: of everything this planet yields, nothing at once fits here, is priced at the hub and earns more than its customs tax."
-    },
-    "spaceOption": {
-      "highsec": "Highsec",
-      "lowsec": "Lowsec",
-      "nullsec": "Nullsec",
-      "wormhole": "Wormhole"
     },
     "stopTierAtLabel": "Best tier — already running it"
   },
