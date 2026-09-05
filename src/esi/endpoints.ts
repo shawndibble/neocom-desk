@@ -741,6 +741,32 @@ export async function postUniverseNames(
   return result.data ?? [];
 }
 
+// --- POST /universe/ids (public) ---
+
+/**
+ * Name -> id resolution. Only the `systems` bucket is modelled: the one caller
+ * is the Build Plan's build-system field, and ESI returns a bucket per
+ * category, so an unmodelled bucket is simply ignored rather than an error.
+ */
+export interface UniverseIds {
+  systems?: { id: number; name: string }[];
+}
+
+/** Exact-name (case-insensitive) lookup. Empty input never calls ESI. */
+export async function postUniverseIds(
+  names: string[],
+  options: { signal?: AbortSignal } = {}
+): Promise<UniverseIds> {
+  if (names.length === 0) return {};
+  const result = await esiFetch<UniverseIds>('/universe/ids', {
+    method: 'POST',
+    body: names,
+    signal: options.signal,
+    endpointId: 'postUniverseIds',
+  });
+  return result.data ?? {};
+}
+
 // --- GET /characters/{character_id}/calendar (esi-calendar.read_calendar_events.v1) ---
 
 export interface CalendarEventSummary {

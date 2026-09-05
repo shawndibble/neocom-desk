@@ -253,6 +253,10 @@ export const ESI_REGISTRY = {
     route: '/universe/names',
     scope: PUBLIC,
   },
+  postUniverseIds: {
+    route: '/universe/ids',
+    scope: PUBLIC,
+  },
   getMarketsPrices: {
     route: '/markets/prices',
     scope: PUBLIC,

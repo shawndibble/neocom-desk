@@ -552,6 +552,8 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     rigLevel: 't1',
     security: 'highsec',
     hubId: 'jita',
+    buildSystemId: 30003888,
+    buildSystemName: 'Badivefi',
     facilityTaxPct: 1.5,
     materialSourcing: { 34: { ownedQuantity: 500, overridePrice: 6.5 } },
     ownedStockScope: {
@@ -581,6 +583,8 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     expect(Object.keys(fullBuildPlan).sort()).toEqual([
       'blueprintTypeID',
       'buildHere',
+      'buildSystemId',
+      'buildSystemName',
       'characterId',
       'facility',
       'facilityTaxPct',

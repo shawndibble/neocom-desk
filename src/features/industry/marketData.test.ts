@@ -41,12 +41,19 @@ function adjustedPricesHandler() {
   );
 }
 
+/** Two systems: the hub's, and Badivefi standing in for a build system elsewhere. */
+const BUILD_SYSTEM_ID = 30003888;
+
 function costIndexHandler() {
   return http.get(`${ESI_BASE_URL}/industry/systems`, () =>
     HttpResponse.json([
       {
         solar_system_id: DEFAULT_TRADE_HUB.systemId,
         cost_indices: [{ activity: 'manufacturing', cost_index: 0.0464 }],
+      },
+      {
+        solar_system_id: BUILD_SYSTEM_ID,
+        cost_indices: [{ activity: 'manufacturing', cost_index: 0.0272 }],
       },
     ])
   );
@@ -64,6 +71,24 @@ describe('loadMarketSnapshot', () => {
     expect(snapshot.hubBuyPrices[587]).toBeUndefined();
     expect(snapshot.adjustedPrices).toEqual({ 34: 4.2 });
     expect(snapshot.systemCostIndex).toBe(0.0464);
+  });
+
+  it("reads the cost index of the build system when one is named, not the hub's", async () => {
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
+
+    const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], BUILD_SYSTEM_ID);
+
+    // The hub is still priced at the hub; only the job fee moves system.
+    expect(snapshot.hubPrices).toEqual({ 34: 5.5 });
+    expect(snapshot.systemCostIndex).toBe(0.0272);
+  });
+
+  it('reports a null cost index for a build system with no industry index', async () => {
+    server.use(fuzzworkHandler(), adjustedPricesHandler(), costIndexHandler());
+
+    const snapshot = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], 30000001);
+
+    expect(snapshot.systemCostIndex).toBeNull();
   });
 
   it('reports adjustedPrices and systemCostIndex as null when the ESI calls fail (offline signal)', async () => {

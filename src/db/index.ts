@@ -192,6 +192,16 @@ export interface BuildPlanRecord {
   rigLevel: RigLevel;
   security: SecurityBand;
   hubId: TradeHub['id'];
+  /**
+   * Solar system the job runs in, which is what the job fee's cost index is
+   * charged at. Absent means the hub's own system — how every plan behaved
+   * before this existed, and still right for a player who builds where they
+   * sell. Additive and unindexed, so no schema version bump (see
+   * `materialSourcing` below).
+   */
+  buildSystemId?: number;
+  /** ESI's name for `buildSystemId`, stored so the results panel can label the index without a lookup. */
+  buildSystemName?: string;
   /** Facility tax, percent of EIV. Structures only — NPC station tax is fixed. */
   facilityTaxPct?: number;
   /**
