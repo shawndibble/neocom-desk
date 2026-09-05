@@ -31,3 +31,13 @@ export async function loadStationName(stationId: number): Promise<string | null>
 export async function loadStationSystemId(stationId: number): Promise<number | null> {
   return (await loadStation(stationId))?.system_id ?? null;
 }
+
+/** The same three fields `loadStructureSummary` returns, for an NPC station. */
+export async function loadStationSummary(
+  stationId: number
+): Promise<{ name: string; systemId: number; typeId: number } | null> {
+  const station = await loadStation(stationId);
+  return station
+    ? { name: station.name, systemId: station.system_id, typeId: station.type_id }
+    : null;
+}

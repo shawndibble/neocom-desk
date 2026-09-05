@@ -741,6 +741,38 @@ export async function postUniverseNames(
   return result.data ?? [];
 }
 
+// --- GET /characters/{character_id}/search (esi-search.search_structures.v1) ---
+
+/** Only the categories the Build Plan's location search asks for. */
+export interface CharacterSearchResult {
+  station?: number[];
+  structure?: number[];
+  solar_system?: number[];
+}
+
+export type SearchCategory = 'station' | 'structure' | 'solar_system';
+
+/**
+ * Name search across the categories asked for, returning ids only.
+ *
+ * ESI requires at least three characters and, for `structure`, filters to what
+ * this Character can actually dock at — the ACL is CCP's, not ours, so a
+ * structure missing from the results is not a bug.
+ */
+export function getCharacterSearch(
+  characterId: number,
+  categories: readonly SearchCategory[],
+  search: string,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterSearchResult>> {
+  return esiFetch<CharacterSearchResult>(`/characters/${characterId}/search`, {
+    ...options,
+    characterId,
+    query: { categories: categories.join(','), search },
+    endpointId: 'getCharacterSearch',
+  });
+}
+
 // --- POST /universe/ids (public) ---
 
 /**

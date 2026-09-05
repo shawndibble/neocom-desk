@@ -12,11 +12,20 @@
  * names never change, and a plan re-resolves the same one on every edit.
  */
 import { postUniverseIds } from '@/esi/endpoints';
+import { loadSystemSecurity } from '@/features/character/systemSecurity';
+import { securityBand, type SecurityBand } from '@/engine/securityStatus';
 
 export interface SolarSystemRef {
   id: number;
   /** ESI's own casing, not what the player typed. */
   name: string;
+  /**
+   * The system's security band, so naming a system settles the plan's rig
+   * multiplier too. `null` only when `/universe/systems/{id}` could not be
+   * reached and nothing was cached — the caller then keeps the band it has
+   * rather than guessing a new one.
+   */
+  security: SecurityBand | null;
 }
 
 /** `null` caches a name ESI does not know, so a typo is not re-asked on every keystroke. */
@@ -46,7 +55,18 @@ export async function resolveSolarSystem(name: string): Promise<SolarSystemRef |
     // collide with a corporation or alliance name (Amarr does). Only the
     // `systems` bucket is ever read.
     const match = result.systems?.find((s) => s.name.toLowerCase() === key) ?? null;
-    if (match) found = { id: match.id, name: match.name };
+    if (match) {
+      // A second, public, statically-cached read — the same
+      // `/universe/systems/{id}` row the Assets badge and the corp structure
+      // picker already share, so a system named twice costs one request.
+      const status = await loadSystemSecurity(match.id);
+      // An unreachable security lookup is the same kind of failure as an
+      // unreachable `/universe/ids`, so it gets the same answer: return what we
+      // have and cache nothing, or a band that failed once would stay null for
+      // the rest of the session with no way to re-derive it.
+      if (status === null) return { id: match.id, name: match.name, security: null };
+      found = { id: match.id, name: match.name, security: securityBand(status) };
+    }
   } catch {
     // An unreachable ESI is not a wrong name: leave it uncached so the next
     // edit retries instead of pinning "not found" for the session.

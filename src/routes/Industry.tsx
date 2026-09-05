@@ -325,6 +325,21 @@ export function Industry() {
   }
 
   /**
+   * A correction the app made for itself — today, a security band brought back
+   * into line with the plan's build system.
+   *
+   * Deliberately does not touch `updatedAt`. Merely opening a plan is not
+   * editing it: bumping the timestamp would make the last plan *viewed* win
+   * the "default a new plan from the most recently updated one" rule (#456),
+   * and would churn every device's sync for a value the pilot never changed.
+   */
+  async function handleDerivedFix(patch: PlanPatch) {
+    if (!selectedPlan) return;
+    await db.buildPlans.put({ ...selectedPlan, ...patch });
+    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
+  }
+
+  /**
    * "Use all detected" (issue #181), applied one row at a time through the very
    * same write path a typed value takes. Awaited in sequence, not fired in
    * parallel: each `saveSourcingEdit` merges into the record it reads inside
@@ -472,6 +487,7 @@ export function Industry() {
                   skills={skills}
                   ownedStockSnapshot={ownedStockSnapshot}
                   onUpdate={(patch) => void handleUpdate(patch)}
+                  onDerivedFix={(patch) => void handleDerivedFix(patch)}
                   onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
                   onSourcingChangeMany={(patches) => void handleSourcingChangeMany(patches)}
                   onAddToQuickbar={quickbar.add}

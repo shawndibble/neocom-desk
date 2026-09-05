@@ -18,7 +18,6 @@ import type {
   FacilityKind,
   MaterialSourcing,
   RigLevel,
-  SecurityBand,
   SkillLevels,
 } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -50,6 +49,9 @@ import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { ResultsSummary } from './ResultsSummary';
 import { BuildSystemInput } from './BuildSystemInput';
+import { BuildLocationPicker } from './BuildLocationPicker';
+import { buildLocationPatch } from './buildLocationPatch';
+import { useDerivedSecurityBand } from './useDerivedSecurityBand';
 
 /** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
 export type PlanPatch = Partial<
@@ -91,6 +93,13 @@ interface BuildPlanDetailProps {
    */
   ownedStockSnapshot: OwnedStockSnapshot;
   onUpdate: (patch: PlanPatch) => void;
+  /**
+   * A correction the panel derived rather than the pilot made — persisted
+   * without counting as an edit, so opening a plan never bumps its
+   * `updatedAt`. Today: a security band brought back into line with the
+   * plan's build system.
+   */
+  onDerivedFix: (patch: PlanPatch) => void;
   /**
    * One material row’s sourcing edit. Separate from `onUpdate` because it is a
    * read-modify-write of a nested map rather than a whole field, so it has to
@@ -139,6 +148,7 @@ export function BuildPlanDetail({
   skills,
   ownedStockSnapshot,
   onUpdate,
+  onDerivedFix,
   onSourcingChange,
   onSourcingChangeMany,
   onAddToQuickbar,
@@ -189,6 +199,13 @@ export function BuildPlanDetail({
     plan.buildSystemId !== undefined && plan.buildSystemName !== undefined
       ? { id: plan.buildSystemId, name: plan.buildSystemName }
       : null;
+  // The band is derived, not typed, so it is reconciled here rather than only
+  // on edit — otherwise a plan saved before the Security field went away keeps
+  // a band nothing can correct, and still drives the rig multiplier.
+  useDerivedSecurityBand(buildSystem?.id, hub.security, plan.security, (security) =>
+    onDerivedFix({ security })
+  );
+
   const snapshotKey = `${hub.id}:${buildSystem?.id ?? hub.systemId}:${typeIds.join(',')}:${refreshTick}`;
   const [prevSnapshotKey, setPrevSnapshotKey] = useState(snapshotKey);
   if (prevSnapshotKey !== snapshotKey) {
@@ -564,108 +581,113 @@ export function BuildPlanDetail({
             <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('industry.groupLocationMarket')}
             </h3>
-            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <label className="flex flex-col gap-1 text-xs">
-                {t('industry.facility')}
-                <NativeSelect
-                  value={plan.facility}
-                  onChange={(e) => {
-                    const facility = e.target.value as FacilityKind;
-                    const structure = FACILITY_PRESETS[facility].structure;
-                    update(
-                      structure
-                        ? { facility }
-                        : { facility, rigLevel: 'none', facilityTaxPct: undefined }
-                    );
-                  }}
-                >
-                  {Object.values(FACILITY_PRESETS).map((f) => (
-                    <option key={f.kind} value={f.kind}>
-                      {f.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </label>
+            <div className="mt-2 flex flex-col gap-3">
+              <BuildLocationPicker
+                summary={t('industry.buildLocationSummary', {
+                  facility: facilityPreset.name,
+                  system: buildSystem?.name ?? hub.systemName,
+                  security: t(`industry.${plan.security}`),
+                })}
+                onPick={(option) => update(buildLocationPatch(option))}
+              >
+                <label className="flex flex-col gap-1 text-xs">
+                  {t('industry.facility')}
+                  <NativeSelect
+                    value={plan.facility}
+                    onChange={(e) => {
+                      const facility = e.target.value as FacilityKind;
+                      const structure = FACILITY_PRESETS[facility].structure;
+                      update(
+                        structure
+                          ? { facility }
+                          : { facility, rigLevel: 'none', facilityTaxPct: undefined }
+                      );
+                    }}
+                  >
+                    {Object.values(FACILITY_PRESETS).map((f) => (
+                      <option key={f.kind} value={f.kind}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </label>
 
-              <label className="flex flex-col gap-1 text-xs">
-                {t('industry.rigLevel')}
-                <NativeSelect
-                  value={plan.rigLevel}
-                  disabled={!facilityPreset.structure}
-                  onChange={(e) => update({ rigLevel: e.target.value as RigLevel })}
-                >
-                  <option value="none">{t('industry.rigNone')}</option>
-                  <option value="t1">{t('industry.rigT1')}</option>
-                  <option value="t2">{t('industry.rigT2')}</option>
-                </NativeSelect>
-              </label>
+                <BuildSystemInput
+                  systemName={buildSystem?.name}
+                  hubSystemName={hub.systemName}
+                  securityLabel={t(`industry.${plan.security}`)}
+                  onChange={(system) =>
+                    update({
+                      buildSystemId: system?.id,
+                      buildSystemName: system?.name,
+                      // The band follows the system, so naming one settles the
+                      // rig multiplier too. An unreachable ESI leaves the plan
+                      // with the band it had rather than a guessed one.
+                      ...(system === null
+                        ? { security: hub.security }
+                        : system.security !== null
+                          ? { security: system.security }
+                          : {}),
+                    })
+                  }
+                />
+              </BuildLocationPicker>
 
-              <label className="flex flex-col gap-1 text-xs">
-                {t('industry.security')}
-                <NativeSelect
-                  value={plan.security}
-                  onChange={(e) => update({ security: e.target.value as SecurityBand })}
-                >
-                  <option value="highsec">{t('industry.highsec')}</option>
-                  <option value="lowsec">{t('industry.lowsec')}</option>
-                  <option value="nullsec">{t('industry.nullsec')}</option>
-                </NativeSelect>
-              </label>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {/* Only a player structure has rig slots or an owner-set tax, so an
+                    NPC station shows neither rather than showing them dead. Both
+                    are already cleared on the plan when the facility changes. */}
+                {facilityPreset.structure && (
+                  <label className="flex flex-col gap-1 text-xs">
+                    {t('industry.rigLevel')}
+                    <NativeSelect
+                      value={plan.rigLevel}
+                      onChange={(e) => update({ rigLevel: e.target.value as RigLevel })}
+                    >
+                      <option value="none">{t('industry.rigNone')}</option>
+                      <option value="t1">{t('industry.rigT1')}</option>
+                      <option value="t2">{t('industry.rigT2')}</option>
+                    </NativeSelect>
+                  </label>
+                )}
 
-              <label className="flex flex-col gap-1 text-xs">
-                {t('industry.tradeHub')}
-                <NativeSelect
-                  value={plan.hubId}
-                  onChange={(e) => update({ hubId: e.target.value as BuildPlanRecord['hubId'] })}
-                >
-                  {TRADE_HUBS.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </label>
-
-              <BuildSystemInput
-                systemName={buildSystem?.name}
-                hubSystemName={hub.systemName}
-                onChange={(system) =>
-                  update({
-                    buildSystemId: system?.id,
-                    buildSystemName: system?.name,
-                  })
-                }
-              />
-
-              {facilityPreset.structure && (
-                <div className="flex flex-col gap-1 text-xs">
-                  <span className="flex items-center gap-1">
-                    <label htmlFor="build-plan-facility-tax">{t('industry.facilityTax')}</label>
-                    <InfoTooltip
-                      label={t('industry.facilityTaxTooltipLabel')}
-                      content={t('industry.facilityTaxTooltip')}
+                {facilityPreset.structure && (
+                  <div className="flex flex-col gap-1 text-xs">
+                    <span className="flex items-center gap-1">
+                      <label htmlFor="build-plan-facility-tax">{t('industry.facilityTax')}</label>
+                      <InfoTooltip
+                        label={t('industry.facilityTaxTooltipLabel')}
+                        content={t('industry.facilityTaxTooltip')}
+                      />
+                    </span>
+                    <TextInput
+                      id="build-plan-facility-tax"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={plan.facilityTaxPct ?? 0}
+                      onChange={(e) =>
+                        update({ facilityTaxPct: Math.max(0, Number(e.target.value) || 0) })
+                      }
                     />
-                  </span>
-                  <TextInput
-                    id="build-plan-facility-tax"
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.1}
-                    value={plan.facilityTaxPct ?? 0}
-                    onChange={(e) =>
-                      update({ facilityTaxPct: Math.max(0, Number(e.target.value) || 0) })
-                    }
-                  />
-                </div>
-              )}
+                  </div>
+                )}
 
-              <OwnedStockScopeControl
-                scope={plan.ownedStockScope}
-                detectedStock={detectedStock}
-                detection={detection}
-                onChange={(ownedStockScope) => update({ ownedStockScope })}
-              />
+                <label className="flex flex-col gap-1 text-xs">
+                  {t('industry.tradeHub')}
+                  <NativeSelect
+                    value={plan.hubId}
+                    onChange={(e) => update({ hubId: e.target.value as BuildPlanRecord['hubId'] })}
+                  >
+                    {TRADE_HUBS.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -737,6 +759,20 @@ export function BuildPlanDetail({
           <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
         ) : (
           <>
+            {/*
+              Lives here, not in the settings block above: it governs one number
+              in one column of the table below it — the owned quantity "use
+              detected" offers — and nothing else on the plan. Beside Facility
+              and Trade hub it read as another thing about where the job runs.
+            */}
+            <div className="mb-3 flex flex-col gap-2">
+              <OwnedStockScopeControl
+                scope={plan.ownedStockScope}
+                detectedStock={detectedStock}
+                detection={detection}
+                onChange={(ownedStockScope) => update({ ownedStockScope })}
+              />
+            </div>
             <MaterialsTable
               materials={visibleMaterials}
               nameFor={(typeID) => nameForType(catalog, typeID)}

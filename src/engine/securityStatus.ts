@@ -1,9 +1,21 @@
 export type SecurityBand = 'highsec' | 'lowsec' | 'nullsec';
 
-/** EVE's own security-status bands: highsec 0.5+, lowsec 0.1-0.4, nullsec below 0.1 (including negative). */
+/**
+ * EVE's own security-status bands: highsec 0.5+, lowsec 0.1-0.4, nullsec 0.0
+ * and below (including negative, which is where J-space sits).
+ *
+ * Banded on the status **rounded to one decimal**, not the raw float ESI
+ * publishes, because that is the number the game both displays and enforces.
+ * Balle is 0.4608891 in ESI and a 0.5 highsec system in game; banding the raw
+ * value called it lowsec, which is the wrong rig multiplier for an industry job
+ * (1.9x instead of 1x) and the wrong POCO base rate in `features/pi/customsRate`
+ * — the only two callers. `securityStatusColor` below interpolates the raw
+ * value and is deliberately untouched.
+ */
 export function securityBand(security: number): SecurityBand {
-  if (security >= 0.5) return 'highsec';
-  if (security >= 0.1) return 'lowsec';
+  const shown = Math.round(security * 10) / 10;
+  if (shown >= 0.5) return 'highsec';
+  if (shown >= 0.1) return 'lowsec';
   return 'nullsec';
 }
 

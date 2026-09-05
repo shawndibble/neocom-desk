@@ -120,6 +120,16 @@ const server = setupServer(
       },
     ])
   ),
+  // The plan panel reconciles its security band against the system it builds
+  // in (`useDerivedSecurityBand`). Tama is lowsec, Badivefi highsec.
+  http.get('https://esi.evetech.net/universe/systems/:id', ({ params }) => {
+    const id = Number(params.id);
+    return HttpResponse.json(
+      id === 30002813
+        ? { system_id: id, name: 'Tama', security_status: 0.2825 }
+        : { system_id: id, name: 'Badivefi', security_status: 0.6587 }
+    );
+  }),
   fuzzworkHandler()
 );
 
@@ -274,7 +284,11 @@ describe('Industry: Build Plan CRUD', () => {
         blueprintTypeID: 9841,
         facility: 'raitaru',
         rigLevel: 't2',
+        // Lowsec because it builds in Tama, not because anyone typed it — the
+        // band follows the build system now, so the fixture has to name one.
         security: 'lowsec',
+        buildSystemId: 30002813,
+        buildSystemName: 'Tama',
         hubId: 'amarr',
         facilityTaxPct: 0.25,
         updatedAt: 5,
@@ -452,6 +466,8 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
     expect(screen.getByRole('button', { name: 'About TE' })).toBeInTheDocument();
 
     expect(screen.queryByRole('button', { name: 'About facility tax' })).not.toBeInTheDocument();
+    // Facility folds behind "Override" now that the location search fills it.
+    await user.click(screen.getByRole('button', { name: 'Override' }));
     await user.selectOptions(screen.getByLabelText('Facility'), 'raitaru');
     expect(screen.getByLabelText('Facility tax %')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About facility tax' })).toBeInTheDocument();
@@ -471,10 +487,16 @@ describe('Industry: build plan settings grouping (#120)', () => {
     expect(screen.getByLabelText('Runs')).toBeInTheDocument();
     expect(screen.getByLabelText('ME %')).toBeInTheDocument();
     expect(screen.getByLabelText('TE %')).toBeInTheDocument();
-    expect(screen.getByLabelText('Facility')).toBeInTheDocument();
-    expect(screen.getByLabelText('Rig')).toBeInTheDocument();
-    expect(screen.getByLabelText('Security')).toBeInTheDocument();
     expect(screen.getByLabelText('Trade hub')).toBeInTheDocument();
+    // Rig and facility tax belong to a player structure. The seeded plan is an
+    // NPC station, which has neither, so neither control is on screen.
+    expect(screen.queryByLabelText('Rig')).toBeNull();
+    expect(screen.queryByLabelText('Facility tax %')).toBeNull();
+    // Facility and Build system fold behind "Override" — the search box fills
+    // both, and the line under it states what the plan is set to.
+    expect(screen.getByRole('button', { name: 'Override' })).toBeInTheDocument();
+    // Security is no longer a control at all: it follows the build system.
+    expect(screen.queryByLabelText('Security')).toBeNull();
   });
 });
 
@@ -839,7 +861,7 @@ describe('Industry: owned-stock scope (#454)', () => {
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
-    const select = screen.getByLabelText('Count owned stock from') as HTMLSelectElement;
+    const select = screen.getByLabelText('Owned Material Source') as HTMLSelectElement;
     expect(select).toHaveValue('everywhere');
 
     await userEvent.selectOptions(select, 'Selected locations');

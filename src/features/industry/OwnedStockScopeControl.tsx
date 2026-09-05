@@ -26,6 +26,11 @@ interface OwnedStockScopeControlProps {
  * matches every behavior before this control existed; "Selected locations"
  * narrows the offer to a chosen subset, derived from the plan's already-
  * computed detected stock so there is nothing new to fetch.
+ *
+ * Rendered at the head of the Materials panel, above the table whose owned
+ * column it governs. It sat in the Location & market settings for a while and
+ * read there as a third thing about *where the job runs*, next to Facility and
+ * Trade hub, when it is really about which of your hangars the table may count.
  */
 export function OwnedStockScopeControl({
   scope,
@@ -54,18 +59,23 @@ export function OwnedStockScopeControl({
     onChange({ mode: 'selected', locations: next });
   }
 
-  // Two grid children, not one. The picker is a plain select the width of
-  // every other control in the row, so it belongs in a normal cell beside
-  // them — it only ever spanned the full row because the chip list underneath
-  // it needed the width. Splitting them lets the select take the cell after
-  // Facility tax and leaves the chips their own full-width row below, which
-  // also stops the row's height from jumping when "Selected" is chosen.
+  // Two children, not one wrapper: the label-and-select line, and the chip
+  // list as a block of its own beneath. Splitting them is what stops the
+  // line's height from jumping when "Selected" is chosen.
+  //
+  // The label sits inline with the select from `sm` up and stacks above it
+  // below that — the same breakpoint the plan's own settings grid folds at, so
+  // a narrow screen never has to choose between a cramped label and a select
+  // too short to read an option in.
   return (
     <>
-      <div className="flex flex-col gap-1 text-xs">
-        <label htmlFor="build-plan-owned-stock-scope">{t('industry.ownedStockScopeLabel')}</label>
+      <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:gap-2">
+        <label htmlFor="build-plan-owned-stock-scope" className="whitespace-nowrap">
+          {t('industry.ownedStockScopeLabel')}
+        </label>
         <NativeSelect
           id="build-plan-owned-stock-scope"
+          className="w-auto"
           value={mode}
           onChange={(e) => {
             const nextMode = e.target.value;
@@ -86,11 +96,9 @@ export function OwnedStockScopeControl({
       </div>
       {mode === 'selected' &&
         (locations.length === 0 ? (
-          <span className="col-span-full text-xs text-text-dim">
-            {t('industry.ownedStockScopeNoLocations')}
-          </span>
+          <span className="text-xs text-text-dim">{t('industry.ownedStockScopeNoLocations')}</span>
         ) : (
-          <div className="col-span-full flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {locations.map((location) => (
               <FilterChip
                 key={ownedStockLocationKey(location)}

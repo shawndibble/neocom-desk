@@ -274,6 +274,17 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
 
+  // Base grant, deliberately: the Build Plan's build-location search is a plain
+  // feature of a route every Character can open, and it pairs with
+  // `getUniverseStructure`'s `esi-universe.read_structures.v1`, which is
+  // already asked for at sign-in. `/industry` stays UNGATED in `routeScopes.ts`
+  // — a Character who signed in before this scope existed keeps the whole route
+  // and is offered the re-auth by the picker itself.
+  getCharacterSearch: {
+    route: '/characters/{character_id}/search',
+    scope: 'esi-search.search_structures.v1',
+  },
+
   // --- The `corp` group (issue #295) ---
   //
   // Every entry below is corp-owned data behind a server-side role gate, so
