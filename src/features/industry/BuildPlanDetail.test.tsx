@@ -742,9 +742,15 @@ describe('BuildPlanDetail reaction plans (issue #460)', () => {
     render(<Harness plan={reactionPlan()} catalog={REACTION_CATALOG} />);
     await openOverride(user);
 
-    const facilitySelect = screen.getByLabelText('Facility') as HTMLSelectElement;
-    const options = Array.from(facilitySelect.options).map((o) => o.value);
-    expect(options.sort()).toEqual(['athanor', 'tatara']);
+    await user.click(screen.getByRole('combobox', { name: 'Facility' }));
+    const options = await screen.findAllByRole('option');
+    // The selected option's own checkmark indicator rides along in
+    // textContent (e.g. "✓Athanor"), so strip leading non-word characters
+    // rather than comparing raw text.
+    expect(options.map((o) => o.textContent?.replace(/^\W+/, '')).sort()).toEqual([
+      'Athanor',
+      'Tatara',
+    ]);
   });
 
   it('produces a materials table and results for the reaction formula', async () => {
