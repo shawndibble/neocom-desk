@@ -71,10 +71,21 @@ const TRITANIUM_BLUEPRINT: BlueprintType = {
   activity: 'manufacturing',
 };
 
+/** Gives Pyerite a producer too, so an expanded row (Tritanium's own input) can carry its own make-or-buy advice. */
+const PYERITE_BLUEPRINT: BlueprintType = {
+  name: 'Pyerite Blueprint',
+  time: 300,
+  materials: [{ typeID: 36, quantity: 2 }],
+  products: [{ typeID: 35, quantity: 1 }],
+  skills: [],
+  activity: 'manufacturing',
+};
+
 const TYPES: TypeMap = {
   '587': { name: 'Rifter', groupID: 25, volume: 27289 },
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
+  '36': { name: 'Mexallon', groupID: 18, volume: 0.01 },
 };
 
 const ENTRY: BlueprintCatalogEntry = {
@@ -93,15 +104,25 @@ const TRITANIUM_ENTRY: BlueprintCatalogEntry = {
   productNameLower: 'tritanium',
 };
 
+const PYERITE_ENTRY: BlueprintCatalogEntry = {
+  blueprintTypeID: 640,
+  blueprint: PYERITE_BLUEPRINT,
+  productTypeID: 35,
+  productName: 'Pyerite',
+  productNameLower: 'pyerite',
+};
+
 const CATALOG: BlueprintCatalog = {
-  entries: [ENTRY, TRITANIUM_ENTRY],
+  entries: [ENTRY, TRITANIUM_ENTRY, PYERITE_ENTRY],
   byBlueprintTypeID: new Map([
     [638, ENTRY],
     [639, TRITANIUM_ENTRY],
+    [640, PYERITE_ENTRY],
   ]),
   byProductTypeID: new Map([
     [587, ENTRY],
     [34, TRITANIUM_ENTRY],
+    [35, PYERITE_ENTRY],
   ]),
   typesById: TYPES,
 };
@@ -407,6 +428,27 @@ describe('BuildPlanDetail sub-builds', () => {
     expect(await screen.findByText('250 runs')).toBeInTheDocument();
     const pyerite = screen.getByText('Pyerite').closest('tr');
     expect(within(pyerite as HTMLElement).getByText('1,250')).toBeInTheDocument();
+  });
+
+  it('marks an expanded input with its own make-or-buy verdict, but offers no control for it', async () => {
+    // Pyerite has its own producer (`PYERITE_ENTRY`) and, unlike every other
+    // test here, a real hub price to judge it against — so once Tritanium's
+    // job pulls it onto the table, it should carry the same advisory glyph a
+    // plan's own material gets, without a second level of "build here".
+    loadMarketSnapshot.mockResolvedValueOnce({
+      hubPrices: { 35: 20, 36: 5 },
+      hubBuyPrices: {},
+      adjustedPrices: {},
+      systemCostIndex: 0.05,
+    });
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+
+    await user.click(buildButton());
+    const pyerite = (await screen.findByText('Pyerite')).closest('tr') as HTMLElement;
+
+    expect(within(pyerite).getByRole('img')).toHaveAccessibleName(/^Cheaper to (build|buy):/);
+    expect(within(pyerite).queryByRole('button', { name: /Build|Buy/ })).not.toBeInTheDocument();
   });
 
   it('puts the recipe inputs on the shopping list in place of what they make', async () => {

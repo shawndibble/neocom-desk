@@ -93,16 +93,27 @@ export function recipeInputTypeIds(typeIDs: readonly number[], sources: RecipeCa
 
 /**
  * Every typeID a Build Plan's own price fetch needs: the blueprint's
- * materials, its product, and (via `recipeInputTypeIds`) one level of their
- * own recipe inputs, for the materials table's make-or-buy marker. Shared by
- * `BuildPlanDetail.tsx` (the currently-open plan) and
- * `useComparedBuildResults.ts` (issue #453 — every compared plan needs this
- * same widening against its own blueprint) so the two never drift apart.
+ * materials, its product, and (via `recipeInputTypeIds`, applied twice) two
+ * levels of their own recipe inputs. Shared by `BuildPlanDetail.tsx` (the
+ * currently-open plan) and `useComparedBuildResults.ts` (issue #453 — every
+ * compared plan needs this same widening against its own blueprint) so the
+ * two never drift apart.
+ *
+ * Two levels, not one. The first prices the materials table's own make-or-buy
+ * marker — is this material worth building, given what its recipe costs in
+ * inputs. Once the player acts on that and the plan expands a material into
+ * its inputs (one level deep, docs/context/decisions), those inputs get the
+ * same marker, and answering *that* verdict needs pricing for one level
+ * further down still — an expanded row's own recipe inputs. Nothing goes
+ * three levels deep: sub-builds themselves stop at one, so there is never a
+ * make-or-buy question to answer beyond what two levels of widening prices.
  */
 export function buildPlanTypeIds(blueprint: IndustryBlueprint, sources: RecipeCatalog): number[] {
   const ids = new Set(blueprint.materials.map((m) => m.typeID));
   const product = blueprint.products[0];
   if (product) ids.add(product.typeID);
-  for (const id of recipeInputTypeIds([...ids], sources)) ids.add(id);
+  const firstLevel = recipeInputTypeIds([...ids], sources);
+  for (const id of firstLevel) ids.add(id);
+  for (const id of recipeInputTypeIds(firstLevel, sources)) ids.add(id);
   return [...ids];
 }

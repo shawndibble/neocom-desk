@@ -25,6 +25,26 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'reaction',
   },
+  // A two-hop manufacturing chain (40 <- 41 <- 42), so `buildPlanTypeIds` has
+  // something to exercise its second level of widening against: pricing a
+  // make-or-buy verdict for 41 (an expanded row's own input) needs 42's hub
+  // price too, one level beyond what a single `recipeInputTypeIds` pass reaches.
+  '9843': {
+    name: 'Isogen Blueprint',
+    time: 100,
+    materials: [{ typeID: 41, quantity: 3 }],
+    products: [{ typeID: 40, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+  '9844': {
+    name: 'Nocxium Blueprint',
+    time: 50,
+    materials: [{ typeID: 42, quantity: 2 }],
+    products: [{ typeID: 41, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
 };
 
 const TYPES: TypeMap = {
@@ -160,29 +180,40 @@ describe('recipeInputTypeIds', () => {
 });
 
 describe('buildPlanTypeIds', () => {
-  // A plain blueprint, not from the fixture catalog: its material (2398) is a
-  // planetary schematic's output, and its product (9840) is itself
-  // manufactured by fixture blueprint 9841 — so the one-level widening below
-  // exercises both the manufacturing and planetary recipe paths at once,
-  // same as `BuildPlanDetail.tsx`'s price fetch (shared via this function,
-  // issue #453 — the Compare table widens its own fetch identically).
+  // A plain blueprint, not from the fixture catalog: one material (2398) is a
+  // planetary schematic's output, the other (40) is manufactured and itself
+  // has an input (41) with its own producer, and the product (9840) is
+  // manufactured by fixture blueprint 9841 — so the two-level widening below
+  // exercises the manufacturing and planetary recipe paths, and a second
+  // manufacturing hop, all at once, same as `BuildPlanDetail.tsx`'s price
+  // fetch (shared via this function, issue #453 — the Compare table widens
+  // its own fetch identically).
   const blueprint = {
     name: 'Widening test blueprint',
     time: 60,
-    materials: [{ typeID: 2398, quantity: 1 }],
+    materials: [
+      { typeID: 2398, quantity: 1 },
+      { typeID: 40, quantity: 1 },
+    ],
     products: [{ typeID: 9840, quantity: 1 }],
   };
 
-  it('adds the product to materials, then one level of recipe inputs for each', () => {
+  it('adds the product to materials, then two levels of recipe inputs for each', () => {
     const ids = buildPlanTypeIds(blueprint, { catalog, pi: PI });
-    // 2398 (material) -> planetary input 2267; 9840 (product) -> manufacturing input 34.
-    expect(ids.sort((a, b) => a - b)).toEqual([34, 2267, 2398, 9840]);
+    // 2398 (material) -> planetary input 2267.
+    // 40 (material) -> manufacturing input 41 -> its own input 42.
+    // 9840 (product) -> manufacturing input 34.
+    // The second level (41 -> 42) is what a make-or-buy verdict on an
+    // expanded row's own input (41) needs a price for — one level a plain
+    // `recipeInputTypeIds` pass never reaches.
+    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 2267, 2398, 9840]);
   });
 
   it('skips the planetary widening when pi.json is unavailable', () => {
     const ids = buildPlanTypeIds(blueprint, { catalog, pi: null });
-    // No pi means no schematic for 2398, so 2267 never gets added; the
-    // manufacturing side (9840 -> 34) is unaffected.
-    expect(ids.sort((a, b) => a - b)).toEqual([34, 2398, 9840]);
+    // No pi means no schematic for 2398, so 2267 never gets added — 2398
+    // itself stays, as a plain material with nothing produced beneath it.
+    // The manufacturing side (40 -> 41 -> 42, 9840 -> 34) is unaffected.
+    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 2398, 9840]);
   });
 });
