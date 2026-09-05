@@ -96,6 +96,18 @@ export interface BuiltColonyAdvice {
   extractedPerHour: { typeId: number; unitsPerHour: number }[];
   /** One entry per distinct schematic running, with its pin count. */
   production: FactoryPinGroup[];
+  /**
+   * How many links the colony has. Links draw CPU and Powergrid of their own
+   * — a base cost plus a per-km term over the distance between the two pins
+   * (dogma 15/49 and 1633/1634 on the Link type, 2280) — and `pinLoad` charges
+   * for none of it, because the distance term needs a per-planet radius no
+   * data source in this app carries.
+   *
+   * So this is not decoration: a colony with links has a load that is
+   * understated and a headroom that is overstated, and a card must say so
+   * rather than print a figure it cannot stand behind.
+   */
+  linkCount: number;
   /** True when an extractor pin had to be dropped for missing data, so the numbers above are incomplete. */
   hasUnverifiedExtractors: boolean;
 }
@@ -182,6 +194,7 @@ function builtAdvice(
       unitsPerHour: perProduct.get(typeId) as number,
     })),
     production: groupFactoryPins(pins),
+    linkCount: detail?.links.length ?? 0,
     hasUnverifiedExtractors: hasUnverifiedExtractors(pins),
   };
 }

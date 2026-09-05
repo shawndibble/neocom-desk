@@ -60,3 +60,24 @@ export function buildComparisonRows(
     (a, b) => a.groupName.localeCompare(b.groupName) || a.name.localeCompare(b.name)
   );
 }
+
+/** True when the compared characters' levels are not all equal for this skill. */
+export function hasDifferingLevels(row: ComparisonRow): boolean {
+  const levels = [...row.levels.values()];
+  return levels.some((level) => level !== levels[0]);
+}
+
+/**
+ * Which selected characters actually need a fetch: everyone, if `forceAll`
+ * (a manual refresh), otherwise only those not already in `cachedIds` — a
+ * character re-selected, or the active character already warmed at boot,
+ * costs nothing extra.
+ */
+export function idsNeedingFetch(
+  selectedIds: readonly number[],
+  cachedIds: ReadonlySet<number>,
+  forceAll: boolean
+): number[] {
+  if (forceAll) return [...selectedIds];
+  return selectedIds.filter((id) => !cachedIds.has(id));
+}

@@ -223,13 +223,21 @@ Three rules hold this together:
   example.
 
 Opt out with `responsive="table"` in two cases, and no others. Either the
-columns _are_ the content — `SkillCompare` is a character-by-skill matrix,
-where a card per skill would make "who is ahead" unscannable; a matrix earns
-its sideways scroll, a list of records does not — or the row is already narrow
-enough to fit a 390px screen unaided, roughly two short columns. The contract
-detail modal's Included/Requested item tables are that second case: an icon +
-name and a quantity fit as they are, so stacking would only spend a 6.5rem
-gutter on "QUANTITY: 744" and turn a scannable list into one card per item.
+columns _are_ the content — a matrix where a card per row would make
+cross-row comparison unscannable; a matrix earns its sideways scroll, a list
+of records does not — or the row is already narrow enough to fit a 390px
+screen unaided, roughly two short columns. The contract detail modal's
+Included/Requested item tables are that second case: an icon + name and a
+quantity fit as they are, so stacking would only spend a 6.5rem gutter on
+"QUANTITY: 744" and turn a scannable list into one card per item.
+
+`SkillCompare`'s character-by-skill matrix used to opt out for the
+columns-are-the-content reason above, but #406 moved it back to the default
+stack: a mobile card per skill, with one level line per compared character,
+is a fine trade once the page's own "differing only" toggle keeps the row
+count down to what's actually worth scanning — and a sideways-scrolling
+matrix couldn't show more than about two characters on a 390px screen
+anyway, so the opt-out was buying less than it looked like.
 
 ## 5. Icons
 
