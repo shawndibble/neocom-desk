@@ -22,6 +22,7 @@ import { formatIsk } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { orderHistoryCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrderHistory } from '@/esi/endpoints';
+import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
@@ -51,8 +52,13 @@ async function loadOrderHistorySnapshot(
   return { historyResult, historyNeedsReauth, historyTruncated, typeNames };
 }
 
-/** Market's History tab: a character's completed/expired/cancelled market orders. */
-export function OrderHistoryPanel() {
+interface OrderHistoryPanelProps {
+  /** Switches the History tab to its other view; the picker lives in this panel's header. */
+  onViewChange: (view: HistoryView) => void;
+}
+
+/** Market's History tab, Orders view: a character's completed/expired/cancelled market orders. */
+export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadOrderHistorySnapshot);
@@ -139,33 +145,36 @@ export function OrderHistoryPanel() {
     <Panel
       padded={false}
       actions={
-        <span className="flex items-center gap-2">
-          <IconButton
-            size="sm"
-            icon={<Icon.Refresh />}
-            label={t('orders.refresh')}
-            onClick={refresh}
-          />
-          {historyResult && (
-            <>
-              <IconButton
-                size="sm"
-                icon={<Icon.Download />}
-                label={t('orders.exportCsvHistory')}
-                disabled={history.length === 0}
-                onClick={() =>
-                  downloadCsv(
-                    'orders-history',
-                    history,
-                    orderHistoryCsvColumns(t, nameFor),
-                    new Date(),
-                    historyTruncated
-                  )
-                }
-              />
-              <DataAgeBadge date={historyResult.fetchedAt} />
-            </>
-          )}
+        <span className="flex w-full items-center justify-between gap-2">
+          <HistoryViewSelect value="history" onChange={onViewChange} />
+          <span className="flex items-center gap-2">
+            <IconButton
+              size="sm"
+              icon={<Icon.Refresh />}
+              label={t('orders.refresh')}
+              onClick={refresh}
+            />
+            {historyResult && (
+              <>
+                <IconButton
+                  size="sm"
+                  icon={<Icon.Download />}
+                  label={t('orders.exportCsvHistory')}
+                  disabled={history.length === 0}
+                  onClick={() =>
+                    downloadCsv(
+                      'orders-history',
+                      history,
+                      orderHistoryCsvColumns(t, nameFor),
+                      new Date(),
+                      historyTruncated
+                    )
+                  }
+                />
+                <DataAgeBadge date={historyResult.fetchedAt} />
+              </>
+            )}
+          </span>
         </span>
       }
     >

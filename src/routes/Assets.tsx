@@ -66,6 +66,7 @@ import {
 import { useStationSort } from '@/features/character/stationSortPreference';
 import {
   namesForSelection,
+  selectAll,
   selectionStateForIds,
   toggleSelection,
 } from '@/features/character/assetSelection';
@@ -89,6 +90,11 @@ import {
   loadBlueprintCatalog,
   type BlueprintCatalog,
 } from '@/features/industry/blueprintCatalog';
+
+// Matches Market.tsx's/SkillPicker.tsx's own search debounce — the input stays
+// instantly responsive, only the potentially-thousands-of-assets recompute
+// below waits out the debounce.
+const SEARCH_DEBOUNCE_MS = 250;
 
 /** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -560,6 +566,14 @@ export function Assets() {
 
   const [search, setSearch] = useState('');
   const searchActive = search.trim().length > 0;
+  // Debounced separately from `search` (issue #415): the input stays
+  // instantly responsive, only the matching/grouping memos below — which
+  // scan every asset — wait out the debounce.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [search]);
 
   // Permanent "all items across all locations" flat view (issue #414): off by
   // default (unpruned tree browsing, as before), and — like search — flattens
@@ -595,14 +609,29 @@ export function Assets() {
   const [crossCharacterSearch, setCrossCharacterSearch] = useState(false);
   const [crossCharacterData, setCrossCharacterData] = useState<CrossCharacterData | null>(null);
   const [crossCharacterLoading, setCrossCharacterLoading] = useState(false);
+  // Cached per Character (issue #415): flipping the toggle off then on again
+  // for the same Character reuses this instead of refetching every other
+  // Character's assets again. A ref, not state — it must survive the toggle
+  // going off (which intentionally leaves `crossCharacterData` itself alone,
+  // per the comment above) without itself being a render dependency.
+  const crossCharacterCacheRef = useRef<{ characterId: number; data: CrossCharacterData } | null>(
+    null
+  );
   useEffect(() => {
     if (!crossCharacterSearch || activeCharacterId === null) return;
+    if (crossCharacterCacheRef.current?.characterId === activeCharacterId) {
+      setCrossCharacterData(crossCharacterCacheRef.current.data);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       setCrossCharacterLoading(true);
       try {
         const result = await loadCrossCharacterData(activeCharacterId);
-        if (!cancelled) setCrossCharacterData(result);
+        if (!cancelled) {
+          crossCharacterCacheRef.current = { characterId: activeCharacterId, data: result };
+          setCrossCharacterData(result);
+        }
       } finally {
         if (!cancelled) setCrossCharacterLoading(false);
       }
@@ -701,7 +730,7 @@ export function Assets() {
     [assetsResult]
   );
   const csvGroups = useMemo(() => {
-    const matches = matchAssets(assetsResult?.data ?? [], typeNames, search);
+    const matches = matchAssets(assetsResult?.data ?? [], typeNames, debouncedSearch);
 
     const byLocation = new Map<number, AssetMatch[]>();
     for (const entry of matches) {
@@ -724,7 +753,7 @@ export function Assets() {
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- t is stable from i18next
-  }, [assetsResult, typeNames, locationNames, csvAssetsByItemId, search]);
+  }, [assetsResult, typeNames, locationNames, csvAssetsByItemId, debouncedSearch]);
 
   // On-screen matching: the active Character's own assets, plus every other
   // Character's when the cross-character toggle is on and a search is active
@@ -883,10 +912,21 @@ export function Assets() {
     return current.location_id;
   }
 
-  const searchMatches = useMemo(
-    () => (flatModeActive ? matchAssets(mergedAssets, mergedTypeNames, search) : []),
-    [flatModeActive, mergedAssets, mergedTypeNames, search]
-  );
+  // Also requires a non-empty `debouncedSearch` when flat mode is driven by
+  // the search box, not just `searchActive`: for up to SEARCH_DEBOUNCE_MS
+  // after the first keystroke, `searchActive` (which tracks the
+  // instantly-responsive `search`) is already true while `debouncedSearch`
+  // is still `''` — `matchAssets` reads an empty query as "match
+  // everything", which would otherwise flash the full unfiltered list as
+  // "search results" for that one debounce window. The permanent "All
+  // items" view (issue #414) has no such flash to guard against — showing
+  // everything with no query is its resting state, not a stale debounce —
+  // so it skips the guard.
+  const searchMatches = useMemo(() => {
+    if (!flatModeActive) return [];
+    if (!allItemsView && debouncedSearch.trim().length === 0) return [];
+    return matchAssets(mergedAssets, mergedTypeNames, debouncedSearch);
+  }, [flatModeActive, allItemsView, mergedAssets, mergedTypeNames, debouncedSearch]);
   // Min-value filter and sort (issue #414) apply to both the search results
   // list and the permanent all-items view — the same flat shape either way.
   // Value is computed once per match up front (not inside the comparator),
@@ -1057,6 +1097,23 @@ export function Assets() {
     mergedLocationNames,
   ]);
 
+  // Narrows the three effects below to the station-id *set*, not the memo
+  // above's array identity (issue #415): `pins` is a live Dexie query that
+  // gets a new array on every write, including a pin toggle for a station
+  // that isn't even in this scoped set, which gives `jumpsAwayScopedStations`
+  // a new reference every time even when the resulting station-id set is
+  // unchanged. React's sanctioned "adjust state during render" pattern (same
+  // shape as `PlanEditor.tsx`'s stale-result clear) turns that back into a
+  // reference that only actually changes when the set does, which is what
+  // the three effects below key off of instead.
+  const scopedStationIdsKey = jumpsAwayScopedStations.map((s) => s.locationId).join(',');
+  const [stableScopedStations, setStableScopedStations] = useState(jumpsAwayScopedStations);
+  const [stableScopedStationIdsKey, setStableScopedStationIdsKey] = useState(scopedStationIdsKey);
+  if (scopedStationIdsKey !== stableScopedStationIdsKey) {
+    setStableScopedStationIdsKey(scopedStationIdsKey);
+    setStableScopedStations(jumpsAwayScopedStations);
+  }
+
   // Each station's own solar system id (resolved once, then reused across a
   // preference switch) and the resulting jumps-away result per (station,
   // preference) pair — keying by preference means switching it never needs
@@ -1111,7 +1168,7 @@ export function Assets() {
 
   useEffect(() => {
     if (activeCharacterId === null) return;
-    const missing = jumpsAwayScopedStations.filter(
+    const missing = stableScopedStations.filter(
       (station) =>
         !stationSystemIds.has(station.locationId) &&
         !systemIdRequested.current.has(station.locationId)
@@ -1139,11 +1196,11 @@ export function Assets() {
         setStationSystemIds((prev) => new Map(prev).set(station.locationId, systemId));
       }
     });
-  }, [activeCharacterId, jumpsAwayScopedStations, stationSystemIds, mergedLocationNames]);
+  }, [activeCharacterId, stableScopedStations, stationSystemIds, mergedLocationNames]);
 
   useEffect(() => {
     if (activeCharacterId === null || !characterLocationResolved) return;
-    const pending = jumpsAwayScopedStations.filter((station) => {
+    const pending = stableScopedStations.filter((station) => {
       const key = `${station.locationId}:${routePreference}`;
       if (jumpsAwayByKey.has(key) || jumpsAwayRequested.current.has(key)) return false;
       return characterSystemId === null || stationSystemIds.has(station.locationId);
@@ -1174,7 +1231,7 @@ export function Assets() {
     activeCharacterId,
     characterLocationResolved,
     characterSystemId,
-    jumpsAwayScopedStations,
+    stableScopedStations,
     jumpsAwayByKey,
     stationSystemIds,
     routePreference,
@@ -1183,7 +1240,7 @@ export function Assets() {
   useEffect(() => {
     if (activeCharacterId === null) return;
     const missing = new Set<number>();
-    for (const station of jumpsAwayScopedStations) {
+    for (const station of stableScopedStations) {
       const systemId = stationSystemIds.get(station.locationId);
       if (
         systemId != null &&
@@ -1203,7 +1260,7 @@ export function Assets() {
         setSecurityBySystemId((prev) => new Map(prev).set(systemId, security));
       }
     });
-  }, [activeCharacterId, jumpsAwayScopedStations, stationSystemIds, securityBySystemId]);
+  }, [activeCharacterId, stableScopedStations, stationSystemIds, securityBySystemId]);
 
   function securityForStation(locationId: number): number | null | undefined {
     const systemId = stationSystemIds.get(locationId);
@@ -1239,6 +1296,28 @@ export function Assets() {
   function handleBulkCopyNames() {
     const names = namesForSelection([...selectedIds], assetsByItemId, mergedTypeNames);
     void writeToClipboard(names.join('\n'));
+  }
+
+  /** Every leaf item_id currently in `rows` — whichever of the three list shapes is on screen (issue #415's "Select all in view"). */
+  function collectRowItemIds(): number[] {
+    return rows.flatMap((row) => {
+      switch (row.kind) {
+        case 'match':
+          return [row.match.asset.item_id];
+        case 'node':
+          return collectItemIds(row.node);
+        case 'location':
+          return collectStationItemIds(row.station);
+        case 'heading':
+          return [];
+      }
+    });
+  }
+  function handleSelectAllInView() {
+    setSelectedIds((prev) => selectAll(prev, collectRowItemIds()));
+  }
+  function handleDeselectAll() {
+    setSelectedIds(new Set());
   }
 
   function handleExportCsv() {
@@ -1369,20 +1448,36 @@ export function Assets() {
         />
       )}
 
-      {selectMode && selectedIds.size > 0 && (
+      {selectMode && (
         <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
-          <span className="text-[0.6875rem] text-text-dim tabular-nums">
-            {t('assets.select.selectedCount', { count: selectedIds.size })}
-          </span>
-          <Button size="sm" disabled={activeCharacterId === null} onClick={handleBulkAddToQuickbar}>
-            {t('assets.select.addToQuickbar')}
+          {selectedIds.size > 0 && (
+            <span className="text-[0.6875rem] text-text-dim tabular-nums">
+              {t('assets.select.selectedCount', { count: selectedIds.size })}
+            </span>
+          )}
+          <Button size="sm" onClick={handleSelectAllInView}>
+            {t('assets.select.selectAllInView')}
           </Button>
-          <Button size="sm" onClick={handleBulkAddToCompare}>
-            {t('assets.select.addToCompare')}
+          <Button size="sm" disabled={selectedIds.size === 0} onClick={handleDeselectAll}>
+            {t('assets.select.deselectAll')}
           </Button>
-          <Button size="sm" onClick={handleBulkCopyNames}>
-            {t('assets.select.copyNames')}
-          </Button>
+          {selectedIds.size > 0 && (
+            <>
+              <Button
+                size="sm"
+                disabled={activeCharacterId === null}
+                onClick={handleBulkAddToQuickbar}
+              >
+                {t('assets.select.addToQuickbar')}
+              </Button>
+              <Button size="sm" onClick={handleBulkAddToCompare}>
+                {t('assets.select.addToCompare')}
+              </Button>
+              <Button size="sm" onClick={handleBulkCopyNames}>
+                {t('assets.select.copyNames')}
+              </Button>
+            </>
+          )}
         </div>
       )}
 
@@ -1407,9 +1502,14 @@ export function Assets() {
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
           {assetsTruncated && (
-            <p className="text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')} —{' '}
-              {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
+            <p className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-warning uppercase">
+              <span>
+                {t('common.incompleteTitle')} —{' '}
+                {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
+              </span>
+              <Button size="sm" disabled={loading} onClick={refresh}>
+                {t('assets.fetchTruncatedRetry')}
+              </Button>
             </p>
           )}
 
@@ -1421,6 +1521,15 @@ export function Assets() {
                   <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('assets.search.resultCount', { count: flatMatches.length })}
                   </span>
+                  {/* CSV export always stays scoped to the active Character's own
+                      assets (see csvGroups above) — this is the only UI surface
+                      that explains why (issue #415), shown exactly when cross-
+                      character results are actually on screen to be confused by. */}
+                  {activeCrossCharacterData && (
+                    <span className="text-[0.6875rem] text-text-faint">
+                      {t('assets.crossCharacterCsvNote')}
+                    </span>
+                  )}
                   <div className="ml-auto flex items-center gap-2">
                     <TextInput
                       type="number"
@@ -1513,7 +1622,11 @@ export function Assets() {
                   <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('assets.section.locationCount', { count: sortedTree.length })}
                   </span>
-                  <div className="ml-auto flex items-center gap-2">
+                  {/* flex-wrap (issue #415): on a narrow phone the two Selects no
+                      longer share one row with no priority order — Sort stays put
+                      (it comes first in DOM order) and Route is the one that drops
+                      to its own line when both can't fit beside the label. */}
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                     <Select
                       value={stationSortField}
                       onValueChange={(value) => void setStationSortField(value as StationSortField)}

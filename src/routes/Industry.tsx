@@ -37,10 +37,16 @@ import {
 } from '@/features/industry/BuildPlanDetail';
 import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
 
+// Facility/rig/security/hub/tax default from the character's own most
+// recently updated plan (issue #456), so a second plan doesn't force
+// re-picking settings the pilot already set once. `defaultsFrom` is that
+// plan, or null/undefined for a character with no plans yet, in which case
+// the historical hardcoded defaults apply.
 function newBuildPlan(
   characterId: number,
   entry: BlueprintCatalogEntry,
-  owned: CharacterBlueprint | null
+  owned: CharacterBlueprint | null,
+  defaultsFrom?: BuildPlanRecord | null
 ): BuildPlanRecord {
   return {
     id: crypto.randomUUID(),
@@ -50,12 +56,21 @@ function newBuildPlan(
     runs: 1,
     me: owned?.material_efficiency ?? 0,
     te: owned?.time_efficiency ?? 0,
-    facility: 'npcStation',
-    rigLevel: 'none',
-    security: 'highsec',
-    hubId: DEFAULT_TRADE_HUB.id,
+    facility: defaultsFrom?.facility ?? 'npcStation',
+    rigLevel: defaultsFrom?.rigLevel ?? 'none',
+    security: defaultsFrom?.security ?? 'highsec',
+    hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
+    ...(defaultsFrom?.facilityTaxPct !== undefined
+      ? { facilityTaxPct: defaultsFrom.facilityTaxPct }
+      : {}),
     updatedAt: Date.now(),
   };
+}
+
+/** The character's own plan with the highest `updatedAt`, or null if they have none yet. */
+function mostRecentlyUpdatedPlan(plans: BuildPlanRecord[] | undefined): BuildPlanRecord | null {
+  if (!plans || plans.length === 0) return null;
+  return plans.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest));
 }
 
 /** Build Plan manager: create (via blueprint search)/duplicate/delete/rename plans, edit the selected one. */
@@ -131,12 +146,12 @@ export function Industry() {
     async (entry: BlueprintCatalogEntry): Promise<string | null> => {
       if (activeCharacterId === null) return null;
       const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
-      const plan = newBuildPlan(activeCharacterId, entry, owned);
+      const plan = newBuildPlan(activeCharacterId, entry, owned, mostRecentlyUpdatedPlan(plans));
       await db.buildPlans.add(plan);
       scheduleSync(activeCharacterId);
       return plan.id;
     },
-    [activeCharacterId, ownedBlueprints]
+    [activeCharacterId, ownedBlueprints, plans]
   );
 
   // The Market Browser's item context menu "jump to a Build Plan" action

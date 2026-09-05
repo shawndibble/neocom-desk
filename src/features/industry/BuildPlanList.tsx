@@ -105,15 +105,13 @@ function PlanRow({
         label={`${t('industry.delete')} ${plan.name}`}
         tooltip={t('industry.delete')}
         tone="danger"
-        onClick={() => {
-          if (window.confirm(t('industry.deleteConfirm'))) onDelete(plan.id);
-        }}
+        onClick={() => onDelete(plan.id)}
       />
     </li>
   );
 }
 
-/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete (confirm), rename inline. */
+/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete, rename inline. */
 export function BuildPlanList({
   plans,
   catalog,
