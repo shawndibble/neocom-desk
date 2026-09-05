@@ -6,6 +6,7 @@
  * registry stays the one place every ESI call is accounted for.
  */
 import { getIndustrySystemCostIndices } from '@/esi/endpoints';
+import type { IndustryActivity } from '@/engine/industry/types';
 
 /**
  * Cost index per solar system ID for one activity — 'manufacturing' (the
@@ -13,7 +14,7 @@ import { getIndustrySystemCostIndices } from '@/esi/endpoints';
  * copying, researching_*) are out of v1 scope.
  */
 export async function fetchSystemCostIndices(
-  activity: 'manufacturing' | 'reaction' = 'manufacturing'
+  activity: IndustryActivity = 'manufacturing'
 ): Promise<Map<number, number>> {
   const result = await getIndustrySystemCostIndices();
   const indices = new Map<number, number>();

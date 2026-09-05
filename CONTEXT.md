@@ -87,7 +87,7 @@ here — they go one per file in `docs/context/decisions/`.
   the single event is fetched/toggled like every other, and each raw `type`
   string gets its own independent opt-out underneath, discovered as it fires
   rather than enumerated from a closed list.
-- **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures (Raitaru/Azbel/Sotiyo, engineering complexes) and reaction structures (Athanor/Tatara, refineries — no NPC-station equivalent) each carry the other's activity's rig bonuses on a different security-multiplier table (issue #460). Drives ME/time/cost bonuses in a Build Plan.
+- **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures (Raitaru/Azbel/Sotiyo, engineering complexes) and reaction structures (Athanor/Tatara, refineries — no NPC-station equivalent) each use their own **Industry Activity**'s rig bonuses and security-multiplier table (issue #460); the two never mix on one facility. Drives ME/time/cost bonuses in a Build Plan.
 - **Foreground Poller**: Client-side interval (5 minutes) that checks each
   enabled Notification Event's underlying ESI data while the app is open and
   the tab/window is visible; paused via the Page Visibility API when
@@ -110,6 +110,7 @@ here — they go one per file in `docs/context/decisions/`.
   at which profit is exactly zero — is always a Net figure, since it answers
   "at what price do I stop losing ISK," which only holds net of the fees an
   actual sale pays.
+- **Industry Activity**: Which job a **Build Plan** runs — `'manufacturing'` or `'reaction'` (issue #460). Never a field on `BuildPlanRecord`; always derived from the picked blueprint/reaction formula's own `activity`, tagged onto it from the SDE (`industryActivity.csv`'s activity ID 1 vs 11) at build time. Determines which **Facility Preset**s and reactor/engineering rig security multipliers apply — a facility hosts one activity, never both.
 - **Install Prompt**: A one-time, in-app call-to-action to install NeoCom
   Desk as a home-screen/desktop app, layered on top of the browser's own
   passive PWA affordance (already present via `vite-plugin-pwa`). Platform-

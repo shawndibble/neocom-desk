@@ -13,7 +13,7 @@
 import { getHubPrices, getAdjustedPrices, HUB_PRICE_TTL_MS } from '@/market/prices';
 import { fetchSystemCostIndices } from '@/market/cost-index';
 import type { TradeHub } from '@/market/hubs';
-import type { AdjustedPrices, HubPrices } from '@/engine/industry/types';
+import type { AdjustedPrices, HubPrices, IndustryActivity } from '@/engine/industry/types';
 
 export interface MarketSnapshot {
   /** Lowest sell at the hub, materials + product. Missing key = unpriceable at this hub. */
@@ -41,7 +41,7 @@ const COST_INDEX_TTL_MS = HUB_PRICE_TTL_MS;
 
 /** One entry per activity — a reaction plan's cost index is a different number than a manufacturing plan's for the same system (issue #460), so caching them together would serve either one wrong. */
 const costIndexCache = new Map<
-  'manufacturing' | 'reaction',
+  IndustryActivity,
   { value: Map<number, number>; expiresAt: number }
 >();
 
@@ -51,7 +51,7 @@ export function clearCostIndexCache(): void {
 }
 
 async function loadSystemCostIndices(
-  activity: 'manufacturing' | 'reaction',
+  activity: IndustryActivity,
   now: () => number = Date.now
 ): Promise<Map<number, number> | null> {
   const nowMs = now();
@@ -85,7 +85,7 @@ export async function loadMarketSnapshot(
   hub: TradeHub,
   typeIds: number[],
   costIndexSystemId?: number,
-  activity: 'manufacturing' | 'reaction' = 'manufacturing'
+  activity: IndustryActivity = 'manufacturing'
 ): Promise<MarketSnapshot> {
   const hubAggregates = await getHubPrices(hub, typeIds);
   const hubPrices: HubPrices = {};

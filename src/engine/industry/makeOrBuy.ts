@@ -78,14 +78,17 @@ export interface MakeOrBuy {
 }
 
 /**
- * Cost per unit of manufacturing the material, sized to a real job.
+ * Cost per unit of running a blueprint or reaction formula's job, sized to a
+ * real job — shared by the manufacturing and reaction branches below, since
+ * `buildVsBuy` already treats both identically given the right facility
+ * context; only the `ctx.facility`/`rig` each branch passes in differs.
  *
  * Runs matter: EVE rounds material use once per job, not per run, and the job
  * fee is a fixed proportion of EIV, so quoting a single run would overstate a
  * material the plan needs hundreds of. `null` when an input has no price —
  * a partial cost would read as a suspiciously cheap build.
  */
-function manufacturingUnitCost(
+function jobUnitCost(
   blueprint: IndustryBlueprint,
   me: number,
   needed: number,
@@ -116,10 +119,9 @@ function manufacturingUnitCost(
 }
 
 /**
- * Cost per unit of reacting the material, sized to a real job — the same
- * shape as `manufacturingUnitCost`, but quoted against an unfitted Athanor
- * (the smaller, more commonly available refinery) rather than the parent
- * plan's own facility.
+ * Cost per unit of reacting the material, sized to a real job — reuses
+ * `jobUnitCost`, but quoted against an unfitted Athanor (the smaller, more
+ * commonly available refinery) rather than the parent plan's own facility.
  *
  * The parent's facility cannot stand in here the way it does for a
  * manufacturing sub-build: this app has no reaction-formula-consuming-a-
@@ -137,7 +139,7 @@ function reactionUnitCost(
   needed: number,
   ctx: MakeOrBuyContext
 ): number | null {
-  return manufacturingUnitCost(blueprint, 0, needed, {
+  return jobUnitCost(blueprint, 0, needed, {
     ...ctx,
     facility: FACILITY_PRESETS.athanor,
     rig: 'none',
@@ -188,7 +190,7 @@ export function makeOrBuy(
   try {
     makeUnitPrice =
       recipe.method === 'manufacturing'
-        ? manufacturingUnitCost(recipe.blueprint, recipe.me, needed, ctx)
+        ? jobUnitCost(recipe.blueprint, recipe.me, needed, ctx)
         : recipe.method === 'reaction'
           ? reactionUnitCost(recipe.blueprint, needed, ctx)
           : planetaryUnitCost(recipe.inputs, recipe.outputQuantity, ctx.hubPrices);

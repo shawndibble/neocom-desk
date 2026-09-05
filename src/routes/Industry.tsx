@@ -67,7 +67,10 @@ function newBuildPlan(
   owned: CharacterBlueprint | null,
   defaultsFrom?: BuildPlanRecord | null
 ): BuildPlanRecord {
-  const activity = entry.blueprint.activity ?? 'manufacturing';
+  // Unlike `IndustryBlueprint.activity` (optional, for pre-#460 engine test
+  // literals), the SDE's own `BlueprintType.activity` is always set — no
+  // fallback needed here.
+  const activity = entry.blueprint.activity;
   const defaultsMatchActivity =
     defaultsFrom !== null &&
     defaultsFrom !== undefined &&

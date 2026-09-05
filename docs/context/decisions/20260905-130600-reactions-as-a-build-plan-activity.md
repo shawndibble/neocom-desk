@@ -36,7 +36,7 @@ _Recorded 2026-09-05 · issue #460._
   the kind of unsourced constant this engine's citation convention exists to
   prevent. If that assumption is wrong, it is wrong in one visible line a
   future pass can correct with a citation, not buried in a silent activity
-  branch.
+  branch. Tracked for follow-up sourcing as issue #513.
 
 - **Facility and location pickers filter by activity, and a new plan's default
   facility no longer carries across activities.** `FACILITY_PRESETS` entries,

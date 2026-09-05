@@ -528,6 +528,16 @@ async function main() {
       const activity = ACTIVITY_TAG[activityID];
       if (!activity) continue;
       const typeID = Number(r[h.typeID]);
+      // A typeID under both manufacturing and reaction would silently
+      // last-write-wins into one BlueprintType with the wrong activity tag.
+      // Issue #460's decision doc records this as verified impossible against
+      // a live dump; enforce that claim here rather than trusting it silently.
+      const existing = bpActivity.get(typeID);
+      if (existing && existing !== activity) {
+        throw new Error(
+          `typeID ${typeID} has industryActivity rows under both '${existing}' and '${activity}' — the manufacturing/reaction activity split assumed these are disjoint`
+        );
+      }
       bpTime.set(typeID, Number(r[h.time]));
       bpActivity.set(typeID, activity);
     }
