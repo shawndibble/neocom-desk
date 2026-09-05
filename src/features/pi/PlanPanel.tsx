@@ -41,6 +41,7 @@ import {
   loadCustomsCodeExpertise,
   type ColonySpace,
 } from './customsRate';
+import { loadInterplanetaryConsolidation, planetSlots } from './planetSlots';
 import { loadPlanPrices, type PlanPrices } from './planPrices';
 import { costPlan, factoryPinsAbove, planRows, sensitivityGrid, validFloors } from './planModel';
 import { productOptions } from './products';
@@ -99,6 +100,8 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
 
   const [pi, setPi] = useState<PiData | null>(null);
   const [skillLevel, setSkillLevel] = useState<number | null>(null);
+  // Interplanetary Consolidation, which sets how many planets can run at once.
+  const [consolidationLevel, setConsolidationLevel] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
 
@@ -127,15 +130,20 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
     let cancelled = false;
     void (async () => {
       try {
-        const [piData, level] = await Promise.all([
+        const [piData, level, consolidation] = await Promise.all([
           loadPi(),
           // A character with no skill data is `null`, which the rate note
           // reports as unknown rather than as a confident untrained zero.
           loadCustomsCodeExpertise(characterId, Date.now()).catch(() => null),
+          // Same rule for the planet ceiling: null stays null, so the
+          // footprint tooltip says the level has not loaded rather than
+          // asserting a number of planets the pilot may not have.
+          loadInterplanetaryConsolidation(characterId, Date.now()).catch(() => null),
         ]);
         if (cancelled) return;
         setPi(piData);
         setSkillLevel(level);
+        setConsolidationLevel(consolidation);
       } catch {
         if (!cancelled) setLoadFailed(true);
       } finally {
@@ -478,6 +486,7 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
               hubName={hub.systemName}
               pricesFetchedAt={prices.fetchedAt}
               extractionRateField={effectiveFloor === 'P0' ? extractionRateField : undefined}
+              planetSlots={planetSlots(consolidationLevel)}
             />
             <PlanChainTable rows={rows} productName={selected.name} />
             <PlanSensitivity grid={grid} rates={sensitivityRates} />

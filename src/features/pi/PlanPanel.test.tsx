@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { PiData } from '@/sde/types';
@@ -31,6 +31,7 @@ const fullPrices = Object.fromEntries(
 
 const loadPlanPrices = vi.fn();
 const loadCustomsCodeExpertise = vi.fn();
+const loadInterplanetaryConsolidation = vi.fn();
 
 vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => pi),
@@ -40,6 +41,10 @@ vi.mock('./planPrices', () => ({
   loadPlanPrices: (...args: unknown[]) => loadPlanPrices(...args),
 }));
 
+vi.mock('./planetSlots', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./planetSlots')>()),
+  loadInterplanetaryConsolidation: (...args: unknown[]) => loadInterplanetaryConsolidation(...args),
+}));
 vi.mock('./customsRate', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./customsRate')>()),
   loadCustomsCodeExpertise: (...args: unknown[]) => loadCustomsCodeExpertise(...args),
@@ -57,6 +62,8 @@ beforeEach(() => {
   });
   loadCustomsCodeExpertise.mockReset();
   loadCustomsCodeExpertise.mockResolvedValue(4);
+  loadInterplanetaryConsolidation.mockReset();
+  loadInterplanetaryConsolidation.mockResolvedValue(4);
 });
 
 function renderPanel(typeId: number | null = BROADCAST_NODE) {
@@ -307,5 +314,33 @@ describe('PlanPanel', () => {
     // (docs/DESIGN.md §4a) — the tier chip carries the hierarchy instead.
     expect(within(table).getByText('Broadcast Node').closest('td')).toHaveClass('dt-primary');
     expect(within(table).getAllByText('P4')[0].closest('td')).not.toHaveClass('dt-primary');
+  });
+});
+
+describe('planet ceiling', () => {
+  it('reports the planets the pilot’s own skill allows, not a flat six', async () => {
+    // Reported bug: the tooltip asserted six planets to a pilot at
+    // Interplanetary Consolidation IV, who can run five.
+    loadInterplanetaryConsolidation.mockResolvedValue(4);
+    renderPanel();
+
+    const about = await screen.findByRole('button', { name: 'About Footprint' });
+    fireEvent.focus(about);
+
+    expect(await screen.findByText(/You can run 5 planets at once/)).toBeInTheDocument();
+    expect(screen.queryByText(/You can run 6 planets at once/)).not.toBeInTheDocument();
+  });
+
+  it('says the level has not loaded rather than naming a number', async () => {
+    loadInterplanetaryConsolidation.mockResolvedValue(null);
+    renderPanel();
+
+    const about = await screen.findByRole('button', { name: 'About Footprint' });
+    fireEvent.focus(about);
+
+    expect(
+      await screen.findByText(/depends on your Interplanetary Consolidation level/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/You can run \d+ planets? at once/)).not.toBeInTheDocument();
   });
 });

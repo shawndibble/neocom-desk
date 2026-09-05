@@ -22,6 +22,7 @@
  */
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { PlanetSlots } from './planetSlots';
 import { DataAgeBadge, DataTable, EmptyState, InfoTooltip, Panel, StatChip } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { PiTier, SourcingFloor } from '@/engine/pi/chain';
@@ -82,6 +83,14 @@ export interface FootprintProps {
   factoryPins: number;
   /** Extractor programs, on the P0 floor only. */
   extractors: number | null;
+  /**
+   * How many planets this character can actually run — `1 + Interplanetary
+   * Consolidation`, not a flat six. Null before skill data lands, which the
+   * tooltip states rather than filling in with a guess: this is the number a
+   * plan's footprint is judged against, so a wrong one here is a plan judged
+   * against a planet the pilot does not have.
+   */
+  planetSlots: PlanetSlots | null;
 }
 
 /**
@@ -108,14 +117,18 @@ function useFootprintText(): (factoryPins: number, extractors: number | null) =>
 }
 
 /** Pins and — on the P0 floor — extractors, as a plain figure. Never a feasibility verdict. */
-export function Footprint({ factoryPins, extractors }: FootprintProps) {
+export function Footprint({ factoryPins, extractors, planetSlots }: FootprintProps) {
   const { t } = useTranslation();
   const footprintText = useFootprintText();
+  const tooltip =
+    planetSlots === null || planetSlots.assumed
+      ? t('piPlan.footprintTooltipUnknown')
+      : t('piPlan.footprintTooltip', { count: planetSlots.slots });
   return (
     <StatChip
       label={t('piPlan.footprintLabel')}
       value={footprintText(factoryPins, extractors)}
-      tooltip={t('piPlan.footprintTooltip')}
+      tooltip={tooltip}
     />
   );
 }
@@ -136,6 +149,8 @@ interface PlanVerdictProps {
    * instant the first digit makes the chain costable.
    */
   extractionRateField?: ReactNode;
+  /** This character's real planet ceiling; null before skill data lands. */
+  planetSlots: PlanetSlots | null;
 }
 
 /**
@@ -157,6 +172,7 @@ export function PlanVerdict({
   hubName,
   pricesFetchedAt,
   extractionRateField,
+  planetSlots,
 }: PlanVerdictProps) {
   const { t } = useTranslation();
 
@@ -248,6 +264,7 @@ export function PlanVerdict({
           <Footprint
             factoryPins={factoryPins}
             extractors={breakdown?.extraction?.totalExtractors ?? null}
+            planetSlots={planetSlots}
           />
           {pricesFetchedAt && <DataAgeBadge date={pricesFetchedAt} />}
         </>

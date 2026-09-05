@@ -75,23 +75,27 @@ function PlanRow({
       {/* Three labelled buttons left the plan name ~90px on a phone ("Raven
           Nav…"). The name is the row — the actions are the adornment — so the
           actions become icons and give the width back. Each label names the
-          plan too, so a screen reader hears which row it is on. */}
+          plan too, so a screen reader hears which row it is on; the tooltip
+          drops it, since a pointer user is already looking at the row. */}
       <IconButton
         size="sm"
         icon={<Icon.Rename />}
         label={`${t('industry.rename')} ${plan.name}`}
+        tooltip={t('industry.rename')}
         onClick={() => setRenaming(true)}
       />
       <IconButton
         size="sm"
         icon={<Icon.Duplicate />}
         label={`${t('industry.duplicate')} ${plan.name}`}
+        tooltip={t('industry.duplicate')}
         onClick={() => onDuplicate(plan.id)}
       />
       <IconButton
         size="sm"
         icon={<Icon.Close />}
         label={`${t('industry.delete')} ${plan.name}`}
+        tooltip={t('industry.delete')}
         tone="danger"
         onClick={() => {
           if (window.confirm(t('industry.deleteConfirm'))) onDelete(plan.id);
