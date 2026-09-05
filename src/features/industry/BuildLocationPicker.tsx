@@ -5,6 +5,7 @@ import { useCorpOwner } from '@/features/corp/owner';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { loadBuildStructureOptions } from './loadBuildStructures';
+import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { BuildStructureOption } from './buildStructures';
 
 interface BuildLocationPickerProps {
@@ -39,6 +40,11 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
   const { t } = useTranslation();
   const [overriding, setOverriding] = useState(false);
   const [asked, setAsked] = useState(false);
+  // Which row the select shows, so a pick does not snap the control back to
+  // the placeholder. Session-only on purpose: fill-once means the plan stores
+  // no structure, so this is a display echo of what was just clicked, cleared
+  // whenever the panel remounts on a different plan.
+  const [pickedId, setPickedId] = useState('');
 
   const { available, corporationId } = useCorpOwner('canReadStructures');
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -67,8 +73,9 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
             <label className="flex flex-1 flex-col gap-1">
               {t('industry.buildLocation')}
               <NativeSelect
-                value=""
+                value={pickedId}
                 onChange={(e) => {
+                  setPickedId(e.target.value);
                   const picked = structures.data?.find(
                     (option) => String(option.structureId) === e.target.value
                   );
@@ -78,7 +85,11 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
                 <option value="">{t('industry.buildLocationPlaceholder')}</option>
                 {structures.data.map((option) => (
                   <option key={option.structureId} value={option.structureId}>
-                    {option.name}
+                    {option.name ??
+                      t('industry.buildLocationUnnamed', {
+                        facility: FACILITY_PRESETS[option.facility].name,
+                        system: option.systemName,
+                      })}
                   </option>
                 ))}
               </NativeSelect>

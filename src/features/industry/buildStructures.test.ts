@@ -59,22 +59,25 @@ describe('buildStructureOptions', () => {
     expect(buildStructureOptions([structure({ system_id: 30000001 })], SYSTEMS)).toEqual([]);
   });
 
-  it('names a structure ESI withheld a name for by what and where it is', () => {
+  it('reports a withheld name as null, leaving the label to the UI', () => {
+    // ESI omits `name` for a Character whose role cannot see it. The stand-in
+    // label is translated copy, so it is the picker's job, not this module's.
     const options = buildStructureOptions([structure({ name: undefined })], SYSTEMS);
 
-    expect(options[0]?.name).toBe('Azbel in Badivefi');
+    expect(options[0]).toMatchObject({ name: null, facility: 'azbel', systemName: 'Badivefi' });
   });
 
-  it('sorts by name, so the list does not reorder between loads', () => {
+  it('sorts by name, with the unnamed ones last, so the list does not reorder between loads', () => {
     const options = buildStructureOptions(
       [
         structure({ structure_id: 1, name: 'Zulu Works' }),
-        structure({ structure_id: 2, name: 'Alpha Works' }),
-        structure({ structure_id: 3, name: 'Mike Works' }),
+        structure({ structure_id: 2, name: undefined }),
+        structure({ structure_id: 3, name: 'Alpha Works' }),
+        structure({ structure_id: 4, name: 'Mike Works' }),
       ],
       SYSTEMS
     );
 
-    expect(options.map((o) => o.name)).toEqual(['Alpha Works', 'Mike Works', 'Zulu Works']);
+    expect(options.map((o) => o.name)).toEqual(['Alpha Works', 'Mike Works', 'Zulu Works', null]);
   });
 });

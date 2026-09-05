@@ -7,8 +7,10 @@ export type SecurityBand = 'highsec' | 'lowsec' | 'nullsec';
  * Banded on the status **rounded to one decimal**, not the raw float ESI
  * publishes, because that is the number the game both displays and enforces.
  * Balle is 0.4608891 in ESI and a 0.5 highsec system in game; banding the raw
- * value called it lowsec, which is a wrong CONCORD answer for the Assets badge
- * and a wrong rig multiplier for an industry job (1.9x instead of 1x).
+ * value called it lowsec, which is the wrong rig multiplier for an industry job
+ * (1.9x instead of 1x) and the wrong POCO base rate in `features/pi/customsRate`
+ * — the only two callers. `securityStatusColor` below interpolates the raw
+ * value and is deliberately untouched.
  */
 export function securityBand(security: number): SecurityBand {
   const shown = Math.round(security * 10) / 10;

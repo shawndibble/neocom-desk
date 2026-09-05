@@ -18,7 +18,6 @@ import {
   type FacilityKind,
   type SecurityBand,
 } from '@/engine/industry/types';
-import { FACILITY_PRESETS } from '@/engine/industry/types';
 
 /** What `/universe/systems/{id}` tells us about one system, reduced to what a plan needs. */
 export interface SystemSummary {
@@ -30,7 +29,12 @@ export interface SystemSummary {
 /** One pickable structure, already carrying every field choosing it would set. */
 export interface BuildStructureOption {
   structureId: number;
-  name: string;
+  /**
+   * The structure's own name, or `null` where ESI withheld it from a Character
+   * whose role cannot see it. Null rather than a composed fallback: the label
+   * that replaces it is UI copy and belongs in i18next, not in this module.
+   */
+  name: string | null;
   facility: FacilityKind;
   systemId: number;
   systemName: string;
@@ -51,14 +55,14 @@ export function buildStructureOptions(
     if (!system) continue;
     options.push({
       structureId: structure.structure_id,
-      // ESI withholds `name` from a Character whose role cannot see it. What
-      // and where it is still identifies it well enough to pick.
-      name: structure.name ?? `${FACILITY_PRESETS[facility].name} in ${system.name}`,
+      name: structure.name ?? null,
       facility,
       systemId: structure.system_id,
       systemName: system.name,
       security: securityBand(system.security),
     });
   }
-  return options.sort((a, b) => a.name.localeCompare(b.name));
+  // Unnamed structures sort last, together: they have no name to sort by, and
+  // scattering them through the list would make it read as unsorted.
+  return options.sort((a, b) => (a.name ?? '\uffff').localeCompare(b.name ?? '\uffff'));
 }

@@ -339,6 +339,7 @@
     "buildSystemNotFound": "No solar system by that name.",
     "buildLocation": "Build location",
     "buildLocationPlaceholder": "Pick a structure…",
+    "buildLocationUnnamed": "{{facility}} in {{system}}",
     "buildLocationSummary": "{{facility}} · {{system}} · {{security}}",
     "useCorpStructure": "Fill from a corp structure",
     "corpStructuresLoading": "Loading corp structures",

@@ -91,6 +91,27 @@ describe('BuildLocationPicker', () => {
     expect(onPick).toHaveBeenCalledExactlyOnceWith(AZBEL);
   });
 
+  it('labels a structure ESI withheld a name for by what and where it is', async () => {
+    const user = userEvent.setup();
+    loadBuildStructureOptions.mockResolvedValue([{ ...AZBEL, name: null }]);
+    renderPicker();
+
+    await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
+
+    expect(await screen.findByRole('option', { name: 'Azbel in Badivefi' })).toBeInTheDocument();
+  });
+
+  it('keeps showing the structure that was picked', async () => {
+    const user = userEvent.setup();
+    renderPicker();
+
+    await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
+    const select = await screen.findByLabelText('Build location');
+    await user.selectOptions(select, '1035');
+
+    expect((select as HTMLSelectElement).value).toBe('1035');
+  });
+
   it('says so when the corp owns no manufacturing structure', async () => {
     const user = userEvent.setup();
     loadBuildStructureOptions.mockResolvedValue([]);

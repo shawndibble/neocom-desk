@@ -47,6 +47,12 @@ _Recorded 2026-09-05. Issue #499._
 
 - **`securityBand` bands the rounded status, not ESI's raw float.** Balle is
   `0.4608891` in ESI and a 0.5 highsec system in game. Banding the raw value
-  called it lowsec, which is a wrong CONCORD answer for the Assets badge and
-  the wrong rig multiplier for an industry job. The game rounds to one decimal
-  and enforces the rounded value, so the app does too.
+  called it lowsec. The game rounds to one decimal and enforces the rounded
+  value, so the app does too.
+
+  This changes two callers, and the second one is not industry: the picker's
+  own rig multiplier (1x rather than 1.9x for a system in the 0.45-0.4999
+  window), and `features/pi/customsRate.ts`, where the same window now takes
+  the highsec POCO base rate. Both were wrong before and are right now, but a
+  planetary money change riding inside an industry change is worth saying out
+  loud. `securityStatusColor` interpolates the raw value and is untouched.
