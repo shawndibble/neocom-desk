@@ -343,7 +343,7 @@
     "facilityTax": "Facility tax %",
     "facilityTaxTooltipLabel": "About facility tax",
     "facilityTaxTooltip": "Structure owner's cut of the job fee, set per-structure by its owner.",
-    "ownedStockScopeLabel": "Count owned stock from",
+    "ownedStockScopeLabel": "Owned Material Source",
     "ownedStockScopeEverywhere": "Everywhere",
     "ownedStockScopeSelected": "Selected locations",
     "ownedStockScopeNoLocations": "No detected owned stock yet to choose locations from.",

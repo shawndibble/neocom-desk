@@ -749,7 +749,7 @@ export function BuildPlanDetail({
               detected" offers — and nothing else on the plan. Beside Facility
               and Trade hub it read as another thing about where the job runs.
             */}
-            <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="mb-3 flex flex-col gap-2">
               <OwnedStockScopeControl
                 scope={plan.ownedStockScope}
                 detectedStock={detectedStock}

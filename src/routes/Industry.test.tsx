@@ -847,7 +847,7 @@ describe('Industry: owned-stock scope (#454)', () => {
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
-    const select = screen.getByLabelText('Count owned stock from') as HTMLSelectElement;
+    const select = screen.getByLabelText('Owned Material Source') as HTMLSelectElement;
     expect(select).toHaveValue('everywhere');
 
     await userEvent.selectOptions(select, 'Selected locations');
