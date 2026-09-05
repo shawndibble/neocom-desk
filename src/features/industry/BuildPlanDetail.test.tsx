@@ -34,7 +34,7 @@ const resolveSolarSystem = vi.hoisted(() =>
       : null
   )
 );
-vi.mock('@/market/systemLookup', () => ({ resolveSolarSystem }));
+vi.mock('@/features/character/systemLookup', () => ({ resolveSolarSystem }));
 
 // The band is reconciled on load against `/universe/systems/{id}`.
 const loadSystemSecurity = vi.hoisted(() =>
