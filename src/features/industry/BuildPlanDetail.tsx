@@ -4,7 +4,6 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
-  FilterChip,
   IconButton,
   InfoTooltip,
   NativeSelect,
@@ -244,17 +243,7 @@ export function BuildPlanDetail({
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
 
-  // View-only toggle (not persisted): once a material is fully sourced from
-  // owned stock there's nothing left to shop for, so hiding it lets a long
-  // materials list focus on what still needs buying.
-  const [hideOwned, setHideOwned] = useState(false);
-
-  // CSV export deliberately keeps the full set regardless of the toggle: it's
-  // a shopping/accounting record, not the on-screen view the toggle curates.
-  const visibleMaterials = useMemo(() => {
-    if (!result) return [];
-    return hideOwned ? result.materials.filter((m) => m.remainingQuantity > 0) : result.materials;
-  }, [hideOwned, result]);
+  const visibleMaterials = useMemo(() => result?.materials ?? [], [result]);
 
   // "Use all detected" fills only rows with nothing typed in them: a
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
@@ -543,11 +532,6 @@ export function BuildPlanDetail({
                 {t('industry.useAllDetected')}
               </Button>
             )}
-            <FilterChip
-              label={t('industry.hideOwned')}
-              selected={hideOwned}
-              onToggle={() => setHideOwned((v) => !v)}
-            />
             <IconButton
               size="sm"
               icon={<Icon.Download />}
