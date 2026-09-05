@@ -1509,7 +1509,7 @@
     "itemTabsLabel": "Item view",
     "sections": {
       "browser": "Market",
-      "openOrders": "Open Orders",
+      "openOrders": "Open",
       "history": "History",
       "transactions": "Transactions"
     },
