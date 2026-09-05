@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   bulkOwnedStockSuggestions,
+  collectStockLocations,
   detectOwnedStock,
+  filterStockByScope,
   suggestedOwnedQuantity,
   type DetectedOwnedStockMap,
   type OwnedStockSource,
@@ -323,5 +325,108 @@ describe('bulkOwnedStockSuggestions', () => {
 
   it('suggests nothing for a material with no detected stock', () => {
     expect(bulkOwnedStockSuggestions(MATERIALS, undefined, stockOf({}))).toEqual([]);
+  });
+});
+
+describe('filterStockByScope', () => {
+  function stock(): DetectedOwnedStockMap {
+    return detectOwnedStock(
+      [
+        source(1, [
+          asset({ item_id: 200, type_id: TRITANIUM, quantity: 100 }),
+          asset({ item_id: 201, type_id: TRITANIUM, quantity: 250, location_id: OTHER_STATION }),
+        ]),
+        source(2, [asset({ item_id: 202, type_id: TRITANIUM, quantity: 700 })]),
+      ],
+      MATERIALS
+    );
+  }
+
+  it('returns the map unchanged when scope is undefined', () => {
+    const detected = stock();
+    expect(filterStockByScope(detected, undefined)).toBe(detected);
+  });
+
+  it('returns the map unchanged for mode "everywhere"', () => {
+    const detected = stock();
+    expect(filterStockByScope(detected, { mode: 'everywhere' })).toBe(detected);
+  });
+
+  it('counts only placements at the selected locations for mode "selected"', () => {
+    const filtered = filterStockByScope(stock(), {
+      mode: 'selected',
+      locations: [{ characterId: 1, locationId: STATION, locationType: 'station' }],
+    });
+    expect(filtered.get(TRITANIUM)).toEqual({
+      quantity: 100,
+      placements: [{ characterId: 1, locationId: STATION, locationType: 'station', quantity: 100 }],
+    });
+  });
+
+  it('sums across several selected locations', () => {
+    const filtered = filterStockByScope(stock(), {
+      mode: 'selected',
+      locations: [
+        { characterId: 1, locationId: STATION, locationType: 'station' },
+        { characterId: 2, locationId: STATION, locationType: 'station' },
+      ],
+    });
+    expect(filtered.get(TRITANIUM)?.quantity).toBe(800);
+    expect(filtered.get(TRITANIUM)?.placements).toHaveLength(2);
+  });
+
+  it('drops a material entirely when none of its placements match the selection', () => {
+    const filtered = filterStockByScope(stock(), {
+      mode: 'selected',
+      locations: [{ characterId: 99, locationId: 999, locationType: 'station' }],
+    });
+    expect(filtered.has(TRITANIUM)).toBe(false);
+  });
+
+  it('counts nothing when the selected-location list is empty', () => {
+    const filtered = filterStockByScope(stock(), { mode: 'selected', locations: [] });
+    expect(filtered.size).toBe(0);
+  });
+});
+
+describe('collectStockLocations', () => {
+  it('returns nothing for an empty stock map', () => {
+    expect(collectStockLocations(new Map())).toEqual([]);
+  });
+
+  it('dedupes one location shared by several materials', () => {
+    const detected = detectOwnedStock(
+      [
+        source(1, [
+          asset({ item_id: 210, type_id: TRITANIUM, quantity: 10 }),
+          asset({ item_id: 211, type_id: PYERITE, quantity: 20 }),
+        ]),
+      ],
+      MATERIALS
+    );
+    expect(collectStockLocations(detected)).toEqual([
+      { characterId: 1, locationId: STATION, locationType: 'station' },
+    ]);
+  });
+
+  it('lists every distinct character/location combination', () => {
+    const detected = detectOwnedStock(
+      [
+        source(1, [
+          asset({ item_id: 220, type_id: TRITANIUM, quantity: 10 }),
+          asset({ item_id: 221, type_id: TRITANIUM, quantity: 5, location_id: OTHER_STATION }),
+        ]),
+        source(2, [asset({ item_id: 222, type_id: TRITANIUM, quantity: 7 })]),
+      ],
+      MATERIALS
+    );
+    expect(collectStockLocations(detected)).toEqual(
+      expect.arrayContaining([
+        { characterId: 1, locationId: STATION, locationType: 'station' },
+        { characterId: 1, locationId: OTHER_STATION, locationType: 'station' },
+        { characterId: 2, locationId: STATION, locationType: 'station' },
+      ])
+    );
+    expect(collectStockLocations(detected)).toHaveLength(3);
   });
 });

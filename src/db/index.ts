@@ -3,6 +3,7 @@ import type { Attributes, Implants, PlanEntry } from '@/engine/types';
 import type {
   FacilityKind,
   MaterialSourcing,
+  OwnedStockScope,
   RigLevel,
   SecurityBand,
 } from '@/engine/industry/types';
@@ -200,6 +201,14 @@ export interface BuildPlanRecord {
    * every unit at the hub", which is how every plan behaved before it existed.
    */
   materialSourcing?: Record<number, MaterialSourcing>;
+  /**
+   * Which locations count toward this plan's "use detected" owned-stock
+   * totals: every placement (absent, or `{ mode: 'everywhere' }`, the
+   * default and today's only behavior before this existed) or only a chosen
+   * subset (`{ mode: 'selected' }`). Additive and unindexed, same as
+   * `materialSourcing` above — no schema version bump needed.
+   */
+  ownedStockScope?: OwnedStockScope;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }
