@@ -639,7 +639,13 @@
       "days": "{{count}}d ago"
     },
     "loadFailedTitle": "Could not load",
-    "loadFailedHint": "Something went wrong fetching this. Try Refresh."
+    "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
+    "spaceOption": {
+      "highsec": "Highsec",
+      "lowsec": "Lowsec",
+      "nullsec": "Nullsec",
+      "wormhole": "Wormhole"
+    }
   },
   "wallet": {
     "title": "Wallet",
@@ -994,12 +1000,6 @@
     "outputPerDay": "Output per day",
     "hub": "Trade hub",
     "space": "Colony space",
-    "spaceOption": {
-      "highsec": "Highsec",
-      "lowsec": "Lowsec",
-      "nullsec": "Nullsec",
-      "wormhole": "Wormhole"
-    },
     "spaceHint": "Sets the starting customs rate only. It never changes yield — per-planet richness is scanner-only and is not in ESI.",
     "customsRate": "Customs rate (%)",
     "customsRateReset": "Use the default for this space",
@@ -1110,6 +1110,13 @@
     "roomForLabel": "Room for",
     "roomForItem": "{{count}}x {{pin}}",
     "roomForNothing": "Nothing — the budget is spent.",
+    "stopTierLabel": "Build up to",
+    "stopTierMake": "{{name}} (P{{tier}})",
+    "stopTierSellRaw": "Keep selling {{name}} raw",
+    "stopTierValue": "{{isk}} an hour, at {{units}} an hour of output",
+    "stopTierBasis_one": "A whole-colony fit, not an addition to what is on the ground: one ratio block against this colony’s own budget less its measured link draw, at its own extraction rate.",
+    "stopTierBasis_other": "A whole-colony fit, not an addition to what is on the ground: {{count}} ratio blocks against this colony’s own budget less its measured link draw, at its own extraction rate.",
+    "stopTierNeedsRate": "No build advice: no extractor here reports a complete program, so this colony has no rate of its own to size a chain against.",
     "roomUnknownRadius_one": "Headroom unknown: this colony has {{count}} link and this planet's radius did not load, so the link's cost cannot be worked out.",
     "roomUnknownRadius_other": "Headroom unknown: this colony has {{count}} links and this planet's radius did not load, so their cost cannot be worked out.",
     "linkDraw_one": "Includes {{count}} link drawing {{cpu}} tf / {{powergrid}} MW.",
@@ -1143,9 +1150,24 @@
       "storage": "storage",
       "launchpad": "launchpad"
     },
-    "measuredOnlyHint": "Every number here is measured, never estimated: pins and extraction rates come from ESI, and each rate is the whole program averaged over its decay curve rather than its opening cycle. Extractor headroom assumes a full ten heads.",
+    "measuredOnlyHint": "Measured where it can be: pins and extraction rates come from ESI, and each rate is the whole program averaged over its decay curve rather than its opening cycle. Extractor headroom assumes a full ten heads. A build recommendation is a projection from those measurements, and an unbuilt planet’s value is an estimate — both say so where they appear.",
     "ccUpgradesTooltip": "The highest Command Center upgrade your Command Center Upgrades skill allows, and what it would supply. Each colony below is measured against its own Command Center’s current level, which may be lower — upgrading one costs ISK per colony.",
-    "unknownTypeHint": "This planet’s type has not loaded, so nothing can be said about it yet. Refresh once you are back online."
+    "unknownTypeHint": "This planet’s type has not loaded, so nothing can be said about it yet. Refresh once you are back online.",
+    "customsRate": "Customs rate",
+    "customsRateValue": "{{percent}}%",
+    "customsRateSource": {
+      "highsec-skill": "The 10% highsec NPC base, less 1% per level of your Customs Code Expertise (level {{level}}). A POCO owner’s own tax is on top and is not in ESI.",
+      "highsec-unknown-skill": "No skill data for this character yet, so the untrained 10% highsec base is assumed. Your real rate is lower at every trained level.",
+      "player-poco": "{{space}} customs offices are player-owned, so there is no NPC rate to assume and 0% is used. Whatever the owner charges is on top and is not in ESI."
+    },
+    "stopTierBlocked": {
+      "does-not-fit": "No build advice: this colony’s Command Center hosts no whole chain of anything this planet yields. A higher upgrade level is what changes that.",
+      "needs-prices": "No build advice: the reference hub quotes no price for anything this planet can extract or make from it.",
+      "throughput": "No build advice: everything that fits here would fill its launchpad and storage faster than a day, so nothing it could run would keep running.",
+      "unprofitable": "No build advice: nothing this planet can extract covers its own customs tax at current hub prices.",
+      "mixed": "No build advice: of everything this planet yields, nothing at once fits here, is priced at the hub and earns more than its customs tax."
+    },
+    "stopTierAtLabel": "Best tier — already running it"
   },
   "employmentHistory": {
     "title": "Employment",
