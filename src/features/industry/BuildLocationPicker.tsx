@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, SearchInput, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -10,6 +10,10 @@ import { MIN_SEARCH_LENGTH, searchBuildLocations } from './searchBuildLocations'
 import type { BuildStructureOption } from './buildStructures';
 
 interface BuildLocationPickerProps {
+  /** What the plan is set to right now, already translated. Always the plan's own values. */
+  summary: string;
+  /** Facility and build system — revealed by "Override". */
+  children: ReactNode;
   onPick: (option: BuildStructureOption) => void;
 }
 
@@ -23,6 +27,13 @@ const DEBOUNCE_MS = 300;
  * Finds the station or structure the job runs in, and fills the fields that
  * follow from it: facility preset, build system, and the security band the
  * system settles.
+ *
+ * Those fields are behind "Override" rather than beside the box, because the
+ * search answers all three and a pilot who has a structure in mind should not
+ * have to translate it into a facility and a system by hand. The line under the
+ * box states what the plan is actually set to, so nothing is hidden — only
+ * folded. The link is always there, including for a Character whose token
+ * predates the search scope: the fields are the whole feature for them.
  *
  * A search rather than a list, because the list ESI can give us is the wrong
  * one: a corporation's own structures leave out the alliance tower, the rented
@@ -40,10 +51,11 @@ const DEBOUNCE_MS = 300;
  * re-auth here, beside the control it unlocks, rather than behind a banner
  * across a page that otherwise works.
  */
-export function BuildLocationPicker({ onPick }: BuildLocationPickerProps) {
+export function BuildLocationPicker({ summary, children, onPick }: BuildLocationPickerProps) {
   const { t } = useTranslation();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
+  const [overriding, setOverriding] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<BuildStructureOption[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -89,11 +101,58 @@ export function BuildLocationPicker({ onPick }: BuildLocationPickerProps) {
     return () => clearTimeout(timer);
   }, [searchKey, characterId]);
 
-  if (granted === undefined) return null;
-
-  if (!canSearch) {
-    return (
-      <div className="flex flex-col gap-1.5 rounded-xs border border-line p-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+  const searchBox =
+    granted === undefined ? null : canSearch ? (
+      <div className="relative flex flex-col gap-1">
+        <label htmlFor="build-plan-location">{t('industry.buildLocation')}</label>
+        <SearchInput
+          id="build-plan-location"
+          value={query}
+          placeholder={t('industry.buildLocationPlaceholder')}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {searching && (
+          <span className="flex items-center gap-1 text-text-dim">
+            <Spinner size="sm" label={t('industry.buildLocationSearching')} />
+          </span>
+        )}
+        {!searching && results !== null && results.length === 0 && (
+          <span className="text-text-dim">{t('industry.buildLocationNoResults')}</span>
+        )}
+        {!searching && results !== null && results.length > 0 && (
+          <ul className="max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">
+            {results.map((option) => (
+              <li key={option.structureId} className="border-b border-line last:border-b-0">
+                <button
+                  type="button"
+                  className="flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left hover:bg-panel-2"
+                  onClick={() => {
+                    onPick(option);
+                    setQuery('');
+                    setResults(null);
+                  }}
+                >
+                  <span className="truncate">
+                    {option.name ??
+                      t('industry.buildLocationUnnamed', {
+                        facility: FACILITY_PRESETS[option.facility].name,
+                        system: option.systemName,
+                      })}
+                  </span>
+                  <span className="text-text-dim">
+                    {t('industry.buildLocationDetail', {
+                      facility: FACILITY_PRESETS[option.facility].name,
+                      system: option.systemName,
+                    })}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    ) : (
+      <div className="flex flex-col gap-1.5 rounded-xs border border-line p-2 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-text-dim">{t('industry.buildLocationGrantHint')}</span>
         <Button
           size="sm"
@@ -103,56 +162,24 @@ export function BuildLocationPicker({ onPick }: BuildLocationPickerProps) {
         </Button>
       </div>
     );
-  }
 
   return (
-    <div className="relative flex flex-col gap-1 text-xs">
-      <label htmlFor="build-plan-location">{t('industry.buildLocation')}</label>
-      <SearchInput
-        id="build-plan-location"
-        value={query}
-        placeholder={t('industry.buildLocationPlaceholder')}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      {searching && (
-        <span className="flex items-center gap-1 text-text-dim">
-          <Spinner size="sm" label={t('industry.buildLocationSearching')} />
-        </span>
-      )}
-      {!searching && results !== null && results.length === 0 && (
-        <span className="text-text-dim">{t('industry.buildLocationNoResults')}</span>
-      )}
-      {!searching && results !== null && results.length > 0 && (
-        <ul className="max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">
-          {results.map((option) => (
-            <li key={option.structureId} className="border-b border-line last:border-b-0">
-              <button
-                type="button"
-                className="flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left hover:bg-panel-2"
-                onClick={() => {
-                  onPick(option);
-                  setQuery('');
-                  setResults(null);
-                }}
-              >
-                <span className="truncate">
-                  {option.name ??
-                    t('industry.buildLocationUnnamed', {
-                      facility: FACILITY_PRESETS[option.facility].name,
-                      system: option.systemName,
-                    })}
-                </span>
-                <span className="text-text-dim">
-                  {t('industry.buildLocationDetail', {
-                    facility: FACILITY_PRESETS[option.facility].name,
-                    system: option.systemName,
-                  })}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="flex flex-col gap-1.5 text-xs">
+      {searchBox}
+
+      <p className="text-text-dim">
+        {summary}{' '}
+        <button
+          type="button"
+          className="underline"
+          aria-expanded={overriding}
+          onClick={() => setOverriding((open) => !open)}
+        >
+          {t(overriding ? 'industry.overrideHide' : 'industry.overrideShow')}
+        </button>
+      </p>
+
+      {overriding && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{children}</div>}
     </div>
   );
 }

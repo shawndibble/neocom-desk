@@ -452,6 +452,8 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
     expect(screen.getByRole('button', { name: 'About TE' })).toBeInTheDocument();
 
     expect(screen.queryByRole('button', { name: 'About facility tax' })).not.toBeInTheDocument();
+    // Facility folds behind "Override" now that the location search fills it.
+    await user.click(screen.getByRole('button', { name: 'Override' }));
     await user.selectOptions(screen.getByLabelText('Facility'), 'raitaru');
     expect(screen.getByLabelText('Facility tax %')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About facility tax' })).toBeInTheDocument();
@@ -471,12 +473,12 @@ describe('Industry: build plan settings grouping (#120)', () => {
     expect(screen.getByLabelText('Runs')).toBeInTheDocument();
     expect(screen.getByLabelText('ME %')).toBeInTheDocument();
     expect(screen.getByLabelText('TE %')).toBeInTheDocument();
-    expect(screen.getByLabelText('Facility')).toBeInTheDocument();
     expect(screen.getByLabelText('Rig')).toBeInTheDocument();
-    expect(screen.getByLabelText('Build system')).toBeInTheDocument();
     expect(screen.getByLabelText('Trade hub')).toBeInTheDocument();
-    // Security is no longer a control: it follows the build system, and is
-    // stated under that field instead.
+    // Facility and Build system fold behind "Override" — the search box fills
+    // both, and the line under it states what the plan is set to.
+    expect(screen.getByRole('button', { name: 'Override' })).toBeInTheDocument();
+    // Security is no longer a control at all: it follows the build system.
     expect(screen.queryByLabelText('Security')).toBeNull();
   });
 });

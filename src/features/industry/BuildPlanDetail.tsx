@@ -566,6 +566,11 @@ export function BuildPlanDetail({
             </h3>
             <div className="mt-2 flex flex-col gap-3">
               <BuildLocationPicker
+                summary={t('industry.buildLocationSummary', {
+                  facility: facilityPreset.name,
+                  system: buildSystem?.name ?? hub.systemName,
+                  security: t(`industry.${plan.security}`),
+                })}
                 onPick={(option) =>
                   update({
                     facility: option.facility,
@@ -574,9 +579,7 @@ export function BuildPlanDetail({
                     buildSystemName: option.systemName,
                   })
                 }
-              />
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              >
                 <label className="flex flex-col gap-1 text-xs">
                   {t('industry.facility')}
                   <NativeSelect
@@ -618,7 +621,9 @@ export function BuildPlanDetail({
                     })
                   }
                 />
+              </BuildLocationPicker>
 
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <label className="flex flex-col gap-1 text-xs">
                   {t('industry.rigLevel')}
                   <NativeSelect

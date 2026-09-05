@@ -43,7 +43,14 @@ beforeEach(() => {
 });
 
 function renderPicker(onPick = vi.fn()) {
-  render(<BuildLocationPicker onPick={onPick} />);
+  render(
+    <BuildLocationPicker summary="NPC station · Jita · Highsec" onPick={onPick}>
+      <label>
+        Facility
+        <input />
+      </label>
+    </BuildLocationPicker>
+  );
   return onPick;
 }
 
@@ -63,11 +70,33 @@ describe('BuildLocationPicker', () => {
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 91 });
   });
 
-  it('renders nothing at all while the grant is still unknown', () => {
+  it('keeps the summary and the override link while the grant is still unknown', () => {
+    // The fields behind Override are the whole feature for anyone who never
+    // gets the search, so the link is never gated on it.
     grant.scopes = undefined;
-    const { container } = render(<BuildLocationPicker onPick={vi.fn()} />);
+    renderPicker();
 
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByText(/NPC station · Jita · Highsec/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Override' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Build location')).toBeNull();
+  });
+
+  it('states what the plan is set to, with the fields folded away', () => {
+    renderPicker();
+
+    expect(screen.getByText(/NPC station · Jita · Highsec/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Facility')).toBeNull();
+  });
+
+  it('reveals the fields on Override, and folds them again', async () => {
+    const user = userEvent.setup();
+    renderPicker();
+
+    await user.click(screen.getByRole('button', { name: 'Override' }));
+    expect(screen.getByLabelText('Facility')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Hide' }));
+    expect(screen.queryByLabelText('Facility')).toBeNull();
   });
 
   it('searches what was typed and lists what came back', async () => {

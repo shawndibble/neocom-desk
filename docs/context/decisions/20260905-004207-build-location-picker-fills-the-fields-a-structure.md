@@ -16,10 +16,20 @@ _Recorded 2026-09-05. Issue #499._
   in the slot is knowable only to the pilot. Trade hub and facility tax fill
   from nothing either.
 
-- **Build system stays a visible field, the same width as its neighbours.** The
-  corp picker is a shortcut for pilots whose structure their corp owns; it is
-  never the only way in, and hiding the field behind a disclosure would have
-  made the ordinary path the harder one.
+- **Facility and build system fold behind an "Override" link, under a line
+  stating what the plan is set to.** Both follow from the place the search
+  finds, and a pilot who has a structure in mind should not have to translate
+  it into a facility and a system by hand. Nothing is hidden, only folded: the
+  summary line reads the plan's own values, so it can never disagree with the
+  fields it stands in for, and the link is always present — including for a
+  Character whose token predates the search scope, for whom those fields are
+  the whole feature. Rig level, trade hub and facility tax stay in the open,
+  because nothing fills those.
+
+  This is a reversal within the same change: the fields were briefly unfolded
+  while the only shortcut was a list of the corporation's own structures, which
+  most plans could not use. A search that finds any station or structure the
+  Character can dock at earns the fold.
 
 - **Picking a structure is fill-once, not a stored link.** Choosing one writes
   facility, security and build system in a single edit, and then steps out of
