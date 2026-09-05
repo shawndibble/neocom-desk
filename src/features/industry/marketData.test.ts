@@ -130,7 +130,7 @@ describe('loadMarketSnapshot', () => {
     expect(hits).toBe(2);
   });
 
-  it('reads the reaction cost index instead of manufacturing when asked, cached separately (issue #460)', async () => {
+  it('reads the reaction cost index instead of manufacturing when asked, from one shared fetch (issue #460)', async () => {
     let hits = 0;
     server.use(
       fuzzworkHandler(),
@@ -154,7 +154,8 @@ describe('loadMarketSnapshot', () => {
 
     expect(manufacturing.systemCostIndex).toBe(0.0464);
     expect(reaction.systemCostIndex).toBe(0.0055);
-    // Two distinct caches, not one shared TTL entry keyed off the first call.
-    expect(hits).toBe(2);
+    // One fetch serves both activities — ESI already returns every
+    // activity's index per system in the one response.
+    expect(hits).toBe(1);
   });
 });

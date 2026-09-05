@@ -72,9 +72,7 @@ function newBuildPlan(
   // fallback needed here.
   const activity = entry.blueprint.activity;
   const defaultsMatchActivity =
-    defaultsFrom !== null &&
-    defaultsFrom !== undefined &&
-    FACILITY_PRESETS[defaultsFrom.facility].activity === activity;
+    defaultsFrom != null && FACILITY_PRESETS[defaultsFrom.facility].activity === activity;
   return {
     id: crypto.randomUUID(),
     characterId,

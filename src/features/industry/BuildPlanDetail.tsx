@@ -11,7 +11,7 @@ import {
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { FACILITY_PRESETS, industryActivityOf } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type {
   FacilityKind,
@@ -158,7 +158,7 @@ export function BuildPlanDetail({
 
   const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID) ?? null;
   const blueprint = useMemo(() => (entry ? toIndustryBlueprint(entry.blueprint) : null), [entry]);
-  const activity = entry?.blueprint.activity ?? 'manufacturing';
+  const activity = blueprint ? industryActivityOf(blueprint) : 'manufacturing';
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
 

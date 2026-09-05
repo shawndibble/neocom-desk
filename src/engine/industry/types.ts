@@ -40,9 +40,16 @@ export interface IndustryBlueprint {
   /**
    * Which job this runs as. Optional and defaulting to 'manufacturing' so
    * every pre-#460 literal (tests, callers) keeps compiling unchanged —
-   * only a reaction formula needs to say otherwise.
+   * only a reaction formula needs to say otherwise. Read it through
+   * `industryActivityOf` rather than repeating the `?? 'manufacturing'`
+   * fallback at each call site.
    */
   activity?: IndustryActivity;
+}
+
+/** `blueprint.activity`, defaulting to 'manufacturing' — the one place that owns what an unset activity means. */
+export function industryActivityOf(blueprint: IndustryBlueprint): IndustryActivity {
+  return blueprint.activity ?? 'manufacturing';
 }
 
 export type RigLevel = 'none' | 't1' | 't2';
@@ -181,6 +188,11 @@ export const REACTION_RIG_SECURITY_MULTIPLIER: Record<SecurityBand, number> = {
   lowsec: 1,
   nullsec: 1.1,
 };
+
+/** Which security-multiplier table a rig reads, by the facility's own activity. One place to own this pick, rather than the same ternary at every call site. */
+export function rigSecurityMultiplierFor(activity: IndustryActivity): Record<SecurityBand, number> {
+  return activity === 'reaction' ? REACTION_RIG_SECURITY_MULTIPLIER : RIG_SECURITY_MULTIPLIER;
+}
 
 /**
  * Upwell structure typeID -> the facility preset it manufactures or reacts as.

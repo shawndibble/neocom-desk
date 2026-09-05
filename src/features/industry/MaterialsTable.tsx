@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, IconButton, TextInput, Tooltip, type DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
+import type { MakeMethod, MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -151,6 +151,13 @@ export function SourcingInput({
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
+/** The "build" glyph per method — a fourth method needs an entry here, never another ternary branch at a call site. */
+const BUILD_GLYPH: Record<MakeMethod, typeof Icon.Build> = {
+  manufacturing: Icon.Build,
+  planetary: Icon.Planetary,
+  reaction: Icon.Reaction,
+};
+
 /**
  * The prose behind a make-or-buy verdict: both unit prices, at ME, and — when
  * there is a remainder left to spend the difference on — what it's worth.
@@ -221,14 +228,7 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
   // flask glyph alone (not a third colour) is what tells them apart, which is
   // the shape-carries-meaning half of docs/DESIGN.md §7, not the colour half.
   const planetary = building && advice.method === 'planetary';
-  const reaction = building && advice.method === 'reaction';
-  const Glyph = planetary
-    ? Icon.Planetary
-    : reaction
-      ? Icon.Reaction
-      : building
-        ? Icon.Build
-        : Icon.Buy;
+  const Glyph = building ? BUILD_GLYPH[advice.method] : Icon.Buy;
   return (
     <Tooltip content={label}>
       <span

@@ -11,7 +11,8 @@
  * degrades unreachable Fuzzwork to per-type nulls, not a throw).
  */
 import { getHubPrices, getAdjustedPrices, HUB_PRICE_TTL_MS } from '@/market/prices';
-import { fetchSystemCostIndices } from '@/market/cost-index';
+import { fetchSystemCostIndices, systemCostIndexByActivity } from '@/market/cost-index';
+import type { SystemCostIndices } from '@/esi/endpoints';
 import type { TradeHub } from '@/market/hubs';
 import type { AdjustedPrices, HubPrices, IndustryActivity } from '@/engine/industry/types';
 
@@ -39,15 +40,18 @@ export interface MarketSnapshot {
 /** Reuses the hub-price TTL: both are "how often do market conditions change" caches. */
 const COST_INDEX_TTL_MS = HUB_PRICE_TTL_MS;
 
-/** One entry per activity — a reaction plan's cost index is a different number than a manufacturing plan's for the same system (issue #460), so caching them together would serve either one wrong. */
-const costIndexCache = new Map<
-  IndustryActivity,
-  { value: Map<number, number>; expiresAt: number }
->();
+/**
+ * One raw fetch shared by every activity — ESI returns every system's full
+ * `cost_indices` list in one call, so a manufacturing plan and a reaction
+ * plan open in the same TTL window derive their two different numbers from
+ * the same cached response rather than each fetching and parsing it again
+ * (issue #460).
+ */
+let rawCostIndexCache: { value: SystemCostIndices[]; expiresAt: number } | null = null;
 
 /** Test-only: production callers rely on TTL expiry instead of clearing. */
 export function clearCostIndexCache(): void {
-  costIndexCache.clear();
+  rawCostIndexCache = null;
 }
 
 async function loadSystemCostIndices(
@@ -55,15 +59,15 @@ async function loadSystemCostIndices(
   now: () => number = Date.now
 ): Promise<Map<number, number> | null> {
   const nowMs = now();
-  const cached = costIndexCache.get(activity);
-  if (cached && cached.expiresAt > nowMs) return cached.value;
-  try {
-    const value = await fetchSystemCostIndices(activity);
-    costIndexCache.set(activity, { value, expiresAt: nowMs + COST_INDEX_TTL_MS });
-    return value;
-  } catch {
-    return null;
+  if (!rawCostIndexCache || rawCostIndexCache.expiresAt <= nowMs) {
+    try {
+      const value = await fetchSystemCostIndices();
+      rawCostIndexCache = { value, expiresAt: nowMs + COST_INDEX_TTL_MS };
+    } catch {
+      return null;
+    }
   }
+  return systemCostIndexByActivity(rawCostIndexCache.value, activity);
 }
 
 /**
