@@ -34,13 +34,6 @@ export type ScopeRequirement = EsiScopeName | PublicAccess;
  * Named, opt-in scope groups: scopes a Character is asked for only when they
  * ask for the feature, rather than at sign-in with everyone else.
  *
- * `search` exists for one scope behind one control: the Build Plan's build
- * location search. Nobody who never opens a Build Plan should be asked at
- * sign-in to let the app search the structures they can dock at, and the
- * structure *read* scope it pairs with is already in the base grant (Assets
- * resolves structure names with it), so the group costs exactly one line on
- * the consent screen of the people who ask for it.
- *
  * `corp` exists because the corp section needs seven scopes that ~95% of users
  * can never use — CCP role-gates the endpoints server-side, so a line member
  * granting them gains nothing but a longer consent screen (CONTEXT.md round
@@ -48,7 +41,7 @@ export type ScopeRequirement = EsiScopeName | PublicAccess;
  * default is the base grant, and a scope leaves it only when most users would
  * be consenting to something they will never exercise.
  */
-export const SCOPE_GROUPS = ['corp', 'search'] as const;
+export const SCOPE_GROUPS = ['corp'] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
 export interface EsiEndpointSpec {
@@ -281,11 +274,15 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
 
-  // --- The `search` group (issue #499) ---
+  // Base grant, deliberately: the Build Plan's build-location search is a plain
+  // feature of a route every Character can open, and it pairs with
+  // `getUniverseStructure`'s `esi-universe.read_structures.v1`, which is
+  // already asked for at sign-in. `/industry` stays UNGATED in `routeScopes.ts`
+  // — a Character who signed in before this scope existed keeps the whole route
+  // and is offered the re-auth by the picker itself.
   getCharacterSearch: {
     route: '/characters/{character_id}/search',
     scope: 'esi-search.search_structures.v1',
-    group: 'search',
   },
 
   // --- The `corp` group (issue #295) ---

@@ -501,8 +501,8 @@
     "buildLocationSearching": "Searching",
     "buildLocationNoResults": "Nothing found. Try more of the name.",
     "buildLocationDetail": "{{facility}} · {{system}}",
-    "buildLocationGrantHint": "Search your stations and structures to fill these in for you.",
-    "buildLocationGrant": "Grant access"
+    "buildLocationGrantHint": "Sign in again to search your stations and structures and fill these in for you.",
+    "buildLocationGrant": "Sign in again"
   },
   "login": {
     "button": "Log in with EVE Online",

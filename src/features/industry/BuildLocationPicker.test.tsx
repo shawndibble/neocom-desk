@@ -50,15 +50,17 @@ function renderPicker(onPick = vi.fn()) {
 const searchBox = () => screen.getByLabelText('Build location');
 
 describe('BuildLocationPicker', () => {
-  it('offers the grant instead of the search when the scope is missing', async () => {
+  it('offers a re-auth instead of the search for a token predating the scope', async () => {
+    // The scope is in the base grant, so this only ever happens to a Character
+    // added before it existed. `/industry` stays usable meanwhile.
     const user = userEvent.setup();
     grant.scopes = [];
     renderPicker();
 
     expect(screen.queryByLabelText('Build location')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Grant access' }));
+    await user.click(screen.getByRole('button', { name: 'Sign in again' }));
 
-    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 91, groups: ['search'] });
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 91 });
   });
 
   it('renders nothing at all while the grant is still unknown', () => {

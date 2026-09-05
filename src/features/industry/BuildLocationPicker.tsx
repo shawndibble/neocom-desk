@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, SearchInput, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
-import { scopesForGroup } from '@/esi/scopes';
+import { ESI_REGISTRY } from '@/esi/registry';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
@@ -13,8 +13,8 @@ interface BuildLocationPickerProps {
   onPick: (option: BuildStructureOption) => void;
 }
 
-/** Derived from the registry, like `CorpGrantPrompt` — this file stays hand-edit-free. */
-const SEARCH_GROUP_SCOPES = scopesForGroup('search');
+/** Read off the registry rather than spelled out here — this file stays hand-edit-free. */
+const SEARCH_SCOPE = ESI_REGISTRY.getCharacterSearch.scope;
 
 /** Long enough that a typed word is one request, short enough to feel live. */
 const DEBOUNCE_MS = 300;
@@ -34,9 +34,11 @@ const DEBOUNCE_MS = 300;
  * field on screen reads the plan's own values, so nothing can drift from them,
  * and a later edit is just an edit rather than a conflict with a stored link.
  *
- * The one scope it needs is opt-in (`search` group): the prompt appears here,
- * at the moment the pilot asks for the search, and never on anyone's sign-in
- * consent screen.
+ * Its scope is in the base grant, so a Character added from now on can search
+ * straight away. One added *before* it existed holds a token without it —
+ * `/industry` stays UNGATED, so they keep the whole route and are offered the
+ * re-auth here, beside the control it unlocks, rather than behind a banner
+ * across a page that otherwise works.
  */
 export function BuildLocationPicker({ onPick }: BuildLocationPickerProps) {
   const { t } = useTranslation();
@@ -46,8 +48,10 @@ export function BuildLocationPicker({ onPick }: BuildLocationPickerProps) {
   const [results, setResults] = useState<BuildStructureOption[] | null>(null);
   const [searching, setSearching] = useState(false);
 
-  const canSearch =
-    granted !== undefined && SEARCH_GROUP_SCOPES.every((scope) => granted.includes(scope));
+  // In the base grant, so every Character signing in from now on has it. A
+  // Character who signed in before it existed holds a token without it, and
+  // gets the re-auth offer below rather than a control that would 403.
+  const canSearch = granted !== undefined && granted.includes(SEARCH_SCOPE);
 
   // What the effect is actually allowed to search for: empty until the query
   // clears ESI's three-character floor and the scope is in hand. Derived
@@ -93,9 +97,7 @@ export function BuildLocationPicker({ onPick }: BuildLocationPickerProps) {
         <span className="text-text-dim">{t('industry.buildLocationGrantHint')}</span>
         <Button
           size="sm"
-          onClick={() =>
-            void beginEveLogin({ characterId: characterId ?? undefined, groups: ['search'] })
-          }
+          onClick={() => void beginEveLogin({ characterId: characterId ?? undefined })}
         >
           {t('industry.buildLocationGrant')}
         </Button>

@@ -43,15 +43,21 @@ _Recorded 2026-09-05. Issue #499._
   multiplier (1x, 1.9x or 2.1x) out of thin air. Half-filling the plan is worse
   than leaving the row out of a list the pilot can still bypass by typing.
 
-- **The one scope it needs is a new opt-in group, `search`, not the base
-  grant.** `esi-search.search_structures.v1` is the only addition —
+- **The one scope it needs goes in the base grant, not an opt-in group.**
+  `esi-search.search_structures.v1` is the only addition —
   `esi-universe.read_structures.v1`, which reads the structure the search
-  found, is already in the base grant because Assets resolves structure names
-  with it. Putting the search scope in the base grant would put "search the
-  structures you can dock at" on the consent screen of everyone who never opens
-  a Build Plan, which is the cost `corp` was grouped to avoid. Instead the
-  prompt appears in the panel, at the moment the pilot asks for the search, and
-  grants that one Character.
+  found, is already asked for at sign-in because Assets resolves structure
+  names with it. So the consent screen grows by one line, for a plain feature
+  of a route every Character can open, and the reasoning that grouped `corp` —
+  seven scopes that ~95% of users can never exercise — does not apply to one
+  scope that any pilot with a Build Plan can.
+
+- **`/industry` stays UNGATED, and the re-auth offer lives in the panel.**
+  Adding a base scope makes every Character who signed in earlier "missing a
+  base scope". Declaring `getCharacterSearch` in `routeScopes.ts` would lock
+  the whole Industry route behind a `ReauthBanner` for all of them, over a
+  route that otherwise works perfectly. The picker offers the re-auth itself,
+  beside the one control the scope unlocks.
 
 - **The typed Build system field stays, and is not behind the grant.** It is
   the whole feature for anyone who declines the scope, and the only way to name
