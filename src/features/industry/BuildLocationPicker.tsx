@@ -130,13 +130,25 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
   // ternary into the non-null branch, so nothing downstream needs `results!`.
   const openResults =
     !dismissed && !searching && results !== null && results.length > 0 ? results : null;
-  const highlighted = openResults !== null && highlightedIndex !== null;
+
+  // ESI can withhold a structure's name; both the row and the sr-only
+  // highlight announcement need the same "what and where" fallback.
+  function optionLabel(option: BuildLocationOption) {
+    return (
+      option.name ??
+      t('industry.buildLocationUnnamed', {
+        facility: FACILITY_PRESETS[option.facility].name,
+        system: option.systemName,
+      })
+    );
+  }
 
   function pick(option: BuildLocationOption) {
     onPick(option);
+    // The searchKey-change block below resets results/highlight/dismissed
+    // once this clears the query on the next render — the same reset every
+    // other query edit already goes through.
     setQuery('');
-    setResults(null);
-    setHighlightedIndex(null);
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -170,14 +182,9 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
   // "Arrow keys move a highlighted option ... a screen reader announces the
   // option count and the highlighted option" (#505) asks a screen reader to
   // say.
-  const highlightedOption = highlighted ? openResults[highlightedIndex] : null;
-  const highlightedName = highlightedOption
-    ? (highlightedOption.name ??
-      t('industry.buildLocationUnnamed', {
-        facility: FACILITY_PRESETS[highlightedOption.facility].name,
-        system: highlightedOption.systemName,
-      }))
-    : null;
+  const highlightedOption =
+    openResults !== null && highlightedIndex !== null ? openResults[highlightedIndex] : null;
+  const highlightedName = highlightedOption ? optionLabel(highlightedOption) : null;
 
   const searchBox =
     granted === undefined ? null : canSearch ? (
@@ -240,13 +247,7 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pick(option)}
               >
-                <span className="truncate">
-                  {option.name ??
-                    t('industry.buildLocationUnnamed', {
-                      facility: FACILITY_PRESETS[option.facility].name,
-                      system: option.systemName,
-                    })}
-                </span>
+                <span className="truncate">{optionLabel(option)}</span>
                 <span className="text-text-dim">
                   {t('industry.buildLocationDetail', {
                     facility: FACILITY_PRESETS[option.facility].name,
