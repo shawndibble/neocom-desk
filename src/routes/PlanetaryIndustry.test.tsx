@@ -458,7 +458,7 @@ describe('PlanetaryIndustry', () => {
     expect(within(panel).getByText('2 facilities running')).toBeInTheDocument();
   });
 
-  it('lists infrastructure pins as chips labeled with no per-cycle data, not dashed rows', async () => {
+  it('lists infrastructure pins as chips, not dashed rows', async () => {
     server.use(
       http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () =>
         HttpResponse.json(roleCardsDetailPayload)
@@ -469,7 +469,7 @@ describe('PlanetaryIndustry', () => {
     );
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
-    expect(within(panel).getByText('Infrastructure · no per-cycle data')).toBeInTheDocument();
+    expect(within(panel).getByText('Infrastructure')).toBeInTheDocument();
     expect(within(panel).getByText('Storage Facility')).toBeInTheDocument();
   });
 
