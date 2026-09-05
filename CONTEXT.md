@@ -2709,7 +2709,39 @@ all reached from the app now, through `engine/pi/stopTier.ts`.
   left to sort order. Margins are floats built from a price, a tax base and a
   block count, so equality is compared with a one-part-in-a-million tolerance;
   exact comparison would let float noise pick the winner, and it picks the
-  deeper colony as often as not.
+  deeper colony as often as not. **The tolerance is applied against the top
+  margin, never inside a sort comparator.** A tolerance is not transitive — A
+  can tie B and B tie C while A and C sit a tolerance apart — so a comparator
+  built on one is inconsistent, and `Array.prototype.sort` may then return any
+  order at all. It does: the same candidates in a different order elected
+  different winners, including the deepest tier the rule exists to reject. So
+  the maximum is taken first on the raw number, and the tie rule is applied
+  only among the candidates level with it.
+- **The Advisor says what stopped a recommendation, and never infers it.** When
+  no candidate scores, the engine reports a named blocker — the Command Center
+  hosts nothing, the hub quotes nothing, everything overflows its buffer,
+  everything loses money, or the candidates disagree and no one sentence is
+  true. The card spells that out rather than reading it off the entry list,
+  which is how the first cut told a pilot whose colony could host nothing that
+  their ore was worthless.
+- **A recommendation is a whole-colony fit, and says so.** The score is what
+  this planet would earn rebuilt at that tier, not what adding a factory would
+  add — and it renders directly under the headroom line, which _is_
+  incremental. So the card states the framing, and when the colony already
+  runs the recommended product it says "already running it" rather than
+  telling a pilot to build what is on the ground.
+- **Raw and made candidates are not taxed symmetrically on the same ore, and
+  that is inherited rather than chosen.** A raw candidate pays its export only,
+  which is the one customs boundary extracted-and-sold ore crosses. A made
+  chain's P0 is charged an import onto the planet that consumes it, because
+  that is what `chainCost` does at the P0 floor — a treatment verified against
+  #304's own margin tables (`chain.test.ts` reproduces the 1,920,000 base to
+  the ISK), even though `chain.ts`'s header prose reads as though the
+  extraction side is untaxed. The gap is 0.25 ISK a unit at a 10% rate and
+  always favours making. #426 is the first code to rank the two against each
+  other, so it is the first place the asymmetry is visible; it is recorded here
+  rather than fixed inside this ticket, since changing it would move every Plan
+  tab figure too.
 - **The customs rate is derived from the system, not asked for.** The Advisor
   knows exactly which system it is showing, so it reads that system's security
   band and the character's Customs Code Expertise and states the result in a

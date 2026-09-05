@@ -122,15 +122,33 @@ export type StopTierEntry =
   /** The hub quotes no price for one of the types this candidate turns on. */
   | (CandidateBase & { status: 'needs-price'; missing: number[] });
 
+/**
+ * Why no candidate could be recommended — named, because "nothing here pays"
+ * and "the hub quotes none of this" send a pilot to different places, and only
+ * one of them is about the planet. Reported rather than left for a caller to
+ * infer from `entries`, which is how a card ends up asserting a cause the
+ * enumeration never reached.
+ */
+export type StopTierBlocker =
+  /** Not one candidate fits the budget, so the Command Center is the constraint. */
+  | 'does-not-fit'
+  /** Everything that fits is unquoted at the hub. */
+  | 'needs-prices'
+  /** Everything that fits would overflow its buffer or saturate its links. */
+  | 'throughput'
+  /** Everything that fits and is priced earns nothing above its own customs tax. */
+  | 'unprofitable'
+  /** Different candidates are stopped by different things; no single cause is true. */
+  | 'mixed';
+
 export type StopTierAdvice =
   | { kind: 'recommended'; best: ScoredStopTier; entries: StopTierEntry[] }
   /**
    * Every candidate was enumerated and none came back with a margin above
-   * zero — either it lost money, or it could not be fitted, moved or priced.
-   * `entries` says which, per candidate; there is no guess in place of a
-   * recommendation.
+   * zero. `blocker` says what stopped them where one thing did, and `entries`
+   * says which, per candidate; there is no guess in place of a recommendation.
    */
-  | { kind: 'no-profitable-tier'; entries: StopTierEntry[] }
+  | { kind: 'no-recommendation'; blocker: StopTierBlocker; entries: StopTierEntry[] }
   /** The planet yields nothing, so there was never a candidate to score. */
   | { kind: 'nothing-to-score'; entries: [] };
 
@@ -204,6 +222,37 @@ function priceOf(typeId: number, prices: Readonly<Record<number, number>>): numb
   return price != null && Number.isFinite(price) ? price : null;
 }
 
+/**
+ * The last two steps both kinds of candidate share: reject the layout if it
+ * cannot move or hold its own output, otherwise score it.
+ *
+ * `link-capacity-unknown` is deliberately not a rejection. Link capacity is
+ * never guessed — an unsupplied one is an explicit verdict rather than a
+ * failure — so treating its absence as one would reject every candidate on
+ * every colony.
+ */
+function rejectOrScore(
+  base: CandidateBase,
+  fit: ColonyFit,
+  throughput: ThroughputCheck,
+  unitsPerHour: number,
+  marginPerUnit: number
+): StopTierEntry {
+  if (throughput.verdict === 'buffer-overflow' || throughput.verdict === 'link-capacity') {
+    return { ...base, status: 'rejected-throughput', throughput };
+  }
+  return {
+    ...base,
+    status: 'scored',
+    blocks: fit.blocks,
+    limitedBy: fit.limitedBy,
+    unitsPerHour,
+    marginPerUnit,
+    marginPerHour: unitsPerHour * marginPerUnit,
+    throughput,
+  };
+}
+
 /** A tier-0 candidate: repeats of one Extractor Control Unit, sold as extracted. */
 function scoreRawResource(
   typeId: number,
@@ -232,24 +281,23 @@ function scoreRawResource(
     linkCapacityPerHour: opts.linkCapacityPerHour,
     bufferHours: opts.bufferHours,
   });
-  if (throughput.verdict === 'buffer-overflow' || throughput.verdict === 'link-capacity') {
-    return { ...base, status: 'rejected-throughput', throughput };
-  }
 
   // The only customs boundary an extracted-and-sold resource crosses is its
-  // own export; nothing is imported onto the planet to make it.
+  // own export; nothing is imported onto the planet to make it. A made chain's
+  // P0 is charged differently — `chainCost` bills it an import onto the planet
+  // that consumes it, a treatment verified against #304's own margin tables —
+  // so raw and made are not taxed symmetrically on the same ore. The gap is
+  // 0.25 ISK a unit at a 10% rate and always favours making; it is recorded in
+  // CONTEXT.md round 55 rather than papered over here, because changing it
+  // would move every Plan tab figure too.
   const marginPerUnit = price - opts.taxRate * CUSTOMS_TAXABLE_VALUE[0];
-  const unitsPerHour = fit.blocks * opts.extractionRatePerHour;
-  return {
-    ...base,
-    status: 'scored',
-    blocks: fit.blocks,
-    limitedBy: fit.limitedBy,
-    unitsPerHour,
-    marginPerUnit,
-    marginPerHour: unitsPerHour * marginPerUnit,
+  return rejectOrScore(
+    base,
+    fit,
     throughput,
-  };
+    fit.blocks * opts.extractionRatePerHour,
+    marginPerUnit
+  );
 }
 
 /** A made-tier candidate: steps 1-5 through `planColony`, then step 6's score. */
@@ -285,11 +333,6 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
     .filter((id) => priceOf(id, opts.prices) === null);
   if (missing.length > 0) return { ...base, tier, status: 'needs-price', missing };
 
-  const { throughput } = plan;
-  if (throughput.verdict === 'buffer-overflow' || throughput.verdict === 'link-capacity') {
-    return { ...base, tier, status: 'rejected-throughput', throughput };
-  }
-
   const cost = chainCost(plan.chain, {
     prices: opts.prices,
     sourcingFloor: 'P0',
@@ -301,18 +344,17 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
   // growing a third, not the mechanism.
   if (cost.status !== 'costed') return { ...base, tier, status: 'needs-price', missing: [typeId] };
 
-  const unitsPerHour = plan.fit.blocks * plan.chain.targetPerHour;
-  return {
-    ...base,
-    tier,
-    status: 'scored',
-    blocks: plan.fit.blocks,
-    limitedBy: plan.fit.limitedBy,
-    unitsPerHour,
-    marginPerUnit: cost.margin,
-    marginPerHour: unitsPerHour * cost.margin,
-    throughput,
-  };
+  // `blocks * targetPerHour`, not `targetPerHour` alone: the chain was expanded
+  // at ONE factory's rate, so the bare figure is one factory's earnings quoted
+  // for a colony of twelve — and it does not change which tier wins, so a test
+  // that only checks the winner would not see it.
+  return rejectOrScore(
+    { ...base, tier },
+    plan.fit,
+    plan.throughput,
+    plan.fit.blocks * plan.chain.targetPerHour,
+    cost.margin
+  );
 }
 
 /**
@@ -331,6 +373,41 @@ const MARGIN_TIE_EPSILON = 1e-6;
 
 function marginsTied(a: number, b: number): boolean {
   return Math.abs(a - b) <= MARGIN_TIE_EPSILON * Math.max(Math.abs(a), Math.abs(b));
+}
+
+/**
+ * The best candidate, in two passes rather than one sort.
+ *
+ * `marginsTied` is not transitive — A can tie B and B tie C while A and C sit
+ * a tolerance apart — so using it inside a comparator makes that comparator
+ * inconsistent, and `Array.prototype.sort` is then free to return any order at
+ * all. It does: the same three candidates in a different input order elect a
+ * different winner, including the deepest tier the rule below exists to
+ * reject. So the maximum is taken first on a total order (the raw number),
+ * and the tie rule is applied only among the candidates level with it.
+ */
+function bestOf(scored: readonly ScoredStopTier[]): ScoredStopTier {
+  const top = scored.reduce((max, entry) => Math.max(max, entry.marginPerHour), -Infinity);
+  return scored
+    .filter((entry) => marginsTied(entry.marginPerHour, top) || entry.marginPerHour === top)
+    .reduce((best, entry) =>
+      entry.tier < best.tier || (entry.tier === best.tier && entry.typeId < best.typeId)
+        ? entry
+        : best
+    );
+}
+
+/** What stopped every candidate, where one thing did. */
+function blockerFor(entries: readonly StopTierEntry[]): StopTierBlocker {
+  // A candidate the budget cannot host says nothing about prices or flow, so
+  // it is set aside before the rest are read — otherwise one unfittable P4
+  // would turn every colony's answer into 'mixed'.
+  const fitted = entries.filter((entry) => entry.status !== 'does-not-fit');
+  if (fitted.length === 0) return 'does-not-fit';
+  if (fitted.every((entry) => entry.status === 'needs-price')) return 'needs-prices';
+  if (fitted.every((entry) => entry.status === 'rejected-throughput')) return 'throughput';
+  if (fitted.every((entry) => entry.status === 'scored')) return 'unprofitable';
+  return 'mixed';
 }
 
 /**
@@ -356,12 +433,9 @@ export function recommendStopTier(opts: StopTierOptions, pi: PiData): StopTierAd
 
   const scored = entries
     .filter((entry): entry is ScoredStopTier => entry.status === 'scored')
-    .filter((entry) => entry.marginPerHour > 0)
-    .sort((a, b) =>
-      marginsTied(a.marginPerHour, b.marginPerHour)
-        ? a.tier - b.tier || a.typeId - b.typeId
-        : b.marginPerHour - a.marginPerHour
-    );
-  if (scored.length === 0) return { kind: 'no-profitable-tier', entries };
-  return { kind: 'recommended', best: scored[0], entries };
+    .filter((entry) => entry.marginPerHour > 0);
+  if (scored.length === 0) {
+    return { kind: 'no-recommendation', blocker: blockerFor(entries), entries };
+  }
+  return { kind: 'recommended', best: bestOf(scored), entries };
 }

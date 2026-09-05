@@ -56,7 +56,21 @@ export const ADVISOR_BUFFER_HOURS = 24;
 const ADVISOR_LAYOUT: ChainLayout = 'single-planet';
 
 export type ColonyStopTierAdvice =
-  | { status: 'advised'; advice: StopTierAdvice }
+  | {
+      status: 'advised';
+      advice: StopTierAdvice;
+      /**
+       * True when the colony is already running what was recommended.
+       *
+       * The score is a fit from scratch — what this planet would earn rebuilt
+       * at that tier — so without this the card tells a pilot already making
+       * Test Cultures to "build up to Test Cultures". It also sits directly
+       * under the headroom line, which counts what could be *added*, and two
+       * adjacent figures meaning different things is how one gets read as the
+       * other.
+       */
+      alreadyRunning: boolean;
+    }
   /** The planet's radius never resolved, so this colony's links cannot be costed (#440). */
   | { status: 'needs-link-cost'; linkCount: number }
   /** No extractor program here could be projected, so there is no rate of this colony's own. */
@@ -102,6 +116,27 @@ export function meanHeadsPerExtractor(colony: BuiltColonyAdvice): number {
   return Math.min(EXTRACTOR_HEADS_MAX, Math.max(1, mean));
 }
 
+/**
+ * What this colony's factories are making right now, by product typeID.
+ *
+ * ESI reports a factory pin's *schematic* id; the recommendation names the
+ * product it yields. `pi.schematics` is keyed by product and carries the
+ * schematic id, so it is the one place that mapping exists.
+ */
+export function currentProductTypeIds(colony: BuiltColonyAdvice, pi: PiData): number[] {
+  const productBySchematic = new Map(
+    Object.entries(pi.schematics).map(([typeId, schematic]) => [
+      schematic.schematicId,
+      Number(typeId),
+    ])
+  );
+  return colony.production
+    .map((group) =>
+      group.schematicId === undefined ? undefined : productBySchematic.get(group.schematicId)
+    )
+    .filter((typeId): typeId is number => typeId !== undefined);
+}
+
 export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTierAdvice {
   const { colony, planetType, pi, prices, taxRate } = input;
 
@@ -119,34 +154,43 @@ export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTier
     powergrid: Math.max(0, colony.budget.powergrid - linkLoad.powergrid),
   };
 
-  return {
-    status: 'advised',
-    advice: recommendStopTier(
-      {
-        localResources: pi.raw
-          .filter((resource) => resource.planetTypes.includes(planetType))
-          .map((resource) => resource.typeID),
-        budget,
-        infrastructure: pi.infrastructure,
-        overhead: {
-          // Nothing leaves a planet without a Launchpad, so one is the floor
-          // even on a colony whose pins have not loaded.
-          launchpads: Math.max(1, colony.pinLoad.counts.launchpad ?? 0),
-          storageFacilities: colony.pinLoad.counts.storage ?? 0,
-        },
-        headsPerExtractor: meanHeadsPerExtractor(colony),
-        extractionRatePerHour: rate,
-        prices,
-        taxRate,
-        layout: ADVISOR_LAYOUT,
-        // Never guessed. A basic link moves 1,250 m3/hr and each upgrade level
-        // doubles it, but whether that axis is the same skill as the budget
-        // table is unconfirmed, so the engine answers `link-capacity-unknown`
-        // rather than picking a level (CONTEXT.md round 51).
-        linkCapacityPerHour: null,
-        bufferHours: ADVISOR_BUFFER_HOURS,
+  const advice = recommendStopTier(
+    {
+      localResources: pi.raw
+        .filter((resource) => resource.planetTypes.includes(planetType))
+        .map((resource) => resource.typeID),
+      budget,
+      infrastructure: pi.infrastructure,
+      overhead: {
+        // Nothing leaves a planet without a Launchpad, so one is the floor
+        // even on a colony whose pins have not loaded.
+        launchpads: Math.max(1, colony.pinLoad.counts.launchpad ?? 0),
+        storageFacilities: colony.pinLoad.counts.storage ?? 0,
       },
-      pi
-    ),
-  };
+      headsPerExtractor: meanHeadsPerExtractor(colony),
+      extractionRatePerHour: rate,
+      prices,
+      taxRate,
+      layout: ADVISOR_LAYOUT,
+      // Never guessed. A basic link moves 1,250 m3/hr and each upgrade level
+      // doubles it, but whether that axis is the same skill as the budget
+      // table is unconfirmed, so the engine answers `link-capacity-unknown`
+      // rather than picking a level (CONTEXT.md round 51).
+      linkCapacityPerHour: null,
+      bufferHours: ADVISOR_BUFFER_HOURS,
+    },
+    pi
+  );
+
+  // A tier-0 recommendation is "sell what you dig up", so the colony is
+  // already there when it refines nothing — not when it happens to extract
+  // that resource, which every candidate colony does.
+  const running = currentProductTypeIds(colony, pi);
+  const alreadyRunning =
+    advice.kind === 'recommended' &&
+    (advice.best.tier === 0
+      ? colony.production.length === 0
+      : running.includes(advice.best.typeId));
+
+  return { status: 'advised', advice, alreadyRunning };
 }

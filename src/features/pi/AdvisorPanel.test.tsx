@@ -604,6 +604,38 @@ describe('AdvisorPanel build advice', () => {
     expect(await screen.findByText(/reference hub quotes no price/)).toBeInTheDocument();
   });
 
+  it('blames the Command Center, not prices, when nothing fits', async () => {
+    // A level-0 Command Center supplies 1,675 tf — a Launchpad alone draws
+    // 3,600, so no candidate is fittable. Saying "nothing covers its customs
+    // tax" here would send the pilot to check prices that are fine.
+    priceEverything();
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: detail,
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [{ ...colony(40_000_001, 'temperate'), upgrade_level: 0 }],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    renderPanel();
+    expect(await screen.findByText(/Command Center hosts no whole chain/)).toBeInTheDocument();
+    expect(screen.queryByText(/covers its own customs tax/)).not.toBeInTheDocument();
+  });
+
   it('gives no build advice on a colony with no measurable extractor', async () => {
     priceEverything();
     loadAllColonyDetails.mockResolvedValue(

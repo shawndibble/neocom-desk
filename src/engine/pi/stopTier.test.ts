@@ -191,7 +191,7 @@ describe('recommendStopTier', () => {
     // A week of buffer in one Launchpad is far more than 10,000 m3 holds.
     const advice = recommendStopTier(options({ bufferHours: 24 * 7 }), pi);
     const cultures =
-      advice.kind === 'recommended' || advice.kind === 'no-profitable-tier'
+      advice.kind === 'recommended' || advice.kind === 'no-recommendation'
         ? advice.entries.find((entry) => entry.typeId === TEST_CULTURES)
         : undefined;
     expect(cultures?.status).toBe('rejected-throughput');
@@ -215,15 +215,57 @@ describe('recommendStopTier', () => {
     expect(cultures?.status).toBe('does-not-fit');
   });
 
-  it('says no tier is profitable rather than recommending a loss', () => {
-    // Every price at zero: nothing sells for more than its own customs tax.
-    const advice = recommendStopTier(options({ prices: {} }), pi);
-    expect(advice.kind).toBe('no-profitable-tier');
-  });
-
   it('has nothing to score on a planet that yields nothing', () => {
     const advice = recommendStopTier(options({ localResources: [] }), pi);
     expect(advice.kind).toBe('nothing-to-score');
+  });
+
+  describe('names what stopped every candidate, rather than leaving a caller to guess', () => {
+    /**
+     * One price for every candidate a Temperate planet offers — the five P0 and
+     * everything makeable from them. A partial map leaves some candidates
+     * `needs-price`, which is its own blocker and would mask the one under test.
+     */
+    function everythingAt(price: number): Record<number, number> {
+      return Object.fromEntries(
+        [...TEMPERATE_P0, ...localChainTargets(TEMPERATE_P0, pi)].map((typeId) => [typeId, price])
+      );
+    }
+
+    function blockerFrom(overrides: Partial<StopTierOptions>) {
+      const advice = recommendStopTier(options(overrides), pi);
+      expect(advice.kind).toBe('no-recommendation');
+      return advice.kind === 'no-recommendation' ? advice.blocker : null;
+    }
+
+    it('blames the hub when everything that fits is unquoted', () => {
+      expect(blockerFrom({ prices: {} })).toBe('needs-prices');
+    });
+
+    it('blames the Command Center when nothing fits at all', () => {
+      // Level 0 supplies 1,675 tf; a Launchpad alone draws 3,600.
+      expect(blockerFrom({ budget: { cpu: 1_675, powergrid: 6_000 } })).toBe('does-not-fit');
+    });
+
+    it('blames the buffer when everything that fits would overflow it', () => {
+      // A year of buffer fits in no launchpad, so every candidate overflows.
+      expect(blockerFrom({ bufferHours: 24 * 365, prices: everythingAt(1_000) })).toBe(
+        'throughput'
+      );
+    });
+
+    it('blames the prices when everything fits, is quoted, and still loses money', () => {
+      // Priced at a hair above zero, every tier is under water on customs tax
+      // alone — and nothing is unfittable, unquoted or overflowing.
+      expect(blockerFrom({ prices: everythingAt(0.01) })).toBe('unprofitable');
+    });
+
+    it('refuses to name one cause when the candidates disagree', () => {
+      // Only Microorganisms is quoted, and it is quoted at a loss: that one
+      // candidate is `scored`, the rest are `needs-price`. No single sentence
+      // is true of all of them.
+      expect(blockerFrom({ prices: { [MICROORGANISMS]: 0.01 } })).toBe('mixed');
+    });
   });
 
   it('breaks a tie toward the lower tier, so the simpler colony wins', () => {
@@ -251,5 +293,38 @@ describe('recommendStopTier', () => {
     if (tied.kind !== 'recommended') return;
     expect(tied.best.typeId).toBe(BACTERIA);
     expect(tied.best.tier).toBe(1);
+  });
+
+  it('ties only against the top margin, not along a chain of near-neighbours', () => {
+    // The tie tolerance is not transitive: A can tie B and B tie C while A and
+    // C sit more than a tolerance apart. Applying it inside a sort comparator
+    // makes that comparator inconsistent, and the winner then depends on how
+    // the runtime happens to merge — it can elect A, which is not the top
+    // margin and not tied with it.
+    //
+    // Three extractor candidates, each fitting three ECUs at 6,000/hr, so
+    // 18,000 units an hour and a tie tolerance of about 18 ISK on the margin.
+    // Spaced 12 ISK apart: each neighbour ties, the ends do not.
+    const step = 12 / 18_000;
+    const advice = recommendStopTier(
+      options({
+        prices: {
+          [MICROORGANISMS]: 1_000,
+          [AQUEOUS_LIQUIDS]: 1_000 + step,
+          [COMPLEX_ORGANISMS]: 1_000 + 2 * step,
+          [CARBON_COMPOUNDS]: 1,
+          [AUTOTROPHS]: 1,
+        },
+      }),
+      pi
+    );
+    expect(advice.kind).toBe('recommended');
+    if (advice.kind !== 'recommended') return;
+    // Complex Organisms earns the most; Aqueous Liquids ties it and has the
+    // lower typeID, so the rule elects Aqueous Liquids. Microorganisms is a
+    // tolerance clear of the top and must never win, however near it is to the
+    // candidate in the middle.
+    expect(advice.best.typeId).toBe(AQUEOUS_LIQUIDS);
+    expect(advice.best.marginPerHour).toBeGreaterThan(18_000 * (999.5 + step) - 1);
   });
 });

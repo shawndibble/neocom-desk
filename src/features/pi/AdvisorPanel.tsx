@@ -35,6 +35,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { EmptyState, NativeSelect, Panel, ReauthBanner, Spinner, StatChip } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { formatIsk } from '@/lib/isk';
@@ -123,6 +124,24 @@ interface SystemGroup {
  */
 function colonySpaceFor(security: number | null): ColonySpace {
   return security === null ? 'highsec' : securityBand(security);
+}
+
+/**
+ * Where the customs rate came from, in words. One branch per source, each
+ * passing only the values its own sentence uses — feeding every key every
+ * placeholder means shipping a `level: 0` to a sentence with no level in it.
+ */
+function customsTooltip(source: CustomsRateSource, t: TFunction): string {
+  switch (source.kind) {
+    case 'highsec-skill':
+      return t('piAdvisor.customsRateSource.highsec-skill', { level: source.level });
+    case 'highsec-unknown-skill':
+      return t('piAdvisor.customsRateSource.highsec-unknown-skill');
+    case 'player-poco':
+      return t('piAdvisor.customsRateSource.player-poco', {
+        space: t(`piAdvisor.spaceOption.${source.space}`),
+      });
+  }
 }
 
 interface Snapshot {
@@ -438,23 +457,18 @@ function StopTierLine({
     return framed(quiet(t('piAdvisor.stopTierNeedsRate')));
   }
   if (result.advice.kind === 'nothing-to-score') return null;
-  if (result.advice.kind === 'no-profitable-tier') {
-    // "The hub quotes none of this" and "none of this pays" are different
-    // answers, and only the second is about the planet. Saying the first as
-    // the second would send a pilot to re-scan a planet that is fine.
-    // Candidates the budget could not host are set aside first: they say
-    // nothing about prices either way, and on a small colony most of the
-    // deeper chains land there.
-    const fitted = result.advice.entries.filter((entry) => entry.status !== 'does-not-fit');
-    const unpriced = fitted.length > 0 && fitted.every((entry) => entry.status === 'needs-price');
-    return framed(
-      quiet(t(unpriced ? 'piAdvisor.stopTierNoPrices' : 'piAdvisor.stopTierNoneProfitable'))
-    );
+  if (result.advice.kind === 'no-recommendation') {
+    // The engine names what stopped every candidate; this only spells it. It
+    // used to infer the cause here and got it wrong in both directions — a
+    // colony whose Command Center hosts nothing was told its ore was worthless.
+    return framed(quiet(t(`piAdvisor.stopTierBlocked.${result.advice.blocker}`)));
   }
 
   const { best } = result.advice;
   return framed(
-    <CardLine label={t('piAdvisor.stopTierLabel')}>
+    <CardLine
+      label={t(result.alreadyRunning ? 'piAdvisor.stopTierAtLabel' : 'piAdvisor.stopTierLabel')}
+    >
       <span className="text-text">
         {best.tier === 0
           ? t('piAdvisor.stopTierSellRaw', { name: best.name })
@@ -466,7 +480,7 @@ function StopTierLine({
           units: Math.round(best.unitsPerHour).toLocaleString(),
         })}
       </div>
-      <p className="mt-1 text-[0.6875rem] text-text-faint">
+      <p className="mt-1 text-[0.6875rem] text-text-dim">
         {t('piAdvisor.stopTierBasis', { count: best.blocks })}
       </p>
     </CardLine>
@@ -908,16 +922,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               value={t('piAdvisor.customsRateValue', {
                 percent: Math.round(activeSystem.customsRate * 10_000) / 100,
               })}
-              tooltip={t(`piAdvisor.customsRateSource.${activeSystem.customsSource.kind}`, {
-                level:
-                  activeSystem.customsSource.kind === 'highsec-skill'
-                    ? activeSystem.customsSource.level
-                    : 0,
-                space:
-                  activeSystem.customsSource.kind === 'player-poco'
-                    ? t(`piPlan.spaceOption.${activeSystem.customsSource.space}`)
-                    : '',
-              })}
+              tooltip={customsTooltip(activeSystem.customsSource, t)}
               tone={
                 activeSystem.customsSource.kind === 'highsec-unknown-skill' ? 'warning' : undefined
               }

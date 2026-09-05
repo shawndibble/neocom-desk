@@ -125,6 +125,42 @@ describe('colonyStopTierAdvice', () => {
     expect(result.advice.best.typeId).toBe(TEST_CULTURES);
   });
 
+  it('says when the colony is already running what was recommended', () => {
+    // Test Cultures is schematic 86. A colony already making it is not being
+    // told to "build up to" it.
+    const result = colonyStopTierAdvice(
+      input({ colony: colony({ production: [{ schematicId: 86, count: 1 }] }) })
+    );
+    expect(result.status).toBe('advised');
+    if (result.status !== 'advised') return;
+    expect(result.advice.kind === 'recommended' && result.advice.best.typeId).toBe(TEST_CULTURES);
+    expect(result.alreadyRunning).toBe(true);
+  });
+
+  it('does not call a colony making something else already there', () => {
+    // Schematic 133 is Reactive Metals — not what this planet was advised to
+    // build, so the recommendation is still a change to make.
+    const result = colonyStopTierAdvice(
+      input({ colony: colony({ production: [{ schematicId: 133, count: 1 }] }) })
+    );
+    expect(result.status).toBe('advised');
+    if (result.status !== 'advised') return;
+    expect(result.alreadyRunning).toBe(false);
+  });
+
+  it('counts a raw recommendation as already there only when nothing is refined', () => {
+    // At 500 ISK the ore beats every made tier, and a colony with no factory
+    // is already doing exactly that.
+    const rawWins = { ...PRICES, [MICROORGANISMS]: 500 };
+    const bare = colonyStopTierAdvice(input({ prices: rawWins }));
+    expect(bare.status === 'advised' && bare.alreadyRunning).toBe(true);
+
+    const refining = colonyStopTierAdvice(
+      input({ prices: rawWins, colony: colony({ production: [{ schematicId: 86, count: 1 }] }) })
+    );
+    expect(refining.status === 'advised' && refining.alreadyRunning).toBe(false);
+  });
+
   it('fits against the budget the links leave, not the Command Center’s full supply', () => {
     // The same colony with a heavier link draw has less Powergrid to fit into,
     // so its recommendation is measurably smaller.
