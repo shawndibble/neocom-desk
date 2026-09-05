@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Tabs, type TabItem } from '@/components/ui';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
+import { readFromClipboard } from '@/lib/clipboard';
 import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
 import { loadUniverseType } from '../data';
 import { loadItemNameMap, loadSkillNameMap } from '../typeCatalog';
@@ -65,7 +66,26 @@ export function ImportClipboardDialog({
   const [preview, setPreview] = useState<ClipboardImportPreview | null>(null);
   const [parsing, setParsing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [pasteError, setPasteError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * The Clipboard API's `readText` needs an explicit user gesture and
+   * permission the browser may deny — unlike the textarea's own native
+   * Ctrl+V, which always works. A failure here falls back to that existing
+   * path rather than blocking the import, so it degrades to "manually paste
+   * into the textarea", not "can't import."
+   */
+  async function handlePasteFromClipboard() {
+    setPasteError(false);
+    try {
+      const clipboardText = await readFromClipboard();
+      setText(clipboardText);
+      setPreview(null);
+    } catch {
+      setPasteError(true);
+    }
+  }
 
   async function handleParse() {
     setParsing(true);
@@ -137,14 +157,24 @@ export function ImportClipboardDialog({
               className="w-full rounded-xs border border-line bg-panel-2 p-2 text-xs text-text"
             />
 
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={() => void handleParse()}
-              disabled={parsing || text.trim() === ''}
-            >
-              {t('plans.importParse')}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="ghost" onClick={() => void handlePasteFromClipboard()}>
+                {t('plans.pasteFromClipboard')}
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => void handleParse()}
+                disabled={parsing || text.trim() === ''}
+              >
+                {t('plans.importParse')}
+              </Button>
+            </div>
+            {pasteError && (
+              <p role="alert" className="text-xs text-danger">
+                {t('plans.pasteFromClipboardFailed')}
+              </p>
+            )}
           </>
         )}
 

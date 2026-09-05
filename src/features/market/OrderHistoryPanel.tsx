@@ -14,6 +14,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadOrderHistory } from '@/features/character/orders';
+import { MarketItemLink } from './MarketItemLink';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -72,7 +73,11 @@ export function OrderHistoryPanel() {
       {
         id: 'item',
         header: t('orders.item'),
-        render: (order) => typeNames.get(order.type_id),
+        render: (order) => (
+          <MarketItemLink typeId={order.type_id}>
+            {typeNames.get(order.type_id) ?? `Type #${order.type_id}`}
+          </MarketItemLink>
+        ),
       },
       {
         id: 'side',

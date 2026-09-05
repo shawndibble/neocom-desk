@@ -82,6 +82,19 @@ describe('SkillPicker', () => {
     expect(screen.queryByRole('list')).toBeNull();
   });
 
+  it('distinguishes an empty query from a query with no matches (#408)', async () => {
+    const user = userEvent.setup();
+    render(
+      <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
+    );
+    expect(screen.queryByText(/no skills match/i)).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('searchbox'), 'zzzznomatch');
+
+    expect(await screen.findByText(/no skills match "zzzznomatch"/i)).toBeInTheDocument();
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
+  });
+
   it('ranks name matches exact > prefix > substring, with a group-name-only match last', async () => {
     const user = userEvent.setup();
     render(
@@ -90,7 +103,9 @@ describe('SkillPicker', () => {
 
     await user.type(screen.getByRole('searchbox'), 'frigate');
 
-    const items = screen.getAllByRole('listitem');
+    // The search re-rank is debounced (#408) — wait it out rather than
+    // reading results synchronously right after typing.
+    const items = await screen.findAllByRole('listitem');
     expect(items.map((li) => li.textContent)).toEqual([
       expect.stringContaining('Frigate'),
       expect.stringContaining('Frigate Prefix Skill'),
@@ -107,7 +122,7 @@ describe('SkillPicker', () => {
 
     await user.type(screen.getByRole('searchbox'), 'spaceship command');
 
-    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(await screen.findAllByRole('listitem')).toHaveLength(3);
   });
 
   it('calls onAdd with the picked skill and level, then clears the query', async () => {
@@ -119,7 +134,7 @@ describe('SkillPicker', () => {
 
     const input = screen.getByRole('searchbox');
     await user.type(input, 'frigate');
-    const firstItem = screen.getAllByRole('listitem')[0];
+    const firstItem = (await screen.findAllByRole('listitem'))[0];
     if (!firstItem) throw new Error('expected at least one result');
     await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
     await user.click(screen.getByRole('button', { name: 'Level III' }));
@@ -141,7 +156,7 @@ describe('SkillPicker', () => {
 
     await user.type(screen.getByRole('searchbox'), 'tracking');
 
-    const items = screen.getAllByRole('listitem').map((li) => li.textContent);
+    const items = (await screen.findAllByRole('listitem')).map((li) => li.textContent);
     expect(items).toHaveLength(1);
     expect(items[0]).toContain('Spaceship Command');
   });
@@ -159,7 +174,7 @@ describe('SkillPicker', () => {
 
     await user.type(screen.getByRole('searchbox'), 'turret');
 
-    const items = screen.getAllByRole('listitem').map((li) => li.textContent);
+    const items = (await screen.findAllByRole('listitem')).map((li) => li.textContent);
     expect(items[0]).toContain('Gunnery');
     expect(items[1]).toContain('Spaceship Command');
   });
@@ -176,6 +191,7 @@ describe('SkillPicker', () => {
     );
 
     await user.type(screen.getByRole('searchbox'), 'e');
+    await screen.findAllByRole('listitem');
     const names = () => screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(names().join()).toContain('Gunnery');
     expect(names().join()).toContain('Mining');
@@ -216,10 +232,73 @@ describe('SkillPicker', () => {
     );
 
     await user.type(screen.getByRole('searchbox'), 'widget');
-    await user.click(screen.getByRole('button', { name: 'RareGroup' }));
+    await user.click(await screen.findByRole('button', { name: 'RareGroup' }));
 
     const names = screen.getAllByRole('listitem').map((li) => li.textContent);
     expect(names).toHaveLength(1);
     expect(names[0]).toContain('Zzz Rare Skill');
+  });
+});
+
+describe('SkillPicker level flags (#408)', () => {
+  it('flags a level the character has already trained', async () => {
+    const user = userEvent.setup();
+    const trained: ReadonlyMap<number, TrainedSkill> = new Map([[1, { level: 3, sp: 0 }]]);
+    render(
+      <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={trained} onAdd={vi.fn()} />
+    );
+
+    await user.type(screen.getByRole('searchbox'), 'frigate');
+    const firstItem = (await screen.findAllByRole('listitem'))[0];
+    await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
+
+    // Accessible names concatenate with no separator ("Level IIIAlready
+    // trained"), so a plain roman-numeral match must not also swallow a
+    // longer numeral sharing its prefix ("Level II" is a prefix of "Level
+    // III") — the negative lookahead rules out another roman-numeral letter
+    // immediately following.
+    const levelIII = screen.getByRole('button', { name: /^Level III(?![IVX])/ });
+    expect(levelIII).toHaveTextContent(/already trained/i);
+    const levelIV = screen.getByRole('button', { name: /^Level IV(?![IVX])/ });
+    expect(levelIV).not.toHaveTextContent(/already trained/i);
+  });
+
+  it('flags a level already in the plan, distinctly from an already-trained level', async () => {
+    const user = userEvent.setup();
+    render(
+      <SkillPicker
+        skills={SKILLS}
+        catalog={CATALOG}
+        trainedSkills={NO_TRAINED}
+        planEntries={[{ skillTypeID: 1, targetLevel: 2 }]}
+        onAdd={vi.fn()}
+      />
+    );
+
+    await user.type(screen.getByRole('searchbox'), 'frigate');
+    const firstItem = (await screen.findAllByRole('listitem'))[0];
+    await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
+
+    const levelII = screen.getByRole('button', { name: /^Level II(?![IVX])/ });
+    expect(levelII).toHaveTextContent(/already in plan/i);
+    expect(levelII).not.toHaveTextContent(/already trained/i);
+    const levelIII = screen.getByRole('button', { name: /^Level III(?![IVX])/ });
+    expect(levelIII).not.toHaveTextContent(/already in plan/i);
+  });
+
+  it('does not flag any level for a skill with neither training nor a plan entry', async () => {
+    const user = userEvent.setup();
+    render(
+      <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
+    );
+
+    await user.type(screen.getByRole('searchbox'), 'frigate');
+    const firstItem = (await screen.findAllByRole('listitem'))[0];
+    await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
+
+    for (const level of ['I', 'II', 'III', 'IV', 'V']) {
+      const button = screen.getByRole('button', { name: new RegExp(`Level ${level}$`) });
+      expect(button).not.toHaveTextContent(/already/i);
+    }
   });
 });

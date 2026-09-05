@@ -1281,3 +1281,33 @@ describe('an attribute sheet nothing explains', () => {
     expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(false);
   });
 });
+
+describe('removing an entry requires confirmation (#408)', () => {
+  it('does not remove the entry until the confirmation Modal is accepted', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: /remove skill a/i }));
+    // Clicking Remove on the row only opens the Modal — the entry survives
+    // until the Modal's own Remove button is clicked.
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.getByText(/remove "skill a" from this plan/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ entries: [{ skillTypeID: 20, targetLevel: 1, priority: 'high' }] })
+    );
+  });
+
+  it('Cancel leaves the entry untouched and closes the Modal', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: /remove skill a/i }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByText(/remove "skill a" from this plan/i)).not.toBeInTheDocument();
+  });
+});
