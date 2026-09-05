@@ -18,6 +18,27 @@
  *   "Upwell_structure" page's raw wikitext (not a rendered/summarized copy,
  *   which contradicted the dump on first pass): Athanor/Tatara reaction
  *   bonuses, and the Standup reactor rig security multipliers.
+ *
+ * Reaction skill sources (verified 2026-09, issue #513) — everef.net
+ * ref-data dogma attributes, read on both the skills and the attributes:
+ * - Industry (3380) carries only `manufacturingTimeBonus` (attribute 440,
+ *   -4), type description "4% reduction in manufacturing time per skill
+ *   level".
+ * - Advanced Industry (3388) carries `advancedIndustrySkillIndustryJobTimeBonus`
+ *   (attribute 1961, -3), type description "3% reduction in all manufacturing
+ *   and research times per skill level". That attribute's own description
+ *   says "all industry job times", which reads wider than the type
+ *   description — the type description is the narrower and authoritative of
+ *   the two, and reaction (industryActivity 11) is neither manufacturing (1)
+ *   nor research.
+ * - Reactions (45746) carries `reactionTimeBonus` (attribute 2660, -4),
+ *   whose description is "Skill attribute that reduces time for reactions
+ *   jobs". A distinct attribute exists at all only because the manufacturing
+ *   ones do not reach reactions.
+ * - EVE University wiki "Reactions" §Skills lists exactly Reactions (4%
+ *   time/level), Mass Reactions and Advanced Mass Reactions (job slots,
+ *   `reactionSlotBonus` 2661) and Remote Reactions (range) — Industry and
+ *   Advanced Industry are not among them.
  */
 
 import type { EngineAsset } from '../assetTree';
@@ -219,6 +240,8 @@ export const SCC_SURCHARGE_PCT = 4;
 export const SKILL_IDS = {
   industry: 3380,
   advancedIndustry: 3388,
+  /** Reaction job time only, never manufacturing (issue #513). */
+  reactions: 45746,
   accounting: 16622,
   brokerRelations: 3446,
 } as const;
