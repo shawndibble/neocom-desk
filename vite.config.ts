@@ -68,6 +68,24 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Tests run in UTC, matching the CI runners, so a suite that passes here
+    // passes there and vice versa.
+    //
+    // Without this, any test asserting a *rendered* date drifts by a day for
+    // developers west of UTC: ESI hands out instants like
+    // "2027-01-15T00:00:00Z", `formatLocalDate` correctly renders them in the
+    // viewer's own zone, and midnight UTC is the previous day everywhere in
+    // the Americas. SkillPlans' remap-cooldown hint was failing exactly that
+    // way on a US machine while passing in CI — a whole class of failure that
+    // looks like a real bug and costs an afternoon to find, since the app
+    // behaviour was right both times.
+    //
+    // The cost is that a genuine timezone bug will not surface from a local
+    // run. That is acceptable here: local-date rendering has its own unit
+    // tests (src/lib/localDate.test.ts) which set the zone deliberately, and
+    // that is where a zone question belongs, not as an accident of whoever
+    // happens to run the suite.
+    env: { TZ: 'UTC' },
     setupFiles: ['./vitest.setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     // Default 5000ms. A test can chain several `findBy*`/`waitFor` calls,
