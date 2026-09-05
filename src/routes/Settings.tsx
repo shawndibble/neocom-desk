@@ -61,6 +61,17 @@ function useCharacterNames(): Map<number, string> {
   );
 }
 
+/** Shared "Character" column render for `ActivityLogPanel` and `DataAgePanel`. */
+function characterCell(
+  characterId: number | undefined,
+  characterNames: Map<number, string>,
+  t: (key: string) => string
+): string {
+  return characterId === undefined
+    ? t('activityLog.publicCall')
+    : (characterNames.get(characterId) ?? `#${characterId}`);
+}
+
 function ActivityLogPanel() {
   const { t } = useTranslation();
   const entries = useActivityLog((state) => state.entries);
@@ -85,10 +96,7 @@ function ActivityLogPanel() {
       {
         id: 'character',
         header: t('activityLog.columnCharacter'),
-        render: (entry) =>
-          entry.characterId === undefined
-            ? t('activityLog.publicCall')
-            : (characterNames.get(entry.characterId) ?? `#${entry.characterId}`),
+        render: (entry) => characterCell(entry.characterId, characterNames, t),
       },
       {
         id: 'time',
@@ -174,10 +182,7 @@ function DataAgePanel() {
       {
         id: 'character',
         header: t('dataAge.columnCharacter'),
-        render: (entry) =>
-          entry.characterId === undefined
-            ? t('activityLog.publicCall')
-            : (characterNames.get(entry.characterId) ?? `#${entry.characterId}`),
+        render: (entry) => characterCell(entry.characterId, characterNames, t),
       },
       {
         id: 'updated',
