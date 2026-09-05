@@ -743,7 +743,7 @@ export function Wallet() {
             title={t('wallet.balanceTab')}
             actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
           >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-wrap gap-x-8 gap-y-4">
               <div>
                 <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('wallet.isk')}
