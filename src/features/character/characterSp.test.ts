@@ -3,7 +3,8 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCharacterSpSummary, getLastKnownSpSummary, NO_SP_SUMMARY } from './characterSp';
+import { loadCharacterSpSummary } from './characterSp';
+import { getLastKnownSpSummary, NO_SP_SUMMARY } from '@/stores/characterSp';
 
 const CHAR_ID = 91;
 const NOW = Date.parse('2026-09-01T00:00:00Z');

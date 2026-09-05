@@ -22,11 +22,8 @@ import type { CachedResult } from '@/esi/cache';
 import type { CorporationHistoryEntry } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
-import {
-  loadCharacterSpSummary,
-  getLastKnownSpSummary,
-  type CharacterSpSummary,
-} from '@/features/character/characterSp';
+import { loadCharacterSpSummary } from '@/features/character/characterSp';
+import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';

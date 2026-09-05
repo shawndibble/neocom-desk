@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { IconButton } from './IconButton';
+import * as Icon from './icons';
 
 export type ModalPlacement = 'center' | 'sheet' | 'wide';
 
@@ -84,14 +86,18 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
             >
               {title}
             </h2>
-            <button
-              type="button"
+            {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
+                this replaced: DESIGN.md's icon rules require an icon-only
+                control to be an `IconButton` and forbid a dingbat character
+                standing in for one, and the mobile "More" sheet's close
+                control was flagged at 23×28px — under the documented 44px
+                touch tier every other icon action in the header now gets. */}
+            <IconButton
+              variant="plain"
+              icon={<Icon.Close />}
+              label={t('common.close')}
               onClick={onClose}
-              aria-label={t('common.close')}
-              className="rounded-xs px-1.5 py-0.5 text-text-dim transition-colors hover:bg-panel-2 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <span aria-hidden="true">×</span>
-            </button>
+            />
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
         </div>
