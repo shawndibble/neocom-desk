@@ -149,8 +149,28 @@ describe('Market top-level tabs', () => {
     await user.click(screen.getByRole('tab', { name: 'History' }));
     expect(await screen.findByText('expired')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'Transactions' }));
+    // The second view is picked from the table's own header, not a nested tab.
+    await user.selectOptions(screen.getByLabelText('History view'), 'transactions');
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+  });
+
+  it('opens the Transactions view from a deep link, with History still the selected tab', async () => {
+    window.history.pushState({}, '', '/market?section=transactions');
+    const user = userEvent.setup();
+    render(<App />);
+
+    // Both views are the character's past, so the tab stays History and the
+    // header's select says which of the two is showing.
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('History view')).toHaveValue('transactions');
+    expect(
+      screen.getByRole('button', { name: 'About Orders and Transactions' })
+    ).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('History view'), 'history');
+    expect(await screen.findByText('expired')).toBeInTheDocument();
+    expect(screen.getByLabelText('History view')).toHaveValue('history');
   });
 });
 

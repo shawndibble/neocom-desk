@@ -40,7 +40,13 @@ const loadPlanetInfo = vi.fn();
 const loadSchematicName = vi.fn();
 const loadTypeNames = vi.fn();
 
-vi.mock('@/sde/loadSde', () => ({ loadPi: vi.fn(async () => pi) }));
+const loadPiPlanetRadius = vi.fn<() => Promise<Record<string, number>>>();
+vi.mock('@/sde/loadSde', () => ({
+  loadPi: vi.fn(async () => pi),
+  // Efa II's real radius, so these tests do the same arithmetic the app does
+  // against the shipped payload.
+  loadPiPlanetRadius: () => loadPiPlanetRadius(),
+}));
 const setPlanetRichness = vi.fn<(planetId: number, order: number[]) => Promise<void>>();
 const clearPlanetRichness = vi.fn<(planetId: number) => Promise<void>>();
 vi.mock('@/sync', () => ({
@@ -140,6 +146,7 @@ function renderPanel(onSystemIdChange = vi.fn()) {
 }
 
 beforeEach(() => {
+  loadPiPlanetRadius.mockResolvedValue({ '40000001': 6030, '40000002': 6030 });
   for (const mock of [
     loadCharacterPlanets,
     loadAllColonyDetails,
@@ -277,11 +284,55 @@ describe('AdvisorPanel', () => {
     expect(room).toHaveTextContent('15x advanced factory');
   });
 
-  it('refuses to state headroom for a colony whose links it cannot cost', async () => {
-    // The bug this guards, reported from a live colony: every planet was full,
-    // and the card still offered "room for 13x basic factory". Links draw CPU
-    // and Powergrid that nothing here charges for, so the load is understated
-    // and the headroom overstated. A card that cannot measure says so.
+  it('charges for links, and still states headroom (#440)', async () => {
+    // The bug this closes: every planet was full and the card still offered
+    // room, because links drew CPU/Powergrid nothing accounted for.
+    //
+    // These two pins are 72.57 km apart on a 6,030 km planet, so the link
+    // costs 15 + 72.57*0.2 = 29.5 tf and 10 + 72.57*0.15 = 20.9 MW. Asserting
+    // those numbers is what makes this a real test: a link priced at zero
+    // would render the very same sentence.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [{ source_pin_id: 1, destination_pin_id: 2, link_level: 0 }],
+                routes: [],
+                pins: [
+                  {
+                    ...extractorPin(1),
+                    latitude: 1.5826666355133057,
+                    longitude: 5.977088451385498,
+                  },
+                  {
+                    pin_id: 2,
+                    type_id: BASIC,
+                    latitude: 1.5946428775787354,
+                    longitude: 5.978272914886475,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  },
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+
+    expect(await screen.findByText('Includes 1 link drawing 30 tf / 21 MW.')).toBeInTheDocument();
+    expect(screen.queryByText(/Headroom unknown/)).not.toBeInTheDocument();
+  });
+
+  it('says so when a planet’s radius did not load, rather than pricing links at zero', async () => {
+    // The only refusal left. Without a radius a link's distance, and so its
+    // cost, cannot be worked out — and free is the one answer known to be wrong.
+    loadPiPlanetRadius.mockResolvedValue({});
     loadAllColonyDetails.mockResolvedValue(
       new Map([
         [
@@ -302,7 +353,6 @@ describe('AdvisorPanel', () => {
     renderPanel();
 
     expect(await screen.findByText(/Headroom unknown/)).toBeInTheDocument();
-    expect(screen.queryByText(/13x basic factory/)).not.toBeInTheDocument();
   });
 
   it('names an unbuilt planet’s resources and refuses to price them', async () => {

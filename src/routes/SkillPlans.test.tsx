@@ -1038,8 +1038,10 @@ describe('SkillPlans editor: optimize remaps', () => {
     // segment's startIndex — must not throw, and must drop the stale panel
     // rather than render against the old (now out-of-range) schedule.
     // Icon-only remove button (#112): accessible name is "Remove {skill}",
-    // not visible text — entries[0] is Gunnery.
+    // not visible text — entries[0] is Gunnery. Removing now opens a confirm
+    // Modal (#408) rather than removing immediately.
     await user.click(within(entriesPanel).getByRole('button', { name: 'Remove Gunnery' }));
+    await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => expect(screen.queryByText(/^Remapping saves/)).not.toBeInTheDocument());
     // The rest of the app must still be usable — no crash boundary tripped.

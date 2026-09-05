@@ -9,6 +9,8 @@ import type { PlanetPin } from '@/esi/endpoints';
 import type { ExtractorProgram, PinCounts, PinLoad } from '@/engine/pi/types';
 import type { PiData, PiPinKind } from '@/sde/types';
 import { pinsLoad } from '@/engine/pi/pinBudget';
+import { linksLoad, type LinkGeometry } from '@/engine/pi/linkCost';
+import type { PlanetLink } from '@/esi/endpoints';
 
 export type PinRole = 'extractor' | 'factory' | 'other';
 
@@ -131,6 +133,15 @@ export interface ColonyPinLoad {
    */
   load: PinLoad;
   /**
+   * What this colony's links draw, or null when the planet's radius did not
+   * resolve — a link's cost is distance-based, and there is no honest figure
+   * without it. Null means the totals below are incomplete, and a caller
+   * showing headroom must say so rather than treat links as free (#440).
+   */
+  linkLoad: PinLoad | null;
+  /** How many links the colony has, whether or not they could be costed. */
+  linkCount: number;
+  /**
    * Pin typeIDs the payload names no kind for, in the order seen, deduped.
    * Command Centers are excluded — every colony has one, it supplies the
    * budget and draws nothing from it, so listing it here would fire "the
@@ -153,7 +164,12 @@ export interface ColonyPinLoad {
  * three-head extractor is charged for thirteen heads rather than for some
  * average of them.
  */
-export function colonyPinLoad(pins: readonly PlanetPin[], pi: PiData): ColonyPinLoad {
+export function colonyPinLoad(
+  pins: readonly PlanetPin[],
+  pi: PiData,
+  links: readonly PlanetLink[] = [],
+  planetRadiusKm: number | null = null
+): ColonyPinLoad {
   const counts: Partial<Record<PiPinKind, number>> = {};
   const unknownTypeIds: number[] = [];
   const commandCenters = new Set(pi.infrastructure.commandCenterTypeIds);
@@ -173,10 +189,37 @@ export function colonyPinLoad(pins: readonly PlanetPin[], pi: PiData): ColonyPin
     }
   }
 
+  const pinLoad = pinsLoad(counts, pi.infrastructure, { extractorHeads });
+
+  // Links are priced from the geometry ESI already reports — each pin's own
+  // latitude/longitude — against the planet's radius. A link whose endpoints
+  // are not both in the pin list is skipped rather than guessed at.
+  const pinById = new Map(pins.map((pin) => [pin.pin_id, pin]));
+  const geometry: LinkGeometry[] = [];
+  for (const link of links) {
+    const a = pinById.get(link.source_pin_id);
+    const b = pinById.get(link.destination_pin_id);
+    if (!a || !b) continue;
+    geometry.push({
+      a: { latitude: a.latitude, longitude: a.longitude },
+      b: { latitude: b.latitude, longitude: b.longitude },
+      level: link.link_level,
+    });
+  }
+
+  const linkLoad =
+    planetRadiusKm !== null && planetRadiusKm > 0
+      ? linksLoad(geometry, planetRadiusKm, pi.infrastructure.link)
+      : null;
+
   return {
     counts,
     extractorHeads,
-    load: pinsLoad(counts, pi.infrastructure, { extractorHeads }),
+    load: linkLoad
+      ? { cpu: pinLoad.cpu + linkLoad.cpu, powergrid: pinLoad.powergrid + linkLoad.powergrid }
+      : pinLoad,
+    linkLoad,
+    linkCount: links.length,
     unknownTypeIds,
   };
 }

@@ -7,7 +7,7 @@
  * buildRows exactly, so bandStarts keeps working unmodified against those).
  */
 import type { PlanEntry, ScheduledStep } from '@/engine/types';
-import { buildRows } from './markers';
+import { buildRows, type PlanRow } from './markers';
 
 export interface EntryQueueSummary {
   /** Sum of `seconds` across this entry's own (non-prereq) scheduled steps. */
@@ -116,14 +116,24 @@ const EMPTY_SUMMARY: EntryQueueInfo = {
   prereqRows: [],
 };
 
-/** Entry+marker interleave (buildRows) with each entry's prereq rows expanded ahead of it. */
+/**
+ * Entry+marker interleave (buildRows) with each entry's prereq rows expanded
+ * ahead of it.
+ *
+ * `precomputedRows`: a caller that already built the entry/marker interleave
+ * for something else (PlanEditor.tsx also needs it for band placement) passes
+ * it here to skip a second `buildRows` pass over the same entries/markers —
+ * the two calls always agreed anyway, so building it twice was pure waste,
+ * not a second opinion.
+ */
 export function buildMergedRows(
   entries: readonly PlanEntry[],
   markers: readonly number[] | undefined,
-  entryQueue: ReadonlyMap<number, EntryQueueInfo>
+  entryQueue: ReadonlyMap<number, EntryQueueInfo>,
+  precomputedRows?: readonly PlanRow[]
 ): MergedRow[] {
   const rows: MergedRow[] = [];
-  for (const row of buildRows(entries, markers)) {
+  for (const row of precomputedRows ?? buildRows(entries, markers)) {
     if (row.kind === 'marker') {
       rows.push({ kind: 'marker', id: row.id, markerIndex: row.markerIndex });
       continue;
@@ -148,6 +158,33 @@ export function buildMergedRows(
     });
   }
   return rows;
+}
+
+export type MoveDirection = 'up' | 'down' | 'top';
+
+/**
+ * The non-drag reorder path (#408): resolve a move-up/move-down/move-to-top
+ * request on `rowId` to the sortable id it should be dropped onto, so the
+ * caller can feed it straight into the same `onReorder(activeId, overId)`
+ * wiring a real drag already produces. Null when the move is a no-op (row not
+ * found, or already at the edge it was asked to move toward) — the caller's
+ * signal to disable that action rather than perform a null drop.
+ */
+export function resolveMoveTarget(
+  rows: readonly { id: string }[],
+  rowId: string,
+  direction: MoveDirection
+): string | null {
+  const index = rows.findIndex((r) => r.id === rowId);
+  if (index === -1) return null;
+  switch (direction) {
+    case 'up':
+      return index === 0 ? null : rows[index - 1].id;
+    case 'down':
+      return index === rows.length - 1 ? null : rows[index + 1].id;
+    case 'top':
+      return index <= 0 ? null : rows[0].id;
+  }
 }
 
 /**

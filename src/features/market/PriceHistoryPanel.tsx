@@ -1,8 +1,15 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Spinner } from '@/components/ui';
+import { EmptyState, NativeSelect, Spinner } from '@/components/ui';
 import { loadPriceHistory } from './priceHistory';
-import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
+import { formatIsk } from '@/lib/isk';
+import {
+  filterPriceHistoryRange,
+  summarizePriceHistory,
+  PRICE_HISTORY_RANGES,
+  type MarketHistoryPoint,
+  type PriceHistoryRange,
+} from '@/engine/market/priceHistory';
 
 /**
  * Dynamic import, not a static one: `PriceHistoryChart.tsx` statically
@@ -16,6 +23,8 @@ interface PriceHistoryPanelProps {
   regionId: number;
   typeId: number;
   itemName: string;
+  /** Injectable for tests, like `getOrderBook`'s `Clock` — the range filter is otherwise wall-clock-relative. */
+  now?: Date;
 }
 
 function ChartFallback({ label }: { label: string }) {
@@ -27,10 +36,11 @@ function ChartFallback({ label }: { label: string }) {
 }
 
 /** Price History tab body: fetches the region's daily history for the item, then hands it to the lazy chart. */
-export function PriceHistoryPanel({ regionId, typeId, itemName }: PriceHistoryPanelProps) {
+export function PriceHistoryPanel({ regionId, typeId, itemName, now }: PriceHistoryPanelProps) {
   const { t } = useTranslation();
   const [points, setPoints] = useState<MarketHistoryPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<PriceHistoryRange>('30d');
   // Distinct from "no history": a thrown fetch failure (network/rate-limit/5xx)
   // is not the same fact as ESI genuinely having nothing for this item, and
   // folding the two into one EmptyState would misreport failures as data.
@@ -79,8 +89,72 @@ export function PriceHistoryPanel({ regionId, typeId, itemName }: PriceHistoryPa
   }
 
   return (
-    <Suspense fallback={<ChartFallback label={t('common.loading')} />}>
-      <LazyPriceHistoryChart points={points} itemName={itemName} />
-    </Suspense>
+    <RangedHistory
+      points={points}
+      range={range}
+      onRangeChange={setRange}
+      itemName={itemName}
+      now={now}
+    />
+  );
+}
+
+interface RangedHistoryProps {
+  points: readonly MarketHistoryPoint[];
+  range: PriceHistoryRange;
+  onRangeChange: (range: PriceHistoryRange) => void;
+  itemName: string;
+  now?: Date;
+}
+
+/** Range control + hi/lo/median summary, both derived from the already-fetched points — neither needs the lazy chart loaded. */
+function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHistoryProps) {
+  const { t } = useTranslation();
+  const filtered = useMemo(
+    () =>
+      now ? filterPriceHistoryRange(points, range, now) : filterPriceHistoryRange(points, range),
+    [points, range, now]
+  );
+  const summary = useMemo(() => summarizePriceHistory(filtered), [filtered]);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 px-1 pb-2">
+        <div className="flex gap-3 text-xs">
+          {summary ? (
+            <>
+              <span>
+                {t('market.priceHistory.summaryHi')}: {formatIsk(summary.hi, 2)}
+              </span>
+              <span>
+                {t('market.priceHistory.summaryLo')}: {formatIsk(summary.lo, 2)}
+              </span>
+              <span>
+                {t('market.priceHistory.summaryMedian')}: {formatIsk(summary.median, 2)}
+              </span>
+            </>
+          ) : (
+            // Distinct from emptyTitle above (ESI has no history at all) — this
+            // item has history, just none inside the currently selected range.
+            <span className="text-text-dim">{t('market.priceHistory.summaryNone')}</span>
+          )}
+        </div>
+        <NativeSelect
+          size="sm"
+          aria-label={t('market.priceHistory.range')}
+          value={range}
+          onChange={(e) => onRangeChange(e.target.value as PriceHistoryRange)}
+        >
+          {PRICE_HISTORY_RANGES.map((r) => (
+            <option key={r} value={r}>
+              {t(`market.priceHistory.range${r}`)}
+            </option>
+          ))}
+        </NativeSelect>
+      </div>
+      <Suspense fallback={<ChartFallback label={t('common.loading')} />}>
+        <LazyPriceHistoryChart points={filtered} itemName={itemName} />
+      </Suspense>
+    </div>
   );
 }

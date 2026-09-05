@@ -21,7 +21,7 @@ function PlanRow({
   onRename,
 }: {
   plan: SkillPlanRecord;
-  onRequestDelete: (id: string) => void;
+  onRequestDelete: (plan: SkillPlanRecord) => void;
 } & Pick<PlanListProps, 'onOpen' | 'onDuplicate' | 'onRename'>) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
@@ -79,7 +79,7 @@ function PlanRow({
         icon={<Icon.Close />}
         label={`${t('plans.delete')} ${plan.name}`}
         tone="danger"
-        onClick={() => onRequestDelete(plan.id)}
+        onClick={() => onRequestDelete(plan)}
       />
     </li>
   );
@@ -95,7 +95,7 @@ export function PlanList({
   onRename,
 }: PlanListProps) {
   const { t } = useTranslation();
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
 
   return (
     <div className="space-y-2">
@@ -117,28 +117,30 @@ export function PlanList({
               plan={plan}
               onOpen={onOpen}
               onDuplicate={onDuplicate}
-              onRequestDelete={setDeletingId}
+              onRequestDelete={setDeletingPlan}
               onRename={onRename}
             />
           ))}
         </ul>
       )}
       <Modal
-        open={deletingId !== null}
-        onClose={() => setDeletingId(null)}
+        open={deletingPlan !== null}
+        onClose={() => setDeletingPlan(null)}
         title={t('plans.delete')}
       >
-        <p className="text-xs text-text-dim">{t('plans.deleteConfirm')}</p>
+        <p className="text-xs text-text-dim">
+          {t('plans.deleteConfirm', { name: deletingPlan?.name ?? '' })}
+        </p>
         <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" onClick={() => setDeletingId(null)}>
+          <Button size="sm" onClick={() => setDeletingPlan(null)}>
             {t('plans.cancel')}
           </Button>
           <Button
             variant="danger"
             size="sm"
             onClick={() => {
-              if (deletingId) onDelete(deletingId);
-              setDeletingId(null);
+              if (deletingPlan) onDelete(deletingPlan.id);
+              setDeletingPlan(null);
             }}
           >
             {t('plans.delete')}
