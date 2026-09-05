@@ -38,6 +38,7 @@ const BLUEPRINTS: BlueprintMap = {
     ],
     products: [{ typeID: 587, quantity: 1 }],
     skills: [],
+    activity: 'manufacturing',
   },
   // Manufactures one of the Rifter's own materials, so the materials table
   // has both a build-able row (Mechanical Parts) and rows nothing produces
@@ -48,6 +49,7 @@ const BLUEPRINTS: BlueprintMap = {
     materials: [{ typeID: 34, quantity: 20 }],
     products: [{ typeID: 9840, quantity: 5 }],
     skills: [],
+    activity: 'manufacturing',
   },
 };
 const TYPES: TypeMap = {

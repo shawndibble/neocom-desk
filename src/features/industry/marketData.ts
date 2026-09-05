@@ -39,21 +39,27 @@ export interface MarketSnapshot {
 /** Reuses the hub-price TTL: both are "how often do market conditions change" caches. */
 const COST_INDEX_TTL_MS = HUB_PRICE_TTL_MS;
 
-let costIndexCache: { value: Map<number, number>; expiresAt: number } | null = null;
+/** One entry per activity — a reaction plan's cost index is a different number than a manufacturing plan's for the same system (issue #460), so caching them together would serve either one wrong. */
+const costIndexCache = new Map<
+  'manufacturing' | 'reaction',
+  { value: Map<number, number>; expiresAt: number }
+>();
 
 /** Test-only: production callers rely on TTL expiry instead of clearing. */
 export function clearCostIndexCache(): void {
-  costIndexCache = null;
+  costIndexCache.clear();
 }
 
 async function loadSystemCostIndices(
+  activity: 'manufacturing' | 'reaction',
   now: () => number = Date.now
 ): Promise<Map<number, number> | null> {
   const nowMs = now();
-  if (costIndexCache && costIndexCache.expiresAt > nowMs) return costIndexCache.value;
+  const cached = costIndexCache.get(activity);
+  if (cached && cached.expiresAt > nowMs) return cached.value;
   try {
-    const value = await fetchSystemCostIndices();
-    costIndexCache = { value, expiresAt: nowMs + COST_INDEX_TTL_MS };
+    const value = await fetchSystemCostIndices(activity);
+    costIndexCache.set(activity, { value, expiresAt: nowMs + COST_INDEX_TTL_MS });
     return value;
   } catch {
     return null;
@@ -70,11 +76,16 @@ async function loadSystemCostIndices(
  * is charged by the build system alone. Callers with no build system of their
  * own (the LP store, planetary plans) omit it and keep the hub's index, which
  * is what every caller got before the argument existed.
+ *
+ * `activity` picks which of ESI's per-activity indices to read (issue #460);
+ * every caller before reactions existed got 'manufacturing', so it defaults
+ * to that rather than becoming a required argument everywhere.
  */
 export async function loadMarketSnapshot(
   hub: TradeHub,
   typeIds: number[],
-  costIndexSystemId?: number
+  costIndexSystemId?: number,
+  activity: 'manufacturing' | 'reaction' = 'manufacturing'
 ): Promise<MarketSnapshot> {
   const hubAggregates = await getHubPrices(hub, typeIds);
   const hubPrices: HubPrices = {};
@@ -95,7 +106,7 @@ export async function loadMarketSnapshot(
     adjustedPrices = null;
   }
 
-  const costIndices = await loadSystemCostIndices();
+  const costIndices = await loadSystemCostIndices(activity);
   const systemCostIndex = costIndices?.get(costIndexSystemId ?? hub.systemId) ?? null;
 
   return { hubPrices, hubBuyPrices, adjustedPrices, systemCostIndex };

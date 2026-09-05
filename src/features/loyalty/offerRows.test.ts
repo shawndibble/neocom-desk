@@ -20,6 +20,7 @@ function makeCatalog(): BlueprintCatalog {
       materials: [{ typeID: TRITANIUM_ID, quantity: 1_000_000 }],
       products: [{ typeID: ASTERO_ID, quantity: 1 }],
       skills: [],
+      activity: 'manufacturing',
     },
   };
   return {

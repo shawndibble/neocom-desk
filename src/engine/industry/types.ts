@@ -1,5 +1,7 @@
 /**
- * Pure manufacturing-math engine types (v1: manufacturing only).
+ * Pure manufacturing-math engine types (v1: manufacturing; v2 adds reactions,
+ * issue #460 — the two activities share every formula below, only their
+ * facility presets and rig security multipliers differ).
  * Decoupled from src/sde — callers adapt SDE BlueprintType to IndustryBlueprint.
  *
  * Formula sources (verified 2026-08):
@@ -9,6 +11,13 @@
  * - EVE University wiki "Trading": sales tax / broker fee.
  * - everef.net dogma attributes: Standup M-Set rig bonuses and security
  *   multipliers (e.g. types 43920/43921/37160).
+ *
+ * Refinery/reaction sources (verified 2026-09, issue #460 triage comment):
+ * - SDE dogma attribute dump (fuzzwork.co.uk invTypes.csv/dgmTypeAttributes.csv/
+ *   dgmAttributeTypes.csv), cross-checked against the EVE University wiki
+ *   "Upwell_structure" page's raw wikitext (not a rendered/summarized copy,
+ *   which contradicted the dump on first pass): Athanor/Tatara reaction
+ *   bonuses, and the Standup reactor rig security multipliers.
  */
 
 import type { EngineAsset } from '../assetTree';
@@ -18,13 +27,22 @@ export interface QuantityEntry {
   quantity: number;
 }
 
-/** Blueprint shape the engine needs (manufacturing activity). */
+/** Which industry job a blueprint/formula represents. Reactions: issue #460. */
+export type IndustryActivity = 'manufacturing' | 'reaction';
+
+/** Blueprint/reaction-formula shape the engine needs. */
 export interface IndustryBlueprint {
   name: string;
-  /** Base manufacturing time in seconds per run. */
+  /** Base job time in seconds per run. */
   time: number;
   materials: QuantityEntry[];
   products: QuantityEntry[];
+  /**
+   * Which job this runs as. Optional and defaulting to 'manufacturing' so
+   * every pre-#460 literal (tests, callers) keeps compiling unchanged —
+   * only a reaction formula needs to say otherwise.
+   */
+  activity?: IndustryActivity;
 }
 
 export type RigLevel = 'none' | 't1' | 't2';
@@ -32,11 +50,13 @@ export type RigLevel = 'none' | 't1' | 't2';
 /** Security band of the facility's solar system. Wormholes count as nullsec. */
 export type SecurityBand = 'highsec' | 'lowsec' | 'nullsec';
 
-export type FacilityKind = 'npcStation' | 'raitaru' | 'azbel' | 'sotiyo';
+export type FacilityKind = 'npcStation' | 'raitaru' | 'azbel' | 'sotiyo' | 'athanor' | 'tatara';
 
 export interface FacilityPreset {
   kind: FacilityKind;
   name: string;
+  /** Which job this facility hosts. A structure never hosts both (verified: refineries and engineering complexes are disjoint groups). */
+  activity: IndustryActivity;
   /** Whether this is a player structure (can fit rigs, owner sets tax). */
   structure: boolean;
   /** Structure material requirement reduction, percent. */
@@ -55,11 +75,19 @@ export interface FacilityPreset {
  * (Raitaru 1%/15%/3%, Azbel 1%/20%/4%, Sotiyo 1%/30%/5%).
  * NPC station: no bonuses; tax fixed at 0.25% (wiki "Manufacturing").
  * Structure default tax 0% — actual tax is owner-set, pass facilityTaxPct.
+ *
+ * Refinery (reaction) bonuses: issue #460 triage — Athanor 0%/0%, Tatara
+ * 0%/25% (`strReactionTimeMultiplier` dogma attribute; absent entirely on
+ * Athanor, 0.75 on Tatara). Neither has a job-cost bonus at all — the
+ * refinery bonus table has no such column, unlike the engineering-complex
+ * one — so `jobCostBonusPct` is 0, not merely unset. No NPC-station
+ * equivalent exists for reactions; a refinery structure is always required.
  */
 export const FACILITY_PRESETS: Record<FacilityKind, FacilityPreset> = {
   npcStation: {
     kind: 'npcStation',
     name: 'NPC station',
+    activity: 'manufacturing',
     structure: false,
     materialBonusPct: 0,
     timeBonusPct: 0,
@@ -69,6 +97,7 @@ export const FACILITY_PRESETS: Record<FacilityKind, FacilityPreset> = {
   raitaru: {
     kind: 'raitaru',
     name: 'Raitaru',
+    activity: 'manufacturing',
     structure: true,
     materialBonusPct: 1,
     timeBonusPct: 15,
@@ -78,6 +107,7 @@ export const FACILITY_PRESETS: Record<FacilityKind, FacilityPreset> = {
   azbel: {
     kind: 'azbel',
     name: 'Azbel',
+    activity: 'manufacturing',
     structure: true,
     materialBonusPct: 1,
     timeBonusPct: 20,
@@ -87,10 +117,31 @@ export const FACILITY_PRESETS: Record<FacilityKind, FacilityPreset> = {
   sotiyo: {
     kind: 'sotiyo',
     name: 'Sotiyo',
+    activity: 'manufacturing',
     structure: true,
     materialBonusPct: 1,
     timeBonusPct: 30,
     jobCostBonusPct: 5,
+    defaultTaxPct: 0,
+  },
+  athanor: {
+    kind: 'athanor',
+    name: 'Athanor',
+    activity: 'reaction',
+    structure: true,
+    materialBonusPct: 0,
+    timeBonusPct: 0,
+    jobCostBonusPct: 0,
+    defaultTaxPct: 0,
+  },
+  tatara: {
+    kind: 'tatara',
+    name: 'Tatara',
+    activity: 'reaction',
+    structure: true,
+    materialBonusPct: 0,
+    timeBonusPct: 25,
+    jobCostBonusPct: 0,
     defaultTaxPct: 0,
   },
 };
@@ -98,6 +149,11 @@ export const FACILITY_PRESETS: Record<FacilityKind, FacilityPreset> = {
 /**
  * Standup M-Set manufacturing rig base bonuses, percent.
  * Source: everef.net dogma (M-Set ME I -2%, ME II -2.4%, TE I -20%, TE II -24%).
+ *
+ * Reused as-is for reactor rigs (Standup reactor M-Set/L-Set): issue #460
+ * triage sourced identical percentages across all 3 reaction categories and
+ * both rig lines. Only the security multiplier differs — see
+ * `REACTION_RIG_SECURITY_MULTIPLIER` below.
  */
 export const RIG_MATERIAL_BONUS_PCT: Record<RigLevel, number> = { none: 0, t1: 2, t2: 2.4 };
 export const RIG_TIME_BONUS_PCT: Record<RigLevel, number> = { none: 0, t1: 20, t2: 24 };
@@ -114,19 +170,34 @@ export const RIG_SECURITY_MULTIPLIER: Record<SecurityBand, number> = {
 };
 
 /**
- * Upwell structure typeID -> the facility preset it manufactures as.
+ * Standup reactor rig security multipliers — not shared with
+ * `RIG_SECURITY_MULTIPLIER` above, which is manufacturing-only and must not
+ * change (issue #460 acceptance criteria). Source: issue #460 triage —
+ * dogma `lowSecModifier`/`nullSecModifier` on the Standup reactor rig
+ * typeIDs: lowsec unchanged from highsec (×1), null/wormhole ×1.1.
+ */
+export const REACTION_RIG_SECURITY_MULTIPLIER: Record<SecurityBand, number> = {
+  highsec: 1,
+  lowsec: 1,
+  nullsec: 1.1,
+};
+
+/**
+ * Upwell structure typeID -> the facility preset it manufactures or reacts as.
  *
- * Engineering Complexes only, which is the whole list of structures that can
- * fit a Manufacturing Plant service module. Verified against ESI
- * `/universe/types/{id}` on 2026-09-05: 35825/35826/35827 are Raitaru, Azbel
- * and Sotiyo, all group 1404 (Engineering Complex). Citadels (group 1657) and
- * Refineries (1406) cannot host a manufacturing job and are deliberately
- * absent, so a lookup that misses is "not a manufacturing structure".
+ * Engineering Complexes (group 1404) fit a Manufacturing Plant service
+ * module; Refineries (group 1406) fit a Reactor service module instead —
+ * verified against ESI `/universe/types/{id}` on 2026-09-05: 35825/35826/35827
+ * are Raitaru/Azbel/Sotiyo, 35835/35836 are Athanor/Tatara. Citadels (group
+ * 1657) can host neither and are deliberately absent, so a lookup that
+ * misses is "not an industry structure".
  */
 export const FACILITY_KIND_BY_STRUCTURE_TYPE_ID: Readonly<Record<number, FacilityKind>> = {
   35825: 'raitaru',
   35826: 'azbel',
   35827: 'sotiyo',
+  35835: 'athanor',
+  35836: 'tatara',
 };
 
 /** SCC surcharge on every industry job, percent of EIV (wiki "Manufacturing"). */

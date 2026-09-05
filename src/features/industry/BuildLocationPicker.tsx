@@ -7,6 +7,7 @@ import { ESI_REGISTRY } from '@/esi/registry';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
+import type { IndustryActivity } from '@/engine/industry/types';
 import { moveHighlight, type ComboboxNavKey } from './comboboxNav';
 import { MIN_SEARCH_LENGTH, searchBuildLocations } from './searchBuildLocations';
 import type { BuildLocationOption } from './buildLocations';
@@ -20,6 +21,8 @@ interface BuildLocationPickerProps {
   /** Facility and build system — revealed by "Override". */
   children: ReactNode;
   onPick: (option: BuildLocationOption) => void;
+  /** Which job the plan runs, so the search offers only places that can host it (issue #460). */
+  activity: IndustryActivity;
 }
 
 /** Read off the registry rather than spelled out here — this file stays hand-edit-free. */
@@ -56,7 +59,12 @@ const DEBOUNCE_MS = 300;
  * re-auth here, beside the control it unlocks, rather than behind a banner
  * across a page that otherwise works.
  */
-export function BuildLocationPicker({ summary, children, onPick }: BuildLocationPickerProps) {
+export function BuildLocationPicker({
+  summary,
+  children,
+  onPick,
+  activity,
+}: BuildLocationPickerProps) {
   const { t } = useTranslation();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
@@ -107,7 +115,7 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
     // still finishes its whole fan-out of per-hit lookups.
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      void searchBuildLocations(characterId, searchKey, controller.signal)
+      void searchBuildLocations(characterId, searchKey, activity, controller.signal)
         .then((found) => {
           if (ticket !== latest.current) return;
           setResults(found);
@@ -123,7 +131,7 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
       clearTimeout(timer);
       controller.abort();
     };
-  }, [searchKey, characterId]);
+  }, [searchKey, characterId, activity]);
 
   // Narrowed rather than a plain boolean: every read below needs the array
   // itself, and TS can carry the `results !== null` check through this

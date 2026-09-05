@@ -159,6 +159,7 @@ export function BuildPlanDetail({
 
   const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID) ?? null;
   const blueprint = useMemo(() => (entry ? toIndustryBlueprint(entry.blueprint) : null), [entry]);
+  const activity = entry?.blueprint.activity ?? 'manufacturing';
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
 
@@ -216,7 +217,7 @@ export function BuildPlanDetail({
   useEffect(() => {
     if (!blueprint || typeIds.length === 0) return;
     let cancelled = false;
-    void loadMarketSnapshot(hub, typeIds, buildSystem?.id).then((snap) => {
+    void loadMarketSnapshot(hub, typeIds, buildSystem?.id, activity).then((snap) => {
       if (cancelled) return;
       setSnapshot(snap);
       setFetchedAt(new Date());
@@ -229,7 +230,7 @@ export function BuildPlanDetail({
     // entry per blueprintTypeID), so this only refires on a real hub, build-system or
     // blueprint change, plus the manual-refresh tick. `catalog`/`pi` land together in one
     // state update on the route, so widening typeIds above cannot make this fire twice.
-  }, [hub, typeIds, blueprint, refreshTick, buildSystem?.id]);
+  }, [hub, typeIds, blueprint, refreshTick, buildSystem?.id, activity]);
 
   const ownedMatch = useMemo(
     () => findOwnedBlueprint(ownedBlueprints, plan.blueprintTypeID),
@@ -529,51 +530,60 @@ export function BuildPlanDetail({
                 />
               </label>
 
-              <div className="flex flex-col gap-1 text-xs">
-                <span className="flex items-center gap-1">
-                  <label htmlFor="build-plan-me">{t('industry.me')}</label>
-                  <InfoTooltip
-                    label={t('industry.meTooltipLabel')}
-                    content={t('industry.meTooltip')}
-                  />
-                </span>
-                <SourcingInput
-                  id="build-plan-me"
-                  value={plan.me}
-                  label={t('industry.me')}
-                  inputMode="numeric"
-                  widthClassName="w-full"
-                  parse={(raw) => parseOrKeep(plan.me, raw, (n) => clampInt(n, 0, 10))}
-                  onCommit={(me) => update({ me })}
-                />
-                {ownedMatch && (
-                  <span className="text-[0.6875rem] text-text-dim">
-                    {t('industry.ownedHint', {
-                      me: ownedMatch.material_efficiency,
-                      te: ownedMatch.time_efficiency,
-                    })}
-                  </span>
-                )}
-              </div>
+              {/*
+                Reaction formulas carry no material/time efficiency — the SDE
+                has no research activity for any of them (issue #460), so
+                they always run at 0/0 and the fields have nothing to edit.
+              */}
+              {activity === 'manufacturing' && (
+                <>
+                  <div className="flex flex-col gap-1 text-xs">
+                    <span className="flex items-center gap-1">
+                      <label htmlFor="build-plan-me">{t('industry.me')}</label>
+                      <InfoTooltip
+                        label={t('industry.meTooltipLabel')}
+                        content={t('industry.meTooltip')}
+                      />
+                    </span>
+                    <SourcingInput
+                      id="build-plan-me"
+                      value={plan.me}
+                      label={t('industry.me')}
+                      inputMode="numeric"
+                      widthClassName="w-full"
+                      parse={(raw) => parseOrKeep(plan.me, raw, (n) => clampInt(n, 0, 10))}
+                      onCommit={(me) => update({ me })}
+                    />
+                    {ownedMatch && (
+                      <span className="text-[0.6875rem] text-text-dim">
+                        {t('industry.ownedHint', {
+                          me: ownedMatch.material_efficiency,
+                          te: ownedMatch.time_efficiency,
+                        })}
+                      </span>
+                    )}
+                  </div>
 
-              <div className="flex flex-col gap-1 text-xs">
-                <span className="flex items-center gap-1">
-                  <label htmlFor="build-plan-te">{t('industry.te')}</label>
-                  <InfoTooltip
-                    label={t('industry.teTooltipLabel')}
-                    content={t('industry.teTooltip')}
-                  />
-                </span>
-                <SourcingInput
-                  id="build-plan-te"
-                  value={plan.te}
-                  label={t('industry.te')}
-                  inputMode="numeric"
-                  widthClassName="w-full"
-                  parse={(raw) => parseOrKeep(plan.te, raw, (n) => clampInt(n, 0, 20))}
-                  onCommit={(te) => update({ te })}
-                />
-              </div>
+                  <div className="flex flex-col gap-1 text-xs">
+                    <span className="flex items-center gap-1">
+                      <label htmlFor="build-plan-te">{t('industry.te')}</label>
+                      <InfoTooltip
+                        label={t('industry.teTooltipLabel')}
+                        content={t('industry.teTooltip')}
+                      />
+                    </span>
+                    <SourcingInput
+                      id="build-plan-te"
+                      value={plan.te}
+                      label={t('industry.te')}
+                      inputMode="numeric"
+                      widthClassName="w-full"
+                      parse={(raw) => parseOrKeep(plan.te, raw, (n) => clampInt(n, 0, 20))}
+                      onCommit={(te) => update({ te })}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -583,6 +593,7 @@ export function BuildPlanDetail({
             </h3>
             <div className="mt-2 flex flex-col gap-3">
               <BuildLocationPicker
+                activity={activity}
                 summary={t('industry.buildLocationSummary', {
                   facility: facilityPreset.name,
                   system: buildSystem?.name ?? hub.systemName,
@@ -604,11 +615,16 @@ export function BuildPlanDetail({
                       );
                     }}
                   >
-                    {Object.values(FACILITY_PRESETS).map((f) => (
-                      <option key={f.kind} value={f.kind}>
-                        {f.name}
-                      </option>
-                    ))}
+                    {/* Only facilities that can actually run this plan's
+                        activity — an Athanor can't manufacture, a Raitaru
+                        can't react (issue #460). */}
+                    {Object.values(FACILITY_PRESETS)
+                      .filter((f) => f.activity === activity)
+                      .map((f) => (
+                        <option key={f.kind} value={f.kind}>
+                          {f.name}
+                        </option>
+                      ))}
                   </NativeSelect>
                 </label>
 

@@ -56,4 +56,29 @@ describe('fetchSystemCostIndices', () => {
 
     expect(result.has(30000142)).toBe(false);
   });
+
+  it('maps to the reaction index instead when asked (issue #460)', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/industry/systems`, () =>
+        HttpResponse.json([
+          {
+            solar_system_id: 30000142,
+            cost_indices: [
+              { activity: 'manufacturing', cost_index: 0.0464 },
+              { activity: 'reaction', cost_index: 0.0123 },
+            ],
+          },
+          {
+            solar_system_id: 30002187,
+            cost_indices: [{ activity: 'manufacturing', cost_index: 0.0021 }],
+          },
+        ])
+      )
+    );
+
+    const result = await fetchSystemCostIndices('reaction');
+
+    expect(result.get(30000142)).toBe(0.0123);
+    expect(result.has(30002187)).toBe(false);
+  });
 });

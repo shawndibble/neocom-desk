@@ -38,6 +38,7 @@ const BLUEPRINTS: BlueprintMap = {
     materials: [{ typeID: 34, quantity: 4500 }],
     products: [{ typeID: 587, quantity: 1 }],
     skills: [],
+    activity: 'manufacturing',
   },
 };
 const SDE_TYPES: TypeMap = {

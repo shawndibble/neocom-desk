@@ -8,7 +8,12 @@
  */
 
 import type { FacilityContext, SkillLevels } from '@/engine/industry/types';
-import { RIG_SECURITY_MULTIPLIER, RIG_TIME_BONUS_PCT, SKILL_IDS } from '@/engine/industry/types';
+import {
+  REACTION_RIG_SECURITY_MULTIPLIER,
+  RIG_SECURITY_MULTIPLIER,
+  RIG_TIME_BONUS_PCT,
+  SKILL_IDS,
+} from '@/engine/industry/types';
 
 const INDUSTRY_PCT_PER_LEVEL = 4;
 const ADVANCED_INDUSTRY_PCT_PER_LEVEL = 3;
@@ -28,8 +33,16 @@ export function timeModifier(te: number, skills: SkillLevels, ctx: FacilityConte
   }
   const industry = skillLevel(skills, SKILL_IDS.industry);
   const advanced = skillLevel(skills, SKILL_IDS.advancedIndustry);
+  // Reactor rigs scale by security band on a different table than
+  // manufacturing rigs (issue #460); every other term applies unchanged —
+  // the brief's sourcing covered facility/rig bonuses only, not a skill
+  // carve-out, so Industry/Advanced Industry keep applying here as written.
+  const securityMultiplier =
+    ctx.facility.activity === 'reaction'
+      ? REACTION_RIG_SECURITY_MULTIPLIER
+      : RIG_SECURITY_MULTIPLIER;
   const rigPct = ctx.facility.structure
-    ? RIG_TIME_BONUS_PCT[ctx.rig] * RIG_SECURITY_MULTIPLIER[ctx.security]
+    ? RIG_TIME_BONUS_PCT[ctx.rig] * securityMultiplier[ctx.security]
     : 0;
   return (
     (1 - te / 100) *

@@ -129,4 +129,32 @@ describe('loadMarketSnapshot', () => {
     await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
     expect(hits).toBe(2);
   });
+
+  it('reads the reaction cost index instead of manufacturing when asked, cached separately (issue #460)', async () => {
+    let hits = 0;
+    server.use(
+      fuzzworkHandler(),
+      adjustedPricesHandler(),
+      http.get(`${ESI_BASE_URL}/industry/systems`, () => {
+        hits += 1;
+        return HttpResponse.json([
+          {
+            solar_system_id: DEFAULT_TRADE_HUB.systemId,
+            cost_indices: [
+              { activity: 'manufacturing', cost_index: 0.0464 },
+              { activity: 'reaction', cost_index: 0.0055 },
+            ],
+          },
+        ]);
+      })
+    );
+
+    const manufacturing = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34]);
+    const reaction = await loadMarketSnapshot(DEFAULT_TRADE_HUB, [34], undefined, 'reaction');
+
+    expect(manufacturing.systemCostIndex).toBe(0.0464);
+    expect(reaction.systemCostIndex).toBe(0.0055);
+    // Two distinct caches, not one shared TTL entry keyed off the first call.
+    expect(hits).toBe(2);
+  });
 });

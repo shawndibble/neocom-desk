@@ -171,7 +171,12 @@ export function SourcingInput({
 function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: number }) {
   const { t } = useTranslation();
   const building = advice.verdict === 'build';
-  const method = advice.method === 'manufacturing' ? 'Manufacturing' : 'Planetary';
+  const method =
+    advice.method === 'manufacturing'
+      ? 'Manufacturing'
+      : advice.method === 'reaction'
+        ? 'Reaction'
+        : 'Planetary';
   const sentences = [
     // Two decimals on the unit prices, unlike the whole-ISK columns beside
     // them: the verdict turns on the gap between these two numbers, and
@@ -193,16 +198,25 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
     );
   }
   const label = sentences.join(' ');
-  // Three glyphs, not two: "build" covers two different errands. A hammer sends
-  // the player to an industry slot, a planet sends them to a colony, and the
-  // two are not interchangeable — nothing about the manufacturing icon told a
-  // player which one a "build" row meant. The tooltip already said so; the
-  // marker now says it at a glance. Planetary keeps its own tone (`text-accent`,
-  // the app's blue) rather than sharing manufacturing's green, so the split
-  // reads without hovering, and the shapes still carry it in greyscale
-  // (docs/DESIGN.md §7).
+  // Four glyphs, not two: "build" covers three different errands. A hammer
+  // sends the player to an industry slot, a planet to a colony, a flask to a
+  // refinery, and none of the three are interchangeable — nothing about the
+  // manufacturing icon told a player which one a "build" row meant. The
+  // tooltip already said so; the marker now says it at a glance. Planetary
+  // keeps its own tone (`text-accent`, the app's blue) rather than sharing
+  // manufacturing's green, so that one split reads without hovering; reaction
+  // shares manufacturing's green — both are "run an industry job", and the
+  // flask glyph alone (not a third colour) is what tells them apart, which is
+  // the shape-carries-meaning half of docs/DESIGN.md §7, not the colour half.
   const planetary = building && advice.method === 'planetary';
-  const Glyph = planetary ? Icon.Planetary : building ? Icon.Build : Icon.Buy;
+  const reaction = building && advice.method === 'reaction';
+  const Glyph = planetary
+    ? Icon.Planetary
+    : reaction
+      ? Icon.Reaction
+      : building
+        ? Icon.Build
+        : Icon.Buy;
   return (
     <Tooltip content={label}>
       <span

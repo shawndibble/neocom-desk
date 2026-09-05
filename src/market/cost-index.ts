@@ -7,13 +7,19 @@
  */
 import { getIndustrySystemCostIndices } from '@/esi/endpoints';
 
-/** Manufacturing cost index per solar system ID. Other activities (invention, etc.) are out of v1 scope. */
-export async function fetchSystemCostIndices(): Promise<Map<number, number>> {
+/**
+ * Cost index per solar system ID for one activity — 'manufacturing' (the
+ * default) or 'reaction' (issue #460). Other ESI activities (invention,
+ * copying, researching_*) are out of v1 scope.
+ */
+export async function fetchSystemCostIndices(
+  activity: 'manufacturing' | 'reaction' = 'manufacturing'
+): Promise<Map<number, number>> {
   const result = await getIndustrySystemCostIndices();
   const indices = new Map<number, number>();
   for (const entry of result.data ?? []) {
-    const manufacturing = entry.cost_indices.find((ci) => ci.activity === 'manufacturing');
-    if (manufacturing) indices.set(entry.solar_system_id, manufacturing.cost_index);
+    const match = entry.cost_indices.find((ci) => ci.activity === activity);
+    if (match) indices.set(entry.solar_system_id, match.cost_index);
   }
   return indices;
 }

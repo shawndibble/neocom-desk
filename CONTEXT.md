@@ -23,7 +23,7 @@ here — they go one per file in `docs/context/decisions/`.
   which fold in implants and any cerebral accelerator on top.
 - **Booster**: Cerebral accelerator; user toggles it on manually with an expiry date for training-time math. Stored on the Skill Plan and synced with it, like What-If Implants above (round 33).
 - **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit and is not remembered — the line under the box always reads the plan's own values, and "Override" unfolds the fields behind it.
-- **Build Plan**: An industry plan for manufacturing: blueprints needed, materials, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). v1 scope: manufacturing only (no invention/reactions).
+- **Build Plan**: An industry plan for one blueprint or reaction formula: materials needed, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). Covers manufacturing and reactions (issue #460); invention and research/copying are still out of scope (`.out-of-scope/`). Which activity a plan runs is derived from the picked blueprint/formula's own `activity`, never a separate field on the record.
 - **Build System**: The solar system a Build Plan's job runs in, named on the plan. Sets the **Cost Index** the job fee is charged at _and_ the security band the rig bonus reads — both follow from the system, so neither is a separate field. Materials are still priced at the plan's trade hub. Empty means "the hub's own system", which is how every plan behaved before the field existed.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
 - **Character Not Training**: Fires when a Character's skill queue shows no
@@ -87,7 +87,7 @@ here — they go one per file in `docs/context/decisions/`.
   the single event is fetched/toggled like every other, and each raw `type`
   string gets its own independent opt-out underneath, discovered as it fires
   rather than enumerated from a closed list.
-- **Facility Preset**: Industry location model: NPC station or player structure type (Raitaru/Azbel/Sotiyo) + rig level. Drives ME/time/cost bonuses in a Build Plan.
+- **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures (Raitaru/Azbel/Sotiyo, engineering complexes) and reaction structures (Athanor/Tatara, refineries — no NPC-station equivalent) each carry the other's activity's rig bonuses on a different security-multiplier table (issue #460). Drives ME/time/cost bonuses in a Build Plan.
 - **Foreground Poller**: Client-side interval (5 minutes) that checks each
   enabled Notification Event's underlying ESI data while the app is open and
   the tab/window is visible; paused via the Page Visibility API when
@@ -229,8 +229,9 @@ here — they go one per file in `docs/context/decisions/`.
   `/corporations/{id}/members`. ESI publishes no join or leave event, so the
   change is only visible by comparing the current roster against a persisted
   previous one — the Roster Baseline.
-- **Sale Profitability**: Whether manufacturing a Build Plan's product and
-  selling it on the market turns a profit, net of sales tax and broker fee.
+- **Sale Profitability**: Whether building a Build Plan's product (manufacturing
+  or reacting) and selling it on the market turns a profit, net of sales tax
+  and broker fee.
   Distinct from the **Acquisition Verdict** — a product can be cheaper to
   build than buy while still losing ISK if resold, since selling fees only
   apply to the sale, not the build-vs-buy comparison.

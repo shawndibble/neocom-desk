@@ -391,6 +391,8 @@
       "buyManufacturing": "Cheaper to buy: {{buy}} a unit, against {{make}} to manufacture at ME {{me}}%.",
       "buildPlanetary": "Cheaper to make with planetary industry: {{make}} a unit in inputs, against {{buy}} to buy.",
       "buyPlanetary": "Cheaper to buy: {{buy}} a unit, against {{make}} of planetary inputs.",
+      "buildReaction": "Cheaper to react: {{make}} a unit to react at an unfitted Athanor, against {{buy}} to buy.",
+      "buyReaction": "Cheaper to buy: {{buy}} a unit, against {{make}} to react.",
       "savings": "Worth {{amount}} across the {{quantity}} units still to buy."
     },
     "results": "Results",

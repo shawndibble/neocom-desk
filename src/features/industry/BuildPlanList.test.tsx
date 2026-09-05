@@ -24,7 +24,14 @@ function plan(overrides: Partial<BuildPlanRecord> & { id: string; name: string }
 
 const RIFTER_ENTRY: BlueprintCatalogEntry = {
   blueprintTypeID: 638,
-  blueprint: { name: 'Rifter Blueprint', time: 1200, materials: [], products: [], skills: [] },
+  blueprint: {
+    name: 'Rifter Blueprint',
+    time: 1200,
+    materials: [],
+    products: [],
+    skills: [],
+    activity: 'manufacturing',
+  },
   productTypeID: 587,
   productName: 'Rifter',
   productNameLower: 'rifter',

@@ -85,7 +85,8 @@ async function computeRow(
     const snapshot = await loadMarketSnapshot(
       hub,
       buildPlanTypeIds(blueprint, { catalog, pi }),
-      plan.buildSystemId
+      plan.buildSystemId,
+      blueprint.activity ?? 'manufacturing'
     );
     const { result, error } = computeBuildPlan({
       plan,

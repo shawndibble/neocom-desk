@@ -10,12 +10,28 @@ const BLUEPRINTS: BlueprintMap = {
     materials: [{ typeID: 34, quantity: 20 }],
     products: [{ typeID: 9840, quantity: 5 }],
     skills: [],
+    activity: 'manufacturing',
+  },
+  // Reinforced Carbon Fiber Reaction Formula (issue #460 follow-up): a
+  // reaction-only material with no manufacturing blueprint and no planetary
+  // schematic, the exact shape that showed no make-or-buy marker before
+  // `materialRecipe` learned a third branch for the catalog's reaction
+  // formulas.
+  '46156': {
+    name: 'Reinforced Carbon Fiber Reaction Formula',
+    time: 10800,
+    materials: [{ typeID: 16650, quantity: 200 }],
+    products: [{ typeID: 16667, quantity: 100 }],
+    skills: [],
+    activity: 'reaction',
   },
 };
 
 const TYPES: TypeMap = {
   '9840': { name: 'Mechanical Parts', groupID: 334, volume: 1.5 },
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
+  '16667': { name: 'Reinforced Carbon Fiber', groupID: 428, volume: 5 },
+  '16650': { name: 'Fried Interface Circuit', groupID: 428, volume: 5 },
 };
 
 const PI = piFixture({
@@ -72,6 +88,7 @@ describe('materialRecipe', () => {
         time: 300,
         materials: [{ typeID: 34, quantity: 20 }],
         products: [{ typeID: 9840, quantity: 5 }],
+        activity: 'manufacturing',
       },
       me: 0,
     });
@@ -100,6 +117,19 @@ describe('materialRecipe', () => {
       method: 'planetary',
       outputQuantity: 20,
       inputs: [{ typeID: 2267, quantity: 3000 }],
+    });
+  });
+
+  it('returns the reaction recipe for a material a reaction formula produces, with no ME (issue #460)', () => {
+    expect(materialRecipe(16667, { catalog, pi: PI, ownedBlueprints: [] })).toEqual({
+      method: 'reaction',
+      blueprint: {
+        name: 'Reinforced Carbon Fiber Reaction Formula',
+        time: 10800,
+        materials: [{ typeID: 16650, quantity: 200 }],
+        products: [{ typeID: 16667, quantity: 100 }],
+        activity: 'reaction',
+      },
     });
   });
 

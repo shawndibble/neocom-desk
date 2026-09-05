@@ -49,6 +49,18 @@ describe('timeModifier', () => {
     expect(timeModifier(0, noSkills, { ...npc, rig: 't2' })).toBe(1);
   });
 
+  it('scales reactor rig time bonus by the reaction security table, not the manufacturing one', () => {
+    // Tatara T2 TE rig nullsec: 24% * 1.1 (reaction table) = 26.4% -> 0.736,
+    // vs. manufacturing's 24% * 2.1 = 50.4% -> 0.496 for the same rig level.
+    // Tatara also carries its own -25% structure time bonus (0.75).
+    const tataraT2Null: FacilityContext = {
+      facility: FACILITY_PRESETS.tatara,
+      rig: 't2',
+      security: 'nullsec',
+    };
+    expect(timeModifier(0, noSkills, tataraT2Null)).toBeCloseTo(0.75 * 0.736, 12);
+  });
+
   it('rejects TE outside 0..20 and bad skill levels', () => {
     expect(() => timeModifier(-2, noSkills, npc)).toThrow(RangeError);
     expect(() => timeModifier(22, noSkills, npc)).toThrow(RangeError);
