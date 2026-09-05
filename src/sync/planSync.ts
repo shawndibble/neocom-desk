@@ -36,6 +36,7 @@ import {
   type PlanetRichnessRecord,
 } from '@/db';
 import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
+import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import {
   idsBeyondLimit,
@@ -423,6 +424,16 @@ interface CollectionSpec<L extends SyncRecord, R extends RemoteDoc> {
   toLocalRecord: (remote: R) => L;
   bulkPutLocal: (records: L[]) => Promise<unknown>;
   bulkDeleteLocal: (ids: string[]) => Promise<unknown>;
+  /**
+   * Account-wide collections only (issue #436): the shared key a deletion is
+   * recognized by regardless of which Character's id a row was copied onto,
+   * and the current per-key deletion times to check it against. See
+   * `AccountWideTombstones` in merge.ts.
+   */
+  accountWide?: {
+    sharedKey: (record: L) => string | undefined;
+    deletedAtByKey: () => Promise<Map<string, number>>;
+  };
 }
 
 interface SyncContext {
@@ -452,7 +463,13 @@ async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>
   const local = await spec.loadLocal(ctx.characterId);
   const tombstoneKey = spec.tombstoneKey(ctx.characterId);
   const tombstones = await readTombstones(tombstoneKey);
-  const plan = mergeRecords<L, R>(local, tombstones, remote, ctx.now);
+  const accountWide = spec.accountWide
+    ? {
+        sharedKey: spec.accountWide.sharedKey,
+        deletedAtByKey: await spec.accountWide.deletedAtByKey(),
+      }
+    : undefined;
+  const plan = mergeRecords<L, R>(local, tombstones, remote, ctx.now, accountWide);
 
   await Promise.all([
     ...plan.pushUpserts.map((p) => setDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))),
@@ -474,13 +491,35 @@ async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>
   if (plan.deleteLocal.length > 0) {
     await spec.bulkDeleteLocal(plan.deleteLocal);
   }
+  // A remote tombstone pulled down here (`deleteLocal`) previously left no
+  // local trace once the row itself was gone — so `deletedAtByKey()`
+  // (accountWideBackfill.ts, and `accountWide` above) only ever saw a
+  // deletion this device originated itself, never one it merely learned by
+  // pulling. Recording it here closes that gap for every collection, not
+  // just account-wide ones: it is exactly the same fact a locally-originated
+  // delete already records via `recordDeletion`, just learned a step later.
+  //
+  // Two distinct sources land in `deleteLocal`, with two distinct correct
+  // timestamps: an ordinary remote tombstone (`r.deleted`) carries its
+  // deletion time as `r.updatedAt`, but `accountWide`'s self-heal (merge.ts)
+  // always pairs its `deleteLocal` push with a `pushTombstones` entry whose
+  // `deletedAt` is the real deletion time — `remoteById.get(id)?.updatedAt`
+  // there would be the row's pre-deletion, still-live remote copy, which is
+  // stale by definition (that mismatch is exactly what triggered the
+  // self-heal). `pushTombstones` is checked first for that reason.
+  const remoteById = new Map(remote.map((r) => [r.id, r]));
+  const pushTombstoneById = new Map(plan.pushTombstones.map((t) => [t.id, t.deletedAt]));
+  const learned: LocalTombstone[] = plan.deleteLocal.flatMap((id) => {
+    const deletedAt = pushTombstoneById.get(id) ?? remoteById.get(id)?.updatedAt;
+    return deletedAt !== undefined ? [{ id, deletedAt }] : [];
+  });
   // Pushed tombstones are now recorded remotely; resolved ones are dropped.
   const settled = new Set([...plan.clearLocalTombstones, ...plan.pushTombstones.map((t) => t.id)]);
-  if (settled.size > 0) {
-    await writeTombstones(
-      tombstoneKey,
-      tombstones.filter((t) => !settled.has(t.id))
-    );
+  if (settled.size > 0 || learned.length > 0) {
+    await writeTombstones(tombstoneKey, [
+      ...tombstones.filter((t) => !settled.has(t.id) && !learned.some((l) => l.id === t.id)),
+      ...learned,
+    ]);
   }
 }
 
@@ -616,6 +655,15 @@ const stationPinSpec: CollectionSpec<StationPinRecord, RemoteStationPinDoc> = {
   }),
   bulkPutLocal: (records) => db.stationPins.bulkPut(records),
   bulkDeleteLocal: (ids) => db.stationPins.bulkDelete(ids),
+  accountWide: {
+    // Only an account-wide row can be resurrected onto a Character added
+    // after the delete (accountWideBackfill.ts only ever copies `scope:
+    // 'account'` rows) — a `character`-scoped pin at the same locationId
+    // must not be caught by a deletion that only ever applied to the
+    // account-wide one.
+    sharedKey: (row) => (row.scope === 'account' ? String(row.locationId) : undefined),
+    deletedAtByKey: stationPinDeletedAtByKey,
+  },
 };
 
 const planetRichnessSpec: CollectionSpec<PlanetRichnessRecord, RemotePlanetRichnessDoc> = {
@@ -640,6 +688,11 @@ const planetRichnessSpec: CollectionSpec<PlanetRichnessRecord, RemotePlanetRichn
   }),
   bulkPutLocal: (records) => db.planetRichness.bulkPut(records),
   bulkDeleteLocal: (ids) => db.planetRichness.bulkDelete(ids),
+  accountWide: {
+    // Every row is account-wide — no per-Character variant exists to opt out.
+    sharedKey: (row) => String(row.planetId),
+    deletedAtByKey: planetRichnessDeletedAtByKey,
+  },
 };
 
 // ---------------------------------------------------------------------------

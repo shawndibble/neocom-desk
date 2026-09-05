@@ -30,20 +30,22 @@
  *
  * The union trusts a local row, and a local row can be behind. That matters
  * more than it looks. `cloneOnto` re-keys the row to `${newCharacterId}:...`,
- * an id **no tombstone anywhere targets** — tombstones are per Character and
- * written only for the Characters that existed when the delete happened. So
- * `merge.ts` sees `l && !r` and pushes it as a brand-new remote doc that
- * nothing can out-rank, and `pinStateForStation` reports `'account'` if *any*
- * Character holds an account row. One stale copy therefore resurrects a
- * cleared pin permanently, not just until the next sync.
+ * an id **no per-id tombstone anywhere targets** — tombstones are per
+ * Character and written only for the Characters that existed when the delete
+ * happened. So `merge.ts` would see `l && !r` and push it as a brand-new
+ * remote doc that nothing can out-rank, and `pinStateForStation` reports
+ * `'account'` if *any* Character holds an account row.
  *
  * `deletedAtByKey` closes the case this device can actually see: a candidate
  * row older than a deletion any local Character has recorded is skipped
- * outright. What it cannot close is a device that has pulled neither the
- * deletion nor its tombstone — there, nothing local says the row is stale.
- * Closing that needs account-level deletion state, which round 7's
- * per-Character fan-out structurally does not have. It is recorded as the
- * residual in CONTEXT.md round 52 rather than papered over here.
+ * outright, so the copy never happens. A device that has pulled neither the
+ * deletion nor its tombstone cannot be closed here — nothing local says the
+ * row is stale — but issue #436 closes it one layer up instead of leaving it
+ * a permanent resurrection: `stationPinDeletedAtByKey`/
+ * `planetRichnessDeletedAtByKey` below feed the same map into `mergeRecords`'
+ * `accountWide` check (`planSync.ts`), which self-heals an already-copied
+ * stale row the moment any sibling Character's own sync learns the deletion —
+ * see `docs/context/decisions/20260904-231339-account-wide-deletions-get-a-shared-key-tombstone.md`.
  *
  * ## The copied row keeps its original `updatedAt`
  *
@@ -196,6 +198,16 @@ const planetRichness: AccountWideCollection<PlanetRichnessRecord> = {
   },
   inWriteTransaction: (run) => db.transaction('rw', db.planetRichness, run),
 };
+
+/**
+ * Exposed so `planSync.ts` can feed the same signal into `mergeRecords`'
+ * `accountWide` check (issue #436) — closing the resurrection this module's
+ * own copy step cannot always prevent (see the module header's "A copied row
+ * can outlive a deletion" section) once the deletion is *learned*, not just
+ * when it is copied.
+ */
+export const stationPinDeletedAtByKey = stationPins.deletedAtByKey;
+export const planetRichnessDeletedAtByKey = planetRichness.deletedAtByKey;
 
 const ACCOUNT_WIDE_COLLECTIONS: ((characterId: number) => Promise<boolean>)[] = [
   (characterId) => backfillCollection(stationPins, characterId),
