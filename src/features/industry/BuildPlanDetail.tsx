@@ -671,13 +671,6 @@ export function BuildPlanDetail({
                     ))}
                   </NativeSelect>
                 </label>
-
-                <OwnedStockScopeControl
-                  scope={plan.ownedStockScope}
-                  detectedStock={detectedStock}
-                  detection={detection}
-                  onChange={(ownedStockScope) => update({ ownedStockScope })}
-                />
               </div>
             </div>
           </div>
@@ -750,6 +743,20 @@ export function BuildPlanDetail({
           <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
         ) : (
           <>
+            {/*
+              Lives here, not in the settings block above: it governs one number
+              in one column of the table below it — the owned quantity "use
+              detected" offers — and nothing else on the plan. Beside Facility
+              and Trade hub it read as another thing about where the job runs.
+            */}
+            <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <OwnedStockScopeControl
+                scope={plan.ownedStockScope}
+                detectedStock={detectedStock}
+                detection={detection}
+                onChange={(ownedStockScope) => update({ ownedStockScope })}
+              />
+            </div>
             <MaterialsTable
               materials={visibleMaterials}
               nameFor={(typeID) => nameForType(catalog, typeID)}

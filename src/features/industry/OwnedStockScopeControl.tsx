@@ -26,6 +26,11 @@ interface OwnedStockScopeControlProps {
  * matches every behavior before this control existed; "Selected locations"
  * narrows the offer to a chosen subset, derived from the plan's already-
  * computed detected stock so there is nothing new to fetch.
+ *
+ * Rendered at the head of the Materials panel, above the table whose owned
+ * column it governs. It sat in the Location & market settings for a while and
+ * read there as a third thing about *where the job runs*, next to Facility and
+ * Trade hub, when it is really about which of your hangars the table may count.
  */
 export function OwnedStockScopeControl({
   scope,
@@ -54,12 +59,10 @@ export function OwnedStockScopeControl({
     onChange({ mode: 'selected', locations: next });
   }
 
-  // Two grid children, not one. The picker is a plain select the width of
-  // every other control in the row, so it belongs in a normal cell beside
-  // them — it only ever spanned the full row because the chip list underneath
-  // it needed the width. Splitting them lets the select take the cell after
-  // Facility tax and leaves the chips their own full-width row below, which
-  // also stops the row's height from jumping when "Selected" is chosen.
+  // Two grid children, not one: a plain select the width of one cell, and a
+  // chip list that needs the whole row. Splitting them is what stops the row's
+  // height from jumping when "Selected" is chosen, and it means the caller
+  // supplies the grid rather than this deciding its own width.
   return (
     <>
       <div className="flex flex-col gap-1 text-xs">

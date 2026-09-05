@@ -84,3 +84,11 @@ _Recorded 2026-09-05. Issue #499._
   the highsec POCO base rate. Both were wrong before and are right now, but a
   planetary money change riding inside an industry change is worth saying out
   loud. `securityStatusColor` interpolates the raw value and is untouched.
+
+- **"Count owned stock from" moves to the head of the Materials panel.** It
+  governs one number in one column of the table below it — the owned quantity
+  "use detected" offers — and nothing else on the plan. Sitting in Location &
+  market it read as a third statement about _where the job runs_, beside
+  Facility and Trade hub, when it is really about which of the pilot's hangars
+  the table may count. Nothing about the control or the stored
+  `ownedStockScope` changes; only where it is asked.
