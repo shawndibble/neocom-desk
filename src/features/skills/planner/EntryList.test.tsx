@@ -8,6 +8,7 @@ import { markerRowId } from './markers';
 import { DEFAULT_COLUMN_VISIBILITY, type ColumnVisibility } from './columnPreference';
 import type { MergedRow } from './queueRows';
 import type { PlanEntry } from '@/engine/types';
+import { formatLocalDate } from '@/lib/localDate';
 
 const entry = (skillTypeID: number, targetLevel = 1): PlanEntry => ({ skillTypeID, targetLevel });
 
@@ -217,8 +218,6 @@ describe('EntryList column visibility', () => {
     expect(screen.queryByText('10m')).not.toBeInTheDocument();
     // Always-present parts remain regardless of the column toggle.
     expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
-    // Anchored: an unanchored /Skill 1/ also matches the new "Move Skill 1
-    // up/down" tooltip text that used to sit elsewhere in the row.
     expect(screen.getByText(/^Skill 1\b/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /remove skill 1/i })).toBeInTheDocument();
   });
@@ -231,15 +230,40 @@ describe('EntryList column visibility', () => {
         bandsAt={new Map()}
         {...defaultProps}
         attributesFor={() => ({ primary: 'perception', secondary: 'willpower' })}
+        columns={{ ...DEFAULT_COLUMN_VISIBILITY, priority: true }}
       />
     );
     expect(screen.getByText('PER/WIL')).toBeInTheDocument();
     expect(screen.getByLabelText(/priority for/i)).toBeInTheDocument();
   });
+
+  it('leaves priority off by default — it is an editing control, not a readout', () => {
+    render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
+    expect(screen.queryByLabelText(/priority for/i)).not.toBeInTheDocument();
+  });
+
+  it('sets a priority from the pill menu instead of a full-width select', async () => {
+    const user = userEvent.setup();
+    const calls: Array<[number, string]> = [];
+    render(
+      <EntryList
+        rows={[entryRow(1, [0])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        columns={{ ...DEFAULT_COLUMN_VISIBILITY, priority: true }}
+        onSetPriority={(skillTypeID, priority) => calls.push([skillTypeID, priority])}
+      />
+    );
+
+    await user.click(screen.getByLabelText(/priority for skill 1/i));
+    await user.click(screen.getByRole('menuitem', { name: 'High' }));
+
+    expect(calls).toEqual([[1, 'high']]);
+  });
 });
 
 describe('EntryList narrow vs desktop layout (#114)', () => {
-  it('folds a row to two lines below the desktop breakpoint, with cumulative time reachable from the per-level cell', () => {
+  it('folds a row to two lines below the desktop breakpoint, with every optional value labelled on line two', () => {
     const restore = mockDesktop(false);
     try {
       const rows = [entryRow(1, [5])];
@@ -249,23 +273,54 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
           bandsAt={new Map()}
           {...defaultProps}
           attributesFor={() => ({ primary: 'perception', secondary: 'willpower' })}
+          columns={{ ...DEFAULT_COLUMN_VISIBILITY, priority: true }}
         />
       );
-      // Line 1: cumulative time (10m) is visible without a header row on narrow screens.
-      expect(screen.queryByText('Per-level')).not.toBeInTheDocument();
-      expect(screen.getByText('10m')).toBeInTheDocument();
-      // Line 2: attribute badge, priority, and per-level time (1m, with cumulative as a tooltip).
+      // Line 1 is the name and its remove button only: the finish date used to
+      // ride up here and squeeze the name.
+      const nameLine = screen.getByText(/^Skill 1\b/).closest('div');
+      expect(nameLine).not.toBeNull();
+      expect(within(nameLine as HTMLElement).queryByText('10m')).toBeNull();
+      // Line 2: attribute badge, priority pill, and both times, each labelled
+      // in place rather than hidden behind a tooltip the user has to find.
       expect(screen.getByText('PER/WIL')).toBeInTheDocument();
-      const perLevelCell = screen.getByText('1m');
-      fireEvent.focus(perLevelCell);
-      const tooltip = screen.getByText(/Cumulative: 10m/);
-      expect(tooltip).toHaveAttribute('role', 'tooltip');
+      expect(screen.getByLabelText(/priority for skill 1/i)).toBeInTheDocument();
+      // Both labels ride the values themselves below `md`, since the desktop
+      // column headers they'd otherwise sit under are not rendered here.
+      expect(screen.getByText('Takes')).toBeInTheDocument();
+      expect(screen.getByText('1m')).toBeInTheDocument();
+      expect(screen.getByText('Done by')).toBeInTheDocument();
+      expect(screen.getByText('10m')).toBeInTheDocument();
     } finally {
       restore();
     }
   });
 
-  it('disabling cumulative time removes it from the narrow-screen tooltip as well as the row', () => {
+  it('collapses to a single line when every optional column is off', () => {
+    const restore = mockDesktop(false);
+    try {
+      render(
+        <EntryList
+          rows={[entryRow(1, [5])]}
+          bandsAt={new Map()}
+          {...defaultProps}
+          columns={{
+            attributePair: false,
+            priority: false,
+            perLevelTime: false,
+            cumulativeTime: false,
+          }}
+        />
+      );
+      expect(screen.queryByText('1m')).not.toBeInTheDocument();
+      expect(screen.queryByText('10m')).not.toBeInTheDocument();
+      expect(screen.getByText(/^Skill 1\b/)).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('disabling the finish date removes it from the narrow row', () => {
     const restore = mockDesktop(false);
     try {
       const rows = [entryRow(1, [5])];
@@ -277,7 +332,6 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
           columns={{ ...DEFAULT_COLUMN_VISIBILITY, cumulativeTime: false }}
         />
       );
-      expect(screen.queryByText(/Cumulative:/)).not.toBeInTheDocument();
       expect(screen.queryByText('10m')).not.toBeInTheDocument();
       expect(screen.getByText('1m')).toBeInTheDocument();
     } finally {
@@ -285,21 +339,53 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
     }
   });
 
-  it('shows a single-line row with a column header on desktop', () => {
+  it('shows a single-line row under Takes/Done by headers on desktop', () => {
     const restore = mockDesktop(true);
     try {
       const rows = [entryRow(1, [5])];
       render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
-      expect(screen.getByText('Per-level')).toBeInTheDocument();
-      expect(screen.getByText('Cumulative')).toBeInTheDocument();
+      expect(screen.getByText('Takes')).toBeInTheDocument();
+      expect(screen.getByText('Done by')).toBeInTheDocument();
       expect(screen.getByText('1m')).toBeInTheDocument();
       expect(screen.getByText('10m')).toBeInTheDocument();
-      expect(screen.queryByText(/Cumulative: /)).not.toBeInTheDocument();
     } finally {
       restore();
     }
   });
 });
+
+describe('EntryList finish date (#20)', () => {
+  const startDate = new Date('2026-01-01T00:00:00Z');
+
+  it('renders the running total as the date that step finishes on', () => {
+    const restore = mockDesktop(true);
+    try {
+      // 600 cumulative seconds past a start date one full day earlier than the
+      // step ahead of it, so the two rows land on different calendar dates.
+      const rows = [entryRow(1, [0]), entryRow(2, [864])];
+      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} startDate={startDate} />);
+      expect(
+        screen.getByText(formatLocalDate(new Date('2026-01-01T00:01:40Z')))
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(formatLocalDate(new Date('2026-01-02T00:00:20Z')))
+      ).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('falls back to the running total as a duration when no start date is known', () => {
+    const restore = mockDesktop(true);
+    try {
+      render(<EntryList rows={[entryRow(1, [5])]} bandsAt={new Map()} {...defaultProps} />);
+      expect(screen.getByText('10m')).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe('EntryList reorder affordance', () => {
   it('offers the drag handle alone at every width — no Up/Down buttons', () => {
     for (const desktop of [false, true]) {
@@ -325,74 +411,6 @@ describe('EntryList reorder affordance', () => {
         restore();
       }
     }
-  });
-});
-
-describe('EntryList non-drag reorder menu (#408)', () => {
-  const rows: MergedRow[] = [
-    entryRow(1, [0]),
-    { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
-    entryRow(2, [1]),
-  ];
-
-  it('moves an entry up via the row-actions menu, calling onReorder like a drag would', async () => {
-    const user = userEvent.setup();
-    const reorders: Array<[string, string]> = [];
-    render(
-      <EntryList
-        rows={rows}
-        bandsAt={new Map()}
-        {...defaultProps}
-        onReorder={(activeId, overId) => reorders.push([activeId, overId])}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /more actions for skill 2/i }));
-    await user.click(screen.getByRole('menuitem', { name: 'Move up' }));
-
-    expect(reorders).toEqual([['2', markerRowId(0)]]);
-  });
-
-  it('moves an entry to top via the row-actions menu', async () => {
-    const user = userEvent.setup();
-    const reorders: Array<[string, string]> = [];
-    render(
-      <EntryList
-        rows={rows}
-        bandsAt={new Map()}
-        {...defaultProps}
-        onReorder={(activeId, overId) => reorders.push([activeId, overId])}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /more actions for skill 2/i }));
-    await user.click(screen.getByRole('menuitem', { name: 'Move to top' }));
-
-    expect(reorders).toEqual([['2', '1']]);
-  });
-
-  it('disables Move up for the first row and Move down for the last row', async () => {
-    const user = userEvent.setup();
-    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
-
-    await user.click(screen.getByRole('button', { name: /more actions for skill 1/i }));
-    expect(screen.getByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
-    await user.keyboard('{Escape}');
-
-    await user.click(screen.getByRole('button', { name: /more actions for skill 2/i }));
-    expect(screen.getByRole('menuitem', { name: 'Move down' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
-  });
-
-  it("the menu trigger's own accessible name never matches the removed Up/Down button pattern (#223 guard)", () => {
-    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
-    const trigger = screen.getByRole('button', { name: /more actions for skill 1/i });
-    expect(trigger.getAttribute('aria-label')).not.toMatch(/move .* (up|down)/i);
   });
 });
 
@@ -522,9 +540,6 @@ describe('EntryList entry level disclosure (#254)', () => {
         render(
           <EntryList rows={[entryRow(1, [0, 1, 2, 3, 4])]} bandsAt={new Map()} {...defaultProps} />
         );
-        // Named, not just `{ expanded: false }`: the row's new "More actions"
-        // menu trigger (#408) is also a closed, `aria-expanded`-carrying
-        // button on every row now.
         const toggle = screen.getByRole('button', { expanded: false, name: /^Skill/ });
         expect(screen.queryByRole('list', { name: /levels trained for skill 1/i })).toBeNull();
 
@@ -551,13 +566,11 @@ describe('EntryList entry level disclosure (#254)', () => {
           '1m',
         ]);
         // The level's running total folds exactly like the row above it
-        // (#114): its own column on desktop, a tooltip on the duration below
-        // `md`, where two unlabelled 6rem columns would not fit a phone.
-        expect(within(levels[1]).getAllByText(/^\d+m$/)).toHaveLength(desktop ? 2 : 1);
-        if (!desktop) {
-          fireEvent.focus(within(levels[1]).getByText(/^\d+m$/));
-          expect(screen.getByText(/^Cumulative: /)).toHaveAttribute('role', 'tooltip');
-        }
+        // (#114): its own fixed column under the desktop header, and a
+        // labelled inline value below `md`, where a second 6rem column would
+        // not fit a phone. Either way it is on screen without interaction.
+        expect(within(levels[1]).getAllByText(/^\d+m$/)).toHaveLength(2);
+        if (!desktop) expect(within(levels[1]).getByText('Done by')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { expanded: true, name: /^Skill/ }));
         expect(screen.queryByRole('list', { name: /levels trained for skill 1/i })).toBeNull();
@@ -584,8 +597,6 @@ describe('EntryList entry level disclosure (#254)', () => {
   it('gives a single-level entry no toggle and no range, leaving the row as it was', () => {
     render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText(/^Skill 1 I$/)).toBeInTheDocument();
-    // No level-toggle button — the row's "More actions" menu trigger is also
-    // a closed `aria-expanded` button now, so this must not match that one.
     expect(screen.queryByRole('button', { expanded: false, name: /^Skill/ })).toBeNull();
   });
 

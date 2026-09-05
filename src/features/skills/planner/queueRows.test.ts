@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  summarizeEntryQueue,
-  buildMergedRows,
-  placeBandHeaders,
-  resolveMoveTarget,
-} from './queueRows';
+import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
 import { entryId } from './reorder';
 import { markerRowId, buildRows } from './markers';
 import type { PlanEntry, PlanPriority, ScheduledStep } from '@/engine/types';
@@ -268,39 +263,5 @@ describe('buildMergedRows precomputedRows (#408: no duplicate row-build pass)', 
     const queue = summarizeEntryQueue(entries, [1, 2], scheduled, alwaysKnown);
     const rows = buildMergedRows(entries, undefined, queue);
     expect(rows.map((r) => r.id)).toEqual(buildRows(entries, undefined).map((r) => r.id));
-  });
-});
-
-describe('resolveMoveTarget (#408: non-drag move up/down/top)', () => {
-  const rows = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
-
-  it('moving up targets the previous row', () => {
-    expect(resolveMoveTarget(rows, 'b', 'up')).toBe('a');
-  });
-
-  it('moving up from the first row is a no-op', () => {
-    expect(resolveMoveTarget(rows, 'a', 'up')).toBeNull();
-  });
-
-  it('moving down targets the next row', () => {
-    expect(resolveMoveTarget(rows, 'b', 'down')).toBe('c');
-  });
-
-  it('moving down from the last row is a no-op', () => {
-    expect(resolveMoveTarget(rows, 'c', 'down')).toBeNull();
-  });
-
-  it('moving to top targets the first row', () => {
-    expect(resolveMoveTarget(rows, 'c', 'top')).toBe('a');
-  });
-
-  it('moving to top from the first row is a no-op', () => {
-    expect(resolveMoveTarget(rows, 'a', 'top')).toBeNull();
-  });
-
-  it('an unknown row id resolves to null for every direction', () => {
-    expect(resolveMoveTarget(rows, 'z', 'up')).toBeNull();
-    expect(resolveMoveTarget(rows, 'z', 'down')).toBeNull();
-    expect(resolveMoveTarget(rows, 'z', 'top')).toBeNull();
   });
 });

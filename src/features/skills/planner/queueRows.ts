@@ -160,33 +160,6 @@ export function buildMergedRows(
   return rows;
 }
 
-export type MoveDirection = 'up' | 'down' | 'top';
-
-/**
- * The non-drag reorder path (#408): resolve a move-up/move-down/move-to-top
- * request on `rowId` to the sortable id it should be dropped onto, so the
- * caller can feed it straight into the same `onReorder(activeId, overId)`
- * wiring a real drag already produces. Null when the move is a no-op (row not
- * found, or already at the edge it was asked to move toward) — the caller's
- * signal to disable that action rather than perform a null drop.
- */
-export function resolveMoveTarget(
-  rows: readonly { id: string }[],
-  rowId: string,
-  direction: MoveDirection
-): string | null {
-  const index = rows.findIndex((r) => r.id === rowId);
-  if (index === -1) return null;
-  switch (direction) {
-    case 'up':
-      return index === 0 ? null : rows[index - 1].id;
-    case 'down':
-      return index === rows.length - 1 ? null : rows[index + 1].id;
-    case 'top':
-      return index <= 0 ? null : rows[0].id;
-  }
-}
-
 /**
  * Re-key bandsAt (keyed by an entry's own row id, from bandStarts or
  * attributePairBandStarts) so a band header renders before the FIRST row of
