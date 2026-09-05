@@ -127,6 +127,10 @@ export function toBoardJobs(
   for (const job of jobs) {
     const endMs = parseInstant(job.end_date);
     if (endMs === null) continue;
+    // The same fallback the name uses: the product when there is one, else
+    // the blueprint — a job's context menu (issue #419) hangs "Check Market"
+    // off whichever type actually got named.
+    const typeId = job.product_type_id ?? job.blueprint_type_id;
     const productName =
       (job.product_type_id === undefined ? undefined : typeNames.get(job.product_type_id)) ??
       typeNames.get(job.blueprint_type_id);
@@ -135,6 +139,7 @@ export function toBoardJobs(
       subject: productName ?? `#${job.job_id}`,
       endMs,
       status: job.status,
+      typeId,
     });
   }
   return sources;

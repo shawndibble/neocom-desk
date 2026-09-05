@@ -58,14 +58,25 @@ export function useActiveCorporationId(): number | null {
  * Character changes, because the next Character may hold no corp role at all
  * and must not land on a corp view it cannot read.
  */
-export function useCorpOwner(capability: CorpCapability): CorpOwnerSelection {
+export function useCorpOwner(
+  capability: CorpCapability,
+  /**
+   * A one-time opening side, for a deep link landing straight on Corporation
+   * (the vitals rail's division link, issue #419) — a `useState` initializer,
+   * read once on mount like `Wallet.tsx`'s own `?tab=` param. `available`
+   * below still forces Personal when the capability turns out not to hold,
+   * so a bad or unreachable deep link degrades to the page's normal default
+   * rather than stranding the view on a control that isn't there.
+   */
+  initialOwner: DataOwner = 'personal'
+): CorpOwnerSelection {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const access = useCorpAccess();
   const corporationId = useActiveCorporationId();
 
   const [selection, setSelection] = useState<{ characterId: number | null; owner: DataOwner }>({
     characterId: activeCharacterId,
-    owner: 'personal',
+    owner: initialOwner,
   });
 
   // Adjusting state during render, as `useRouteSnapshot` does for the same

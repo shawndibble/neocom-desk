@@ -1845,6 +1845,11 @@
         "warning": "Due soon",
         "watch": "Worth watching",
         "clear": "Not urgent"
+      },
+      "contextMenu": {
+        "copyName": "Copy name",
+        "showInfo": "Show info",
+        "viewInMarket": "View in Market"
       }
     },
     "vitals": {
@@ -1855,7 +1860,8 @@
       "runwayDays_one": "{{count}} day",
       "runwayDays_other": "{{count}} days",
       "runwayUnknown": "Unknown",
-      "runwayHint": "How long division {{division}} lasts: its own balance divided by its own average daily spending over the last {{days}} days. EVE publishes no all-divisions journal, so this covers that one wallet. Income is ignored, so this is what is already banked."
+      "runwayHint": "How long division {{division}} lasts: its own balance divided by its own average daily spending over the last {{days}} days. EVE publishes no all-divisions journal, so this covers that one wallet. Income is ignored, so this is what is already banked.",
+      "viewInWallet": "View {{division}} in Wallet"
     },
     "people": {
       "viewRoster": "Roster",

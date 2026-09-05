@@ -11,8 +11,20 @@
  * `engine/corp/board.ts`. This file renders them and does no time arithmetic of
  * its own beyond formatting.
  */
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Tooltip } from '@/components/ui';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  EmptyState,
+  Tooltip,
+} from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { marketItemUrl } from '@/engine/market/urlState';
+import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
 import { structureStateLabel } from './boardSources';
 import type { CorpBoardItem, CorpBoardSeverity } from '@/engine/corp/board';
@@ -35,6 +47,20 @@ const SEVERITY_LABEL: Record<CorpBoardSeverity, string> = {
   warning: 'corp.board.severity.warning',
   watch: 'corp.board.severity.watch',
   clear: 'corp.board.severity.clear',
+};
+
+/**
+ * Severity to shape (issue #419): colour alone is not a signal a colorblind
+ * reader can use, and DESIGN.md §6/§7 say so outright ("color never the sole
+ * signal"). `warning` reuses the app's existing `Warn` triangle rather than a
+ * fifth glyph; the sr-only label beside each icon (`BoardRow` below) is what
+ * actually names the severity for assistive tech — the icon is decorative.
+ */
+const SEVERITY_ICON: Record<CorpBoardSeverity, typeof Icon.Warn> = {
+  critical: Icon.SeverityCritical,
+  warning: Icon.Warn,
+  watch: Icon.SeverityWatch,
+  clear: Icon.SeverityClear,
 };
 
 type Translate = ReturnType<typeof useTranslation>['t'];
@@ -75,13 +101,31 @@ function detailText(item: CorpBoardItem, t: Translate): string {
 function Countdown({ item }: { item: CorpBoardItem }) {
   const { t } = useTranslation();
   const tone = SEVERITY_TONE[item.severity];
-  const base = 'w-full shrink-0 text-sm font-semibold tabular-nums sm:w-24';
+  const SeverityIcon = SEVERITY_ICON[item.severity];
+  // `flex items-center gap-1` puts the shape beside the countdown text inside
+  // this same element — a fourth row child would reflow the 320px stack this
+  // element's own `w-full`/`sm:w-24` split is built for (issue #419).
+  const base = 'flex w-full shrink-0 items-center gap-1 text-sm font-semibold tabular-nums sm:w-24';
+  // Decorative: the severity's *name* comes from `BoardRow`'s sr-only label,
+  // not from this icon (DESIGN.md §5 — icon beside its own visible text is
+  // aria-hidden, no separate label needed).
+  const icon = <SeverityIcon aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0" />;
 
   if (item.timing === 'untimed') {
-    return <span className={`${base} ${tone}`}>{t('corp.board.noTimer')}</span>;
+    return (
+      <span className={`${base} ${tone}`}>
+        {icon}
+        {t('corp.board.noTimer')}
+      </span>
+    );
   }
   if (item.timing === 'passed') {
-    return <span className={`${base} ${tone}`}>{t('corp.board.dry')}</span>;
+    return (
+      <span className={`${base} ${tone}`}>
+        {icon}
+        {t('corp.board.dry')}
+      </span>
+    );
   }
   if (item.withinStaleWindow) {
     return (
@@ -93,6 +137,7 @@ function Countdown({ item }: { item: CorpBoardItem }) {
           type="button"
           className={`${base} ${tone} cursor-help text-left underline decoration-dotted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
         >
+          {icon}
           {t('corp.board.underCacheWindow')}
         </button>
       </Tooltip>
@@ -102,37 +147,96 @@ function Countdown({ item }: { item: CorpBoardItem }) {
   if (remainingMs <= 0) {
     return (
       <span className={`${base} ${tone}`}>
+        {icon}
         {t('corp.board.overdueFor', { duration: formatDuration(-remainingMs / 1000) })}
       </span>
     );
   }
   // Clamped only here, at the point of display — the engine keeps the signed
   // value so overdue items stay ordered against each other.
-  return <span className={`${base} ${tone}`}>{formatDuration(remainingMs / 1000)}</span>;
+  return (
+    <span className={`${base} ${tone}`}>
+      {icon}
+      {formatDuration(remainingMs / 1000)}
+    </span>
+  );
 }
 
-function BoardRow({ item }: { item: CorpBoardItem }) {
+/**
+ * Right-click menu for one row (issue #419): copy the subject, and — only for
+ * a job, the one kind with a market-relevant item of its own (see
+ * `CorpBoardItem.typeId`) — check its product in the Market Browser and show
+ * its item info. `ContextMenuTrigger asChild` clones the `<li>` itself rather
+ * than wrapping it, the same way `VariationsTable.tsx` triggers off a `<tr>`
+ * — a wrapper element would break `<ul>` semantics and the row's own layout.
+ */
+function BoardRowMenu({
+  item,
+  onShowInfo,
+  children,
+}: {
+  item: CorpBoardItem;
+  onShowInfo: (typeId: number, itemName: string) => void;
+  children: ReactElement;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const typeId = item.typeId;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={() => void writeToClipboard(item.subject)}>
+          {t('corp.board.contextMenu.copyName')}
+        </ContextMenuItem>
+        {typeId !== null && (
+          <>
+            <ContextMenuItem onSelect={() => onShowInfo(typeId, item.subject)}>
+              {t('corp.board.contextMenu.showInfo')}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => navigate(marketItemUrl(typeId, location.search))}>
+              {t('corp.board.contextMenu.viewInMarket')}
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+function BoardRow({
+  item,
+  onShowInfo,
+}: {
+  item: CorpBoardItem;
+  onShowInfo: (typeId: number, itemName: string) => void;
+}) {
   const { t } = useTranslation();
   return (
-    <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 last:border-b-0">
-      <Countdown item={item} />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm">{item.subject}</p>
-        <p className="truncate text-xs text-text-dim">{detailText(item, t)}</p>
-      </div>
-      {/*
-        The severity is already carried by the countdown's colour; this is its
-        text equivalent, for anyone who cannot use the colour. `sr-only` rather
-        than a visible badge — a fifth element on every row would crowd the one
-        thing the row exists to show.
-      */}
-      <span className="sr-only">{t(SEVERITY_LABEL[item.severity])}</span>
-    </li>
+    <BoardRowMenu item={item} onShowInfo={onShowInfo}>
+      <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 last:border-b-0">
+        <Countdown item={item} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm">{item.subject}</p>
+          <p className="truncate text-xs text-text-dim">{detailText(item, t)}</p>
+        </div>
+        {/*
+          The severity is already carried by the countdown's colour and shape;
+          this is its text equivalent, for anyone who cannot use either.
+          `sr-only` rather than a visible badge — a fifth element on every row
+          would crowd the one thing the row exists to show.
+        */}
+        <span className="sr-only">{t(SEVERITY_LABEL[item.severity])}</span>
+      </li>
+    </BoardRowMenu>
   );
 }
 
 interface CorpBoardProps {
   items: readonly CorpBoardItem[];
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 /**
@@ -142,7 +246,7 @@ interface CorpBoardProps {
  * board at all (`routes/Corp.tsx`), never by an empty state standing in for a
  * panel nobody was allowed to ask about.
  */
-export function CorpBoard({ items }: CorpBoardProps) {
+export function CorpBoard({ items, onShowInfo }: CorpBoardProps) {
   const { t } = useTranslation();
 
   if (items.length === 0) {
@@ -152,7 +256,7 @@ export function CorpBoard({ items }: CorpBoardProps) {
   return (
     <ul className="divide-y divide-line">
       {items.map((item) => (
-        <BoardRow key={item.id} item={item} />
+        <BoardRow key={item.id} item={item} onShowInfo={onShowInfo} />
       ))}
     </ul>
   );

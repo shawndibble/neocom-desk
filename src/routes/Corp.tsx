@@ -21,7 +21,7 @@
  *   The `DataAgeBadge` note says so, and the board refuses to print a countdown
  *   shorter than the window.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, EmptyState, IconButton, PageHeader, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -31,6 +31,12 @@ import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { CorpBoard } from '@/features/corp/CorpBoard';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
 import { CorpPeopleRail } from '@/features/corp/CorpPeopleRail';
+// The board's "open in-game" context menu action (issue #419) is this same
+// modal Market/Industry/Assets already use for "Show info" — item info never
+// existed as a real in-game protocol link in a browser (`showinfo:` is dead
+// here, see `engine/market/itemDescription.ts`), so this modal already *is*
+// the established substitute, not a fifth pattern.
+import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import {
   MASTER_WALLET_DIVISION,
   loadCorporationId,
@@ -270,6 +276,12 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
     capabilities.canReadMoonExtractions ||
     capabilities.canReadIndustry;
 
+  // The board row's "Show info" action (issue #419) — same `infoModalItem`
+  // shape Industry/Assets/Market already use.
+  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
+    null
+  );
+
   const snapshot = useRouteSnapshot<CorpSnapshot>(
     (characterId, signal) => loadCorpSnapshot(characterId, capabilities, signal),
     undefined,
@@ -335,8 +347,18 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             someone who was never allowed to ask.
           */}
           {canReadAnything && (
-            <Panel title={t('corp.boardTitle')} padded={false}>
-              <CorpBoard items={items} />
+            // `min-w-0`: a grid item's default `min-width` is `auto` (its own
+            // content's intrinsic width), not 0 — unlike a flex item. Below
+            // `lg`, this cell has no explicit track sizing to fall back on
+            // (that's what `minmax(0,1fr)` supplies at `lg`+), so without this
+            // an unbroken structure name inside `CorpBoard`'s `truncate` row
+            // widens the grid track itself instead of being clipped, and the
+            // whole board overflows a 320px viewport (issue #419).
+            <Panel title={t('corp.boardTitle')} padded={false} className="min-w-0">
+              <CorpBoard
+                items={items}
+                onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
+              />
             </Panel>
           )}
           {/*
@@ -355,9 +377,13 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             width it had before this pair existed.
           */}
           {(showVitals || showPeople) && data !== null && (
+            // `min-w-0` for the same reason the board's own Panel needs it
+            // (issue #419): this is a grid item of the outer grid too, and an
+            // unbroken division name in the vitals rail's `truncate`d `dt`
+            // would otherwise widen this whole cell below `lg`.
             <div
               className={cx(
-                'grid gap-3',
+                'grid min-w-0 gap-3',
                 showVitals && showPeople && 'sm:grid-cols-2 lg:grid-cols-1'
               )}
             >
@@ -379,6 +405,13 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             </div>
           )}
         </div>
+      )}
+      {infoModalItem && (
+        <ItemDetailModal
+          typeId={infoModalItem.typeId}
+          itemName={infoModalItem.itemName}
+          onClose={() => setInfoModalItem(null)}
+        />
       )}
     </div>
   );

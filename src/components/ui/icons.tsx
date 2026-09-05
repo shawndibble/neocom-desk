@@ -29,12 +29,14 @@ import {
   CaretUpDown,
   ChartLineUp,
   Check,
+  CheckCircle,
   Clipboard,
   Copy,
   DotsThreeVertical,
   DownloadSimple,
   EnvelopeOpen,
   EnvelopeSimple,
+  Eye,
   EyeSlash,
   Export as ExportIcon,
   Factory,
@@ -57,6 +59,7 @@ import {
   UsersThree,
   Wallet as WalletGlyph,
   Warning,
+  WarningOctagon,
   X,
   type Icon as PhosphorIcon,
   type IconProps,
@@ -121,6 +124,17 @@ export const Container = withWeight(Package);
 export const Route = withWeight(ArrowsLeftRight);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */
 export const Warn = withWeight(Warning);
+/**
+ * The Corp ops board's severity ladder, shaped as well as coloured (issue
+ * #419) — `SEVERITY_TONE`'s four colours alone are not a signal for a
+ * colorblind reader. `warning` reuses `Warn` rather than a fifth glyph; the
+ * other three are their own icons so all four differ in outline, not only hue.
+ */
+export const SeverityCritical = withWeight(WarningOctagon);
+/** Worth watching, not yet due. */
+export const SeverityWatch = withWeight(Eye);
+/** Nothing pending. */
+export const SeverityClear = withWeight(CheckCircle);
 /** Clear a field, dismiss a panel. */
 export const Close = withWeight(X);
 /** Edit a name in place — the rename affordance on a saved-plan row. */

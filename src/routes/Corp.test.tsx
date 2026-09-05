@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
 import {
@@ -234,6 +235,37 @@ describe('per-panel capability gating (AC3)', () => {
   });
 
   /**
+   * Issue #419: each balance links to the matching Wallet division view
+   * rather than making the manager reopen Wallet and flip both the switch
+   * and the division selector by hand.
+   */
+  it('links each division balance to its matching Wallet division view', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
+    mocked.loadCorporationWallets.mockResolvedValue(
+      cached([
+        { division: 1, balance: 1_000_000 },
+        { division: 3, balance: 250 },
+      ])
+    );
+    mocked.loadCorporationDivisions.mockResolvedValue(
+      cached({ wallet: [{ division: 3, name: 'SRP' }] })
+    );
+    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
+
+    renderCorp();
+
+    await waitFor(() => expect(screen.getByText('SRP')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'View SRP in Wallet' })).toHaveAttribute(
+      'href',
+      '/wallet?owner=corporation&division=3'
+    );
+    expect(screen.getByRole('link', { name: 'View Division 1 in Wallet' })).toHaveAttribute(
+      'href',
+      '/wallet?owner=corporation&division=1'
+    );
+  });
+
+  /**
    * The runway's two halves must describe the same wallet: ESI publishes no
    * all-divisions journal, so putting every division's balance over division
    * 1's spending would answer a question nobody asked.
@@ -385,6 +417,144 @@ describe('the board (AC2, AC5, AC6)', () => {
     const rows = screen.getAllByRole('listitem');
     expect(rows[0]).toHaveTextContent('Type 1001');
     expect(rows[1]).toHaveTextContent('Fortizar');
+  });
+
+  /**
+   * Issue #419: colour alone is not a signal every reader can use (DESIGN.md
+   * §6/§7), so severity also has to change the row's shape. Two rows far
+   * enough apart on the ladder must render visibly different icons, not the
+   * same decorative glyph repeated.
+   */
+  it('renders each row’s severity as a distinct, decorative shape — not colour alone', async () => {
+    mocked.loadCorporationStructures.mockResolvedValue(
+      cached([
+        {
+          structure_id: 1,
+          corporation_id: CORPORATION_ID,
+          system_id: 1,
+          type_id: 1,
+          profile_id: 1,
+          name: 'Critical Fortizar',
+          fuel_expires: at(3 * HOUR),
+        },
+        {
+          structure_id: 2,
+          corporation_id: CORPORATION_ID,
+          system_id: 1,
+          type_id: 1,
+          profile_id: 1,
+          name: 'Clear Athanor',
+          fuel_expires: at(30 * DAY),
+        },
+      ])
+    );
+    renderCorp();
+    await waitFor(() => expect(screen.getByText('Clear Athanor')).toBeInTheDocument());
+
+    const criticalIcon = screen.getByText('Critical Fortizar').closest('li')?.querySelector('svg');
+    const clearIcon = screen.getByText('Clear Athanor').closest('li')?.querySelector('svg');
+    expect(criticalIcon).not.toBeNull();
+    expect(clearIcon).not.toBeNull();
+    // Decorative: the sr-only severity label (already covered above) is what
+    // names it for assistive tech, not the icon.
+    expect(criticalIcon).not.toHaveAccessibleName();
+    expect(criticalIcon?.innerHTML).not.toEqual(clearIcon?.innerHTML);
+  });
+
+  describe('row context menu (issue #419)', () => {
+    const readyJob = {
+      job_id: 7,
+      installer_id: 1,
+      activity_id: 1,
+      blueprint_id: 1,
+      blueprint_type_id: 1001,
+      blueprint_location_id: 1,
+      output_location_id: 1,
+      facility_id: 1,
+      location_id: 1,
+      runs: 1,
+      start_date: at(-10 * DAY),
+      end_date: at(-3 * HOUR),
+      status: 'ready' as const,
+    };
+
+    it('offers Copy name, Show info and Check Market for a job row, keyed off its product', async () => {
+      mocked.loadCorporationStructures.mockResolvedValue(cached([]));
+      mocked.loadCorporationIndustryJobs.mockResolvedValue(cached([readyJob]));
+      renderCorp();
+
+      const row = (await screen.findByText('Type 1001')).closest('li');
+      fireEvent.contextMenu(row!);
+
+      expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    });
+
+    it('offers only Copy name for a structure row, which has no market item of its own', async () => {
+      mocked.loadCorporationStructures.mockResolvedValue(
+        cached([
+          {
+            structure_id: 1,
+            corporation_id: CORPORATION_ID,
+            system_id: 1,
+            type_id: 1,
+            profile_id: 1,
+            name: 'Fortizar',
+            fuel_expires: at(20 * DAY),
+          },
+        ])
+      );
+      renderCorp();
+
+      const row = (await screen.findByText('Fortizar')).closest('li');
+      fireEvent.contextMenu(row!);
+
+      expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'View in Market' })).not.toBeInTheDocument();
+    });
+
+    it('copies the row’s subject text', async () => {
+      const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+      configureClipboard(clipboardWriteText);
+      try {
+        mocked.loadCorporationStructures.mockResolvedValue(
+          cached([
+            {
+              structure_id: 1,
+              corporation_id: CORPORATION_ID,
+              system_id: 1,
+              type_id: 1,
+              profile_id: 1,
+              name: 'Fortizar',
+              fuel_expires: at(20 * DAY),
+            },
+          ])
+        );
+        renderCorp();
+
+        const row = (await screen.findByText('Fortizar')).closest('li');
+        fireEvent.contextMenu(row!);
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy name' }));
+
+        expect(clipboardWriteText).toHaveBeenCalledWith('Fortizar');
+      } finally {
+        configureClipboard(null);
+      }
+    });
+
+    it('opens the item detail modal, titled for the job’s product, on Show info', async () => {
+      mocked.loadCorporationStructures.mockResolvedValue(cached([]));
+      mocked.loadCorporationIndustryJobs.mockResolvedValue(cached([readyJob]));
+      renderCorp();
+
+      const row = (await screen.findByText('Type 1001')).closest('li');
+      fireEvent.contextMenu(row!);
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Show info' }));
+
+      expect(await screen.findByRole('dialog', { name: 'Type 1001' })).toBeInTheDocument();
+    });
   });
 
   /** AC6: the badge is present and says plainly how stale corp data can be. */
