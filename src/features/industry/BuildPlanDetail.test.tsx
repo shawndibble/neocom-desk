@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintType, TypeMap } from '@/sde/types';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
@@ -233,5 +234,51 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     await user.click(screen.getByText('ME %'));
 
     expect(document.activeElement).toBe(meInput());
+  });
+});
+
+describe('BuildPlanDetail shopping list', () => {
+  const copyButton = () => screen.getByRole('button', { name: 'Copy shopping list for multibuy' });
+
+  afterEach(() => configureClipboard(null));
+
+  it('copies one tab-separated line per material, netted against what is owned', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    // 100 Tritanium a run x 10 runs = 1000, less the 40 already held.
+    render(<Harness plan={{ runs: 10, materialSourcing: { 34: { ownedQuantity: 40 } } }} />);
+
+    await user.click(copyButton());
+
+    expect(writeText).toHaveBeenCalledWith('Tritanium\t960');
+  });
+
+  it('confirms on the button itself — a clipboard write leaves nothing else to look at', async () => {
+    const user = userEvent.setup();
+    configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
+    render(<Harness />);
+
+    await user.click(copyButton());
+
+    expect(await screen.findByRole('button', { name: 'Shopping list copied' })).toBeInTheDocument();
+  });
+
+  it('surfaces a denied clipboard instead of failing silently', async () => {
+    const user = userEvent.setup();
+    configureClipboard(vi.fn<ClipboardWriter>().mockRejectedValue(new Error('denied')));
+    render(<Harness />);
+
+    await user.click(copyButton());
+
+    expect(
+      await screen.findByRole('button', { name: /Couldn't reach the clipboard/ })
+    ).toBeInTheDocument();
+  });
+
+  it('is unavailable when every material is already owned — nothing left to order', () => {
+    render(<Harness plan={{ runs: 10, materialSourcing: { 34: { ownedQuantity: 1000 } } }} />);
+
+    expect(copyButton()).toBeDisabled();
   });
 });
