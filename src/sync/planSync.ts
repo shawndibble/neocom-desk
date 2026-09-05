@@ -589,6 +589,11 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
       ...(p.buildSystemId !== undefined && p.buildSystemName !== undefined
         ? { buildSystemId: p.buildSystemId, buildSystemName: p.buildSystemName }
         : {}),
+      // Two independent fields, not a pair like the system above: the id is a
+      // label's subject and never a number's source, so an id whose name ESI
+      // withheld still travels — the picker composes the stand-in label.
+      ...(p.buildLocationId !== undefined ? { buildLocationId: p.buildLocationId } : {}),
+      ...(p.buildLocationName !== undefined ? { buildLocationName: p.buildLocationName } : {}),
       ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
       ...(materialSourcing !== undefined ? { materialSourcing } : {}),
       ...(p.ownedStockScope !== undefined ? { ownedStockScope: p.ownedStockScope } : {}),
@@ -616,6 +621,8 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     ...(r.buildSystemId !== undefined && r.buildSystemName !== undefined
       ? { buildSystemId: r.buildSystemId, buildSystemName: r.buildSystemName }
       : {}),
+    ...(r.buildLocationId !== undefined ? { buildLocationId: r.buildLocationId } : {}),
+    ...(r.buildLocationName !== undefined ? { buildLocationName: r.buildLocationName } : {}),
     ...(r.facilityTaxPct !== undefined ? { facilityTaxPct: r.facilityTaxPct } : {}),
     ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
     ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),

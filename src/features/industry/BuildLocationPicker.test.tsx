@@ -42,10 +42,11 @@ beforeEach(() => {
   searchBuildLocations.mockResolvedValue([AZBEL]);
 });
 
-function renderPicker(onPick = vi.fn()) {
+function renderPicker(onPick = vi.fn(), selectedLabel: string | null = null) {
   render(
     <BuildLocationPicker
       summary="NPC station · Jita · Highsec"
+      selectedLabel={selectedLabel}
       onPick={onPick}
       activity="manufacturing"
     >
@@ -143,6 +144,29 @@ describe('BuildLocationPicker', () => {
       'manufacturing',
       expect.any(AbortSignal)
     );
+  });
+
+  it("names the plan's own picked location, so a reload does not blank the box", async () => {
+    // The pick used to leave nothing behind: every field it filled was
+    // visible except the one the pilot actually chose.
+    renderPicker(vi.fn(), 'K2-18 R&D');
+
+    await waitFor(() => expect((searchBox() as HTMLInputElement).value).toBe('K2-18 R&D'));
+  });
+
+  it('lets typing replace the shown location, then shows the plan again once a pick lands', async () => {
+    const user = userEvent.setup();
+    renderPicker(vi.fn(), 'Jita IV - Moon 4');
+
+    await user.clear(searchBox());
+    await user.type(searchBox(), 'K2-18');
+    expect((searchBox() as HTMLInputElement).value).toBe('K2-18');
+
+    await user.click(await screen.findByRole('option', { name: /K2-18 R&D/ }));
+
+    // Back to reading the plan — which the parent rewrites with the pick, so
+    // the box states the new location rather than the typed fragment.
+    expect((searchBox() as HTMLInputElement).value).toBe('Jita IV - Moon 4');
   });
 
   it('hands over every field in one call, and clears itself', async () => {

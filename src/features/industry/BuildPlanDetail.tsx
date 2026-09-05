@@ -69,11 +69,23 @@ export type PlanPatch = Partial<
     | 'hubId'
     | 'buildSystemId'
     | 'buildSystemName'
+    | 'buildLocationId'
+    | 'buildLocationName'
     | 'facilityTaxPct'
     | 'ownedStockScope'
     | 'buildHere'
   >
 >;
+
+/**
+ * The half of a patch that drops the plan's remembered location. Spread by
+ * every control that can move the job away from the place the search picked —
+ * the label is worth keeping only while it is still true.
+ */
+const clearedBuildLocation = {
+  buildLocationId: undefined,
+  buildLocationName: undefined,
+} satisfies PlanPatch;
 
 /** One material's sourcing edit, for the bulk "use all detected" action. */
 export interface SourcingPatchEntry {
@@ -203,6 +215,19 @@ export function BuildPlanDetail({
     plan.buildSystemId !== undefined && plan.buildSystemName !== undefined
       ? { id: plan.buildSystemId, name: plan.buildSystemName }
       : null;
+  // What the build location search should say it is pointed at. The stored
+  // name where ESI gave one; otherwise the same "what and where" stand-in the
+  // picker's own result rows use, composed here because the copy is i18next's
+  // and the record holds only the id (see `BuildPlanRecord.buildLocationId`).
+  const buildLocationLabel =
+    plan.buildLocationName ??
+    (plan.buildLocationId !== undefined
+      ? t('industry.buildLocationUnnamed', {
+          facility: facilityPreset.name,
+          system: buildSystem?.name ?? hub.systemName,
+        })
+      : null);
+
   // The band is derived, not typed, so it is reconciled here rather than only
   // on edit — otherwise a plan saved before the Security field went away keeps
   // a band nothing can correct, and still drives the rig multiplier.
@@ -652,6 +677,7 @@ export function BuildPlanDetail({
                   system: buildSystem?.name ?? hub.systemName,
                   security: t(`industry.${plan.security}`),
                 })}
+                selectedLabel={buildLocationLabel}
                 onPick={(option) => update(buildLocationPatch(option))}
               >
                 <label className="flex flex-col gap-1 text-xs">
@@ -661,11 +687,14 @@ export function BuildPlanDetail({
                     onValueChange={(value) => {
                       const facility = value as FacilityKind;
                       const structure = FACILITY_PRESETS[facility].structure;
-                      update(
-                        structure
-                          ? { facility }
-                          : { facility, rigLevel: 'none', facilityTaxPct: undefined }
-                      );
+                      update({
+                        facility,
+                        // Whatever place was picked, this is no longer it: a
+                        // Raitaru named in the box while the plan says NPC
+                        // station is a label lying about the plan.
+                        ...clearedBuildLocation,
+                        ...(structure ? {} : { rigLevel: 'none', facilityTaxPct: undefined }),
+                      });
                     }}
                   >
                     <SelectTrigger aria-label={t('industry.facility')}>
@@ -694,6 +723,10 @@ export function BuildPlanDetail({
                     update({
                       buildSystemId: system?.id,
                       buildSystemName: system?.name,
+                      // Typing a system by hand moves the job away from the
+                      // place that was picked, so the picked name stops being
+                      // true of this plan.
+                      ...clearedBuildLocation,
                       // The band follows the system, so naming one settles the
                       // rig multiplier too. An unreachable ESI leaves the plan
                       // with the band it had rather than a guessed one.

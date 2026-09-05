@@ -11,6 +11,7 @@ import { useAuthFailure } from '@/stores/authFailure';
 import { App } from '@/app/App';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
+import { useLastOpenedPlan } from '@/features/industry/lastOpenedPlan';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
@@ -195,6 +196,9 @@ beforeEach(async () => {
   await db.buildPlans.clear();
   await db.quickbars.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  // Module-scope store, so it outlives a test unless it is put back — the
+  // same reset `Calendar.test.tsx` does for its own view preference.
+  useLastOpenedPlan.setState({ value: {}, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useAuthFailure.setState({ failure: null });
 
@@ -654,6 +658,54 @@ describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => 
     expect(detailPane?.querySelector('div')?.className).not.toMatch(/\bmax-h-/);
   });
 });
+describe('Industry: the plan you had open reopens', () => {
+  async function seedTwoPlans() {
+    await db.buildPlans.add(seedPlan());
+    await db.buildPlans.add(
+      seedPlan({ id: 'bp-parts', name: 'Parts run', blueprintTypeID: 9841, updatedAt: 2 })
+    );
+  }
+
+  it('reopens the last plan instead of falling back to the first one', async () => {
+    const user = userEvent.setup();
+    await seedTwoPlans();
+    const first = render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Parts run' }));
+    await screen.findByRole('heading', { name: 'Mechanical Parts' });
+    // The write is a Dexie put behind the store; wait for it rather than for
+    // the render that triggered it.
+    await waitFor(() => expect(useLastOpenedPlan.getState().value[CHAR_ID]).toBe('bp-parts'));
+    first.unmount();
+
+    // A fresh visit reads the row back, exactly as a reload would.
+    useLastOpenedPlan.setState({ value: {}, hydrated: false });
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Mechanical Parts' })).toBeInTheDocument();
+  });
+
+  it('falls back to the first plan when the remembered one is gone', async () => {
+    await seedTwoPlans();
+    await db.settings.put({ key: 'industryLastOpenedPlan', value: { [CHAR_ID]: 'bp-deleted' } });
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
+  });
+
+  it('still lands a narrow screen on the list, remembered plan or not', async () => {
+    // Reopening a plan is about which plan is selected, not which column a
+    // phone shows — that gate stays on an explicit tap.
+    useNarrowViewport();
+    await seedTwoPlans();
+    await db.settings.put({ key: 'industryLastOpenedPlan', value: { [CHAR_ID]: 'bp-parts' } });
+    render(<App />);
+
+    await screen.findByRole('button', { name: 'Parts run' });
+    expect(screen.queryByRole('heading', { name: 'Mechanical Parts' })).not.toBeInTheDocument();
+  });
+});
+
 describe('Industry: materials row context menu', () => {
   /** Right-clicks a materials-table row by its item name and returns the row. */
   async function openMaterialMenu(name: string) {

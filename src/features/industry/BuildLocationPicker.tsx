@@ -18,6 +18,14 @@ const optionId = (structureId: number) => `build-location-option-${structureId}`
 interface BuildLocationPickerProps {
   /** What the plan is set to right now, already translated. Always the plan's own values. */
   summary: string;
+  /**
+   * The place the plan was pointed at, already labelled by the caller (which
+   * owns the stand-in copy for a structure ESI would not name). Shown in the
+   * box whenever the pilot is not mid-search, so the pick survives a reload,
+   * a plan switch and a navigation away — `null` for a plan that was never
+   * pointed at one.
+   */
+  selectedLabel: string | null;
   /** Facility and build system — revealed by "Override". */
   children: ReactNode;
   onPick: (option: BuildLocationOption) => void;
@@ -49,9 +57,12 @@ const DEBOUNCE_MS = 300;
  * route that finds a structure by name, and it returns what this Character can
  * actually dock at — CCP's ACL, not ours.
  *
- * **Fill-once, by decision.** Nothing records which place was picked. Every
- * field on screen reads the plan's own values, so nothing can drift from them,
- * and a later edit is just an edit rather than a conflict with a stored link.
+ * **The pick is remembered, for the label only.** The plan stores which place
+ * was chosen (`buildLocationId`/`buildLocationName`) so this box can still name
+ * it later; every number still comes from the fields the pick filled. A stale
+ * pair is therefore a wrong label and never a wrong ISK figure — and the two
+ * controls that could make it stale, the Facility select and the Build system
+ * field, clear it as they edit.
  *
  * Its scope is in the base grant, so a Character added from now on can search
  * straight away. One added *before* it existed holds a token without it —
@@ -61,6 +72,7 @@ const DEBOUNCE_MS = 300;
  */
 export function BuildLocationPicker({
   summary,
+  selectedLabel,
   children,
   onPick,
   activity,
@@ -69,7 +81,11 @@ export function BuildLocationPicker({
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
   const [overriding, setOverriding] = useState(false);
-  const [query, setQuery] = useState('');
+  // `null` means "not searching" — the box then reads the plan's own pick
+  // rather than a typed fragment, which is what makes the choice outlive a
+  // reload. A typed empty string is a different state: the pilot cleared the
+  // box themselves, so it stays cleared until they pick again.
+  const [query, setQuery] = useState<string | null>(null);
   const [results, setResults] = useState<BuildLocationOption[] | null>(null);
   const [searching, setSearching] = useState(false);
   // Which result Arrow/Home/End has highlighted, without moving DOM focus off
@@ -93,7 +109,7 @@ export function BuildLocationPicker({
   // during render, and the two display states reset with it — the same
   // adjust-during-render idiom `BuildPlanDetail` uses for its snapshot key,
   // and the reason nothing here sets state from inside an effect body.
-  const trimmed = query.trim();
+  const trimmed = query?.trim() ?? '';
   const searchKey = canSearch && trimmed.length >= MIN_SEARCH_LENGTH ? trimmed : '';
   const [prevSearchKey, setPrevSearchKey] = useState(searchKey);
   if (prevSearchKey !== searchKey) {
@@ -153,10 +169,12 @@ export function BuildLocationPicker({
 
   function pick(option: BuildLocationOption) {
     onPick(option);
-    // The searchKey-change block below resets results/highlight/dismissed
-    // once this clears the query on the next render — the same reset every
+    // Back to reading the plan, which `onPick` has just rewritten — so the
+    // box states the place that was chosen instead of the fragment typed to
+    // find it. The searchKey-change block above resets
+    // results/highlight/dismissed on the next render, the same reset every
     // other query edit already goes through.
-    setQuery('');
+    setQuery(null);
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -200,7 +218,7 @@ export function BuildLocationPicker({
         <label htmlFor="build-plan-location">{t('industry.buildLocation')}</label>
         <SearchInput
           id="build-plan-location"
-          value={query}
+          value={query ?? selectedLabel ?? ''}
           placeholder={t('industry.buildLocationPlaceholder')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}

@@ -43,6 +43,11 @@ import {
   type SourcingPatchEntry,
 } from '@/features/industry/BuildPlanDetail';
 import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
+import {
+  lastOpenedPlanFor,
+  useLastOpenedPlan,
+  withLastOpenedPlan,
+} from '@/features/industry/lastOpenedPlan';
 
 /**
  * The historical hardcoded default per activity — a character with no prior
@@ -130,6 +135,17 @@ export function Industry() {
   const ownedStockSnapshot = useOwnedStockSnapshot();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Which plan this Character had open last time (device-local). Read only
+  // through `effectiveSelectedId` below, never written into `selectedId`
+  // itself: `selectedId` also decides which column a narrow screen shows, and
+  // reopening a plan must not stop a phone landing on the list.
+  const lastOpened = useLastOpenedPlan((state) => state.value);
+  const lastOpenedHydrated = useLastOpenedPlan((state) => state.hydrated);
+  const hydrateLastOpened = useLastOpenedPlan((state) => state.hydrate);
+  const setLastOpened = useLastOpenedPlan((state) => state.setValue);
+  useEffect(() => {
+    void hydrateLastOpened();
+  }, [hydrateLastOpened]);
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   // Planetary schematics, for the materials table's make-or-buy marker. Loaded
   // beside the catalog so both are in place before a plan first renders — a
@@ -273,18 +289,34 @@ export function Industry() {
     setSearchParams(next, { replace: true });
   }, [materialParam, plans, catalog, searchParams, setSearchParams]);
 
-  // Derived, not effect-synced: falls back to the first plan whenever the
-  // explicitly selected one is missing (first load, or it was just deleted).
+  // Derived, not effect-synced: the explicit selection, else the plan this
+  // Character had open last, else the first plan (first ever visit, or the
+  // remembered one was deleted — here or on another device).
   const effectiveSelectedId = useMemo(() => {
     if (!plans) return null;
     if (selectedId && plans.some((p) => p.id === selectedId)) return selectedId;
+    const remembered =
+      activeCharacterId === null ? null : lastOpenedPlanFor(lastOpened, activeCharacterId);
+    if (remembered && plans.some((p) => p.id === remembered)) return remembered;
     return plans[0]?.id ?? null;
-  }, [plans, selectedId]);
+  }, [plans, selectedId, lastOpened, activeCharacterId]);
 
   const selectedPlan = useMemo(
     () => plans?.find((p) => p.id === effectiveSelectedId) ?? null,
     [plans, effectiveSelectedId]
   );
+
+  // Recorded from the effective selection rather than from each place that
+  // sets one: the `?product=`/`?material=` deep links and the first-plan
+  // fallback are openings too, and the narrow-screen back control — which
+  // clears `selectedId` to show the list again — is not a change of plan and
+  // must not erase the memory. Waits for hydration, so the stored map is the
+  // one being added to rather than an empty default overwriting it.
+  useEffect(() => {
+    if (!lastOpenedHydrated || activeCharacterId === null || effectiveSelectedId === null) return;
+    if (lastOpenedPlanFor(lastOpened, activeCharacterId) === effectiveSelectedId) return;
+    void setLastOpened(withLastOpenedPlan(lastOpened, activeCharacterId, effectiveSelectedId));
+  }, [lastOpenedHydrated, lastOpened, activeCharacterId, effectiveSelectedId, setLastOpened]);
 
   const comparePlans = useMemo(
     () => plans?.filter((p) => compareSelectedIds.has(p.id)) ?? [],
