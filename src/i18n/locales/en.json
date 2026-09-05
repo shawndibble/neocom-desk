@@ -505,6 +505,8 @@
     "buildLocationSummary": "{{facility}} · {{system}} · {{security}}",
     "buildLocationResultsCount_one": "{{count}} result",
     "buildLocationResultsCount_other": "{{count}} results",
+    "buildLocationHighlighted_one": "{{count}} result. {{name}} highlighted.",
+    "buildLocationHighlighted_other": "{{count}} results. {{name}} highlighted.",
     "override": "Override",
     "buildLocationGrantHint": "Sign in again to search your stations and structures and fill these in for you.",
     "buildLocationGrant": "Sign in again"

@@ -125,7 +125,12 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
     };
   }, [searchKey, characterId]);
 
-  const listOpen = !dismissed && !searching && results !== null && results.length > 0;
+  // Narrowed rather than a plain boolean: every read below needs the array
+  // itself, and TS can carry the `results !== null` check through this
+  // ternary into the non-null branch, so nothing downstream needs `results!`.
+  const openResults =
+    !dismissed && !searching && results !== null && results.length > 0 ? results : null;
+  const highlighted = openResults !== null && highlightedIndex !== null;
 
   function pick(option: BuildLocationOption) {
     onPick(option);
@@ -135,7 +140,7 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (!listOpen) return;
+    if (openResults === null) return;
     switch (e.key) {
       case 'ArrowDown':
       case 'ArrowUp':
@@ -143,13 +148,13 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
       case 'End':
         e.preventDefault();
         setHighlightedIndex((current) =>
-          moveHighlight(e.key as ComboboxNavKey, current, results!.length)
+          moveHighlight(e.key as ComboboxNavKey, current, openResults.length)
         );
         break;
       case 'Enter':
         if (highlightedIndex !== null) {
           e.preventDefault();
-          pick(results![highlightedIndex]);
+          pick(openResults[highlightedIndex]);
         }
         break;
       case 'Escape':
@@ -159,6 +164,20 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
         break;
     }
   }
+
+  // Named for the sr-only status region below: count alone on open, plus the
+  // highlighted row's own label once one is picked out — the two things
+  // "Arrow keys move a highlighted option ... a screen reader announces the
+  // option count and the highlighted option" (#505) asks a screen reader to
+  // say.
+  const highlightedOption = highlighted ? openResults[highlightedIndex] : null;
+  const highlightedName = highlightedOption
+    ? (highlightedOption.name ??
+      t('industry.buildLocationUnnamed', {
+        facility: FACILITY_PRESETS[highlightedOption.facility].name,
+        system: highlightedOption.systemName,
+      }))
+    : null;
 
   const searchBox =
     granted === undefined ? null : canSearch ? (
@@ -172,19 +191,22 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
           onKeyDown={handleKeyDown}
           role="combobox"
           aria-autocomplete="list"
-          aria-expanded={listOpen}
+          aria-expanded={openResults !== null}
           aria-controls={LISTBOX_ID}
           aria-activedescendant={
-            listOpen && highlightedIndex !== null
-              ? optionId(results![highlightedIndex].structureId)
-              : undefined
+            highlightedOption ? optionId(highlightedOption.structureId) : undefined
           }
         />
         <span role="status" aria-live="polite" className="sr-only">
           {!searching &&
             !failed &&
             results !== null &&
-            t('industry.buildLocationResultsCount', { count: results.length })}
+            (highlightedName
+              ? t('industry.buildLocationHighlighted', {
+                  count: results.length,
+                  name: highlightedName,
+                })
+              : t('industry.buildLocationResultsCount', { count: results.length }))}
         </span>
         {searching && (
           <span className="flex items-center gap-1 text-text-dim">
@@ -199,13 +221,13 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
         {!searching && !failed && results !== null && results.length === 0 && (
           <span className="text-text-dim">{t('industry.buildLocationNoResults')}</span>
         )}
-        {listOpen && (
+        {openResults !== null && (
           <ul
             id={LISTBOX_ID}
             role="listbox"
             className="max-h-56 overflow-y-auto rounded-xs border border-line bg-panel"
           >
-            {results!.map((option, index) => (
+            {openResults.map((option, index) => (
               <li
                 key={option.structureId}
                 id={optionId(option.structureId)}

@@ -223,6 +223,18 @@ describe('BuildLocationPicker', () => {
     expect(screen.getByRole('status')).toHaveTextContent('1 result');
   });
 
+  it('announces the highlighted option by name once arrowed onto', async () => {
+    const user = userEvent.setup();
+    renderPicker();
+
+    await user.type(searchBox(), 'K2-18');
+    await screen.findByRole('option', { name: /K2-18 R&D/ });
+
+    await user.keyboard('{ArrowDown}');
+
+    expect(screen.getByRole('status')).toHaveTextContent('1 result. K2-18 R&D highlighted.');
+  });
+
   it('says the search failed rather than pretending nothing matched', async () => {
     const user = userEvent.setup();
     searchBuildLocations.mockRejectedValue(new Error('offline'));
