@@ -159,3 +159,49 @@ export function diffRoster(
 export function isEmptyRosterDiff(diff: RosterDiff): boolean {
   return diff.joined.length === 0 && diff.left.length === 0;
 }
+
+/** The repo's placeholder for a cell with nothing in it (Contacts, Characters). */
+export const DASH = '—';
+
+/**
+ * A name we could not resolve degrades to the id, never to a blank cell.
+ * Lives here (not `CorpRoster.tsx`) so the table cell, the row context menu's
+ * Copy Character Name, and the CSV export all agree on what a member's name
+ * is — and so a plain function can live next to `filterRosterRows` without
+ * tripping react-refresh's one-component-per-file rule on the view.
+ */
+export function label(name: string | null, id: number | null): string {
+  if (name !== null) return name;
+  return id === null ? DASH : `#${id}`;
+}
+
+/**
+ * The three fields the roster search box matches against (issue #421). A
+ * structural subset rather than an import of the view's `RosterRow` — the
+ * engine layer does not depend on `features/`.
+ */
+export interface RosterSearchFields {
+  name: string | null;
+  shipName: string | null;
+  locationName: string | null;
+}
+
+/**
+ * Name/ship/location filter for the roster table, on the
+ * `filterCorpAssetGroups` precedent (`engine/corp/assetDivisions.ts`):
+ * lowercase substring match, empty query matches everything. A `null` field
+ * (unresolved name, docked-nowhere member) never matches rather than being
+ * coerced to a matchable string.
+ */
+export function filterRosterRows<T extends RosterSearchFields>(
+  rows: readonly T[],
+  query: string
+): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...rows];
+  return rows.filter((row) =>
+    [row.name, row.shipName, row.locationName].some(
+      (field) => field !== null && field.toLowerCase().includes(q)
+    )
+  );
+}

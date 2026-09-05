@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -15,6 +15,9 @@ import type { CorporationMemberTracking } from '@/esi/endpoints';
 import * as boardData from '@/features/corp/boardData';
 import * as corpMembers from '@/features/corp/members';
 import * as rosterState from '@/features/corp/rosterState';
+import * as download from '@/lib/download';
+import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { CorpMembers } from './CorpMembers';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -109,6 +112,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.setSystemTime(NOW);
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+  usePublicInfoModalStore.setState({ request: null });
 
   mocked.loadCorporationId.mockResolvedValue(CORPORATION_ID);
   mocked.loadCorporationMemberIds.mockResolvedValue(cached([1001, 1002]));
@@ -122,6 +126,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  configureClipboard(null);
 });
 
 describe('access (AC1)', () => {
@@ -325,5 +330,164 @@ describe('the joins/leaves summary', () => {
     mocked.loadCorporationMemberIds.mockResolvedValue({ cached: null, needsReauth: false });
     await rosterTable();
     expect(mocked.recordRoster).not.toHaveBeenCalled();
+  });
+});
+
+/** Right-clicks a member row by its resolved name and returns the row. */
+async function openMemberMenu(name: string) {
+  const row = (await screen.findByText(name)).closest('tr');
+  if (!row) throw new Error(`expected a ${name} row`);
+  fireEvent.contextMenu(row);
+  return row;
+}
+
+describe('row context menu (issue #421, AC1)', () => {
+  it('offers Show Info and Copy Character Name', async () => {
+    await rosterTable();
+    await openMemberMenu('Jita Local');
+
+    expect(screen.getByRole('menuitem', { name: 'Show Info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy Character Name' })).toBeInTheDocument();
+  });
+
+  it('Show Info opens the shared Public Info Modal for the character', async () => {
+    await rosterTable();
+    await openMemberMenu('Jita Local');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Show Info' }));
+
+    expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 1001 });
+  });
+
+  it('Copy Character Name copies the resolved name to the clipboard', async () => {
+    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(clipboardWriteText);
+    await rosterTable();
+    await openMemberMenu('Jita Local');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy Character Name' }));
+
+    expect(clipboardWriteText).toHaveBeenCalledWith('Jita Local');
+  });
+
+  it('falls back to the #id when the row has no resolved name', async () => {
+    mocked.loadMemberLabels.mockResolvedValue(labels({ characters: new Map() }));
+    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(clipboardWriteText);
+    await rosterTable();
+    await openMemberMenu('#1001');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy Character Name' }));
+
+    expect(clipboardWriteText).toHaveBeenCalledWith('#1001');
+  });
+});
+
+describe('roster search (issue #421, AC2)', () => {
+  beforeEach(() => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+  });
+
+  it('narrows the roster by name, ship, or location', async () => {
+    const table = await rosterTable();
+    expect(within(table).getByText('Jita Local')).toBeInTheDocument();
+    expect(within(table).getByText('Silent Ren')).toBeInTheDocument();
+
+    await userEvent
+      .setup()
+      .type(screen.getByPlaceholderText('Search name, ship, location…'), 'local');
+
+    await waitFor(() => expect(screen.queryByText('Silent Ren')).not.toBeInTheDocument());
+    expect(screen.getByText('Jita Local')).toBeInTheDocument();
+  });
+
+  it('composes with the dark-only toggle rather than replacing it (round 55 AND-stacking)', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
+        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+      ])
+    );
+    await rosterTable();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Dark 30d\+/ }));
+    expect(screen.queryByText('Jita Local')).not.toBeInTheDocument();
+    expect(screen.getByText('Silent Ren')).toBeInTheDocument();
+
+    await userEvent
+      .setup()
+      .type(screen.getByPlaceholderText('Search name, ship, location…'), 'local');
+
+    await waitFor(() => expect(screen.queryByText('Silent Ren')).not.toBeInTheDocument());
+    expect(screen.queryByText('Jita Local')).not.toBeInTheDocument();
+  });
+});
+
+describe('dark-only toggle (issue #421, AC3)', () => {
+  it('filters the table to members past the dark threshold when toggled on', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
+        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+      ])
+    );
+    const table = await rosterTable();
+    expect(within(table).getByText('Jita Local')).toBeInTheDocument();
+    expect(within(table).getByText('Silent Ren')).toBeInTheDocument();
+
+    const toggle = screen.getByRole('button', { name: /Dark 30d\+/ });
+    await userEvent.setup().click(toggle);
+
+    expect(screen.queryByText('Jita Local')).not.toBeInTheDocument();
+    expect(screen.getByText('Silent Ren')).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    await userEvent.setup().click(toggle);
+    expect(screen.getByText('Jita Local')).toBeInTheDocument();
+  });
+});
+
+describe('CSV export (issue #421, AC4)', () => {
+  it('exports the visible rows named neocom-corp-members-<date>.csv', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    await rosterTable();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Export CSV' }));
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [filename, content] = spy.mock.calls[0];
+    expect(filename).toMatch(/^neocom-corp-members-\d{4}-\d{2}-\d{2}\.csv$/);
+    expect(content).toContain('Jita Local');
+    expect(content).toContain('Silent Ren');
+  });
+
+  it('exports only what the search/dark-only filters currently show', async () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    await rosterTable();
+    await userEvent
+      .setup()
+      .type(screen.getByPlaceholderText('Search name, ship, location…'), 'local');
+    await waitFor(() => expect(screen.queryByText('Silent Ren')).not.toBeInTheDocument());
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Export CSV' }));
+
+    const content = spy.mock.calls[0][1];
+    expect(content).toContain('Jita Local');
+    expect(content).not.toContain('Silent Ren');
+  });
+
+  it('disables export when nothing is visible', async () => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
+    renderMembers();
+    await screen.findByText('No member activity');
+
+    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
   });
 });

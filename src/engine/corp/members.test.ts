@@ -4,9 +4,11 @@ import {
   DARK_AFTER_MS,
   EMPTY_ROSTER_DIFF,
   diffRoster,
+  filterRosterRows,
   isEmptyRosterDiff,
   memberStanding,
   type MemberActivity,
+  type RosterSearchFields,
 } from './members';
 
 const NOW = Date.parse('2026-09-03T12:00:00Z');
@@ -145,5 +147,53 @@ describe('diffRoster', () => {
   it('calls a diff with either half populated non-empty', () => {
     expect(isEmptyRosterDiff({ joined: [1], left: [] })).toBe(false);
     expect(isEmptyRosterDiff({ joined: [], left: [1] })).toBe(false);
+  });
+});
+
+describe('filterRosterRows', () => {
+  function row(overrides: Partial<RosterSearchFields> = {}): RosterSearchFields {
+    return {
+      name: 'Jita Local',
+      shipName: 'Rifter',
+      locationName: 'Jita IV - Moon 4',
+      ...overrides,
+    };
+  }
+
+  it('returns every row, unmodified, for an empty query', () => {
+    const rows = [row(), row({ name: 'Silent Ren' })];
+    expect(filterRosterRows(rows, '')).toEqual(rows);
+  });
+
+  it('treats a whitespace-only query as empty', () => {
+    const rows = [row()];
+    expect(filterRosterRows(rows, '   ')).toEqual(rows);
+  });
+
+  it('matches case-insensitively on the member name', () => {
+    const rows = [
+      row({ name: 'Jita Local', shipName: null, locationName: null }),
+      row({ name: 'Silent Ren', shipName: null, locationName: null }),
+    ];
+    expect(filterRosterRows(rows, 'jita')).toEqual([rows[0]]);
+  });
+
+  it('matches on ship name', () => {
+    const rows = [row({ shipName: 'Rifter' }), row({ shipName: 'Merlin' })];
+    expect(filterRosterRows(rows, 'merlin')).toEqual([rows[1]]);
+  });
+
+  it('matches on location name', () => {
+    const rows = [row({ locationName: 'Jita IV - Moon 4' }), row({ locationName: 'Amarr VIII' })];
+    expect(filterRosterRows(rows, 'amarr')).toEqual([rows[1]]);
+  });
+
+  it('never matches a null field', () => {
+    const rows = [row({ name: null, shipName: null, locationName: null })];
+    expect(filterRosterRows(rows, 'jita')).toEqual([]);
+  });
+
+  it('drops a row that matches nothing', () => {
+    expect(filterRosterRows([row()], 'caldari')).toEqual([]);
   });
 });

@@ -14,6 +14,7 @@ export type CsvSurface =
   // one: the two files hold different owners' rows and must not land in a
   // downloads folder under the same name (issue #298).
   | 'corp-industry-jobs'
+  | 'corp-members'
   | 'wallet-journal'
   | 'corp-wallet-journal'
   | 'wallet-transactions'
