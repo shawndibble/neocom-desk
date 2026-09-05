@@ -23,6 +23,18 @@ export interface RenderedFire<TFire> {
 export interface FireGroup<TFire> {
   /** The first fire in the group -- what a caller needing "the" fire (its eventId, its identifying fields for a channel gate) should use. */
   fire: TFire;
+  /**
+   * Every fire in the group, in arrival order; `fire` is this list's first
+   * element and `count` its length.
+   *
+   * The browser channel only ever needed the representative -- it raises one
+   * toast and the others are discarded. The Notification Feed does not: it
+   * stores a row per occurrence deliberately (see `foregroundPoller.ts`'s
+   * "one row per actual occurrence, never grouped"), collapses them only for
+   * display, and so has to reach every stored row behind a collapsed one to
+   * dismiss it.
+   */
+  fires: TFire[];
   title: string;
   body: string;
   count: number;
@@ -42,8 +54,15 @@ export function groupIdenticalFires<TFire extends { eventId: string }>(
     const existingIndex = indexByKey.get(key);
     if (existingIndex === undefined) {
       indexByKey.set(key, groups.length);
-      groups.push({ fire: item.fire, title: item.title, body: item.body, count: 1 });
+      groups.push({
+        fire: item.fire,
+        fires: [item.fire],
+        title: item.title,
+        body: item.body,
+        count: 1,
+      });
     } else {
+      groups[existingIndex].fires.push(item.fire);
       groups[existingIndex].count += 1;
     }
   }

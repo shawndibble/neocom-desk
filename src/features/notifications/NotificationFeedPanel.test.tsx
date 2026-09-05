@@ -179,6 +179,80 @@ describe('NotificationFeedPanel', () => {
     expect(link).toHaveAttribute('href', '/wallet?tab=journal');
   });
 
+  it('collapses rows that read identically into one carrying the count', async () => {
+    for (let i = 0; i < 6; i++)
+      await seed('Market order filled', 'Your order was filled.', 1000 + i);
+
+    renderPanel();
+
+    const items = await screen.findAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent('Market order filled x6');
+  });
+
+  it('leaves a lone notification’s title alone — no "x1"', async () => {
+    await seed('Market order filled', 'Your order was filled.', 1000);
+
+    renderPanel();
+
+    const items = await screen.findAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('Market order filled');
+    expect(items[0]).not.toHaveTextContent('x1');
+  });
+
+  it('collapses across an unrelated notification sitting between the duplicates', async () => {
+    await seed('Market order filled', 'Your order was filled.', 3000);
+    await seed('Wallet balance changed', 'Balance changed.', 2000);
+    await seed('Market order filled', 'Your order was filled.', 1000);
+
+    renderPanel();
+
+    const items = await screen.findAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    // The group keeps the place of its newest member, so the list stays
+    // newest-first rather than the pair sinking to the older one's slot.
+    expect(items[0]).toHaveTextContent('Market order filled x2');
+    expect(items[1]).toHaveTextContent('Wallet balance changed');
+  });
+
+  it('keeps notifications with different bodies apart, however alike their titles', async () => {
+    await seed('Skill training complete', 'Finished Gunnery V.', 2000);
+    await seed('Skill training complete', 'Finished Missiles IV.', 1000);
+
+    renderPanel();
+
+    expect(await screen.findAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('dismisses every notification behind a collapsed row, not just the one on screen', async () => {
+    const user = userEvent.setup();
+    for (let i = 0; i < 3; i++)
+      await seed('Market order filled', 'Your order was filled.', 1000 + i);
+    await seed('Keep me', 'different body', 500);
+
+    renderPanel();
+    await screen.findByText('Market order filled x3');
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss Market order filled x3' }));
+
+    await waitFor(async () => {
+      const rows = await db.notificationFeed.toArray();
+      expect(rows.filter((r) => r.dismissedAt === undefined)).toHaveLength(1);
+    });
+    // Asserted against the list, not the document: the dismiss button's own
+    // tooltip still holds its label ("Dismiss Market order filled x3") while
+    // it fades, and a document-wide text query would match that too.
+    //
+    // Inside `waitFor` rather than a bare `findAllByRole`, which resolves on
+    // the first non-empty match and so would read the list mid-update, before
+    // the dismissed group has left it.
+    await waitFor(() => {
+      const remaining = screen.getAllByRole('listitem');
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]).toHaveTextContent('Keep me');
+    });
+  });
+
   it('renders nothing when the master switch is off', async () => {
     await db.settings.put({
       key: NOTIFICATION_PREFS_SETTING_KEY,

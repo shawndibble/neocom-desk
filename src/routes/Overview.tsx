@@ -196,9 +196,24 @@ export function Overview() {
 
       {/* Wallet and training queue share a row on desktop, stack on mobile.
           The aria-live region stays on the queue alone — hoisting it to the
-          grid would start announcing wallet balance changes too. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+          grid would start announcing wallet balance changes too.
+
+          Deliberately no `items-start`: the grid's default `stretch` is what
+          gives the two panels a common bottom edge side by side, and a pair of
+          cards at different heights reads as one of them having failed to
+          load. Stacked it changes nothing — a single-column row is as tall as
+          its only item either way. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* The balance is one line against the queue's three, so equal heights
+            leave it stranded at the top of a tall card. Centring is the whole
+            reason for the flex chain here, and it takes every link: the section
+            has to be a column (`flex flex-col`) for `fill` to have room to
+            claim, `fill` makes the content wrapper the growing child rather
+            than a plain block, and only then can the inner box centre what it
+            holds. Drop any one and the balance goes back to the top. */}
         <Panel
+          className="flex flex-col"
+          fill
           title={t('overview.wallet')}
           actions={
             <>
@@ -212,40 +227,51 @@ export function Overview() {
             </>
           }
         >
-          {walletSnapshot.loading ? (
-            <Spinner label={t('common.loading')} />
-          ) : walletSnapshot.error ? (
-            <EmptyState
-              title={t('common.loadFailedTitle')}
-              hint={t('common.loadFailedHint')}
-              className="py-4"
-            />
-          ) : walletData?.needsReauth ? (
-            <ReauthBanner
-              title={t('overview.reauthTitle')}
-              hint={t('overview.reauthHint')}
-              actionLabel={t('overview.reauthAction')}
-              onLogin={() => void beginEveLogin()}
-            />
-          ) : walletData?.result ? (
-            <Link
-              to="/wallet"
-              className="inline-block text-lg font-medium tabular-nums text-isk-pos hover:underline"
-            >
-              {formatIsk(walletData.result.data, 2)} {t('overview.isk')}
-            </Link>
-          ) : (
-            <EmptyState title={t('overview.walletEmpty')} className="py-4" />
-          )}
-          {walletData?.result?.fromCache && (
-            <p className="mt-1 text-[0.6875rem] text-warning uppercase">
-              {t('skills.offlineTitle')}
-            </p>
-          )}
+          <div className="flex flex-1 flex-col justify-center">
+            {walletSnapshot.loading ? (
+              <Spinner label={t('common.loading')} />
+            ) : walletSnapshot.error ? (
+              <EmptyState
+                title={t('common.loadFailedTitle')}
+                hint={t('common.loadFailedHint')}
+                className="py-4"
+              />
+            ) : walletData?.needsReauth ? (
+              <ReauthBanner
+                title={t('overview.reauthTitle')}
+                hint={t('overview.reauthHint')}
+                actionLabel={t('overview.reauthAction')}
+                onLogin={() => void beginEveLogin()}
+              />
+            ) : walletData?.result ? (
+              // `inline-block` would stretch the link across the centred
+              // column and put its underline under the whitespace too;
+              // `self-start` keeps the hit area on the digits.
+              <Link
+                to="/wallet"
+                className="self-start text-lg font-medium tabular-nums text-isk-pos hover:underline"
+              >
+                {formatIsk(walletData.result.data, 2)} {t('overview.isk')}
+              </Link>
+            ) : (
+              <EmptyState title={t('overview.walletEmpty')} className="py-4" />
+            )}
+            {walletData?.result?.fromCache && (
+              <p className="mt-1 text-[0.6875rem] text-warning uppercase">
+                {t('skills.offlineTitle')}
+              </p>
+            )}
+          </div>
         </Panel>
 
-        <div aria-live="polite">
+        {/* `h-full` twice, and both are load-bearing. The grid stretches this
+            wrapper, not the Panel inside it, so without the pair the queue card
+            would sit at its content height inside a full-height box and the
+            row's bottom edges would still disagree. The wallet Panel is a grid
+            child directly, so it needs neither. */}
+        <div aria-live="polite" className="h-full">
           <Panel
+            className="h-full"
             title={t('overview.queue')}
             actions={
               <>
