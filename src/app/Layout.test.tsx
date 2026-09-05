@@ -384,6 +384,7 @@ describe('Layout desktop rail domain grouping', () => {
       '[Economy]',
       'Market',
       'Wallet',
+      'Moon Mining Tax',
       'Assets',
       'Contracts',
       '[Social]',
