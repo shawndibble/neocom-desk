@@ -11,6 +11,11 @@ import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi, loadSkills } from '@/sde/loadSde';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
+import { clearOrderBookCache } from './orderBook';
+import type { RegionOrder } from '@/esi/endpoints';
+
+/** Jita/The Forge, the default Trade Hub the modal falls back to unhydrated. */
+const JITA_REGION_ID = 10000002;
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(),
@@ -27,7 +32,10 @@ const mockedLoadPi = vi.mocked(loadPi);
 
 const TYPE_ID = 587;
 
-const server = setupServer();
+const server = setupServer(
+  // Default: no orders anywhere. Individual price tests override with `server.use`.
+  http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () => HttpResponse.json([]))
+);
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(async () => {
@@ -36,6 +44,10 @@ afterEach(async () => {
   // Group names are cached under the global sentinel and would otherwise
   // leak a resolved name into the next test's "unresolvable" case.
   await db.esiCache.clear();
+  // Order Book has its own 300s TTL cache, keyed by region+type — several
+  // tests reuse TYPE_ID, and a real Date.now would let one test's response
+  // leak into the next's.
+  clearOrderBookCache();
 });
 
 describe('ItemDetailModal', () => {
@@ -393,5 +405,88 @@ describe('ItemDetailModal planetary production', () => {
     expect(await screen.findByText('Reactive Metals description.')).toBeInTheDocument();
     expect(screen.queryByText('Planetary production')).not.toBeInTheDocument();
     expect(screen.queryByText("Couldn't load item info")).not.toBeInTheDocument();
+  });
+});
+
+describe('ItemDetailModal best sell/buy price', () => {
+  function order(overrides: Partial<RegionOrder>): RegionOrder {
+    return {
+      duration: 90,
+      is_buy_order: false,
+      issued: '2026-01-01T00:00:00Z',
+      location_id: 60003760,
+      min_volume: 1,
+      order_id: 1,
+      price: 100,
+      range: 'region',
+      system_id: 30000142,
+      type_id: TYPE_ID,
+      volume_remain: 10,
+      volume_total: 10,
+      ...overrides,
+    };
+  }
+
+  function serveRifter() {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Rifter',
+          description: '',
+          group_id: 25,
+          published: true,
+          volume: 27289,
+          dogma_attributes: [],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({});
+    mockedLoadSkills.mockResolvedValue([]);
+  }
+
+  it("shows the region's best sell and buy price", async () => {
+    serveRifter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${JITA_REGION_ID}/orders`, () =>
+        HttpResponse.json([
+          order({ order_id: 1, is_buy_order: false, price: 500_000 }),
+          order({ order_id: 2, is_buy_order: false, price: 450_000 }),
+          order({ order_id: 3, is_buy_order: true, price: 400_000 }),
+          order({ order_id: 4, is_buy_order: true, price: 420_000 }),
+        ])
+      )
+    );
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByText('450,000.00')).toBeInTheDocument();
+    expect(screen.getByText('420,000.00')).toBeInTheDocument();
+  });
+
+  it('shows a dash for a side with no orders', async () => {
+    serveRifter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${JITA_REGION_ID}/orders`, () =>
+        HttpResponse.json([order({ order_id: 1, is_buy_order: false, price: 500_000 })])
+      )
+    );
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByText('500,000.00')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('hides the price row rather than blanking the modal when the order book fetch fails', async () => {
+    serveRifter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${JITA_REGION_ID}/orders`, () => HttpResponse.error())
+    );
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByText('Volume: 27,289 m3')).toBeInTheDocument();
+    expect(screen.queryByText('Best sell:')).not.toBeInTheDocument();
   });
 });

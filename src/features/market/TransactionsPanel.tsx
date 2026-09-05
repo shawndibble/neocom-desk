@@ -12,6 +12,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { loadWalletTransactions } from '@/features/character/wallet';
+import { MarketItemLink } from './MarketItemLink';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { iskToneClass } from '@/features/character/format';
@@ -84,7 +85,11 @@ export function TransactionsPanel() {
         header: t('wallet.item'),
         /** Titles the card on a phone — the item is what the transaction is. */
         primary: true,
-        render: (txn) => typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`,
+        render: (txn) => (
+          <MarketItemLink typeId={txn.type_id}>
+            {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
+          </MarketItemLink>
+        ),
       },
       {
         id: 'side',

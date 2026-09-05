@@ -20,14 +20,19 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState, Modal, Spinner } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
+import { summarizeOrderBook, type OrderBookSummary } from '@/engine/market/orderBook';
 import { getUniverseType, type UniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
 import { typeIconUrl } from '@/lib/eveImages';
+import { formatIsk } from '@/lib/isk';
+import { getTradeHub } from '@/market/hubs';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
+import { useMarketHub } from './hub';
+import { getOrderBook } from './orderBook';
 
 export interface ItemDetailModalProps {
   typeId: number;
@@ -42,12 +47,52 @@ interface DetailData {
   pi: PiData | null;
 }
 
+/**
+ * Distinct from a plain `OrderBookSummary | null`: a region with truly no
+ * orders is a valid `'ready'` result (both sides null), which must render
+ * differently from `'error'` (the fetch itself failed) — nullability alone
+ * can't tell those apart.
+ */
+type PriceState =
+  { status: 'loading' } | { status: 'ready'; summary: OrderBookSummary } | { status: 'error' };
+
 /** Mounted only while open (ImportClipboardDialog's pattern) — mounting is the open signal. */
 export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  const hubId = useMarketHub((state) => state.value);
+  const hubHydrated = useMarketHub((state) => state.hydrated);
+  const hydrateHub = useMarketHub((state) => state.hydrate);
+  const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
+
+  useEffect(() => {
+    void hydrateHub();
+  }, [hydrateHub]);
+
+  useEffect(() => {
+    if (!hubHydrated) return;
+    let cancelled = false;
+    const regionId = getTradeHub(hubId)?.regionId;
+    void (async () => {
+      setPriceState({ status: 'loading' });
+      try {
+        if (regionId === undefined) throw new Error(`Unknown hub ${hubId}`);
+        const { orders } = await getOrderBook(regionId, typeId);
+        if (cancelled) return;
+        setPriceState({ status: 'ready', summary: summarizeOrderBook(orders) });
+      } catch {
+        // A nice-to-have fetch, same as the PI schematic below: its failure
+        // costs the price row, never the whole modal.
+        if (!cancelled) setPriceState({ status: 'error' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [typeId, hubId, hubHydrated]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +157,26 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
               <p className="text-text-dim">
                 {t('market.itemDetail.volume', { volume: formatVolume(data.type.volume ?? 0) })}
               </p>
+              {priceState.status !== 'error' && (
+                <p className="flex gap-4 text-text-dim">
+                  <span>
+                    {t('market.itemDetail.bestSell')}{' '}
+                    <span className="tabular-nums text-text">
+                      {priceState.status === 'loading'
+                        ? '…'
+                        : priceCellText(priceState.summary.bestSell)}
+                    </span>
+                  </span>
+                  <span>
+                    {t('market.itemDetail.bestBuy')}{' '}
+                    <span className="tabular-nums text-text">
+                      {priceState.status === 'loading'
+                        ? '…'
+                        : priceCellText(priceState.summary.bestBuy)}
+                    </span>
+                  </span>
+                </p>
+              )}
               {data.type.description && (
                 <p className="whitespace-pre-line text-text">
                   {parseItemDescription(data.type.description).map((run, i) => (
@@ -150,6 +215,11 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
       )}
     </Modal>
   );
+}
+
+/** A side of the order book with no orders renders as '—', matching CompareDrawer/VariationsTable. */
+function priceCellText(price: number | null): string {
+  return price != null ? formatIsk(price, 2) : '—';
 }
 
 /**

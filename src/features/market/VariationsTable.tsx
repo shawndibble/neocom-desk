@@ -9,11 +9,15 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
+import { IconButton } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { downloadCsv } from '@/lib/downloadCsv';
 import { formatIsk } from '@/lib/isk';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
 import type { VariationRow } from './variations';
+import { variationsCsvColumns } from './variationsCsv';
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -134,9 +138,17 @@ export function VariationsTable({
         <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('market.variations.title')}
         </h2>
-        <Button size="sm" onClick={onCompare}>
-          {t('market.variations.compare')}
-        </Button>
+        <span className="flex items-center gap-2">
+          <IconButton
+            size="sm"
+            icon={<Icon.Download />}
+            label={t('market.variations.exportCsv')}
+            onClick={() => downloadCsv('market-variations', rows, variationsCsvColumns(t, prices))}
+          />
+          <Button size="sm" onClick={onCompare}>
+            {t('market.variations.compare')}
+          </Button>
+        </span>
       </div>
       {truncated && (
         <p className="pb-1 text-[0.6875rem] text-warning uppercase">
