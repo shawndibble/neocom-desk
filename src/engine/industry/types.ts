@@ -11,6 +11,8 @@
  *   multipliers (e.g. types 43920/43921/37160).
  */
 
+import type { EngineAsset } from '../assetTree';
+
 export interface QuantityEntry {
   typeID: number;
   quantity: number;
@@ -194,6 +196,22 @@ export interface MaterialSourcing {
 
 /** Sourcing overrides keyed by material typeID. Missing key = no overrides. */
 export type MaterialSourcingMap = Record<number, MaterialSourcing>;
+
+/** One Character-and-location combination that can hold owned stock (issue #454). */
+export interface OwnedStockLocation {
+  characterId: number;
+  locationId: number;
+  locationType: EngineAsset['location_type'];
+}
+
+/**
+ * How a Build Plan's "use detected" owned-stock total is scoped: every
+ * placement (`everywhere`, the default and today's only behavior), or only
+ * placements at a plan-chosen subset of locations (`selected`). One scope
+ * governs the whole plan, not per-material.
+ */
+export type OwnedStockScope =
+  { mode: 'everywhere' } | { mode: 'selected'; locations: readonly OwnedStockLocation[] };
 
 /** An effective material priced against its sourcing overrides + hub prices. */
 export interface MaterialCostLine extends EffectiveMaterial {

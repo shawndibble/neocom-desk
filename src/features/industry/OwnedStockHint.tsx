@@ -10,10 +10,17 @@ import type { OwnedStockDetection } from './ownedStockDetection';
 const MAX_BREAKDOWN_ROWS = 5;
 
 interface OwnedStockHintProps {
+  /** Every placement galaxy-wide, unfiltered by the plan's owned-stock scope — the breakdown list always shows the full picture. */
   stock: DetectedOwnedStock;
+  /**
+   * The total narrowed to the plan's owned-stock scope (issue #454), shown as
+   * the headline number. Equal to `stock.quantity` when the scope is absent
+   * or `everywhere`.
+   */
+  scopedQuantity: number;
   detection: OwnedStockDetection;
   materialName: string;
-  /** What the "use" action writes: min(detected, required). */
+  /** What the "use" action writes: min(scoped detected, required). */
   suggestion: number;
   /** False when the row's stored value already equals `suggestion` — nothing left to apply. */
   canApply: boolean;
@@ -36,6 +43,7 @@ interface OwnedStockHintProps {
  */
 export function OwnedStockHint({
   stock,
+  scopedQuantity,
   detection,
   materialName,
   suggestion,
@@ -45,7 +53,10 @@ export function OwnedStockHint({
   const { t } = useTranslation();
   const shown = stock.placements.slice(0, MAX_BREAKDOWN_ROWS);
   const remaining = stock.placements.length - shown.length;
-  const quantity = stock.quantity.toLocaleString();
+  // The headline reflects the plan's owned-stock scope (issue #454); the
+  // breakdown list below stays the full, unfiltered picture so the player can
+  // still see where every unit actually is.
+  const quantity = scopedQuantity.toLocaleString();
   // The lower-bound marker is part of the number, so it has to be part of the
   // accessible name too: a name that dropped it would announce a floor as an
   // exact count, and the buy list a player builds on that is wrong low.
