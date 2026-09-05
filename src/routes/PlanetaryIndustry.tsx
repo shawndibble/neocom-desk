@@ -268,36 +268,41 @@ function pinTypeName(pin: PlanetPin, pinTypeNames: ReadonlyMap<number, string>):
 }
 
 /**
- * A `panel-2`-filled header + body, styled like `Panel` but never rendering
- * one: `Panel`'s own doc comment says "don't nest them — use `panel-2`
- * fills inside", and a colony's role cards nest inside the colony's own
- * outer `Panel`.
+ * One section of the expanded drilldown — an extractor, Production, or
+ * Infrastructure — separated from its neighbor by a hairline rule instead of
+ * its own bordered box. The drilldown region itself (`bg-panel-2`) is the
+ * only box in this tree; nesting a `RoleCard`-style box per section inside it
+ * was boxes in boxes in boxes by the time a chip inside Infrastructure was
+ * reached. `first:border-t-0` drops the rule on whichever section renders
+ * first, so callers don't have to track that themselves.
  */
-function RoleCard({
+function FlatSection({
+  as: Heading = 'div',
   title,
+  titleClassName = 'text-sm font-semibold',
   actions,
-  padded = true,
-  className = '',
   children,
 }: {
+  as?: 'h3' | 'div';
   title: ReactNode;
+  titleClassName?: string;
   actions?: ReactNode;
-  padded?: boolean;
-  className?: string;
   children: ReactNode;
 }) {
   return (
-    <div className={`rounded-xs border border-line ${className}`}>
-      <div className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
-        <h3 className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {title}
-        </h3>
+    <div className="border-t border-line py-3 first:border-t-0 first:pt-0">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <Heading className={`flex items-center gap-1.5 ${titleClassName}`}>{title}</Heading>
         {actions && <div className="flex items-center gap-1">{actions}</div>}
       </div>
-      <div className={padded ? 'p-3' : ''}>{children}</div>
+      {children}
     </div>
   );
 }
+
+/** Uppercase micro-heading style shared by Production and Infrastructure's `FlatSection` titles — the same treatment `RoleCard`'s header bar used to give every section, now carried by the text alone. */
+const SECTION_EYEBROW_CLASS =
+  'text-[0.6875rem] font-semibold tracking-widest text-text-faint uppercase';
 
 /** A label/value pair inside a card body — the hero card's Expires/Banked/Reset now row. */
 function CardStat({
@@ -333,10 +338,9 @@ interface ExtractionCardProps {
  * One extractor pin's live telemetry: product, status, a banked-share
  * progress bar, and the Expires/Banked/Reset now stats already computed by
  * `engine/pi/extraction` for the old table's columns — same numbers, read as
- * a card instead of a row. Bordered/tinted in accent (docs/DESIGN.md's
- * accent = interactive/live-data convention) since this is the one card with
- * genuine per-cycle telemetry; Production and Infrastructure below never get
- * this treatment.
+ * a section instead of a row. The accent-colored icon is the only thing that
+ * marks this as the section with genuine per-cycle telemetry — no border or
+ * tinted fill, since this section has no box of its own left to tint.
  */
 function ExtractionCard({
   pin,
@@ -359,10 +363,11 @@ function ExtractionCard({
   const percent = banked === null ? null : Math.round((banked / total) * 100);
 
   return (
-    <RoleCard
+    <FlatSection
+      as="h3"
       title={
         <>
-          <Icon.Extraction size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          <Icon.Extraction size={Icon.ICON_SIZE.sm} className="text-accent" aria-hidden="true" />
           {productName}
         </>
       }
@@ -373,7 +378,6 @@ function ExtractionCard({
           tone={state === null ? 'default' : STATE_TONE[state]}
         />
       }
-      className="border-accent-dim bg-gradient-to-b from-accent/10 to-transparent"
     >
       <p className="mb-2 text-xs text-text-dim">{pinTypeName(pin, pinTypeNames)}</p>
       <div
@@ -382,7 +386,7 @@ function ExtractionCard({
         aria-valuenow={percent ?? 0}
         aria-valuemin={0}
         aria-valuemax={100}
-        className="h-1.5 overflow-hidden rounded-full bg-panel-2"
+        className="h-1.5 overflow-hidden rounded-full bg-panel"
       >
         <div className="h-full bg-accent" style={{ width: `${percent ?? 0}%` }} />
       </div>
@@ -417,7 +421,7 @@ function ExtractionCard({
           accent
         />
       </div>
-    </RoleCard>
+    </FlatSection>
   );
 }
 
@@ -460,9 +464,10 @@ interface ColonyRowProps {
  * One line per colony — status, soonest-extractor countdown, primary
  * product, pin count — that expands in place into the same
  * extraction/production/infrastructure cards the old per-colony panel always
- * rendered. Collapsed by default and single-open (`PlanetaryIndustry` owns
- * `expandedPlanetId`): a character with several colonies used to mean that
- * many full pin tables stacked on load, most of them mostly dashes.
+ * rendered. Collapsed by default, and any number can be open at once
+ * (`PlanetaryIndustry` owns `expandedKeys`): a character with several
+ * colonies used to mean that many full pin tables stacked on load, most of
+ * them mostly dashes, so nothing opens until asked for.
  *
  * `<h3><button>` is the APG disclosure/accordion shape — the heading keeps
  * the row locatable by its planet name (`getByRole('heading')`) without
@@ -573,13 +578,20 @@ function ColonyRow({
           onClick={onToggle}
           className="flex w-full flex-col gap-2 px-3 py-2.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1.5"
         >
-          <span className="truncate font-medium sm:w-32 sm:shrink-0">{planetName}</span>
-          <StatChip
-            label={t('pi.attentionLabel')}
-            value={t(`pi.attention.${attention}`)}
-            tone={ATTENTION_TONE[attention]}
-            className="shrink-0 self-start sm:self-auto"
-          />
+          {/* Below `sm` this collapses to 3 lines (name+status, the track,
+              expiry+product+pins+caret) instead of one field per line —
+              `sm:contents` drops these two grouping divs from layout at the
+              desktop breakpoint so their children rejoin the outer
+              `sm:flex-row` as flat siblings, unchanged from before. */}
+          <div className="flex items-center justify-between gap-2 sm:contents">
+            <span className="truncate font-medium sm:w-32 sm:shrink-0">{planetName}</span>
+            <StatChip
+              label={t('pi.attentionLabel')}
+              value={t(`pi.attention.${attention}`)}
+              tone={ATTENTION_TONE[attention]}
+              className="shrink-0"
+            />
+          </div>
           <span
             aria-hidden="true"
             className="h-1.5 w-full min-w-16 flex-1 overflow-hidden rounded-full bg-panel-2"
@@ -593,16 +605,18 @@ function ColonyRow({
               <span className="block h-full bg-accent" style={{ width: `${soonestPercent}%` }} />
             )}
           </span>
-          <span className="w-full truncate text-xs text-text-dim tabular-nums sm:w-44 sm:shrink-0">
-            {expiryLabel}
-          </span>
-          <span className="w-full truncate text-xs text-text-dim sm:w-40 sm:shrink-0">
-            {productLabel}
-          </span>
-          <span className="shrink-0 text-xs text-text-faint tabular-nums">
-            {t('pi.pinCount', { count: planet.num_pins })}
-          </span>
-          <Caret expanded={expanded} />
+          <div className="flex w-full items-center gap-3 sm:contents">
+            <span className="min-w-0 flex-1 truncate text-xs text-text-dim tabular-nums sm:w-44 sm:shrink-0 sm:flex-none">
+              {expiryLabel}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-xs text-text-dim sm:w-40 sm:shrink-0 sm:flex-none">
+              {productLabel}
+            </span>
+            <span className="shrink-0 text-xs text-text-faint tabular-nums">
+              {t('pi.pinCount', { count: planet.num_pins })}
+            </span>
+            <Caret expanded={expanded} />
+          </div>
         </button>
       </h3>
       {expanded && (
@@ -640,7 +654,7 @@ function ColonyRow({
             />
           </div>
           {detail && detail.pins.length > 0 ? (
-            <div className="space-y-3">
+            <div>
               {extractorPins.map((pin) => (
                 <ExtractionCard
                   key={pin.pin_id}
@@ -652,43 +666,51 @@ function ColonyRow({
                 />
               ))}
               {factoryGroups.length > 0 && (
-                <RoleCard title={t('pi.production.title')} padded={false}>
-                  {factoryGroups.map((group) => (
-                    <div
-                      key={String(group.schematicId)}
-                      className="flex items-center gap-2 border-b border-line px-3 py-2 text-sm last:border-b-0"
-                    >
-                      <Icon.Industry
-                        size={Icon.ICON_SIZE.sm}
-                        className="shrink-0 text-text-dim"
-                        aria-hidden="true"
-                      />
-                      <span className="flex-1 font-medium">
-                        {group.schematicId !== undefined
-                          ? (schematicNames.get(group.schematicId) ?? t('pi.unknownSchematic'))
-                          : t('pi.unknownSchematic')}
-                      </span>
-                      <span className="text-xs text-text-dim">
-                        {t('pi.production.facilitiesRunning', { count: group.count })}
-                      </span>
-                    </div>
-                  ))}
-                </RoleCard>
+                <FlatSection
+                  title={t('pi.production.title')}
+                  titleClassName={SECTION_EYEBROW_CLASS}
+                >
+                  <div className="space-y-1.5">
+                    {factoryGroups.map((group) => (
+                      <div
+                        key={String(group.schematicId)}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Icon.Industry
+                          size={Icon.ICON_SIZE.sm}
+                          className="shrink-0 text-text-dim"
+                          aria-hidden="true"
+                        />
+                        <span className="flex-1 truncate font-medium">
+                          {group.schematicId !== undefined
+                            ? (schematicNames.get(group.schematicId) ?? t('pi.unknownSchematic'))
+                            : t('pi.unknownSchematic')}
+                        </span>
+                        <span className="shrink-0 text-xs text-text-dim">
+                          {t('pi.production.facilitiesRunning', { count: group.count })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </FlatSection>
               )}
               {infrastructurePins.length > 0 && (
-                <RoleCard title={t('pi.infrastructure.title')}>
+                <FlatSection
+                  title={t('pi.infrastructure.title')}
+                  titleClassName={SECTION_EYEBROW_CLASS}
+                >
                   <div className="flex flex-wrap gap-2">
                     {infrastructurePins.map((pin) => (
                       <span
                         key={pin.pin_id}
-                        className="inline-flex items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2.5 py-1 text-xs text-text-dim"
+                        className="inline-flex items-center gap-1.5 rounded-xs border border-line px-2.5 py-1 text-xs text-text-dim"
                       >
                         <Icon.Container size={Icon.ICON_SIZE.sm} aria-hidden="true" />
                         {pinTypeName(pin, pinTypeNames)}
                       </span>
                     ))}
                   </div>
-                </RoleCard>
+                </FlatSection>
               )}
             </div>
           ) : (
@@ -750,10 +772,18 @@ export function PlanetaryIndustry() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadPiSnapshot);
-  // Single-open accordion: at most one colony's drilldown is on screen at a
-  // time. Keyed by `${characterId}:${planetId}`, not the planet id alone —
-  // two characters can each hold a colony on the same planet.
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  // Multi-open accordion: any number of colonies' drilldowns can be on
+  // screen at once. Keyed by `${characterId}:${planetId}`, not the planet id
+  // alone — two characters can each hold a colony on the same planet.
+  const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleExpandedKey = useCallback((key: string) => {
+    setExpandedKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
   // Off by default: appends every other Character's cache-only colonies
   // (features/pi/roster.ts) below the active Character's live ones, grouped
   // by character.
@@ -998,10 +1028,8 @@ export function PlanetaryIndustry() {
                           planet={planet}
                           detail={details.get(planet.planet_id)?.cached?.data ?? null}
                           status={statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS}
-                          expanded={expandedKey === key}
-                          onToggle={() =>
-                            setExpandedKey((current) => (current === key ? null : key))
-                          }
+                          expanded={expandedKeys.has(key)}
+                          onToggle={() => toggleExpandedKey(key)}
                           planetNames={planetNames}
                           pinTypeNames={pinTypeNames}
                           productNames={productNames}
@@ -1026,10 +1054,8 @@ export function PlanetaryIndustry() {
                             planet={colony.planet}
                             detail={colony.detail}
                             status={status}
-                            expanded={expandedKey === key}
-                            onToggle={() =>
-                              setExpandedKey((current) => (current === key ? null : key))
-                            }
+                            expanded={expandedKeys.has(key)}
+                            onToggle={() => toggleExpandedKey(key)}
                             planetNames={planetNames}
                             pinTypeNames={pinTypeNames}
                             productNames={productNames}

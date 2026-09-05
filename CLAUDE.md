@@ -1,7 +1,15 @@
 # NeoCom Desk — agent instructions
 
 - Architecture map: docs/ARCHITECTURE.md — read before locating or adding features.
-- Read `CONTEXT.md` first: glossary + scope decisions. Use its terms exactly.
+- Read `CONTEXT.md` first: the glossary. Use its terms exactly.
+- **Never append a scope decision to `CONTEXT.md`.** Scope decisions live one
+  per file in `docs/context/decisions/`, named `YYYYMMDD-HHMMSS-<slug>.md`.
+  Create one with `node scripts/new-decision.mjs "<title>" [--issue <n>]`.
+  Never number these files and never work out "the next" number for anything —
+  parallel `/next-ticket` agents all claim the same number, and appending to
+  one shared file conflicted on nearly every merge, which is exactly what this
+  layout removes. Genuinely new vocabulary still goes in `CONTEXT.md`'s
+  glossary. See `docs/context/decisions/README.md`.
 - Design tokens/components: `docs/DESIGN.md`. Decisions: `docs/adr/`.
 - TDD for all calculation/logic modules (`src/engine`, `src/auth`, industry
   math): failing test first, then code.
@@ -51,7 +59,8 @@ Default vocabulary; label string equals the canonical role name. See
 
 ### Domain docs
 
-Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
+Single-context: root `CONTEXT.md` (glossary) + `docs/context/decisions/`
+(scope decisions, one file each) + `docs/adr/`. See `docs/agents/domain.md`.
 
 ### Autonomous ticket loop
 

@@ -8,14 +8,16 @@ Implement the work described in the spec or ticket you were given. Do not reopen
 ## Beats, in order
 
 1. Explore in a **sub-agent** (`Agent`, `subagent_type: general-purpose`):
-   read the ticket or spec, `CONTEXT.md` for domain vocabulary, `docs/adr/`
+   read the ticket or spec, `CONTEXT.md` for domain vocabulary,
+   `docs/context/decisions/` (grep it — one file per past scope decision) and
+   `docs/adr/`
    for decisions that touch the code you're changing, and the existing code
    in the area (patterns to reuse, prefactoring that makes the change
    easy). This is read-heavy and one-shot — exactly the shape that pays for
    a sub-agent's own context instead of sitting in this one for the rest of
    the run. Have it report back: what to build, the **seams** to test at
    (name them if the ticket doesn't), the acceptance criteria, relevant
-   `CONTEXT.md`/ADR excerpts, and existing patterns/files to reuse. Don't
+   glossary/scope-decision/ADR excerpts, and existing patterns/files to reuse. Don't
    re-read what the report already gives you.
 2. Drive `/tdd` at the seams from that report — one red → green slice at a
    time. Calculation/logic modules (`src/engine`, `src/auth`, industry math)

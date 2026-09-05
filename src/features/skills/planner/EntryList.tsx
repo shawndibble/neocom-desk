@@ -24,17 +24,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
-  NativeSelect,
-  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { AttributeName, Attributes, PlanPriority, ScheduledStep } from '@/engine/types';
-import { formatDuration, stepTimeline } from '@/lib/duration';
+import { formatDuration, stepFinish } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
-import { resolveMoveTarget, type MergedRow, type MoveDirection } from './queueRows';
+import type { MergedRow } from './queueRows';
 import { remapInstruction } from './remapInstruction';
 
 /** A band header's grouping (#115): either mode carries enough to render its label. */
@@ -57,6 +55,12 @@ const TIME_CELL = 'w-24 shrink-0 whitespace-nowrap text-right';
  * a flex container to hold the level caret.
  */
 const NAME_CELL = 'flex min-w-0 flex-1 items-center gap-1.5';
+/**
+ * Stands in for a row's single trailing icon button (remove / promote), so the
+ * desktop column headers and the level breakdown keep their numbers in the
+ * same column as the rows above and below them.
+ */
+const ACTION_SPACER = 'w-7 shrink-0';
 /** Stands in for the level caret (`ICON_SIZE.sm`) on rows that have none, so names stay aligned. */
 const CARET_SPACER = 'w-4 shrink-0';
 /** Matches Layout.tsx's phone/desktop line (#114). */
@@ -102,43 +106,93 @@ function AttributePairBadge({ primary, secondary }: AttributePairBadgeProps) {
   );
 }
 
-interface PerLevelTimeCellProps {
-  seconds: number;
-  cumulativeSeconds: number;
-  /** Narrow layout only: cumulative time has no line of its own there, so this cell also carries it as a tooltip/long-press reveal (#114). */
-  showCumulativeTooltip: boolean;
+interface TimeCellProps {
+  /** Already-formatted duration or date — this cell only places it. */
+  value: string;
   /** PrereqRow's dimmed/italic `<li>` already colors its text; EntryRow's doesn't, so its cell dims itself. */
-  dim: boolean;
+  dim?: boolean;
+  /** Desktop columns are fixed-width so they line up under their headers; the narrow meta line packs its values inline instead. */
+  fixedWidth?: boolean;
 }
 
-function PerLevelTimeCell({
-  seconds,
-  cumulativeSeconds,
-  showCumulativeTooltip,
-  dim,
-}: PerLevelTimeCellProps) {
-  const { t } = useTranslation();
-  const cell = (
+/** One training-time value: a duration ("Takes") or a finish date ("Done by"). */
+function TimeCell({ value, dim = false, fixedWidth = true }: TimeCellProps) {
+  return (
     <span
-      className={`${TIME_CELL} tabular-nums ${dim ? 'text-text-dim' : ''}`}
-      // Tooltip.tsx requires a focusable trigger to reveal on keyboard focus,
-      // not just hover/touch (docs/DESIGN.md §6) — only needed when this
-      // cell actually carries the tooltip.
-      tabIndex={showCumulativeTooltip ? 0 : undefined}
+      className={`${fixedWidth ? TIME_CELL : 'shrink-0 whitespace-nowrap'} tabular-nums ${
+        dim ? 'text-text-dim' : ''
+      }`}
     >
-      {formatDuration(seconds)}
+      {value}
     </span>
   );
-  if (!showCumulativeTooltip) return cell;
+}
+
+/**
+ * A labelled value on the narrow layout's meta line. Below `md` the desktop
+ * column headers are gone, so each number carries its own label rather than
+ * hiding behind a tooltip the user has to discover (#114 shipped cumulative
+ * time that way, and it read as an unexplained second duration).
+ */
+function MetaValue({ label, value }: { label: string; value: string }) {
   return (
-    <Tooltip
-      content={t('plans.cumulativeTooltip', {
-        label: t('plans.columnCumulative'),
-        duration: formatDuration(cumulativeSeconds),
-      })}
-    >
-      {cell}
-    </Tooltip>
+    <span className="whitespace-nowrap tabular-nums">
+      <span className="text-text-faint">{label}</span> {value}
+    </span>
+  );
+}
+
+/**
+ * When this step finishes training, as a local calendar date. Falls back to the
+ * running total as a duration when the caller has no wall-clock basis to offer
+ * (`startDate` omitted) — the number is still true, just not yet a date.
+ */
+function doneByText(cumulativeSeconds: number, startDate: Date | undefined): string {
+  return startDate === undefined
+    ? formatDuration(cumulativeSeconds)
+    : formatLocalDate(stepFinish(cumulativeSeconds, startDate));
+}
+
+/** Priority pill tones — hierarchy by text weight only; status colors carry meaning here (docs/DESIGN.md §6). */
+const PRIORITY_TONE: Record<PlanPriority, string> = {
+  high: 'border-line-bright text-text',
+  normal: 'border-line text-text-dim',
+  low: 'border-line text-text-faint',
+};
+
+interface PriorityPillProps {
+  skillTypeID: number;
+  name: string;
+  priority: PlanPriority;
+  onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
+}
+
+/**
+ * An entry's priority (#27) as a menu behind a pill the size of the attribute
+ * badge beside it. Was a `NativeSelect`, whose native chrome made it the widest
+ * thing in the row by a distance and pushed every column after it out of line.
+ */
+function PriorityPill({ skillTypeID, name, priority, onSetPriority }: PriorityPillProps) {
+  const { t } = useTranslation();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={t('plans.priorityLabel', { name })}
+          className={`rounded-xs border px-1 text-[0.6875rem] tracking-wide uppercase hover:border-line-bright focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
+        >
+          {t(priorityLabelKey(priority))}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {PRIORITY_ORDER.map((option) => (
+          <DropdownMenuItem key={option} onSelect={() => onSetPriority(skillTypeID, option)}>
+            {t(priorityLabelKey(option))}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -182,56 +236,6 @@ function useRowSortable(id: string): SortableRowChrome {
   };
 }
 
-interface RowActionsMenuProps {
-  rowId: string;
-  /** The row's own name, for the trigger's accessible name — deliberately NOT "Move up/down", so it can never collide with EntryList.test.tsx's #223 guard against always-visible Up/Down buttons. */
-  name: string;
-  rows: readonly MergedRow[];
-  onReorder: (activeId: string, overId: string) => void;
-}
-
-/**
- * The non-drag reorder path (#408): a per-row overflow menu offering
- * move-up/move-down/move-to-top, each resolving to the sortable id a real
- * drag onto that position would produce and handed to the same `onReorder`
- * wiring — so it can never disagree with what dragging the row does. One
- * control, not #223's since-removed always-visible Up/Down pair, which cost
- * two 36px targets per row and squeezed the skill name on a phone.
- */
-function RowActionsMenu({ rowId, name, rows, onReorder }: RowActionsMenuProps) {
-  const { t } = useTranslation();
-
-  function targetFor(direction: MoveDirection): string | null {
-    return resolveMoveTarget(rows, rowId, direction);
-  }
-
-  function move(direction: MoveDirection) {
-    const target = targetFor(direction);
-    if (target) onReorder(rowId, target);
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="sm" className={ICON_BUTTON} aria-label={t('plans.rowActions', { name })}>
-          <Icon.More size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem disabled={targetFor('up') === null} onSelect={() => move('up')}>
-          {t('plans.moveUp')}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={targetFor('down') === null} onSelect={() => move('down')}>
-          {t('plans.moveDown')}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={targetFor('top') === null} onSelect={() => move('top')}>
-          {t('plans.moveToTop')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 /** A row's booster mark: shared by entry and prereq rows. */
 function BoosterMark() {
   const { t } = useTranslation();
@@ -247,15 +251,6 @@ function BoosterMark() {
   );
 }
 
-function TimelineLine({ start, finish }: { start: Date; finish: Date }) {
-  const { t } = useTranslation();
-  return (
-    <div className="mt-0.5 text-[0.625rem] tabular-nums text-text-dim">
-      {t('plans.stepTimeline', { start: formatLocalDate(start), finish: formatLocalDate(finish) })}
-    </div>
-  );
-}
-
 interface LevelBreakdownProps {
   /** The entry's own steps, one per level the plan trains (`steps[i]` at `stepIndices[i]`). */
   steps: readonly ScheduledStep[];
@@ -264,6 +259,8 @@ interface LevelBreakdownProps {
   columns: ColumnVisibility;
   isDesktop: boolean;
   boostedSteps: ReadonlySet<number> | undefined;
+  /** When training begins, so each level can show the date it finishes on. */
+  startDate: Date | undefined;
 }
 
 /**
@@ -274,12 +271,11 @@ interface LevelBreakdownProps {
  *
  * The per-level duration is always shown — it is the whole content of the
  * disclosure, and unlike the row above it, it is opened on request rather than
- * always on screen, so `columns.perLevelTime` doesn't gate it. The level's
- * running total follows the same fold as the row above (#114): its own column
- * on desktop, under a header naming it, and a tooltip on the duration below
- * `md`, where two unlabelled 6rem columns would neither fit a phone nor say
- * which number is which. `w-7` trails the line to clear the row's remove
- * button and keep the durations in their column.
+ * always on screen, so `columns.perLevelTime` doesn't gate it. The finish date
+ * follows the row above: its own column under the desktop header, and a
+ * labelled inline value below `md`, where a fixed 6rem column would not fit.
+ * `ACTION_SPACER` trails the line to clear the row's remove button and keep the
+ * numbers in their column.
  */
 function LevelBreakdown({
   steps,
@@ -288,6 +284,7 @@ function LevelBreakdown({
   columns,
   isDesktop,
   boostedSteps,
+  startDate,
 }: LevelBreakdownProps) {
   const { t } = useTranslation();
   return (
@@ -301,18 +298,25 @@ function LevelBreakdown({
             {ROMAN[step.level - 1]}
             {(boostedSteps?.has(stepIndices[i]) ?? false) && <BoosterMark />}
           </span>
-          <PerLevelTimeCell
-            seconds={step.seconds}
-            cumulativeSeconds={step.cumulativeSeconds}
-            showCumulativeTooltip={!isDesktop && columns.cumulativeTime}
-            dim={false}
-          />
-          {isDesktop && columns.cumulativeTime && (
-            <span className={`${TIME_CELL} tabular-nums`}>
-              {formatDuration(step.cumulativeSeconds)}
-            </span>
+          {isDesktop ? (
+            <>
+              <TimeCell value={formatDuration(step.seconds)} />
+              {columns.cumulativeTime && (
+                <TimeCell value={doneByText(step.cumulativeSeconds, startDate)} />
+              )}
+            </>
+          ) : (
+            <>
+              <TimeCell value={formatDuration(step.seconds)} fixedWidth={false} />
+              {columns.cumulativeTime && (
+                <MetaValue
+                  label={t('plans.columnDoneBy')}
+                  value={doneByText(step.cumulativeSeconds, startDate)}
+                />
+              )}
+            </>
           )}
-          <span aria-hidden="true" className="w-7 shrink-0" />
+          <span aria-hidden="true" className={ACTION_SPACER} />
         </li>
       ))}
     </ul>
@@ -325,14 +329,12 @@ interface EntryRowProps {
   attributes: AttributePair | undefined;
   /** Step indices a live Booster speeds up — the row's own mark and its per-level marks both read this. */
   boostedSteps: ReadonlySet<number> | undefined;
-  timeline: { start: Date; finish: Date } | null;
+  /** When training begins, for this row's finish date. Undefined when there's no wall-clock basis to offer. */
+  startDate: Date | undefined;
   columns: ColumnVisibility;
   isDesktop: boolean;
   /** Whether this row's level breakdown is open. Owned by EntryList so a row can be re-rendered/reordered without losing it. */
   expanded: boolean;
-  /** The full row list and reorder callback, for the row-actions menu's move-up/down/top (#408) — see RowActionsMenu. */
-  rows: readonly MergedRow[];
-  onReorder: (activeId: string, overId: string) => void;
   onToggleLevels: (rowId: string) => void;
   onRemove: (skillTypeID: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
@@ -352,12 +354,10 @@ const EntryRow = memo(function EntryRow({
   name,
   attributes,
   boostedSteps,
-  timeline,
+  startDate,
   columns,
   isDesktop,
   expanded,
-  rows,
-  onReorder,
   onToggleLevels,
   onRemove,
   onSetPriority,
@@ -431,22 +431,12 @@ const EntryRow = memo(function EntryRow({
     ) : null;
 
   const priorityControl = columns.priority ? (
-    <NativeSelect
-      size="sm"
-      aria-label={t('plans.priorityLabel', { name })}
-      value={entry.priority ?? 'normal'}
-      onChange={(e) => onSetPriority(entry.skillTypeID, e.target.value as PlanPriority)}
-    >
-      {PRIORITY_ORDER.map((priority) => (
-        <option key={priority} value={priority}>
-          {t(priorityLabelKey(priority))}
-        </option>
-      ))}
-    </NativeSelect>
-  ) : null;
-
-  const cumulativeTimeCell = columns.cumulativeTime ? (
-    <span className={`${TIME_CELL} tabular-nums`}>{formatDuration(row.cumulativeSeconds)}</span>
+    <PriorityPill
+      skillTypeID={entry.skillTypeID}
+      name={name}
+      priority={entry.priority ?? 'normal'}
+      onSetPriority={onSetPriority}
+    />
   ) : null;
 
   const removeButton = (
@@ -461,11 +451,29 @@ const EntryRow = memo(function EntryRow({
     </Button>
   );
 
-  const rowActions = (
-    <RowActionsMenu rowId={row.id} name={name} rows={rows} onReorder={onReorder} />
-  );
-
-  const hasSecondLine = Boolean(attributeBadge) || Boolean(priorityControl) || columns.perLevelTime;
+  /**
+   * Below `md` every optional value drops to one dim meta line under the name
+   * (#114), including the finish date — which used to ride line one and eat
+   * the width the skill name and its Booster mark needed. Line one is now the
+   * row's identity and its one action, nothing else, and the row still folds
+   * back to a single line when the user turns every optional column off.
+   */
+  const metaLine =
+    attributeBadge || priorityControl || columns.perLevelTime || columns.cumulativeTime ? (
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 text-[0.6875rem] text-text-dim">
+        {attributeBadge}
+        {priorityControl}
+        {columns.perLevelTime && (
+          <MetaValue label={t('plans.columnTakes')} value={formatDuration(row.seconds)} />
+        )}
+        {columns.cumulativeTime && (
+          <MetaValue
+            label={t('plans.columnDoneBy')}
+            value={doneByText(row.cumulativeSeconds, startDate)}
+          />
+        )}
+      </div>
+    ) : null;
 
   return (
     <li
@@ -481,44 +489,22 @@ const EntryRow = memo(function EntryRow({
           {nameSpan}
           {attributeBadge}
           {priorityControl}
-          {columns.perLevelTime && (
-            <PerLevelTimeCell
-              seconds={row.seconds}
-              cumulativeSeconds={row.cumulativeSeconds}
-              showCumulativeTooltip={false}
-              dim
-            />
+          {columns.perLevelTime && <TimeCell value={formatDuration(row.seconds)} dim />}
+          {columns.cumulativeTime && (
+            <TimeCell value={doneByText(row.cumulativeSeconds, startDate)} />
           )}
-          {cumulativeTimeCell}
           {removeButton}
-          {rowActions}
         </div>
       ) : (
         <>
           <div className="flex items-center justify-between gap-2">
             {dragHandle}
             {nameSpan}
-            {cumulativeTimeCell}
             {removeButton}
-            {rowActions}
           </div>
-          {hasSecondLine && (
-            <div className="mt-0.5 flex items-center gap-2 pl-6 text-[0.6875rem] text-text-dim">
-              {attributeBadge}
-              {priorityControl}
-              {columns.perLevelTime && (
-                <PerLevelTimeCell
-                  seconds={row.seconds}
-                  cumulativeSeconds={row.cumulativeSeconds}
-                  showCumulativeTooltip={columns.cumulativeTime}
-                  dim
-                />
-              )}
-            </div>
-          )}
+          {metaLine}
         </>
       )}
-      {timeline && <TimelineLine start={timeline.start} finish={timeline.finish} />}
       {expandable && expanded && (
         <LevelBreakdown
           steps={steps}
@@ -527,6 +513,7 @@ const EntryRow = memo(function EntryRow({
           columns={columns}
           isDesktop={isDesktop}
           boostedSteps={boostedSteps}
+          startDate={startDate}
         />
       )}
     </li>
@@ -538,7 +525,8 @@ interface PrereqRowProps {
   name: string;
   attributes: AttributePair | undefined;
   boosted: boolean;
-  timeline: { start: Date; finish: Date } | null;
+  /** When training begins, for this row's finish date. Undefined when there's no wall-clock basis to offer. */
+  startDate: Date | undefined;
   columns: ColumnVisibility;
   isDesktop: boolean;
   onPromote: (rowId: string) => void;
@@ -552,16 +540,13 @@ interface PrereqRowProps {
  * without guessing that a dimmed row can be dragged.
  *
  * Memoized (#408) like EntryRow — holds as long as `onPromote` is stable.
- * No row-actions menu here: a prereq row isn't user-owned data to reorder in
- * place (its "+"/drag already means "promote", not "move"); moving one
- * before promoting it isn't a case #408 asked for.
  */
 const PrereqRow = memo(function PrereqRow({
   row,
   name,
   attributes,
   boosted,
-  timeline,
+  startDate,
   columns,
   isDesktop,
   onPromote,
@@ -614,13 +599,23 @@ const PrereqRow = memo(function PrereqRow({
       <AttributePairBadge primary={attributes.primary} secondary={attributes.secondary} />
     ) : null;
 
-  const cumulativeTimeCell = columns.cumulativeTime ? (
-    <span className={`${TIME_CELL} tabular-nums`}>
-      {formatDuration(row.step.cumulativeSeconds)}
-    </span>
-  ) : null;
-
-  const hasSecondLine = Boolean(attributeBadge) || columns.perLevelTime;
+  // Same fold as EntryRow's: line one is the name and its one action, every
+  // optional value sits on the meta line below it.
+  const metaLine =
+    attributeBadge || columns.perLevelTime || columns.cumulativeTime ? (
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 text-[0.6875rem]">
+        {attributeBadge}
+        {columns.perLevelTime && (
+          <MetaValue label={t('plans.columnTakes')} value={formatDuration(row.step.seconds)} />
+        )}
+        {columns.cumulativeTime && (
+          <MetaValue
+            label={t('plans.columnDoneBy')}
+            value={doneByText(row.step.cumulativeSeconds, startDate)}
+          />
+        )}
+      </div>
+    ) : null;
 
   return (
     <li
@@ -635,15 +630,10 @@ const PrereqRow = memo(function PrereqRow({
           {dragHandle}
           {nameSpan}
           {attributeBadge}
-          {columns.perLevelTime && (
-            <PerLevelTimeCell
-              seconds={row.step.seconds}
-              cumulativeSeconds={row.step.cumulativeSeconds}
-              showCumulativeTooltip={false}
-              dim={false}
-            />
+          {columns.perLevelTime && <TimeCell value={formatDuration(row.step.seconds)} />}
+          {columns.cumulativeTime && (
+            <TimeCell value={doneByText(row.step.cumulativeSeconds, startDate)} />
           )}
-          {cumulativeTimeCell}
           {promoteButton}
         </div>
       ) : (
@@ -651,25 +641,11 @@ const PrereqRow = memo(function PrereqRow({
           <div className="flex items-center justify-between gap-2">
             {dragHandle}
             {nameSpan}
-            {cumulativeTimeCell}
             {promoteButton}
           </div>
-          {hasSecondLine && (
-            <div className="mt-0.5 flex items-center gap-2 pl-6 text-[0.6875rem]">
-              {attributeBadge}
-              {columns.perLevelTime && (
-                <PerLevelTimeCell
-                  seconds={row.step.seconds}
-                  cumulativeSeconds={row.step.cumulativeSeconds}
-                  showCumulativeTooltip={columns.cumulativeTime}
-                  dim={false}
-                />
-              )}
-            </div>
-          )}
+          {metaLine}
         </>
       )}
-      {timeline && <TimelineLine start={timeline.start} finish={timeline.finish} />}
     </li>
   );
 });
@@ -679,8 +655,6 @@ interface MarkerRowProps {
   markerIndex: number;
   /** This marker's target attribute spread — a manual override, or "Optimize at my markers"' result, once either is known. */
   attributes?: Attributes;
-  rows: readonly MergedRow[];
-  onReorder: (activeId: string, overId: string) => void;
   onRemove: (markerIndex: number) => void;
   /** Opens the manual attribute editor (RemapMarkerModal) for this marker. */
   onEdit: (markerIndex: number) => void;
@@ -703,8 +677,6 @@ const MarkerRow = memo(function MarkerRow({
   id,
   markerIndex,
   attributes,
-  rows,
-  onReorder,
   onRemove,
   onEdit,
 }: MarkerRowProps) {
@@ -757,7 +729,6 @@ const MarkerRow = memo(function MarkerRow({
       >
         <span aria-hidden="true">✕</span>
       </Button>
-      <RowActionsMenu rowId={id} name={t('plans.markerRow')} rows={rows} onReorder={onReorder} />
     </li>
   );
 });
@@ -774,7 +745,7 @@ interface EntryListProps {
   columns: ColumnVisibility;
   /** Step indices (into the underlying scheduled queue) a live Booster speeds up. */
   boostedSteps?: ReadonlySet<number>;
-  /** When training begins, for each row's start/finish line (#20). Omitted when there's no wall-clock basis to offer. */
+  /** When training begins, for each row's finish date (#20). Omitted when there's no wall-clock basis to offer — rows then fall back to a running total. */
   startDate?: Date;
   onReorder: (activeId: string, overId: string) => void;
   onRemove: (skillTypeID: number) => void;
@@ -871,12 +842,12 @@ export function EntryList({
           {isDesktop && (columns.perLevelTime || columns.cumulativeTime) && (
             <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
               <span className="flex-1" />
-              {columns.perLevelTime && (
-                <span className={TIME_CELL}>{t('plans.columnPerLevel')}</span>
-              )}
+              {columns.perLevelTime && <span className={TIME_CELL}>{t('plans.columnTakes')}</span>}
               {columns.cumulativeTime && (
-                <span className={TIME_CELL}>{t('plans.columnCumulative')}</span>
+                <span className={TIME_CELL}>{t('plans.columnDoneBy')}</span>
               )}
+              {/* Clears each row's trailing remove/promote button, so the headers sit over their own columns. */}
+              <span aria-hidden="true" className={ACTION_SPACER} />
             </div>
           )}
           <ul>
@@ -891,19 +862,10 @@ export function EntryList({
                       name={nameFor(row.entry.skillTypeID)}
                       attributes={attributesFor(row.entry.skillTypeID)}
                       boostedSteps={boostedSteps}
-                      timeline={
-                        startDate && row.stepIndices.length > 0
-                          ? stepTimeline(
-                              { seconds: row.seconds, cumulativeSeconds: row.cumulativeSeconds },
-                              startDate
-                            )
-                          : null
-                      }
+                      startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
                       expanded={expandedRowIds.has(row.id)}
-                      rows={rows}
-                      onReorder={onReorder}
                       onToggleLevels={toggleLevels}
                       onRemove={onRemove}
                       onSetPriority={onSetPriority}
@@ -915,7 +877,7 @@ export function EntryList({
                       name={nameFor(row.step.skillTypeID)}
                       attributes={attributesFor(row.step.skillTypeID)}
                       boosted={boostedSteps?.has(row.stepIndex) ?? false}
-                      timeline={startDate ? stepTimeline(row.step, startDate) : null}
+                      startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
                       onPromote={onPromotePrereq}
@@ -926,8 +888,6 @@ export function EntryList({
                       id={row.id}
                       markerIndex={row.markerIndex}
                       attributes={markerAttributesFor?.(row.markerIndex)}
-                      rows={rows}
-                      onReorder={onReorder}
                       onRemove={onRemoveMarker}
                       onEdit={onEditMarker}
                     />

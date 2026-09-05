@@ -355,7 +355,7 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
             >
               {COLONY_SPACES.map((candidate) => (
                 <option key={candidate} value={candidate}>
-                  {t(`piPlan.spaceOption.${candidate}`)}
+                  {t(`common.spaceOption.${candidate}`)}
                 </option>
               ))}
             </NativeSelect>

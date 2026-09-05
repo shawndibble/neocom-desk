@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -8,6 +8,7 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -82,6 +83,7 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  usePublicInfoModalStore.setState({ request: null });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -99,10 +101,11 @@ describe('Contracts', () => {
   it('renders every page from mocked ESI with resolved issuer name and a humanized status', async () => {
     render(<App />);
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
-    expect(screen.getByText('Courier')).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    expect(within(table).getByText('Courier')).toBeInTheDocument();
     expect(screen.getAllByText(/Some Trader/).length).toBe(2);
-    expect(screen.getByText('Outstanding')).toBeInTheDocument();
-    expect(screen.getByText('Finished')).toBeInTheDocument();
+    expect(within(table).getByText('Outstanding')).toBeInTheDocument();
+    expect(within(table).getByText('Finished')).toBeInTheDocument();
   });
 
   it('dims only a lapsed, unclaimed contract — not a finished one whose deadline has simply passed', async () => {
@@ -128,16 +131,17 @@ describe('Contracts', () => {
     );
     render(<App />);
     await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
 
-    const freshRow = screen.getByText('Rifter fit').closest('tr');
+    const freshRow = within(table).getByText('Rifter fit').closest('tr');
     expect(freshRow).not.toHaveClass('opacity-50');
 
-    const staleRow = screen.getByText('Lapsed offer').closest('tr');
+    const staleRow = within(table).getByText('Lapsed offer').closest('tr');
     expect(staleRow).toHaveClass('opacity-50');
 
     // Finished, with a deadline in the past — no longer dims (issue: was
     // status-blind, so almost every completed contract dimmed).
-    const finishedRow = screen.getByText('Courier').closest('tr');
+    const finishedRow = within(table).getByText('Courier').closest('tr');
     expect(finishedRow).not.toHaveClass('opacity-50');
   });
 
@@ -189,5 +193,79 @@ describe('Contracts', () => {
     render(<App />);
     expect(await screen.findByText('Log in again to see your contracts')).toBeInTheDocument();
     expect(screen.queryByText(/no contracts cached/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('Contracts market/issuer links and filters (issue #417)', () => {
+  it('issuer name opens the shared Public Info Modal', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/500001`, () =>
+        HttpResponse.json({
+          name: 'Some Trader',
+          birthday: '2020-01-01T00:00:00Z',
+          bloodline_id: 1,
+          gender: 'male',
+          race_id: 1,
+          security_status: 1.5,
+        })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    const [issuerButton] = within(table).getAllByRole('button', { name: 'Some Trader' });
+    await user.click(issuerButton);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('tab', { name: 'Character' })).toBeInTheDocument();
+  });
+
+  it('a status filter chip narrows the table to matching rows', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    expect(within(table).getByText('Courier')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Outstanding' }));
+
+    expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
+    expect(within(table).queryByText('Courier')).not.toBeInTheDocument();
+  });
+
+  it('search narrows contracts by title', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+
+    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'rifter');
+
+    expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
+    expect(within(table).queryByText('Courier')).not.toBeInTheDocument();
+  });
+
+  it('the truncation notice has a retry action', async () => {
+    let page2Requests = 0;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        if (page === '2') {
+          page2Requests += 1;
+          return new HttpResponse(null, { status: 404 });
+        }
+        return HttpResponse.json(contractPage1, { headers: { 'X-Pages': '2' } });
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
+    const requestsBeforeRetry = page2Requests;
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(page2Requests).toBeGreaterThan(requestsBeforeRetry));
   });
 });

@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { ContractDetailModal } from './ContractDetailModal';
+import { ContractDetailModal, type ContractDetailModalProps } from './ContractDetailModal';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import type { Contract } from '@/esi/endpoints';
 
 vi.mock('@/sde/loadSde', () => ({
@@ -52,11 +54,21 @@ const COURIER: Contract = {
   days_to_complete: 3,
 };
 
+/** `MarketItemLink` needs a router context — same wrapper `ImplantChip.test.tsx` uses. */
+function renderModal(props: ContractDetailModalProps) {
+  return render(
+    <MemoryRouter>
+      <ContractDetailModal {...props} />
+    </MemoryRouter>
+  );
+}
+
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  usePublicInfoModalStore.setState({ request: null });
 });
 afterEach(() => {
   server.resetHandlers();
@@ -72,14 +84,12 @@ describe('ContractDetailModal', () => {
         HttpResponse.json([])
       )
     );
-    render(
-      <ContractDetailModal
-        characterId={CHAR_ID}
-        contract={ITEM_EXCHANGE}
-        issuerName="Mero Otichoda"
-        onClose={() => {}}
-      />
-    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
     expect(screen.getByRole('dialog', { name: 'Item Exchange' })).toBeInTheDocument();
     expect(screen.getByText('Finished (Contractor)')).toBeInTheDocument();
     expect(screen.getByText('Mero Otichoda')).toBeInTheDocument();
@@ -100,14 +110,12 @@ describe('ContractDetailModal', () => {
         HttpResponse.json([])
       )
     );
-    render(
-      <ContractDetailModal
-        characterId={CHAR_ID}
-        contract={ITEM_EXCHANGE}
-        issuerName="Mero Otichoda"
-        onClose={() => {}}
-      />
-    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
     expect(await screen.findByText('Tycho Brahe 18 HQ')).toBeInTheDocument();
   });
 
@@ -123,14 +131,12 @@ describe('ContractDetailModal', () => {
         ])
       )
     );
-    render(
-      <ContractDetailModal
-        characterId={CHAR_ID}
-        contract={ITEM_EXCHANGE}
-        issuerName="Mero Otichoda"
-        onClose={() => {}}
-      />
-    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
     const included = await screen.findByRole('table', { name: 'Included' });
     expect(within(included).getByText('744')).toBeInTheDocument();
     const requested = screen.getByRole('table', { name: 'Requested' });
@@ -155,30 +161,59 @@ describe('ContractDetailModal', () => {
         ])
       )
     );
-    render(
-      <ContractDetailModal
-        characterId={CHAR_ID}
-        contract={ITEM_EXCHANGE}
-        issuerName="Mero Otichoda"
-        onClose={() => {}}
-      />
-    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
     expect(await screen.findByRole('table', { name: 'Included' })).not.toHaveClass('dt-stack');
     expect(screen.getByRole('table', { name: 'Requested' })).not.toHaveClass('dt-stack');
   });
 
   it('never fetches items for a courier contract, and shows its own fields', () => {
-    render(
-      <ContractDetailModal
-        characterId={CHAR_ID}
-        contract={COURIER}
-        issuerName="Mero Otichoda"
-        onClose={() => {}}
-      />
-    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: COURIER,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
     expect(screen.getByText('500,000.00')).toBeInTheDocument();
     expect(screen.getByText('1,000,000.00')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('links an item-exchange line item through to Market (issue #417)', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([
+          { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+        ])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    const link = await screen.findByRole('link', { name: /Tritanium/ });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/market?'));
+  });
+
+  it('issuer name opens the shared Public Info Modal (issue #417)', () => {
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Mero Otichoda' }));
+    expect(usePublicInfoModalStore.getState().request).toEqual({
+      kind: 'character',
+      id: ITEM_EXCHANGE.issuer_id,
+    });
   });
 });

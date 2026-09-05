@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_COLUMN_VISIBILITY, isColumnVisibility } from './columnPreference';
+import {
+  COLUMN_VISIBILITY_SETTING_KEY,
+  DEFAULT_COLUMN_VISIBILITY,
+  isColumnVisibility,
+} from './columnPreference';
 
 describe('isColumnVisibility', () => {
   it('accepts a fully-populated boolean record', () => {
@@ -29,5 +33,18 @@ describe('isColumnVisibility', () => {
 
   it('rejects an object with a non-boolean value', () => {
     expect(isColumnVisibility({ ...DEFAULT_COLUMN_VISIBILITY, priority: 'yes' })).toBe(false);
+  });
+});
+
+describe('DEFAULT_COLUMN_VISIBILITY', () => {
+  it('leaves priority off — an editing control in a list built for scanning', () => {
+    expect(DEFAULT_COLUMN_VISIBILITY.priority).toBe(false);
+    expect(DEFAULT_COLUMN_VISIBILITY.attributePair).toBe(true);
+    expect(DEFAULT_COLUMN_VISIBILITY.perLevelTime).toBe(true);
+    expect(DEFAULT_COLUMN_VISIBILITY.cumulativeTime).toBe(true);
+  });
+
+  it('reads from a versioned key, so a device holding the old defaults picks these up', () => {
+    expect(COLUMN_VISIBILITY_SETTING_KEY).not.toBe('planColumnVisibility');
   });
 });

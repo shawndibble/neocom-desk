@@ -17,15 +17,10 @@ export function formatDuration(totalSeconds: number): string {
 }
 
 /**
- * Wall-clock start/finish for a scheduled step, derived from the same
- * `seconds`/`cumulativeSeconds` the training-time columns already show —
- * never re-derived a second way, so the two can't disagree.
+ * Wall-clock finish for a scheduled step, derived from the same
+ * `cumulativeSeconds` the training-time column already shows — never
+ * re-derived a second way, so the two can't disagree.
  */
-export function stepTimeline(
-  step: { seconds: number; cumulativeSeconds: number },
-  startDate: Date
-): { start: Date; finish: Date } {
-  const finish = new Date(startDate.getTime() + step.cumulativeSeconds * 1000);
-  const start = new Date(finish.getTime() - step.seconds * 1000);
-  return { start, finish };
+export function stepFinish(cumulativeSeconds: number, startDate: Date): Date {
+  return new Date(startDate.getTime() + cumulativeSeconds * 1000);
 }

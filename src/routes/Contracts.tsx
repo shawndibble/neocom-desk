@@ -2,21 +2,33 @@ import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
+  FilterChip,
   IconButton,
   PageHeader,
   Panel,
   ReauthBanner,
+  SearchInput,
   Spinner,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContracts } from '@/features/character/contracts';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
+import { IssuerLink } from '@/features/character/IssuerLink';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
+import {
+  contractStatusOptions,
+  contractTypeOptions,
+  filterContracts,
+  EMPTY_CONTRACTS_FILTER,
+  type ContractsFilter,
+} from '@/features/character/contractsFilter';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -47,6 +59,9 @@ const STATUS_TONE: Record<Contract['status'], string> = {
   reversed: 'text-danger',
 };
 
+/** Rows shown before "show all" (same precedent as the market order book). */
+const ROW_CAP = 50;
+
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 
@@ -76,6 +91,49 @@ async function loadContractsSnapshot(
   return { contractsResult, contractsNeedsReauth, contractsTruncated, issuerNames };
 }
 
+interface ContractsFilterBarProps {
+  filter: ContractsFilter;
+  onChange: (filter: ContractsFilter) => void;
+  statusOptions: Contract['status'][];
+  typeOptions: Contract['type'][];
+}
+
+/** Search plus status/type filter chips above the contracts table (issue #417). */
+function ContractsFilterBar({
+  filter,
+  onChange,
+  statusOptions,
+  typeOptions,
+}: ContractsFilterBarProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+      <SearchInput
+        value={filter.text}
+        onChange={(event) => onChange({ ...filter, text: event.target.value })}
+        placeholder={t('contracts.searchPlaceholder')}
+        className="min-w-48 flex-1"
+      />
+      {statusOptions.map((status) => (
+        <FilterChip
+          key={status}
+          label={t(CONTRACT_STATUS_KEY[status])}
+          selected={filter.status === status}
+          onToggle={() => onChange({ ...filter, status: filter.status === status ? null : status })}
+        />
+      ))}
+      {typeOptions.map((type) => (
+        <FilterChip
+          key={type}
+          label={t(CONTRACT_TYPE_KEY[type])}
+          selected={filter.type === type}
+          onToggle={() => onChange({ ...filter, type: filter.type === type ? null : type })}
+        />
+      ))}
+    </div>
+  );
+}
+
 /** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
@@ -88,6 +146,8 @@ export function Contracts() {
   const issuerNames = data?.issuerNames ?? NO_NAMES;
 
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [filter, setFilter] = useState<ContractsFilter>(EMPTY_CONTRACTS_FILTER);
+  const [showAll, setShowAll] = useState(false);
 
   const columns = useMemo<DataTableColumn<Contract>[]>(
     () => [
@@ -109,12 +169,27 @@ export function Contracts() {
         header: t('contracts.status'),
         className: 'font-semibold',
         cellClassName: (contract) => STATUS_TONE[contract.status],
-        render: (contract) => t(CONTRACT_STATUS_KEY[contract.status]),
+        render: (contract) => {
+          const label = t(CONTRACT_STATUS_KEY[contract.status]);
+          return isStale(contract) ? (
+            <Tooltip content={t('contracts.staleTooltip')}>
+              <span>{label}</span>
+            </Tooltip>
+          ) : (
+            label
+          );
+        },
       },
       {
         id: 'issuer',
         header: t('contracts.issuer'),
-        render: (contract) => issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`,
+        render: (contract) => (
+          <IssuerLink
+            issuerId={contract.issuer_id}
+            name={issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`}
+            className="text-left"
+          />
+        ),
       },
       {
         id: 'price',
@@ -144,6 +219,14 @@ export function Contracts() {
     [contractsResult]
   );
 
+  const statusOptions = useMemo(() => contractStatusOptions(contracts), [contracts]);
+  const typeOptions = useMemo(() => contractTypeOptions(contracts), [contracts]);
+  const filteredContracts = useMemo(
+    () => filterContracts(contracts, filter, issuerNames),
+    [contracts, filter, issuerNames]
+  );
+  const visibleContracts = showAll ? filteredContracts : filteredContracts.slice(0, ROW_CAP);
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -163,11 +246,11 @@ export function Contracts() {
             <IconButton
               icon={<Icon.Download />}
               label={t('contracts.exportCsv')}
-              disabled={contracts.length === 0}
+              disabled={filteredContracts.length === 0}
               onClick={() =>
                 downloadCsv(
                   'contracts',
-                  contracts,
+                  filteredContracts,
                   contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`),
                   new Date(),
                   contractsTruncated
@@ -207,17 +290,39 @@ export function Contracts() {
             </p>
           )}
           {contractsTruncated && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')}
+            <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+              <span>{t('common.incompleteTitle')}</span>
+              <Button size="sm" disabled={loading} onClick={refresh}>
+                {t('contracts.fetchTruncatedRetry')}
+              </Button>
             </p>
           )}
-          <DataTable
-            label={t('contracts.title')}
-            columns={columns}
-            rows={contracts}
-            rowKey={(contract) => contract.contract_id}
-            rowClassName={(contract) => (isStale(contract) ? 'opacity-50' : undefined)}
+          <ContractsFilterBar
+            filter={filter}
+            onChange={setFilter}
+            statusOptions={statusOptions}
+            typeOptions={typeOptions}
           />
+          {filteredContracts.length === 0 ? (
+            <EmptyState title={t('contracts.noFilterMatches')} className="py-8" />
+          ) : (
+            <>
+              <DataTable
+                label={t('contracts.title')}
+                columns={columns}
+                rows={visibleContracts}
+                rowKey={(contract) => contract.contract_id}
+                rowClassName={(contract) => (isStale(contract) ? 'opacity-50' : undefined)}
+              />
+              {!showAll && filteredContracts.length > ROW_CAP && (
+                <div className="px-3 py-2">
+                  <Button size="sm" onClick={() => setShowAll(true)}>
+                    {t('contracts.showAll', { count: filteredContracts.length })}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </Panel>
       )}
 
