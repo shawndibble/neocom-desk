@@ -204,6 +204,15 @@ function builtAdvice(
   };
 }
 
+/**
+ * Every P0 a planet of this type yields, in payload order. One derivation, so
+ * the resources an unbuilt card names and the ones a built card's build advice
+ * is scored against cannot drift apart.
+ */
+export function localResourcesFor(planetType: PlanetType, pi: PiData): PiRawResource[] {
+  return pi.raw.filter((resource) => resource.planetTypes.includes(planetType));
+}
+
 /** Ordered so the cards carrying real numbers lead, then the ones that could. */
 const KIND_ORDER: Record<PlanetAdvice['kind'], number> = {
   built: 0,
@@ -253,7 +262,7 @@ export function systemAdvice(input: SystemAdviceInput, pi: PiData): PlanetAdvice
       planetId: planet.planetId,
       name: planet.name,
       planetType,
-      localResources: pi.raw.filter((resource) => resource.planetTypes.includes(planetType)),
+      localResources: localResourcesFor(planetType, pi),
     };
   });
 

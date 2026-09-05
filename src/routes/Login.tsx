@@ -121,7 +121,7 @@ export function Login() {
           <div className="flex flex-wrap items-center gap-3 border-b border-line pb-3">
             <div
               aria-hidden="true"
-              className={`${characterAvatarBoxClassName('lg')} border-line bg-gradient-to-br from-accent-dim to-panel-2`}
+              className={`${characterAvatarBoxClassName('lg')} border-line bg-panel-2`}
             />
             <div className="min-w-0 flex-1 basis-48">
               <p className="truncate text-sm font-semibold tracking-widest uppercase">
