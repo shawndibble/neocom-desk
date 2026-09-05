@@ -62,6 +62,15 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      // Doc id is "{characterId}:{planetId}" (planSync.ts planetRichnessId).
+      match /planetRichness/{richnessId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
       match /settings/{key} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();

@@ -36,20 +36,29 @@ import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { MaterialsTable } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
-import { bulkOwnedStockSuggestions } from '@/engine/industry/ownedStock';
+import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
   stockLocationLabel,
   type OwnedStockDetection,
   type OwnedStockSnapshot,
 } from './ownedStockDetection';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
+import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { ResultsSummary } from './ResultsSummary';
 
 /** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
 export type PlanPatch = Partial<
   Pick<
     BuildPlanRecord,
-    'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'hubId' | 'facilityTaxPct'
+    | 'runs'
+    | 'me'
+    | 'te'
+    | 'facility'
+    | 'rigLevel'
+    | 'security'
+    | 'hubId'
+    | 'facilityTaxPct'
+    | 'ownedStockScope'
   >
 >;
 
@@ -189,15 +198,23 @@ export function BuildPlanDetail({
     incompleteCharacters,
   } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
 
+  // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
+  // itself stays the full, galaxy-wide picture the breakdown popover shows.
+  const scopedStock = useMemo(
+    () => filterStockByScope(detectedStock, plan.ownedStockScope),
+    [detectedStock, plan.ownedStockScope]
+  );
+
   const detection = useMemo<OwnedStockDetection>(
     () => ({
       stockFor: (typeID) => detectedStock.get(typeID),
+      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
       lowerBound: incompleteCharacters.length > 0,
       incompleteCharacters,
       characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
       locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
     }),
-    [detectedStock, characterNames, locationNames, incompleteCharacters, t]
+    [detectedStock, scopedStock, characterNames, locationNames, incompleteCharacters, t]
   );
 
   const { result, error } = useMemo(() => {
@@ -233,10 +250,10 @@ export function BuildPlanDetail({
   // row means it.
   const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
     () =>
-      bulkOwnedStockSuggestions(result?.materials ?? [], plan.materialSourcing, detectedStock).map(
+      bulkOwnedStockSuggestions(result?.materials ?? [], plan.materialSourcing, scopedStock).map(
         ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
       ),
-    [result, plan.materialSourcing, detectedStock]
+    [result, plan.materialSourcing, scopedStock]
   );
 
   /**
@@ -482,6 +499,13 @@ export function BuildPlanDetail({
                   />
                 </div>
               )}
+
+              <OwnedStockScopeControl
+                scope={plan.ownedStockScope}
+                detectedStock={detectedStock}
+                detection={detection}
+                onChange={(ownedStockScope) => update({ ownedStockScope })}
+              />
             </div>
           </div>
         </div>
