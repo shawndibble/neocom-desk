@@ -10,6 +10,8 @@ export interface ParsedMarketParams {
   typeId: number | null;
   hubId: string | null;
   regionId: number | null;
+  /** A Market Group to land expanded-open on — independent of typeId/location. */
+  groupId: number | null;
 }
 
 export type MarketLocationParam =
@@ -30,6 +32,7 @@ export function parseMarketParams(get: (key: string) => string | null): ParsedMa
     typeId: parsePositiveInt(get('type')),
     hubId: nonEmpty(get('hub')),
     regionId: parsePositiveInt(get('region')),
+    groupId: parsePositiveInt(get('group')),
   };
 }
 
@@ -42,6 +45,14 @@ export function buildMarketParams(
   if (location.mode === 'hub') params.hub = location.hubId;
   else params.region = String(location.regionId);
   return params;
+}
+
+/**
+ * A bare `?group=` cross-link: no typeId, no location — the caller has
+ * neither, and Market Browser's own Location Mode default already covers it.
+ */
+export function buildMarketGroupParams(groupId: number): Record<string, string> {
+  return { group: String(groupId) };
 }
 
 /**

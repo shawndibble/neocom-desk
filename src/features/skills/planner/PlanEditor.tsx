@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -116,6 +117,11 @@ import {
 } from './planBooster';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 import { attributeShort, remapInstruction } from './remapInstruction';
+import {
+  ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID,
+  BOOSTER_MARKET_GROUP_ID,
+} from './plannerMarketGroups';
+import { buildMarketGroupParams } from '@/engine/market/urlState';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
@@ -242,6 +248,7 @@ export function PlanEditor({
   onUpdate,
 }: PlanEditorProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   // Which side the tools pane lands on, and whether the entry list gets its
   // own capped scroller — the same hook the rest of the app's two-column
   // layouts switch on, so this pane can never disagree with them.
@@ -406,6 +413,23 @@ export function PlanEditor({
 
   const nameFor = (skillTypeID: number): string =>
     catalog.bySkillTypeID.get(skillTypeID)?.name ?? `#${skillTypeID}`;
+
+  /** A cross-link into Market Browser, landed pre-expanded to the given category. */
+  function marketGroupLink(label: string, marketGroupId: number) {
+    return (
+      <IconButton
+        icon={<Icon.Market size={Icon.ICON_SIZE.sm} />}
+        label={label}
+        onClick={() =>
+          navigate(
+            `/market?${new URLSearchParams(buildMarketGroupParams(marketGroupId)).toString()}`
+          )
+        }
+        size="sm"
+        variant="plain"
+      />
+    );
+  }
 
   const attributesFor = (
     skillTypeID: number
@@ -1156,34 +1180,37 @@ export function PlanEditor({
             </p>
           )}
 
-          <label className="flex items-center justify-between gap-2">
-            {t('plans.whatIfImplants')}
-            <NativeSelect
-              size="md"
-              value={whatIf.kind === 'custom' ? 'custom' : whatIf.preset}
-              onChange={(e) => {
-                const value = e.target.value;
-                // 'custom' is a readout of the grid below, never a thing to
-                // pick — it is only in the list while it is already the state.
-                if (value !== 'custom') {
-                  setWhatIf({ kind: 'preset', preset: value as WhatIfImplantPreset });
-                }
-              }}
-            >
-              {WHAT_IF_IMPLANT_PRESETS.map((preset) => (
-                <option key={preset} value={preset}>
-                  {preset === 'none'
-                    ? t('plans.whatIfNone')
-                    : preset === 'current'
-                      ? t('plans.whatIfCurrent')
-                      : preset}
-                </option>
-              ))}
-              {whatIf.kind === 'custom' && (
-                <option value="custom">{t('plans.whatIfCustom')}</option>
-              )}
-            </NativeSelect>
-          </label>
+          <div className="flex items-center gap-1">
+            <label className="flex flex-1 items-center justify-between gap-2">
+              {t('plans.whatIfImplants')}
+              <NativeSelect
+                size="md"
+                value={whatIf.kind === 'custom' ? 'custom' : whatIf.preset}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // 'custom' is a readout of the grid below, never a thing to
+                  // pick — it is only in the list while it is already the state.
+                  if (value !== 'custom') {
+                    setWhatIf({ kind: 'preset', preset: value as WhatIfImplantPreset });
+                  }
+                }}
+              >
+                {WHAT_IF_IMPLANT_PRESETS.map((preset) => (
+                  <option key={preset} value={preset}>
+                    {preset === 'none'
+                      ? t('plans.whatIfNone')
+                      : preset === 'current'
+                        ? t('plans.whatIfCurrent')
+                        : preset}
+                  </option>
+                ))}
+                {whatIf.kind === 'custom' && (
+                  <option value="custom">{t('plans.whatIfCustom')}</option>
+                )}
+              </NativeSelect>
+            </label>
+            {marketGroupLink(t('plans.whatIfMarketLink'), ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID)}
+          </div>
 
           {/* EVE's hardwirings are per slot (+4 PER / +5 INT / nothing in
               CHA), which a uniform preset cannot say. One row of five, always
@@ -1227,14 +1254,17 @@ export function PlanEditor({
             ))}
           </div>
 
-          <label className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={planBooster.enabled}
-              onChange={(e) => patchBooster({ enabled: e.target.checked })}
-            />
-            {t('plans.booster')}
-          </label>
+          <div className="flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={planBooster.enabled}
+                onChange={(e) => patchBooster({ enabled: e.target.checked })}
+              />
+              {t('plans.booster')}
+            </label>
+            {marketGroupLink(t('plans.boosterMarketLink'), BOOSTER_MARKET_GROUP_ID)}
+          </div>
           {/* Outside the checkbox's own block on purpose: unticking it is a
               legitimate answer ("that accelerator is gone"), and the reason
               the sheet was corrected has to survive that. */}
