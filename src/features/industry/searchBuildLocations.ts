@@ -17,6 +17,7 @@ import { getCharacterSearch } from '@/esi/endpoints';
 import { loadStationSummary } from '@/features/character/stations';
 import { loadStructureSummary } from '@/features/character/structures';
 import { loadSystemName, loadSystemSecurity } from '@/features/character/systemSecurity';
+import type { IndustryActivity } from '@/engine/industry/types';
 import {
   buildLocationOptions,
   type BuildLocationOption,
@@ -49,6 +50,7 @@ function interleave(stations: readonly number[], structures: readonly number[]):
 export async function searchBuildLocations(
   characterId: number,
   query: string,
+  activity: IndustryActivity,
   signal?: AbortSignal
 ): Promise<BuildLocationOption[]> {
   const trimmed = query.trim();
@@ -91,5 +93,5 @@ export async function searchBuildLocations(
     })
   );
 
-  return buildLocationOptions(places, systems);
+  return buildLocationOptions(places, systems, activity);
 }

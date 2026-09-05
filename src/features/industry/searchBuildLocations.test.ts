@@ -77,7 +77,7 @@ describe('searchBuildLocations', () => {
   it('turns a structure hit into every field picking it would set', async () => {
     server.use(searchHandler({ structure: [AZBEL_ID] }), structureHandler, systemHandler);
 
-    expect(await searchBuildLocations(CHAR_ID, 'K2-18')).toEqual([
+    expect(await searchBuildLocations(CHAR_ID, 'K2-18', 'manufacturing')).toEqual([
       {
         structureId: AZBEL_ID,
         name: 'K2-18 R&D',
@@ -92,7 +92,7 @@ describe('searchBuildLocations', () => {
   it('finds NPC stations too, as the npcStation facility', async () => {
     server.use(searchHandler({ station: [JITA_44] }), stationHandler, systemHandler);
 
-    const [found] = await searchBuildLocations(CHAR_ID, 'Jita IV');
+    const [found] = await searchBuildLocations(CHAR_ID, 'Jita IV', 'manufacturing');
 
     expect(found).toMatchObject({
       facility: 'npcStation',
@@ -109,7 +109,7 @@ describe('searchBuildLocations', () => {
       systemHandler
     );
 
-    const found = await searchBuildLocations(CHAR_ID, 'K2-18');
+    const found = await searchBuildLocations(CHAR_ID, 'K2-18', 'manufacturing');
 
     expect(found.map((o) => o.name)).toEqual(['K2-18 R&D']);
   });
@@ -130,9 +130,9 @@ describe('searchBuildLocations', () => {
       systemHandler
     );
 
-    expect((await searchBuildLocations(CHAR_ID, 'K2-18')).map((o) => o.name)).toEqual([
-      'K2-18 R&D',
-    ]);
+    expect(
+      (await searchBuildLocations(CHAR_ID, 'K2-18', 'manufacturing')).map((o) => o.name)
+    ).toEqual(['K2-18 R&D']);
   });
 
   it('caps the lookups across both categories, not once each', async () => {
@@ -163,7 +163,7 @@ describe('searchBuildLocations', () => {
       systemHandler
     );
 
-    const found = await searchBuildLocations(CHAR_ID, 'Common');
+    const found = await searchBuildLocations(CHAR_ID, 'Common', 'manufacturing');
 
     expect(lookups).toBe(15);
     expect(found).toHaveLength(15);
@@ -183,20 +183,50 @@ describe('searchBuildLocations', () => {
       systemHandler
     );
 
-    await expect(searchBuildLocations(CHAR_ID, 'K2-18', controller.signal)).rejects.toThrow();
+    await expect(
+      searchBuildLocations(CHAR_ID, 'K2-18', 'manufacturing', controller.signal)
+    ).rejects.toThrow();
   });
 
   it('never calls ESI below the three-character floor ESI itself enforces', async () => {
     // No handler registered: onUnhandledRequest 'error' fails on any call.
-    expect(await searchBuildLocations(CHAR_ID, 'K2')).toEqual([]);
-    expect(await searchBuildLocations(CHAR_ID, '   ')).toEqual([]);
+    expect(await searchBuildLocations(CHAR_ID, 'K2', 'manufacturing')).toEqual([]);
+    expect(await searchBuildLocations(CHAR_ID, '   ', 'manufacturing')).toEqual([]);
+  });
+
+  it('drops NPC stations and manufacturing structures for a reaction search (issue #460)', async () => {
+    const TATARA_ID = 1035466617948;
+    server.use(
+      searchHandler({ station: [JITA_44], structure: [AZBEL_ID, TATARA_ID] }),
+      stationHandler,
+      http.get(`${ESI_BASE_URL}/universe/structures/:id`, ({ params }) =>
+        Number(params.id) === TATARA_ID
+          ? HttpResponse.json({
+              name: 'A Tatara',
+              owner_id: 98,
+              solar_system_id: 30003888,
+              type_id: 35836,
+            })
+          : HttpResponse.json({
+              name: 'K2-18 R&D',
+              owner_id: 98,
+              solar_system_id: 30003888,
+              type_id: 35826, // Azbel — cannot react
+            })
+      ),
+      systemHandler
+    );
+
+    const found = await searchBuildLocations(CHAR_ID, 'K2-18', 'reaction');
+
+    expect(found.map((o) => o.facility)).toEqual(['tatara']);
   });
 
   it('asks only for the two categories a job can run in', async () => {
     const seen = vi.fn<(url: URL) => void>();
     server.use(searchHandler({}, seen), systemHandler);
 
-    await searchBuildLocations(CHAR_ID, 'K2-18');
+    await searchBuildLocations(CHAR_ID, 'K2-18', 'manufacturing');
 
     const url = seen.mock.calls[0]?.[0];
     expect(url?.searchParams.get('categories')).toBe('station,structure');

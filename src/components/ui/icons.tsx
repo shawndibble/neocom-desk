@@ -43,6 +43,7 @@ import {
   Factory,
   FileText,
   Flag,
+  Flask,
   Funnel,
   Gauge,
   GraduationCap,
@@ -169,6 +170,8 @@ export const SuggestReorder = withWeight(ArrowsDownUp);
 export const Build = withWeight(Hammer);
 /** The same verdict the other way: buying the material beats producing it. */
 export const Buy = withWeight(ShoppingCart);
+/** A build plan material this character is better off reacting than buying (issue #460) — its own glyph, not the manufacturing hammer or the planetary globe. */
+export const Reaction = withWeight(Flask);
 /** Promote a derived prereq row into a real Skill Plan entry (CONTEXT.md "Prereq Promotion"). */
 export const AddToPlan = withWeight(Plus);
 /** A row's browser-notification channel is currently on (issue #364). */

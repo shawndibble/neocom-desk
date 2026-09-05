@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
+import { industryActivityOf } from '@/engine/industry/types';
 import type { BuildResult, SkillLevels } from '@/engine/industry/types';
 import type { PiData } from '@/sde/types';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -85,7 +86,8 @@ async function computeRow(
     const snapshot = await loadMarketSnapshot(
       hub,
       buildPlanTypeIds(blueprint, { catalog, pi }),
-      plan.buildSystemId
+      plan.buildSystemId,
+      industryActivityOf(blueprint)
     );
     const { result, error } = computeBuildPlan({
       plan,

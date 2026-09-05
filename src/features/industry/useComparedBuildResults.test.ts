@@ -44,6 +44,7 @@ function entry(
       materials: [],
       products: [{ typeID: 1, quantity: 1 }],
       skills: [],
+      activity: 'manufacturing',
     },
     productTypeID: 1,
     productName: 'Widget',

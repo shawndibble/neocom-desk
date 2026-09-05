@@ -9,6 +9,7 @@ const BLUEPRINTS: BlueprintMap = {
     materials: [{ typeID: 34, quantity: 4500 }],
     products: [{ typeID: 587, quantity: 1 }],
     skills: [],
+    activity: 'manufacturing',
   },
   '640': {
     name: 'No Product Blueprint',
@@ -16,12 +17,25 @@ const BLUEPRINTS: BlueprintMap = {
     materials: [{ typeID: 34, quantity: 100 }],
     products: [],
     skills: [],
+    activity: 'manufacturing',
+  },
+  // A reaction formula (issue #460): must surface through the same catalog
+  // as a manufacturing blueprint, not a separate lookup, for the picker to
+  // find it by product name and the facility filter to key off its activity.
+  '46157': {
+    name: 'Methanofullerene Reaction Formula',
+    time: 10800,
+    materials: [{ typeID: 16272, quantity: 3200 }],
+    products: [{ typeID: 16667, quantity: 100 }],
+    skills: [],
+    activity: 'reaction',
   },
 };
 
 const TYPES: TypeMap = {
   '587': { name: 'Rifter', groupID: 25, volume: 27289 },
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
+  '16667': { name: 'Reinforced Carbon Fiber', groupID: 428, volume: 5 },
 };
 
 vi.mock('@/sde/loadSde', () => ({
@@ -84,6 +98,17 @@ describe('loadBlueprintCatalog', () => {
     const catalog = await loadBlueprintCatalog();
     expect(catalog.byProductTypeID.has(34)).toBe(false);
   });
+
+  it('surfaces a reaction formula the same way as a manufacturing blueprint (issue #460)', async () => {
+    const catalog = await loadBlueprintCatalog();
+    const entry = catalog.byBlueprintTypeID.get(46157);
+    expect(entry).toMatchObject({
+      productTypeID: 16667,
+      productName: 'Reinforced Carbon Fiber',
+    });
+    expect(entry?.blueprint.activity).toBe('reaction');
+    expect(catalog.byProductTypeID.get(16667)?.blueprintTypeID).toBe(46157);
+  });
 });
 
 describe('searchByProductName', () => {
@@ -96,6 +121,12 @@ describe('searchByProductName', () => {
   it('returns nothing for a blank query', async () => {
     const catalog = await loadBlueprintCatalog();
     expect(searchByProductName(catalog, '   ')).toEqual([]);
+  });
+
+  it("finds a reaction formula by its product's name too (issue #460)", async () => {
+    const catalog = await loadBlueprintCatalog();
+    const results = searchByProductName(catalog, 'reinforced carbon');
+    expect(results.map((r) => r.blueprintTypeID)).toEqual([46157]);
   });
 
   it('precomputes productNameLower once rather than lower-casing on every search call', async () => {
@@ -112,6 +143,7 @@ describe('toIndustryBlueprint', () => {
       time: 1200,
       materials: [{ typeID: 34, quantity: 4500 }],
       products: [{ typeID: 587, quantity: 1 }],
+      activity: 'manufacturing',
     });
   });
 });

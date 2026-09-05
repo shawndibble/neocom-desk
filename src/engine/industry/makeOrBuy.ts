@@ -21,14 +21,16 @@ import type {
   SecurityBand,
   SkillLevels,
 } from '@/engine/industry/types';
+import { FACILITY_PRESETS } from '@/engine/industry/types';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 
-export type MakeMethod = 'manufacturing' | 'planetary';
+export type MakeMethod = 'manufacturing' | 'planetary' | 'reaction';
 
 /**
  * How a material is produced. A single value rather than a list: no type in
  * the SDE is both manufactured from a blueprint and produced by a planetary
- * schematic (verified against blueprints.json/pi.json — zero overlap).
+ * schematic (verified against blueprints.json/pi.json — zero overlap), and a
+ * reaction formula (issue #460) is disjoint from both the same way.
  */
 export type MaterialRecipe =
   | {
@@ -42,6 +44,11 @@ export type MaterialRecipe =
       /** Units the schematic yields per cycle. */
       outputQuantity: number;
       inputs: readonly QuantityEntry[];
+    }
+  | {
+      method: 'reaction';
+      /** Reaction formula. Always ME0/TE0 — reaction formulas carry no research activity. */
+      blueprint: IndustryBlueprint;
     };
 
 /** Where the hypothetical sub-job would run: the parent plan's own facility and market. */
@@ -71,14 +78,17 @@ export interface MakeOrBuy {
 }
 
 /**
- * Cost per unit of manufacturing the material, sized to a real job.
+ * Cost per unit of running a blueprint or reaction formula's job, sized to a
+ * real job — shared by the manufacturing and reaction branches below, since
+ * `buildVsBuy` already treats both identically given the right facility
+ * context; only the `ctx.facility`/`rig` each branch passes in differs.
  *
  * Runs matter: EVE rounds material use once per job, not per run, and the job
  * fee is a fixed proportion of EIV, so quoting a single run would overstate a
  * material the plan needs hundreds of. `null` when an input has no price —
  * a partial cost would read as a suspiciously cheap build.
  */
-function manufacturingUnitCost(
+function jobUnitCost(
   blueprint: IndustryBlueprint,
   me: number,
   needed: number,
@@ -106,6 +116,34 @@ function manufacturingUnitCost(
   // are pricing — has no hub listing, which says nothing about build cost.
   if (result.unpricedMaterials.length > 0) return null;
   return result.totalCost / (product.quantity * runs);
+}
+
+/**
+ * Cost per unit of reacting the material, sized to a real job — reuses
+ * `jobUnitCost`, but quoted against an unfitted Athanor (the smaller, more
+ * commonly available refinery) rather than the parent plan's own facility.
+ *
+ * The parent's facility cannot stand in here the way it does for a
+ * manufacturing sub-build: this app has no reaction-formula-consuming-a-
+ * reaction-formula case where that facility is itself a refinery, so a
+ * sub-input reached from a *manufacturing* plan (issue #460 follow-up — e.g.
+ * a Raven's component consuming a reaction material) would otherwise be
+ * quoted as if an engineering complex's bonuses and manufacturing-rig
+ * security table applied to a job that structure cannot even run. Assuming
+ * no rig keeps the estimate conservative (understating the saving) rather
+ * than wrong (misapplying an inapplicable bonus) — the same trade this
+ * codebase already makes wherever a real number isn't knowable.
+ */
+function reactionUnitCost(
+  blueprint: IndustryBlueprint,
+  needed: number,
+  ctx: MakeOrBuyContext
+): number | null {
+  return jobUnitCost(blueprint, 0, needed, {
+    ...ctx,
+    facility: FACILITY_PRESETS.athanor,
+    rig: 'none',
+  });
 }
 
 /**
@@ -152,8 +190,10 @@ export function makeOrBuy(
   try {
     makeUnitPrice =
       recipe.method === 'manufacturing'
-        ? manufacturingUnitCost(recipe.blueprint, recipe.me, needed, ctx)
-        : planetaryUnitCost(recipe.inputs, recipe.outputQuantity, ctx.hubPrices);
+        ? jobUnitCost(recipe.blueprint, recipe.me, needed, ctx)
+        : recipe.method === 'reaction'
+          ? reactionUnitCost(recipe.blueprint, needed, ctx)
+          : planetaryUnitCost(recipe.inputs, recipe.outputQuantity, ctx.hubPrices);
   } catch {
     // The engine range-checks ME and runs. A blueprint or an owned-ME value
     // outside those bounds is bad data, not a reason to fail the whole table.

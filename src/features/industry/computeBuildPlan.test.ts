@@ -118,4 +118,19 @@ describe('computeBuildPlan', () => {
     // eiv x 2% > eiv x 0 (structure defaultTaxPct is 0)
     expect(result?.jobFee.facilityTax).toBeGreaterThan(0);
   });
+
+  it('forces ME/TE to 0 for a reaction blueprint regardless of the stored plan value (issue #460: reaction formulas are always unresearched)', () => {
+    const reactionBlueprint: IndustryBlueprint = { ...BLUEPRINT, activity: 'reaction' };
+    const { result } = computeBuildPlan({
+      plan: { ...BASE_PLAN, facility: 'athanor', me: 10, te: 20 },
+      blueprint: reactionBlueprint,
+      ...MARKET,
+    });
+    const zeroed = computeBuildPlan({
+      plan: { ...BASE_PLAN, facility: 'athanor', me: 0, te: 0 },
+      blueprint: reactionBlueprint,
+      ...MARKET,
+    }).result;
+    expect(result).toEqual(zeroed);
+  });
 });

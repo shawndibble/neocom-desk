@@ -90,6 +90,11 @@ const CHAR_ATTR_NAMES = {
 };
 const SKILL_CATEGORY_ID = 16;
 const MANUFACTURING_ACTIVITY_ID = 1;
+// Reaction formulas (issue #460): SDE industryActivity* rows for this
+// activity ID are disjoint from every other activity — verified against a
+// live industryActivity.csv dump (0 typeIDs shared with manufacturing,
+// research or invention), so a formula is always unresearched (ME0/TE0).
+const REACTION_ACTIVITY_ID = 11;
 
 // The eight values ESI reports for CharacterPlanet.planet_type (mirrors
 // `PlanetType` in src/esi/endpoints.ts). P0_PLANET_TYPES is checked against
@@ -507,15 +512,34 @@ async function main() {
     });
   }
 
-  // --- blueprints.json (manufacturing only, published blueprints only) ---
+  // --- blueprints.json (manufacturing + reaction, published items only) ---
+  const ACTIVITY_TAG = {
+    [MANUFACTURING_ACTIVITY_ID]: 'manufacturing',
+    [REACTION_ACTIVITY_ID]: 'reaction',
+  };
   const bpTime = new Map();
+  const bpActivity = new Map();
   {
     const rows = raw['industryActivity.csv'];
     const h = indexHeader(rows);
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
-      if (Number(r[h.activityID]) !== MANUFACTURING_ACTIVITY_ID) continue;
-      bpTime.set(Number(r[h.typeID]), Number(r[h.time]));
+      const activityID = Number(r[h.activityID]);
+      const activity = ACTIVITY_TAG[activityID];
+      if (!activity) continue;
+      const typeID = Number(r[h.typeID]);
+      // A typeID under both manufacturing and reaction would silently
+      // last-write-wins into one BlueprintType with the wrong activity tag.
+      // Issue #460's decision doc records this as verified impossible against
+      // a live dump; enforce that claim here rather than trusting it silently.
+      const existing = bpActivity.get(typeID);
+      if (existing && existing !== activity) {
+        throw new Error(
+          `typeID ${typeID} has industryActivity rows under both '${existing}' and '${activity}' — the manufacturing/reaction activity split assumed these are disjoint`
+        );
+      }
+      bpTime.set(typeID, Number(r[h.time]));
+      bpActivity.set(typeID, activity);
     }
   }
   const collectActivity = (fileName, idCol, qtyCol) => {
@@ -524,7 +548,7 @@ async function main() {
     const map = new Map();
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
-      if (Number(r[h.activityID]) !== MANUFACTURING_ACTIVITY_ID) continue;
+      if (!ACTIVITY_TAG[Number(r[h.activityID])]) continue;
       const typeID = Number(r[h.typeID]);
       let list = map.get(typeID);
       if (!list) {
@@ -547,7 +571,7 @@ async function main() {
     const h = indexHeader(rows);
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
-      if (Number(r[h.activityID]) !== MANUFACTURING_ACTIVITY_ID) continue;
+      if (!ACTIVITY_TAG[Number(r[h.activityID])]) continue;
       const typeID = Number(r[h.typeID]);
       let list = bpSkills.get(typeID);
       if (!list) {
@@ -561,15 +585,16 @@ async function main() {
   const blueprints = {};
   for (const typeID of [...bpTime.keys()].sort((a, b) => a - b)) {
     const t = types.get(typeID);
-    if (!t || !t.published) continue; // strip unpublished blueprints
+    if (!t || !t.published) continue; // strip unpublished blueprints/formulas
     const products = bpProducts.get(typeID);
-    if (!products || products.length === 0) continue; // nothing manufactured
+    if (!products || products.length === 0) continue; // nothing made
     blueprints[typeID] = {
       name: t.name,
       time: bpTime.get(typeID),
       materials: bpMaterials.get(typeID) ?? [],
       products,
       skills: bpSkills.get(typeID) ?? [],
+      activity: bpActivity.get(typeID),
     };
   }
 
@@ -1210,7 +1235,13 @@ async function main() {
     if (!s.primaryAttr || !s.secondaryAttr) badAttrs++;
   }
   console.log(`  skills: ${skills.length}`);
-  console.log(`  blueprints (manufacturing): ${Object.keys(blueprints).length}`);
+  {
+    const byActivity = { manufacturing: 0, reaction: 0 };
+    for (const bp of Object.values(blueprints)) byActivity[bp.activity]++;
+    console.log(
+      `  blueprints: ${Object.keys(blueprints).length} (manufacturing ${byActivity.manufacturing}, reaction ${byActivity.reaction})`
+    );
+  }
   console.log(`  types map entries: ${Object.keys(typeMap).length}`);
   console.log(
     `  planetary schematics: ${Object.keys(piSchematics).length} (+${piRaw.length} raw resources, ${piUnpublished} unpublished skipped)`

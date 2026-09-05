@@ -54,6 +54,7 @@ const BLUEPRINT: BlueprintType = {
   materials: [{ typeID: 34, quantity: 100 }],
   products: [{ typeID: 587, quantity: 1 }],
   skills: [],
+  activity: 'manufacturing',
 };
 
 /**
@@ -67,6 +68,7 @@ const TRITANIUM_BLUEPRINT: BlueprintType = {
   materials: [{ typeID: 35, quantity: 5 }],
   products: [{ typeID: 34, quantity: 4 }],
   skills: [],
+  activity: 'manufacturing',
 };
 
 /** Gives Pyerite a producer too, so an expanded row (Tritanium's own input) can carry its own make-or-buy advice. */
@@ -76,6 +78,7 @@ const PYERITE_BLUEPRINT: BlueprintType = {
   materials: [{ typeID: 36, quantity: 2 }],
   products: [{ typeID: 35, quantity: 1 }],
   skills: [],
+  activity: 'manufacturing',
 };
 
 const TYPES: TypeMap = {
@@ -124,6 +127,35 @@ const CATALOG: BlueprintCatalog = {
   typesById: TYPES,
 };
 
+// A reaction formula (issue #460): same catalog shape as a manufacturing
+// blueprint, just tagged with the other activity.
+const REACTION_FORMULA: BlueprintType = {
+  name: 'Methanofullerene Reaction Formula',
+  time: 10800,
+  materials: [{ typeID: 16272, quantity: 3200 }],
+  products: [{ typeID: 16667, quantity: 100 }],
+  skills: [],
+  activity: 'reaction',
+};
+const REACTION_ENTRY: BlueprintCatalogEntry = {
+  blueprintTypeID: 46157,
+  blueprint: REACTION_FORMULA,
+  productTypeID: 16667,
+  productName: 'Reinforced Carbon Fiber',
+  productNameLower: 'reinforced carbon fiber',
+};
+const REACTION_TYPES: TypeMap = {
+  ...TYPES,
+  '16272': { name: 'Fullerides', groupID: 429, volume: 5 },
+  '16667': { name: 'Reinforced Carbon Fiber', groupID: 428, volume: 5 },
+};
+const REACTION_CATALOG: BlueprintCatalog = {
+  entries: [REACTION_ENTRY],
+  byBlueprintTypeID: new Map([[46157, REACTION_ENTRY]]),
+  byProductTypeID: new Map([[16667, REACTION_ENTRY]]),
+  typesById: REACTION_TYPES,
+};
+
 function makePlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
   return {
     id: 'bp-1',
@@ -144,6 +176,7 @@ function makePlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
 
 interface HarnessProps {
   plan?: Partial<BuildPlanRecord>;
+  catalog?: BlueprintCatalog;
   onUpdate?: (patch: PlanPatch) => void;
   onDerivedFix?: (patch: PlanPatch) => void;
 }
@@ -153,13 +186,13 @@ interface HarnessProps {
  * `onUpdate` patches to it, so a committed edit is visible in the next
  * render the way it would be against the real store.
  */
-function Harness({ plan: planOverrides, onUpdate, onDerivedFix }: HarnessProps) {
+function Harness({ plan: planOverrides, catalog = CATALOG, onUpdate, onDerivedFix }: HarnessProps) {
   const [plan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
   return (
     <MemoryRouter>
       <BuildPlanDetail
         plan={plan}
-        catalog={CATALOG}
+        catalog={catalog}
         pi={null}
         ownedBlueprints={[]}
         skills={{}}
@@ -608,7 +641,8 @@ describe('BuildPlanDetail build system', () => {
     expect(loadMarketSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'jita' }),
       expect.anything(),
-      30003888
+      30003888,
+      'manufacturing'
     );
   });
 
@@ -664,7 +698,8 @@ describe('BuildPlanDetail build system', () => {
     expect(loadMarketSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'jita' }),
       expect.anything(),
-      undefined
+      undefined,
+      'manufacturing'
     );
   });
 
@@ -677,5 +712,51 @@ describe('BuildPlanDetail build system', () => {
     await user.tab();
 
     expect(resolveSolarSystem).not.toHaveBeenCalled();
+  });
+});
+
+describe('BuildPlanDetail reaction plans (issue #460)', () => {
+  async function openOverride(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /Override/ }));
+  }
+
+  function reactionPlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
+    return {
+      ...makePlan(overrides),
+      blueprintTypeID: 46157,
+      facility: 'athanor',
+      ...overrides,
+    };
+  }
+
+  it('has no ME/TE fields — reaction formulas carry no research activity', () => {
+    render(<Harness plan={reactionPlan()} catalog={REACTION_CATALOG} />);
+    expect(screen.queryByLabelText('ME %')).toBeNull();
+    expect(screen.queryByLabelText('TE %')).toBeNull();
+    // Runs is unaffected — only ME/TE are activity-specific.
+    expect(runsInput()).toBeInTheDocument();
+  });
+
+  it('offers only Athanor/Tatara in the facility picker, never a manufacturing facility or NPC station', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={reactionPlan()} catalog={REACTION_CATALOG} />);
+    await openOverride(user);
+
+    await user.click(screen.getByRole('combobox', { name: 'Facility' }));
+    const options = await screen.findAllByRole('option');
+    // The selected option's own checkmark indicator rides along in
+    // textContent (e.g. "✓Athanor"), so strip leading non-word characters
+    // rather than comparing raw text.
+    expect(options.map((o) => o.textContent?.replace(/^\W+/, '')).sort()).toEqual([
+      'Athanor',
+      'Tatara',
+    ]);
+  });
+
+  it('produces a materials table and results for the reaction formula', async () => {
+    render(<Harness plan={reactionPlan()} catalog={REACTION_CATALOG} />);
+
+    expect(await screen.findByText('Fullerides')).toBeInTheDocument();
+    expect(screen.getByText('Results')).toBeInTheDocument();
   });
 });

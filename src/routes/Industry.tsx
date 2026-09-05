@@ -13,7 +13,13 @@ import {
   VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
 } from '@/lib/useViewportBoundedHeight';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import type { MaterialSourcing, SkillLevels } from '@/engine/industry/types';
+import { FACILITY_PRESETS } from '@/engine/industry/types';
+import type {
+  FacilityKind,
+  IndustryActivity,
+  MaterialSourcing,
+  SkillLevels,
+} from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
@@ -38,17 +44,35 @@ import {
 } from '@/features/industry/BuildPlanDetail';
 import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
 
+/**
+ * The historical hardcoded default per activity — a character with no prior
+ * plan of that activity, or whose most recent plan is the other activity
+ * (issue #460: `defaultsFrom.facility` would otherwise be an NPC station
+ * that cannot host a reaction, or a refinery that cannot manufacture).
+ */
+function fallbackFacility(activity: IndustryActivity): FacilityKind {
+  return activity === 'reaction' ? 'athanor' : 'npcStation';
+}
+
 // Facility/rig/security/hub/tax default from the character's own most
 // recently updated plan (issue #456), so a second plan doesn't force
 // re-picking settings the pilot already set once. `defaultsFrom` is that
 // plan, or null/undefined for a character with no plans yet, in which case
-// the historical hardcoded defaults apply.
+// the historical hardcoded defaults apply. Only carried when it hosts the
+// same activity as the new plan (issue #460) — otherwise it names a
+// facility the new blueprint/formula cannot run at.
 function newBuildPlan(
   characterId: number,
   entry: BlueprintCatalogEntry,
   owned: CharacterBlueprint | null,
   defaultsFrom?: BuildPlanRecord | null
 ): BuildPlanRecord {
+  // Unlike `IndustryBlueprint.activity` (optional, for pre-#460 engine test
+  // literals), the SDE's own `BlueprintType.activity` is always set — no
+  // fallback needed here.
+  const activity = entry.blueprint.activity;
+  const defaultsMatchActivity =
+    defaultsFrom != null && FACILITY_PRESETS[defaultsFrom.facility].activity === activity;
   return {
     id: crypto.randomUUID(),
     characterId,
@@ -57,7 +81,7 @@ function newBuildPlan(
     runs: 1,
     me: owned?.material_efficiency ?? 0,
     te: owned?.time_efficiency ?? 0,
-    facility: defaultsFrom?.facility ?? 'npcStation',
+    facility: defaultsMatchActivity ? defaultsFrom.facility : fallbackFacility(activity),
     rigLevel: defaultsFrom?.rigLevel ?? 'none',
     security: defaultsFrom?.security ?? 'highsec',
     hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
