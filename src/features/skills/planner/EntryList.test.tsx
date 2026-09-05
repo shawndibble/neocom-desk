@@ -164,6 +164,28 @@ describe('EntryList prereq rows', () => {
   });
 });
 
+describe('EntryList drag handles mention keyboard reordering (#408)', () => {
+  it("an entry row's drag handle names the keyboard alternative", () => {
+    render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
+    expect(
+      screen.getByRole('button', { name: /reorder skill 1 — press space then arrow keys/i })
+    ).toBeInTheDocument();
+  });
+
+  it("a marker row's drag handle names the keyboard alternative", () => {
+    render(
+      <EntryList
+        rows={[{ kind: 'marker', id: markerRowId(0), markerIndex: 0 }]}
+        bandsAt={new Map()}
+        {...defaultProps}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: /reorder remap marker — press space then arrow keys/i })
+    ).toBeInTheDocument();
+  });
+});
+
 describe('EntryList empty state', () => {
   it('shows the empty-entries message when there are no rows', () => {
     render(<EntryList rows={[]} bandsAt={new Map()} {...defaultProps} />);
@@ -306,6 +328,74 @@ describe('EntryList reorder affordance', () => {
   });
 });
 
+describe('EntryList non-drag reorder menu (#408)', () => {
+  const rows: MergedRow[] = [
+    entryRow(1, [0]),
+    { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
+    entryRow(2, [1]),
+  ];
+
+  it('moves an entry up via the row-actions menu, calling onReorder like a drag would', async () => {
+    const user = userEvent.setup();
+    const reorders: Array<[string, string]> = [];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        onReorder={(activeId, overId) => reorders.push([activeId, overId])}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /more actions for skill 2/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move up' }));
+
+    expect(reorders).toEqual([['2', markerRowId(0)]]);
+  });
+
+  it('moves an entry to top via the row-actions menu', async () => {
+    const user = userEvent.setup();
+    const reorders: Array<[string, string]> = [];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        onReorder={(activeId, overId) => reorders.push([activeId, overId])}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /more actions for skill 2/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move to top' }));
+
+    expect(reorders).toEqual([['2', '1']]);
+  });
+
+  it('disables Move up for the first row and Move down for the last row', async () => {
+    const user = userEvent.setup();
+    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: /more actions for skill 1/i }));
+    expect(screen.getByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: /more actions for skill 2/i }));
+    expect(screen.getByRole('menuitem', { name: 'Move down' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+  });
+
+  it("the menu trigger's own accessible name never matches the removed Up/Down button pattern (#223 guard)", () => {
+    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+    const trigger = screen.getByRole('button', { name: /more actions for skill 1/i });
+    expect(trigger.getAttribute('aria-label')).not.toMatch(/move .* (up|down)/i);
+  });
+});
+
 describe('EntryList marker row attributes', () => {
   const rows: MergedRow[] = [
     entryRow(1, [0]),
@@ -432,7 +522,10 @@ describe('EntryList entry level disclosure (#254)', () => {
         render(
           <EntryList rows={[entryRow(1, [0, 1, 2, 3, 4])]} bandsAt={new Map()} {...defaultProps} />
         );
-        const toggle = screen.getByRole('button', { expanded: false });
+        // Named, not just `{ expanded: false }`: the row's new "More actions"
+        // menu trigger (#408) is also a closed, `aria-expanded`-carrying
+        // button on every row now.
+        const toggle = screen.getByRole('button', { expanded: false, name: /^Skill/ });
         expect(screen.queryByRole('list', { name: /levels trained for skill 1/i })).toBeNull();
 
         fireEvent.click(toggle);
@@ -466,7 +559,7 @@ describe('EntryList entry level disclosure (#254)', () => {
           expect(screen.getByText(/^Cumulative: /)).toHaveAttribute('role', 'tooltip');
         }
 
-        fireEvent.click(screen.getByRole('button', { expanded: true }));
+        fireEvent.click(screen.getByRole('button', { expanded: true, name: /^Skill/ }));
         expect(screen.queryByRole('list', { name: /levels trained for skill 1/i })).toBeNull();
       } finally {
         restore();
@@ -481,7 +574,7 @@ describe('EntryList entry level disclosure (#254)', () => {
     );
     expect(screen.getByText(/^Skill 1 IV–V$/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /^Skill/ }));
     const breakdown = screen.getByRole('list', { name: /levels trained for skill 1/i });
     expect(within(breakdown).getAllByRole('listitem')).toHaveLength(2);
     expect(within(breakdown).getByLabelText('Level 4')).toBeInTheDocument();
@@ -491,14 +584,16 @@ describe('EntryList entry level disclosure (#254)', () => {
   it('gives a single-level entry no toggle and no range, leaving the row as it was', () => {
     render(<EntryList rows={[entryRow(1, [0])]} bandsAt={new Map()} {...defaultProps} />);
     expect(screen.getByText(/^Skill 1 I$/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { expanded: false })).toBeNull();
+    // No level-toggle button — the row's "More actions" menu trigger is also
+    // a closed `aria-expanded` button now, so this must not match that one.
+    expect(screen.queryByRole('button', { expanded: false, name: /^Skill/ })).toBeNull();
   });
 
   it('leaves the drag handle as the only reorder affordance — the toggle is not a second one', () => {
     render(<EntryList rows={[entryRow(1, [0, 1])]} bandsAt={new Map()} {...defaultProps} />);
     const handle = screen.getByRole('button', { name: /reorder skill 1/i });
     expect(handle).not.toHaveAttribute('aria-expanded');
-    expect(screen.getByRole('button', { expanded: false })).not.toBe(handle);
+    expect(screen.getByRole('button', { expanded: false, name: /^Skill/ })).not.toBe(handle);
   });
 
   it('marks only the boosted level inside the breakdown', () => {
@@ -510,7 +605,7 @@ describe('EntryList entry level disclosure (#254)', () => {
         {...defaultProps}
       />
     );
-    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /^Skill/ }));
     const breakdown = screen.getByRole('list', { name: /levels trained for skill 1/i });
     const levels = within(breakdown).getAllByRole('listitem');
     expect(within(levels[0]).queryByRole('img', { name: /booster/i })).toBeNull();

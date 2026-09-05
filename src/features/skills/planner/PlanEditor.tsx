@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -42,6 +42,7 @@ import type {
   Booster,
   Implants,
   PlanEntry,
+  PlanPriority,
   PlanStep,
   ScheduledStep,
   TrainedSkill,
@@ -283,6 +284,11 @@ export function PlanEditor({
   // Which marker's manual attribute editor (RemapMarkerModal) is open, by
   // ordinal — the same addressing `onRemoveMarker`/`markerAttributesFor` use.
   const [editingMarkerIndex, setEditingMarkerIndex] = useState<number | null>(null);
+  // The entry pending a remove confirmation (#408) — an in-app Modal rather
+  // than removing on click, matching the pattern PlanList already uses for
+  // deleting a whole plan (CONTEXT.md's "an in-app Modal replacing
+  // window.confirm on delete").
+  const [removingSkillTypeID, setRemovingSkillTypeID] = useState<number | null>(null);
 
   // The entry list is the only thing that scrolls independently: it gets a
   // live-measured cap so it fills the room actually left below it, while the
@@ -404,15 +410,24 @@ export function PlanEditor({
   // eslint-disable-next-line react-hooks/purity -- see comment above
   const boosterExpired = booster !== null && booster.expiresAt.getTime() <= Date.now();
 
-  const nameFor = (skillTypeID: number): string =>
-    catalog.bySkillTypeID.get(skillTypeID)?.name ?? `#${skillTypeID}`;
+  // useCallback'd (#408): both cross into EntryList as per-row props
+  // (`nameFor`/`attributesFor`), which now wraps its rows in `React.memo` —
+  // an identity that changed every render would defeat that regardless of
+  // the row components' own memoization. `attributesFor` also returns the
+  // catalog's own EngineSkill object rather than a fresh `{primary,
+  // secondary}` literal: same reasoning one level deeper, since a *new*
+  // object every call would still break memo even with a stable function.
+  const nameFor = useCallback(
+    (skillTypeID: number): string =>
+      catalog.bySkillTypeID.get(skillTypeID)?.name ?? `#${skillTypeID}`,
+    [catalog]
+  );
 
-  const attributesFor = (
-    skillTypeID: number
-  ): { primary: AttributeName; secondary: AttributeName } | undefined => {
-    const skill = catalog.engineSkills.get(skillTypeID);
-    return skill ? { primary: skill.primary, secondary: skill.secondary } : undefined;
-  };
+  const attributesFor = useCallback(
+    (skillTypeID: number): { primary: AttributeName; secondary: AttributeName } | undefined =>
+      catalog.engineSkills.get(skillTypeID),
+    [catalog]
+  );
 
   const stepLabel = (step: PlanStep): string =>
     `${nameFor(step.skillTypeID)} ${ROMAN[step.level - 1]}`;
@@ -505,12 +520,15 @@ export function PlanEditor({
       ),
     [plan.entries, entryBoundaries, scheduled, catalog]
   );
+  // Built once and reused by both mergedRows and bandsAt below (#408: the
+  // two used to each call buildRows independently over the same
+  // entries/markers, a duplicate pass on every render).
+  const rows = useMemo(() => buildRows(plan.entries, plan.markers), [plan.entries, plan.markers]);
   const mergedRows = useMemo(
-    () => buildMergedRows(plan.entries, plan.markers, entryQueue),
-    [plan.entries, plan.markers, entryQueue]
+    () => buildMergedRows(plan.entries, plan.markers, entryQueue, rows),
+    [plan.entries, plan.markers, entryQueue, rows]
   );
   const bandsAt = useMemo<ReadonlyMap<string, BandInfo>>(() => {
-    const rows = buildRows(plan.entries, plan.markers);
     if (groupingMode === 'attributePair') {
       const placed = placeBandHeaders(
         mergedRows,
@@ -524,7 +542,7 @@ export function PlanEditor({
     return new Map(
       [...placed].map(([id, priority]) => [id, { kind: 'priority', priority } as const])
     );
-  }, [groupingMode, mergedRows, plan.entries, plan.markers, priorityMap, catalog.engineSkills]);
+  }, [groupingMode, mergedRows, rows, priorityMap, catalog.engineSkills]);
 
   const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0;
   // No steps means no plan finish to project — never invent one for an
@@ -574,9 +592,7 @@ export function PlanEditor({
     effectiveImplants,
   ]);
 
-  function update(entries: PlanEntry[]) {
-    onUpdate({ entries });
-  }
+  const update = useCallback((entries: PlanEntry[]) => onUpdate({ entries }), [onUpdate]);
 
   async function handleImport() {
     setImportError(null);
@@ -791,72 +807,149 @@ export function PlanEditor({
   }
 
   /** "{Skill} III" — how a promoted prereq is named back to the user. */
-  function levelLabel(skillTypeID: number, level: number): string {
-    return `${nameFor(skillTypeID)} ${ROMAN[level - 1]}`;
-  }
+  const levelLabel = useCallback(
+    (skillTypeID: number, level: number): string => `${nameFor(skillTypeID)} ${ROMAN[level - 1]}`,
+    [nameFor]
+  );
 
-  function confirmPromotion(skillTypeID: number, level: number) {
-    setPromoteConfirm(t('plans.prereqPromoted', { name: levelLabel(skillTypeID, level) }));
-    setTimeout(() => setPromoteConfirm(null), 4000);
-  }
+  const confirmPromotion = useCallback(
+    (skillTypeID: number, level: number) => {
+      setPromoteConfirm(t('plans.prereqPromoted', { name: levelLabel(skillTypeID, level) }));
+      setTimeout(() => setPromoteConfirm(null), 4000);
+    },
+    [t, levelLabel]
+  );
+
+  /** `markerOrder` names, per new marker, which old ordinal it was — see `RowsToState`. */
+  const reorderedMarkerAttributes = useCallback(
+    (markerOrder: readonly number[]): (Attributes | null)[] =>
+      markerOrder.map((oldOrdinal) => normalizedMarkerAttributes[oldOrdinal] ?? null),
+    [normalizedMarkerAttributes]
+  );
 
   /**
-   * One drag on the merged list. planDrop decides what it meant — a plain
+   * One drag on the merged list — or the equivalent non-drag move (#408's
+   * row-actions menu resolves its own target id and calls this the same way
+   * EntryList's DndContext does). planDrop decides what it meant — a plain
    * reorder, a prereq row promoted into a real entry, or a drop the
    * normalizer would silently undo, which is refused with the entry that
    * requires the dragged skill named rather than springing back unexplained.
+   *
+   * useCallback'd: crosses into EntryList's memoized rows as the row-actions
+   * menu's `onReorder` prop (#408) — see nameFor's comment for why an
+   * unstable identity there would defeat that memoization.
    */
-  /** `markerOrder` names, per new marker, which old ordinal it was — see `RowsToState`. */
-  function reorderedMarkerAttributes(markerOrder: readonly number[]): (Attributes | null)[] {
-    return markerOrder.map((oldOrdinal) => normalizedMarkerAttributes[oldOrdinal] ?? null);
-  }
-
-  function handleDrop(activeId: string, overId: string) {
-    const result = planDrop({
-      entries: plan.entries,
-      markers: plan.markers,
-      rows: mergedRows,
-      activeId,
-      overId,
-      skills: catalog.engineSkills,
+  const handleDrop = useCallback(
+    (activeId: string, overId: string) => {
+      const result = planDrop({
+        entries: plan.entries,
+        markers: plan.markers,
+        rows: mergedRows,
+        activeId,
+        overId,
+        skills: catalog.engineSkills,
+        trainedSkills,
+      });
+      if (!result.ok) {
+        setDropError(
+          t('plans.dropBlocked', {
+            skill: nameFor(result.skillTypeID),
+            blocker: nameFor(result.blockedBy),
+          })
+        );
+        return;
+      }
+      setDropError(null);
+      onUpdate({
+        entries: result.entries,
+        markers: result.markers,
+        markerAttributes: reorderedMarkerAttributes(result.markerOrder),
+      });
+      if (result.promoted) confirmPromotion(result.promoted.skillTypeID, result.promoted.level);
+    },
+    [
+      plan.entries,
+      plan.markers,
+      mergedRows,
+      catalog.engineSkills,
       trainedSkills,
-    });
-    if (!result.ok) {
-      setDropError(
-        t('plans.dropBlocked', {
-          skill: nameFor(result.skillTypeID),
-          blocker: nameFor(result.blockedBy),
-        })
-      );
-      return;
-    }
-    setDropError(null);
-    onUpdate({
-      entries: result.entries,
-      markers: result.markers,
-      markerAttributes: reorderedMarkerAttributes(result.markerOrder),
-    });
-    if (result.promoted) confirmPromotion(result.promoted.skillTypeID, result.promoted.level);
-  }
+      t,
+      nameFor,
+      reorderedMarkerAttributes,
+      confirmPromotion,
+      onUpdate,
+    ]
+  );
 
   /** The "+" on a prereq row: the same promotion, without needing a drag. */
-  function handlePromotePrereq(rowId: string) {
-    const result = promotePrereq({
-      entries: plan.entries,
-      markers: plan.markers,
-      rows: mergedRows,
-      rowId,
-    });
-    if (!result) return;
-    setDropError(null);
+  const handlePromotePrereq = useCallback(
+    (rowId: string) => {
+      const result = promotePrereq({
+        entries: plan.entries,
+        markers: plan.markers,
+        rows: mergedRows,
+        rowId,
+      });
+      if (!result) return;
+      setDropError(null);
+      onUpdate({
+        entries: result.entries,
+        markers: result.markers,
+        markerAttributes: reorderedMarkerAttributes(result.markerOrder),
+      });
+      const row = mergedRows.find((r) => r.id === rowId);
+      if (row?.kind === 'prereq') confirmPromotion(row.step.skillTypeID, row.step.level);
+    },
+    [plan.entries, plan.markers, mergedRows, onUpdate, reorderedMarkerAttributes, confirmPromotion]
+  );
+
+  /** EntryList's `onRemove`: opens the confirm Modal rather than removing immediately (#408). */
+  const requestRemoveEntry = useCallback((skillTypeID: number) => {
+    setRemovingSkillTypeID(skillTypeID);
+  }, []);
+
+  /** The confirm Modal's Remove button: the removal `onRemove` used to do inline before #408. */
+  const confirmRemoveEntry = useCallback(() => {
+    if (removingSkillTypeID === null) return;
+    const skillTypeID = removingSkillTypeID;
+    const entryIndex = plan.entries.findIndex((e) => e.skillTypeID === skillTypeID);
     onUpdate({
-      entries: result.entries,
-      markers: result.markers,
-      markerAttributes: reorderedMarkerAttributes(result.markerOrder),
+      entries: removeEntry(plan.entries, skillTypeID),
+      ...(plan.markers
+        ? {
+            markers: markersAfterEntryRemoval(plan.markers, entryIndex, plan.entries.length),
+            markerAttributes: markerAttributesAfterEntryRemoval(
+              plan.markers,
+              plan.markerAttributes,
+              entryIndex,
+              plan.entries.length
+            ),
+          }
+        : {}),
     });
-    const row = mergedRows.find((r) => r.id === rowId);
-    if (row?.kind === 'prereq') confirmPromotion(row.step.skillTypeID, row.step.level);
-  }
+    setRemovingSkillTypeID(null);
+  }, [removingSkillTypeID, plan.entries, plan.markers, plan.markerAttributes, onUpdate]);
+
+  const handleRemoveMarker = useCallback(
+    (markerIndex: number) => {
+      onUpdate({
+        markers: removeMarker(plan.markers, markerIndex, plan.entries.length),
+        markerAttributes: removeMarkerAttributes(
+          plan.markers,
+          plan.markerAttributes,
+          markerIndex,
+          plan.entries.length
+        ),
+      });
+    },
+    [plan.markers, plan.markerAttributes, plan.entries.length, onUpdate]
+  );
+
+  const handleSetPriority = useCallback(
+    (skillTypeID: number, priority: PlanPriority) =>
+      update(setEntryPriority(plan.entries, skillTypeID, priority)),
+    [plan.entries, update]
+  );
 
   function handleAddMarker() {
     onUpdate({
@@ -1361,6 +1454,7 @@ export function PlanEditor({
               skills={pickerSkills}
               catalog={catalog}
               trainedSkills={trainedSkills}
+              planEntries={plan.entries}
               onAdd={(entry) => update(upsertEntry(plan.entries, entry))}
               controls={
                 // Group-by and Columns are this list's own view controls —
@@ -1445,43 +1539,11 @@ export function PlanEditor({
                   startDate={startDate}
                   onReorder={handleDrop}
                   onPromotePrereq={handlePromotePrereq}
-                  onRemove={(skillTypeID) => {
-                    const entryIndex = plan.entries.findIndex((e) => e.skillTypeID === skillTypeID);
-                    onUpdate({
-                      entries: removeEntry(plan.entries, skillTypeID),
-                      ...(plan.markers
-                        ? {
-                            markers: markersAfterEntryRemoval(
-                              plan.markers,
-                              entryIndex,
-                              plan.entries.length
-                            ),
-                            markerAttributes: markerAttributesAfterEntryRemoval(
-                              plan.markers,
-                              plan.markerAttributes,
-                              entryIndex,
-                              plan.entries.length
-                            ),
-                          }
-                        : {}),
-                    });
-                  }}
-                  onRemoveMarker={(markerIndex) =>
-                    onUpdate({
-                      markers: removeMarker(plan.markers, markerIndex, plan.entries.length),
-                      markerAttributes: removeMarkerAttributes(
-                        plan.markers,
-                        plan.markerAttributes,
-                        markerIndex,
-                        plan.entries.length
-                      ),
-                    })
-                  }
+                  onRemove={requestRemoveEntry}
+                  onRemoveMarker={handleRemoveMarker}
                   markerAttributesFor={markerAttributesFor}
                   onEditMarker={setEditingMarkerIndex}
-                  onSetPriority={(skillTypeID, priority) =>
-                    update(setEntryPriority(plan.entries, skillTypeID, priority))
-                  }
+                  onSetPriority={handleSetPriority}
                 />
               )}
             </div>
@@ -1646,6 +1708,26 @@ export function PlanEditor({
           if (editingMarkerIndex !== null) handleSaveMarkerAttributes(editingMarkerIndex, next);
         }}
       />
+
+      <Modal
+        open={removingSkillTypeID !== null}
+        onClose={() => setRemovingSkillTypeID(null)}
+        title={t('plans.removeEntryConfirmTitle')}
+      >
+        <p className="text-xs text-text-dim">
+          {t('plans.removeEntryConfirm', {
+            name: removingSkillTypeID === null ? '' : nameFor(removingSkillTypeID),
+          })}
+        </p>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button size="sm" onClick={() => setRemovingSkillTypeID(null)}>
+            {t('plans.cancel')}
+          </Button>
+          <Button variant="danger" size="sm" onClick={confirmRemoveEntry}>
+            {t('plans.removeEntryAction')}
+          </Button>
+        </div>
+      </Modal>
     </>
   );
 }

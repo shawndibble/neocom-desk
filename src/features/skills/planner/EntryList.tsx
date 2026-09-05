@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -16,7 +16,17 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret, EmptyState, NativeSelect, Tooltip } from '@/components/ui';
+import {
+  Button,
+  Caret,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  EmptyState,
+  NativeSelect,
+  Tooltip,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { AttributeName, Attributes, PlanPriority, ScheduledStep } from '@/engine/types';
@@ -24,7 +34,7 @@ import { formatDuration, stepTimeline } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
-import type { MergedRow } from './queueRows';
+import { resolveMoveTarget, type MergedRow, type MoveDirection } from './queueRows';
 import { remapInstruction } from './remapInstruction';
 
 /** A band header's grouping (#115): either mode carries enough to render its label. */
@@ -172,6 +182,56 @@ function useRowSortable(id: string): SortableRowChrome {
   };
 }
 
+interface RowActionsMenuProps {
+  rowId: string;
+  /** The row's own name, for the trigger's accessible name — deliberately NOT "Move up/down", so it can never collide with EntryList.test.tsx's #223 guard against always-visible Up/Down buttons. */
+  name: string;
+  rows: readonly MergedRow[];
+  onReorder: (activeId: string, overId: string) => void;
+}
+
+/**
+ * The non-drag reorder path (#408): a per-row overflow menu offering
+ * move-up/move-down/move-to-top, each resolving to the sortable id a real
+ * drag onto that position would produce and handed to the same `onReorder`
+ * wiring — so it can never disagree with what dragging the row does. One
+ * control, not #223's since-removed always-visible Up/Down pair, which cost
+ * two 36px targets per row and squeezed the skill name on a phone.
+ */
+function RowActionsMenu({ rowId, name, rows, onReorder }: RowActionsMenuProps) {
+  const { t } = useTranslation();
+
+  function targetFor(direction: MoveDirection): string | null {
+    return resolveMoveTarget(rows, rowId, direction);
+  }
+
+  function move(direction: MoveDirection) {
+    const target = targetFor(direction);
+    if (target) onReorder(rowId, target);
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" className={ICON_BUTTON} aria-label={t('plans.rowActions', { name })}>
+          <Icon.More size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem disabled={targetFor('up') === null} onSelect={() => move('up')}>
+          {t('plans.moveUp')}
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={targetFor('down') === null} onSelect={() => move('down')}>
+          {t('plans.moveDown')}
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={targetFor('top') === null} onSelect={() => move('top')}>
+          {t('plans.moveToTop')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /** A row's booster mark: shared by entry and prereq rows. */
 function BoosterMark() {
   const { t } = useTranslation();
@@ -270,12 +330,24 @@ interface EntryRowProps {
   isDesktop: boolean;
   /** Whether this row's level breakdown is open. Owned by EntryList so a row can be re-rendered/reordered without losing it. */
   expanded: boolean;
+  /** The full row list and reorder callback, for the row-actions menu's move-up/down/top (#408) — see RowActionsMenu. */
+  rows: readonly MergedRow[];
+  onReorder: (activeId: string, overId: string) => void;
   onToggleLevels: (rowId: string) => void;
   onRemove: (skillTypeID: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
 }
 
-function EntryRow({
+/**
+ * Memoized (#408): PlanEditor re-renders on state that has nothing to do
+ * with any given row (dropError, an unrelated marker's editor, the export
+ * menu, another row's own expansion) — `React.memo` skips this row entirely
+ * when none of its own props changed. Only holds if the callback props below
+ * are themselves stable (`useCallback`'d at the PlanEditor/EntryList call
+ * sites) — an inline arrow recreated every render would defeat this the same
+ * way an unstable dependency defeats `useMemo`.
+ */
+const EntryRow = memo(function EntryRow({
   row,
   name,
   attributes,
@@ -284,6 +356,8 @@ function EntryRow({
   columns,
   isDesktop,
   expanded,
+  rows,
+  onReorder,
   onToggleLevels,
   onRemove,
   onSetPriority,
@@ -387,6 +461,10 @@ function EntryRow({
     </Button>
   );
 
+  const rowActions = (
+    <RowActionsMenu rowId={row.id} name={name} rows={rows} onReorder={onReorder} />
+  );
+
   const hasSecondLine = Boolean(attributeBadge) || Boolean(priorityControl) || columns.perLevelTime;
 
   return (
@@ -413,6 +491,7 @@ function EntryRow({
           )}
           {cumulativeTimeCell}
           {removeButton}
+          {rowActions}
         </div>
       ) : (
         <>
@@ -421,6 +500,7 @@ function EntryRow({
             {nameSpan}
             {cumulativeTimeCell}
             {removeButton}
+            {rowActions}
           </div>
           {hasSecondLine && (
             <div className="mt-0.5 flex items-center gap-2 pl-6 text-[0.6875rem] text-text-dim">
@@ -451,7 +531,7 @@ function EntryRow({
       )}
     </li>
   );
-}
+});
 
 interface PrereqRowProps {
   row: Extract<MergedRow, { kind: 'prereq' }>;
@@ -470,8 +550,13 @@ interface PrereqRowProps {
  * real entry at that position (CONTEXT.md "Prereq Promotion"). The "+" button
  * beside it does the same promotion in place, so the affordance is reachable
  * without guessing that a dimmed row can be dragged.
+ *
+ * Memoized (#408) like EntryRow — holds as long as `onPromote` is stable.
+ * No row-actions menu here: a prereq row isn't user-owned data to reorder in
+ * place (its "+"/drag already means "promote", not "move"); moving one
+ * before promoting it isn't a case #408 asked for.
  */
-function PrereqRow({
+const PrereqRow = memo(function PrereqRow({
   row,
   name,
   attributes,
@@ -587,13 +672,15 @@ function PrereqRow({
       {timeline && <TimelineLine start={timeline.start} finish={timeline.finish} />}
     </li>
   );
-}
+});
 
 interface MarkerRowProps {
   id: string;
   markerIndex: number;
   /** This marker's target attribute spread — a manual override, or "Optimize at my markers"' result, once either is known. */
   attributes?: Attributes;
+  rows: readonly MergedRow[];
+  onReorder: (activeId: string, overId: string) => void;
   onRemove: (markerIndex: number) => void;
   /** Opens the manual attribute editor (RemapMarkerModal) for this marker. */
   onEdit: (markerIndex: number) => void;
@@ -609,8 +696,18 @@ interface MarkerRowProps {
  * Either way the label/spread is a real button, not a click handler on the
  * `<li>`, so it doesn't fight the drag handle or the remove button for the
  * row's clicks: clicking it opens the manual attribute editor.
+ *
+ * Memoized (#408) like EntryRow/PrereqRow.
  */
-function MarkerRow({ id, markerIndex, attributes, onRemove, onEdit }: MarkerRowProps) {
+const MarkerRow = memo(function MarkerRow({
+  id,
+  markerIndex,
+  attributes,
+  rows,
+  onReorder,
+  onRemove,
+  onEdit,
+}: MarkerRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(id);
 
@@ -660,9 +757,10 @@ function MarkerRow({ id, markerIndex, attributes, onRemove, onEdit }: MarkerRowP
       >
         <span aria-hidden="true">✕</span>
       </Button>
+      <RowActionsMenu rowId={id} name={t('plans.markerRow')} rows={rows} onReorder={onReorder} />
     </li>
   );
-}
+});
 
 interface EntryListProps {
   /** Pre-merged entry + marker + prereq rows (see queueRows.ts), in schedule order. */
@@ -724,7 +822,12 @@ export function EntryList({
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    // A bare PointerSensor starts dragging on the first pixel of pointer
+    // movement, which both fires from ordinary jitter on a click (the level
+    // caret and remove button sit right beside the drag handle) and fights a
+    // tap-to-expand/tap-to-remove gesture on touch (#408). Requiring a small
+    // travel distance first is dnd-kit's own recommended fix for exactly this.
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   // Which entry rows have their level breakdown open (#254). Keyed by row id,
@@ -752,7 +855,17 @@ export function EntryList({
   const sortableIds = rows.map((r) => r.id);
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+      // Wider edge threshold and stronger acceleration than dnd-kit's default
+      // (#408): the entry list's own scroller is often the last few hundred
+      // pixels of a long capped-height panel, and the default threshold gave
+      // a dragged row too little room near the top/bottom edge to trigger
+      // autoscroll before the pointer ran out of list to drag within.
+      autoScroll={{ threshold: { x: 0.2, y: 0.25 }, acceleration: 20 }}
+    >
       <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
         <div className="rounded-xs border border-line">
           {isDesktop && (columns.perLevelTime || columns.cumulativeTime) && (
@@ -789,6 +902,8 @@ export function EntryList({
                       columns={columns}
                       isDesktop={isDesktop}
                       expanded={expandedRowIds.has(row.id)}
+                      rows={rows}
+                      onReorder={onReorder}
                       onToggleLevels={toggleLevels}
                       onRemove={onRemove}
                       onSetPriority={onSetPriority}
@@ -811,6 +926,8 @@ export function EntryList({
                       id={row.id}
                       markerIndex={row.markerIndex}
                       attributes={markerAttributesFor?.(row.markerIndex)}
+                      rows={rows}
+                      onReorder={onReorder}
                       onRemove={onRemoveMarker}
                       onEdit={onEditMarker}
                     />
