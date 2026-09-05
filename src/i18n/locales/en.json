@@ -1531,6 +1531,8 @@
       "browser": "Market",
       "openOrders": "Open",
       "history": "History",
+      "historyOrders": "Orders",
+      "historyViews": "History views",
       "transactions": "Transactions"
     },
     "priceHistory": {
