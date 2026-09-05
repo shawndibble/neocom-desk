@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import '@/i18n';
 import type { BuildResult } from '@/engine/industry/types';
 import { ResultsSummary } from './ResultsSummary';
@@ -30,16 +31,28 @@ const RESULT: BuildResult = {
 
 function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> = {}) {
   return render(
-    <ResultsSummary
-      result={RESULT}
-      pricesReady={true}
-      systemCostIndex={0.023}
-      productName="Rifter"
-      productUnitPrice={100000}
-      productQuantity={10}
-      costIndexSystemName="Jita"
-      {...overrides}
-    />
+    <MemoryRouter initialEntries={['/industry']}>
+      <Routes>
+        <Route
+          path="/industry"
+          element={
+            <ResultsSummary
+              result={RESULT}
+              pricesReady={true}
+              pricesLoading={false}
+              systemCostIndex={0.023}
+              productName="Rifter"
+              productTypeID={587}
+              productUnitPrice={100000}
+              productQuantity={10}
+              costIndexSystemName="Jita"
+              {...overrides}
+            />
+          }
+        />
+        <Route path="/market" element={<p>Market Browser</p>} />
+      </Routes>
+    </MemoryRouter>
   );
 }
 
@@ -341,5 +354,41 @@ describe('ResultsSummary: Gross/Net profit toggle (#118)', () => {
     // Toggling never hides the fee rows from the Revenue block (#117).
     expect(screen.getByText('Sales tax')).toBeInTheDocument();
     expect(screen.getByText('Broker fee')).toBeInTheDocument();
+  });
+});
+
+describe('ResultsSummary: fetching vs. unavailable prices (#409)', () => {
+  it('shows a distinct fetching state while pricesLoading, not the unavailable warning', () => {
+    renderSummary({ pricesReady: false, pricesLoading: true });
+    expect(screen.getByRole('status', { name: 'Fetching prices…' })).toBeInTheDocument();
+    expect(screen.queryByText('Price data unavailable')).not.toBeInTheDocument();
+  });
+
+  it('shows the unavailable warning once loading has finished and prices are genuinely missing', () => {
+    renderSummary({ pricesReady: false, pricesLoading: false });
+    expect(screen.getByText('Price data unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Fetching prices…')).not.toBeInTheDocument();
+  });
+});
+
+describe('ResultsSummary: unpriced-product Market link (#409)', () => {
+  it('links the unpriced-product warning to Market for that product', async () => {
+    renderSummary({
+      result: { ...RESULT, buyCost: null, unpriceable: true, unpricedMaterials: [] },
+      productTypeID: 587,
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Rifter has no hub sell price/ }));
+    expect(screen.getByText('Market Browser')).toBeInTheDocument();
+  });
+
+  it('renders the unpriced-product warning as plain text when there is no productTypeID', () => {
+    renderSummary({
+      result: { ...RESULT, buyCost: null, unpriceable: true, unpricedMaterials: [] },
+      productTypeID: null,
+    });
+    expect(
+      screen.queryByRole('button', { name: /Rifter has no hub sell price/ })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Rifter has no hub sell price/)).toBeInTheDocument();
   });
 });

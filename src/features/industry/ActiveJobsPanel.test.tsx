@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -19,6 +20,8 @@ const TYPES: TypeMap = {
 
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
+  // The row context menu (issue #409) asks usePiPlannable, which reads this.
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
 const CHAR_ID = 91;
@@ -89,15 +92,27 @@ describe('ActiveJobsPanel: rendering', () => {
       )
     );
 
-    const { container } = render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    const { container } = render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
 
     await screen.findByText('Widget Alpha');
     expect(screen.getByText('Widget Beta')).toBeInTheDocument();
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
 
-    expect(screen.getByText('Manufacturing')).toBeInTheDocument();
-    expect(screen.getByText('Material efficiency research')).toBeInTheDocument();
-    expect(screen.getByText('Invention')).toBeInTheDocument();
+    // Scoped to the job list, not the filter chips row above it (#409 added a
+    // chip per activity type, so these names now also appear there).
+    const jobList = within(container.querySelector('ul')!);
+    expect(jobList.getByText('Manufacturing')).toBeInTheDocument();
+    expect(jobList.getByText('Material efficiency research')).toBeInTheDocument();
+    expect(jobList.getByText('Invention')).toBeInTheDocument();
 
     // Sort: job 3 (past, "done") first, then job 2 (30m left), then job 1 (1h30m left).
     const text = container.textContent ?? '';
@@ -110,7 +125,8 @@ describe('ActiveJobsPanel: rendering', () => {
     expect(screen.getByText('1h 30m')).toBeInTheDocument();
 
     // <1h remaining ("completing soon") gets the warning-tone badge; the others don't.
-    expect(screen.getByText('Completing soon')).toBeInTheDocument();
+    // (#409 also added a "Completing soon" filter chip above the list, hence scoping.)
+    expect(jobList.getByText('Completing soon')).toBeInTheDocument();
 
     // Progress bars: past job at 100%, 30m-of-60m window at 50%, 30m-of-120m window at 25%.
     const bars = screen.getAllByRole('progressbar');
@@ -128,14 +144,32 @@ describe('ActiveJobsPanel: rendering', () => {
 
   it('shows a "no active jobs" empty state (not the no-data-cached one) when ESI answers with zero jobs', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([])));
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
     expect(await screen.findByText('No active jobs')).toBeInTheDocument();
     expect(screen.queryByText('No active jobs cached')).toBeNull();
   });
 
   it('shows the "no data cached" empty state when there is no data at all (offline, nothing cached)', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.error()));
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
     expect(await screen.findByText('No active jobs cached')).toBeInTheDocument();
   });
 });
@@ -148,7 +182,16 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
       )
     );
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
 
     expect(await screen.findByText('Log in again to see jobs')).toBeInTheDocument();
     expect(
@@ -167,7 +210,16 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
     const { beginEveLogin } = await import('@/app/loginFlow');
     const user = userEvent.setup();
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
 
     const loginButton = await screen.findByRole('button', { name: 'Log in again with EVE Online' });
     await user.click(loginButton);
@@ -184,7 +236,16 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
     );
     const user = userEvent.setup();
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
 
     await screen.findByText('Log in again to see jobs');
     expect(requestCount).toBe(1);
@@ -221,7 +282,16 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
     });
     server.use(http.get(jobsUrl(), () => HttpResponse.error()));
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
 
     expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
@@ -250,7 +320,16 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.error()));
     const user = userEvent.setup();
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
 
     // Initial load falls back to cache too, but this is the generic banner, not "Refresh failed".
     expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
@@ -259,5 +338,154 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
     expect(await screen.findByText('Refresh failed — showing cached data')).toBeInTheDocument();
+  });
+});
+
+describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
+  function manufacturingJob(overrides: Record<string, unknown> = {}) {
+    return {
+      job_id: 1,
+      activity_id: 1,
+      blueprint_type_id: 100,
+      product_type_id: 200,
+      facility_id: 60003760,
+      station_id: 60003760,
+      runs: 1,
+      start_date: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+      end_date: new Date(NOW.getTime() + 90 * 60_000).toISOString(),
+      status: 'active',
+      ...overrides,
+    };
+  }
+
+  it('offers Add to Quickbar, View in Market, and Build Plan on a job row, keyed off its product', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([manufacturingJob()])));
+    const onAddToQuickbar = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={onAddToQuickbar}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    // The row itself still shows the blueprint's name (unchanged); the context
+    // menu it opens targets the job's product typeID.
+    const row = (await screen.findByText('Widget Alpha')).closest('li')!;
+    fireEvent.contextMenu(row);
+
+    const quickbarItem = await screen.findByText('Add to Quickbar');
+    expect(screen.getByText('View in Market')).toBeInTheDocument();
+
+    fireEvent.click(quickbarItem);
+    // The job's product (200 -> Widget Beta), not its blueprint (100 -> Widget Alpha).
+    expect(onAddToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
+  });
+
+  it('disables the Build Plan action for a job with no product (research/copying/invention)', async () => {
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json([manufacturingJob({ activity_id: 5, product_type_id: undefined })])
+      )
+    );
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    const row = (await screen.findByText('Widget Alpha')).closest('li')!;
+    fireEvent.contextMenu(row);
+
+    expect(await screen.findByText(/no blueprint/i)).toBeInTheDocument();
+  });
+
+  it('filters jobs by activity-type chip', async () => {
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json([
+          manufacturingJob({ job_id: 1, activity_id: 1, blueprint_type_id: 100 }),
+          manufacturingJob({
+            job_id: 2,
+            activity_id: 8,
+            blueprint_type_id: 300,
+            product_type_id: undefined,
+          }),
+        ])
+      )
+    );
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await screen.findByText('Widget Alpha');
+    expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Manufacturing' }));
+
+    expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
+  });
+
+  it('filters jobs to completing-soon only', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json([
+          manufacturingJob({
+            job_id: 1,
+            blueprint_type_id: 100,
+            product_type_id: 200,
+            end_date: new Date(NOW.getTime() + 30 * 60_000).toISOString(),
+          }),
+          manufacturingJob({
+            job_id: 2,
+            blueprint_type_id: 300,
+            product_type_id: undefined,
+            end_date: new Date(NOW.getTime() + 5 * 60 * 60_000).toISOString(),
+          }),
+        ])
+      )
+    );
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await screen.findByText('Widget Alpha');
+    expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Completing soon' }));
+
+    expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
   });
 });

@@ -40,6 +40,7 @@ describe('loadBlueprintCatalog', () => {
       blueprint: BLUEPRINTS['638'],
       productTypeID: 587,
       productName: 'Rifter',
+      productNameLower: 'rifter',
     });
   });
 
@@ -71,6 +72,12 @@ describe('searchByProductName', () => {
   it('returns nothing for a blank query', async () => {
     const catalog = await loadBlueprintCatalog();
     expect(searchByProductName(catalog, '   ')).toEqual([]);
+  });
+
+  it('precomputes productNameLower once rather than lower-casing on every search call', async () => {
+    const catalog = await loadBlueprintCatalog();
+    const entry = catalog.byBlueprintTypeID.get(638);
+    expect(entry?.productNameLower).toBe('rifter');
   });
 });
 

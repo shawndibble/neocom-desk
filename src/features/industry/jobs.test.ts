@@ -12,6 +12,7 @@ import {
   isCompletingSoon,
   secondsRemaining,
   activityI18nKey,
+  contextMenuTypeId,
 } from './jobs';
 
 const CHAR_ID = 91;
@@ -214,5 +215,15 @@ describe('activityI18nKey', () => {
 
   it('falls back to a generic key for an unmapped activity_id', () => {
     expect(activityI18nKey(9)).toBe('industry.activity.unknown');
+  });
+});
+
+describe('contextMenuTypeId', () => {
+  it('uses the manufactured product when the job has one', () => {
+    expect(contextMenuTypeId({ blueprint_type_id: 638, product_type_id: 587 })).toBe(587);
+  });
+
+  it('falls back to the blueprint itself for research/copying/invention jobs (no product)', () => {
+    expect(contextMenuTypeId({ blueprint_type_id: 638, product_type_id: undefined })).toBe(638);
   });
 });

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
   EmptyState,
+  FilterChip,
   IconButton,
   Panel,
   ReauthBanner,
@@ -20,6 +21,7 @@ import {
   isCompletingSoon,
   secondsRemaining,
   activityI18nKey,
+  contextMenuTypeId,
   type ActiveJob,
   type JobsLoadResult,
 } from './jobs';
@@ -31,9 +33,14 @@ import { useCorpOwner } from '@/features/corp/owner';
 import { OwnerSwitch } from '@/features/corp/OwnerSwitch';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { loadCorporationIndustryJobs, type CorpJobsLoadResult } from '@/features/corp/jobs';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 
 interface ActiveJobsPanelProps {
   characterId: number;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  /** False with no active character — the Quickbar has nobody to save the item under. */
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 interface Snapshot {
@@ -72,9 +79,18 @@ async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
  * For everyone else the switch is not rendered at all and this panel is exactly
  * what it was.
  */
-export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
+export function ActiveJobsPanel({
+  characterId,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
+}: ActiveJobsPanelProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
+  // View-only filters (not persisted): an empty set means "every activity",
+  // matching how no chip pressed reads as no filter everywhere else in the app.
+  const [activityFilter, setActivityFilter] = useState<ReadonlySet<number>>(new Set());
+  const [completingSoonOnly, setCompletingSoonOnly] = useState(false);
   const { data, loading, refreshCount, refresh } = useRouteSnapshot(
     loadActiveJobsSnapshot,
     characterId
@@ -114,6 +130,32 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const listRefresh = showingCorp ? corp.refresh : refresh;
 
   const jobs = useMemo(() => sortJobsBySoonest<ActiveJob>(result?.cached?.data ?? []), [result]);
+
+  // Chips only for activities actually present — a chip for an activity type
+  // this character never runs would just be a permanently-dead toggle.
+  const presentActivityIds = useMemo(
+    () => [...new Set(jobs.map((job) => job.activity_id))].sort((a, b) => a - b),
+    [jobs]
+  );
+
+  const filteredJobs = useMemo(
+    () =>
+      jobs.filter((job) => {
+        if (activityFilter.size > 0 && !activityFilter.has(job.activity_id)) return false;
+        if (completingSoonOnly && !isCompletingSoon(job, now)) return false;
+        return true;
+      }),
+    [jobs, activityFilter, completingSoonOnly, now]
+  );
+
+  function toggleActivity(activityId: number) {
+    setActivityFilter((current) => {
+      const next = new Set(current);
+      if (next.has(activityId)) next.delete(activityId);
+      else next.add(activityId);
+      return next;
+    });
+  }
 
   const nameForBlueprint = (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`;
 
@@ -203,60 +245,100 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
               {listRefreshCount > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
             </p>
           )}
-          <ul className="space-y-2">
-            {jobs.map((job) => {
-              const name = nameForBlueprint(job.blueprint_type_id);
-              const done = isJobDone(job, now);
-              const soon = !done && isCompletingSoon(job, now);
-              const progress = Math.round(jobProgress(job, now) * 100);
-              const endDate = new Date(job.end_date);
-              return (
-                <li
-                  key={job.job_id}
-                  className={`rounded-xs border px-3 py-2 ${
-                    soon ? 'border-warning/60 bg-warning/10' : 'border-line bg-panel-2'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-medium">{name}</span>
-                    <span className="flex items-center gap-1.5">
-                      {soon && (
-                        <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
-                          {t('industry.jobsCompletingSoon')}
-                        </span>
-                      )}
-                      <span className="text-text-dim">
-                        {t(activityI18nKey(job.activity_id), { id: job.activity_id })}
-                      </span>
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-[0.6875rem] text-text-dim">
-                    <span>{t('industry.jobsRuns', { count: job.runs })}</span>
-                    <time
-                      dateTime={endDate.toISOString()}
-                      title={endDate.toLocaleString()}
-                      className={`tabular-nums ${done ? '' : soon ? 'font-semibold text-warning' : ''}`}
-                    >
-                      {done ? t('industry.jobsDone') : formatDuration(secondsRemaining(job, now))}
-                    </time>
-                  </div>
-                  <div
-                    role="progressbar"
-                    aria-label={t('industry.jobsProgress', { name })}
-                    aria-valuenow={progress}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    className="mt-2 h-1.5 overflow-hidden rounded-full bg-panel"
+          {(presentActivityIds.length > 1 || jobs.some((job) => isCompletingSoon(job, now))) && (
+            <div
+              role="group"
+              aria-label={t('industry.jobsFilterLabel')}
+              className="flex flex-wrap gap-1.5"
+            >
+              {presentActivityIds.map((activityId) => (
+                <FilterChip
+                  key={activityId}
+                  label={t(activityI18nKey(activityId), { id: activityId })}
+                  selected={activityFilter.has(activityId)}
+                  onToggle={() => toggleActivity(activityId)}
+                />
+              ))}
+              <FilterChip
+                label={t('industry.jobsCompletingSoon')}
+                selected={completingSoonOnly}
+                onToggle={() => setCompletingSoonOnly((v) => !v)}
+              />
+            </div>
+          )}
+          {filteredJobs.length === 0 ? (
+            <EmptyState title={t('industry.jobsFilteredEmptyTitle')} className="py-4" />
+          ) : (
+            <ul className="space-y-2">
+              {filteredJobs.map((job) => {
+                const name = nameForBlueprint(job.blueprint_type_id);
+                const done = isJobDone(job, now);
+                const soon = !done && isCompletingSoon(job, now);
+                const progress = Math.round(jobProgress(job, now) * 100);
+                const endDate = new Date(job.end_date);
+                const menuTypeId = contextMenuTypeId(job);
+                const menuItemName = nameForBlueprint(menuTypeId);
+                return (
+                  <ItemContextMenu
+                    key={job.job_id}
+                    typeId={menuTypeId}
+                    itemName={menuItemName}
+                    blueprintTypeID={
+                      job.product_type_id !== undefined ? job.blueprint_type_id : null
+                    }
+                    onAddToQuickbar={onAddToQuickbar}
+                    quickbarAvailable={quickbarAvailable}
+                    onShowInfo={onShowInfo}
                   >
-                    <div
-                      className={`h-full ${soon ? 'bg-warning' : 'bg-accent'}`}
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                    <li
+                      className={`rounded-xs border px-3 py-2 ${
+                        soon ? 'border-warning/60 bg-warning/10' : 'border-line bg-panel-2'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="font-medium">{name}</span>
+                        <span className="flex items-center gap-1.5">
+                          {soon && (
+                            <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
+                              {t('industry.jobsCompletingSoon')}
+                            </span>
+                          )}
+                          <span className="text-text-dim">
+                            {t(activityI18nKey(job.activity_id), { id: job.activity_id })}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-2 text-[0.6875rem] text-text-dim">
+                        <span>{t('industry.jobsRuns', { count: job.runs })}</span>
+                        <time
+                          dateTime={endDate.toISOString()}
+                          title={endDate.toLocaleString()}
+                          className={`tabular-nums ${done ? '' : soon ? 'font-semibold text-warning' : ''}`}
+                        >
+                          {done
+                            ? t('industry.jobsDone')
+                            : formatDuration(secondsRemaining(job, now))}
+                        </time>
+                      </div>
+                      <div
+                        role="progressbar"
+                        aria-label={t('industry.jobsProgress', { name })}
+                        aria-valuenow={progress}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        className="mt-2 h-1.5 overflow-hidden rounded-full bg-panel"
+                      >
+                        <div
+                          className={`h-full ${soon ? 'bg-warning' : 'bg-accent'}`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </li>
+                  </ItemContextMenu>
+                );
+              })}
+            </ul>
+          )}
         </div>
       )}
     </Panel>

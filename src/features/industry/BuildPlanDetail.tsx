@@ -4,6 +4,7 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
+  FilterChip,
   IconButton,
   InfoTooltip,
   NativeSelect,
@@ -36,7 +37,11 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { MaterialsTable } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
 import { bulkOwnedStockSuggestions } from '@/engine/industry/ownedStock';
-import { stockLocationLabel, type OwnedStockDetection } from './ownedStockDetection';
+import {
+  stockLocationLabel,
+  type OwnedStockDetection,
+  type OwnedStockSnapshot,
+} from './ownedStockDetection';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { ResultsSummary } from './ResultsSummary';
 
@@ -61,6 +66,13 @@ interface BuildPlanDetailProps {
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
+  /**
+   * Whole-account asset snapshot for owned-stock detection (issue #181),
+   * loaded once by `useOwnedStockSnapshot` above this component's own
+   * `key={plan.id}` remount boundary in `Industry.tsx` — switching plans
+   * must not redo that load, only the (cheap) per-plan aggregation below.
+   */
+  ownedStockSnapshot: OwnedStockSnapshot;
   onUpdate: (patch: PlanPatch) => void;
   /**
    * One material row’s sourcing edit. Separate from `onUpdate` because it is a
@@ -95,6 +107,7 @@ export function BuildPlanDetail({
   pi,
   ownedBlueprints,
   skills,
+  ownedStockSnapshot,
   onUpdate,
   onSourcingChange,
   onSourcingChangeMany,
@@ -124,6 +137,21 @@ export function BuildPlanDetail({
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  // Distinct from `pricesReady` below: that one collapses "still fetching"
+  // and "the live ESI call failed" into the same false, which used to flash
+  // the "prices unavailable" warning on every fresh load before the first
+  // response landed.
+  const [pricesLoading, setPricesLoading] = useState(true);
+  // Reset to loading the instant a new fetch is due (hub/typeIds/manual
+  // refresh), in the same commit rather than the effect's next tick — same
+  // derived-and-cleared-during-render shape as PlanEditor's stale-result
+  // clear above.
+  const snapshotKey = `${hub.id}:${typeIds.join(',')}:${refreshTick}`;
+  const [prevSnapshotKey, setPrevSnapshotKey] = useState(snapshotKey);
+  if (prevSnapshotKey !== snapshotKey) {
+    setPrevSnapshotKey(snapshotKey);
+    setPricesLoading(true);
+  }
 
   useEffect(() => {
     if (!blueprint || typeIds.length === 0) return;
@@ -132,6 +160,7 @@ export function BuildPlanDetail({
       if (cancelled) return;
       setSnapshot(snap);
       setFetchedAt(new Date());
+      setPricesLoading(false);
     });
     return () => {
       cancelled = true;
@@ -158,7 +187,7 @@ export function BuildPlanDetail({
     characterNames,
     locationNames,
     incompleteCharacters,
-  } = useDetectedOwnedStock(materialTypeIds);
+  } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
 
   const detection = useMemo<OwnedStockDetection>(
     () => ({
@@ -185,6 +214,18 @@ export function BuildPlanDetail({
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
+
+  // View-only toggle (not persisted): once a material is fully sourced from
+  // owned stock there's nothing left to shop for, so hiding it lets a long
+  // materials list focus on what still needs buying.
+  const [hideOwned, setHideOwned] = useState(false);
+
+  // CSV export deliberately keeps the full set regardless of the toggle: it's
+  // a shopping/accounting record, not the on-screen view the toggle curates.
+  const visibleMaterials = useMemo(() => {
+    if (!result) return [];
+    return hideOwned ? result.materials.filter((m) => m.remainingQuantity > 0) : result.materials;
+  }, [hideOwned, result]);
 
   // "Use all detected" fills only rows with nothing typed in them: a
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
@@ -461,6 +502,11 @@ export function BuildPlanDetail({
                 {t('industry.useAllDetected')}
               </Button>
             )}
+            <FilterChip
+              label={t('industry.hideOwned')}
+              selected={hideOwned}
+              onToggle={() => setHideOwned((v) => !v)}
+            />
             <IconButton
               size="sm"
               icon={<Icon.Download />}
@@ -482,7 +528,7 @@ export function BuildPlanDetail({
           <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
         ) : (
           <MaterialsTable
-            materials={result.materials}
+            materials={visibleMaterials}
             nameFor={(typeID) => nameForType(catalog, typeID)}
             sourcing={plan.materialSourcing}
             pricesReady={pricesReady}
@@ -499,8 +545,10 @@ export function BuildPlanDetail({
           <ResultsSummary
             result={result}
             pricesReady={pricesReady}
+            pricesLoading={pricesLoading}
             systemCostIndex={snapshot?.systemCostIndex ?? null}
             productName={entry.productName}
+            productTypeID={entry.productTypeID}
             productUnitPrice={
               entry.productTypeID !== null
                 ? (snapshot?.hubPrices[entry.productTypeID] ?? null)
