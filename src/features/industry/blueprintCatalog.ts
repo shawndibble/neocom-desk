@@ -15,6 +15,8 @@ export interface BlueprintCatalogEntry {
   productTypeID: number | null;
   /** Product name when known, else the blueprint's own name. */
   productName: string;
+  /** `productName.toLowerCase()`, precomputed once at catalog load rather than per search call — the picker calls `searchByProductName` on every keystroke, and lower-casing every entry's name each time was the actual per-keystroke cost over ~thousands of blueprints, not the substring scan itself. */
+  productNameLower: string;
 }
 
 export interface BlueprintCatalog {
@@ -42,7 +44,13 @@ export async function loadBlueprintCatalog(): Promise<BlueprintCatalog> {
     const productTypeID = product?.typeID ?? null;
     const productName =
       (productTypeID !== null ? types[String(productTypeID)]?.name : undefined) ?? blueprint.name;
-    const entry: BlueprintCatalogEntry = { blueprintTypeID, blueprint, productTypeID, productName };
+    const entry: BlueprintCatalogEntry = {
+      blueprintTypeID,
+      blueprint,
+      productTypeID,
+      productName,
+      productNameLower: productName.toLowerCase(),
+    };
     entries.push(entry);
     byBlueprintTypeID.set(blueprintTypeID, entry);
     if (productTypeID !== null && !byProductTypeID.has(productTypeID)) {
@@ -65,7 +73,7 @@ export function searchByProductName(
 ): BlueprintCatalogEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  return catalog.entries.filter((e) => e.productName.toLowerCase().includes(q));
+  return catalog.entries.filter((e) => e.productNameLower.includes(q));
 }
 
 /** Adapt an SDE BlueprintType to the shape src/engine/industry consumes (drops skills). */

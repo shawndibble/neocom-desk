@@ -49,12 +49,24 @@ export type ActiveJob = Pick<
   | 'job_id'
   | 'activity_id'
   | 'blueprint_type_id'
+  | 'product_type_id'
   | 'runs'
   | 'start_date'
   | 'end_date'
   | 'status'
   | 'cost'
 >;
+
+/**
+ * The typeID the job's context menu (Market/Quickbar/PI/Build Plan) acts on:
+ * the manufactured product when there is one, else the blueprint itself
+ * (research/copying/invention jobs have no product).
+ */
+export function contextMenuTypeId(
+  job: Pick<ActiveJob, 'blueprint_type_id' | 'product_type_id'>
+): number {
+  return job.product_type_id ?? job.blueprint_type_id;
+}
 
 /** Ending soonest first. */
 export function sortJobsBySoonest<T extends Pick<IndustryJob, 'end_date'>>(

@@ -24,6 +24,7 @@ import {
   type BlueprintCatalogEntry,
 } from '@/features/industry/blueprintCatalog';
 import { findOwnedBlueprint, loadCharacterBlueprints } from '@/features/industry/data';
+import { useOwnedStockSnapshot } from '@/features/industry/useDetectedOwnedStock';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
@@ -76,6 +77,10 @@ export function Industry() {
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
     null
   );
+
+  // Loaded once here, above BuildPlanDetail's `key={plan.id}` remount below —
+  // switching plans must not redo the whole-account asset load (issue #409).
+  const ownedStockSnapshot = useOwnedStockSnapshot();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
@@ -274,7 +279,12 @@ export function Industry() {
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title={t('nav.industry')} />
-      <ActiveJobsPanel characterId={activeCharacterId} />
+      <ActiveJobsPanel
+        characterId={activeCharacterId}
+        onAddToQuickbar={quickbar.add}
+        quickbarAvailable={quickbar.available}
+        onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
+      />
 
       {blueprintsNeedsReauth && (
         <Panel title={t('industry.blueprintsTitle')}>
@@ -340,6 +350,7 @@ export function Industry() {
                   pi={pi}
                   ownedBlueprints={ownedBlueprints}
                   skills={skills}
+                  ownedStockSnapshot={ownedStockSnapshot}
                   onUpdate={(patch) => void handleUpdate(patch)}
                   onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
                   onSourcingChangeMany={(patches) => void handleSourcingChangeMany(patches)}

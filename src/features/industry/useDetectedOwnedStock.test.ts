@@ -23,19 +23,35 @@ const SNAPSHOT: OwnedStockSnapshot = {
   incompleteCharacters: [],
 };
 
+const loadOwnedStockSnapshot = vi.fn(() => Promise.resolve(SNAPSHOT));
+
 vi.mock('./ownedStockDetection', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./ownedStockDetection')>()),
-  loadOwnedStockSnapshot: () => Promise.resolve(SNAPSHOT),
+  loadOwnedStockSnapshot: () => loadOwnedStockSnapshot(),
   resolveStockLocationNames: () => Promise.resolve(new Map([[60003760, 'Jita IV - Moon 4']])),
 }));
 
-const { useDetectedOwnedStock } = await import('./useDetectedOwnedStock');
+const { useDetectedOwnedStock, useOwnedStockSnapshot } = await import('./useDetectedOwnedStock');
 
 const TYPE_IDS = [34, 35];
 
+describe('useOwnedStockSnapshot', () => {
+  it('loads the whole-account snapshot once', async () => {
+    loadOwnedStockSnapshot.mockClear();
+    const { result, rerender } = renderHook(() => useOwnedStockSnapshot());
+
+    await waitFor(() => expect(result.current).toEqual(SNAPSHOT));
+
+    rerender();
+    rerender();
+
+    expect(loadOwnedStockSnapshot).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('useDetectedOwnedStock', () => {
-  it('counts the loaded assets against the plan material set and names the locations', async () => {
-    const { result } = renderHook(() => useDetectedOwnedStock(TYPE_IDS));
+  it('counts the given snapshot against the plan material set and names the locations', async () => {
+    const { result } = renderHook(() => useDetectedOwnedStock(SNAPSHOT, TYPE_IDS));
 
     await waitFor(() => expect(result.current.stock.get(34)?.quantity).toBe(5000));
     await waitFor(() =>
@@ -48,7 +64,7 @@ describe('useDetectedOwnedStock', () => {
     // Asset lists run to tens of thousands of rows per Character, and this hook
     // lives in a panel that re-renders on every runs/ME/TE keystroke — so the
     // caller passing a stable array has to be enough to avoid re-aggregating.
-    const { result, rerender } = renderHook(({ ids }) => useDetectedOwnedStock(ids), {
+    const { result, rerender } = renderHook(({ ids }) => useDetectedOwnedStock(SNAPSHOT, ids), {
       initialProps: { ids: TYPE_IDS },
     });
     await waitFor(() => expect(result.current.stock.size).toBe(1));
@@ -60,7 +76,7 @@ describe('useDetectedOwnedStock', () => {
   });
 
   it('recounts when the material set actually changes', async () => {
-    const { result, rerender } = renderHook(({ ids }) => useDetectedOwnedStock(ids), {
+    const { result, rerender } = renderHook(({ ids }) => useDetectedOwnedStock(SNAPSHOT, ids), {
       initialProps: { ids: TYPE_IDS },
     });
     await waitFor(() => expect(result.current.stock.size).toBe(1));
@@ -70,5 +86,17 @@ describe('useDetectedOwnedStock', () => {
 
     expect(result.current.stock).not.toBe(first);
     expect(result.current.stock.size).toBe(0);
+  });
+
+  it('does not recount when the snapshot reference is unchanged, even across a remount boundary', () => {
+    // The whole point of hoisting: passing the same snapshot object in (as
+    // Industry.tsx does across a plan switch) must not force a reload — there
+    // is nothing here to reload, since fetching moved to useOwnedStockSnapshot.
+    const { result, rerender } = renderHook(({ ids }) => useDetectedOwnedStock(SNAPSHOT, ids), {
+      initialProps: { ids: TYPE_IDS },
+    });
+    const first = result.current.stock;
+    rerender({ ids: TYPE_IDS });
+    expect(result.current.stock).toBe(first);
   });
 });
