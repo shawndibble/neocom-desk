@@ -36,6 +36,14 @@ const INFRASTRUCTURE: PiInfrastructure = {
   // Temperate and Barren; the real payload carries all eight.
   commandCenterTypeIds: [2254, 2524],
   extractorHead: { cpu: 110, powergrid: 550 },
+  link: {
+    cpu: 15,
+    powergrid: 10,
+    cpuPerKm: 0.2,
+    powergridPerKm: 0.15,
+    cpuLevelModifier: 1.4,
+    powergridLevelModifier: 1.2,
+  },
   commandCenterUpgrades: [
     { level: 0, cpu: 1_675, powergrid: 6_000 },
     { level: 1, cpu: 7_057, powergrid: 9_000 },

@@ -94,6 +94,7 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { orderBookCsvColumns, rangeLabel } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
+import type { HistoryView } from '@/features/market/HistoryViewSelect';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 
 /** Debounce for the catalogue search, so a fast typist doesn't re-filter the tree on every keystroke. */
@@ -112,18 +113,17 @@ const ROW_CAP = 15;
  * `history` and `transactions` are one tab wearing two hats: both are the
  * character's past, they overlap on item and side, and they answer the same
  * question from either end — which orders ended, and which fills paid out.
- * So History is the tab and they are its two views. They stay separate
- * `section` values rather than a nested param because that keeps every
- * existing `?section=` link working and lets each view keep its own
- * `useRouteSnapshot`, so opening one never fetches the other.
+ * So History is the tab, and the view is picked from a select in the table's
+ * own header (`HistoryViewSelect`) rather than a second row of tabs. They
+ * stay separate `section` values rather than a nested param because that
+ * keeps every existing `?section=` link working and lets each view keep its
+ * own `useRouteSnapshot`, so opening one never fetches the other.
  */
 type MarketSection = 'browser' | 'orders' | 'history' | 'transactions';
 function parseMarketSection(value: string | null): MarketSection {
   return value === 'orders' || value === 'history' || value === 'transactions' ? value : 'browser';
 }
 
-/** The two views behind the History tab. `history` is the one it opens on. */
-type HistoryView = Extract<MarketSection, 'history' | 'transactions'>;
 function isHistoryView(section: MarketSection): section is HistoryView {
   return section === 'history' || section === 'transactions';
 }
@@ -1108,20 +1108,8 @@ export function Market() {
 
       {section === 'orders' && <OpenOrdersPanel />}
 
-      {isHistoryView(section) && (
-        <>
-          <Tabs
-            label={t('market.sections.historyViews')}
-            value={section}
-            onChange={(id) => handleSectionChange(id as MarketSection)}
-            tabs={[
-              { id: 'history', label: t('market.sections.historyOrders') },
-              { id: 'transactions', label: t('market.sections.transactions') },
-            ]}
-          />
-          {section === 'history' ? <OrderHistoryPanel /> : <TransactionsPanel />}
-        </>
-      )}
+      {section === 'history' && <OrderHistoryPanel onViewChange={handleSectionChange} />}
+      {section === 'transactions' && <TransactionsPanel onViewChange={handleSectionChange} />}
 
       {section === 'browser' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">

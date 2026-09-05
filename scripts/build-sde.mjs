@@ -37,6 +37,9 @@ const FILES = [
   'invMetaGroups.csv',
   'mapRegions.csv',
   'mapSolarSystems.csv',
+  // Per-planet radius, for PI link cost (issue #440). Only the group-7 rows
+  // are kept; see `piPlanetRadius` below.
+  'mapDenormalize.csv',
   'staStations.csv',
 ];
 
@@ -132,6 +135,14 @@ const CPU_LOAD_ATTR = 49; // cpuLoad
 const PLANET_RESTRICTION_ATTR = 1632; // planetRestriction: the planet typeID a pin belongs to
 const ECU_HEAD_CPU_ATTR = 1690; // ecuExtractorHeadCPU
 const ECU_HEAD_POWER_ATTR = 1691; // ecuExtractorHeadPower
+// The Link type (2280) and its own cost attributes. A link is a pin cost like
+// any other, except its size depends on the distance between the two pins it
+// joins — which is why per-planet radius has to ship alongside it.
+const PI_LINK_TYPE_ID = 2280;
+const LINK_POWER_PER_KM_ATTR = 1633; // powerLoadPerKm
+const LINK_CPU_PER_KM_ATTR = 1634; // cpuLoadPerKm
+const LINK_CPU_LEVEL_ATTR = 1635; // cpuLoadLevelModifier
+const LINK_POWER_LEVEL_ATTR = 1636; // powerLoadLevelModifier
 
 // CPU/Powergrid a Command Center supplies at each of its **own** upgrade
 // levels, 0-5.
@@ -456,7 +467,8 @@ async function main() {
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
       const typeID = Number(r[iType]);
-      if (!skillTypeIds.has(typeID) && !piPinTypeIds.has(typeID)) continue;
+      if (!skillTypeIds.has(typeID) && !piPinTypeIds.has(typeID) && typeID !== PI_LINK_TYPE_ID)
+        continue;
       const value = r[iInt] !== '' ? Number(r[iInt]) : num(r[iFloat]);
       let m = attrsByType.get(typeID);
       if (!m) {
@@ -837,6 +849,49 @@ async function main() {
           piCommandCenterOutput.powergrid !== CC_UPGRADE_LEVELS[0].powergrid
         ? `dump says ${piCommandCenterOutput.cpu} tf / ${piCommandCenterOutput.powergrid} MW, CC_UPGRADE_LEVELS[0] says ${CC_UPGRADE_LEVELS[0].cpu} / ${CC_UPGRADE_LEVELS[0].powergrid}`
         : null;
+  // --- Link cost (issue #440) ---
+  //
+  // A link draws CPU and Powergrid like any other pin, but its cost has a
+  // per-km term over the distance between the two pins it joins. Everything
+  // here is read from the Link type's own dogma attributes; the distance
+  // itself needs the planet's radius, emitted separately below.
+  const piLink = (() => {
+    const attrs = attrsByType.get(PI_LINK_TYPE_ID) ?? new Map();
+    const spec = {
+      cpu: attrs.get(CPU_LOAD_ATTR),
+      powergrid: attrs.get(POWER_LOAD_ATTR),
+      cpuPerKm: attrs.get(LINK_CPU_PER_KM_ATTR),
+      powergridPerKm: attrs.get(LINK_POWER_PER_KM_ATTR),
+      cpuLevelModifier: attrs.get(LINK_CPU_LEVEL_ATTR),
+      powergridLevelModifier: attrs.get(LINK_POWER_LEVEL_ATTR),
+    };
+    return Object.values(spec).every((v) => typeof v === 'number') ? spec : null;
+  })();
+
+  // --- Per-planet radius, in km (issue #440) ---
+  //
+  // The one input the link formula needs that is not a dogma attribute, and
+  // the reason it cannot be approximated: two colonies of identical shape cost
+  // wildly different amounts purely because their planets differ in size (a
+  // 6,030 km planet vs an 85,400 km one is a 6.7x difference in link cost).
+  // `mapDenormalize` stores it in metres; km is what the per-km attributes are
+  // denominated in, so the conversion happens once, here.
+  const piPlanetRadiusKm = {};
+  {
+    const rows = raw['mapDenormalize.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (Number(r[h.groupID]) !== PLANET_GROUP_ID) continue;
+      const metres = Number(r[h.radius]);
+      if (!Number.isFinite(metres) || metres <= 0) continue;
+      // Rounded to the km the formula works in: sub-km precision on a body
+      // thousands of km across cannot change a pin count, and the payload is
+      // one entry per planet in New Eden.
+      piPlanetRadiusKm[r[h.itemID]] = Math.round(metres / 1000);
+    }
+  }
+
   const piPlanetTypeCoverage = new Set(Object.values(piPlanetTypeByTypeId));
   const piMissingPlanetTypes = ESI_PLANET_TYPES.filter((p) => !piPlanetTypeCoverage.has(p));
   const pi = {
@@ -847,6 +902,7 @@ async function main() {
       pinKindByTypeId: piPinKindByTypeId,
       commandCenterTypeIds: piCommandCenterTypeIds.sort((a, b) => a - b),
       extractorHead: piExtractorHead,
+      link: piLink,
       commandCenterUpgrades: CC_UPGRADE_LEVELS,
     },
     planetTypeByTypeId: piPlanetTypeByTypeId,
@@ -888,6 +944,22 @@ async function main() {
     }
     if (!(piExtractorHead?.cpu > 0) || !(piExtractorHead?.powergrid > 0)) {
       problems.push('extractor head is priced at nothing');
+    }
+    // A link costs something, and its per-km terms are the whole point of
+    // shipping radius at all — a zero here would silently restore the
+    // uncharged-link bug #440 exists to fix, with no warning anywhere.
+    if (!piLink) {
+      problems.push(`Link type ${PI_LINK_TYPE_ID} is missing one of its cost attributes`);
+    } else {
+      for (const [field, value] of Object.entries(piLink)) {
+        if (!(value > 0)) problems.push(`link ${field} is ${value}; every term must be positive`);
+      }
+    }
+    // Radius is per planet and cannot be approximated. An empty or tiny table
+    // would make every colony's links look free.
+    const radiusCount = Object.keys(piPlanetRadiusKm).length;
+    if (radiusCount < 10_000) {
+      problems.push(`only ${radiusCount} planet radii found; mapDenormalize looks wrong or empty`);
     }
     for (const [typeID, schematic] of Object.entries(piSchematics)) {
       if (!schematic.facility) problems.push(`schematic ${typeID} has no facility`);
@@ -1098,6 +1170,9 @@ async function main() {
     ['blueprints.json', blueprints],
     ['types.json', typeMap],
     ['pi.json', pi],
+    // Its own file, not folded into pi.json: it is one entry per planet in New
+    // Eden and every other consumer of pi.json would pay for it on load.
+    ['pi-planet-radius.json', piPlanetRadiusKm],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {

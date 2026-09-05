@@ -24,6 +24,7 @@ import {
   walletTransactionsCsvColumns,
 } from '@/features/character/walletTransactionsCsv';
 import type { WalletTransaction } from '@/esi/endpoints';
+import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
@@ -54,7 +55,12 @@ async function loadTransactionsSnapshot(
  * only — ESI publishes a corp wallet transactions endpoint but the registry
  * (esi/registry.ts) registers only the journal for corp wallets.
  */
-export function TransactionsPanel() {
+interface TransactionsPanelProps {
+  /** Switches the History tab to its other view; the picker lives in this panel's header. */
+  onViewChange: (view: HistoryView) => void;
+}
+
+export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadTransactionsSnapshot);
@@ -146,33 +152,36 @@ export function TransactionsPanel() {
     <Panel
       padded={false}
       actions={
-        <span className="flex items-center gap-2">
-          <IconButton
-            size="sm"
-            icon={<Icon.Refresh />}
-            label={t('wallet.refresh')}
-            onClick={refresh}
-          />
-          {transactionsResult && (
-            <>
-              <IconButton
-                size="sm"
-                icon={<Icon.Download />}
-                label={t('wallet.exportCsvTransactions')}
-                disabled={transactions.length === 0}
-                onClick={() =>
-                  downloadCsv(
-                    'wallet-transactions',
-                    transactions,
-                    walletTransactionsCsvColumns(t, (id) => typeNames.get(id) ?? `Type #${id}`),
-                    new Date(),
-                    transactionsTruncated
-                  )
-                }
-              />
-              <DataAgeBadge date={transactionsResult.fetchedAt} />
-            </>
-          )}
+        <span className="flex w-full items-center justify-between gap-2">
+          <HistoryViewSelect value="transactions" onChange={onViewChange} />
+          <span className="flex items-center gap-2">
+            <IconButton
+              size="sm"
+              icon={<Icon.Refresh />}
+              label={t('wallet.refresh')}
+              onClick={refresh}
+            />
+            {transactionsResult && (
+              <>
+                <IconButton
+                  size="sm"
+                  icon={<Icon.Download />}
+                  label={t('wallet.exportCsvTransactions')}
+                  disabled={transactions.length === 0}
+                  onClick={() =>
+                    downloadCsv(
+                      'wallet-transactions',
+                      transactions,
+                      walletTransactionsCsvColumns(t, (id) => typeNames.get(id) ?? `Type #${id}`),
+                      new Date(),
+                      transactionsTruncated
+                    )
+                  }
+                />
+                <DataAgeBadge date={transactionsResult.fetchedAt} />
+              </>
+            )}
+          </span>
         </span>
       }
     >
