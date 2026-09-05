@@ -959,15 +959,14 @@
     "expiresIn": "in {{duration}}",
     "extraction": {
       "statusLabel": "Status",
-      "expiresLabel": "Expires",
-      "progressLabel": "{{product}} banked share of program total"
+      "expiresLabel": "Expires"
     },
     "production": {
       "title": "Production",
       "facilitiesRunning": "{{count}} facilities running"
     },
     "infrastructure": {
-      "title": "Infrastructure · no per-cycle data"
+      "title": "Infrastructure"
     },
     "colonies": {
       "panelTitle_one": "{{count}} colony",
