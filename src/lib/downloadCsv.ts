@@ -1,4 +1,4 @@
-import { toCsv, csvFilename, type CsvColumn } from './csv';
+import { toCsv, csvFilename, slugifyForFilename, type CsvColumn } from './csv';
 import { downloadTextFile } from './download';
 
 /**
@@ -36,14 +36,19 @@ export type CsvSurface =
  * `now` is injected so a caller's test can pin the filename instead of
  * freezing the clock. `truncated` marks a fetch that stopped short (pages
  * missing/capped) — the filename gets a `-partial` suffix so the file never
- * looks like the complete list just because it opens fine.
+ * looks like the complete list just because it opens fine. `qualifier` folds
+ * a free-text distinguisher (a corp wallet division's name) into the
+ * filename, slugified — without it, exporting two divisions back to back
+ * overwrites the same file (issue #413).
  */
 export function downloadCsv<T>(
   surface: CsvSurface,
   rows: readonly T[],
   columns: readonly CsvColumn<T>[],
   now: Date = new Date(),
-  truncated = false
+  truncated = false,
+  qualifier?: string
 ): void {
-  downloadTextFile(csvFilename(surface, now, { partial: truncated }), toCsv(rows, columns));
+  const base = qualifier ? `${surface}-${slugifyForFilename(qualifier)}` : surface;
+  downloadTextFile(csvFilename(base, now, { partial: truncated }), toCsv(rows, columns));
 }

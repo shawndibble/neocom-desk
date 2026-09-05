@@ -69,3 +69,16 @@ export function csvFilename(base: string, date: Date, options?: { partial?: bool
   const suffix = options?.partial ? '-partial' : '';
   return `neocom-${base}-${stamp}${suffix}.csv`;
 }
+
+/**
+ * A free-text label (a corp's own division name) reduced to a filename-safe
+ * slug, so a name like "SRP / Reimbursements!!" can't inject a path
+ * separator or otherwise land as a surprising filename fragment.
+ */
+export function slugifyForFilename(label: string): string {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'unnamed';
+}
