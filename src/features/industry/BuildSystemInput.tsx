@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip, Spinner, TextInput } from '@/components/ui';
-import { resolveSolarSystem, type SolarSystemRef } from '@/market/systemLookup';
+import { resolveSolarSystem, type SolarSystemRef } from '@/features/character/systemLookup';
 
 interface BuildSystemInputProps {
   /** The plan's stored build-system name, or undefined when it builds at its hub. */
