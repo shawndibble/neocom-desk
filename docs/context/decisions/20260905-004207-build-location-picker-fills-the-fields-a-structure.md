@@ -10,8 +10,11 @@ _Recorded 2026-09-05. Issue #499._
   band, which is highsec for all five hubs.
 
   Facility does **not** follow from the system — a system holds many
-  structures — so it stays a field. So do rig level, trade hub and facility
-  tax: nothing fills those either.
+  structures — so it stays a field. Nor does the rig: the band is only the
+  _multiplier_ applied to a fitted rig (`materials.ts` computes rig percent x
+  security multiplier), and ESI publishes no structure fitting, so which rig is
+  in the slot is knowable only to the pilot. Trade hub and facility tax fill
+  from nothing either.
 
 - **Build system stays a visible field, the same width as its neighbours.** The
   corp picker is a shortcut for pilots whose structure their corp owns; it is

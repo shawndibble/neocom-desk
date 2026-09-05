@@ -16,9 +16,13 @@ interface BuildSystemInputProps {
 
 /**
  * Names the system the job runs in, which settles two things at once: the cost
- * index the job fee is charged at, and the security band the rig multiplier
- * reads. Both follow from the system, so neither is a field of its own — the
- * band is stated under this one rather than picked beside it.
+ * index the job fee is charged at, and the security band that scales the rig
+ * bonus (`materials.ts`: rig percent x security multiplier). Both follow from
+ * the system, so neither is a field of its own — the band is stated under this
+ * one rather than picked beside it.
+ *
+ * Which rig is *fitted* does not follow from anything, and stays its own
+ * select: it is a physical module, and ESI publishes no structure fitting.
  *
  * A typed name rather than a picker: ESI's `/universe/ids` is an exact match,
  * not a search, and the app has no solar-system table to autocomplete against

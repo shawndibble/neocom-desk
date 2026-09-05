@@ -335,7 +335,7 @@
     "tradeHub": "Trade hub",
     "buildSystem": "Build system",
     "buildSystemTooltipLabel": "About build system",
-    "buildSystemTooltip": "The solar system your job runs in. Its cost index sets the job fee, and its security band sets the rig bonus — so naming it settles both. Leave it empty to build at the hub. Type the system name exactly, then press Enter or click away.",
+    "buildSystemTooltip": "The solar system your job runs in. Its cost index sets the job fee, and its security band scales whatever rig is fitted (1x highsec, 1.9x lowsec, 2.1x nullsec) — so naming it settles both. It cannot tell you which rig is fitted; ESI does not publish structure fittings. Leave it empty to build at the hub. Type the system name exactly, then press Enter or click away.",
     "buildSystemNotFound": "No solar system by that name.",
     "buildLocation": "Corp structure",
     "buildLocationPlaceholder": "Pick a structure…",
