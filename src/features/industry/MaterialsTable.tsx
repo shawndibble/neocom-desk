@@ -15,10 +15,11 @@ import { materialRowState } from './materialRow';
 import { suggestedOwnedQuantity } from '@/engine/industry/ownedStock';
 import { OwnedStockHint } from './OwnedStockHint';
 import type { OwnedStockDetection } from './ownedStockDetection';
+import type { MaterialTableRow } from './subBuildPlan';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
-  materials: readonly MaterialCostLine[];
+  materials: readonly MaterialTableRow[];
   nameFor: (typeID: number) => string;
   /** The plan's raw overrides. Needed to tell an override apart from a hub price of the same value. */
   sourcing: MaterialSourcingMap | undefined;
@@ -31,6 +32,15 @@ interface MaterialsTableProps {
   rowContextMenu?: (material: MaterialCostLine, tr: ReactElement) => ReactElement;
   /** Make-or-buy verdicts by material typeID. A material with no entry has no advice to show; omitted entirely where the caller can't price recipes. */
   makeOrBuy?: ReadonlyMap<number, MakeOrBuy>;
+  /**
+   * Whether a material can be produced here rather than bought — a blueprint
+   * makes it. Deliberately independent of `makeOrBuy`, which needs live prices:
+   * the run count and input quantities do not, so an unpriced row can still be
+   * expanded. Omitted where the caller cannot look recipes up at all.
+   */
+  canBuildHere?: (typeID: number) => boolean;
+  /** Turns one material's sub-build on or off. Omitted alongside `canBuildHere`. */
+  onToggleBuildHere?: (typeID: number) => void;
 }
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
@@ -246,20 +256,62 @@ export function MaterialsTable({
   detection,
   rowContextMenu,
   makeOrBuy,
+  canBuildHere,
+  onToggleBuildHere,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
-  const columns = useMemo<DataTableColumn<MaterialCostLine>[]>(
+  const columns = useMemo<DataTableColumn<MaterialTableRow>[]>(
     () => [
       {
         id: 'material',
         header: t('industry.material'),
         render: (material) => {
           const advice = makeOrBuy?.get(material.typeID);
+          const name = nameFor(material.typeID);
+          const building = material.subBuild !== undefined;
           return (
-            <span className="inline-flex items-center gap-1.5">
+            // Indented when the row only exists because something above it is
+            // being built. The indent is the glance; the tag beside the name is
+            // what a screen reader and a narrow card get, since neither has a
+            // column edge to measure the offset against.
+            <span
+              className={cx('inline-flex items-center gap-1.5', material.isSubInput && 'sm:pl-4')}
+            >
               {advice && <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />}
-              {nameFor(material.typeID)}
+              {name}
+              {material.isSubInput && (
+                <span className="text-[0.6875rem] text-text-dim">
+                  {t('industry.subBuildInput')}
+                </span>
+              )}
+              {/*
+                Never offered on an indented row. That is what holds the
+                feature to one level: a recipe input may well have a blueprint
+                of its own, but expanding it would push the list toward raw
+                planetary resources no market sells (docs/context/decisions).
+              */}
+              {!material.isSubInput && canBuildHere?.(material.typeID) && onToggleBuildHere && (
+                // Hammer to start building it, cart to go back to buying it —
+                // the same two glyphs the make-or-buy marker already uses for
+                // those two errands, so the control reads as "switch this row
+                // to that" rather than as a third vocabulary.
+                <IconButton
+                  size="sm"
+                  variant="plain"
+                  icon={
+                    building ? (
+                      <Icon.Buy size={Icon.ICON_SIZE.sm} />
+                    ) : (
+                      <Icon.Build size={Icon.ICON_SIZE.sm} />
+                    )
+                  }
+                  label={t(building ? 'industry.buyInsteadFor' : 'industry.buildHereFor', {
+                    material: name,
+                  })}
+                  onClick={() => onToggleBuildHere(material.typeID)}
+                />
+              )}
             </span>
           );
         },
@@ -322,6 +374,16 @@ export function MaterialsTable({
         header: t('industry.price'),
         align: 'right',
         render: (material) => {
+          // A material being produced has no purchase price to show or edit:
+          // what it costs is the inputs listed below it plus its job fee, and a
+          // hub price beside it would read as money this plan is spending.
+          if (material.subBuild) {
+            return (
+              <span className="text-[0.6875rem] text-text-dim">
+                {t('industry.priceSourceBuilt')}
+              </span>
+            );
+          }
           const state = materialRowState(material, sourcing, pricesReady);
           const overridden = state.priceSource === 'override';
           const name = nameFor(material.typeID);
@@ -385,6 +447,25 @@ export function MaterialsTable({
         align: 'right',
         className: 'tabular-nums',
         render: (material) => {
+          // The job replaces the line total, because the money moved: this
+          // row's cost is now the indented inputs plus a fee counted once in
+          // the panel footer, and repeating either here would double it.
+          if (material.subBuild) {
+            const { runs, outputPerRun, unitsMade, spare } = material.subBuild;
+            return (
+              <span className="flex flex-col items-start sm:items-end">
+                <span>{t('industry.subBuildRuns', { runs: runs.toLocaleString() })}</span>
+                <span className="text-[0.6875rem] text-text-dim">
+                  {t('industry.subBuildYield', {
+                    output: outputPerRun.toLocaleString(),
+                    made: unitsMade.toLocaleString(),
+                  })}
+                  {spare > 0 &&
+                    ` ${t('industry.subBuildSpare', { spare: spare.toLocaleString() })}`}
+                </span>
+              </span>
+            );
+          }
           const state = materialRowState(material, sourcing, pricesReady);
           const owned = material.ownedQuantity;
           return (
@@ -413,7 +494,17 @@ export function MaterialsTable({
         },
       },
     ],
-    [t, nameFor, sourcing, pricesReady, onSourcingChange, detection, makeOrBuy]
+    [
+      t,
+      nameFor,
+      sourcing,
+      pricesReady,
+      onSourcingChange,
+      detection,
+      makeOrBuy,
+      canBuildHere,
+      onToggleBuildHere,
+    ]
   );
 
   return (

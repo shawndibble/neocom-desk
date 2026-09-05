@@ -12,7 +12,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
-import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
+import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type {
   EffectiveMaterial,
   FacilityKind,
@@ -38,6 +38,8 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
 import { hasShoppingList, shoppingListText } from './shoppingList';
+import { expandBuildPlan, subBuildTableRows } from './subBuildPlan';
+import { formatIsk } from '@/lib/isk';
 import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
   stockLocationLabel,
@@ -61,6 +63,7 @@ export type PlanPatch = Partial<
     | 'hubId'
     | 'facilityTaxPct'
     | 'ownedStockScope'
+    | 'buildHere'
   >
 >;
 
@@ -253,7 +256,31 @@ export function BuildPlanDetail({
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
 
-  const visibleMaterials = useMemo(() => result?.materials ?? [], [result]);
+  /**
+   * What produces each material, memoized per type.
+   *
+   * Deliberately outside the `advice` memo below, which returns nothing until
+   * live prices land: a recipe's run count and input quantities need no prices
+   * at all, so gating the lookup on them would leave the "build this here"
+   * control missing whenever the market was slow or unreachable.
+   */
+  const recipes = useMemo(() => {
+    const byType = new Map<number, MaterialRecipe | null>();
+    for (const typeID of materialTypeIds) {
+      byType.set(typeID, materialRecipe(typeID, { catalog, pi, ownedBlueprints }));
+    }
+    return byType;
+  }, [materialTypeIds, catalog, pi, ownedBlueprints]);
+
+  // Built once for the blueprint's own materials, so a type outside that set —
+  // a recipe input an expansion swapped in — answers "nothing produces this".
+  // That is also what keeps the build control off indented rows.
+  const recipeFor = useMemo(
+    () =>
+      (typeID: number): MaterialRecipe | null =>
+        recipes.get(typeID) ?? null,
+    [recipes]
+  );
 
   // "Use all detected" fills only rows with nothing typed in them: a
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
@@ -290,8 +317,7 @@ export function BuildPlanDetail({
       skills,
     };
     for (const material of result.materials) {
-      const recipe = materialRecipe(material.typeID, { catalog, pi, ownedBlueprints });
-      const verdict = makeOrBuy(material, recipe, context);
+      const verdict = makeOrBuy(material, recipeFor(material.typeID), context);
       if (verdict) verdicts.set(material.typeID, verdict);
     }
     return verdicts;
@@ -303,10 +329,57 @@ export function BuildPlanDetail({
     plan.security,
     plan.facilityTaxPct,
     skills,
-    catalog,
-    pi,
-    ownedBlueprints,
+    recipeFor,
   ]);
+
+  /**
+   * The plan with the player's chosen sub-builds applied: materials they asked
+   * to produce are replaced by what those jobs consume, merged and priced.
+   * Falls out to the plan untouched when nothing is expanded.
+   */
+  const expanded = useMemo(
+    () =>
+      expandBuildPlan({
+        materials: result?.materials ?? [],
+        buildHere: plan.buildHere ?? [],
+        recipeFor,
+        hubPrices: snapshot?.hubPrices ?? {},
+        sourcing: plan.materialSourcing,
+        ctx: {
+          facility: facilityPreset,
+          rig: plan.rigLevel,
+          security: plan.security,
+          facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
+          systemCostIndex: snapshot?.systemCostIndex ?? 0,
+          adjustedPrices: snapshot?.adjustedPrices ?? {},
+          skills,
+        },
+      }),
+    [
+      result,
+      plan.buildHere,
+      plan.materialSourcing,
+      plan.rigLevel,
+      plan.security,
+      plan.facilityTaxPct,
+      facilityPreset,
+      recipeFor,
+      snapshot,
+      skills,
+    ]
+  );
+
+  const visibleMaterials = useMemo(
+    () => (result ? subBuildTableRows(result.materials, expanded) : []),
+    [result, expanded]
+  );
+
+  /** Wall-clock the sub-jobs add before the main run can even be installed. */
+  const subBuildSeconds = useMemo(() => {
+    let seconds = 0;
+    for (const sub of expanded.subBuilds.values()) seconds += sub.seconds;
+    return seconds;
+  }, [expanded]);
 
   // The copy confirmation is a flash, not a state the panel keeps. Cleared by
   // an effect rather than a `setTimeout` inside the handler so unmounting mid-
@@ -324,6 +397,23 @@ export function BuildPlanDetail({
 
   function update(patch: PlanPatch) {
     onUpdate(patch);
+  }
+
+  /**
+   * Switches one material between being bought and being produced here.
+   *
+   * The whole list is rewritten rather than the single entry toggled in place,
+   * because it is a plain field on the record — unlike `materialSourcing`,
+   * which is a nested map and so needs the read-modify-write path
+   * `onSourcingChange` takes.
+   */
+  function toggleBuildHere(typeID: number) {
+    const current = plan.buildHere ?? [];
+    update({
+      buildHere: current.includes(typeID)
+        ? current.filter((id) => id !== typeID)
+        : [...current, typeID],
+    });
   }
 
   /**
@@ -362,7 +452,11 @@ export function BuildPlanDetail({
   async function copyShoppingList() {
     if (!result) return;
     try {
-      await writeToClipboard(shoppingListText(result.materials, (id) => nameForType(catalog, id)));
+      // The expanded list, not the plan's own: a material being produced here
+      // is not something to order, and the recipe inputs that replaced it are.
+      await writeToClipboard(
+        shoppingListText(expanded.materials, (id) => nameForType(catalog, id))
+      );
       setCopyState('copied');
     } catch {
       setCopyState('failed');
@@ -373,7 +467,7 @@ export function BuildPlanDetail({
     if (!result) return;
     downloadCsv(
       'build-materials',
-      result.materials,
+      expanded.materials,
       materialsCsvColumns(
         t,
         (typeID) => nameForType(catalog, typeID),
@@ -599,14 +693,14 @@ export function BuildPlanDetail({
                     : t('industry.copyShoppingList')
               }
               onClick={() => void copyShoppingList()}
-              disabled={!!error || !result || !hasShoppingList(result.materials)}
+              disabled={!!error || !result || !hasShoppingList(expanded.materials)}
             />
             <IconButton
               size="sm"
               icon={<Icon.Download />}
               label={t('industry.exportCsvMaterials')}
               onClick={exportMaterialsCsv}
-              disabled={!!error || !result || result.materials.length === 0}
+              disabled={!!error || !result || expanded.materials.length === 0}
             />
             <IconButton
               size="sm"
@@ -621,16 +715,41 @@ export function BuildPlanDetail({
         {error || !result ? (
           <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
         ) : (
-          <MaterialsTable
-            materials={visibleMaterials}
-            nameFor={(typeID) => nameForType(catalog, typeID)}
-            sourcing={plan.materialSourcing}
-            pricesReady={pricesReady}
-            onSourcingChange={onSourcingChange}
-            detection={detection}
-            rowContextMenu={materialContextMenu}
-            makeOrBuy={advice}
-          />
+          <>
+            <MaterialsTable
+              materials={visibleMaterials}
+              nameFor={(typeID) => nameForType(catalog, typeID)}
+              sourcing={plan.materialSourcing}
+              pricesReady={pricesReady}
+              onSourcingChange={onSourcingChange}
+              detection={detection}
+              rowContextMenu={materialContextMenu}
+              makeOrBuy={advice}
+              canBuildHere={(typeID) => recipeFor(typeID)?.method === 'manufacturing'}
+              onToggleBuildHere={toggleBuildHere}
+            />
+            {/*
+              Two totals, never one rewritten in place. The materials above are
+              what the expanded plan buys; the plan's own material cost is what
+              it would have cost to buy the lot. Showing only the new number
+              would hide the decision the player just made, and quietly
+              contradict the Results panel below — which still prices the plan
+              as written, because a sub-build changes what you shop for, not
+              what the parent job installs or sells.
+            */}
+            {expanded.subBuilds.size > 0 && (
+              <p className="mt-3 border-t border-line pt-2 text-[0.6875rem] text-text-dim">
+                {t('industry.subBuildSummary', {
+                  count: expanded.subBuilds.size,
+                  materials: formatIsk(expanded.materialCost),
+                  fees: formatIsk(expanded.subBuildFees),
+                  total: formatIsk(expanded.materialCost + expanded.subBuildFees),
+                  planned: formatIsk(result.materialCost),
+                })}{' '}
+                {t('industry.subBuildTimeNote', { time: formatDuration(subBuildSeconds) })}
+              </p>
+            )}
+          </>
         )}
       </Panel>
 

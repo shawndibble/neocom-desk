@@ -558,6 +558,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       mode: 'selected',
       locations: [{ characterId: 1, locationId: 60003760, locationType: 'station' }],
     },
+    buildHere: [57478],
     updatedAt: Date.now() - 1000,
   };
 
@@ -579,6 +580,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
   it('pins the Build Plan fields, so a new one has to be routed deliberately', () => {
     expect(Object.keys(fullBuildPlan).sort()).toEqual([
       'blueprintTypeID',
+      'buildHere',
       'characterId',
       'facility',
       'facilityTaxPct',
@@ -689,6 +691,28 @@ describe('triggerSync: build plans', () => {
     await db.buildPlans.put(buildPlan({ ownedStockScope: scope }));
     await triggerSync(1);
     expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')?.ownedStockScope).toEqual(scope);
+  });
+
+  it('round-trips buildHere through the pushed doc', async () => {
+    await db.buildPlans.put(buildPlan({ buildHere: [57478, 57486] }));
+    await triggerSync(1);
+
+    expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')?.buildHere).toEqual([57478, 57486]);
+  });
+
+  it('omits an empty buildHere from the pushed doc — collapsing every row leaves no trace', async () => {
+    await db.buildPlans.put(buildPlan({ buildHere: [] }));
+    await triggerSync(1);
+
+    expect('buildHere' in (remoteStore.get(BUILD_PLANS_PATH)?.get('b1') ?? {})).toBe(false);
+  });
+
+  it('pulls buildHere from a remote build plan into Dexie', async () => {
+    const expected = buildPlan({ buildHere: [57478] });
+    seedRemote(BUILD_PLANS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    await triggerSync(1);
+
+    expect(await db.buildPlans.get('b1')).toEqual(expected);
   });
 
   it('omits ownedStockScope from the pushed doc when absent (Firestore rejects undefined)', async () => {
