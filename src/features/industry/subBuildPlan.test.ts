@@ -173,7 +173,7 @@ describe('subBuildTableRows', () => {
     expect(rows[0].subBuild?.runs).toBe(50);
   });
 
-  it('adds the recipe inputs after the plan’s own materials, marked as inputs', () => {
+  it('adds the recipe inputs directly under the material being built, marked as inputs', () => {
     const lines = materials([
       { typeID: SEAL, quantity: 150 },
       { typeID: TRITANIUM, quantity: 1000 },
@@ -181,9 +181,9 @@ describe('subBuildTableRows', () => {
 
     const rows = subBuildTableRows(lines, expand(lines, [SEAL]));
 
-    expect(rows.map((r) => r.typeID)).toEqual([SEAL, TRITANIUM, FIBRE]);
-    expect(rows[2].isSubInput).toBe(true);
-    expect(rows[2].quantity).toBe(500);
+    expect(rows.map((r) => r.typeID)).toEqual([SEAL, FIBRE, TRITANIUM]);
+    expect(rows[1].isSubInput).toBe(true);
+    expect(rows[1].quantity).toBe(500);
   });
 
   it('never indents an input the plan already buys — it joins that row instead', () => {
@@ -198,5 +198,35 @@ describe('subBuildTableRows', () => {
     expect(rows[1].isSubInput).toBeUndefined();
     // 200 bought outright plus the 500 the seal job now needs.
     expect(rows[1].quantity).toBe(700);
+  });
+
+  it('places an input two builds share once, under whichever of them comes first', () => {
+    const RIVET = 57459;
+    const rivetBlueprint: IndustryBlueprint = {
+      name: 'Rivet Blueprint',
+      time: 900,
+      materials: [{ typeID: FIBRE, quantity: 4 }],
+      products: [{ typeID: RIVET, quantity: 2 }],
+    };
+    const lines = materials([
+      { typeID: SEAL, quantity: 150 },
+      { typeID: RIVET, quantity: 20 },
+    ]);
+
+    const rows = subBuildTableRows(
+      lines,
+      expand(lines, [SEAL, RIVET], {
+        recipes: {
+          ...RECIPES,
+          [RIVET]: { method: 'manufacturing', blueprint: rivetBlueprint, me: 0 },
+        },
+      })
+    );
+
+    // 50 seal runs x 10 fibre, plus 10 rivet runs x 4 fibre — one merged row,
+    // not one under each parent.
+    expect(rows.map((r) => r.typeID)).toEqual([SEAL, FIBRE, RIVET]);
+    expect(rows[1].isSubInput).toBe(true);
+    expect(rows[1].quantity).toBe(540);
   });
 });
