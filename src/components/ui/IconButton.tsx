@@ -9,11 +9,18 @@ interface IconButtonProps extends Omit<
   /** The glyph. Rendered `aria-hidden` — `label` is the accessible name. */
   icon: ReactNode;
   /**
-   * The control's name, in plain language. Becomes both the `aria-label` and
-   * the tooltip text, so it is the only thing a sighted-and-unsighted user
-   * read differently — never a description, always what the button does.
+   * The control's name, in plain language. Sets the `aria-label`, and the
+   * tooltip text unless `tooltip` overrides it — never a description, always
+   * what the button does.
    */
   label: string;
+  /**
+   * Shortens the visible bubble only: a per-item action keeps the item in
+   * `label` ("Delete Rifter run") for a screen reader, while a pointer user
+   * looking at the row needs "Delete". Keep it a substring of `label` (WCAG
+   * 2.5.3 Label in Name). Defaults to `label`.
+   */
+  tooltip?: string;
   onClick?: () => void;
   /** Present makes this a toggle: renders `aria-pressed` and takes the accent treatment when on. */
   pressed?: boolean;
@@ -43,7 +50,8 @@ interface IconButtonProps extends Omit<
  * Icon-only buttons fail two ways and this component is what stops both: no
  * accessible name (so a screen reader announces "button"), and a hit target
  * sized for a mouse. The name is mandatory — `label` is not optional and is
- * used for `aria-label` and the Tooltip alike, so the two can never drift.
+ * used for `aria-label` and the Tooltip alike, so the two can never drift
+ * unless a caller deliberately shortens the bubble via `tooltip`.
  * The default size is the 44px touch tier below `md` and the standard 36px
  * control above it (DESIGN.md §3); a pointer never gets the phone-sized box
  * and a thumb never gets the mouse-sized one.
@@ -57,6 +65,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   {
     icon,
     label,
+    tooltip,
     onClick,
     pressed,
     disabled = false,
@@ -69,7 +78,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   ref
 ) {
   return (
-    <Tooltip content={label}>
+    <Tooltip content={tooltip ?? label}>
       <button
         {...rest}
         ref={ref}

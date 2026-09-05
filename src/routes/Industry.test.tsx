@@ -222,6 +222,11 @@ describe('Industry: Build Plan CRUD', () => {
     expect(await screen.findByRole('button', { name: 'Rifter run' })).toBeInTheDocument();
 
     const row = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
+    // The row action names the plan for a screen reader, but the bubble a
+    // pointer user sees is the bare verb — they can already see the row.
+    fireEvent.pointerMove(within(row).getByRole('button', { name: 'Delete Rifter run' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Delete$/);
+
     await user.click(within(row).getByRole('button', { name: 'Duplicate Rifter run' }));
     expect(await screen.findByRole('button', { name: 'Rifter run (copy)' })).toBeInTheDocument();
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
