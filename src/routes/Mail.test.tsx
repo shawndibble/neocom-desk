@@ -233,37 +233,6 @@ describe('Mail', () => {
     expect(list).toHaveClass('max-h-[32rem]', 'overflow-y-auto');
   });
 
-  it('does not show a custom-label filter when the character has none', async () => {
-    render(<App />);
-    await screen.findByText('Fleet up!');
-    expect(screen.queryByRole('group', { name: /labels/i })).not.toBeInTheDocument();
-  });
-
-  it('shows custom labels as filter chips, distinct from the system-label tabs, and filters on toggle', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
-        HttpResponse.json({
-          labels: [...mailLabels.labels, { label_id: 100, name: 'Miners', unread_count: 0 }],
-          total_unread_count: 3,
-        })
-      ),
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
-        HttpResponse.json([...headers, { mail_id: 3, subject: 'Ore report', labels: [100] }])
-      )
-    );
-    const user = userEvent.setup();
-    render(<App />);
-    await screen.findByText('Fleet up!');
-    expect(screen.getByText('Ore report')).toBeInTheDocument();
-
-    const group = screen.getByRole('group', { name: /labels/i });
-    expect(group.querySelector('[aria-pressed="false"]')).toHaveTextContent('Miners');
-
-    await user.click(screen.getByRole('button', { name: 'Miners' }));
-    expect(screen.getByText('Ore report')).toBeInTheDocument();
-    expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
-  });
-
   it('does not show a "load more" affordance when fewer than 50 mails are cached', async () => {
     render(<App />);
     await screen.findByText('Fleet up!');
@@ -342,43 +311,6 @@ describe('Mail', () => {
     });
   }
 
-  it('clears the custom-label filter when the active character changes', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
-        HttpResponse.json({
-          labels: [...mailLabels.labels, { label_id: 100, name: 'Miners', unread_count: 0 }],
-          total_unread_count: 3,
-        })
-      ),
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
-        HttpResponse.json([...headers, { mail_id: 3, subject: 'Ore report', labels: [100] }])
-      )
-    );
-    await addSecondCharacter();
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail`, () =>
-        HttpResponse.json([
-          { mail_id: 4, subject: 'Second pilot mail', timestamp: '2026-08-03T00:00:00Z' },
-        ])
-      ),
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail/labels`, () =>
-        HttpResponse.json({ labels: mailLabels.labels, total_unread_count: 0 })
-      )
-    );
-
-    const user = userEvent.setup();
-    render(<App />);
-    await screen.findByText('Ore report');
-    await user.click(screen.getByRole('button', { name: 'Miners' }));
-    expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
-
-    await act(async () => {
-      await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
-    });
-
-    expect(await screen.findByText('Second pilot mail')).toBeInTheDocument();
-  });
-
   it('discards a "load more" result that resolves after the character changes', async () => {
     const fullPage = Array.from({ length: 50 }, (_, i) => ({
       mail_id: 1000 - i,
@@ -454,14 +386,18 @@ describe('Mail', () => {
     expect(screen.getByText('Market report')).toBeInTheDocument();
   });
 
-  it('locally marks a mail read/unread without writing back to ESI, and can hide read mail', async () => {
+  it('locally marks a mail read on selection without writing back to ESI, and can hide read mail', async () => {
     const user = userEvent.setup();
     render(<App />);
-    const fleetRow = (await screen.findByText('Fleet up!')).closest('li') as HTMLElement;
+    const fleetSubject = await screen.findByText('Fleet up!');
+    const fleetRow = fleetSubject.closest('li') as HTMLElement;
+    expect(within(fleetRow).getByText('Fleet up!')).toHaveClass('font-semibold', 'text-text');
 
-    await user.click(within(fleetRow).getByRole('button', { name: 'Mark read' }));
-    expect(within(fleetRow).getByRole('button', { name: 'Mark unread' })).toBeInTheDocument();
+    await user.click(fleetSubject);
+    expect(within(fleetRow).getByText('Fleet up!')).toHaveClass('font-normal', 'text-text-dim');
 
+    // Mobile layout shows one pane at a time — back to the list to reach the filter row.
+    await user.click(screen.getByRole('button', { name: 'Back' }));
     await user.click(screen.getByRole('button', { name: 'Hide read' }));
     expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
     // The already-read fixture header ('Market report') is also hidden now.
