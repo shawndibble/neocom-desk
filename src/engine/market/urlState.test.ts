@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseMarketParams,
   buildMarketParams,
+  buildMarketGroupParams,
   resolveAgainstCatalogue,
   resolveMarketLocation,
   type MarketLocationParam,
@@ -17,11 +18,17 @@ describe('parseMarketParams', () => {
       typeId: 587,
       hubId: 'jita',
       regionId: 10000002,
+      groupId: null,
     });
   });
 
   it('returns nulls when params are absent', () => {
-    expect(parseMarketParams(paramsOf({}))).toEqual({ typeId: null, hubId: null, regionId: null });
+    expect(parseMarketParams(paramsOf({}))).toEqual({
+      typeId: null,
+      hubId: null,
+      regionId: null,
+      groupId: null,
+    });
   });
 
   it('rejects a non-numeric type or region as malformed', () => {
@@ -29,6 +36,7 @@ describe('parseMarketParams', () => {
       typeId: null,
       hubId: null,
       regionId: null,
+      groupId: null,
     });
   });
 
@@ -39,6 +47,21 @@ describe('parseMarketParams', () => {
 
   it('treats an empty hub param as absent', () => {
     expect(parseMarketParams(paramsOf({ hub: '' })).hubId).toBeNull();
+  });
+
+  it('parses a valid group id', () => {
+    expect(parseMarketParams(paramsOf({ group: '618' })).groupId).toBe(618);
+  });
+
+  it('rejects a non-numeric or non-positive group id', () => {
+    expect(parseMarketParams(paramsOf({ group: 'abc' })).groupId).toBeNull();
+    expect(parseMarketParams(paramsOf({ group: '0' })).groupId).toBeNull();
+  });
+});
+
+describe('buildMarketGroupParams', () => {
+  it('builds a bare group param', () => {
+    expect(buildMarketGroupParams(618)).toEqual({ group: '618' });
   });
 });
 

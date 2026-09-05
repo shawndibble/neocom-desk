@@ -41,7 +41,11 @@ import { buildVariationIndex } from '@/engine/market/variations';
 import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
-import { filterMarketTree, MARKET_TREE_MATCH_LIMIT } from '@/features/market/marketTree';
+import {
+  filterMarketTree,
+  addAncestors,
+  MARKET_TREE_MATCH_LIMIT,
+} from '@/features/market/marketTree';
 import {
   getOrderBook,
   clearOrderBookCache,
@@ -389,6 +393,45 @@ export function Market() {
   );
   const selectedTypeId = parsedParams.typeId !== null && typeIsValid ? parsedParams.typeId : null;
 
+  // One pass over `groups` builds both lookups this route needs — by id (this
+  // param's validation and the ancestor walk below) and by parent
+  // (`childrenByParent`, the tree's own render shape, further down).
+  const groupCatalogue = useMemo(() => {
+    const byId = new Map<number, MarketGroupNode>();
+    const byParent = new Map<number | null, MarketGroupNode[]>();
+    for (const group of groups ?? []) {
+      byId.set(group.id, group);
+      const list = byParent.get(group.parentId) ?? [];
+      list.push(group);
+      byParent.set(group.parentId, list);
+    }
+    for (const list of byParent.values()) list.sort((a, b) => a.name.localeCompare(b.name));
+    return { byId, byParent };
+  }, [groups]);
+  const groupsById = groupCatalogue.byId;
+
+  const groupIdIsValid =
+    parsedParams.groupId === null
+      ? false
+      : groups === null
+        ? true
+        : groupsById.has(parsedParams.groupId);
+  const linkedGroupId = groupIdIsValid ? parsedParams.groupId : null;
+
+  // A `?group=` cross-link lands the tree pre-expanded to that category,
+  // additive to whatever's already open, once per incoming id — a ref, not
+  // state, since a manual re-collapse afterwards must not be fought back open.
+  const expandedForGroupId = useRef<number | null>(null);
+  useEffect(() => {
+    if (groups === null || linkedGroupId === null || linkedGroupId === expandedForGroupId.current) {
+      return;
+    }
+    const ancestry = new Set<number>();
+    addAncestors(linkedGroupId, groupsById, ancestry);
+    setExpandedIds((prev) => new Set([...prev, ...ancestry]));
+    expandedForGroupId.current = linkedGroupId;
+  }, [groups, linkedGroupId, groupsById]);
+
   const regionIsValid = resolveAgainstCatalogue(
     parsedParams.regionId,
     marketRegions,
@@ -587,16 +630,7 @@ export function Market() {
     };
   }, [selectedTypeId, resolvedRegion, hubHydrated, locationModeHydrated, refreshTick]);
 
-  const childrenByParent = useMemo(() => {
-    const map = new Map<number | null, MarketGroupNode[]>();
-    for (const group of groups ?? []) {
-      const list = map.get(group.parentId) ?? [];
-      list.push(group);
-      map.set(group.parentId, list);
-    }
-    for (const list of map.values()) list.sort((a, b) => a.name.localeCompare(b.name));
-    return map;
-  }, [groups]);
+  const childrenByParent = groupCatalogue.byParent;
 
   const typesByGroup = useMemo(() => {
     const map = new Map<number, MarketTypeEntry[]>();

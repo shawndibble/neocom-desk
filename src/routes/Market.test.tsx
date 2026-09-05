@@ -361,6 +361,25 @@ describe('Market Browser', () => {
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
   });
 
+  it('a ?group= link lands the tree expanded down to that category (issue #407)', async () => {
+    window.history.pushState({}, '', '/market?group=4');
+    render(<App />);
+
+    // Group 4 ("Destroyers") sits under group 1 ("Ships") — both must expand
+    // for its items to show, with no click needed.
+    expect(await screen.findByText('Merlin')).toBeInTheDocument();
+    expect(screen.getByText('Ships')).toBeInTheDocument();
+    expect(screen.getByText('Destroyers')).toBeInTheDocument();
+  });
+
+  it('ignores a ?group= id that is not in the loaded catalogue', async () => {
+    window.history.pushState({}, '', '/market?group=999');
+    render(<App />);
+
+    expect(await screen.findByText('Ships')).toBeInTheDocument();
+    expect(screen.queryByText('Merlin')).not.toBeInTheDocument();
+  });
+
   it('prompts to search or browse when nothing is selected', async () => {
     render(<App />);
     expect(await screen.findByText('Select an item')).toBeInTheDocument();
