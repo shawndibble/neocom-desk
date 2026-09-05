@@ -1403,8 +1403,9 @@
         "bodyWithAmount": "{{character}}'s wallet balance changed by {{amount}} ISK."
       },
       "marketOrderFilled": {
-        "title": "Market order filled",
-        "body": "{{character}}'s market order was filled."
+        "title": "Sell order filled",
+        "body": "Someone bought {{item}} from {{character}}.",
+        "bodyWithQuantity": "Someone bought {{quantity}} x {{item}} from {{character}}."
       },
       "structureFuelLow": {
         "title": "Structure fuel low",
@@ -1751,7 +1752,7 @@
         "newMail": "New Mail",
         "planetaryExtractionDone": "Planetary Extraction Done",
         "planetaryExtractorExpiring": "Planetary Extractor Expiring",
-        "marketOrderFilled": "Market Order Filled",
+        "marketOrderFilled": "Sell Order Filled",
         "newCalendarEvent": "New Calendar Event",
         "calendarEventStarting": "Calendar Event Starting",
         "contractAccepted": "Contract Accepted",

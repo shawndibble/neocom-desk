@@ -934,8 +934,12 @@ describe('diffWalletBalanceChanged', () => {
   });
 });
 
-function orderEntry(orderId: number, filled: boolean): MarketOrderEntrySnapshot {
-  return { orderId, filled };
+function orderEntry(
+  orderId: number,
+  filled: boolean,
+  overrides: Partial<MarketOrderEntrySnapshot> = {}
+): MarketOrderEntrySnapshot {
+  return { orderId, filled, isBuyOrder: false, typeId: 34, quantity: 100, ...overrides };
 }
 
 function orderSnapshot(
@@ -951,20 +955,30 @@ describe('diffMarketOrderFilled', () => {
     expect(diffMarketOrderFilled(1, undefined, next)).toEqual([]);
   });
 
-  it('fires when a sell order newly transitions to filled', () => {
-    const prev = orderSnapshot([orderEntry(1, false)], T0);
-    const next = orderSnapshot([orderEntry(1, true)], T0 + 2000);
+  it('fires when a sell order newly transitions to filled, naming the item and how many', () => {
+    const prev = orderSnapshot([orderEntry(1, false, { typeId: 34, quantity: 250 })], T0);
+    const next = orderSnapshot([orderEntry(1, true, { typeId: 34, quantity: 250 })], T0 + 2000);
     expect(diffMarketOrderFilled(7, prev, next)).toEqual([
-      { eventId: 'marketOrderFilled', characterId: 7, orderId: 1 },
+      { eventId: 'marketOrderFilled', characterId: 7, orderId: 1, typeId: 34, quantity: 250 },
     ]);
   });
 
-  it('fires the same event type when a buy order newly transitions to filled', () => {
-    const prev = orderSnapshot([orderEntry(2, false)], T0);
-    const next = orderSnapshot([orderEntry(2, true)], T0 + 2000);
-    expect(diffMarketOrderFilled(7, prev, next)).toEqual([
-      { eventId: 'marketOrderFilled', characterId: 7, orderId: 2 },
-    ]);
+  it('stays silent for a filled buy order — nobody bought anything from you', () => {
+    const prev = orderSnapshot([orderEntry(2, false, { isBuyOrder: true })], T0);
+    const next = orderSnapshot([orderEntry(2, true, { isBuyOrder: true })], T0 + 2000);
+    expect(diffMarketOrderFilled(7, prev, next)).toEqual([]);
+  });
+
+  it('still fires the sell orders in a batch that also holds a filled buy order', () => {
+    const prev = orderSnapshot(
+      [orderEntry(1, false), orderEntry(2, false, { isBuyOrder: true })],
+      T0
+    );
+    const next = orderSnapshot(
+      [orderEntry(1, true), orderEntry(2, true, { isBuyOrder: true })],
+      T0 + 2000
+    );
+    expect(diffMarketOrderFilled(7, prev, next).map((f) => f.orderId)).toEqual([1]);
   });
 
   it('does not fire while an order stays unfilled', () => {
@@ -982,9 +996,7 @@ describe('diffMarketOrderFilled', () => {
   it('fires for an order that only appears once already filled (never seen open before)', () => {
     const prev = orderSnapshot([orderEntry(2, false)], T0);
     const next = orderSnapshot([orderEntry(1, true), orderEntry(2, false)], T0 + 2000);
-    expect(diffMarketOrderFilled(7, prev, next)).toEqual([
-      { eventId: 'marketOrderFilled', characterId: 7, orderId: 1 },
-    ]);
+    expect(diffMarketOrderFilled(7, prev, next).map((f) => f.orderId)).toEqual([1]);
   });
 });
 

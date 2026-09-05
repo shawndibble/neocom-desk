@@ -167,9 +167,12 @@ describe('gatedOn', () => {
 });
 
 describe('deriveMarketOrderEntries', () => {
+  /** The fixture's own type and size, so a row assertion states only what it is testing. */
+  const item = { typeId: 34, quantity: 10 };
+
   it('marks every still-open order as not filled', () => {
     const entries = deriveMarketOrderEntries([marketOrder({ order_id: 1 })], []);
-    expect(entries).toEqual([{ orderId: 1, filled: false }]);
+    expect(entries).toEqual([{ orderId: 1, filled: false, isBuyOrder: false, ...item }]);
   });
 
   it('marks a history order gone from the open list as filled once volume_remain is 0', () => {
@@ -177,7 +180,7 @@ describe('deriveMarketOrderEntries', () => {
       [],
       [marketOrderHistoryEntry({ order_id: 2, volume_remain: 0 })]
     );
-    expect(entries).toEqual([{ orderId: 2, filled: true }]);
+    expect(entries).toEqual([{ orderId: 2, filled: true, isBuyOrder: false, ...item }]);
   });
 
   it('does not mark a history order with remaining volume as filled (cancelled/expired unfilled)', () => {
@@ -185,7 +188,7 @@ describe('deriveMarketOrderEntries', () => {
       [],
       [marketOrderHistoryEntry({ order_id: 3, volume_remain: 4 })]
     );
-    expect(entries).toEqual([{ orderId: 3, filled: false }]);
+    expect(entries).toEqual([{ orderId: 3, filled: false, isBuyOrder: false, ...item }]);
   });
 
   it('prefers the open-list entry over a stale history row for the same order id', () => {
@@ -193,10 +196,10 @@ describe('deriveMarketOrderEntries', () => {
       [marketOrder({ order_id: 4 })],
       [marketOrderHistoryEntry({ order_id: 4, volume_remain: 0 })]
     );
-    expect(entries).toEqual([{ orderId: 4, filled: false }]);
+    expect(entries).toEqual([{ orderId: 4, filled: false, isBuyOrder: false, ...item }]);
   });
 
-  it('derives the same shape for a filled buy order as a filled sell order', () => {
+  it('records which side of the book each order was on', () => {
     const entries = deriveMarketOrderEntries(
       [],
       [
@@ -204,10 +207,31 @@ describe('deriveMarketOrderEntries', () => {
         marketOrderHistoryEntry({ order_id: 6, is_buy_order: false, volume_remain: 0 }),
       ]
     );
-    expect(entries).toEqual([
-      { orderId: 5, filled: true },
-      { orderId: 6, filled: true },
-    ]);
+    expect(entries.map((e) => e.isBuyOrder)).toEqual([true, false]);
+  });
+
+  it('reads an absent is_buy_order as a sell order, which is how ESI sends one', () => {
+    // ESI omits the field on a sell order rather than sending false, so a
+    // truthiness test here is what keeps every offer out of the buy bucket.
+    const sell: MarketOrderHistory = marketOrderHistoryEntry({ order_id: 7, volume_remain: 0 });
+    delete sell.is_buy_order;
+
+    expect(deriveMarketOrderEntries([], [sell])[0].isBuyOrder).toBe(false);
+  });
+
+  it('carries what was sold and how much of it, for the notification copy', () => {
+    const entries = deriveMarketOrderEntries(
+      [],
+      [
+        marketOrderHistoryEntry({
+          order_id: 8,
+          type_id: 12345,
+          volume_total: 250,
+          volume_remain: 0,
+        }),
+      ]
+    );
+    expect(entries[0]).toMatchObject({ typeId: 12345, quantity: 250 });
   });
 });
 
@@ -440,7 +464,9 @@ describe('truncation guards', () => {
   it('polls market orders normally when the history page set is complete', async () => {
     vi.mocked(loadOrders).mockResolvedValue(statusResult([marketOrder({ order_id: 9 })], false));
     vi.mocked(loadOrderHistory).mockResolvedValue(statusResult([], false));
-    expect(await marketOrderDomain.load(1)).toEqual([{ orderId: 9, filled: false }]);
+    expect(await marketOrderDomain.load(1)).toEqual([
+      { orderId: 9, filled: false, isBuyOrder: false, typeId: 34, quantity: 10 },
+    ]);
   });
 });
 

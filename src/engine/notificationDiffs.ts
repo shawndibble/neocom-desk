@@ -608,6 +608,16 @@ export interface MarketOrderEntrySnapshot {
    * value, so filled-ness isn't a field ESI ever hands back directly.
    */
   filled: boolean;
+  /** True for a bid, false for an offer. Only offers are worth telling anyone about — see the diff below. */
+  isBuyOrder: boolean;
+  /** What was being sold, for the copy. */
+  typeId: number;
+  /**
+   * Units the order was for. Equal to what actually changed hands *because*
+   * fill is only recognised at `volume_remain === 0` — a partial fill never
+   * reaches here. Anyone adding partial-fill detection has to revisit this.
+   */
+  quantity: number;
 }
 
 export interface MarketOrderSnapshot {
@@ -619,17 +629,27 @@ export interface MarketOrderNotificationFire {
   eventId: 'marketOrderFilled';
   characterId: number;
   orderId: number;
+  typeId: number;
+  quantity: number;
 }
 
 /**
- * Fires per order whose `filled` is newly true (issue #175) — edge-triggered
- * on the transition, same shape as `diffContractAccepted`. Deliberately one
- * event for both directions (CONTEXT.md round 20: a completed sell and a
- * completed buy both count as `marketOrderFilled`, not two event types) —
- * `MarketOrderEntrySnapshot` carries no buy/sell field, so the diff can't
- * distinguish them even if it wanted to. An order missing from `prev.entries`
- * is treated as not-previously-filled, so one discovered already filled with
- * no prior baseline still fires once.
+ * Fires per **sell** order whose `filled` is newly true (issue #175) —
+ * edge-triggered on the transition, same shape as `diffContractAccepted`. An
+ * order missing from `prev.entries` is treated as not-previously-filled, so
+ * one discovered already filled with no prior baseline still fires once.
+ *
+ * Sell orders only. This reverses CONTEXT.md round 20, which made one event
+ * cover both directions on the grounds that a completed buy and a completed
+ * sell are the same thing happening — they are not, to the person being told.
+ * A filled sell order is news: someone bought from you while you were doing
+ * something else, and there is ISK to collect. A filled buy order is the
+ * trade you already set up completing on schedule, and telling you about it
+ * buries the one you wanted to hear. See the superseding decision file.
+ *
+ * Buy orders stay in the snapshot rather than being dropped at derive time so
+ * that this rule lives here, next to the tests that pin it, instead of
+ * becoming an invisible filter in the polling layer.
  */
 export function diffMarketOrderFilled(
   characterId: number,
@@ -640,9 +660,15 @@ export function diffMarketOrderFilled(
   const prevFilledById = new Map(prev.entries.map((entry) => [entry.orderId, entry.filled]));
   const fires: MarketOrderNotificationFire[] = [];
   for (const entry of next.entries) {
-    if (!entry.filled) continue;
+    if (!entry.filled || entry.isBuyOrder) continue;
     if (prevFilledById.get(entry.orderId) === true) continue;
-    fires.push({ eventId: 'marketOrderFilled', characterId, orderId: entry.orderId });
+    fires.push({
+      eventId: 'marketOrderFilled',
+      characterId,
+      orderId: entry.orderId,
+      typeId: entry.typeId,
+      quantity: entry.quantity,
+    });
   }
   return fires;
 }

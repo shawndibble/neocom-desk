@@ -135,8 +135,25 @@ describe('occurrenceKey', () => {
       eventId: 'marketOrderFilled',
       characterId: 7,
       orderId: 456,
+      typeId: 34,
+      quantity: 100,
     };
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0 + 1000));
+  });
+
+  it('keys marketOrderFilled on the order alone — the item and count are only copy', () => {
+    const fire: MarketOrderNotificationFire = {
+      eventId: 'marketOrderFilled',
+      characterId: 7,
+      orderId: 456,
+      typeId: 34,
+      quantity: 100,
+    };
+    // Same occurrence, so the same row: the Scheduled Push backend and this
+    // device must agree on the key without agreeing on the rendered wording.
+    expect(occurrenceKey(fire, T0)).toEqual(
+      occurrenceKey({ ...fire, typeId: 35, quantity: 999 }, T0)
+    );
   });
 
   it('keys newMail on mailId', () => {

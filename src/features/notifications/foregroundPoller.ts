@@ -18,6 +18,7 @@ import type { ProjectionRow } from '@/engine/projection';
 import { loadUniverseType } from '@/features/skills/data';
 import { loadPlanetName } from '@/features/pi/names';
 import { resolveNames } from '@/features/character/names';
+import { loadTypeNames } from '@/features/character/typeNames';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import { formatIsk } from '@/lib/isk';
 import i18n from '@/i18n';
@@ -492,9 +493,27 @@ async function notificationText(
     };
   }
   if (fire.eventId === 'marketOrderFilled') {
+    // Best-effort, like the EVE-notification names below: `loadTypeNames`
+    // reads the local SDE snapshot first, falls back to one batched ESI call,
+    // and yields "Type #id" rather than throwing. A name we cannot resolve is
+    // no reason to hold the notification back.
+    const names = await loadTypeNames([fire.typeId]).catch(() => new Map<number, string>());
+    const item = names.get(fire.typeId) ?? `#${fire.typeId}`;
     return {
       title: i18n.t('notifications.fired.marketOrderFilled.title'),
-      body: i18n.t('notifications.fired.marketOrderFilled.body', { character: character.name }),
+      // "1 x Tritanium" is noise; a bare item name is not. Same body/bodyWith…
+      // split `walletBalanceChanged` uses just above.
+      body:
+        fire.quantity > 1
+          ? i18n.t('notifications.fired.marketOrderFilled.bodyWithQuantity', {
+              character: character.name,
+              item,
+              quantity: fire.quantity.toLocaleString(),
+            })
+          : i18n.t('notifications.fired.marketOrderFilled.body', {
+              character: character.name,
+              item,
+            }),
     };
   }
   if (fire.eventId === 'eveNotification') {

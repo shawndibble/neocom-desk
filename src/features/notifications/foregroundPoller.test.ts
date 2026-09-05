@@ -1,4 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
+
+// The sell-order copy names the item. Resolving it for real would read the
+// bundled SDE snapshot over HTTP and fall through to ESI, neither of which is
+// served here — so the lookup is stubbed, and the unresolvable case gets its
+// own test below rather than being every test's accidental behaviour.
+vi.mock('@/features/character/typeNames', () => ({
+  loadTypeNames: vi.fn(async (typeIds: readonly number[]) => {
+    const names = new Map<number, string>([[34, 'Tritanium']]);
+    return new Map([...names].filter(([id]) => typeIds.includes(id)));
+  }),
+}));
 import type {
   SkillQueueEntry,
   IndustryJob,
@@ -950,7 +961,10 @@ describe('runForegroundPoll', () => {
 
   it('leaves the market-order baseline untouched and fires nothing when the load is truncated', async () => {
     const initial: MarketOrderPollerState = {
-      [CHAR.characterId]: { entries: [{ orderId: 1, filled: false }], nowMs: 500 },
+      [CHAR.characterId]: {
+        entries: [{ orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 }],
+        nowMs: 500,
+      },
     };
     const saveMarketOrderState = vi.fn(async () => {});
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
@@ -971,7 +985,9 @@ describe('runForegroundPoll', () => {
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
       eventPrefsFor: async () => ({ marketOrderFilled: { browser: true } }),
-      loadMarketOrders: async () => [{ orderId: 1, filled: false }],
+      loadMarketOrders: async () => [
+        { orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 },
+      ],
       saveMarketOrderState: async (state) => {
         savedMarketOrders = state;
       },
@@ -979,12 +995,17 @@ describe('runForegroundPoll', () => {
     await runForegroundPoll(deps);
     expect(deps.notify).not.toHaveBeenCalled();
     expect(savedMarketOrders).not.toBeNull();
-    expect(savedMarketOrders![CHAR.characterId].entries).toEqual([{ orderId: 1, filled: false }]);
+    expect(savedMarketOrders![CHAR.characterId].entries).toEqual([
+      { orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 },
+    ]);
   });
 
   it('records marketOrderFilled to the feed but does not raise a browser notification by default (feed-only, CONTEXT.md round 45)', async () => {
     const savedMarketOrders: MarketOrderPollerState = {
-      [CHAR.characterId]: { entries: [{ orderId: 1, filled: false }], nowMs: 1000 },
+      [CHAR.characterId]: {
+        entries: [{ orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 }],
+        nowMs: 1000,
+      },
     };
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
@@ -992,7 +1013,9 @@ describe('runForegroundPoll', () => {
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
       feedChannelEnabled: async () => true,
       prevMarketOrderState: async () => savedMarketOrders,
-      loadMarketOrders: async () => [{ orderId: 1, filled: true }],
+      loadMarketOrders: async () => [
+        { orderId: 1, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 },
+      ],
       notify,
       recordToFeed,
     });
@@ -1003,7 +1026,10 @@ describe('runForegroundPoll', () => {
 
   it('fires marketOrderFilled when an order newly transitions to filled', async () => {
     let savedMarketOrders: MarketOrderPollerState = {
-      [CHAR.characterId]: { entries: [{ orderId: 1, filled: false }], nowMs: 1000 },
+      [CHAR.characterId]: {
+        entries: [{ orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 }],
+        nowMs: 1000,
+      },
     };
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const deps = baseDeps({
@@ -1013,7 +1039,9 @@ describe('runForegroundPoll', () => {
       saveMarketOrderState: async (state) => {
         savedMarketOrders = state;
       },
-      loadMarketOrders: async () => [{ orderId: 1, filled: true }],
+      loadMarketOrders: async () => [
+        { orderId: 1, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 },
+      ],
       notify,
     });
     await runForegroundPoll(deps);
@@ -1023,13 +1051,18 @@ describe('runForegroundPoll', () => {
       eventId: 'marketOrderFilled',
       characterId: CHAR.characterId,
       orderId: 1,
+      typeId: 34,
+      quantity: 100,
     });
     expect(character).toEqual(CHAR);
   });
 
-  it('fires marketOrderFilled the same way for a buy order as a sell order', async () => {
+  it('names the item and the number of them sold', async () => {
     let savedMarketOrders: MarketOrderPollerState = {
-      [CHAR.characterId]: { entries: [{ orderId: 2, filled: false }], nowMs: 1000 },
+      [CHAR.characterId]: {
+        entries: [{ orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 250 }],
+        nowMs: 1000,
+      },
     };
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const deps = baseDeps({
@@ -1039,22 +1072,114 @@ describe('runForegroundPoll', () => {
       saveMarketOrderState: async (state) => {
         savedMarketOrders = state;
       },
-      loadMarketOrders: async () => [{ orderId: 2, filled: true }],
+      loadMarketOrders: async () => [
+        { orderId: 1, filled: true, isBuyOrder: false, typeId: 34, quantity: 250 },
+      ],
       notify,
     });
+
     await runForegroundPoll(deps);
+
+    // Type 34 is Tritanium in the bundled SDE snapshot, so the name resolves
+    // without an ESI round trip — the same path a real poll takes first.
+    const [, , copy] = notify.mock.calls[0];
+    expect(copy?.title).toBe('Sell order filled');
+    expect(copy?.body).toBe('Someone bought 250 x Tritanium from Test Pilot.');
+  });
+
+  it('leaves the count out when a single unit sold — "1 x" is noise', async () => {
+    let savedMarketOrders: MarketOrderPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 1 }],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({ marketOrderFilled: { browser: true } }),
+      prevMarketOrderState: async () => savedMarketOrders,
+      saveMarketOrderState: async (state) => {
+        savedMarketOrders = state;
+      },
+      loadMarketOrders: async () => [
+        { orderId: 1, filled: true, isBuyOrder: false, typeId: 34, quantity: 1 },
+      ],
+      notify,
+    });
+
+    await runForegroundPoll(deps);
+
+    expect(notify.mock.calls[0][2]?.body).toBe('Someone bought Tritanium from Test Pilot.');
+  });
+
+  it('still delivers when the item name cannot be resolved', async () => {
+    let savedMarketOrders: MarketOrderPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ orderId: 1, filled: false, isBuyOrder: false, typeId: 99999, quantity: 5 }],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({ marketOrderFilled: { browser: true } }),
+      prevMarketOrderState: async () => savedMarketOrders,
+      saveMarketOrderState: async (state) => {
+        savedMarketOrders = state;
+      },
+      loadMarketOrders: async () => [
+        { orderId: 1, filled: true, isBuyOrder: false, typeId: 99999, quantity: 5 },
+      ],
+      notify,
+    });
+
+    await runForegroundPoll(deps);
+
+    // An id we cannot name is no reason to hold the notification back — the
+    // same best-effort rule the EVE-notification copy follows.
     expect(notify).toHaveBeenCalledTimes(1);
-    const [fire] = notify.mock.calls[0];
-    expect(fire.eventId).toBe('marketOrderFilled');
+    expect(notify.mock.calls[0][2]?.body).toBe('Someone bought 5 x #99999 from Test Pilot.');
+  });
+
+  it('says nothing when a buy order fills — that is the trade you set up, not news', async () => {
+    let savedMarketOrders: MarketOrderPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ orderId: 2, filled: false, isBuyOrder: true, typeId: 34, quantity: 100 }],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({ marketOrderFilled: { browser: true, feed: true } }),
+      prevMarketOrderState: async () => savedMarketOrders,
+      saveMarketOrderState: async (state) => {
+        savedMarketOrders = state;
+      },
+      loadMarketOrders: async () => [
+        { orderId: 2, filled: true, isBuyOrder: true, typeId: 34, quantity: 100 },
+      ],
+      notify,
+      recordToFeed,
+    });
+
+    await runForegroundPoll(deps);
+
+    // Neither channel: the buy side is filtered in the diff, so nothing
+    // downstream ever sees a fire to deliver.
+    expect(notify).not.toHaveBeenCalled();
+    expect(recordToFeed).not.toHaveBeenCalled();
   });
 
   it('groups several marketOrderFilled fires from the same poll into one notify call, since none name the order (issue: duplicate order-filled toasts)', async () => {
     let savedMarketOrders: MarketOrderPollerState = {
       [CHAR.characterId]: {
         entries: [
-          { orderId: 1, filled: false },
-          { orderId: 2, filled: false },
-          { orderId: 3, filled: false },
+          { orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 },
+          { orderId: 2, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 },
+          { orderId: 3, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 },
         ],
         nowMs: 1000,
       },
@@ -1068,9 +1193,9 @@ describe('runForegroundPoll', () => {
         savedMarketOrders = state;
       },
       loadMarketOrders: async () => [
-        { orderId: 1, filled: true },
-        { orderId: 2, filled: true },
-        { orderId: 3, filled: true },
+        { orderId: 1, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 },
+        { orderId: 2, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 },
+        { orderId: 3, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 },
       ],
       notify,
     });
@@ -1086,8 +1211,8 @@ describe('runForegroundPoll', () => {
     let savedMarketOrders: MarketOrderPollerState = {
       [CHAR.characterId]: {
         entries: [
-          { orderId: 1, filled: false },
-          { orderId: 2, filled: false },
+          { orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 },
+          { orderId: 2, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 },
         ],
         nowMs: 1000,
       },
@@ -1101,8 +1226,8 @@ describe('runForegroundPoll', () => {
         savedMarketOrders = state;
       },
       loadMarketOrders: async () => [
-        { orderId: 1, filled: true },
-        { orderId: 2, filled: true },
+        { orderId: 1, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 },
+        { orderId: 2, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 },
       ],
       recordToFeed,
     });
@@ -1118,8 +1243,14 @@ describe('runForegroundPoll', () => {
     const CHAR_2: CharacterRef = { characterId: 2, name: 'Second Pilot' };
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const marketOrderStates: Record<number, MarketOrderPollerState[number]> = {
-      1: { entries: [{ orderId: 1, filled: false }], nowMs: 1000 },
-      2: { entries: [{ orderId: 9, filled: false }], nowMs: 1000 },
+      1: {
+        entries: [{ orderId: 1, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 }],
+        nowMs: 1000,
+      },
+      2: {
+        entries: [{ orderId: 9, filled: false, isBuyOrder: false, typeId: 34, quantity: 100 }],
+        nowMs: 1000,
+      },
     };
     const deps = baseDeps({
       characters: async () => [CHAR, CHAR_2],
@@ -1130,7 +1261,9 @@ describe('runForegroundPoll', () => {
         Object.assign(marketOrderStates, state);
       },
       loadMarketOrders: async (characterId) =>
-        characterId === 1 ? [{ orderId: 1, filled: true }] : [{ orderId: 9, filled: true }],
+        characterId === 1
+          ? [{ orderId: 1, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 }]
+          : [{ orderId: 9, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 }],
       notify,
     });
     await runForegroundPoll(deps);
