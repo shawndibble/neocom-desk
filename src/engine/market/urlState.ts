@@ -62,6 +62,22 @@ export function resolveAgainstCatalogue<T>(
 }
 
 /**
+ * Query params for a link into the Market Browser preselecting `typeId`,
+ * preserving whatever region/hub the current page is already scoped to
+ * (region wins, matching `resolveMarketLocation`'s own precedence) rather
+ * than resetting to the device's Location Mode default. A caller arriving
+ * with neither (e.g. Skills' implant chips, #405) gets just the typeId, same
+ * as opening `/market?type=…` fresh.
+ */
+export function marketLinkParams(typeId: number, currentSearch: string): Record<string, string> {
+  const parsed = parseMarketParams((key) => new URLSearchParams(currentSearch).get(key));
+  if (parsed.regionId !== null)
+    return buildMarketParams(typeId, { mode: 'region', regionId: parsed.regionId });
+  if (parsed.hubId !== null) return buildMarketParams(typeId, { mode: 'hub', hubId: parsed.hubId });
+  return { type: String(typeId) };
+}
+
+/**
  * The Market Browser's Location Mode precedence (CONTEXT.md round 7/9,
  * issue #4): a valid region param wins, then a valid hub param, then the
  * device-local Location Mode preference. `valid` is supplied by the caller —

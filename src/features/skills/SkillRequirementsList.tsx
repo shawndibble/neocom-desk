@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { openSkillDetailModal } from '@/stores/skillDetailModal';
 import type { PrereqRow, UnlockRow } from './skillRequirements';
 
 interface SkillRequirementsListProps {
@@ -9,15 +10,28 @@ interface SkillRequirementsListProps {
 }
 
 interface RequirementRowProps {
+  typeID: number;
   name: string;
   muted?: boolean;
   trailing: ReactNode;
 }
 
-function RequirementRow({ name, muted = false, trailing }: RequirementRowProps) {
+/**
+ * Name opens the shared Skill Detail popover (#400/#405) rather than
+ * navigating away — same target `SkillDetailModal` already reachable from a
+ * skill row, so a prereq/unlock two levels deep in another skill's detail
+ * re-targets the same popover instead of opening a second one.
+ */
+function RequirementRow({ typeID, name, muted = false, trailing }: RequirementRowProps) {
   return (
     <li className="flex items-center justify-between gap-2 py-1 text-xs">
-      <span className={muted ? 'text-text-dim' : 'text-text'}>{name}</span>
+      <button
+        type="button"
+        onClick={() => openSkillDetailModal(typeID)}
+        className={`truncate text-left hover:underline ${muted ? 'text-text-dim' : 'text-text'}`}
+      >
+        {name}
+      </button>
       {trailing}
     </li>
   );
@@ -43,6 +57,7 @@ export function SkillRequirementsList({
             {prereqs.map((req) => (
               <RequirementRow
                 key={req.typeID}
+                typeID={req.typeID}
                 name={req.name}
                 muted={!req.trained}
                 trailing={
@@ -74,6 +89,7 @@ export function SkillRequirementsList({
             {unlocks.map((req) => (
               <RequirementRow
                 key={req.typeID}
+                typeID={req.typeID}
                 name={req.name}
                 trailing={
                   <span className="shrink-0 text-text-dim">

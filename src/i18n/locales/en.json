@@ -49,6 +49,7 @@
     "attributeEffectiveBoth": "{{base}} + {{implant}} implant + {{booster}} booster = {{effective}}",
     "implants": "Implants",
     "implantsNone": "None fitted",
+    "implantsSlotsEmpty": "{{count}} of 5 slots empty",
     "emptyTitle": "No skill data cached",
     "emptyHint": "Reconnect to fetch this character's trained skills.",
     "offlineTitle": "Showing cached data",
@@ -84,6 +85,11 @@
     },
     "detail": {
       "title": "Skill Detail"
+    },
+    "contextMenu": {
+      "addToSkillPlan": "Add to Skill Plan",
+      "noPlans": "No skill plans yet",
+      "maxLevelTitle": "Already at level 5"
     }
   },
   "plans": {

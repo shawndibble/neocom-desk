@@ -62,6 +62,22 @@ export function remainingSpForLevel(rank: number, level: number, currentSp: numb
   return end - banked;
 }
 
+/**
+ * Fraction (0..1) of the next level already banked, or `null` at level 5
+ * (there is no level 6 to progress toward). Feeds SkillBar's partial-fill
+ * segment (#405) — a discrete pip per completed level hides that a skill
+ * sitting at level 2 might be 90% of the way to level 3.
+ */
+export function progressToNextLevel(rank: number, level: number, currentSp: number): number | null {
+  assertRank(rank);
+  assertLevel(level);
+  if (level === 5) return null;
+  const start = spForLevel(rank, level);
+  const end = spForLevel(rank, level + 1);
+  const fraction = (currentSp - start) / (end - start);
+  return Math.min(1, Math.max(0, fraction));
+}
+
 /** Training speed in SP per minute (Omega): primary + secondary/2. */
 export function trainingRate(primaryVal: number, secondaryVal: number): number {
   if (!(primaryVal > 0) || !(secondaryVal > 0)) {

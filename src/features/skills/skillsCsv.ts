@@ -11,6 +11,8 @@ export interface SkillGroup {
     sp: number | null;
     /** Markup-stripped skill description, for the row's tooltip. Null/absent when the skill has none. */
     description?: string | null;
+    /** Feeds SkillBar's progress-toward-next-level segment (#405); not part of the CSV export. */
+    rank: number;
   }[];
 }
 

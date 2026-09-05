@@ -425,6 +425,37 @@ describe('loadUniverseType', () => {
     expect(result?.data.name).toBe('Memory Augmentation - Improved');
     expect(result?.data.dogma_attributes).toEqual([{ attribute_id: 177, value: 5.0 }]);
   });
+
+  it('collapses concurrent lookups of the same typeId onto one live ESI call (issue #405 batching)', async () => {
+    // #405 asks that implant type lookups be batched rather than one ESI call
+    // per implant. There's no ESI batch endpoint returning full type +
+    // dogma_attributes data (only POST /universe/names, names only), so the
+    // achievable version of that ask is: two callers racing on the SAME
+    // typeId (e.g. Skills.tsx and loadImplantBonuses both wanting 10209 at
+    // once) must not issue two live requests. cache.ts's `withDedupe`
+    // already collapses this for any STALE_AFTER.static key — this locks
+    // that guarantee in for universeType specifically.
+    let requests = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/10209`, async () => {
+        requests += 1;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return HttpResponse.json({
+          type_id: 10209,
+          name: 'Memory Augmentation - Improved',
+          description: '',
+          group_id: 745,
+          published: true,
+        });
+      })
+    );
+
+    const [a, b] = await Promise.all([loadUniverseType(10209), loadUniverseType(10209)]);
+
+    expect(requests).toBe(1);
+    expect(a?.data.name).toBe('Memory Augmentation - Improved');
+    expect(b?.data.name).toBe('Memory Augmentation - Improved');
+  });
 });
 
 describe('loadImplantBonuses + loadUniverseType retry, end to end', () => {

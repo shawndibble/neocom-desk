@@ -179,6 +179,37 @@ describe('Skills', () => {
     expect(await screen.findByText('19 + 3 = 22')).toBeInTheDocument();
   });
 
+  it('counts only attribute-enhancer implants toward "N of 5 slots empty", not skill hardwirings (#405)', async () => {
+    // ESI's /characters/{id}/implants returns every fitted implant
+    // undifferentiated by slot. A hardwiring (bonuses something other than
+    // one of dogma.ts's five attribute-bonus ids 175-179) must not count as
+    // filling one of the 5 attribute-enhancer slots, or the count reads as
+    // "more full" than the character's attributes actually are.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/implants`, () =>
+        HttpResponse.json([9899, 20355])
+      ),
+      http.get('https://esi.evetech.net/universe/types/20355', () =>
+        HttpResponse.json({
+          type_id: 20355,
+          name: 'Zainou "Deadeye" Small Hybrid Turret SH-603',
+          description: '',
+          group_id: 300,
+          published: true,
+          dogma_attributes: [{ attribute_id: 999, value: 5.0 }],
+        })
+      )
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText('Ocular Filter - Basic')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Zainou "Deadeye" Small Hybrid Turret SH-603')
+    ).toBeInTheDocument();
+    expect(await screen.findByText('4 of 5 slots empty')).toBeInTheDocument();
+  });
+
   it('detects a cerebral accelerator and shows it as a third term, separate from implants', async () => {
     // A legal base spread (20/20/20/20/19, sums to 99) with a uniform +4
     // booster on every attribute, plus the fixture's own +3 perception
