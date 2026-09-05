@@ -14,7 +14,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import type { CachedResult } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { rememberSpSummary, getLastKnownSpSummary } from '@/features/character/characterSp';
+import { rememberSpSummary, getLastKnownSpSummary } from '@/stores/characterSp';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { loadContracts, isActiveContractStatus } from '@/features/character/contracts';
 import { loadOrders } from '@/features/character/orders';
@@ -183,6 +183,9 @@ export function Overview() {
   const skillsQueueData = skillsQueueSnapshot.data;
   const queueResult = skillsQueueData?.queueResult ?? null;
   const catalog = skillsQueueData?.catalog ?? null;
+  // Looked up once, not once per field: both chips fall back to the same
+  // character's cached SP pair while this tab's own load is in flight.
+  const lastKnownSp = getLastKnownSpSummary(activeCharacterId);
 
   // Reads the wall clock to pick "the entry training right now" — unavoidably
   // impure, but it only affects which row is shown, not any cached value.
@@ -199,10 +202,9 @@ export function Overview() {
     <div className="mx-auto max-w-6xl space-y-4">
       <CharacterHeader
         characterId={activeCharacterId}
-        totalSp={skillsQueueData?.totalSp ?? getLastKnownSpSummary(activeCharacterId).totalSp}
+        totalSp={skillsQueueData?.totalSp ?? lastKnownSp.totalSp}
         unallocatedSp={
-          skillsQueueData?.skillsResult?.data?.unallocated_sp ??
-          getLastKnownSpSummary(activeCharacterId).unallocatedSp
+          skillsQueueData?.skillsResult?.data?.unallocated_sp ?? lastKnownSp.unallocatedSp
         }
       />
       <OverviewSubNav />

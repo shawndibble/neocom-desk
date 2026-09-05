@@ -17,11 +17,8 @@ import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { loadCharacterClones } from '@/features/character/clones';
-import {
-  loadCharacterSpSummary,
-  getLastKnownSpSummary,
-  type CharacterSpSummary,
-} from '@/features/character/characterSp';
+import { loadCharacterSpSummary } from '@/features/character/characterSp';
+import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { loadCharacterSkills } from '@/features/skills/data';
 import { loadStationName } from '@/features/character/stations';
