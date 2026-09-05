@@ -308,6 +308,17 @@ export function BuildPlanDetail({
     [recipes]
   );
 
+  // The one place "can this be built here" is decided (manufacturing only —
+  // one level deep, docs/context/decisions). Shared by the materials table's
+  // own toggle and the row context menu, so a future change to the rule
+  // (a new method, say) touches this and nothing else.
+  const canBuildHere = useMemo(
+    () =>
+      (typeID: number): boolean =>
+        recipeFor(typeID)?.method === 'manufacturing',
+    [recipeFor]
+  );
+
   // "Use all detected" fills only rows with nothing typed in them: a
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
   // action. The per-row action is the one that overwrites — clicking it on that
@@ -328,11 +339,19 @@ export function BuildPlanDetail({
    * live adjusted prices and a system cost index there is no job fee, and a
    * fee-free quote would call almost everything worth building.
    */
-  const advice = useMemo(() => {
-    const verdicts = new Map<number, MakeOrBuy>();
-    if (!result || !snapshot || snapshot.adjustedPrices === null) return verdicts;
-    if (snapshot.systemCostIndex === null) return verdicts;
-    const context = {
+  /**
+   * The pricing context every make-or-buy verdict on this plan needs — shared
+   * by `advice` and `subInputAdvice` below, so a plan's own materials and an
+   * expanded row's own inputs are always judged against identical numbers.
+   * Null until live prices land, for the same reason the results panel
+   * waits: without adjusted prices and a system cost index there is no job
+   * fee, and a fee-free quote would call almost everything worth building.
+   */
+  const makeOrBuyContext = useMemo(() => {
+    if (!snapshot || snapshot.adjustedPrices === null || snapshot.systemCostIndex === null) {
+      return null;
+    }
+    return {
       facility: facilityPreset,
       rig: plan.rigLevel,
       security: plan.security,
@@ -342,21 +361,17 @@ export function BuildPlanDetail({
       hubPrices: snapshot.hubPrices,
       skills,
     };
+  }, [snapshot, facilityPreset, plan.rigLevel, plan.security, plan.facilityTaxPct, skills]);
+
+  const advice = useMemo(() => {
+    const verdicts = new Map<number, MakeOrBuy>();
+    if (!result || !makeOrBuyContext) return verdicts;
     for (const material of result.materials) {
-      const verdict = makeOrBuy(material, recipeFor(material.typeID), context);
+      const verdict = makeOrBuy(material, recipeFor(material.typeID), makeOrBuyContext);
       if (verdict) verdicts.set(material.typeID, verdict);
     }
     return verdicts;
-  }, [
-    result,
-    snapshot,
-    facilityPreset,
-    plan.rigLevel,
-    plan.security,
-    plan.facilityTaxPct,
-    skills,
-    recipeFor,
-  ]);
+  }, [result, makeOrBuyContext, recipeFor]);
 
   /**
    * The plan with the player's chosen sub-builds applied: materials they asked
@@ -413,40 +428,16 @@ export function BuildPlanDetail({
    */
   const subInputAdvice = useMemo(() => {
     const verdicts = new Map<number, MakeOrBuy>();
-    if (!snapshot || snapshot.adjustedPrices === null || snapshot.systemCostIndex === null) {
-      return verdicts;
-    }
+    if (!makeOrBuyContext) return verdicts;
     const own = new Set((result?.materials ?? []).map((material) => material.typeID));
-    const context = {
-      facility: facilityPreset,
-      rig: plan.rigLevel,
-      security: plan.security,
-      facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
-      systemCostIndex: snapshot.systemCostIndex,
-      adjustedPrices: snapshot.adjustedPrices,
-      hubPrices: snapshot.hubPrices,
-      skills,
-    };
     for (const material of expanded.materials) {
       if (own.has(material.typeID)) continue;
       const recipe = materialRecipe(material.typeID, { catalog, pi, ownedBlueprints });
-      const verdict = makeOrBuy(material, recipe, context);
+      const verdict = makeOrBuy(material, recipe, makeOrBuyContext);
       if (verdict) verdicts.set(material.typeID, verdict);
     }
     return verdicts;
-  }, [
-    expanded,
-    result,
-    snapshot,
-    facilityPreset,
-    plan.rigLevel,
-    plan.security,
-    plan.facilityTaxPct,
-    skills,
-    catalog,
-    pi,
-    ownedBlueprints,
-  ]);
+  }, [expanded, result, makeOrBuyContext, catalog, pi, ownedBlueprints]);
 
   /** `advice` plus `subInputAdvice`, so the table and the CSV export never disagree about which rows have a verdict. */
   const materialAdvice = useMemo(
@@ -509,8 +500,7 @@ export function BuildPlanDetail({
     // Same one-level-deep rule the inline marker in `MaterialsTable` follows:
     // never offered on a row that only exists because another build already
     // introduced it (docs/context/decisions).
-    const buildable =
-      !material.isSubInput && recipeFor(material.typeID)?.method === 'manufacturing';
+    const buildable = !material.isSubInput && canBuildHere(material.typeID);
     return (
       <ItemContextMenu
         typeId={material.typeID}
@@ -842,7 +832,7 @@ export function BuildPlanDetail({
               detection={detection}
               rowContextMenu={materialContextMenu}
               makeOrBuy={materialAdvice}
-              canBuildHere={(typeID) => recipeFor(typeID)?.method === 'manufacturing'}
+              canBuildHere={canBuildHere}
               onToggleBuildHere={toggleBuildHere}
             />
             {/*

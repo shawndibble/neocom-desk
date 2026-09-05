@@ -986,7 +986,7 @@ describe('MaterialsTable build-here control', () => {
     expect(cartControl.querySelector('svg')?.parentElement).toHaveClass('text-text-dim');
   });
 
-  it('carries the make-or-buy price rationale into the toggle, so hovering still says why', () => {
+  it('carries the make-or-buy price rationale into the toggle’s tooltip, keeping the accessible name to the short action', async () => {
     const advice: MakeOrBuy = {
       method: 'manufacturing',
       verdict: 'build',
@@ -1001,10 +1001,17 @@ describe('MaterialsTable build-here control', () => {
       makeOrBuy: new Map([[9840, advice]]),
     });
 
+    // The accessible name stays the short action — a real tab stop, unlike
+    // the advice-only marker's span, so a keyboard user's screen reader
+    // isn't reading a paragraph on every Tab.
     const control = within(row('Mechanical Parts')).getByRole('button', {
-      name: /^Build Mechanical Parts here instead of buying it\. Cheaper to build: 42\.96/,
+      name: 'Build Mechanical Parts here instead of buying it',
     });
-    expect(control).toHaveAccessibleName(/Worth 70 across the 10 units still to buy/);
+
+    fireEvent.pointerMove(control);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent(/Cheaper to build: 42\.96 a unit/);
+    expect(tooltip).toHaveTextContent(/Worth 70 across the 10 units still to buy/);
   });
 
   it('replaces a built material’s price with the job that produces it', () => {
@@ -1036,5 +1043,11 @@ describe('MaterialsTable build-here control', () => {
     expect(screen.getAllByRole('button', { name: /here instead of buying it$/ })).toHaveLength(2);
     expect(within(row('Pyerite')).queryByRole('button', { name: /Build/ })).toBeNull();
     expect(screen.getByText('Pyerite')).toHaveClass('sm:pl-4');
+    // The indent alone reaches a sighted reader at `sm` and up; a screen
+    // reader and a narrow stacked card (where `sm:pl-4` is inert) get this
+    // instead.
+    expect(within(row('Pyerite')).getByText("input to another material's build")).toHaveClass(
+      'sr-only'
+    );
   });
 });

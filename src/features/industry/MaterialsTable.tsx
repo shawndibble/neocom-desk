@@ -291,20 +291,28 @@ export function MaterialsTable({
           const actionLabel = t(building ? 'industry.buyInsteadFor' : 'industry.buildHereFor', {
             material: name,
           });
-          // Carries the same price rationale the advice-only marker shows,
-          // appended after the action so a screen reader hears what clicking
-          // does first. This is also the tooltip text (no separate `tooltip`
-          // override), so the visible bubble matches what gets announced.
-          const label = advice
+          // The price rationale is the hover tooltip, not the accessible
+          // name: this control is icon-only (no visible text WCAG 2.5.3
+          // could mismatch) and, unlike `MakeOrBuyMarker`'s span, a real tab
+          // stop — keeping `label` to the short action is what keeps a
+          // keyboard/screen-reader user from hearing a whole paragraph on
+          // every Tab. `undefined` falls back to `label` (IconButton's own
+          // rule), so a row with no advice still just shows the short action.
+          const tooltip = advice
             ? `${actionLabel}. ${makeOrBuyLabel(advice, material.remainingQuantity, t)}`
-            : actionLabel;
+            : undefined;
           return (
             // Indented when the row only exists because something above it is
-            // being built — a sighted reader on a wide-enough screen gets that
-            // from the offset alone, same as any other tree.
+            // being built. The offset alone reaches a sighted reader on a
+            // wide-enough screen; the sr-only label below is what a screen
+            // reader and a narrow stacked card get instead, since neither has
+            // a column edge to measure the offset against.
             <span
               className={cx('inline-flex items-center gap-1.5', material.isSubInput && 'sm:pl-4')}
             >
+              {material.isSubInput && (
+                <span className="sr-only">{t('industry.subBuildInput')}</span>
+              )}
               {toggle ? (
                 // The marker slot itself is the control on a material
                 // something here can produce — hammer to start building it,
@@ -336,7 +344,8 @@ export function MaterialsTable({
                       </span>
                     )
                   }
-                  label={label}
+                  label={actionLabel}
+                  tooltip={tooltip}
                   onClick={() => toggle(material.typeID)}
                 />
               ) : (
