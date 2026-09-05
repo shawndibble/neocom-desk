@@ -29,7 +29,9 @@ vi.mock('./marketData', () => ({ loadMarketSnapshot }));
 // same reason as the snapshot: the panel under test needs an answer, not a network.
 const resolveSolarSystem = vi.hoisted(() =>
   vi.fn(async (name: string) =>
-    name.trim().toLowerCase() === 'badivefi' ? { id: 30003888, name: 'Badivefi' } : null
+    name.trim().toLowerCase() === 'badivefi'
+      ? { id: 30003888, name: 'Badivefi', security: 'highsec' as const }
+      : null
   )
 );
 vi.mock('@/market/systemLookup', () => ({ resolveSolarSystem }));
@@ -418,39 +420,41 @@ describe('BuildPlanDetail sub-builds', () => {
 describe('BuildPlanDetail build system', () => {
   const systemInput = () => screen.getByLabelText('Build system');
 
-  /**
-   * Facility, security and build system sit behind "Override these" — the
-   * summary line states them, and the fields are one click away. Every test
-   * below edits one of them, so each opens it first.
-   */
-  async function openOverride(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole('button', { name: 'Override these' }));
-  }
-
   afterEach(() => {
     loadMarketSnapshot.mockClear();
     resolveSolarSystem.mockClear();
   });
 
-  it("summarises the plan's own location values above the fields", async () => {
+  it('states the security band under the field rather than offering it as a choice', async () => {
+    // The band follows the system, so a select beside it could only ever
+    // disagree with it.
     render(
       <Harness
-        plan={{
-          facility: 'azbel',
-          security: 'lowsec',
-          buildSystemId: 30003888,
-          buildSystemName: 'Badivefi',
-        }}
+        plan={{ security: 'lowsec', buildSystemId: 30003888, buildSystemName: 'Badivefi' }}
       />
     );
 
-    expect(await screen.findByText(/Azbel · Badivefi · Lowsec/)).toBeInTheDocument();
+    expect(await screen.findByText('Lowsec')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Security')).toBeNull();
   });
 
-  it('shows the hub system as the placeholder when no build system is set', async () => {
+  it('takes the band from the system it just resolved', async () => {
     const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ security: 'nullsec' }} onUpdate={onUpdate} />);
+
+    await user.type(systemInput(), 'badivefi');
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      buildSystemId: 30003888,
+      buildSystemName: 'Badivefi',
+      security: 'highsec',
+    });
+  });
+
+  it('shows the hub system as the placeholder when no build system is set', () => {
     render(<Harness plan={{ hubId: 'jita' }} />);
-    await openOverride(user);
 
     expect(valueOf(systemInput())).toBe('');
     expect(systemInput()).toHaveAttribute('placeholder', 'Jita');
@@ -460,7 +464,6 @@ describe('BuildPlanDetail build system', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness onUpdate={onUpdate} />);
-    await openOverride(user);
 
     await user.type(systemInput(), 'badivefi');
     await user.tab();
@@ -468,6 +471,7 @@ describe('BuildPlanDetail build system', () => {
     expect(onUpdate).toHaveBeenCalledWith({
       buildSystemId: 30003888,
       buildSystemName: 'Badivefi',
+      security: 'highsec',
     });
     expect(valueOf(systemInput())).toBe('Badivefi');
   });
@@ -493,7 +497,6 @@ describe('BuildPlanDetail build system', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness onUpdate={onUpdate} />);
-    await openOverride(user);
 
     await user.type(systemInput(), 'Notasystem');
     await user.tab();
@@ -513,7 +516,6 @@ describe('BuildPlanDetail build system', () => {
         onUpdate={onUpdate}
       />
     );
-    await openOverride(user);
 
     await user.clear(systemInput());
     await user.tab();
@@ -521,6 +523,7 @@ describe('BuildPlanDetail build system', () => {
     expect(onUpdate).toHaveBeenCalledWith({
       buildSystemId: undefined,
       buildSystemName: undefined,
+      security: 'highsec',
     });
   });
 
@@ -541,7 +544,6 @@ describe('BuildPlanDetail build system', () => {
   it('does not call ESI when the field is committed unchanged', async () => {
     const user = userEvent.setup();
     render(<Harness plan={{ buildSystemId: 30003888, buildSystemName: 'Badivefi' }} />);
-    await openOverride(user);
 
     await user.click(systemInput());
     await user.tab();

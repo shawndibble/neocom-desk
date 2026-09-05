@@ -473,8 +473,11 @@ describe('Industry: build plan settings grouping (#120)', () => {
     expect(screen.getByLabelText('TE %')).toBeInTheDocument();
     expect(screen.getByLabelText('Facility')).toBeInTheDocument();
     expect(screen.getByLabelText('Rig')).toBeInTheDocument();
-    expect(screen.getByLabelText('Security')).toBeInTheDocument();
+    expect(screen.getByLabelText('Build system')).toBeInTheDocument();
     expect(screen.getByLabelText('Trade hub')).toBeInTheDocument();
+    // Security is no longer a control: it follows the build system, and is
+    // stated under that field instead.
+    expect(screen.queryByLabelText('Security')).toBeNull();
   });
 });
 

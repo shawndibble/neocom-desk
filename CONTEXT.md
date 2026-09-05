@@ -23,8 +23,7 @@ here — they go one per file in `docs/context/decisions/`.
   which fold in implants and any cerebral accelerator on top.
 - **Booster**: Cerebral accelerator; user toggles it on manually with an expiry date for training-time math. Stored on the Skill Plan and synced with it, like What-If Implants above (round 33).
 - **Build Plan**: An industry plan for manufacturing: blueprints needed, materials, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). v1 scope: manufacturing only (no invention/reactions).
-- **Build Location**: The one line that states where a Build Plan's job runs — facility, **Build System** and security band — with those three fields behind an "Override these" link. A corp structure picked from the list fills all three at once and is not remembered: the summary always reads the plan's own values.
-- **Build System**: The solar system a Build Plan's job runs in, named on the plan. Sets the **Cost Index** the job fee is charged at, and nothing else — materials are still priced at the plan's trade hub. Empty means "the hub's own system", which is how every plan behaved before the field existed.
+- **Build System**: The solar system a Build Plan's job runs in, named on the plan. Sets the **Cost Index** the job fee is charged at _and_ the security band the rig bonus reads — both follow from the system, so neither is a separate field. Materials are still priced at the plan's trade hub. Empty means "the hub's own system", which is how every plan behaved before the field existed.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
 - **Character Not Training**: Fires when a Character's skill queue shows no
   active training (the head entry has no live `finish_date`) — whether from

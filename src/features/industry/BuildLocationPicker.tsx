@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, NativeSelect, Spinner } from '@/components/ui';
 import { useCorpOwner } from '@/features/corp/owner';
@@ -9,21 +9,17 @@ import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { BuildStructureOption } from './buildStructures';
 
 interface BuildLocationPickerProps {
-  /** Live summary of what the plan is actually set to, already translated. */
-  summary: string;
-  /** Facility, security and build system — revealed by "Override these". */
-  children: ReactNode;
   onPick: (option: BuildStructureOption) => void;
 }
 
 /**
- * Where the job runs, in one line instead of three fields.
+ * Fills the location fields from a structure the corporation owns.
  *
- * Facility, security and build system are three ways of saying "this
- * structure", and a pilot who has one in mind should not have to translate it
- * into three dropdowns. Picking a corp structure fills all three at once; the
- * summary line then states what the plan is set to, and the fields stay one
- * click away for anyone whose structure is not in the list.
+ * Facility and build system are two ways of saying "this structure", and a
+ * pilot who has one in mind should not have to translate it into two fields.
+ * Picking one fills both — and the security band follows the system, so that
+ * is settled too. The fields stay visible and editable for anyone whose
+ * structure is not in the list; this is a shortcut, never the only way in.
  *
  * **Fill-once, by decision.** Nothing records which structure was picked. The
  * summary always reads the plan's own values, so it cannot drift from them,
@@ -36,9 +32,8 @@ interface BuildLocationPickerProps {
  * Character with no corp capability the button never renders at all — the hide
  * rule (CONTEXT.md round 35), same as every other corp surface.
  */
-export function BuildLocationPicker({ summary, children, onPick }: BuildLocationPickerProps) {
+export function BuildLocationPicker({ onPick }: BuildLocationPickerProps) {
   const { t } = useTranslation();
-  const [overriding, setOverriding] = useState(false);
   const [asked, setAsked] = useState(false);
   // Which row the select shows, so a pick does not snap the control back to
   // the placeholder. Session-only on purpose: fill-once means the plan stores
@@ -99,20 +94,6 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
           )}
         </div>
       )}
-
-      <p className="text-text-dim">
-        {summary}{' '}
-        <button
-          type="button"
-          className="underline"
-          aria-expanded={overriding}
-          onClick={() => setOverriding((open) => !open)}
-        >
-          {t(overriding ? 'industry.overrideHide' : 'industry.overrideShow')}
-        </button>
-      </p>
-
-      {overriding && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{children}</div>}
     </div>
   );
 }

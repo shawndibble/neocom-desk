@@ -2,23 +2,30 @@
 
 _Recorded 2026-09-05. Issue #499._
 
-- **Facility, security and build system sit behind one summary line and an
-  "Override these" link.** They are three ways of saying "this structure", and
-  a pilot who has a structure in mind should not have to translate it into
-  three dropdowns. Rig level, trade hub and facility tax stay in the open —
-  nothing fills those, so hiding them would only add a click. The disclosure is
-  component state, not a stored field: it is presentation, so it can never
-  disagree with the plan.
+- **Security stops being a field. It follows the build system.** A solar
+  system has exactly one security band, so a select beside the system could
+  only ever disagree with it. Naming a system now settles both the cost index
+  the fee is charged at and the band the rig multiplier reads; the band is
+  stated under the field as text. A plan with no build system takes its hub's
+  band, which is highsec for all five hubs.
+
+  Facility does **not** follow from the system — a system holds many
+  structures — so it stays a field. So do rig level, trade hub and facility
+  tax: nothing fills those either.
+
+- **Build system stays a visible field, the same width as its neighbours.** The
+  corp picker is a shortcut for pilots whose structure their corp owns; it is
+  never the only way in, and hiding the field behind a disclosure would have
+  made the ordinary path the harder one.
 
 - **Picking a structure is fill-once, not a stored link.** Choosing one writes
   facility, security and build system in a single edit, and then steps out of
-  the way. Nothing records which structure it was. The summary line always
-  reads the plan's own values, so it cannot drift from them, and a later edit
-  to any field is just an edit rather than a conflict with a link. The
-  alternative — `buildStructureId` on the record — buys a "from K2-18 R&D"
-  label and pays for it with two more synced fields and a divergence state to
-  render. The job fee PR that preceded this one was caused by exactly that
-  class of mismatch.
+  the way. Nothing records which structure it was. Every field on screen reads
+  the plan's own values, so nothing can drift from them, and a later edit is
+  just an edit rather than a conflict with a link. The alternative —
+  `buildStructureId` on the record — buys a "from K2-18 R&D" label and pays for
+  it with two more synced fields and a divergence state to render. The job fee
+  PR that preceded this one was caused by exactly that class of mismatch.
 
 - **The structure list is filtered by typeID, not by reported services.**
   `CorporationStructure.services` is optional and ESI omits it once a structure

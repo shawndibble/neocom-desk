@@ -18,7 +18,6 @@ import type {
   FacilityKind,
   MaterialSourcing,
   RigLevel,
-  SecurityBand,
   SkillLevels,
 } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -567,11 +566,6 @@ export function BuildPlanDetail({
             </h3>
             <div className="mt-2 flex flex-col gap-3">
               <BuildLocationPicker
-                summary={t('industry.buildLocationSummary', {
-                  facility: facilityPreset.name,
-                  system: buildSystem?.name ?? hub.systemName,
-                  security: t(`industry.${plan.security}`),
-                })}
                 onPick={(option) =>
                   update({
                     facility: option.facility,
@@ -580,7 +574,9 @@ export function BuildPlanDetail({
                     buildSystemName: option.systemName,
                   })
                 }
-              >
+              />
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <label className="flex flex-col gap-1 text-xs">
                   {t('industry.facility')}
                   <NativeSelect
@@ -606,16 +602,23 @@ export function BuildPlanDetail({
                 <BuildSystemInput
                   systemName={buildSystem?.name}
                   hubSystemName={hub.systemName}
+                  securityLabel={t(`industry.${plan.security}`)}
                   onChange={(system) =>
                     update({
                       buildSystemId: system?.id,
                       buildSystemName: system?.name,
+                      // The band follows the system, so naming one settles the
+                      // rig multiplier too. An unreachable ESI leaves the plan
+                      // with the band it had rather than a guessed one.
+                      ...(system === null
+                        ? { security: hub.security }
+                        : system.security !== null
+                          ? { security: system.security }
+                          : {}),
                     })
                   }
                 />
-              </BuildLocationPicker>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <label className="flex flex-col gap-1 text-xs">
                   {t('industry.rigLevel')}
                   <NativeSelect
@@ -626,18 +629,6 @@ export function BuildPlanDetail({
                     <option value="none">{t('industry.rigNone')}</option>
                     <option value="t1">{t('industry.rigT1')}</option>
                     <option value="t2">{t('industry.rigT2')}</option>
-                  </NativeSelect>
-                </label>
-
-                <label className="flex flex-col gap-1 text-xs">
-                  {t('industry.security')}
-                  <NativeSelect
-                    value={plan.security}
-                    onChange={(e) => update({ security: e.target.value as SecurityBand })}
-                  >
-                    <option value="highsec">{t('industry.highsec')}</option>
-                    <option value="lowsec">{t('industry.lowsec')}</option>
-                    <option value="nullsec">{t('industry.nullsec')}</option>
                   </NativeSelect>
                 </label>
 

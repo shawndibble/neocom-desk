@@ -44,36 +44,11 @@ beforeEach(() => {
 });
 
 function renderPicker(onPick = vi.fn()) {
-  render(
-    <BuildLocationPicker summary="NPC station · Jita · Highsec" onPick={onPick}>
-      <label>
-        Facility
-        <input />
-      </label>
-    </BuildLocationPicker>
-  );
+  render(<BuildLocationPicker onPick={onPick} />);
   return onPick;
 }
 
 describe('BuildLocationPicker', () => {
-  it('states what the plan is set to, with the fields tucked behind a link', () => {
-    renderPicker();
-
-    expect(screen.getByText(/NPC station · Jita · Highsec/)).toBeInTheDocument();
-    expect(screen.queryByLabelText('Facility')).toBeNull();
-  });
-
-  it('reveals the fields on Override these, and hides them again', async () => {
-    const user = userEvent.setup();
-    renderPicker();
-
-    await user.click(screen.getByRole('button', { name: 'Override these' }));
-    expect(screen.getByLabelText('Facility')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Hide these' }));
-    expect(screen.queryByLabelText('Facility')).toBeNull();
-  });
-
   it('fetches nothing until the pilot asks — the corp read is opt-in', () => {
     renderPicker();
 
@@ -86,7 +61,7 @@ describe('BuildLocationPicker', () => {
     const onPick = renderPicker();
 
     await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
-    await user.selectOptions(await screen.findByLabelText('Build location'), '1035');
+    await user.selectOptions(await screen.findByLabelText('Corp structure'), '1035');
 
     expect(onPick).toHaveBeenCalledExactlyOnceWith(AZBEL);
   });
@@ -106,7 +81,7 @@ describe('BuildLocationPicker', () => {
     renderPicker();
 
     await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
-    const select = await screen.findByLabelText('Build location');
+    const select = await screen.findByLabelText('Corp structure');
     await user.selectOptions(select, '1035');
 
     expect((select as HTMLSelectElement).value).toBe('1035');
@@ -135,6 +110,6 @@ describe('BuildLocationPicker', () => {
     renderPicker();
 
     expect(screen.queryByRole('button', { name: 'Fill from a corp structure' })).toBeNull();
-    expect(screen.getByText(/NPC station · Jita/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Corp structure')).toBeNull();
   });
 });
