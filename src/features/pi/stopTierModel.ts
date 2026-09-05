@@ -36,8 +36,7 @@ import type { PlanetType } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX } from '@/engine/pi/pinBudget';
 import { recommendStopTier, type StopTierAdvice } from '@/engine/pi/stopTier';
-import type { ChainLayout } from '@/engine/pi/types';
-import type { BuiltColonyAdvice } from './advisorModel';
+import { localResourcesFor, type BuiltColonyAdvice } from './advisorModel';
 
 /**
  * How long a colony is left to fill before someone hauls. The throughput
@@ -47,13 +46,6 @@ import type { BuiltColonyAdvice } from './advisorModel';
  * would start rejecting layouts that are fine for anyone who logs in daily.
  */
 export const ADVISOR_BUFFER_HOURS = 24;
-
-/**
- * Every made tier is fitted on one planet, so nothing between them is taxed.
- * A recommendation is about the planet in front of you; spreading a chain
- * across planets is the Plan tab's question, and it has the control for it.
- */
-const ADVISOR_LAYOUT: ChainLayout = 'single-planet';
 
 export type ColonyStopTierAdvice =
   | {
@@ -156,9 +148,7 @@ export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTier
 
   const advice = recommendStopTier(
     {
-      localResources: pi.raw
-        .filter((resource) => resource.planetTypes.includes(planetType))
-        .map((resource) => resource.typeID),
+      localResources: localResourcesFor(planetType, pi).map((resource) => resource.typeID),
       budget,
       infrastructure: pi.infrastructure,
       overhead: {
@@ -171,7 +161,6 @@ export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTier
       extractionRatePerHour: rate,
       prices,
       taxRate,
-      layout: ADVISOR_LAYOUT,
       // Never guessed. A basic link moves 1,250 m3/hr and each upgrade level
       // doubles it, but whether that axis is the same skill as the budget
       // table is unconfirmed, so the engine answers `link-capacity-unknown`

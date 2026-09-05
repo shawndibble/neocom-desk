@@ -62,7 +62,6 @@ function options(overrides: Partial<StopTierOptions> = {}): StopTierOptions {
     extractionRatePerHour: 6_000,
     prices: PRICES,
     taxRate: 0.1,
-    layout: 'single-planet',
     linkCapacityPerHour: null,
     bufferHours: 24,
     ...overrides,

@@ -59,8 +59,8 @@
  */
 
 import type { PiData, PiInfrastructure } from '@/sde/types';
-import { CUSTOMS_TAXABLE_VALUE, chainCost, isP0, piTier } from './chain';
-import { checkThroughput, fitColony, planColony, singleFactoryChain } from './pinBudget';
+import { CUSTOMS_TAXABLE_VALUE, chainCost, isP0 } from './chain';
+import { checkThroughput, fitColony, planColony } from './pinBudget';
 import type {
   ChainLayout,
   ColonyFit,
@@ -89,10 +89,17 @@ export interface StopTierOptions {
   /** ISK per unit by typeID. A type the hub does not quote is absent, never zero. */
   prices: Readonly<Record<number, number>>;
   taxRate: number;
-  layout: ChainLayout;
   linkCapacityPerHour: ThroughputOptions['linkCapacityPerHour'];
   bufferHours: ThroughputOptions['bufferHours'];
 }
+
+/**
+ * Every made tier sits on the planet being scored, so nothing between them is
+ * taxed. Not a parameter: `planet-per-tier` would charge customs on hops this
+ * module has just fitted onto one planet, so the other value is not an
+ * alternative here, it is a wrong answer.
+ */
+const LAYOUT: ChainLayout = 'single-planet';
 
 interface CandidateBase {
   typeId: number;
@@ -253,21 +260,21 @@ function rejectOrScore(
   };
 }
 
-/** A tier-0 candidate: repeats of one Extractor Control Unit, sold as extracted. */
+/**
+ * A tier-0 candidate: repeats of one Extractor Control Unit, sold as extracted.
+ *
+ * `fit` is passed in because it is the same for every resource on the planet —
+ * one ECU costs what one ECU costs — so it is solved once for the whole set
+ * rather than re-solved per resource.
+ */
 function scoreRawResource(
   typeId: number,
   name: string,
+  fit: ColonyFit,
   pi: PiData,
   opts: StopTierOptions
 ): StopTierEntry {
   const base = { typeId, name, tier: 0 as PiTier };
-  const fit = fitColony({
-    budget: opts.budget,
-    infrastructure: opts.infrastructure,
-    overhead: opts.overhead,
-    block: { extractorControlUnit: 1 },
-    headsPerExtractor: opts.headsPerExtractor,
-  });
   if (fit.blocks <= 0) return { ...base, status: 'does-not-fit', fit };
 
   const price = priceOf(typeId, opts.prices);
@@ -282,14 +289,9 @@ function scoreRawResource(
     bufferHours: opts.bufferHours,
   });
 
-  // The only customs boundary an extracted-and-sold resource crosses is its
-  // own export; nothing is imported onto the planet to make it. A made chain's
-  // P0 is charged differently — `chainCost` bills it an import onto the planet
-  // that consumes it, a treatment verified against #304's own margin tables —
-  // so raw and made are not taxed symmetrically on the same ore. The gap is
-  // 0.25 ISK a unit at a 10% rate and always favours making; it is recorded in
-  // CONTEXT.md round 55 rather than papered over here, because changing it
-  // would move every Plan tab figure too.
+  // Its export is the only customs boundary extracted-and-sold ore crosses.
+  // A made chain's P0 is billed differently, and CONTEXT.md round 55 records
+  // why that asymmetry is inherited rather than fixed here.
   const marginPerUnit = price - opts.taxRate * CUSTOMS_TAXABLE_VALUE[0];
   return rejectOrScore(
     base,
@@ -302,14 +304,9 @@ function scoreRawResource(
 
 /** A made-tier candidate: steps 1-5 through `planColony`, then step 6's score. */
 function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTierEntry | null {
-  const chain = singleFactoryChain(typeId, pi);
-  if (chain === null) return null;
-  const base = {
-    typeId,
-    name: chain.nodes.find((n) => n.typeId === typeId)?.name ?? String(typeId),
-  };
-  const tier = piTier(typeId, pi);
-
+  // `planColony` expands the chain itself, so its `chain` is where the name and
+  // tier are read from. Calling `singleFactoryChain` and `piTier` first to get
+  // them walked the same graph twice more, per candidate, per card.
   const plan = planColony(typeId, pi, {
     budget: opts.budget,
     infrastructure: opts.infrastructure,
@@ -321,9 +318,9 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
     bufferHours: opts.bufferHours,
   });
   if (plan.status === 'not-a-product' || plan.status === 'needs-extraction-rate') return null;
-  if (plan.status === 'does-not-fit') {
-    return { ...base, tier, status: 'does-not-fit', fit: plan.fit };
-  }
+  const node = plan.chain.nodes.find((entry) => entry.typeId === typeId);
+  const base = { typeId, name: node?.name ?? String(typeId), tier: node?.tier ?? (1 as PiTier) };
+  if (plan.status === 'does-not-fit') return { ...base, status: 'does-not-fit', fit: plan.fit };
 
   // Asked before `chainCost`, which throws on the first unpriced type and
   // names only that one. A refusal here keeps the rest of the enumeration
@@ -331,25 +328,22 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
   const missing = [typeId, ...plan.chain.nodes.filter((n) => n.tier === 0).map((n) => n.typeId)]
     .filter((id, index, all) => all.indexOf(id) === index)
     .filter((id) => priceOf(id, opts.prices) === null);
-  if (missing.length > 0) return { ...base, tier, status: 'needs-price', missing };
+  if (missing.length > 0) return { ...base, status: 'needs-price', missing };
 
   const cost = chainCost(plan.chain, {
     prices: opts.prices,
     sourcingFloor: 'P0',
-    layout: opts.layout,
+    layout: LAYOUT,
     taxRate: opts.taxRate,
     extractionRate: opts.extractionRatePerHour,
   });
   // Both refusals were answered above; this is a guard against the engine
   // growing a third, not the mechanism.
-  if (cost.status !== 'costed') return { ...base, tier, status: 'needs-price', missing: [typeId] };
+  if (cost.status !== 'costed') return { ...base, status: 'needs-price', missing: [typeId] };
 
-  // `blocks * targetPerHour`, not `targetPerHour` alone: the chain was expanded
-  // at ONE factory's rate, so the bare figure is one factory's earnings quoted
-  // for a colony of twelve — and it does not change which tier wins, so a test
-  // that only checks the winner would not see it.
+  // `blocks * targetPerHour`: the chain was expanded at ONE factory's rate.
   return rejectOrScore(
-    { ...base, tier },
+    base,
     plan.fit,
     plan.throughput,
     plan.fit.blocks * plan.chain.targetPerHour,
@@ -358,16 +352,10 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
 }
 
 /**
- * How close two margins have to be to count as the same answer: one part in a
- * million, relative.
- *
- * Not decoration. A margin an hour is a float built out of a price, a tax
- * base and a block count, so two candidates that are equal in every way a
- * pilot can see still differ in the last bits. Comparing them exactly would
- * let that noise decide, and it decides the wrong way — toward whichever
- * happened to round up, which on a real tie is as often the deeper, more
- * expensive colony as not. A stated tolerance hands the tie to the rule
- * below instead.
+ * How close two margins count as the same answer: one part in a million.
+ * A margin is a float built from a price, a tax base and a block count, so
+ * candidates equal in every way a pilot can see still differ in the last bits,
+ * and an exact comparison lets that noise pick the winner instead of the rule.
  */
 const MARGIN_TIE_EPSILON = 1e-6;
 
@@ -397,6 +385,15 @@ function bestOf(scored: readonly ScoredStopTier[]): ScoredStopTier {
     );
 }
 
+const BLOCKER_BY_STATUS: Readonly<Record<StopTierEntry['status'], StopTierBlocker>> = {
+  'does-not-fit': 'does-not-fit',
+  'needs-price': 'needs-prices',
+  'rejected-throughput': 'throughput',
+  // Reached only when a scored candidate earned nothing above its customs tax;
+  // a profitable one would have been recommended instead of asking this.
+  scored: 'unprofitable',
+};
+
 /** What stopped every candidate, where one thing did. */
 function blockerFor(entries: readonly StopTierEntry[]): StopTierBlocker {
   // A candidate the budget cannot host says nothing about prices or flow, so
@@ -404,10 +401,8 @@ function blockerFor(entries: readonly StopTierEntry[]): StopTierBlocker {
   // would turn every colony's answer into 'mixed'.
   const fitted = entries.filter((entry) => entry.status !== 'does-not-fit');
   if (fitted.length === 0) return 'does-not-fit';
-  if (fitted.every((entry) => entry.status === 'needs-price')) return 'needs-prices';
-  if (fitted.every((entry) => entry.status === 'rejected-throughput')) return 'throughput';
-  if (fitted.every((entry) => entry.status === 'scored')) return 'unprofitable';
-  return 'mixed';
+  const statuses = new Set(fitted.map((entry) => entry.status));
+  return statuses.size === 1 ? BLOCKER_BY_STATUS[[...statuses][0]] : 'mixed';
 }
 
 /**
@@ -421,9 +416,17 @@ function blockerFor(entries: readonly StopTierEntry[]): StopTierBlocker {
  */
 export function recommendStopTier(opts: StopTierOptions, pi: PiData): StopTierAdvice {
   const local = new Set(opts.localResources);
+  // One ECU costs what one ECU costs, so every raw candidate fits identically.
+  const rawFit = fitColony({
+    budget: opts.budget,
+    infrastructure: opts.infrastructure,
+    overhead: opts.overhead,
+    block: { extractorControlUnit: 1 },
+    headsPerExtractor: opts.headsPerExtractor,
+  });
   const rawEntries = pi.raw
     .filter((resource) => local.has(resource.typeID))
-    .map((resource) => scoreRawResource(resource.typeID, resource.name, pi, opts));
+    .map((resource) => scoreRawResource(resource.typeID, resource.name, rawFit, pi, opts));
   const madeEntries = localChainTargets(opts.localResources, pi)
     .map((typeId) => scoreProduct(typeId, pi, opts))
     .filter((entry): entry is StopTierEntry => entry !== null);

@@ -22,6 +22,7 @@
  * exactly the confident-wrong-number the colony `unknown` state avoids.
  */
 
+import { securityBand } from '@/engine/securityStatus';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 
 /** SDE typeID of Customs Code Expertise. */
@@ -76,6 +77,24 @@ export function customsRateSource(space: ColonySpace, level: number | null): Cus
     kind: 'highsec-skill',
     level: Math.min(Math.max(Math.trunc(level), 0), MAX_SKILL_LEVEL),
   };
+}
+
+/**
+ * The band a system's security status puts a colony in.
+ *
+ * An unresolved status falls back to highsec — the only assumption that cannot
+ * understate what a customs office will charge, same rule as an unknown skill
+ * level above. Wormhole space is not derivable from security status and is not
+ * offered: a J-space colony reads as nullsec, whose 0% default is right for a
+ * player-owned office anyway.
+ */
+export function colonySpaceFor(security: number | null): ColonySpace {
+  return security === null ? 'highsec' : securityBand(security);
+}
+
+/** The rate as a percentage, rounded to two places for display. */
+export function customsRatePercent(rate: number): number {
+  return Math.round(rate * 10_000) / 100;
 }
 
 /**

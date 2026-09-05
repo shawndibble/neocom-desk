@@ -56,7 +56,6 @@ import type { CharacterPlanet, CharacterPlanetDetail, PlanetType } from '@/esi/e
 import { EXTRACTOR_HEADS_MAX, spareCapacity } from '@/engine/pi/pinBudget';
 import type { PinLoad } from '@/engine/pi/types';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { securityBand } from '@/engine/securityStatus';
 import {
   loadSystemName,
   loadSystemPlanetIds,
@@ -66,13 +65,15 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterPlanets, loadAllColonyDetails } from './data';
 import { loadCommandCenterUpgrades, maxColonyBudget, type MaxColonyBudget } from './colonyBudget';
 import { loadPlanetInfo, loadSchematicName } from './names';
+import { plannableTypeIds } from './products';
 import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorModel';
 import { colonyStopTierAdvice } from './stopTierModel';
 import {
+  colonySpaceFor,
+  customsRatePercent,
   customsRateSource,
   defaultCustomsRate,
   loadCustomsCodeExpertise,
-  type ColonySpace,
   type CustomsRateSource,
 } from './customsRate';
 
@@ -110,20 +111,6 @@ interface SystemGroup {
    */
   customsRate: number;
   customsSource: CustomsRateSource;
-}
-
-/**
- * The band that sets a system's default customs rate.
- *
- * An unresolved security status falls back to highsec, which is the only
- * assumption that cannot understate what a customs office will charge — the
- * same rule `customsRate.ts` applies to a character with no skill data.
- * Wormhole space is not detectable from security status and is not offered
- * here; a J-space colony reads as nullsec, whose 0% default is right for a
- * player-owned office anyway.
- */
-function colonySpaceFor(security: number | null): ColonySpace {
-  return security === null ? 'highsec' : securityBand(security);
 }
 
 /**
@@ -247,14 +234,8 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     ])
   );
 
-  // Every planetary commodity, P0 and made alike, in one request. The list is
-  // the whole payload rather than the types this character happens to touch,
-  // which is what keeps it a fixed cost as cards come and go.
   const piTypeIds = [
-    ...new Set([
-      ...pi.raw.map((resource) => resource.typeID),
-      ...Object.keys(pi.schematics).map(Number),
-    ]),
+    ...new Set([...pi.raw.map((resource) => resource.typeID), ...plannableTypeIds(pi)]),
   ];
   // Failure here is not fatal: an unpriced candidate refuses with
   // `needs-price` rather than taking the whole panel down with it.
@@ -458,9 +439,7 @@ function StopTierLine({
   }
   if (result.advice.kind === 'nothing-to-score') return null;
   if (result.advice.kind === 'no-recommendation') {
-    // The engine names what stopped every candidate; this only spells it. It
-    // used to infer the cause here and got it wrong in both directions — a
-    // colony whose Command Center hosts nothing was told its ore was worthless.
+    // The engine names what stopped every candidate; this only spells it.
     return framed(quiet(t(`piAdvisor.stopTierBlocked.${result.advice.blocker}`)));
   }
 
@@ -911,16 +890,11 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               label={t('piAdvisor.colonised')}
               value={t('piAdvisor.colonisedValue', { built: builtCount, total: colonisable })}
             />
-            {/*
-              The rate every recommendation below is costed at, stated rather
-              than left implicit: it is derived from this system's security
-              band and the character's Customs Code Expertise, and a derived
-              number that does not say so reads as a measured one.
-            */}
+            {/* Derived, so it says so: a derived number that does not reads as measured. */}
             <StatChip
               label={t('piAdvisor.customsRate')}
               value={t('piAdvisor.customsRateValue', {
-                percent: Math.round(activeSystem.customsRate * 10_000) / 100,
+                percent: customsRatePercent(activeSystem.customsRate),
               })}
               tooltip={customsTooltip(activeSystem.customsSource, t)}
               tone={
