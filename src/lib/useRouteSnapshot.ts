@@ -43,8 +43,30 @@ interface StampedSnapshot<T> {
   error: unknown;
 }
 
+export interface RouteSnapshotOptions {
+  /**
+   * Keep the last successfully-loaded data visible while a manual `refresh()`
+   * is in flight, instead of `data` going back to `null` until the reload
+   * lands (issue #418). Off by default: most callers already gate their whole
+   * body on `loading` and would otherwise render nothing underneath a
+   * "loading" state that never shows — this only helps a caller whose body
+   * reads `data` directly. Never masks a character switch: the carried value
+   * is cleared the moment `characterId` changes, same render as the epoch
+   * bump, so switching characters still shows a spinner rather than the
+   * previous one's rows.
+   */
+  staleWhileRevalidate?: boolean;
+}
+
 export interface RouteSnapshot<T> {
-  /** Data for the current character + refresh, or null while loading or failed. */
+  /**
+   * Data for the current character + refresh, or null while loading or
+   * failed — except mid-refresh with `staleWhileRevalidate`, where this is
+   * the last successful load instead. `loading` still flips true in that
+   * window (a refresh is genuinely in flight), so a caller wanting "is this
+   * fresh" keeps using `loading`; a caller wanting "do I have something to
+   * show" uses `data`.
+   */
   data: T | null;
   /** Whatever the loader threw. Views must offer a way out — `loading` alone would strand them. */
   error: unknown;
@@ -65,8 +87,10 @@ export function useRouteSnapshot<T>(
    * `hydrated` is `true` from the first render, since there is no store wait
    * to report.
    */
-  propCharacterId?: number
+  propCharacterId?: number,
+  options?: RouteSnapshotOptions
 ): RouteSnapshot<T> {
+  const staleWhileRevalidate = options?.staleWhileRevalidate ?? false;
   const storeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const storeHydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = propCharacterId ?? storeCharacterId;
@@ -78,6 +102,8 @@ export function useRouteSnapshot<T>(
     refreshCount: 0,
   });
   const [snapshot, setSnapshot] = useState<StampedSnapshot<T> | null>(null);
+  // Carried across a refresh only — see `RouteSnapshotOptions.staleWhileRevalidate`.
+  const [lastGoodData, setLastGoodData] = useState<T | null>(null);
 
   /**
    * Bumped when a background revalidation settles (`esi/cache.ts` serves a
@@ -96,6 +122,7 @@ export function useRouteSnapshot<T>(
   // and no frame showing the previous character's data.
   if (lifecycle.characterId !== activeCharacterId) {
     setLifecycle({ characterId: activeCharacterId, epoch: lifecycle.epoch + 1, refreshCount: 0 });
+    if (lastGoodData !== null) setLastGoodData(null);
   }
 
   // Latest-ref so a caller passing an inline loader can't re-trigger the load
@@ -133,7 +160,10 @@ export function useRouteSnapshot<T>(
     void (async () => {
       try {
         const data = await loadRef.current(characterId, signal);
-        if (!signal.cancelled) setSnapshot({ epoch, data, error: null });
+        if (!signal.cancelled) {
+          setSnapshot({ epoch, data, error: null });
+          if (staleWhileRevalidate) setLastGoodData(data);
+        }
       } catch (error) {
         // Stamping the failure is what clears `loading` and re-enables Refresh.
         // Swallowing it would leave the view spinning with no way back.
@@ -153,13 +183,14 @@ export function useRouteSnapshot<T>(
     };
     // `revalidation` re-runs the loader without touching `epoch`; see its
     // declaration for why that distinction is what keeps the view from
-    // blinking.
-  }, [characterId, epoch, revalidation]);
+    // blinking. `staleWhileRevalidate` is a primitive, stable per call site —
+    // safe to depend on directly rather than routing it through a ref.
+  }, [characterId, epoch, revalidation, staleWhileRevalidate]);
 
   const current = snapshot?.epoch === epoch ? snapshot : null;
 
   return {
-    data: current?.data ?? null,
+    data: current?.data ?? (staleWhileRevalidate ? lastGoodData : null),
     error: current?.error ?? null,
     loading: current === null,
     hydrated,

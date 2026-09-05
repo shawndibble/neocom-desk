@@ -270,8 +270,12 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
     capabilities.canReadMoonExtractions ||
     capabilities.canReadIndustry;
 
-  const snapshot = useRouteSnapshot<CorpSnapshot>((characterId, signal) =>
-    loadCorpSnapshot(characterId, capabilities, signal)
+  const snapshot = useRouteSnapshot<CorpSnapshot>(
+    (characterId, signal) => loadCorpSnapshot(characterId, capabilities, signal),
+    undefined,
+    // Keeps the board on screen during a manual refresh (issue #418) — a
+    // triage-oriented view losing its rows on every refresh defeats the point.
+    { staleWhileRevalidate: true }
   );
   const data = snapshot.data;
 
@@ -318,7 +322,7 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
       />
       <CorpSubNav />
 
-      {snapshot.loading ? (
+      {snapshot.loading && data === null ? (
         <Spinner />
       ) : (
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">

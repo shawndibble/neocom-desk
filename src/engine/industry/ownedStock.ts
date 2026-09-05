@@ -20,7 +20,14 @@
  */
 
 import { isShipBayFlag, type EngineAsset } from '../assetTree';
-import type { MaterialSourcingMap } from './types';
+import type { MaterialSourcingMap, OwnedStockLocation, OwnedStockScope } from './types';
+
+// Re-exported from here too: every existing caller of this module already
+// imports its owned-stock types from `./ownedStock`, and the canonical
+// definitions live in `./types` alongside `MaterialSourcing`/`RigLevel` etc.
+// — the same module `BuildPlanRecord`'s other persisted-field types come
+// from (`src/db/index.ts`).
+export type { OwnedStockLocation, OwnedStockScope };
 
 /** `EngineAsset` plus the packaged/assembled flag this module filters on. */
 export interface StockAsset extends EngineAsset {
@@ -51,6 +58,67 @@ export interface DetectedOwnedStock {
 
 /** Detected stock keyed by material typeID. A material with no stock has no entry. */
 export type DetectedOwnedStockMap = Map<number, DetectedOwnedStock>;
+
+/**
+ * `characterId:locationType:locationId` — the one identity key every
+ * owned-stock-scope operation keys off of, shared by `filterStockByScope`,
+ * `collectStockLocations`, and the scope-control UI's own chip identity.
+ * Accepts a placement or a bare location: both carry the three fields.
+ */
+export function ownedStockLocationKey(
+  location: Pick<OwnedStockPlacement, 'characterId' | 'locationId' | 'locationType'>
+): string {
+  return `${location.characterId}:${location.locationType}:${location.locationId}`;
+}
+
+/**
+ * Narrows detected stock down to placements within `scope`'s selected
+ * locations, re-summing each material's `quantity` from what remains.
+ *
+ * `scope` absent or `{ mode: 'everywhere' }` returns `stock` itself unchanged
+ * — today's galaxy-wide behavior stays the default, byte-identical to before
+ * this scope existed.
+ */
+export function filterStockByScope(
+  stock: DetectedOwnedStockMap,
+  scope: OwnedStockScope | undefined
+): DetectedOwnedStockMap {
+  if (!scope || scope.mode === 'everywhere') return stock;
+
+  const allowed = new Set(scope.locations.map(ownedStockLocationKey));
+  const filtered: DetectedOwnedStockMap = new Map();
+  for (const [typeID, entry] of stock) {
+    const placements = entry.placements.filter((p) => allowed.has(ownedStockLocationKey(p)));
+    if (placements.length === 0) continue;
+    filtered.set(typeID, {
+      quantity: placements.reduce((sum, p) => sum + p.quantity, 0),
+      placements,
+    });
+  }
+  return filtered;
+}
+
+/**
+ * Every distinct Character/location combination holding any of the detected
+ * stock, for populating a "selected locations" picker. Order is not
+ * meaningful — callers sort for display.
+ */
+export function collectStockLocations(stock: DetectedOwnedStockMap): OwnedStockLocation[] {
+  const seen = new Map<string, OwnedStockLocation>();
+  for (const entry of stock.values()) {
+    for (const p of entry.placements) {
+      const key = ownedStockLocationKey(p);
+      if (!seen.has(key)) {
+        seen.set(key, {
+          characterId: p.characterId,
+          locationId: p.locationId,
+          locationType: p.locationType,
+        });
+      }
+    }
+  }
+  return [...seen.values()];
+}
 
 /**
  * The station/system this row ultimately sits in, or `null` when the chain

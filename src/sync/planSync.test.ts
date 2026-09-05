@@ -539,6 +539,10 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     hubId: 'jita',
     facilityTaxPct: 1.5,
     materialSourcing: { 34: { ownedQuantity: 500, overridePrice: 6.5 } },
+    ownedStockScope: {
+      mode: 'selected',
+      locations: [{ characterId: 1, locationId: 60003760, locationType: 'station' }],
+    },
     updatedAt: Date.now() - 1000,
   };
 
@@ -568,6 +572,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       'materialSourcing',
       'me',
       'name',
+      'ownedStockScope',
       'rigLevel',
       'runs',
       'security',
@@ -656,6 +661,31 @@ describe('triggerSync: build plans', () => {
 
   it('pulls materialSourcing from a remote build plan into Dexie', async () => {
     const expected = buildPlan({ materialSourcing: { 34: { overridePrice: 6.5 } } });
+    seedRemote(BUILD_PLANS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    await triggerSync(1);
+    expect(await db.buildPlans.get('b1')).toEqual(expected);
+  });
+
+  it('round-trips ownedStockScope through the pushed doc', async () => {
+    const scope = {
+      mode: 'selected' as const,
+      locations: [{ characterId: 1, locationId: 60003760, locationType: 'station' as const }],
+    };
+    await db.buildPlans.put(buildPlan({ ownedStockScope: scope }));
+    await triggerSync(1);
+    expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')?.ownedStockScope).toEqual(scope);
+  });
+
+  it('omits ownedStockScope from the pushed doc when absent (Firestore rejects undefined)', async () => {
+    await db.buildPlans.put(buildPlan());
+    await triggerSync(1);
+    const doc = remoteStore.get(BUILD_PLANS_PATH)?.get('b1');
+    expect(doc).toBeDefined();
+    expect('ownedStockScope' in (doc ?? {})).toBe(false);
+  });
+
+  it('pulls ownedStockScope from a remote build plan into Dexie', async () => {
+    const expected = buildPlan({ ownedStockScope: { mode: 'everywhere' } });
     seedRemote(BUILD_PLANS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
     await triggerSync(1);
     expect(await db.buildPlans.get('b1')).toEqual(expected);

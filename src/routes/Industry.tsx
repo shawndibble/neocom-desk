@@ -19,6 +19,7 @@ import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import {
+  buildPlansByMaterialTypeID,
   loadBlueprintCatalog,
   type BlueprintCatalog,
   type BlueprintCatalogEntry,
@@ -29,6 +30,7 @@ import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
+import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
 import {
   BuildPlanDetail,
   type PlanPatch,
@@ -106,6 +108,18 @@ export function Industry() {
   const [ownedBlueprints, setOwnedBlueprints] = useState<CharacterBlueprint[]>([]);
   const [blueprintsNeedsReauth, setBlueprintsNeedsReauth] = useState(false);
   const [skills, setSkills] = useState<SkillLevels>({});
+
+  // Compare mode (issue #453): the list shows a checkbox per row while
+  // `compareMode` is on, and `comparing` swaps the detail pane over to
+  // `BuildPlanCompare` for the checked plans. Kept as three separate pieces
+  // (mode/selection/open) rather than one, because unchecking down to a
+  // single plan while the table is open should show a "need 2+" hint, not
+  // silently fall back to `selectedPlan`'s detail — only the explicit
+  // `exitCompare` action (the compare view's "Done", or the back control)
+  // does that.
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareSelectedIds, setCompareSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [comparing, setComparing] = useState(false);
 
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -204,6 +218,31 @@ export function Industry() {
     createPlan,
   ]);
 
+  // Assets' item context menu "View in Industry as material" action (issue
+  // #414) lands here with `?material=<typeId>`. Unlike `?product=`, this
+  // never creates a plan — the action only renders when at least one of the
+  // character's own plans already consumes that material, so it just
+  // selects that plan.
+  const materialParam = searchParams.get('material');
+  const materialPlanByTypeID = useMemo(
+    () => (plans && catalog ? buildPlansByMaterialTypeID(plans, catalog) : null),
+    [plans, catalog]
+  );
+  const materialPlan = materialParam
+    ? (materialPlanByTypeID?.get(Number(materialParam)) ?? null)
+    : null;
+
+  if (materialPlan && selectedId !== materialPlan.id) {
+    setSelectedId(materialPlan.id);
+  }
+
+  useEffect(() => {
+    if (!materialParam || !plans || !catalog) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('material');
+    setSearchParams(next, { replace: true });
+  }, [materialParam, plans, catalog, searchParams, setSearchParams]);
+
   // Derived, not effect-synced: falls back to the first plan whenever the
   // explicitly selected one is missing (first load, or it was just deleted).
   const effectiveSelectedId = useMemo(() => {
@@ -217,15 +256,23 @@ export function Industry() {
     [plans, effectiveSelectedId]
   );
 
+  const comparePlans = useMemo(
+    () => plans?.filter((p) => compareSelectedIds.has(p.id)) ?? [],
+    [plans, compareSelectedIds]
+  );
+
   // Narrow screens show one column at a time (CONTEXT.md round 25); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width. Gated on the explicit `selectedId`, not
   // `effectiveSelectedId`'s first-plan fallback, so a narrow-screen visitor
   // lands on the list first, same as Mail/SkillPlans, rather than jumping
-  // straight to whichever plan the fallback picked.
+  // straight to whichever plan the fallback picked. `comparing` participates
+  // in the same collapse (issue #453): it is a state of this detail pane, not
+  // a separate screen, so opening it on a narrow screen must navigate away
+  // from the list exactly like picking a plan does.
   const isDesktop = useIsDesktop();
-  const detailVisible = isDesktop || selectedId !== null;
-  const showBackControl = !isDesktop && selectedId !== null;
+  const detailVisible = isDesktop || selectedId !== null || comparing;
+  const showBackControl = !isDesktop && (selectedId !== null || comparing);
   const [scrollerRef, scrollerMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   if (!hydrated) {
@@ -291,6 +338,33 @@ export function Industry() {
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
+  function toggleCompareMode() {
+    setCompareMode((wasOn) => {
+      // Turning off (from either state) always resets the selection and
+      // closes the table — the single exit path "Cancel" and "Done" share.
+      if (wasOn) {
+        setCompareSelectedIds(new Set());
+        setComparing(false);
+      }
+      return !wasOn;
+    });
+  }
+
+  function toggleCompareSelected(id: string) {
+    setCompareSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitCompare() {
+    setComparing(false);
+    setCompareMode(false);
+    setCompareSelectedIds(new Set());
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title={t('nav.industry')} />
@@ -322,7 +396,7 @@ export function Industry() {
         // short rows) gets pulled up to match the detail column's full
         // height, rendering as a tall, mostly-empty box.
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
-          <Panel className={isDesktop || selectedId === null ? '' : 'hidden'}>
+          <Panel className={isDesktop || !detailVisible ? '' : 'hidden'}>
             <BuildPlanList
               plans={plans}
               catalog={catalog}
@@ -339,12 +413,17 @@ export function Industry() {
               onDuplicate={(id) => void handleDuplicate(id)}
               onDelete={(id) => void handleDelete(id)}
               onRename={(id, name) => void handleRename(id, name)}
+              compareMode={compareMode}
+              compareSelectedIds={compareSelectedIds}
+              onToggleCompareMode={toggleCompareMode}
+              onToggleCompareSelected={toggleCompareSelected}
+              onOpenCompare={() => setComparing(true)}
             />
           </Panel>
 
           <article className={`space-y-2 ${detailVisible ? '' : 'hidden'}`}>
             {showBackControl && (
-              <Button size="sm" onClick={() => setSelectedId(null)}>
+              <Button size="sm" onClick={() => (comparing ? exitCompare() : setSelectedId(null))}>
                 {t('industry.backToList')}
               </Button>
             )}
@@ -357,7 +436,27 @@ export function Industry() {
                   : undefined
               }
             >
-              {!detailVisible ? null : selectedPlan ? (
+              {!detailVisible ? null : comparing ? (
+                comparePlans.length >= 2 ? (
+                  <BuildPlanCompare
+                    plans={comparePlans}
+                    catalog={catalog}
+                    pi={pi}
+                    skills={skills}
+                    onDone={exitCompare}
+                  />
+                ) : (
+                  <EmptyState
+                    title={t('industry.compareNeedMore')}
+                    hint={t('industry.compareNeedMoreHint')}
+                    action={
+                      <Button size="sm" onClick={exitCompare}>
+                        {t('industry.compareDone')}
+                      </Button>
+                    }
+                  />
+                )
+              ) : selectedPlan ? (
                 <BuildPlanDetail
                   key={selectedPlan.id}
                   plan={selectedPlan}

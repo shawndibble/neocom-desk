@@ -258,6 +258,81 @@ describe('useRouteSnapshot', () => {
     expect(inner).toHaveBeenCalledTimes(1);
   });
 
+  describe('staleWhileRevalidate (issue #418)', () => {
+    it('keeps the previous data visible while a refresh reloads', async () => {
+      const { calls, load } = deferredLoader();
+      const { result } = renderHook(() =>
+        useRouteSnapshot(load, undefined, { staleWhileRevalidate: true })
+      );
+      setCharacter(CHAR_A);
+      await waitFor(() => expect(calls).toHaveLength(1));
+      await act(async () => calls[0].resolve('first'));
+      expect(result.current.data).toBe('first');
+
+      act(() => result.current.refresh());
+      // Unlike the default behaviour, `data` does not go back to null —
+      // only `loading` reports the refresh is in flight.
+      expect(result.current.loading).toBe(true);
+      expect(result.current.data).toBe('first');
+
+      await waitFor(() => expect(calls).toHaveLength(2));
+      await act(async () => calls[1].resolve('second'));
+      expect(result.current.data).toBe('second');
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('still reports no data on the very first load — nothing to carry yet', async () => {
+      const { calls, load } = deferredLoader();
+      const { result } = renderHook(() =>
+        useRouteSnapshot(load, undefined, { staleWhileRevalidate: true })
+      );
+      setCharacter(CHAR_A);
+      await waitFor(() => expect(calls).toHaveLength(1));
+
+      expect(result.current.loading).toBe(true);
+      expect(result.current.data).toBeNull();
+    });
+
+    it('does not carry a previous character’s data across a character switch', async () => {
+      const { result } = renderHook(() =>
+        useRouteSnapshot((id) => Promise.resolve(`data-${id}`), undefined, {
+          staleWhileRevalidate: true,
+        })
+      );
+      setCharacter(CHAR_A);
+      await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_A}`));
+
+      setCharacter(CHAR_B);
+      expect(result.current.data).toBeNull();
+      expect(result.current.loading).toBe(true);
+
+      await waitFor(() => expect(result.current.data).toBe(`data-${CHAR_B}`));
+    });
+
+    it('keeps the previous data visible when a refresh fails', async () => {
+      let attempt = 0;
+      const boom = new Error('offline');
+      const { result } = renderHook(() =>
+        useRouteSnapshot(
+          () => {
+            attempt += 1;
+            return attempt === 1 ? Promise.resolve('first') : Promise.reject(boom);
+          },
+          undefined,
+          { staleWhileRevalidate: true }
+        )
+      );
+      setCharacter(CHAR_A);
+      await waitFor(() => expect(result.current.data).toBe('first'));
+
+      act(() => result.current.refresh());
+      await waitFor(() => expect(result.current.error).toBe(boom));
+      // The failed refresh clears `loading` (Refresh is re-enabled) but must
+      // not blank out the last data that did load successfully.
+      expect(result.current.data).toBe('first');
+    });
+  });
+
   describe('prop-supplied character (second case, alongside the active-character store)', () => {
     it('loads for the prop character immediately, without waiting on store hydration', async () => {
       // Store never hydrates in this test — a prop-supplied character must not depend on it.

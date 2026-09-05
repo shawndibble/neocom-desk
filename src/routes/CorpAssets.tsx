@@ -223,7 +223,10 @@ function CorpAssetGroupSection({
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpAssetsView() {
   const { t } = useTranslation();
-  const snapshot = useRouteSnapshot<AssetsSnapshot>(loadAssetsSnapshot);
+  const snapshot = useRouteSnapshot<AssetsSnapshot>(loadAssetsSnapshot, undefined, {
+    // Keeps the asset list on screen during a manual refresh (issue #418).
+    staleWhileRevalidate: true,
+  });
   const data = snapshot.data;
   const [expanded, setExpanded] = useState<ReadonlySet<CorpAssetGroupId>>(new Set());
 
@@ -260,7 +263,7 @@ function CorpAssetsView() {
       />
       <CorpSubNav />
 
-      {snapshot.loading ? (
+      {snapshot.loading && data === null ? (
         <Spinner />
       ) : data === null || data.groups === null ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />

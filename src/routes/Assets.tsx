@@ -18,11 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@/sync';
-import { db } from '@/db';
+import { db, type BuildPlanRecord } from '@/db';
 import { cx } from '@/lib/cx';
 import { nextPinState, pinStateForStation, type PinState } from '@/features/character/stationPins';
 import {
@@ -84,7 +85,11 @@ import { addQuickbarItem } from '@/features/market/quickbar';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
-import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import {
+  buildPlansByMaterialTypeID,
+  loadBlueprintCatalog,
+  type BlueprintCatalog,
+} from '@/features/industry/blueprintCatalog';
 
 // Matches Market.tsx's/SkillPicker.tsx's own search debounce — the input stays
 // instantly responsive, only the potentially-thousands-of-assets recompute
@@ -97,6 +102,7 @@ const NO_PRICES: ReadonlyMap<number, number> = new Map();
 const NO_VOLUMES: ReadonlyMap<number, number> = new Map();
 const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
 const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_BUILD_PLANS: readonly BuildPlanRecord[] = [];
 
 interface Snapshot {
   assetsResult: CachedResult<CharacterAsset[]> | null;
@@ -180,6 +186,30 @@ function matchAssets(
     matches.push({ asset, name });
   }
   return matches;
+}
+
+type AssetSortField = 'name' | 'value' | 'quantity';
+
+/** An `AssetMatch` with its estimated value precomputed once, rather than re-derived by every sort comparison. */
+interface ValuedAssetMatch {
+  match: AssetMatch;
+  value: number;
+}
+
+/** Orders the search/all-items flat list: name ascending, value and quantity highest-first. */
+function compareValuedAssetMatches(
+  a: ValuedAssetMatch,
+  b: ValuedAssetMatch,
+  field: AssetSortField
+): number {
+  switch (field) {
+    case 'name':
+      return a.match.name.localeCompare(b.match.name);
+    case 'value':
+      return b.value - a.value;
+    case 'quantity':
+      return b.match.asset.quantity - a.match.asset.quantity;
+  }
 }
 
 /** Global average market prices, best-effort — a Fuzzwork/ESI outage degrades badges to 0 rather than the whole page. */
@@ -459,10 +489,13 @@ interface AssetItemActions {
   priceByTypeId: ReadonlyMap<number, number>;
   volumeByTypeId: ReadonlyMap<number, number>;
   blueprintCatalog: BlueprintCatalog | null;
+  /** Material typeID -> the character's own Build Plan consuming it; null until the blueprint catalog has loaded. */
+  materialPlanMap: ReadonlyMap<number, BuildPlanRecord> | null;
   quickbarAvailable: boolean;
   onRequestBlueprintCatalog: () => void;
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   onShowInfo: (typeId: number, itemName: string) => void;
+  onViewInIndustryAsMaterial: (typeId: number) => void;
 }
 
 const AssetItemActionsContext = createContext<AssetItemActions | null>(null);
@@ -541,6 +574,15 @@ export function Assets() {
     const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [search]);
+
+  // Permanent "all items across all locations" flat view (issue #414): off by
+  // default (unpruned tree browsing, as before), and — like search — flattens
+  // every location into one sortable list rather than replacing the tree.
+  const [allItemsView, setAllItemsView] = useState(false);
+  const [minValueInput, setMinValueInput] = useState('');
+  const [sortField, setSortField] = useState<AssetSortField>('name');
+  const flatModeActive = searchActive || allItemsView;
+  const minValueThreshold = Number(minValueInput) > 0 ? Number(minValueInput) : 0;
 
   // Multi-select and bulk actions (issue #90): select mode is off by default and
   // browsing (select mode off) renders exactly as it did before this ticket.
@@ -645,6 +687,24 @@ export function Assets() {
       .catch(() => {
         // Build Plan action degrades to "No blueprint options" on failure — not core functionality.
       });
+  }
+
+  // "View in Industry as material" (issue #414): the character's own plans,
+  // reverse-indexed by the materials their blueprints consume, once the
+  // (lazily loaded) blueprint catalog is in hand. Null while unknown, same
+  // as `blueprintCatalog` itself, so the menu action stays absent rather than
+  // flashing in once the catalog lands.
+  const buildPlansQuery = useLiveQuery(async () => {
+    if (activeCharacterId === null) return undefined;
+    return db.buildPlans.where('characterId').equals(activeCharacterId).toArray();
+  }, [activeCharacterId]);
+  const buildPlans = buildPlansQuery ?? NO_BUILD_PLANS;
+  const materialPlanMap = useMemo<ReadonlyMap<number, BuildPlanRecord> | null>(
+    () => (blueprintCatalog ? buildPlansByMaterialTypeID(buildPlans, blueprintCatalog) : null),
+    [blueprintCatalog, buildPlans]
+  );
+  function handleViewInIndustryAsMaterial(typeId: number) {
+    navigate(`/industry?material=${typeId}`);
   }
 
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
@@ -852,24 +912,40 @@ export function Assets() {
     return current.location_id;
   }
 
-  // Also requires a non-empty `debouncedSearch`, not just `searchActive`: for
-  // up to SEARCH_DEBOUNCE_MS after the first keystroke, `searchActive` (which
-  // tracks the instantly-responsive `search`) is already true while
-  // `debouncedSearch` is still `''` — `matchAssets` reads an empty query as
-  // "match everything", which would otherwise flash the full unfiltered list
-  // as "search results" for that one debounce window.
-  const searchMatches = useMemo(
-    () =>
-      searchActive && debouncedSearch.trim().length > 0
-        ? matchAssets(mergedAssets, mergedTypeNames, debouncedSearch)
-        : [],
-    [searchActive, mergedAssets, mergedTypeNames, debouncedSearch]
-  );
+  // Also requires a non-empty `debouncedSearch` when flat mode is driven by
+  // the search box, not just `searchActive`: for up to SEARCH_DEBOUNCE_MS
+  // after the first keystroke, `searchActive` (which tracks the
+  // instantly-responsive `search`) is already true while `debouncedSearch`
+  // is still `''` — `matchAssets` reads an empty query as "match
+  // everything", which would otherwise flash the full unfiltered list as
+  // "search results" for that one debounce window. The permanent "All
+  // items" view (issue #414) has no such flash to guard against — showing
+  // everything with no query is its resting state, not a stale debounce —
+  // so it skips the guard.
+  const searchMatches = useMemo(() => {
+    if (!flatModeActive) return [];
+    if (!allItemsView && debouncedSearch.trim().length === 0) return [];
+    return matchAssets(mergedAssets, mergedTypeNames, debouncedSearch);
+  }, [flatModeActive, allItemsView, mergedAssets, mergedTypeNames, debouncedSearch]);
+  // Min-value filter and sort (issue #414) apply to both the search results
+  // list and the permanent all-items view — the same flat shape either way.
+  // Value is computed once per match up front (not inside the comparator),
+  // which both the filter and the sort then reuse.
+  const flatMatches = useMemo(() => {
+    if (!flatModeActive) return [];
+    const valued: ValuedAssetMatch[] = searchMatches.map((match) => ({
+      match,
+      value: estimatedValueFor(match.asset, priceByTypeId),
+    }));
+    const filtered =
+      minValueThreshold > 0 ? valued.filter((v) => v.value >= minValueThreshold) : valued;
+    return filtered.sort((a, b) => compareValuedAssetMatches(a, b, sortField)).map((v) => v.match);
+  }, [flatModeActive, searchMatches, minValueThreshold, priceByTypeId, sortField]);
 
   // The three list shapes, reduced to one row array for one virtualizer.
   const rows = useMemo<BrowseRow[]>(() => {
-    if (searchActive) {
-      return searchMatches.map((match) => ({
+    if (flatModeActive) {
+      return flatMatches.map((match) => ({
         kind: 'match' as const,
         key: `m:${match.asset.item_id}`,
         match,
@@ -930,8 +1006,8 @@ export function Assets() {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinStateFor closes over pins/activeCharacterId, listed explicitly; t is stable
   }, [
-    searchActive,
-    searchMatches,
+    flatModeActive,
+    flatMatches,
     pathStationId,
     resolved,
     sortedTree,
@@ -961,7 +1037,7 @@ export function Assets() {
   // extra API surface.
   useEffect(() => {
     if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
-  }, [wildcard, searchActive]);
+  }, [wildcard, flatModeActive]);
 
   // Jumps-away distances (issue #87): the active character's current solar
   // system, fetched once per page load (not polled) via ESI's location
@@ -1266,10 +1342,12 @@ export function Assets() {
     priceByTypeId,
     volumeByTypeId,
     blueprintCatalog,
+    materialPlanMap,
     quickbarAvailable: activeCharacterId !== null,
     onRequestBlueprintCatalog: ensureBlueprintCatalog,
     onAddToQuickbar: handleAddToQuickbar,
     onShowInfo: handleShowInfo,
+    onViewInIndustryAsMaterial: handleViewInIndustryAsMaterial,
   };
 
   if (!hydrated) {
@@ -1332,6 +1410,12 @@ export function Assets() {
                 label={t('assets.crossCharacterToggle')}
                 pressed={crossCharacterSearch}
                 onClick={() => setCrossCharacterSearch((v) => !v)}
+              />
+              <IconButton
+                icon={<Icon.Sort />}
+                label={t('assets.allItemsToggle')}
+                pressed={allItemsView}
+                onClick={() => setAllItemsView((v) => !v)}
               />
               <IconButton
                 icon={<Icon.Select />}
@@ -1432,10 +1516,10 @@ export function Assets() {
           <AssetItemActionsContext.Provider value={itemActions}>
             <Panel padded={false} fill className="flex min-h-0 flex-1 flex-col">
               {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
-              {searchActive ? (
-                <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
+              {flatModeActive ? (
+                <div className="flex h-11 shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
                   <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('assets.search.resultCount', { count: searchMatches.length })}
+                    {t('assets.search.resultCount', { count: flatMatches.length })}
                   </span>
                   {/* CSV export always stays scoped to the active Character's own
                       assets (see csvGroups above) — this is the only UI surface
@@ -1446,14 +1530,41 @@ export function Assets() {
                       {t('assets.crossCharacterCsvNote')}
                     </span>
                   )}
-                  <IconButton
-                    icon={<Icon.Close />}
-                    label={t('assets.search.clear')}
-                    variant="plain"
-                    size="sm"
-                    className="ml-auto"
-                    onClick={() => setSearch('')}
-                  />
+                  <div className="ml-auto flex items-center gap-2">
+                    <TextInput
+                      type="number"
+                      size="sm"
+                      min={0}
+                      inputMode="decimal"
+                      value={minValueInput}
+                      onChange={(e) => setMinValueInput(e.target.value)}
+                      placeholder={t('assets.minValue.placeholder')}
+                      aria-label={t('assets.minValue.label')}
+                      className="w-24 tabular-nums"
+                    />
+                    <Select
+                      value={sortField}
+                      onValueChange={(value) => setSortField(value as AssetSortField)}
+                    >
+                      <SelectTrigger aria-label={t('assets.sort.label')} className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
+                        <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
+                        <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {searchActive && (
+                      <IconButton
+                        icon={<Icon.Close />}
+                        label={t('assets.search.clear')}
+                        variant="plain"
+                        size="sm"
+                        onClick={() => setSearch('')}
+                      />
+                    )}
+                  </div>
                 </div>
               ) : pathStationId !== null ? (
                 <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
@@ -1571,7 +1682,7 @@ export function Assets() {
                 />
               ) : rows.length === 0 ? (
                 <EmptyState
-                  title={searchActive ? t('assets.noResults') : t('assets.emptyLocation')}
+                  title={flatModeActive ? t('assets.noResults') : t('assets.emptyLocation')}
                   className="py-8"
                 />
               ) : (
@@ -1766,6 +1877,9 @@ function NodeRowView({
     actions.blueprintCatalog === null
       ? undefined
       : (actions.blueprintCatalog.byProductTypeID.get(asset.type_id)?.blueprintTypeID ?? null);
+  const onViewInIndustryAsMaterial = actions.materialPlanMap?.has(asset.type_id)
+    ? () => actions.onViewInIndustryAsMaterial(asset.type_id)
+    : undefined;
 
   return (
     <ItemRow
@@ -1786,6 +1900,7 @@ function NodeRowView({
           onAddToQuickbar={actions.onAddToQuickbar}
           quickbarAvailable={actions.quickbarAvailable}
           onShowInfo={actions.onShowInfo}
+          onViewInIndustryAsMaterial={onViewInIndustryAsMaterial}
           onOpenChange={(open) => {
             if (open) actions.onRequestBlueprintCatalog();
           }}

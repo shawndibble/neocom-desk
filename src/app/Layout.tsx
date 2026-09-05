@@ -439,10 +439,11 @@ export function Layout() {
         {/*
           Footer: Settings then the active Character, in that reading order —
           Settings sits just above the Character link, which is the very
-          bottom of the rail. Its own `border-t` is what visually separates
-          this from the scrollable nav above.
+          bottom of the rail. Its `border-b` rules off the bottom of Settings,
+          separating it from the Character link below rather than from the
+          scrollable nav above.
         */}
-        <div className="shrink-0 border-t border-line p-2">
+        <div className="shrink-0 border-b border-line p-2">
           <NavItem to="/settings" label={t('nav.settings')} locked={false} />
         </div>
         <CharacterFooterLink activeCharacter={activeCharacter} />
