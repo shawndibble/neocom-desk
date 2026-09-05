@@ -28,6 +28,40 @@ export interface CharacterSpSummary {
 /** Stable identity for "nothing to show", so a caller can default to it without allocating. */
 export const NO_SP_SUMMARY: CharacterSpSummary = { totalSp: null, unallocatedSp: null };
 
+/**
+ * Last successfully-observed SP pair per character, in memory only. Every
+ * Character-overview tab (Overview, Clones, Employment History) mounts its
+ * own loader and starts it from scratch, so switching between them used to
+ * blank both header chips to "—" on every switch, however briefly, even
+ * though another tab had already loaded the very same character's SP
+ * moments earlier. `getLastKnownSpSummary` lets a freshly-mounted tab seed
+ * `CharacterHeader` with that value immediately instead of `NO_SP_SUMMARY`,
+ * while its own load — still the source of truth for *this* tab — runs
+ * behind it as before.
+ */
+const lastKnownByCharacter = new Map<number, CharacterSpSummary>();
+
+export function getLastKnownSpSummary(characterId: number | null): CharacterSpSummary {
+  if (characterId === null) return NO_SP_SUMMARY;
+  return lastKnownByCharacter.get(characterId) ?? NO_SP_SUMMARY;
+}
+
+/**
+ * Records a freshly-loaded SP pair for `getLastKnownSpSummary` to serve to
+ * the next tab that mounts. An all-null summary is not remembered — a
+ * legitimate "no scope"/"unreachable" read from one tab must not blank out
+ * a real value another tab already found.
+ */
+export function rememberSpSummary(
+  characterId: number,
+  summary: CharacterSpSummary
+): CharacterSpSummary {
+  if (summary.totalSp !== null || summary.unallocatedSp !== null) {
+    lastKnownByCharacter.set(characterId, summary);
+  }
+  return summary;
+}
+
 /** `nowMs` is a parameter, keeping the queue correction clock-free. */
 export async function loadCharacterSpSummary(
   characterId: number,
@@ -41,5 +75,8 @@ export async function loadCharacterSpSummary(
   const { skillsResult, totalSp } = await loadCorrectedSkills(characterId, nowMs, {
     skipQueueWithoutScope: true,
   });
-  return { totalSp, unallocatedSp: skillsResult?.data.unallocated_sp ?? null };
+  return rememberSpSummary(characterId, {
+    totalSp,
+    unallocatedSp: skillsResult?.data.unallocated_sp ?? null,
+  });
 }

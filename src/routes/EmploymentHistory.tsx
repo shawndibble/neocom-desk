@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -24,7 +24,7 @@ import { resolveNames } from '@/features/character/names';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import {
   loadCharacterSpSummary,
-  NO_SP_SUMMARY,
+  getLastKnownSpSummary,
   type CharacterSpSummary,
 } from '@/features/character/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
@@ -76,7 +76,9 @@ export function EmploymentHistory() {
 
   const historyResult = data?.historyResult ?? null;
   const corpNames = data?.corpNames ?? NO_NAMES;
-  const sp = data?.sp ?? NO_SP_SUMMARY;
+  // See Clones.tsx: falls back to another tab's already-loaded SP rather
+  // than blanking the shared header while this tab's own read is in flight.
+  const sp = data?.sp ?? getLastKnownSpSummary(activeCharacterId);
 
   // Falls back to 0 when nothing has loaded yet: `historyResult` is null then too,
   // so `deriveEmploymentHistoryRows` receives no entries and the value is unused.
@@ -94,14 +96,15 @@ export function EmploymentHistory() {
         render: (row) => {
           const name = corpNames.get(row.corporationId) ?? `#${row.corporationId}`;
           // Only the row that is both ongoing and matches the character's
-          // current corp links out — past corps and an ongoing row the
-          // character record hasn't caught up to yet stay plain text.
+          // current corp gets the badge — past corps and an ongoing row the
+          // character record hasn't caught up to yet stay plain text. Never
+          // a link to /corp: this route needs no scope and a typical viewer
+          // has no Corp Access grant, so it would just land them on a
+          // rejection.
           if (!row.ongoing || character?.corporationId !== row.corporationId) return name;
           return (
             <span className="inline-flex items-center gap-2">
-              <Link to="/corp" className="hover:underline">
-                {name}
-              </Link>
+              {name}
               <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-success uppercase">
                 {t('employmentHistory.current')}
               </span>

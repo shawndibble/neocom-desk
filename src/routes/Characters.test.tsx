@@ -100,12 +100,14 @@ describe('Characters', () => {
     );
   });
 
-  it('shows SP and wallet with independent data-age badges, an em dash when unavailable', async () => {
+  it('shows one combined data-age badge per card — the oldest of the fetched fields, not one each', async () => {
     const now = Date.now();
-    // Pilot One: both fields cached, at deliberately different ages so the
-    // two badges must disagree ("5m ago" vs "3d ago") rather than share one
-    // fetchedAt. Pilot Two: neither ever cached — never fetched, not a
-    // scope-not-granted 0.
+    // Pilot One: both fields cached, at deliberately different ages. Three
+    // badges in a row (one per stat) was the actual complaint (issue: "sync
+    // number listed 3 times") — the card now carries a single dot-only badge
+    // for the oldest of them, "3d ago" (in its tooltip, not visible text —
+    // see DataAgeBadge's `dotOnly`), not "5m ago" alongside it. Pilot Two:
+    // neither ever cached — never fetched, not a scope-not-granted 0.
     await db.esiCache.put({
       characterId: 91,
       key: 'skills',
@@ -128,8 +130,10 @@ describe('Characters', () => {
     const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
     expect(pilotOneCard).toHaveTextContent('12.3M');
     expect(pilotOneCard).toHaveTextContent('250M');
-    expect(pilotOneCard).toHaveTextContent('5m ago');
-    expect(pilotOneCard).toHaveTextContent('3d ago');
+    const badges = pilotOneCard.querySelectorAll('time');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].getAttribute('title')).toContain('3d ago');
+    expect(badges[0].getAttribute('title')).not.toContain('5m ago');
 
     const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
     const spChip = within(pilotTwoCard).getByText('SP').parentElement as HTMLElement;
@@ -140,7 +144,7 @@ describe('Characters', () => {
     expect(within(pilotTwoCard).queryByText(/ago$/)).not.toBeInTheDocument();
   });
 
-  it("shows each character's cached queue state, with a data-age badge when it was fetched", async () => {
+  it("shows each character's cached queue state, with the one combined data-age badge when anything was fetched", async () => {
     const now = Date.now();
     const entries: SkillQueueEntry[] = [
       {
@@ -160,7 +164,7 @@ describe('Characters', () => {
 
     const pilotOneCard = screen.getByText('Pilot One').closest('li');
     expect(pilotOneCard).toHaveTextContent('Training');
-    expect(pilotOneCard?.querySelector('time')).not.toBeNull();
+    expect(pilotOneCard?.querySelectorAll('time')).toHaveLength(1);
 
     const pilotTwoCard = screen.getByText('Pilot Two').closest('li');
     expect(pilotTwoCard).toHaveTextContent('Unknown');

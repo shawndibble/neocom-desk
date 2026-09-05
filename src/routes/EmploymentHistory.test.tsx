@@ -105,8 +105,6 @@ describe('EmploymentHistory', () => {
     // 'Past Corp' rather than 'Current Corp': the shared header names the
     // character's *current* corporation too, and it resolves first.
     expect(await screen.findByText('Past Corp')).toBeInTheDocument();
-    // Current Corp's row is the ongoing/matching one, so it renders as a link.
-    expect(screen.getByRole('link', { name: 'Current Corp' })).toBeInTheDocument();
     const rows = screen.getAllByRole('row');
     // Row 0 is the header; row 1 should be the most recent corp.
     expect(rows[1]).toHaveTextContent('Current Corp');
@@ -115,18 +113,22 @@ describe('EmploymentHistory', () => {
     expect(rows[2]).toHaveTextContent('365d');
   });
 
-  it('links the ongoing row to /corp and badges it when it matches the character record', async () => {
+  it('badges the ongoing row when it matches the character record, without linking it', async () => {
+    // A typical user has no grant on /corp and would just be rejected there,
+    // so the ongoing row is a badge, never a link.
     render(<App />);
 
     await screen.findByText('Past Corp');
-    const link = screen.getByRole('link', { name: 'Current Corp' });
-    expect(link).toHaveAttribute('href', '/corp');
-    expect(screen.getByText('Current')).toBeInTheDocument();
-    // The past corp's row stays plain text — no link, no badge.
-    expect(screen.queryByRole('link', { name: 'Past Corp' })).toBeNull();
+    // Row 0 is the header; row 1 is the ongoing/matching corp.
+    const rows = screen.getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('Current Corp');
+    expect(rows[1]).toHaveTextContent('Current');
+    expect(screen.queryByRole('link', { name: 'Current Corp' })).toBeNull();
+    // The past corp's row gets no badge either.
+    expect(rows[2]).not.toHaveTextContent('Current');
   });
 
-  it('does not link the ongoing row when the character record has a different corp', async () => {
+  it('does not badge the ongoing row when the character record has a different corp', async () => {
     // The character's own corp record resolves from ESI's public-info fetch
     // (CharacterHeader triggers it), which would otherwise resync back to
     // 200 — override the endpoint itself rather than the db row, so this
@@ -159,7 +161,6 @@ describe('EmploymentHistory', () => {
 
     await screen.findByText('Past Corp');
     await screen.findByText('Other Corp');
-    expect(screen.queryByRole('link', { name: 'Current Corp' })).toBeNull();
     expect(screen.queryByText('Current')).toBeNull();
   });
 
@@ -197,7 +198,10 @@ describe('EmploymentHistory', () => {
     );
     render(<App />);
     expect(await screen.findByText(/showing cached data/i)).toBeInTheDocument();
-    expect(screen.getByText(/#200|Current Corp/, { selector: 'td, a' })).toBeInTheDocument();
+    // Row 0 is the header; row 1 is the cached, ongoing/matching corp — its
+    // name may or may not have resolved yet.
+    const rows = screen.getAllByRole('row');
+    expect(rows[1]).toHaveTextContent(/#200|Current Corp/);
   });
 
   it('shows the empty state when there is no data at all', async () => {

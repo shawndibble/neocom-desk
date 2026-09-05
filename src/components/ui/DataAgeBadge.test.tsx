@@ -54,4 +54,38 @@ describe('DataAgeBadge', () => {
       'Corp data refreshes about hourly.'
     );
   });
+
+  describe('dotOnly', () => {
+    it('renders only the dot — no visible age text', () => {
+      const date = new Date(NOW.getTime() - 5 * 60_000);
+      const { container } = render(<DataAgeBadge date={date} dotOnly />);
+      const time = container.querySelector('time');
+      expect(time).not.toBeNull();
+      expect(time?.textContent?.trim()).toBe('');
+    });
+
+    it('moves the relative age into the tooltip, alongside the absolute timestamp', () => {
+      const date = new Date(NOW.getTime() - 5 * 60_000);
+      const { container } = render(<DataAgeBadge date={date} dotOnly />);
+      const title = container.querySelector('time')?.getAttribute('title');
+      expect(title).toContain('5m ago');
+      expect(title).toContain(date.toLocaleString());
+    });
+
+    it('still appends a view’s own refresh-cadence note to the tooltip', () => {
+      const date = new Date(NOW.getTime() - 5 * 60_000);
+      const { container } = render(
+        <DataAgeBadge date={date} dotOnly note="Corp data refreshes about hourly." />
+      );
+      expect(container.querySelector('time')?.getAttribute('title')).toContain(
+        'Corp data refreshes about hourly.'
+      );
+    });
+
+    it('keeps the stale tone on the dot', () => {
+      const date = new Date(NOW.getTime() - 2 * 86_400_000);
+      const { container } = render(<DataAgeBadge date={date} dotOnly />);
+      expect(container.querySelector('time')?.className).toContain('text-danger');
+    });
+  });
 });
