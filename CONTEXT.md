@@ -14,6 +14,14 @@ here — they go one per file in `docs/context/decisions/`.
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
+- **Assignment**: Links a Mining Ledger Entry (or a split slice of its ore
+  lines, for the two-corps-one-system-one-day case) to a Payee, snapshotting
+  the tax % and ISK value at assignment time — invoice semantics, so neither a
+  later Jita price move nor an edited Payee default retroactively changes what
+  it shows as owed. Re-diffed on every ledger refresh: if ESI reports _more_
+  ore for the same entry afterward, it flips to `needs-review` with an
+  explicit before/after diff rather than silently absorbing the growth (issue
+  #523).
 - **Base Grant**: What every Character is asked for at sign-in — `SCOPES`, and
   nothing from any Scope Group.
 - **Base sheet** — the character's attributes as base + remap alone: five
@@ -140,6 +148,13 @@ here — they go one per file in `docs/context/decisions/`.
   qualifies — wormhole, Abyssal and the unreachable dev regions never do — and
   the test is not whether the region has an NPC station: 31 nullsec regions have
   none and still carry busy player-structure markets.
+- **Mining Ledger Entry**: One row of the Moon Mining Tax ledger, derived (not
+  stored) from ESI's personal mining ledger: every moon-goo row for one
+  (character, EVE/UTC date, solar system), summed per ore type. This is also
+  ESI's own granularity ceiling — no intra-day timestamp and no moon identity
+  survive to the app, so two different corps' moons rented in the same system
+  on the same day cannot be told apart; the split-payee Assignment flow is the
+  mitigation, not a fix (issue #523).
 - **Notification Allow-List**: The closed set of EVE Notification `type`
   strings the app delivers. A type outside it is dropped at the poller — not
   toggled off, not rendered generically, not recorded. Replaces round 34's
@@ -174,6 +189,11 @@ here — they go one per file in `docs/context/decisions/`.
   this ceiling, so it is derived from trained skills
   (`src/engine/market/orderSlots.ts`) and shown as the denominator of the
   Overview's Open orders tile.
+- **Payee**: Who the Moon Mining Tax ledger owes — user-managed `{name,
+default tax %, optional moon/system tag}`. The moon/system tag lets the UI
+  auto-suggest (and pre-fill) the Payee and rate for a future Mining Ledger
+  Entry from that system: "pick the moon, the corp, or the person, whichever
+  is memorable" (issue #523).
 - **Pin Budget**: The CPU and Powergrid a Command Center supplies to one
   colony, and the fixed amount each pin draws from it. **This is the pin cap
   — the game defines no pin-count limit** — so "how many P1 pins, or fewer

@@ -1,0 +1,52 @@
+import type { OreLine } from './types';
+
+export type MiningTaxRowStatus = 'unassigned' | 'outstanding' | 'paid' | 'needs-review';
+
+/**
+ * The entry's ore lines whose typeId no covering Assignment claims at all —
+ * the split-payee residual (decision doc: "one derived entry split across two
+ * Payees"). Presence-based, not quantity-based: a split assigns a *whole* ore
+ * line to a Payee, never a partial quantity of one, so a typeId any covering
+ * Assignment already names is fully spoken for regardless of how much
+ * quantity that Assignment's own snapshot holds.
+ *
+ * This matters most for a `needs-review` Assignment, whose stored quantity is
+ * stale by definition: `resolveNeedsReview` (assignments.ts) always
+ * re-snapshots to the type's *entire* fresh quantity, so treating only the
+ * already-stored amount as "covered" here would double-count the pending
+ * growth as a second, separately assignable "unassigned" residual — a real
+ * defect this function used to have (caught by `snapshot.test.ts`), not a
+ * quantity computation worth doing.
+ */
+export function unassignedOreLines(
+  entryLines: readonly OreLine[],
+  coveringOreLines: readonly (readonly OreLine[])[]
+): OreLine[] {
+  const coveredTypeIds = new Set<number>();
+  for (const lines of coveringOreLines) {
+    for (const line of lines) coveredTypeIds.add(line.typeId);
+  }
+  return entryLines.filter((line) => !coveredTypeIds.has(line.typeId));
+}
+
+/**
+ * Every status present on one row (one Mining Ledger Entry): `unassigned`
+ * when any of its ore is not yet covered by an Assignment, plus each distinct
+ * status among the Assignments that do cover it. A split entry can carry more
+ * than one — the ledger's Status filter (Unassigned/Needs Review/Outstanding/
+ * Paid multi-select) matches a row if *any* of its statuses is selected,
+ * since "outstanding" and "still has an unassigned line" are both true at
+ * once for that row.
+ */
+export function statusesForRow(
+  entryLines: readonly OreLine[],
+  covering: readonly { status: MiningTaxRowStatus; oreLines: readonly OreLine[] }[]
+): Set<MiningTaxRowStatus> {
+  const statuses = new Set<MiningTaxRowStatus>(covering.map((c) => c.status));
+  const residual = unassignedOreLines(
+    entryLines,
+    covering.map((c) => c.oreLines)
+  );
+  if (residual.length > 0) statuses.add('unassigned');
+  return statuses;
+}

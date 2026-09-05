@@ -338,6 +338,78 @@ export interface NotificationFeedRecord {
   dismissedAt?: number;
 }
 
+/**
+ * A Payee (CONTEXT.md, issue #523): who the Moon Mining Tax ledger owes —
+ * user-managed, per-character (like `BuildPlanRecord`). The moon/system tag
+ * is what lets a future entry auto-suggest this Payee and its rate — "pick
+ * the moon, the corp, or the person, whichever is memorable" — and is
+ * deliberately left unmatched for the two-corps-one-system-one-day case,
+ * which the Assignment's own split-line support handles instead.
+ */
+export interface PayeeRecord {
+  id: string;
+  characterId: number;
+  name: string;
+  /** Percent, 0-100. What a new Assignment against this Payee prefills. */
+  defaultTaxPct: number;
+  /** Solar system id this Payee collects on, for auto-match. Optional — a Payee need not be tied to one system. */
+  systemId?: number;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
+/** One ore line an Assignment covers — a whole Mining Ledger Entry, or a split slice of one (two Payees, one system, one day). */
+export interface MiningTaxOreLine {
+  typeId: number;
+  quantity: number;
+}
+
+/** Before/after quantity for one ore type, recorded when a `needs-review` flip occurs (CONTEXT.md, issue #523). */
+export interface MiningTaxQuantityDiff {
+  typeId: number;
+  before: number;
+  after: number;
+}
+
+export type MiningTaxAssignmentStatus = 'outstanding' | 'paid' | 'needs-review';
+
+/**
+ * An Assignment (CONTEXT.md, issue #523): links a Mining Ledger Entry (or a
+ * split slice of its ore lines) to a Payee, snapshotting the tax percent and
+ * ISK value **at assignment time** — invoice semantics, so neither a later
+ * Jita price move nor an edited Payee default retroactively changes what an
+ * already-assigned obligation shows as owed.
+ *
+ * Re-diffed on every ledger refresh: if ESI reports *more* ore for the same
+ * (characterId, date, solarSystemId) after assignment, `status` flips to
+ * `needs-review` and `reviewDiff` records the before/after — never silently
+ * absorbed into `oreLines`.
+ */
+export interface MiningTaxAssignmentRecord {
+  id: string;
+  /** The character who mined this — the Mining Ledger Entry's own owner. */
+  characterId: number;
+  /** EVE/UTC calendar date, e.g. "2026-09-04". */
+  date: string;
+  solarSystemId: number;
+  payeeId: string;
+  /** The ore lines this Assignment covers, snapshotted at assignment time. */
+  oreLines: MiningTaxOreLine[];
+  /** Percent, 0-100, snapshotted from the Payee's default (or overridden) at assignment time. */
+  taxPct: number;
+  /** ISK value of `oreLines` at Jita price, snapshotted at assignment time. */
+  estimatedValue: number;
+  /** `estimatedValue * taxPct / 100`, snapshotted at assignment time. */
+  taxOwed: number;
+  status: MiningTaxAssignmentStatus;
+  /** Set only while `status` is `needs-review`. */
+  reviewDiff?: MiningTaxQuantityDiff[];
+  /** Epoch ms the assignment was marked paid, absent while outstanding or needs-review. */
+  paidAt?: number;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -349,6 +421,8 @@ export const db = new Dexie('neocom') as Dexie & {
   stationPins: EntityTable<StationPinRecord, 'id'>;
   planetRichness: EntityTable<PlanetRichnessRecord, 'id'>;
   notificationFeed: EntityTable<NotificationFeedRecord, 'id'>;
+  payees: EntityTable<PayeeRecord, 'id'>;
+  miningTaxAssignments: EntityTable<MiningTaxAssignmentRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -445,4 +519,23 @@ db.version(8).stores({
   stationPins: 'id, characterId, locationId',
   planetRichness: 'id, characterId, planetId',
   notificationFeed: 'id, characterId, firedAt',
+});
+
+// Additive: v8 stores unchanged, plus Payees and Mining Tax Assignments
+// (issue #523). `miningTaxAssignments` also indexes the compound
+// `[characterId+date+solarSystemId]` key — the Mining Ledger Entry identity —
+// since every assignment/re-diff read is scoped to one entry at a time.
+db.version(9).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
 });

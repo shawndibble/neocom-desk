@@ -225,7 +225,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(8);
+    expect(db.verno).toBe(9);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -248,7 +248,9 @@ describe('schema upgrade v7 -> v8', () => {
         'buildPlans',
         'characters',
         'esiCache',
+        'miningTaxAssignments',
         'notificationFeed',
+        'payees',
         'planetRichness',
         'quickbars',
         'settings',
@@ -256,6 +258,15 @@ describe('schema upgrade v7 -> v8', () => {
         'stationPins',
         'tokens',
       ].sort()
+    );
+  });
+});
+
+describe('schema upgrade v8 -> v9', () => {
+  it('adds Payees and Mining Tax Assignments (issue #523)', () => {
+    expect(db.payees.schema.indexes.map((i) => i.name).sort()).toEqual(['characterId']);
+    expect(db.miningTaxAssignments.schema.indexes.map((i) => i.name).sort()).toEqual(
+      ['[characterId+date+solarSystemId]', 'characterId'].sort()
     );
   });
 });

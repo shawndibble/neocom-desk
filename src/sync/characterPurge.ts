@@ -1,7 +1,8 @@
 // Remote-data purge for a removed Character (parity plan §5.7 item 3): the
 // delete counterpart to planSync's push/pull, for every piece of Editable
 // Data (CONTEXT.md) a Character owns — plans, buildPlans, quickbars,
-// stationPins, planetRichness, settings, notificationFeed under /characters/{uid}.
+// stationPins, planetRichness, payees, miningTaxAssignments, settings,
+// notificationFeed under /characters/{uid}.
 //
 // Firestore rules grant `delete` uid-only, unlike `get`/`update`, which also
 // require an ownerHash match (see firestore.rules) — the same rule that lets
@@ -32,6 +33,8 @@ const REMOTE_COLLECTIONS = [
   'quickbars',
   'stationPins',
   'planetRichness',
+  'payees',
+  'miningTaxAssignments',
   'settings',
   'notificationFeed',
 ] as const;
@@ -61,8 +64,8 @@ async function deleteAllDocs(firestore: Firestore, uid: string, name: string): P
 }
 
 /**
- * Delete every remote Firestore doc owned by one Character, across all six
- * Editable Data collections. Throws on failure (dead refresh token, offline,
+ * Delete every remote Firestore doc owned by one Character, across every
+ * Editable Data collection. Throws on failure (dead refresh token, offline,
  * Firebase misconfigured) — callers decide how to degrade.
  */
 export async function purgeCharacterRemoteData(characterId: number): Promise<void> {

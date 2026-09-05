@@ -54,6 +54,26 @@ async function seedCharacter(characterId: number): Promise<void> {
     updatedAt: 1,
   });
   await db.esiCache.put({ characterId, key: 'wallet', value: 100, fetchedAt: 1 });
+  await db.payees.add({
+    id: `payee-${characterId}`,
+    characterId,
+    name: 'Some Corp',
+    defaultTaxPct: 10,
+    updatedAt: 1,
+  });
+  await db.miningTaxAssignments.add({
+    id: `assignment-${characterId}`,
+    characterId,
+    date: '2026-09-04',
+    solarSystemId: 30000142,
+    payeeId: `payee-${characterId}`,
+    oreLines: [{ typeId: 45490, quantity: 100 }],
+    taxPct: 10,
+    estimatedValue: 1000,
+    taxOwed: 100,
+    status: 'outstanding',
+    updatedAt: 1,
+  });
 }
 
 beforeEach(async () => {
@@ -69,6 +89,8 @@ beforeEach(async () => {
     db.stationPins.clear(),
     db.esiCache.clear(),
     db.settings.clear(),
+    db.payees.clear(),
+    db.miningTaxAssignments.clear(),
   ]);
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
 });
@@ -86,6 +108,8 @@ describe('removeCharacter', () => {
     expect(await db.quickbars.where('characterId').equals(1).count()).toBe(0);
     expect(await db.stationPins.where('characterId').equals(1).count()).toBe(0);
     expect(await db.esiCache.where('[characterId+key]').equals([1, 'wallet']).count()).toBe(0);
+    expect(await db.payees.where('characterId').equals(1).count()).toBe(0);
+    expect(await db.miningTaxAssignments.where('characterId').equals(1).count()).toBe(0);
   });
 
   it('does not touch another character’s data', async () => {
@@ -96,6 +120,8 @@ describe('removeCharacter', () => {
 
     expect(await db.characters.get(2)).toBeDefined();
     expect(await db.skillPlans.where('characterId').equals(2).count()).toBe(1);
+    expect(await db.payees.where('characterId').equals(2).count()).toBe(1);
+    expect(await db.miningTaxAssignments.where('characterId').equals(2).count()).toBe(1);
   });
 
   it('attempts the remote purge and clears sync bookkeeping when configured', async () => {

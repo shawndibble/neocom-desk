@@ -473,9 +473,10 @@ describe('triggerSync: plans', () => {
 describe('triggerSync: ownerHash-scoped reads', () => {
   it('queries every collection filtered by the character ownerHash', async () => {
     await triggerSync(1);
-    // plans + buildPlans + quickbars + stationPins + planetRichness +
-    // notificationFeed + settings, each read through a where clause.
-    expect(vi.mocked(where)).toHaveBeenCalledTimes(7);
+    // plans + buildPlans + quickbars + stationPins + planetRichness + payees +
+    // miningTaxAssignments + notificationFeed + settings, each read through a
+    // where clause.
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(9);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
       expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
@@ -1335,7 +1336,7 @@ describe('sync orchestration', () => {
 
     release();
     await Promise.all([p1, p2]);
-    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(7);
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(9);
   });
 
   it('a queued sync still runs after the previous one fails', async () => {
@@ -1351,10 +1352,11 @@ describe('sync orchestration', () => {
     scheduleSync(1, 20);
     scheduleSync(1, 20);
     // One sync = one getDocs per collection (plans + buildPlans + quickbars +
-    // stationPins + notificationFeed + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(7));
+    // stationPins + planetRichness + payees + miningTaxAssignments +
+    // notificationFeed + settings).
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(9));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(7);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(9);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
   });
 });

@@ -1024,6 +1024,54 @@ async function main() {
   }
   marketTypes.sort((a, b) => a.typeId - b.typeId);
 
+  // --- moonOreTypes.json: published types under the "Moon Ores" market group
+  // (issue #523). Moon mining yields its own five rarity-tier ore types —
+  // Ubiquitous/Common/Uncommon/Rare/Exceptional Moon Ores, all children of one
+  // "Moon Ores" market group — distinct from ordinary asteroid ore and ice,
+  // which already arrive under different type_ids in the personal mining
+  // ledger. That's the whole allowlist src/engine/miningTax/groupLedger.ts
+  // needs to isolate moon-mining rows, with zero "was this interrupted by
+  // asteroid ore" logic required. Derived from the market tree rather than
+  // hand-maintained so a future CCP rarity tier (a new child of "Moon Ores")
+  // is picked up on the next SDE rebuild instead of only ever surfacing
+  // through the app's "unclassified ore" fallback.
+  const MOON_ORES_GROUP_NAME = 'Moon Ores';
+  const moonOresParent = marketGroups.find((g) => g.name === MOON_ORES_GROUP_NAME && !g.hasTypes);
+  const moonOreMarketGroupIds = new Set(
+    marketGroups.filter((g) => g.parentId === moonOresParent?.id).map((g) => g.id)
+  );
+  const moonOreTypeIds = marketTypes
+    .filter((t) => moonOreMarketGroupIds.has(t.marketGroupId))
+    .map((t) => t.typeId)
+    .sort((a, b) => a - b);
+
+  // --- oreAndIceTypeIds.json: every ore/ice type this app can name, moon or
+  // not (issue #523). Broader than moonOreTypes.json on purpose: it is how
+  // the Moon Mining Tax ledger tells "ordinary asteroid ore/ice — silently
+  // not moon mining" apart from "a type_id nothing here recognizes at all,"
+  // which is exactly the allowlist-gap case the decision doc's "unclassified
+  // ore" banner exists to catch instead of silently dropping.
+  const ORE_AND_ICE_ROOT_GROUP_NAMES = ['Standard Ores', 'Ice Ores', MOON_ORES_GROUP_NAME];
+  const marketGroupsByParent = new Map();
+  for (const g of marketGroups) {
+    const list = marketGroupsByParent.get(g.parentId) ?? [];
+    list.push(g);
+    marketGroupsByParent.set(g.parentId, list);
+  }
+  const oreAndIceMarketGroupIds = new Set();
+  const collectDescendants = (groupId) => {
+    oreAndIceMarketGroupIds.add(groupId);
+    for (const child of marketGroupsByParent.get(groupId) ?? []) collectDescendants(child.id);
+  };
+  for (const name of ORE_AND_ICE_ROOT_GROUP_NAMES) {
+    const root = marketGroups.find((g) => g.name === name && g.parentId === 1031);
+    if (root) collectDescendants(root.id);
+  }
+  const oreAndIceTypeIds = marketTypes
+    .filter((t) => oreAndIceMarketGroupIds.has(t.marketGroupId))
+    .map((t) => t.typeId)
+    .sort((a, b) => a - b);
+
   // --- market/variations.json: invMetaTypes + invMetaGroups -> Tech/Meta/
   // Faction variation relation (the EVE client's "Variations" tab). Every
   // classified type has an invMetaTypes row; a group's root has an empty
@@ -1198,6 +1246,8 @@ async function main() {
     // Its own file, not folded into pi.json: it is one entry per planet in New
     // Eden and every other consumer of pi.json would pay for it on load.
     ['pi-planet-radius.json', piPlanetRadiusKm],
+    ['moonOreTypes.json', moonOreTypeIds],
+    ['oreAndIceTypeIds.json', oreAndIceTypeIds],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {
@@ -1243,6 +1293,24 @@ async function main() {
     );
   }
   console.log(`  types map entries: ${Object.keys(typeMap).length}`);
+  console.log(`  moon ore type ids: ${moonOreTypeIds.length}`);
+  if (!moonOresParent || moonOreMarketGroupIds.size === 0 || moonOreTypeIds.length < 50) {
+    console.error(
+      '  FAIL: moon ore type ids came out empty or implausibly small — the "Moon Ores" market group structure may have changed'
+    );
+    process.exitCode = 1;
+  }
+  console.log(`  ore/ice type ids (moon + asteroid + ice): ${oreAndIceTypeIds.length}`);
+  if (!moonOreTypeIds.every((id) => oreAndIceTypeIds.includes(id))) {
+    console.error('  FAIL: moonOreTypeIds is not a subset of oreAndIceTypeIds');
+    process.exitCode = 1;
+  }
+  if (oreAndIceTypeIds.length < moonOreTypeIds.length + 100) {
+    console.error(
+      '  FAIL: ore/ice type ids came out implausibly small — the ore/ice market group structure may have changed'
+    );
+    process.exitCode = 1;
+  }
   console.log(
     `  planetary schematics: ${Object.keys(piSchematics).length} (+${piRaw.length} raw resources, ${piUnpublished} unpublished skipped)`
   );

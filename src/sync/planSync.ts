@@ -34,6 +34,8 @@ import {
   type SkillPlanRecord,
   type StationPinRecord,
   type PlanetRichnessRecord,
+  type PayeeRecord,
+  type MiningTaxAssignmentRecord,
 } from '@/db';
 import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
@@ -55,6 +57,8 @@ import {
   quickbarTombstonesKey,
   stationPinTombstonesKey,
   planetRichnessTombstonesKey,
+  payeeTombstonesKey,
+  miningTaxAssignmentTombstonesKey,
   readTombstones,
 } from './localBookkeeping';
 import { setStatus } from './status';
@@ -71,6 +75,8 @@ import {
   type RemoteQuickbarDoc,
   type RemoteStationPinDoc,
   type RemotePlanetRichnessDoc,
+  type RemotePayeeDoc,
+  type RemoteMiningTaxAssignmentDoc,
   type RemoteSyncedSetting,
   type SyncedSettingTombstone,
   type SyncedSettingValue,
@@ -159,6 +165,26 @@ export async function markPlanDeleted(characterId: number, planId: string): Prom
 export async function markBuildPlanDeleted(characterId: number, planId: string): Promise<void> {
   await recordDeletion(characterId, planId, buildPlanTombstonesKey(characterId), () =>
     db.buildPlans.delete(planId)
+  );
+}
+
+/** Payee analogue of markPlanDeleted — same tombstone semantics (issue #523). */
+export async function markPayeeDeleted(characterId: number, payeeId: string): Promise<void> {
+  await recordDeletion(characterId, payeeId, payeeTombstonesKey(characterId), () =>
+    db.payees.delete(payeeId)
+  );
+}
+
+/** Mining Tax Assignment analogue of markPlanDeleted — same tombstone semantics (issue #523). */
+export async function markMiningTaxAssignmentDeleted(
+  characterId: number,
+  assignmentId: string
+): Promise<void> {
+  await recordDeletion(
+    characterId,
+    assignmentId,
+    miningTaxAssignmentTombstonesKey(characterId),
+    () => db.miningTaxAssignments.delete(assignmentId)
   );
 }
 
@@ -389,11 +415,15 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     await db.quickbars.where('characterId').equals(character.characterId).delete();
     await db.stationPins.where('characterId').equals(character.characterId).delete();
     await db.planetRichness.where('characterId').equals(character.characterId).delete();
+    await db.payees.where('characterId').equals(character.characterId).delete();
+    await db.miningTaxAssignments.where('characterId').equals(character.characterId).delete();
     await writeTombstones(planTombstonesKey(character.characterId), []);
     await writeTombstones(buildPlanTombstonesKey(character.characterId), []);
     await writeTombstones(quickbarTombstonesKey(character.characterId), []);
     await writeTombstones(stationPinTombstonesKey(character.characterId), []);
     await writeTombstones(planetRichnessTombstonesKey(character.characterId), []);
+    await writeTombstones(payeeTombstonesKey(character.characterId), []);
+    await writeTombstones(miningTaxAssignmentTombstonesKey(character.characterId), []);
     // Cached wallet/mail/assets belong to the previous owner just as much as
     // the plans do. `auth/session` purges on the same signal at login; this
     // covers a transfer noticed between logins. Degrades rather than throws
@@ -710,6 +740,76 @@ const planetRichnessSpec: CollectionSpec<PlanetRichnessRecord, RemotePlanetRichn
   },
 };
 
+const payeeSpec: CollectionSpec<PayeeRecord, RemotePayeeDoc> = {
+  name: 'payees',
+  tombstoneKey: payeeTombstonesKey,
+  loadLocal: (characterId) => db.payees.where('characterId').equals(characterId).toArray(),
+  toRemoteDoc: (p, ownerHash) => ({
+    id: p.id,
+    characterId: p.characterId,
+    name: p.name,
+    defaultTaxPct: p.defaultTaxPct,
+    ...(p.systemId !== undefined ? { systemId: p.systemId } : {}),
+    updatedAt: p.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    name: r.name,
+    defaultTaxPct: r.defaultTaxPct,
+    ...(r.systemId !== undefined ? { systemId: r.systemId } : {}),
+    updatedAt: r.updatedAt,
+  }),
+  bulkPutLocal: (records) => db.payees.bulkPut(records),
+  bulkDeleteLocal: (ids) => db.payees.bulkDelete(ids),
+};
+
+const miningTaxAssignmentSpec: CollectionSpec<
+  MiningTaxAssignmentRecord,
+  RemoteMiningTaxAssignmentDoc
+> = {
+  name: 'miningTaxAssignments',
+  tombstoneKey: miningTaxAssignmentTombstonesKey,
+  loadLocal: (characterId) =>
+    db.miningTaxAssignments.where('characterId').equals(characterId).toArray(),
+  toRemoteDoc: (a, ownerHash) => ({
+    id: a.id,
+    characterId: a.characterId,
+    date: a.date,
+    solarSystemId: a.solarSystemId,
+    payeeId: a.payeeId,
+    oreLines: a.oreLines,
+    taxPct: a.taxPct,
+    estimatedValue: a.estimatedValue,
+    taxOwed: a.taxOwed,
+    status: a.status,
+    ...(a.reviewDiff !== undefined ? { reviewDiff: a.reviewDiff } : {}),
+    ...(a.paidAt !== undefined ? { paidAt: a.paidAt } : {}),
+    updatedAt: a.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    date: r.date,
+    solarSystemId: r.solarSystemId,
+    payeeId: r.payeeId,
+    oreLines: r.oreLines,
+    taxPct: r.taxPct,
+    estimatedValue: r.estimatedValue,
+    taxOwed: r.taxOwed,
+    status: r.status,
+    ...(r.reviewDiff !== undefined ? { reviewDiff: r.reviewDiff } : {}),
+    ...(r.paidAt !== undefined ? { paidAt: r.paidAt } : {}),
+    updatedAt: r.updatedAt,
+  }),
+  bulkPutLocal: (records) => db.miningTaxAssignments.bulkPut(records),
+  bulkDeleteLocal: (ids) => db.miningTaxAssignments.bulkDelete(ids),
+};
+
 // ---------------------------------------------------------------------------
 // Notification Feed sync (issue #362)
 //
@@ -817,6 +917,8 @@ async function syncCharacter(characterId: number): Promise<void> {
   await syncEditableCollection(quickbarSpec, ctx);
   await syncEditableCollection(stationPinSpec, ctx);
   await syncEditableCollection(planetRichnessSpec, ctx);
+  await syncEditableCollection(payeeSpec, ctx);
+  await syncEditableCollection(miningTaxAssignmentSpec, ctx);
   await syncFeed(ctx);
 
   // ---- Synced settings ----
