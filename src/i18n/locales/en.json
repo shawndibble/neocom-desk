@@ -1488,7 +1488,14 @@
     "searchLabel": "Search items",
     "searchPlaceholder": "Search item name…",
     "searchCapped": "Showing {{limit}} of {{total}} matches — refine your search to see more.",
+    "searchTooShort": "Type {{min}}+ characters to search.",
     "noResults": "No items match your search.",
+    "locationKind": {
+      "label": "Order location",
+      "all": "All",
+      "npc": "NPC Stations",
+      "structure": "Structures"
+    },
     "selectPromptTitle": "Select an item",
     "selectPromptHint": "Search or browse the tree to see its live order book.",
     "backToFinder": "Back",
@@ -1553,7 +1560,16 @@
       "emptyTitle": "No price history",
       "emptyHint": "ESI has no market history for this item in this region yet.",
       "errorTitle": "Couldn't load price history",
-      "errorHint": "Try switching tabs and back, or reload the page."
+      "errorHint": "Try switching tabs and back, or reload the page.",
+      "range": "Range",
+      "range7d": "7 days",
+      "range30d": "30 days",
+      "range90d": "90 days",
+      "range1y": "1 year",
+      "summaryHi": "High",
+      "summaryLo": "Low",
+      "summaryMedian": "Median",
+      "summaryNone": "No data in this range"
     },
     "compare": {
       "handle": "Compare ({{count}})",
