@@ -2297,9 +2297,10 @@ rather than each inventing its own:
   `type_id`, not the row's per-stack `item_id`.** A Build Plan's materials
   list is matched by SDE type (a blueprint needs N units of _type_ X), not by
   a specific inventory item instance, so `item_id` would be the wrong key
-  entirely — asked and settled during the audit review. The same context
-  menu also gets a plain "Copy Type ID" action alongside "Copy Name" while
-  it's being touched.
+  entirely — asked and settled during the audit review. (A "Copy Type ID"
+  action alongside "Copy Name" was proposed for the same menu edit but
+  dropped before implementation — issue #414 — as scope creep on a menu that
+  already carries 7-9 entries app-wide.)
 
 ## Implementation notes (round 50) — Public Info Modal (issue #399)
 

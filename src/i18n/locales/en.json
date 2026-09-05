@@ -799,6 +799,17 @@
       "resultCount_other": "{{count}} matches",
       "clear": "Clear search"
     },
+    "allItemsToggle": "All items",
+    "minValue": {
+      "label": "Minimum value",
+      "placeholder": "Min value"
+    },
+    "sort": {
+      "label": "Sort",
+      "name": "Name",
+      "value": "Value",
+      "quantity": "Quantity"
+    },
     "breadcrumb": {
       "back": "Back one level"
     },
@@ -1567,6 +1578,7 @@
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",
       "noBlueprintOptions": "No blueprint options",
+      "viewInIndustryAsMaterial": "View in Industry as material",
       "piPlan": "PI Plan",
       "copyLocation": "Copy location",
       "copyPrice": "Copy price",

@@ -28,6 +28,8 @@ export interface ItemContextMenuProps {
   onShowInfo: (typeId: number, itemName: string) => void;
   /** Variations-table rows only (issue #147): opens the attribute-compare modal for the row's variation group. Omitted elsewhere. */
   onCompareVariations?: () => void;
+  /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
+  onViewInIndustryAsMaterial?: () => void;
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }
@@ -53,6 +55,7 @@ export function ItemContextMenu({
   quickbarAvailable,
   onShowInfo,
   onCompareVariations,
+  onViewInIndustryAsMaterial,
   onOpenChange,
   children,
 }: ItemContextMenuProps) {
@@ -110,6 +113,11 @@ export function ItemContextMenu({
         >
           {buildPlanLabel}
         </ContextMenuItem>
+        {onViewInIndustryAsMaterial && (
+          <ContextMenuItem onSelect={onViewInIndustryAsMaterial}>
+            {t('market.contextMenu.viewInIndustryAsMaterial')}
+          </ContextMenuItem>
+        )}
         {piPlannable && (
           <ContextMenuItem onSelect={() => navigate(`/planetary-industry?tab=plan&type=${typeId}`)}>
             {t('market.contextMenu.piPlan')}
