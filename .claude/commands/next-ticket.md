@@ -13,8 +13,11 @@ same machine.** It never touches the checkout it's invoked from — it fetches
 claiming are serialized through a local lock so two concurrent runs can't grab
 the same ticket.
 
-Tracker conventions: `docs/agents/issue-tracker.md`. Domain: `CONTEXT.md`,
-`docs/adr/`. Coding rules: `CLAUDE.md`.
+Tracker conventions: `docs/agents/issue-tracker.md`. Domain: `CONTEXT.md`
+(glossary), `docs/context/decisions/` (scope decisions — grep, don't read all),
+`docs/adr/`. Coding rules: `CLAUDE.md`. Recording a new scope decision: a new
+file via `node scripts/new-decision.mjs`, never an append to `CONTEXT.md` —
+concurrent runs of this command conflict on any shared last line.
 
 If `$ARGUMENTS` contains an issue number, use that issue instead of auto-picking
 in step 2 (still run every check against it — unblocked, unassigned, no

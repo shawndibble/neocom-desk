@@ -23,7 +23,8 @@ Live: https://neocomdesk.com
 - Market prices from Fuzzwork aggregates; static game data compiled to slim
   JSON from the SDE at build time (`npm run sde:build`).
 
-See `CONTEXT.md` (glossary), `docs/DESIGN.md` (design system), `docs/adr/` (decisions).
+See `CONTEXT.md` (glossary), `docs/context/decisions/` (scope decisions),
+`docs/DESIGN.md` (design system), `docs/adr/` (architecture decisions).
 
 ## Development
 

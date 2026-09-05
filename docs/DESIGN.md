@@ -279,6 +279,8 @@ Rules:
 ## 6. Usage rules
 
 - **Dark only.** No light theme. `color-scheme: dark` is set globally.
+- **No gradients, anywhere.** Flat fills only (`bg-accent/10`, `bg-panel-2`,
+  …). Depth comes from the layering step below, not a fade.
 - Layering: `bg` → `panel` → `panel-2`. Depth via background steps + hairlines,
   not shadows. Shadows only for popovers/menus (`shadow-lg shadow-black/50`).
 - One `primary` button per view; everything else `ghost`.
