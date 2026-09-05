@@ -58,6 +58,13 @@ interface SourcingInputProps {
    * a price of nothing.
    */
   placeholder?: string;
+  /**
+   * Pairs with an external `<label htmlFor>` for callers that don't wrap the
+   * input in a `<label>`. Only for click-to-focus — `aria-label` above (set
+   * from `label`) always wins the accessible name over an id/for
+   * association, so this id changes nothing a screen reader announces.
+   */
+  id?: string;
   parse: (raw: string) => number | undefined;
   onCommit: (value: number | undefined) => void;
 }
@@ -80,12 +87,13 @@ interface SourcingInputProps {
  * already suppressed on a phone, Enter still commits, and `unmaskNumber`
  * accepts the separators a pasted number brings with it.
  */
-function SourcingInput({
+export function SourcingInput({
   value,
   label,
   inputMode,
   widthClassName,
   placeholder,
+  id,
   parse,
   onCommit,
 }: SourcingInputProps) {
@@ -93,6 +101,7 @@ function SourcingInput({
   const [editing, setEditing] = useState(false);
   return (
     <TextInput
+      id={id}
       size="sm"
       type="text"
       inputMode={inputMode}

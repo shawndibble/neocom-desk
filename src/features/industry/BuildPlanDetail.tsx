@@ -34,7 +34,8 @@ import { materialRecipe, recipeInputTypeIds } from './recipes';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
-import { MaterialsTable } from './MaterialsTable';
+import { unmaskNumber } from '@/lib/numberMask';
+import { MaterialsTable, SourcingInput } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
 import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
@@ -107,6 +108,19 @@ interface BuildPlanDetailProps {
 function clampInt(value: number, min: number, max: number): number {
   const n = Math.round(Number(value));
   return Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
+}
+
+/**
+ * `SourcingInput.parse` for Runs/ME/TE: unlike the materials sourcing
+ * fields it was built for, these three are always-defined numbers with no
+ * "unset" state, so blank or unusable input has nowhere to fall but back to
+ * `current` — which also, via `SourcingInput`'s "skip onCommit when
+ * unchanged" rule, is exactly what makes an emptied-then-abandoned field
+ * commit nothing instead of forcing a minimum.
+ */
+function parseOrKeep(current: number, raw: string, transform: (n: number) => number): number {
+  const n = unmaskNumber(raw);
+  return n === undefined ? current : transform(n);
 }
 
 /** Build Plan inputs (runs, ME/TE, facility, rig, security, hub, tax) + materials/results. */
@@ -355,13 +369,16 @@ export function BuildPlanDetail({
             <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="flex flex-col gap-1 text-xs">
                 {t('industry.runs')}
-                <TextInput
-                  type="number"
-                  min={1}
+                <SourcingInput
                   value={plan.runs}
-                  onChange={(e) =>
-                    update({ runs: Math.max(1, Math.round(Number(e.target.value) || 1)) })
-                  }
+                  label={t('industry.runs')}
+                  inputMode="numeric"
+                  widthClassName="w-full"
+                  // Blank/garbage reverts to the last committed value rather than
+                  // snapping to the minimum — clearing the box to retype "10" as
+                  // "100" must not overwrite it with 1 mid-edit.
+                  parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
+                  onCommit={(runs) => update({ runs })}
                 />
               </label>
 
@@ -373,13 +390,14 @@ export function BuildPlanDetail({
                     content={t('industry.meTooltip')}
                   />
                 </span>
-                <TextInput
+                <SourcingInput
                   id="build-plan-me"
-                  type="number"
-                  min={0}
-                  max={10}
                   value={plan.me}
-                  onChange={(e) => update({ me: clampInt(Number(e.target.value), 0, 10) })}
+                  label={t('industry.me')}
+                  inputMode="numeric"
+                  widthClassName="w-full"
+                  parse={(raw) => parseOrKeep(plan.me, raw, (n) => clampInt(n, 0, 10))}
+                  onCommit={(me) => update({ me })}
                 />
                 {ownedMatch && (
                   <span className="text-[0.6875rem] text-text-dim">
@@ -399,13 +417,14 @@ export function BuildPlanDetail({
                     content={t('industry.teTooltip')}
                   />
                 </span>
-                <TextInput
+                <SourcingInput
                   id="build-plan-te"
-                  type="number"
-                  min={0}
-                  max={20}
                   value={plan.te}
-                  onChange={(e) => update({ te: clampInt(Number(e.target.value), 0, 20) })}
+                  label={t('industry.te')}
+                  inputMode="numeric"
+                  widthClassName="w-full"
+                  parse={(raw) => parseOrKeep(plan.te, raw, (n) => clampInt(n, 0, 20))}
+                  onCommit={(te) => update({ te })}
                 />
               </div>
             </div>
