@@ -136,6 +136,15 @@ snapshot is a whole rendered board and cannot be forgotten by `corp:` prefix.
 `{ name, characterId }`, folding its own key (character + corporation +
 division) into the retained name.
 
+**Name lookups are cache-first.** `features/character/names.ts`
+(`resolveNames`) and `typeNames.ts` (`resolveViaEsi`) both used to POST
+`/universe/names` first and read `esiCache` only as an offline fallback, so
+every render of a view holding a name blocked on a live round-trip. Both now
+read the cache first and ask only for ids they have no name for. `resolveNames`
+returns a lapsed name (`STALE_AFTER.static`) at once and refreshes it behind
+the caller; a type name has no window at all, being as immutable as the SDE
+snapshot it backstops.
+
 **Boot prefetch.** `app/prefetch.ts` warms every granted surface into
 `esiCache` on app start and on each character switch, wired from the same
 `App.tsx` effect shape as `triggerSync`. It is a thin orchestrator over the

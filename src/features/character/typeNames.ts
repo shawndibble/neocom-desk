@@ -25,7 +25,7 @@
 import { EsiError } from '@/esi/client';
 import { getUniverseType, postUniverseNames } from '@/esi/endpoints';
 import { loadTypes } from '@/sde/loadSde';
-import { GLOBAL_CACHE_CHARACTER_ID, readCached, writeCached } from '@/esi/cache';
+import { GLOBAL_CACHE_CHARACTER_ID, readCached, readCachedEntries, writeCached } from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
 /** ESI's documented cap on ids per /universe/names request (maxItems in the spec). */
@@ -41,10 +41,28 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-/** Resolves whatever the SDE snapshot doesn't cover, via ESI + esiCache. */
+/**
+ * Resolves whatever the SDE snapshot doesn't cover, via esiCache then ESI.
+ *
+ * Cache first, not cache-as-fallback. A type name is as immutable as the SDE
+ * snapshot this backstops — nothing re-reads that at runtime either — so an id
+ * resolved once has no reason to cost a request ever again. Reading it last,
+ * as this used to, meant a page holding any market- or asset-only type (which
+ * the slim snapshot deliberately omits) blocked on a live POST on every single
+ * render.
+ */
 async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
   const map = new Map<number, string>();
-  for (const ids of chunk(typeIds, NAMES_BATCH_LIMIT)) {
+  const cached = await readCachedEntries<string>(GLOBAL_CACHE_CHARACTER_ID, typeIds.map(cacheKey));
+  const unknown: number[] = [];
+  for (const id of typeIds) {
+    const row = cached.get(cacheKey(id));
+    if (row === undefined) unknown.push(id);
+    else map.set(id, row.value);
+  }
+  if (unknown.length === 0) return map;
+
+  for (const ids of chunk(unknown, NAMES_BATCH_LIMIT)) {
     let unresolved = ids;
     try {
       const resolved = await postUniverseNames(ids);

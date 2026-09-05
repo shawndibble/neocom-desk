@@ -239,6 +239,42 @@ describe('loadTypeNames', () => {
     expect(maxInFlight).toBeGreaterThan(1);
   });
 
+  it('serves an already-cached name without any request', async () => {
+    // Cache-first, not cache-as-fallback: a type name never changes, so a
+    // page that resolved it once must not go back to ESI for it on every
+    // later render.
+    let called = false;
+    await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, () => {
+        called = true;
+        return HttpResponse.json([]);
+      })
+    );
+
+    const names = await loadTypeNames([100]);
+
+    expect(names.get(100)).toBe('Widget 100');
+    expect(called).toBe(false);
+  });
+
+  it('asks only for the SDE-missing ids it has no cached name for', async () => {
+    let asked: number[] = [];
+    await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        asked = (await request.json()) as number[];
+        return HttpResponse.json([{ id: 101, name: 'Widget 101', category: 'inventory_type' }]);
+      })
+    );
+
+    const names = await loadTypeNames([100, 101]);
+
+    expect(asked).toEqual([101]);
+    expect(names.get(100)).toBe('Widget 100');
+    expect(names.get(101)).toBe('Widget 101');
+  });
+
   it('falls back to cached names when ESI is unreachable (offline)', async () => {
     await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
     server.use(http.post(`${ESI_BASE_URL}/universe/names`, () => HttpResponse.error()));

@@ -142,14 +142,16 @@ describe('loadMemberLabels (AC3)', () => {
   }
 
   it('resolves a 200-member roster in one names call, not two hundred', async () => {
-    let nameCalls = 0;
-    let batched: number[] = [];
+    // Every request body, not just the last: `loadMemberLabels` fans its
+    // three lookups out with `Promise.all`, so which one lands last is not
+    // something this test gets to assert.
+    const batches: number[][] = [];
     server.use(
       http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
-        nameCalls += 1;
-        batched = (await request.json()) as number[];
+        const ids = (await request.json()) as number[];
+        batches.push(ids);
         return HttpResponse.json(
-          batched.map((id) => ({ id, name: `Name ${id}`, category: 'character' }))
+          ids.map((id) => ({ id, name: `Name ${id}`, category: 'character' }))
         );
       })
     );
@@ -157,8 +159,9 @@ describe('loadMemberLabels (AC3)', () => {
     const labels = await loadMemberLabels(CHAR_ID, roster(200));
 
     // One batch for the 200 characters, one for the single distinct location.
-    expect(nameCalls).toBe(2);
-    expect(batched).toEqual([60003760]);
+    expect(batches).toHaveLength(2);
+    expect(batches).toContainEqual([60003760]);
+    expect(batches.some((ids) => ids.length === 200)).toBe(true);
     expect(labels.characters.size).toBe(200);
     expect(labels.ships.get(587)).toBe('Type 587');
     expect(labels.locations.get(60003760)).toBe('Name 60003760');

@@ -54,8 +54,20 @@ _Recorded 2026-09-05._
   long the session had run. Being a public endpoint, it is also the first task
   that survives an empty scope set.
 
-- **`STALE_AFTER.static` keys keep their blocking read.** `loadPastWindow`
-  still plain-awaits a lapsed static row (`resolveNames`, stations, systems)
-  rather than racing the 250ms grace. Retained snapshots already hide that wait
-  behind the previous visit's rows; giving names the grace race would trade a
-  documented decision for a stale-then-swap flash across a whole asset list.
+- **Name lookups become cache-first, because they were never cached at all in
+  the sense that matters.** `resolveNames` and `typeNames.resolveViaEsi` both
+  POSTed `/universe/names` _first_ and consulted `esiCache` only as an offline
+  fallback — so every render of Mail, Contracts, Contacts, Assets, Employment
+  History and the corp views blocked on a live round-trip, warm session or not,
+  and a retained snapshot could not help the first visit of a session. They now
+  read the cache first and ask only for ids they have no name for. A lapsed
+  name (`STALE_AFTER.static`) is returned at once and refreshed behind the
+  caller; an unknown one still blocks, because there is nothing to show
+  instead.
+
+- **`STALE_AFTER.static` keys keep their blocking read in `loadPastWindow`.**
+  A lapsed static row still plain-awaits rather than racing the 250ms grace.
+  That path is not the one the spinners came from — every `staleAfterMs:
+STALE_AFTER.static` loader already serves from its window without a request —
+  and giving it the grace race would trade a documented decision for a
+  stale-then-swap flash across a whole asset list.
