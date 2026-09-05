@@ -277,7 +277,7 @@ describe('Market Transactions tab', () => {
     expect(buyTotal.className).toContain('text-isk-neg');
   });
 
-  it('warns that transactions stop at the page cap when every call comes back full (D4)', async () => {
+  it('stops paging at the cap, and says nothing about it (D4)', async () => {
     let calls = 0;
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, () => {
@@ -287,8 +287,12 @@ describe('Market Transactions tab', () => {
     );
     window.history.pushState({}, '', '/market?section=transactions');
     render(<App />);
-    expect(await screen.findByText(/recent transactions only/i)).toBeInTheDocument();
+
+    // Five identical Tritanium fills come back, one per page.
+    expect((await screen.findAllByText('Tritanium')).length).toBeGreaterThan(1);
     expect(calls).toBe(5);
+    // The cap is how far back this view goes, not a fault to warn about.
+    expect(screen.queryByText(/recent transactions only/i)).not.toBeInTheDocument();
   });
 
   it('distinguishes a failed manual Refresh from the initial-load offline banner (UX-REVIEW #10)', async () => {
