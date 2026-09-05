@@ -10,12 +10,12 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   EmptyState,
+  FilterChip,
   IconButton,
+  Modal,
   PageHeader,
   Panel,
-  ReauthBanner,
   Spinner,
-  StatChip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -25,10 +25,16 @@ import { formatIsk } from '@/lib/isk';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { loadMoonMiningTaxSnapshot, type MoonMiningTaxRow } from '@/features/miningTax/snapshot';
+import {
+  loadMoonMiningTaxSnapshot,
+  type MoonMiningTaxRow,
+  type TrackedCharacter,
+} from '@/features/miningTax/snapshot';
 import { resolveRowNames } from '@/features/miningTax/names';
 import { loadJitaUnitPrices } from '@/features/miningTax/pricing';
+import { loadTypeNames } from '@/features/character/typeNames';
 import { resolveNeedsReview } from '@/features/miningTax/assignments';
+import { tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { AssignDialog } from '@/features/miningTax/AssignDialog';
 import { BulkPayConfirmDialog } from '@/features/miningTax/BulkPayConfirmDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
@@ -44,9 +50,10 @@ const DEFAULT_STATUSES = new Set<MiningTaxRowStatus>(['unassigned', 'needs-revie
 
 interface Snapshot {
   entries: MoonMiningTaxRow[];
+  characters: TrackedCharacter[];
   payeesByCharacter: Map<number, PayeeRecord[]>;
   unclassified: { characterId: number; characterName: string; typeIds: number[] }[];
-  needsReauth: boolean;
+  reauthCharacters: TrackedCharacter[];
   fetchedAt: Date | null;
   fromCache: boolean;
   systemNames: Map<number, string>;
@@ -65,10 +72,16 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
       unitPrices: new Map(),
     };
   }
-  const [{ systemNames, typeNames }, unitPrices] = await Promise.all([
-    resolveRowNames(result.rows),
-    loadJitaUnitPrices(result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))),
-  ]);
+  const unclassifiedTypeIds = result.unclassified.flatMap((u) => u.typeIds);
+  const [{ systemNames, typeNames: rowTypeNames }, unitPrices, unclassifiedTypeNames] =
+    await Promise.all([
+      resolveRowNames(result.rows),
+      loadJitaUnitPrices(
+        result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))
+      ),
+      loadTypeNames(unclassifiedTypeIds),
+    ]);
+  const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);
   return { ...result, entries: result.rows, systemNames, typeNames, unitPrices };
 }
 
@@ -100,6 +113,11 @@ function flatten(rows: readonly MoonMiningTaxRow[]): DisplayRow[] {
   });
 }
 
+/** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
+function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): string {
+  return t(`miningTax.status.${status.replace('-', '')}`);
+}
+
 function oreSummary(
   lines: readonly { typeId: number; quantity: number }[],
   typeNames: ReadonlyMap<number, string>
@@ -128,15 +146,17 @@ export function MoonMiningTax() {
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
   const [bulkPaySelection, setBulkPaySelection] = useState<ReadonlySet<string>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
-  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolveTarget, setResolveTarget] = useState<{
+    assignment: MiningTaxAssignmentRecord;
+    row: MoonMiningTaxRow;
+  } | null>(null);
+  const [resolving, setResolving] = useState(false);
 
-  const characters = useMemo(
-    () =>
-      [...new Map(data?.entries.map((r) => [r.characterId, r.characterName]) ?? []).entries()].map(
-        ([characterId, characterName]) => ({ characterId, characterName })
-      ),
-    [data]
-  );
+  // Every tracked character, not just those with a Mining Ledger Entry this
+  // refresh (CONTEXT.md: the point of the feature is not missing an alt's
+  // obligation) — a character with nothing mined yet still needs to appear
+  // in the Characters filter and in Manage Payees.
+  const characters = data?.characters ?? [];
 
   const allDisplayRows = useMemo(() => flatten(data?.entries ?? []), [data]);
 
@@ -178,14 +198,21 @@ export function MoonMiningTax() {
     });
   }
 
-  async function handleResolve(assignment: MiningTaxAssignmentRecord, row: MoonMiningTaxRow) {
-    setResolvingId(assignment.id);
+  async function handleConfirmResolve() {
+    if (!resolveTarget) return;
+    setResolving(true);
     try {
-      await resolveNeedsReview(assignment, row.entry);
+      await resolveNeedsReview(resolveTarget.assignment, resolveTarget.row.entry);
+      setResolveTarget(null);
       refresh();
     } finally {
-      setResolvingId(null);
+      setResolving(false);
     }
+  }
+
+  async function handleTagAsMoonOre(typeId: number) {
+    await tagAsMoonOre(typeId);
+    refresh();
   }
 
   const outstandingSelectable = visibleRows.filter(
@@ -283,7 +310,7 @@ export function MoonMiningTax() {
     {
       id: 'status',
       header: t('miningTax.statusColumn'),
-      render: (dr) => t(`miningTax.status.${dr.status.replace('-', '')}`),
+      render: (dr) => statusLabel(t, dr.status),
     },
     {
       id: 'actions',
@@ -300,8 +327,12 @@ export function MoonMiningTax() {
           return (
             <Button
               size="sm"
-              disabled={resolvingId === dr.assignment.id}
-              onClick={() => void handleResolve(dr.assignment as MiningTaxAssignmentRecord, dr.row)}
+              onClick={() =>
+                setResolveTarget({
+                  assignment: dr.assignment as MiningTaxAssignmentRecord,
+                  row: dr.row,
+                })
+              }
             >
               {t('miningTax.resolveAction')}
             </Button>
@@ -321,7 +352,10 @@ export function MoonMiningTax() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  const needsReauth = data?.needsReauth ?? false;
+  const payeeManagerDefaultCharacterId =
+    characters.find((c) => c.characterId === activeCharacterId)?.characterId ??
+    characters[0]?.characterId ??
+    null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -330,10 +364,10 @@ export function MoonMiningTax() {
         meta={data?.fetchedAt && <DataAgeBadge date={data.fetchedAt} />}
         actions={
           <>
-            {characters.length > 0 && (
+            {payeeManagerDefaultCharacterId !== null && (
               <Button
                 size="sm"
-                onClick={() => setPayeeManagerCharacterId(characters[0].characterId)}
+                onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}
               >
                 {t('miningTax.managePayeesAction')}
               </Button>
@@ -352,13 +386,6 @@ export function MoonMiningTax() {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
-      ) : needsReauth && (data?.entries.length ?? 0) === 0 ? (
-        <ReauthBanner
-          title={t('miningTax.reauthTitle')}
-          hint={t('miningTax.reauthHint')}
-          actionLabel={t('miningTax.reauthAction')}
-          onLogin={() => void beginEveLogin()}
-        />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : (
@@ -367,15 +394,59 @@ export function MoonMiningTax() {
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
 
+          {/* Per-character re-login, never one flag hiding every other
+              character's data behind a full-page banner — a lapsed alt must
+              stay visible as needing attention, not disappear. */}
+          {data && data.reauthCharacters.length > 0 && (
+            <div
+              role="alert"
+              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
+            >
+              <p className="font-semibold text-warning uppercase">{t('miningTax.reauthTitle')}</p>
+              <ul className="space-y-1">
+                {data.reauthCharacters.map((c) => (
+                  <li key={c.characterId} className="flex items-center justify-between gap-2">
+                    <span>
+                      {t('miningTax.reauthCharacterHint', { character: c.characterName })}
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={() => void beginEveLogin({ characterId: c.characterId })}
+                    >
+                      {t('miningTax.reauthAction')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {data && data.unclassified.length > 0 && (
             <div
               role="alert"
-              className="rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
+              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
             >
               <p className="font-semibold text-warning uppercase">
                 {t('miningTax.unclassifiedTitle')}
               </p>
               <p className="text-text-dim">{t('miningTax.unclassifiedHint')}</p>
+              <ul className="space-y-1">
+                {data.unclassified.flatMap((u) =>
+                  u.typeIds.map((typeId) => (
+                    <li
+                      key={`${u.characterId}:${typeId}`}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span>
+                        {u.characterName} — {data.typeNames.get(typeId) ?? `#${typeId}`}
+                      </span>
+                      <Button size="sm" onClick={() => void handleTagAsMoonOre(typeId)}>
+                        {t('miningTax.tagAsMoonOre')}
+                      </Button>
+                    </li>
+                  ))
+                )}
+              </ul>
             </div>
           )}
 
@@ -416,28 +487,20 @@ export function MoonMiningTax() {
                     onSelect={(e) => e.preventDefault()}
                     onCheckedChange={() => toggleStatus(status)}
                   >
-                    {t(`miningTax.status.${status.replace('-', '')}`)}
+                    {statusLabel(t, status)}
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
             {ALL_STATUSES.map((status) => (
-              <button key={status} type="button" onClick={() => toggleStatus(status)}>
-                <StatChip
-                  label={t(`miningTax.status.${status.replace('-', '')}`)}
-                  value={statusCounts.get(status) ?? 0}
-                  tone={
-                    status === 'needs-review'
-                      ? 'warning'
-                      : status === 'paid'
-                        ? 'success'
-                        : status === 'outstanding'
-                          ? 'accent'
-                          : 'default'
-                  }
-                />
-              </button>
+              <FilterChip
+                key={status}
+                label={statusLabel(t, status)}
+                count={statusCounts.get(status) ?? 0}
+                selected={statusFilter.has(status)}
+                onToggle={() => toggleStatus(status)}
+              />
             ))}
 
             {bulkPaySelection.size > 0 && (
@@ -488,6 +551,41 @@ export function MoonMiningTax() {
           initialCharacterId={payeeManagerCharacterId}
           onChanged={refresh}
         />
+      )}
+
+      {resolveTarget && (
+        <Modal
+          open={resolveTarget !== null}
+          onClose={() => setResolveTarget(null)}
+          title={t('miningTax.resolveTitle')}
+        >
+          <div className="space-y-3">
+            <p className="text-xs text-text-dim">{t('miningTax.resolveHint')}</p>
+            <ul className="space-y-1 text-sm">
+              {(resolveTarget.assignment.reviewDiff ?? []).map((diff) => (
+                <li key={diff.typeId} className="flex items-center justify-between gap-2">
+                  <span>{data?.typeNames.get(diff.typeId) ?? `#${diff.typeId}`}</span>
+                  <span className="tabular-nums">
+                    {diff.before.toLocaleString()} → {diff.after.toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="primary"
+                className="flex-1"
+                disabled={resolving}
+                onClick={() => void handleConfirmResolve()}
+              >
+                {t('miningTax.resolveConfirm')}
+              </Button>
+              <Button className="flex-1" onClick={() => setResolveTarget(null)}>
+                {t('filters.cancel')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       <BulkPayConfirmDialog

@@ -15,6 +15,7 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 import { groupMiningLedger } from '@/engine/miningTax/groupLedger';
 import type { MiningLedgerEntry, MiningLedgerRow } from '@/engine/miningTax/types';
 import { loadMoonOreTypeIds, loadOreAndIceTypeIds } from '@/sde/loadSde';
+import { loadManualMoonOreTypeIds } from './typeOverrides';
 
 export const KEYS = { ledger: 'miningTax:ledger' } as const;
 
@@ -52,12 +53,16 @@ export async function loadAllCharacterLedgers(): Promise<CharacterMiningLedger[]
   const characters: CharacterRecord[] = await db.characters.toArray();
   if (characters.length === 0) return [];
 
-  const [moonOreTypeIds, oreAndIceTypeIds] = await Promise.all([
+  const [moonOreTypeIds, oreAndIceTypeIds, manualOverrides] = await Promise.all([
     loadMoonOreTypeIds(),
     loadOreAndIceTypeIds(),
+    loadManualMoonOreTypeIds(),
   ]);
-  const moonOreSet = new Set(moonOreTypeIds);
-  const oreAndIceSet = new Set(oreAndIceTypeIds);
+  // A manually-tagged type_id (typeOverrides.ts's "unclassified ore" banner
+  // action) counts as moon ore from now on, in both sets: it groups into
+  // entries going forward, and it must stop showing up as unclassified.
+  const moonOreSet = new Set([...moonOreTypeIds, ...manualOverrides]);
+  const oreAndIceSet = new Set([...oreAndIceTypeIds, ...manualOverrides]);
 
   const results: CharacterMiningLedger[] = characters.map((c) => ({
     characterId: c.characterId,

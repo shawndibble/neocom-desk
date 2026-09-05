@@ -33,12 +33,30 @@ export interface UnclassifiedOre {
   typeIds: number[];
 }
 
+export interface TrackedCharacter {
+  characterId: number;
+  characterName: string;
+}
+
 export interface MoonMiningTaxSnapshot {
   rows: MoonMiningTaxRow[];
+  /**
+   * Every tracked character, regardless of whether it has any Mining Ledger
+   * Entries this refresh — the Characters filter and Manage Payees need the
+   * whole roster, not just whoever happens to have mined moon goo lately, or
+   * a character with zero entries this cycle is invisible to both.
+   */
+  characters: TrackedCharacter[];
   payeesByCharacter: Map<number, PayeeRecord[]>;
   unclassified: UnclassifiedOre[];
-  /** True when any tracked character's ledger read needed a re-login. */
-  needsReauth: boolean;
+  /**
+   * Tracked characters whose ledger read needed a re-login this refresh —
+   * per character, not one flag OR'd across all of them, so a single lapsed
+   * alt's obligation cannot go missing behind the other characters' data
+   * looking fine (CONTEXT.md: "the point of the feature is not missing an
+   * alt's obligation").
+   */
+  reauthCharacters: TrackedCharacter[];
   /** Oldest `fetchedAt` among characters with cached data — the page's Data Age badge is only as fresh as its stalest character. */
   fetchedAt: Date | null;
   /** True when every ledger read was cache-only (offline). */
@@ -55,14 +73,32 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
   );
 
   const rows: MoonMiningTaxRow[] = [];
+  const characters: TrackedCharacter[] = ledgers.map((ledger) => ({
+    characterId: ledger.characterId,
+    characterName: ledger.characterName,
+  }));
   const payeesByCharacter = new Map<number, PayeeRecord[]>();
   const unclassified: UnclassifiedOre[] = [];
-  let needsReauth = false;
+  const reauthCharacters: TrackedCharacter[] = [];
   let fetchedAt: Date | null = null;
   let fromCache = ledgers.length > 0;
 
-  for (const ledger of ledgers) {
-    needsReauth = needsReauth || ledger.needsReauth;
+  // Payees + Assignments reads are fanned out across every character at once
+  // (Dexie reads, not ESI — no fan-out cap needed) rather than one character
+  // awaited at a time, matching `ledger.ts`'s own fan-out for the ESI half.
+  const [payeesByLedger, assignmentsByLedger] = await Promise.all([
+    Promise.all(ledgers.map((ledger) => loadPayees(ledger.characterId))),
+    // Reloaded after reconcile so a fresh needs-review flip is reflected.
+    Promise.all(ledgers.map((ledger) => loadAssignments(ledger.characterId))),
+  ]);
+
+  ledgers.forEach((ledger, index) => {
+    if (ledger.needsReauth) {
+      reauthCharacters.push({
+        characterId: ledger.characterId,
+        characterName: ledger.characterName,
+      });
+    }
     if (ledger.fetchedAt && (!fetchedAt || ledger.fetchedAt < fetchedAt))
       fetchedAt = ledger.fetchedAt;
     if (!ledger.fromCache) fromCache = false;
@@ -74,9 +110,8 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
       });
     }
 
-    payeesByCharacter.set(ledger.characterId, await loadPayees(ledger.characterId));
-    // Reloaded after reconcile so a fresh needs-review flip is reflected.
-    const assignments = await loadAssignments(ledger.characterId);
+    payeesByCharacter.set(ledger.characterId, payeesByLedger[index]);
+    const assignments = assignmentsByLedger[index];
 
     for (const entry of ledger.entries) {
       const covering = assignments.filter(
@@ -97,7 +132,15 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
         ),
       });
     }
-  }
+  });
 
-  return { rows, payeesByCharacter, unclassified, needsReauth, fetchedAt, fromCache };
+  return {
+    rows,
+    characters,
+    payeesByCharacter,
+    unclassified,
+    reauthCharacters,
+    fetchedAt,
+    fromCache,
+  };
 }

@@ -14,6 +14,7 @@ const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn() }));
 vi.mock('@/sync', () => syncMock);
 
 const CHAR_A = 1;
+const CHAR_B = 2;
 const LEDGER_KEY = 'miningTax:ledger';
 
 beforeEach(async () => {
@@ -112,5 +113,21 @@ describe('loadMoonMiningTaxSnapshot', () => {
     expect((await db.miningTaxAssignments.get('a1'))?.reviewDiff).toEqual([
       { typeId: MOON_ORE, before: 100, after: 150 },
     ]);
+  });
+
+  it('lists every tracked character, even one with zero entries this refresh', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedCharacter(CHAR_B, 'Pilot B');
+    await db.esiCache.put({
+      characterId: CHAR_A,
+      key: LEDGER_KEY,
+      value: [{ date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: MOON_ORE }],
+      fetchedAt: 1,
+    });
+    // CHAR_B has no cached ledger row at all — no entries, but still tracked.
+
+    const snapshot = await loadMoonMiningTaxSnapshot();
+
+    expect(snapshot.characters.map((c) => c.characterId).sort()).toEqual([CHAR_A, CHAR_B]);
   });
 });

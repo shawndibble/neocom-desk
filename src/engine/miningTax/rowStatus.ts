@@ -30,6 +30,24 @@ export function unassignedOreLines(
 }
 
 /**
+ * The subset of `freshLines` whose typeId `assignedLines` claims — the fresh,
+ * current-truth counterpart of an Assignment's own (possibly stale) ore
+ * lines. Shared by `reconcile.ts` (diffing an Assignment against a fresh
+ * ledger read) and `assignments.ts`'s `resolveNeedsReview` (re-snapshotting
+ * to it): both need exactly "what does the fresh entry say now, for only the
+ * types this Assignment already covers" — never lines a *different* Payee's
+ * Assignment claims.
+ */
+export function linesClaimedBy(
+  assignedLines: readonly OreLine[],
+  freshLines: readonly OreLine[]
+): OreLine[] {
+  return freshLines.filter((line) =>
+    assignedLines.some((covered) => covered.typeId === line.typeId)
+  );
+}
+
+/**
  * Every status present on one row (one Mining Ledger Entry): `unassigned`
  * when any of its ore is not yet covered by an Assignment, plus each distinct
  * status among the Assignments that do cover it. A split entry can carry more

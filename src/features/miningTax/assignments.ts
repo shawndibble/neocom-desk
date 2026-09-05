@@ -7,6 +7,7 @@
 import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
 import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
+import { linesClaimedBy } from '@/engine/miningTax/rowStatus';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { loadJitaUnitPrices } from './pricing';
 
@@ -93,9 +94,7 @@ export async function resolveNeedsReview(
   assignment: MiningTaxAssignmentRecord,
   freshEntry: MiningLedgerEntry
 ): Promise<void> {
-  const relevantFresh = freshEntry.oreLines.filter((line) =>
-    assignment.oreLines.some((covered) => covered.typeId === line.typeId)
-  );
+  const relevantFresh = linesClaimedBy(assignment.oreLines, freshEntry.oreLines);
   const prices = await loadJitaUnitPrices(relevantFresh.map((line) => line.typeId));
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,

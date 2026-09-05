@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { unassignedOreLines, statusesForRow } from './rowStatus';
+import { unassignedOreLines, statusesForRow, linesClaimedBy } from './rowStatus';
 import type { OreLine } from './types';
 
 const A = 45490;
@@ -66,5 +66,24 @@ describe('statusesForRow', () => {
       { status: 'needs-review' as const, oreLines: [{ typeId: B, quantity: 50 }] },
     ];
     expect(statusesForRow(entryLines, covering)).toEqual(new Set(['paid', 'needs-review']));
+  });
+});
+
+describe('linesClaimedBy', () => {
+  it('returns the fresh lines whose typeId the assignment covers', () => {
+    const assigned: OreLine[] = [{ typeId: A, quantity: 100 }];
+    const fresh: OreLine[] = [
+      { typeId: A, quantity: 150 },
+      { typeId: B, quantity: 999 },
+    ];
+    expect(linesClaimedBy(assigned, fresh)).toEqual([{ typeId: A, quantity: 150 }]);
+  });
+
+  it('returns nothing when the assignment covers no line present in fresh', () => {
+    expect(linesClaimedBy([{ typeId: A, quantity: 1 }], [{ typeId: B, quantity: 1 }])).toEqual([]);
+  });
+
+  it('returns [] for an assignment with no ore lines', () => {
+    expect(linesClaimedBy([], [{ typeId: A, quantity: 1 }])).toEqual([]);
   });
 });

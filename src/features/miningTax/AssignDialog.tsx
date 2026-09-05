@@ -55,7 +55,12 @@ export function AssignDialog({
   onAssigned,
 }: AssignDialogProps) {
   const { t } = useTranslation();
-  const autoMatch = payees.find((p) => p.systemId === row.entry.solarSystemId) ?? payees[0];
+  // Deliberately no `?? payees[0]` fallback: the decision doc leaves the
+  // multiple-moons-one-system case "deliberately unmatched... that's the one
+  // case nothing can auto-resolve" — pre-selecting an arbitrary Payee here
+  // would, combined with `markPaid` defaulting on, let one click write a
+  // paid invoice against a Payee the pilot never actually chose.
+  const autoMatch = payees.find((p) => p.systemId === row.entry.solarSystemId);
   const [payeeId, setPayeeId] = useState<string | null>(autoMatch?.id ?? null);
   const [taxPct, setTaxPct] = useState(String(autoMatch?.defaultTaxPct ?? ''));
   const [includedTypeIds, setIncludedTypeIds] = useState<ReadonlySet<number>>(
