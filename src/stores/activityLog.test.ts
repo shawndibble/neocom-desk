@@ -46,6 +46,17 @@ describe('useActivityLog.record', () => {
   });
 });
 
+describe('useActivityLog.clear', () => {
+  it('empties the entries', () => {
+    useActivityLog.getState().record(event());
+    useActivityLog.getState().record(event());
+
+    useActivityLog.getState().clear();
+
+    expect(useActivityLog.getState().entries).toEqual([]);
+  });
+});
+
 describe('subscribeToEsiActivity', () => {
   it('records events published on the esi activity signal', () => {
     const unsubscribe = subscribeToEsiActivity();
