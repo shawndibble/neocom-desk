@@ -814,6 +814,16 @@ describe('MaterialsTable make-or-buy marker', () => {
     );
   });
 
+  it('gives a planetary build its own glyph, distinct from a manufacturing one', () => {
+    // "Build this" means two different errands — an industry slot or a colony —
+    // and one hammer for both never said which. Shape, not only tone, again.
+    const planetary = renderTable(advise({ ...buildIt, method: 'planetary', me: null }));
+    const manufacturing = renderTable(advise(buildIt));
+    const glyph = (c: HTMLElement) => c.querySelector('[role="img"] svg')?.innerHTML;
+    expect(glyph(planetary.container)).toBeTruthy();
+    expect(glyph(planetary.container)).not.toEqual(glyph(manufacturing.container));
+  });
+
   it('leaves a material with no verdict unmarked', () => {
     renderTable(advise(buildIt));
     expect(within(row('Tritanium')).queryByRole('img')).toBeNull();

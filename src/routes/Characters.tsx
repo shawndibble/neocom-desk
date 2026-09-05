@@ -41,6 +41,7 @@ import {
   removeGroup,
   renameGroup,
   reorderGroups,
+  rosterSortStats,
   sortCharacterIds,
   ungroupedCharacterIds,
   type CharacterGroup,
@@ -48,6 +49,8 @@ import {
   type CharacterSortStats,
   type SortDirection,
 } from '@/features/character/groups';
+import { formatCompactNumber } from '@/lib/compactNumber';
+import { formatIskCompact } from '@/lib/isk';
 
 const UNGROUPED_VALUE = '__ungrouped__';
 
@@ -77,6 +80,7 @@ interface QueueInfo {
 interface CharacterCardProps {
   character: CharacterRecord;
   info: PublicInfoEntry | undefined;
+  stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
   groups: readonly CharacterGroup[];
   groupId: string | null;
@@ -88,6 +92,7 @@ interface CharacterCardProps {
 function CharacterCard({
   character,
   info,
+  stats,
   queue,
   groups,
   groupId,
@@ -118,16 +123,34 @@ function CharacterCard({
           <span className="block truncate text-xs text-text-faint">
             {info?.allianceName ?? t('common.unknown')}
           </span>
-          {queue && (
-            <span className="mt-1 flex items-center gap-2">
-              <StatChip
-                label={t('characters.queueState')}
-                tone={QUEUE_STATE_TONE[queue.state]}
-                value={t(`characters.queueStates.${queue.state}`)}
-              />
-              {queue.fetchedAt && <DataAgeBadge date={queue.fetchedAt} />}
-            </span>
-          )}
+          <span className="mt-1 flex flex-wrap items-center gap-2">
+            <StatChip
+              label={t('characters.spLabel')}
+              value={
+                stats?.skillPoints === undefined
+                  ? t('common.unknown')
+                  : formatCompactNumber(stats.skillPoints)
+              }
+            />
+            {stats?.skillPointsFetchedAt && <DataAgeBadge date={stats.skillPointsFetchedAt} />}
+            <StatChip
+              label={t('characters.walletLabel')}
+              value={
+                stats?.wallet === undefined ? t('common.unknown') : formatIskCompact(stats.wallet)
+              }
+            />
+            {stats?.walletFetchedAt && <DataAgeBadge date={stats.walletFetchedAt} />}
+            {queue && (
+              <>
+                <StatChip
+                  label={t('characters.queueState')}
+                  tone={QUEUE_STATE_TONE[queue.state]}
+                  value={t(`characters.queueStates.${queue.state}`)}
+                />
+                {queue.fetchedAt && <DataAgeBadge date={queue.fetchedAt} />}
+              </>
+            )}
+          </span>
         </span>
       </button>
       {groups.length > 0 && (
@@ -326,18 +349,7 @@ export function Characters() {
       const now = Date.now();
       const roster = await loadRosterSnapshot();
       if (cancelled) return;
-      setStats(
-        new Map(
-          roster.map((entry) => [
-            entry.characterId,
-            {
-              name: entry.name,
-              skillPoints: entry.correctedTotalSp ?? undefined,
-              wallet: entry.wallet?.data,
-            },
-          ])
-        )
-      );
+      setStats(rosterSortStats(roster));
       setQueueById(
         new Map(
           roster.map((entry) => [
@@ -455,6 +467,7 @@ export function Characters() {
               key={characterId}
               character={character}
               info={publicInfo[characterId]}
+              stats={stats.get(characterId)}
               queue={queueById.get(characterId)}
               groups={groupsValue.groups}
               groupId={groupIdByCharacterId.get(characterId) ?? null}

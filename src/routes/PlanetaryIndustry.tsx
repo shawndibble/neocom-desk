@@ -365,32 +365,27 @@ function ExtractionCard({
   return (
     <FlatSection
       as="h3"
+      /* Status rides beside the product rather than in `actions`: pushed to
+         the far edge of the header it read as the column's status, not this
+         extractor's. */
       title={
         <>
           <Icon.Extraction size={Icon.ICON_SIZE.sm} className="text-accent" aria-hidden="true" />
           {productName}
+          <StatChip
+            label={t('pi.extraction.statusLabel')}
+            value={state === null ? t('pi.programDataUnavailable') : t(`pi.state.${state}`)}
+            tone={state === null ? 'default' : STATE_TONE[state]}
+            className="ml-1"
+          />
         </>
       }
-      actions={
-        <StatChip
-          label={t('pi.extraction.statusLabel')}
-          value={state === null ? t('pi.programDataUnavailable') : t(`pi.state.${state}`)}
-          tone={state === null ? 'default' : STATE_TONE[state]}
-        />
-      }
     >
+      {/* No progress track here: the collapsed row above already renders the
+          same banked share, and repeating it inside the open card read as two
+          different measurements of one number. */}
       <p className="mb-2 text-xs text-text-dim">{pinTypeName(pin, pinTypeNames)}</p>
-      <div
-        role="progressbar"
-        aria-label={t('pi.extraction.progressLabel', { product: productName })}
-        aria-valuenow={percent ?? 0}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        className="h-1.5 overflow-hidden rounded-full bg-panel"
-      >
-        <div className="h-full bg-accent" style={{ width: `${percent ?? 0}%` }} />
-      </div>
-      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
         <CardStat
           label={t('pi.extraction.expiresLabel')}
           value={
@@ -520,6 +515,9 @@ function ColonyRow({
   const extractorPins = useMemo(() => pins.filter((pin) => pinRole(pin) === 'extractor'), [pins]);
   const factoryGroups = useMemo(() => groupFactoryPins(pins), [pins]);
   const infrastructurePins = useMemo(() => pins.filter((pin) => pinRole(pin) === 'other'), [pins]);
+
+  const hasSideColumn =
+    extractorPins.length > 0 && (factoryGroups.length > 0 || infrastructurePins.length > 0);
 
   const soonestPin = useMemo(() => soonestExtractorPin(pins), [pins]);
   const soonestProgram = soonestPin ? yieldProgramsByPin.get(soonestPin.pin_id) : undefined;
@@ -651,67 +649,82 @@ function ColonyRow({
               label={t('pi.lastUpdate')}
               value={new Date(planet.last_update).toLocaleString()}
               tooltip={t('pi.lastUpdateTooltip')}
+              className="ml-auto"
             />
           </div>
           {detail && detail.pins.length > 0 ? (
-            <div>
-              {extractorPins.map((pin) => (
-                <ExtractionCard
-                  key={pin.pin_id}
-                  pin={pin}
-                  pinTypeNames={pinTypeNames}
-                  productNames={productNames}
-                  program={yieldProgramsByPin.get(pin.pin_id)}
-                  loadedAt={loadedAt}
-                />
-              ))}
-              {factoryGroups.length > 0 && (
-                <FlatSection
-                  title={t('pi.production.title')}
-                  titleClassName={SECTION_EYEBROW_CLASS}
-                >
-                  <div className="space-y-1.5">
-                    {factoryGroups.map((group) => (
-                      <div
-                        key={String(group.schematicId)}
-                        className="flex items-center gap-2 text-sm"
-                      >
-                        <Icon.Industry
-                          size={Icon.ICON_SIZE.sm}
-                          className="shrink-0 text-text-dim"
-                          aria-hidden="true"
-                        />
-                        <span className="flex-1 truncate font-medium">
-                          {group.schematicId !== undefined
-                            ? (schematicNames.get(group.schematicId) ?? t('pi.unknownSchematic'))
-                            : t('pi.unknownSchematic')}
+            /* Extraction down the left, the sections with no per-cycle
+               telemetry down the right — but only when both columns have
+               something in them, since a colony with no extractors (or no
+               factories and no infrastructure) would otherwise render a dead
+               half. `FlatSection`'s `first:` reset resolves per column, so
+               each column's top section keeps its border off. */
+            <div
+              className={
+                hasSideColumn ? 'grid gap-x-6 gap-y-3 sm:grid-cols-2 sm:gap-y-0' : undefined
+              }
+            >
+              <div>
+                {extractorPins.map((pin) => (
+                  <ExtractionCard
+                    key={pin.pin_id}
+                    pin={pin}
+                    pinTypeNames={pinTypeNames}
+                    productNames={productNames}
+                    program={yieldProgramsByPin.get(pin.pin_id)}
+                    loadedAt={loadedAt}
+                  />
+                ))}
+              </div>
+              <div>
+                {factoryGroups.length > 0 && (
+                  <FlatSection
+                    title={t('pi.production.title')}
+                    titleClassName={SECTION_EYEBROW_CLASS}
+                  >
+                    <div className="space-y-1.5">
+                      {factoryGroups.map((group) => (
+                        <div
+                          key={String(group.schematicId)}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          <Icon.Industry
+                            size={Icon.ICON_SIZE.sm}
+                            className="shrink-0 text-text-dim"
+                            aria-hidden="true"
+                          />
+                          <span className="flex-1 truncate font-medium">
+                            {group.schematicId !== undefined
+                              ? (schematicNames.get(group.schematicId) ?? t('pi.unknownSchematic'))
+                              : t('pi.unknownSchematic')}
+                          </span>
+                          <span className="shrink-0 text-xs text-text-dim">
+                            {t('pi.production.facilitiesRunning', { count: group.count })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </FlatSection>
+                )}
+                {infrastructurePins.length > 0 && (
+                  <FlatSection
+                    title={t('pi.infrastructure.title')}
+                    titleClassName={SECTION_EYEBROW_CLASS}
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      {infrastructurePins.map((pin) => (
+                        <span
+                          key={pin.pin_id}
+                          className="inline-flex items-center gap-1.5 rounded-xs border border-line px-2.5 py-1 text-xs text-text-dim"
+                        >
+                          <Icon.Container size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                          {pinTypeName(pin, pinTypeNames)}
                         </span>
-                        <span className="shrink-0 text-xs text-text-dim">
-                          {t('pi.production.facilitiesRunning', { count: group.count })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </FlatSection>
-              )}
-              {infrastructurePins.length > 0 && (
-                <FlatSection
-                  title={t('pi.infrastructure.title')}
-                  titleClassName={SECTION_EYEBROW_CLASS}
-                >
-                  <div className="flex flex-wrap gap-2">
-                    {infrastructurePins.map((pin) => (
-                      <span
-                        key={pin.pin_id}
-                        className="inline-flex items-center gap-1.5 rounded-xs border border-line px-2.5 py-1 text-xs text-text-dim"
-                      >
-                        <Icon.Container size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                        {pinTypeName(pin, pinTypeNames)}
-                      </span>
-                    ))}
-                  </div>
-                </FlatSection>
-              )}
+                      ))}
+                    </div>
+                  </FlatSection>
+                )}
+              </div>
             </div>
           ) : (
             <EmptyState title={t('pi.noPinsTitle')} className="py-6" />

@@ -100,6 +100,46 @@ describe('Characters', () => {
     );
   });
 
+  it('shows SP and wallet with independent data-age badges, an em dash when unavailable', async () => {
+    const now = Date.now();
+    // Pilot One: both fields cached, at deliberately different ages so the
+    // two badges must disagree ("5m ago" vs "3d ago") rather than share one
+    // fetchedAt. Pilot Two: neither ever cached — never fetched, not a
+    // scope-not-granted 0.
+    await db.esiCache.put({
+      characterId: 91,
+      key: 'skills',
+      value: { skills: [], total_sp: 12_345_000 },
+      fetchedAt: now - 5 * 60_000,
+    });
+    await db.esiCache.put({
+      characterId: 91,
+      key: 'wallet:balance',
+      value: 250_000_000,
+      fetchedAt: now - 3 * 24 * 60 * 60_000,
+    });
+
+    renderCharacters();
+    await screen.findByText('Pilot One');
+    // The roster snapshot load is async (`loadRosterSnapshot`); wait for it
+    // to land rather than asserting against the initial "—" render.
+    await screen.findByText('12.3M');
+
+    const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+    expect(pilotOneCard).toHaveTextContent('12.3M');
+    expect(pilotOneCard).toHaveTextContent('250M');
+    expect(pilotOneCard).toHaveTextContent('5m ago');
+    expect(pilotOneCard).toHaveTextContent('3d ago');
+
+    const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
+    const spChip = within(pilotTwoCard).getByText('SP').parentElement as HTMLElement;
+    const walletChip = within(pilotTwoCard).getByText('Wallet').parentElement as HTMLElement;
+    expect(spChip).toHaveTextContent('—');
+    expect(walletChip).toHaveTextContent('—');
+    // No fetchedAt at all for either field on Pilot Two — no badge, full stop.
+    expect(within(pilotTwoCard).queryByText(/ago$/)).not.toBeInTheDocument();
+  });
+
   it("shows each character's cached queue state, with a data-age badge when it was fetched", async () => {
     const now = Date.now();
     const entries: SkillQueueEntry[] = [
