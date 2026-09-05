@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   Caret,
   DataAgeBadge,
   EmptyState,
@@ -366,12 +365,18 @@ export function Skills() {
               />
               {/* `md`, not `sm`: these sit on the search box's own line, and the
                   shared control scale is what keeps the three the same height. */}
-              <Button onClick={expandAllGroups} disabled={searching}>
-                {t('skills.expandAll')}
-              </Button>
-              <Button onClick={collapseAllGroups} disabled={searching}>
-                {t('skills.collapseAll')}
-              </Button>
+              <IconButton
+                icon={<Icon.ExpandAll />}
+                label={t('skills.expandAll')}
+                onClick={expandAllGroups}
+                disabled={searching}
+              />
+              <IconButton
+                icon={<Icon.CollapseAll />}
+                label={t('skills.collapseAll')}
+                onClick={collapseAllGroups}
+                disabled={searching}
+              />
             </div>
           )}
 

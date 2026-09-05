@@ -23,6 +23,8 @@ import {
   ArrowsLeftRight,
   Bell,
   BellSlash,
+  CaretDoubleDown,
+  CaretDoubleUp,
   CaretDown,
   CaretLeft,
   CaretRight,
@@ -173,6 +175,10 @@ export const BrowserNotifyOn = withWeight(Bell);
 export const BrowserNotifyOff = withWeight(BellSlash);
 /** Hide a Notification Feed row's type from the feed (issue #364) — one-way from here, reversible in Settings. */
 export const HideInFeed = withWeight(EyeSlash);
+/** Open every collapsible group at once. */
+export const ExpandAll = withWeight(CaretDoubleDown);
+/** Close every collapsible group at once. */
+export const CollapseAll = withWeight(CaretDoubleUp);
 
 // The Login page's feature list (src/routes/Login.tsx) is the one caller for
 // the seven below — grouped here so a reader can see they're a set.
