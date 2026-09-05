@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { configureClipboardReader } from '@/lib/clipboard';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 
 vi.mock('../typeCatalog', () => ({
@@ -82,5 +83,35 @@ describe('ImportClipboardDialog', () => {
     await user.upload(input, truncated);
 
     await waitFor(() => expect(screen.getByText(/malformed or truncated/i)).toBeInTheDocument());
+  });
+
+  describe('paste from clipboard (#408)', () => {
+    afterEach(() => {
+      configureClipboardReader(null);
+    });
+
+    it('fills the textarea from the clipboard', async () => {
+      configureClipboardReader(async () => 'Gunnery 4');
+      const user = userEvent.setup();
+      renderDialog();
+
+      await user.click(screen.getByRole('button', { name: 'Paste from clipboard' }));
+
+      expect(screen.getByLabelText(/paste an eft fit/i)).toHaveValue('Gunnery 4');
+    });
+
+    it('surfaces a translated error instead of throwing when the browser denies clipboard access', async () => {
+      configureClipboardReader(async () => {
+        throw new DOMException('denied', 'NotAllowedError');
+      });
+      const user = userEvent.setup();
+      renderDialog();
+
+      await user.click(screen.getByRole('button', { name: 'Paste from clipboard' }));
+
+      expect(await screen.findByText(/couldn't read the clipboard/i)).toBeInTheDocument();
+      // The textarea is untouched — the user can still paste manually.
+      expect(screen.getByLabelText(/paste an eft fit/i)).toHaveValue('');
+    });
   });
 });

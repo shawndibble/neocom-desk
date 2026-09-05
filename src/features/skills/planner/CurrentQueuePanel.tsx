@@ -17,6 +17,16 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 /** Countdown recompute cadence; the display is minute-grained, so 30s is fresh enough. */
 const TICK_MS = 30_000;
 
+/**
+ * How often this panel re-reads the character's in-game queue from ESI
+ * (#408): the countdown above ticks locally between reads, but a skill
+ * finishing, a new one starting, or the queue being edited in-game all go
+ * unnoticed here until the next actual fetch. `loadCharacterSkillQueue` is
+ * cache-aware (`loadWithCache` honors ESI's own `Expires`), so a call landing
+ * inside a still-fresh window is a cheap cache hit, not a wasted round trip.
+ */
+const REFETCH_MS = 5 * 60_000;
+
 const BADGE_STYLE: Record<SkillQueueStatus, string> = {
   training: 'border-accent/50 bg-accent/15 text-accent',
   completed: 'border-success/50 bg-success/15 text-success',
@@ -49,11 +59,16 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
 
   useEffect(() => {
     let cancelled = false;
-    void loadCharacterSkillQueue(characterId).then((r) => {
-      if (!cancelled) setResult(r);
-    });
+    const load = () => {
+      void loadCharacterSkillQueue(characterId).then((r) => {
+        if (!cancelled) setResult(r);
+      });
+    };
+    load();
+    const id = setInterval(load, REFETCH_MS);
     return () => {
       cancelled = true;
+      clearInterval(id);
     };
   }, [characterId]);
 

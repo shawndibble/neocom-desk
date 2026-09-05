@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, SearchInput } from '@/components/ui';
 import type { SkillType } from '@/sde/types';
@@ -10,6 +10,8 @@ import type { SkillCatalog } from '../skillMap';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const MAX_RESULTS = 20;
+/** Debounce for the skill search, matching Market.tsx's catalogue search — a fast typist doesn't re-rank ~500 skills on every keystroke. */
+const SEARCH_DEBOUNCE_MS = 250;
 
 interface SkillPickerProps {
   skills: readonly SkillType[];
@@ -24,6 +26,8 @@ interface SkillPickerProps {
    * search bar is this panel's one full-width row wide enough to hold them.
    */
   controls?: ReactNode;
+  /** The plan's own entries, so a level button can flag one already added at or above it (#408) — distinct from `trainedSkills`, which flags one already trained in-game. */
+  planEntries?: readonly PlanEntry[];
 }
 
 /**
@@ -38,11 +42,20 @@ export function SkillPicker({
   onAdd,
   className = '',
   controls,
+  planEntries = [],
 }: SkillPickerProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
+  // Debounced separately from `query`: the input itself stays instantly
+  // responsive, only the ~500-skill re-rank below waits out the debounce.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [query]);
 
   /**
    * Ranked over every skill rather than capped at MAX_RESULTS, so a group
@@ -52,12 +65,12 @@ export function SkillPicker({
    */
   const matches = useMemo(
     () =>
-      rankedSearch(skills, query, {
+      rankedSearch(skills, debouncedQuery, {
         primary: (s) => s.name,
         secondary: [(s) => s.groupName, (s) => s.description],
         limit: skills.length,
       }),
-    [skills, query]
+    [skills, debouncedQuery]
   );
 
   const groups = useMemo(
@@ -86,6 +99,7 @@ export function SkillPicker({
   function pick(skillTypeID: number, targetLevel: number) {
     onAdd({ skillTypeID, targetLevel });
     setQuery('');
+    setDebouncedQuery('');
     setSelected(null);
     setActiveGroups(new Set());
   }
@@ -126,7 +140,7 @@ export function SkillPicker({
           ))}
         </div>
       )}
-      {results.length > 0 && (
+      {results.length > 0 ? (
         <ul className="mt-1 max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">
           {results.map((skill) => (
             <li key={skill.typeID} className="border-b border-line last:border-b-0">
@@ -140,12 +154,33 @@ export function SkillPicker({
               </button>
               {selected === skill.typeID && (
                 <div className="space-y-2 px-2 pb-2">
-                  <div className="flex gap-1">
-                    {ROMAN.map((roman, i) => (
-                      <Button key={roman} size="sm" onClick={() => pick(skill.typeID, i + 1)}>
-                        {t('plans.level', { level: roman })}
-                      </Button>
-                    ))}
+                  <div className="flex flex-wrap gap-1">
+                    {ROMAN.map((roman, i) => {
+                      const level = i + 1;
+                      const trainedLevel = trainedSkills.get(skill.typeID)?.level ?? 0;
+                      const planLevel =
+                        planEntries.find((e) => e.skillTypeID === skill.typeID)?.targetLevel ?? 0;
+                      const alreadyTrained = trainedLevel >= level;
+                      const alreadyInPlan = !alreadyTrained && planLevel >= level;
+                      const flagKey = alreadyTrained
+                        ? 'plans.alreadyTrained'
+                        : alreadyInPlan
+                          ? 'plans.alreadyInPlan'
+                          : null;
+                      return (
+                        <Button
+                          key={roman}
+                          size="sm"
+                          className={flagKey ? 'text-text-dim' : undefined}
+                          onClick={() => pick(skill.typeID, level)}
+                        >
+                          {t('plans.level', { level: roman })}
+                          {flagKey && (
+                            <span className="ml-1 text-[0.625rem] uppercase">{t(flagKey)}</span>
+                          )}
+                        </Button>
+                      );
+                    })}
                   </div>
                   {requirements && (
                     <SkillRequirementsList
@@ -158,6 +193,12 @@ export function SkillPicker({
             </li>
           ))}
         </ul>
+      ) : (
+        debouncedQuery.trim() !== '' && (
+          <p className="mt-1 text-xs text-text-dim">
+            {t('plans.noSkillsMatch', { query: debouncedQuery })}
+          </p>
+        )
       )}
     </div>
   );
