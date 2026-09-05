@@ -154,6 +154,43 @@ describe('Market top-level tabs', () => {
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
+  it('switching to Open Orders keeps that tab selected even with a lingering ?type= param from Browser', async () => {
+    // A prior item selection on the Browser tab leaves `type` in the URL;
+    // switching tabs must not be undone by the cross-link sync effect below.
+    // Mocked because a fresh mount briefly treats an unloaded catalogue as
+    // "not yet known invalid" (`resolveAgainstCatalogue`), so Browser's order
+    // book can fetch once before this suite's empty catalogue mocks resolve.
+    server.use(
+      http.get('https://esi.evetech.net/markets/:regionId/orders', () =>
+        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    window.history.pushState({}, '', '/market?type=34');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('tab', { name: 'Market' });
+
+    await user.click(screen.getByRole('tab', { name: 'Open' }));
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('clicking a linked item name from Open Orders lands on the Market Browser tab', async () => {
+    window.history.pushState({}, '', '/market?section=orders');
+    const user = userEvent.setup();
+    render(<App />);
+
+    const itemLink = await screen.findByRole('link', { name: 'Tritanium' });
+    await user.click(itemLink);
+
+    expect(await screen.findByRole('tab', { name: 'Market' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.queryByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'false');
+  });
+
   it('opens the Transactions view from a deep link, with History still the selected tab', async () => {
     window.history.pushState({}, '', '/market?section=transactions');
     const user = userEvent.setup();
