@@ -82,7 +82,11 @@ async function computeRow(
   const hub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
 
   try {
-    const snapshot = await loadMarketSnapshot(hub, buildPlanTypeIds(blueprint, { catalog, pi }));
+    const snapshot = await loadMarketSnapshot(
+      hub,
+      buildPlanTypeIds(blueprint, { catalog, pi }),
+      plan.buildSystemId
+    );
     const { result, error } = computeBuildPlan({
       plan,
       blueprint,

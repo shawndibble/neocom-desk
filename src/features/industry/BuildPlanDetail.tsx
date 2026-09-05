@@ -49,6 +49,7 @@ import {
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { ResultsSummary } from './ResultsSummary';
+import { BuildSystemInput } from './BuildSystemInput';
 
 /** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
 export type PlanPatch = Partial<
@@ -61,6 +62,8 @@ export type PlanPatch = Partial<
     | 'rigLevel'
     | 'security'
     | 'hubId'
+    | 'buildSystemId'
+    | 'buildSystemName'
     | 'facilityTaxPct'
     | 'ownedStockScope'
     | 'buildHere'
@@ -179,7 +182,14 @@ export function BuildPlanDetail({
   // refresh), in the same commit rather than the effect's next tick — same
   // derived-and-cleared-during-render shape as PlanEditor's stale-result
   // clear above.
-  const snapshotKey = `${hub.id}:${typeIds.join(',')}:${refreshTick}`;
+  // One source for both the index that is fetched and the name that labels it,
+  // so the two can never disagree. A plan holding only half the pair (an id
+  // with no name, or the reverse) builds at its hub — see `BuildPlanRecord`.
+  const buildSystem =
+    plan.buildSystemId !== undefined && plan.buildSystemName !== undefined
+      ? { id: plan.buildSystemId, name: plan.buildSystemName }
+      : null;
+  const snapshotKey = `${hub.id}:${buildSystem?.id ?? hub.systemId}:${typeIds.join(',')}:${refreshTick}`;
   const [prevSnapshotKey, setPrevSnapshotKey] = useState(snapshotKey);
   if (prevSnapshotKey !== snapshotKey) {
     setPrevSnapshotKey(snapshotKey);
@@ -189,7 +199,7 @@ export function BuildPlanDetail({
   useEffect(() => {
     if (!blueprint || typeIds.length === 0) return;
     let cancelled = false;
-    void loadMarketSnapshot(hub, typeIds).then((snap) => {
+    void loadMarketSnapshot(hub, typeIds, buildSystem?.id).then((snap) => {
       if (cancelled) return;
       setSnapshot(snap);
       setFetchedAt(new Date());
@@ -199,10 +209,10 @@ export function BuildPlanDetail({
       cancelled = true;
     };
     // typeIds/blueprint are stable references keyed off `entry` (the catalog Map holds one
-    // entry per blueprintTypeID), so this only refires on a real hub or blueprint change,
-    // plus the manual-refresh tick. `catalog`/`pi` land together in one state
-    // update on the route, so widening typeIds above cannot make this fire twice.
-  }, [hub, typeIds, blueprint, refreshTick]);
+    // entry per blueprintTypeID), so this only refires on a real hub, build-system or
+    // blueprint change, plus the manual-refresh tick. `catalog`/`pi` land together in one
+    // state update on the route, so widening typeIds above cannot make this fire twice.
+  }, [hub, typeIds, blueprint, refreshTick, buildSystem?.id]);
 
   const ownedMatch = useMemo(
     () => findOwnedBlueprint(ownedBlueprints, plan.blueprintTypeID),
@@ -616,6 +626,17 @@ export function BuildPlanDetail({
                 </NativeSelect>
               </label>
 
+              <BuildSystemInput
+                systemName={buildSystem?.name}
+                hubSystemName={hub.systemName}
+                onChange={(system) =>
+                  update({
+                    buildSystemId: system?.id,
+                    buildSystemName: system?.name,
+                  })
+                }
+              />
+
               {facilityPreset.structure && (
                 <div className="flex flex-col gap-1 text-xs">
                   <span className="flex items-center gap-1">
@@ -770,7 +791,7 @@ export function BuildPlanDetail({
             productQuantity={
               blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null
             }
-            costIndexSystemName={hub.systemName}
+            costIndexSystemName={buildSystem?.name ?? hub.systemName}
           />
         </Panel>
       )}

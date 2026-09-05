@@ -15,14 +15,24 @@ import { BuildPlanDetail, type PlanPatch } from './BuildPlanDetail';
 // fetch would hit ESI/Fuzzwork and never resolve under MSW's default
 // handlers here. The panel only needs *a* resolved snapshot to stop showing
 // "loading" — its shape doesn't matter to the Runs/ME/TE fields under test.
-vi.mock('./marketData', () => ({
-  loadMarketSnapshot: vi.fn(async () => ({
+const loadMarketSnapshot = vi.hoisted(() =>
+  vi.fn(async () => ({
     hubPrices: {},
     hubBuyPrices: {},
     adjustedPrices: {},
     systemCostIndex: 0.05,
-  })),
-}));
+  }))
+);
+vi.mock('./marketData', () => ({ loadMarketSnapshot }));
+
+// The build-system field resolves a typed name through ESI. Mocked here for the
+// same reason as the snapshot: the panel under test needs an answer, not a network.
+const resolveSolarSystem = vi.hoisted(() =>
+  vi.fn(async (name: string) =>
+    name.trim().toLowerCase() === 'badivefi' ? { id: 30003888, name: 'Badivefi' } : null
+  )
+);
+vi.mock('@/market/systemLookup', () => ({ resolveSolarSystem }));
 
 const BLUEPRINT: BlueprintType = {
   name: 'Rifter Blueprint',
@@ -396,5 +406,116 @@ describe('BuildPlanDetail sub-builds', () => {
     // that indented rows are never offered the control at all.
     await screen.findByText('Pyerite');
     expect(screen.queryByRole('button', { name: /Build Pyerite here/ })).toBeNull();
+  });
+});
+
+/**
+ * The job fee is charged by the system the job runs in, not the system the
+ * plan sells in — the two are routinely different, and pricing the fee at the
+ * hub overstated it threefold for a hub-selling, nullsec-building pilot. See
+ * `docs/context/decisions/20260905-000835-*.md`.
+ */
+describe('BuildPlanDetail build system', () => {
+  const systemInput = () => screen.getByLabelText('Build system');
+
+  afterEach(() => {
+    loadMarketSnapshot.mockClear();
+    resolveSolarSystem.mockClear();
+  });
+
+  it('shows the hub system as the placeholder when no build system is set', () => {
+    render(<Harness plan={{ hubId: 'jita' }} />);
+
+    expect(valueOf(systemInput())).toBe('');
+    expect(systemInput()).toHaveAttribute('placeholder', 'Jita');
+  });
+
+  it('resolves a typed system on commit and stores its id and ESI casing', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness onUpdate={onUpdate} />);
+
+    await user.type(systemInput(), 'badivefi');
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      buildSystemId: 30003888,
+      buildSystemName: 'Badivefi',
+    });
+    expect(valueOf(systemInput())).toBe('Badivefi');
+  });
+
+  it('fetches the cost index for the build system, not the hub', async () => {
+    render(<Harness plan={{ buildSystemId: 30003888, buildSystemName: 'Badivefi' }} />);
+
+    await screen.findByText('Badivefi', { exact: false });
+    expect(loadMarketSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'jita' }),
+      expect.anything(),
+      30003888
+    );
+  });
+
+  it('labels the cost index with the build system', async () => {
+    render(<Harness plan={{ buildSystemId: 30003888, buildSystemName: 'Badivefi' }} />);
+
+    expect(await screen.findByText('Cost index (Badivefi)')).toBeInTheDocument();
+  });
+
+  it('keeps the typed text and says so when ESI knows no such system', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness onUpdate={onUpdate} />);
+
+    await user.type(systemInput(), 'Notasystem');
+    await user.tab();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No solar system by that name.');
+    // The plan is untouched, and the near-miss is still there to correct.
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(valueOf(systemInput())).toBe('Notasystem');
+  });
+
+  it('clears back to the hub system when the field is emptied', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <Harness
+        plan={{ buildSystemId: 30003888, buildSystemName: 'Badivefi' }}
+        onUpdate={onUpdate}
+      />
+    );
+
+    await user.clear(systemInput());
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      buildSystemId: undefined,
+      buildSystemName: undefined,
+    });
+  });
+
+  it('builds at the hub when the plan holds only half the id/name pair', async () => {
+    // A half-pair is what a partial sync or a hand-edited record can leave
+    // behind. Charging the fee at one system while labelling it another is
+    // worse than not having a build system at all.
+    render(<Harness plan={{ buildSystemId: 30003888 }} />);
+
+    expect(await screen.findByText('Cost index (Jita)')).toBeInTheDocument();
+    expect(loadMarketSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'jita' }),
+      expect.anything(),
+      undefined
+    );
+  });
+
+  it('does not call ESI when the field is committed unchanged', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ buildSystemId: 30003888, buildSystemName: 'Badivefi' }} />);
+
+    await user.click(systemInput());
+    await user.tab();
+
+    expect(resolveSolarSystem).not.toHaveBeenCalled();
   });
 });

@@ -582,6 +582,13 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
       rigLevel: p.rigLevel,
       security: p.security,
       hubId: p.hubId,
+      // One fact, routed as one pair: the id is what the fee is charged at and
+      // the name is what labels it, so a half-pair would label the cost index
+      // with a system it was not charged at. A half-pair syncs as neither,
+      // which falls the plan back to its hub — wrong, but not lying.
+      ...(p.buildSystemId !== undefined && p.buildSystemName !== undefined
+        ? { buildSystemId: p.buildSystemId, buildSystemName: p.buildSystemName }
+        : {}),
       ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
       ...(materialSourcing !== undefined ? { materialSourcing } : {}),
       ...(p.ownedStockScope !== undefined ? { ownedStockScope: p.ownedStockScope } : {}),
@@ -606,6 +613,9 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     rigLevel: r.rigLevel,
     security: r.security,
     hubId: r.hubId,
+    ...(r.buildSystemId !== undefined && r.buildSystemName !== undefined
+      ? { buildSystemId: r.buildSystemId, buildSystemName: r.buildSystemName }
+      : {}),
     ...(r.facilityTaxPct !== undefined ? { facilityTaxPct: r.facilityTaxPct } : {}),
     ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
     ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),

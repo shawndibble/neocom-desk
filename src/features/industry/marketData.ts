@@ -27,7 +27,12 @@ export interface MarketSnapshot {
   hubBuyPrices: HubPrices;
   /** Global adjusted prices (job-cost EIV). Null when the live ESI call failed. */
   adjustedPrices: AdjustedPrices | null;
-  /** Manufacturing cost index for the hub's system. Null when the live ESI call failed. */
+  /**
+   * Manufacturing cost index for the system the job runs in — `costIndexSystemId`
+   * when the caller names one, else the hub's own system. Null when the live ESI
+   * call failed, or when the named system has no index (an unknown or
+   * industry-less system).
+   */
   systemCostIndex: number | null;
 }
 
@@ -58,11 +63,18 @@ async function loadSystemCostIndices(
 /**
  * Fetches everything a Build Plan needs to price a job: hub sell prices for
  * the given type IDs (materials + product), global adjusted prices, and the
- * hub system's manufacturing cost index.
+ * manufacturing cost index of the system the job runs in.
+ *
+ * `costIndexSystemId` is separate from the hub for a reason: where a player
+ * sells and where they build are routinely different systems, and the job fee
+ * is charged by the build system alone. Callers with no build system of their
+ * own (the LP store, planetary plans) omit it and keep the hub's index, which
+ * is what every caller got before the argument existed.
  */
 export async function loadMarketSnapshot(
   hub: TradeHub,
-  typeIds: number[]
+  typeIds: number[],
+  costIndexSystemId?: number
 ): Promise<MarketSnapshot> {
   const hubAggregates = await getHubPrices(hub, typeIds);
   const hubPrices: HubPrices = {};
@@ -84,7 +96,7 @@ export async function loadMarketSnapshot(
   }
 
   const costIndices = await loadSystemCostIndices();
-  const systemCostIndex = costIndices?.get(hub.systemId) ?? null;
+  const systemCostIndex = costIndices?.get(costIndexSystemId ?? hub.systemId) ?? null;
 
   return { hubPrices, hubBuyPrices, adjustedPrices, systemCostIndex };
 }
