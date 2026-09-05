@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -388,5 +389,57 @@ describe('Wallet', () => {
     const { beginEveLogin } = await import('@/app/loginFlow');
     screen.getByRole('button', { name: /log in again/i }).click();
     expect(beginEveLogin).toHaveBeenCalled();
+  });
+
+  /**
+   * Narrow, so the journal's filters render in the sheet rather than the row.
+   * jsdom's `matchMedia` stub never matches, which `useIsNarrow` reads as a
+   * pointer viewport.
+   */
+  function useNarrowViewport(): () => void {
+    const real = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: media === NARROW_QUERY,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    return () => {
+      window.matchMedia = real;
+    };
+  }
+
+  it('keeps the journal date range on one row inside the mobile filter sheet', async () => {
+    const restore = useNarrowViewport();
+    try {
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+      await screen.findByText('Bounty');
+
+      // The dates are behind the trigger now, with the search box left in the row.
+      expect(screen.queryByLabelText(/^From$/)).toBeNull();
+      await user.click(screen.getByRole('button', { name: /^Filters/ }));
+
+      const dialog = screen.getByRole('dialog', { name: 'Filters' });
+      const dates = within(dialog)
+        .getAllByDisplayValue('')
+        .filter((el) => el.getAttribute('type') === 'date');
+      expect(dates).toHaveLength(2);
+      // `JournalDateRange`'s wrapper becomes a real row here rather than the
+      // `display: contents` it carries inline — which is also the only proof
+      // that `useFilterSurface` resolves to the sheet from inside the modal.
+      const wrapper = dates[0]!.closest('div')!;
+      expect(wrapper).toBe(dates[1]!.closest('div'));
+      expect(wrapper).toHaveClass('flex');
+      expect(wrapper).not.toHaveClass('contents');
+    } finally {
+      restore();
+    }
   });
 });

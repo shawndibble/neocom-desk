@@ -20,6 +20,7 @@ import {
   Spinner,
   Tabs,
   TextInput,
+  useFilterSurface,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -39,6 +40,7 @@ import {
   loadCorporationWalletJournal,
   loadCorporationWallets,
 } from '@/features/corp/wallet';
+import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
@@ -74,6 +76,66 @@ interface JournalFilterBarProps {
  * here, and the empty string reads to it as "nothing selected".
  */
 const ALL_REF_TYPES = '__all';
+
+/**
+ * The journal's From/To pair, kept on one line in the mobile sheet.
+ *
+ * A visible `<label>` rather than a `FilterField`: a date input reads as
+ * nothing without its caption, so this one is wanted in the row as well as in
+ * the sheet, where `FilterField`'s caption is sheet-only. Its own component
+ * because `useFilterSurface` is a hook — `FilterBar` calls its `children`
+ * during its own render, so a bare fragment there would read the default
+ * surface rather than the sheet's.
+ *
+ * Inline, the wrapper is `display: contents`, so the two labels stay direct
+ * items of the toolbar row and keep the widths they had before this existed.
+ * In the sheet it becomes a real row and the two fields split it, which is
+ * what stops a range reading as two unrelated filters stacked apart.
+ */
+function JournalDateRange({
+  draft,
+  setDraft,
+}: {
+  draft: WalletJournalFilter;
+  setDraft: (next: WalletJournalFilter) => void;
+}) {
+  const { t } = useTranslation();
+  const sheet = useFilterSurface() === 'sheet';
+  const labelClassName = cx(
+    'flex items-center gap-1 text-xs text-text-dim',
+    sheet && 'min-w-0 flex-1'
+  );
+  const fieldClassName = sheet ? 'w-full min-w-0' : 'w-36';
+  return (
+    <div className={sheet ? 'flex w-full items-center gap-2' : 'contents'}>
+      <label className={labelClassName}>
+        {t('wallet.dateFromLabel')}
+        <TextInput
+          type="date"
+          className={fieldClassName}
+          value={draft.startDate ?? ''}
+          onChange={(event) =>
+            setDraft({
+              ...draft,
+              startDate: event.target.value === '' ? null : event.target.value,
+            })
+          }
+        />
+      </label>
+      <label className={labelClassName}>
+        {t('wallet.dateToLabel')}
+        <TextInput
+          type="date"
+          className={fieldClassName}
+          value={draft.endDate ?? ''}
+          onChange={(event) =>
+            setDraft({ ...draft, endDate: event.target.value === '' ? null : event.target.value })
+          }
+        />
+      </label>
+    </div>
+  );
+}
 
 function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBarProps) {
   const { t } = useTranslation();
@@ -114,39 +176,7 @@ function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBar
               </SelectContent>
             </Select>
           </FilterField>
-          {/*
-            A visible `<label>` rather than a `FilterField`: a date input reads
-            as nothing without its caption, so this one is wanted in the row as
-            well as in the sheet, where `FilterField`'s caption is sheet-only.
-          */}
-          <label className="flex items-center gap-1 text-xs text-text-dim">
-            {t('wallet.dateFromLabel')}
-            <TextInput
-              type="date"
-              className="w-36"
-              value={draft.startDate ?? ''}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  startDate: event.target.value === '' ? null : event.target.value,
-                })
-              }
-            />
-          </label>
-          <label className="flex items-center gap-1 text-xs text-text-dim">
-            {t('wallet.dateToLabel')}
-            <TextInput
-              type="date"
-              className="w-36"
-              value={draft.endDate ?? ''}
-              onChange={(event) =>
-                setDraft({
-                  ...draft,
-                  endDate: event.target.value === '' ? null : event.target.value,
-                })
-              }
-            />
-          </label>
+          <JournalDateRange draft={draft} setDraft={setDraft} />
         </>
       )}
     </FilterBar>
