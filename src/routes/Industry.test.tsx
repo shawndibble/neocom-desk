@@ -376,8 +376,10 @@ describe('Industry: owned-blueprint prefill', () => {
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 
     await screen.findByRole('button', { name: 'Rifter' });
-    expect(screen.getByLabelText('ME %')).toHaveValue(8);
-    expect(screen.getByLabelText('TE %')).toHaveValue(16);
+    // Text fields now (issue #455's commit-on-blur fix), not `type="number"`
+    // spinbuttons — `toHaveValue` compares against the DOM string value.
+    expect(screen.getByLabelText('ME %')).toHaveValue('8');
+    expect(screen.getByLabelText('TE %')).toHaveValue('16');
     expect(screen.getByText('Owned, ME 8% / TE 16%')).toBeInTheDocument();
 
     const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).first();
@@ -808,5 +810,38 @@ describe('Industry: hide fully-owned material rows (#409)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
 
     expect(screen.getByText('Tritanium')).toBeInTheDocument();
+  });
+});
+
+describe('Industry: owned-stock scope (#454)', () => {
+  it('defaults to Everywhere, and persists Selected locations to the plan', async () => {
+    const plan = seedPlan();
+    await db.buildPlans.add(plan);
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    const select = screen.getByLabelText('Count owned stock from') as HTMLSelectElement;
+    expect(select).toHaveValue('everywhere');
+
+    await userEvent.selectOptions(select, 'Selected locations');
+    expect(select).toHaveValue('selected');
+
+    // No Characters are authenticated in this test, so there is no detected
+    // stock to choose locations from yet.
+    expect(
+      screen.getByText('No detected owned stock yet to choose locations from.')
+    ).toBeInTheDocument();
+
+    await waitFor(async () => {
+      expect((await db.buildPlans.get(plan.id))?.ownedStockScope).toEqual({
+        mode: 'selected',
+        locations: [],
+      });
+    });
+
+    await userEvent.selectOptions(select, 'Everywhere');
+    await waitFor(async () => {
+      expect((await db.buildPlans.get(plan.id))?.ownedStockScope).toBeUndefined();
+    });
   });
 });

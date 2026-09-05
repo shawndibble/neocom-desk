@@ -42,4 +42,23 @@ describe('downloadCsv', () => {
     downloadCsv('assets', [{ name: 'Tritanium' }], columns, new Date(2026, 7, 5));
     expect(spy.mock.calls[0][0]).toBe('neocom-assets-2026-08-05.csv');
   });
+
+  it('folds a qualifier into the filename, slugified, so per-division corp exports never collide', () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    downloadCsv(
+      'corp-wallet-journal',
+      [{ name: 'Tritanium' }],
+      columns,
+      new Date(2026, 7, 5),
+      false,
+      'SRP Division'
+    );
+    expect(spy.mock.calls[0][0]).toBe('neocom-corp-wallet-journal-srp-division-2026-08-05.csv');
+  });
+
+  it('omits the qualifier segment entirely when none is given', () => {
+    const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
+    downloadCsv('corp-wallet-journal', [{ name: 'Tritanium' }], columns, new Date(2026, 7, 5));
+    expect(spy.mock.calls[0][0]).toBe('neocom-corp-wallet-journal-2026-08-05.csv');
+  });
 });
