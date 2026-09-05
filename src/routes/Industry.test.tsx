@@ -687,7 +687,16 @@ describe('Industry: the plan you had open reopens', () => {
 
   it('falls back to the first plan when the remembered one is gone', async () => {
     await seedTwoPlans();
-    await db.settings.put({ key: 'industryLastOpenedPlan', value: { [CHAR_ID]: 'bp-deleted' } });
+    await db.settings.put({ key: 'industryLastOpenedPlan', value: { [CHAR_ID]: 'bp-parts' } });
+    const remembered = render(<App />);
+
+    // The memory is honoured first — otherwise the fallback below would pass
+    // for a build with the whole feature removed.
+    expect(await screen.findByRole('heading', { name: 'Mechanical Parts' })).toBeInTheDocument();
+    remembered.unmount();
+
+    await db.buildPlans.delete('bp-parts');
+    useLastOpenedPlan.setState({ value: {}, hydrated: false });
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();

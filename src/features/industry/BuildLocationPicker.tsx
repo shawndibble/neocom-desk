@@ -86,6 +86,11 @@ export function BuildLocationPicker({
   // reload. A typed empty string is a different state: the pilot cleared the
   // box themselves, so it stays cleared until they pick again.
   const [query, setQuery] = useState<string | null>(null);
+  // What the pilot just chose, held only until the plan comes back carrying
+  // it. The parent's write is a Dexie round-trip, so without this the box
+  // would state the *previous* location for a frame after the click — the
+  // fill-once blankness this whole change removes, in miniature.
+  const [picked, setPicked] = useState<string | null>(null);
   const [results, setResults] = useState<BuildLocationOption[] | null>(null);
   const [searching, setSearching] = useState(false);
   // Which result Arrow/Home/End has highlighted, without moving DOM focus off
@@ -119,6 +124,15 @@ export function BuildLocationPicker({
     setSearching(searchKey !== '');
     setHighlightedIndex(null);
     setDismissed(false);
+  }
+
+  // Dropped as soon as the plan answers — including when it answers with
+  // nothing, which is what a manual facility or build-system edit leaves
+  // behind. Adjusted during render for the same reason `searchKey` is.
+  const [prevSelectedLabel, setPrevSelectedLabel] = useState(selectedLabel);
+  if (prevSelectedLabel !== selectedLabel) {
+    setPrevSelectedLabel(selectedLabel);
+    setPicked(null);
   }
 
   // Only the newest query may write results: ESI answers out of order, and a
@@ -175,6 +189,7 @@ export function BuildLocationPicker({
     // results/highlight/dismissed on the next render, the same reset every
     // other query edit already goes through.
     setQuery(null);
+    setPicked(optionLabel(option));
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -218,7 +233,7 @@ export function BuildLocationPicker({
         <label htmlFor="build-plan-location">{t('industry.buildLocation')}</label>
         <SearchInput
           id="build-plan-location"
-          value={query ?? selectedLabel ?? ''}
+          value={query ?? picked ?? selectedLabel ?? ''}
           placeholder={t('industry.buildLocationPlaceholder')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
