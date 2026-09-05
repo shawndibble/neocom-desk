@@ -51,7 +51,7 @@ export function AttributeChips({
 }: AttributeChipsProps) {
   const { t } = useTranslation();
   return (
-    <div className={cx('flex flex-wrap', dense ? 'gap-x-2 gap-y-1.5' : 'gap-4')}>
+    <div className={cx('flex flex-wrap', dense ? 'gap-x-2 gap-y-1.5' : 'gap-2 sm:gap-4')}>
       {attributes ? (
         ATTRIBUTE_ORDER.map((name) => {
           const effective = attributes[name];

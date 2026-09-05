@@ -283,7 +283,7 @@ interface MobileMoreSheetProps {
 /**
  * Mobile-only overflow sheet: the Character-section views that don't fit as
  * primary bottom-tab items, plus Market (which isn't Character-scoped, but the
- * tab bar is full at 3 + More). Settings and the active Character trail the
+ * tab bar is full at 4 + More). Settings and the active Character trail the
  * list, below a divider — Settings has no other route on a phone, and the
  * Character link is the only way to switch or add one. A real modal, not a
  * drawer: it covers the viewport, so the tab bar underneath must not stay
@@ -300,20 +300,14 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           between two of them left almost no dead zone for a thumb to miss
           into on this phone-only sheet. */}
       <div className="space-y-2 pb-3">
-        {/* The phone's only route to /corp: the tab bar is full at 3 + More. */}
+        {/* The phone's only route to /corp: the tab bar is full at 4 + More. */}
         <CorpNavItem onClick={onClose} />
         {/*
           From here down, same relative order as the desktop rail's
-          Progression/Economy/Social groups (Skills and Industry lead
+          Progression/Economy/Social groups (Skills, Industry and PI lead
           Progression there, but sit in the primary tab bar here, not this
           sheet) — one order to learn, not two.
         */}
-        <NavItem
-          to="/planetary-industry"
-          label={t('nav.pi')}
-          locked={locked.has('/planetary-industry')}
-          onClick={onClose}
-        />
         <NavItem
           to="/market"
           label={t('nav.market')}
@@ -464,7 +458,7 @@ export function Layout() {
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar: 3 primary destinations + More. Fixed-width
+      {/* Mobile bottom tab bar: 4 primary destinations + More. Fixed-width
           items (see MOBILE_NAV_ITEM) so the bar never overflows the
           viewport; `env(safe-area-inset-bottom)` keeps it clear of the
           home-indicator gesture area on notched phones. */}
@@ -480,6 +474,9 @@ export function Layout() {
         </NavLink>
         <NavLink to="/industry" className={mobileNavClass}>
           <span className="truncate">{t('nav.industry')}</span>
+        </NavLink>
+        <NavLink to="/planetary-industry" className={mobileNavClass}>
+          <span className="truncate">{t('nav.pi')}</span>
         </NavLink>
         <button
           type="button"
