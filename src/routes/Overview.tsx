@@ -16,8 +16,9 @@ import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap'
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { loadContracts, isActiveContractStatus } from '@/features/character/contracts';
+import { loadOrders } from '@/features/character/orders';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
-import { useQuickbar } from '@/features/market/useQuickbar';
+import { maxMarketOrders } from '@/engine/market/orderSlots';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
@@ -43,6 +44,14 @@ interface SkillsQueuePanelData {
   queueNeedsReauth: boolean;
   totalSp: number | null;
   catalog: SkillCatalog;
+  /**
+   * Open-order ceiling for the Open Orders tile. Derived here rather than in
+   * its own snapshot: the Trade-group skill levels it needs are already in
+   * this load's corrected skills, so it costs no extra ESI read. Null until
+   * /skills has landed — an untrained character still has slots, so "5" and
+   * "not loaded yet" must not look alike.
+   */
+  maxOrders: number | null;
 }
 
 async function loadSkillsQueuePanel(characterId: number): Promise<SkillsQueuePanelData> {
@@ -56,6 +65,7 @@ async function loadSkillsQueuePanel(characterId: number): Promise<SkillsQueuePan
     queueNeedsReauth: corrected.queueNeedsReauth,
     totalSp: corrected.totalSp,
     catalog,
+    maxOrders: corrected.skillsResult ? maxMarketOrders(corrected.trained) : null,
   };
 }
 
@@ -75,24 +85,43 @@ async function loadContractsTile(characterId: number): Promise<CountTileData> {
   return { count, needsReauth };
 }
 
+async function loadOrdersTile(characterId: number): Promise<CountTileData> {
+  const { cached, needsReauth } = await loadOrders(characterId);
+  return { count: cached ? cached.data.length : null, needsReauth };
+}
+
 function SummaryTile({
   icon,
   label,
   to,
   count,
+  total,
   needsReauth = false,
 }: {
   icon: React.ReactNode;
   label: string;
   to: string;
   count: number | null;
+  /**
+   * Optional ceiling, rendered as `count / total`. Passed separately because
+   * it comes from a different snapshot than `count` — an unloaded ceiling
+   * must not blank out a count that did load.
+   */
+  total?: number | null;
   needsReauth?: boolean;
 }) {
   const { t } = useTranslation();
+  const shown = needsReauth ? '—' : (count ?? '—');
+  // "12 / 305" reads as a slash to a screen reader, so the ratio tiles carry
+  // the same figure spelled out.
+  const ratioLabel =
+    total === undefined || needsReauth
+      ? undefined
+      : t('overview.tileRatioLabel', { label, used: shown, total: total ?? '—' });
   return (
     <Link
       to={to}
-      aria-label={needsReauth ? t('overview.tileReauthLabel', { label }) : undefined}
+      aria-label={needsReauth ? t('overview.tileReauthLabel', { label }) : ratioLabel}
       className="flex items-center gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm hover:border-line-bright"
     >
       <span aria-hidden="true" className="text-text-dim">
@@ -104,7 +133,10 @@ function SummaryTile({
       <span
         className={`text-base font-medium tabular-nums ${needsReauth ? 'text-warning' : 'text-text'}`}
       >
-        {needsReauth ? '—' : (count ?? '—')}
+        {shown}
+        {total !== undefined && !needsReauth && (
+          <span className="text-text-dim"> / {total ?? '—'}</span>
+        )}
       </span>
     </Link>
   );
@@ -116,8 +148,8 @@ export function Overview() {
   const skillsQueueSnapshot = useRouteSnapshot(loadSkillsQueuePanel);
   const industrySnapshot = useRouteSnapshot(loadIndustryTile);
   const contractsSnapshot = useRouteSnapshot(loadContractsTile);
+  const ordersSnapshot = useRouteSnapshot(loadOrdersTile);
   const { hydrated, activeCharacterId } = walletSnapshot;
-  const quickbar = useQuickbar(activeCharacterId);
 
   const queueEntries = skillsQueueSnapshot.data?.queueResult?.data ?? null;
   // Sorted once per fetched queue rather than on every render (this component
@@ -162,121 +194,130 @@ export function Overview() {
       />
       <OverviewSubNav />
 
-      <Panel
-        title={t('overview.wallet')}
-        actions={
-          <>
-            {walletData?.result && <DataAgeBadge date={walletData.result.fetchedAt} />}
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('overview.refreshWallet')}
-              onClick={walletSnapshot.refresh}
-              disabled={walletSnapshot.loading}
-            />
-          </>
-        }
-      >
-        {walletSnapshot.loading ? (
-          <Spinner label={t('common.loading')} />
-        ) : walletSnapshot.error ? (
-          <EmptyState
-            title={t('common.loadFailedTitle')}
-            hint={t('common.loadFailedHint')}
-            className="py-4"
-          />
-        ) : walletData?.needsReauth ? (
-          <ReauthBanner
-            title={t('overview.reauthTitle')}
-            hint={t('overview.reauthHint')}
-            actionLabel={t('overview.reauthAction')}
-            onLogin={() => void beginEveLogin()}
-          />
-        ) : walletData?.result ? (
-          <Link
-            to="/wallet"
-            className="inline-block text-lg font-medium tabular-nums text-isk-pos hover:underline"
-          >
-            {formatIsk(walletData.result.data, 2)} {t('overview.isk')}
-          </Link>
-        ) : (
-          <EmptyState title={t('overview.walletEmpty')} className="py-4" />
-        )}
-        {walletData?.result?.fromCache && (
-          <p className="mt-1 text-[0.6875rem] text-warning uppercase">{t('skills.offlineTitle')}</p>
-        )}
-      </Panel>
-
-      <div aria-live="polite">
+      {/* Wallet and training queue share a row on desktop, stack on mobile.
+          The aria-live region stays on the queue alone — hoisting it to the
+          grid would start announcing wallet balance changes too. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
         <Panel
-          title={t('overview.queue')}
+          title={t('overview.wallet')}
           actions={
             <>
-              {queueResult && <DataAgeBadge date={queueResult.fetchedAt} />}
+              {walletData?.result && <DataAgeBadge date={walletData.result.fetchedAt} />}
               <IconButton
                 icon={<Icon.Refresh />}
-                label={t('overview.refreshQueue')}
-                onClick={skillsQueueSnapshot.refresh}
-                disabled={skillsQueueSnapshot.loading}
+                label={t('overview.refreshWallet')}
+                onClick={walletSnapshot.refresh}
+                disabled={walletSnapshot.loading}
               />
             </>
           }
         >
-          {skillsQueueSnapshot.loading ? (
+          {walletSnapshot.loading ? (
             <Spinner label={t('common.loading')} />
-          ) : skillsQueueSnapshot.error ? (
+          ) : walletSnapshot.error ? (
             <EmptyState
               title={t('common.loadFailedTitle')}
               hint={t('common.loadFailedHint')}
               className="py-4"
             />
-          ) : skillsQueueData?.queueNeedsReauth ? (
+          ) : walletData?.needsReauth ? (
             <ReauthBanner
-              title={t('overview.queueReauthTitle')}
-              hint={t('overview.queueReauthHint')}
-              actionLabel={t('overview.queueReauthAction')}
+              title={t('overview.reauthTitle')}
+              hint={t('overview.reauthHint')}
+              actionLabel={t('overview.reauthAction')}
               onLogin={() => void beginEveLogin()}
             />
-          ) : !queueResult || queueDepth?.status === 'empty' ? (
-            <EmptyState title={t('overview.queueEmpty')} className="py-4" />
-          ) : queueDepth?.status === 'paused' ? (
-            <EmptyState title={t('overview.queuePaused')} className="py-4" />
+          ) : walletData?.result ? (
+            <Link
+              to="/wallet"
+              className="inline-block text-lg font-medium tabular-nums text-isk-pos hover:underline"
+            >
+              {formatIsk(walletData.result.data, 2)} {t('overview.isk')}
+            </Link>
           ) : (
-            <div className="space-y-1">
-              <Link to="/skills/plans" className="block text-sm hover:text-accent">
-                {activeSkillName
-                  ? t('overview.training', { name: activeSkillName })
-                  : t('overview.queueScheduled')}
-                {activeEntry?.finish_date && (
-                  <span className="ml-2 text-xs text-text-dim">
-                    {t('overview.finishes', {
-                      date: new Date(activeEntry.finish_date).toLocaleString(),
-                    })}{' '}
-                    ·{' '}
-                    {t('overview.timeLeft', {
-                      duration: formatDuration((Date.parse(activeEntry.finish_date) - now) / 1000),
-                    })}
-                  </span>
-                )}
-              </Link>
-              {queueDepth && (
-                <p className="text-xs text-text-dim">
-                  {t('overview.queueDepth', {
-                    count: queueDepth.count,
-                    total: formatDuration(queueDepth.totalRemainingSeconds),
-                    date: queueDepth.finalFinishDate
-                      ? new Date(queueDepth.finalFinishDate).toLocaleDateString()
-                      : '—',
-                  })}
-                </p>
-              )}
-            </div>
+            <EmptyState title={t('overview.walletEmpty')} className="py-4" />
           )}
-          {queueResult?.fromCache && (
+          {walletData?.result?.fromCache && (
             <p className="mt-1 text-[0.6875rem] text-warning uppercase">
               {t('skills.offlineTitle')}
             </p>
           )}
         </Panel>
+
+        <div aria-live="polite">
+          <Panel
+            title={t('overview.queue')}
+            actions={
+              <>
+                {queueResult && <DataAgeBadge date={queueResult.fetchedAt} />}
+                <IconButton
+                  icon={<Icon.Refresh />}
+                  label={t('overview.refreshQueue')}
+                  onClick={skillsQueueSnapshot.refresh}
+                  disabled={skillsQueueSnapshot.loading}
+                />
+              </>
+            }
+          >
+            {skillsQueueSnapshot.loading ? (
+              <Spinner label={t('common.loading')} />
+            ) : skillsQueueSnapshot.error ? (
+              <EmptyState
+                title={t('common.loadFailedTitle')}
+                hint={t('common.loadFailedHint')}
+                className="py-4"
+              />
+            ) : skillsQueueData?.queueNeedsReauth ? (
+              <ReauthBanner
+                title={t('overview.queueReauthTitle')}
+                hint={t('overview.queueReauthHint')}
+                actionLabel={t('overview.queueReauthAction')}
+                onLogin={() => void beginEveLogin()}
+              />
+            ) : !queueResult || queueDepth?.status === 'empty' ? (
+              <EmptyState title={t('overview.queueEmpty')} className="py-4" />
+            ) : queueDepth?.status === 'paused' ? (
+              <EmptyState title={t('overview.queuePaused')} className="py-4" />
+            ) : (
+              <div className="space-y-1">
+                <Link to="/skills/plans" className="block text-sm hover:text-accent">
+                  {activeSkillName
+                    ? t('overview.training', { name: activeSkillName })
+                    : t('overview.queueScheduled')}
+                  {activeEntry?.finish_date && (
+                    <span className="ml-2 text-xs text-text-dim">
+                      {t('overview.finishes', {
+                        date: new Date(activeEntry.finish_date).toLocaleString(),
+                      })}{' '}
+                      ·{' '}
+                      {t('overview.timeLeft', {
+                        duration: formatDuration(
+                          (Date.parse(activeEntry.finish_date) - now) / 1000
+                        ),
+                      })}
+                    </span>
+                  )}
+                </Link>
+                {queueDepth && (
+                  <p className="text-xs text-text-dim">
+                    {t('overview.queueDepth', {
+                      count: queueDepth.count,
+                      total: formatDuration(queueDepth.totalRemainingSeconds),
+                      date: queueDepth.finalFinishDate
+                        ? new Date(queueDepth.finalFinishDate).toLocaleDateString()
+                        : '—',
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
+            {queueResult?.fromCache && (
+              <p className="mt-1 text-[0.6875rem] text-warning uppercase">
+                {t('skills.offlineTitle')}
+              </p>
+            )}
+          </Panel>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -289,9 +330,11 @@ export function Overview() {
         />
         <SummaryTile
           icon={<Icon.Market size={Icon.ICON_SIZE.md} />}
-          label={t('overview.marketTile')}
-          to="/market"
-          count={quickbar.items.length}
+          label={t('overview.ordersTile')}
+          to="/market?section=orders"
+          count={ordersSnapshot.data?.count ?? null}
+          total={skillsQueueData?.maxOrders ?? null}
+          needsReauth={ordersSnapshot.data?.needsReauth ?? false}
         />
         <SummaryTile
           icon={<Icon.Contracts size={Icon.ICON_SIZE.md} />}

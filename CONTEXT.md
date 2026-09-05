@@ -165,6 +165,12 @@ here — they go one per file in `docs/context/decisions/`.
   from ESI. Rows, not a summary — each row is one order with its price,
   quantity, location, range and expiry. Replaces the single best bid/ask that a
   **Price Aggregate** gives.
+- **Order Slots**: How many market orders a character may keep open at once —
+  a base 5, plus 4 per level of Trade, 8 per Retail, 16 per Wholesale and 32
+  per Tycoon, so 305 with all four at V. ESI reports the open orders but never
+  this ceiling, so it is derived from trained skills
+  (`src/engine/market/orderSlots.ts`) and shown as the denominator of the
+  Overview's Open orders tile.
 - **Pin Budget**: The CPU and Powergrid a Command Center supplies to one
   colony, and the fixed amount each pin draws from it. **This is the pin cap
   — the game defines no pin-count limit** — so "how many P1 pins, or fewer

@@ -108,8 +108,24 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
     HttpResponse.json([])
   ),
-  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () => HttpResponse.json([]))
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () => HttpResponse.json([]))
 );
+
+/** One open sell order; only `type_id`/`order_id` matter to the tile's count. */
+const OPEN_ORDER = {
+  order_id: 1,
+  type_id: 3300,
+  region_id: 10000002,
+  location_id: 60003760,
+  range: 'station',
+  price: 100,
+  volume_total: 10,
+  volume_remain: 10,
+  duration: 90,
+  issued: '2026-08-01T00:00:00Z',
+  is_corporation: false,
+};
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
@@ -336,7 +352,7 @@ describe('Overview', () => {
     expect(await screen.findByText('Could not load')).toBeInTheDocument();
   });
 
-  it('shows industry/market/contracts summary tiles with counts and links', async () => {
+  it('shows industry/open-orders/contracts summary tiles with counts and links', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
         HttpResponse.json([
@@ -396,8 +412,63 @@ describe('Overview', () => {
     expect(contractsLink).toHaveAttribute('href', '/contracts');
     expect(await within(contractsLink).findByText('1')).toBeInTheDocument(); // only the outstanding one
 
-    const marketLink = main.getByRole('link', { name: /market/i });
-    expect(marketLink).toHaveAttribute('href', '/market');
+    const ordersLink = main.getByRole('link', { name: /open orders/i });
+    expect(ordersLink).toHaveAttribute('href', '/market?section=orders');
+  });
+
+  it('shows open orders over the order slots the trade skills grant, linking to the Open Orders tab', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
+        HttpResponse.json({
+          ...skillsPayload,
+          skills: [
+            ...skillsPayload.skills,
+            // Trade V (+20) and Retail III (+24) on top of the base 5.
+            {
+              skill_id: 3443,
+              trained_skill_level: 5,
+              active_skill_level: 5,
+              skillpoints_in_skill: 1,
+            },
+            {
+              skill_id: 3444,
+              trained_skill_level: 3,
+              active_skill_level: 3,
+              skillpoints_in_skill: 1,
+            },
+          ],
+        })
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () =>
+        HttpResponse.json([OPEN_ORDER, { ...OPEN_ORDER, order_id: 2 }])
+      )
+    );
+    render(<App />);
+    await screen.findByText(/1,234,567\.89/);
+    const main = within(document.querySelector('main') as HTMLElement);
+
+    const ordersLink = await main.findByRole('link', { name: /open orders: 2 of 49/i });
+    expect(ordersLink).toHaveAttribute('href', '/market?section=orders');
+    expect(within(ordersLink).getByText('2')).toBeInTheDocument();
+    expect(within(ordersLink).getByText('/ 49')).toBeInTheDocument();
+  });
+
+  it('offers a re-login on the open-orders tile when the orders scope is gone', async () => {
+    server.use(
+      http.get(
+        `https://esi.evetech.net/characters/${CHAR_ID}/orders`,
+        () => new HttpResponse(null, { status: 403 })
+      )
+    );
+    render(<App />);
+    await screen.findByText(/1,234,567\.89/);
+    const main = within(document.querySelector('main') as HTMLElement);
+    const ordersLink = await main.findByRole('link', {
+      name: /open orders: log in again to see this data/i,
+    });
+    // No "— / 5": a revoked scope hides the ratio rather than implying zero used.
+    expect(within(ordersLink).getByText('—')).toBeInTheDocument();
+    expect(ordersLink.textContent).not.toContain('/');
   });
 });
 
