@@ -1790,7 +1790,11 @@
         "browser": "Toggle all browser notifications for {{family}}",
         "feed": "Toggle all Overview notifications for {{family}}"
       }
-    }
+    },
+    "dataTitle": "Data",
+    "dataHint": "Clear locally cached EVE data if a view looks stale or you're troubleshooting — the app refetches from ESI as needed.",
+    "clearCache": "Clear cached ESI data",
+    "clearCacheConfirm": "Cache cleared."
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",
@@ -1801,7 +1805,7 @@
   },
   "activityLog": {
     "title": "Activity Log",
-    "hint": "Recent requests this device has made to EVE's servers — useful for your own reference, or for a support conversation. Clears on reload.",
+    "hint": "Recent requests this device has made to EVE's servers — useful for your own reference, or for a support conversation. Clears on reload. New entries appear automatically as you use the app.",
     "columnEndpoint": "Endpoint",
     "columnCharacter": "Character",
     "columnTime": "Time",
@@ -1811,7 +1815,9 @@
     "outcomeError": "Failed",
     "publicCall": "Public",
     "emptyTitle": "No activity yet",
-    "emptyHint": "Requests the app makes will appear here as you use it."
+    "emptyHint": "Requests the app makes will appear here as you use it.",
+    "clearLog": "Clear log",
+    "clearedConfirm": "Log cleared."
   },
   "corp": {
     "title": "Corporation",
