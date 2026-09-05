@@ -261,6 +261,26 @@ describe('truncation (AC4)', () => {
   });
 });
 
+describe('manual refresh keeps the asset list visible (issue #418)', () => {
+  it('does not blank the division list while a refresh is in flight', async () => {
+    await divisionList();
+
+    let resolveSecondFetch!: (value: ReturnType<typeof cached<CorporationAsset[]>>) => void;
+    mocked.loadCorporationAssets.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSecondFetch = resolve;
+      })
+    );
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh corp assets' }));
+    expect(screen.getByRole('button', { name: /Division 1/ })).toBeInTheDocument();
+
+    resolveSecondFetch(cached([asset({ item_id: 1 })]));
+    await waitFor(() => expect(mocked.loadCorporationAssets).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: /Division 1/ })).toBeInTheDocument();
+  });
+});
+
 describe('failed vs. genuinely empty reads', () => {
   it('shows a load-failed state rather than an empty corporation when the assets read itself failed', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(READ_FAILED);

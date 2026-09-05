@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -399,6 +400,26 @@ describe('the board (AC2, AC5, AC6)', () => {
     renderCorp();
     await waitFor(() => expect(screen.getByText('Nothing due')).toBeInTheDocument());
     expect(screen.getByRole('navigation', { name: 'Corporation' })).toBeInTheDocument();
+  });
+
+  it('does not blank the board while a manual refresh is in flight (issue #418)', async () => {
+    mocked.loadCorporationStructures.mockResolvedValue(cached([]));
+    renderCorp();
+    await waitFor(() => expect(screen.getByText('Nothing due')).toBeInTheDocument());
+
+    let resolveSecondFetch!: (value: ReturnType<typeof cached<never[]>>) => void;
+    mocked.loadCorporationStructures.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSecondFetch = resolve;
+      })
+    );
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh corp data' }));
+    expect(screen.getByText('Nothing due')).toBeInTheDocument();
+
+    resolveSecondFetch(cached([]));
+    await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Nothing due')).toBeInTheDocument();
   });
 });
 

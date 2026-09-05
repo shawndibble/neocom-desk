@@ -121,7 +121,10 @@ async function loadMembersSnapshot(
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpMembersView() {
   const { t } = useTranslation();
-  const snapshot = useRouteSnapshot<MembersSnapshot>(loadMembersSnapshot);
+  const snapshot = useRouteSnapshot<MembersSnapshot>(loadMembersSnapshot, undefined, {
+    // Keeps the roster on screen during a manual refresh (issue #418).
+    staleWhileRevalidate: true,
+  });
   const data = snapshot.data;
 
   const rows = useMemo<RosterRow[]>(() => {
@@ -162,7 +165,7 @@ function CorpMembersView() {
       />
       <CorpSubNav />
 
-      {snapshot.loading ? (
+      {snapshot.loading && data === null ? (
         <Spinner />
       ) : (
         <Panel padded={false}>
