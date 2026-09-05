@@ -107,8 +107,7 @@ describe('ActiveJobsPanel: rendering', () => {
     expect(screen.getByText('Widget Beta')).toBeInTheDocument();
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
 
-    // Scoped to the table body, not the filter chips row above it (#409 added
-    // a chip per activity type, so these names now also appear there) and not
+    // Scoped to tbody: activity names also appear on the filter chips and
     // the column headers.
     const jobList = within(container.querySelector('tbody')!);
     expect(jobList.getByText('Manufacturing')).toBeInTheDocument();
@@ -133,7 +132,7 @@ describe('ActiveJobsPanel: rendering', () => {
     const bars = screen.getAllByRole('progressbar');
     expect(bars.map((b) => b.getAttribute('aria-valuenow'))).toEqual(['100', '50', '25']);
 
-    // Absolute end date exposed via dateTime (ISO, TZ-stable) as secondary/hover text.
+    // Absolute end date exposed via dateTime (ISO, TZ-stable) in Ends (EVE).
     // Scoped to the job list: the panel header's DataAgeBadge also renders a <time>.
     const timeEls = container.querySelectorAll('tbody time');
     expect(Array.from(timeEls).map((el) => el.getAttribute('dateTime'))).toEqual([
@@ -541,8 +540,8 @@ describe('ActiveJobsPanel: table columns', () => {
 
     await screen.findByText('Widget Alpha');
 
-    // Every column the desktop table adds over the old card, header and value.
-    for (const header of ['Blueprint', 'Activity', 'Runs', 'Progress', 'Ends in', 'Ends']) {
+    // Every table column, header and value.
+    for (const header of ['Blueprint', 'Activity', 'Runs', 'Progress', 'Ends in', 'Ends (EVE)']) {
       expect(screen.getByRole('columnheader', { name: header })).toBeInTheDocument();
     }
     const rows = within(container.querySelector('tbody')!).getAllByRole('row');

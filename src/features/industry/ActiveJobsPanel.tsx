@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -28,6 +28,7 @@ import {
   type JobsLoadResult,
 } from './jobs';
 import { formatDuration } from '@/lib/duration';
+import { formatEveDateTime } from '@/lib/eveTime';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { jobsCsvColumns } from './jobsCsv';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -122,9 +123,9 @@ export function ActiveJobsPanel({
     return () => clearInterval(id);
   }, []);
 
-  // Memoised only to keep the `{}` fallback stable: it feeds the column
-  // definitions below, and a fresh empty object each render would rebuild them
-  // on every tick of anything else.
+  // Stable `{}` fallback: `nameForBlueprint` closes over `types`, and
+  // react-hooks/exhaustive-deps rejects a dependency that is a fresh object
+  // on every render.
   const types = useMemo(() => data?.types ?? {}, [data]);
   // Each side keeps its own result, so the badge below reports the age of the
   // data actually on screen — the two have different cache windows and must
@@ -166,26 +167,33 @@ export function ActiveJobsPanel({
     });
   }
 
-  const nameForBlueprint = (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`;
+  const nameForBlueprint = useCallback(
+    (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`,
+    [types]
+  );
 
   /**
-   * One row per job. Rebuilt on every countdown tick (`now`) — the remaining
-   * time, the progress fraction and the "completing soon" tone are all
-   * relative to it, so memoising on `t` alone would freeze the clock.
+   * Rebuilt on every countdown tick — the remaining time, the progress
+   * fraction and the warning tone are all relative to `now`, so memoising on
+   * `t` alone would freeze the clock.
    */
   const columns = useMemo<DataTableColumn<ActiveJob>[]>(() => {
-    const nameFor = (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`;
+    const soon = (job: ActiveJob) => isCompletingSoon(job, now);
     return [
       {
         id: 'blueprint',
         header: t('industry.jobsColBlueprint'),
         primary: true,
         className: 'font-medium',
-        sortValue: (job) => nameFor(job.blueprint_type_id),
+        sortValue: (job) => nameForBlueprint(job.blueprint_type_id),
+        // The row's warning stripe. On a `<tr>` this would be a `box-shadow`,
+        // which Chromium drops under the `border-collapse: collapse` every
+        // table here inherits; a cell border paints either way.
+        cellClassName: (job) => (soon(job) ? 'border-l-2 border-l-warning' : undefined),
         render: (job) => (
           <span className="flex items-center gap-1.5">
-            <span>{nameFor(job.blueprint_type_id)}</span>
-            {!isJobDone(job, now) && isCompletingSoon(job, now) && (
+            <span>{nameForBlueprint(job.blueprint_type_id)}</span>
+            {soon(job) && (
               <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
                 {t('industry.jobsCompletingSoon')}
               </span>
@@ -214,24 +222,28 @@ export function ActiveJobsPanel({
         // Sorts on the raw fraction, not the rounded percent the cell prints.
         sortValue: (job) => jobProgress(job, now),
         render: (job) => {
-          const soon = !isJobDone(job, now) && isCompletingSoon(job, now);
           const progress = Math.round(jobProgress(job, now) * 100);
           return (
+            // Fixed track: `flex-1` in a shrink-to-fit cell has no width to
+            // fill and collapses. Nothing may right-align itself below `sm`
+            // either (docs/DESIGN.md §4a) — hence `sm:text-right`.
             <span className="flex items-center gap-2">
               <span
                 role="progressbar"
-                aria-label={t('industry.jobsProgress', { name: nameFor(job.blueprint_type_id) })}
+                aria-label={t('industry.jobsProgress', {
+                  name: nameForBlueprint(job.blueprint_type_id),
+                })}
                 aria-valuenow={progress}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                className="block h-1.5 min-w-10 flex-1 overflow-hidden rounded-full bg-panel"
+                className="block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-panel sm:w-24"
               >
                 <span
-                  className={`block h-full ${soon ? 'bg-warning' : 'bg-accent'}`}
+                  className={`block h-full ${soon(job) ? 'bg-warning' : 'bg-accent'}`}
                   style={{ width: `${progress}%` }}
                 />
               </span>
-              <span className="w-8 shrink-0 text-right tabular-nums text-text-dim">
+              <span className="w-8 shrink-0 tabular-nums text-text-dim sm:text-right">
                 {progress}%
               </span>
             </span>
@@ -243,10 +255,7 @@ export function ActiveJobsPanel({
         header: t('industry.jobsColEndsIn'),
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
-        cellClassName: (job) =>
-          !isJobDone(job, now) && isCompletingSoon(job, now)
-            ? 'font-semibold text-warning'
-            : undefined,
+        cellClassName: (job) => (soon(job) ? 'font-semibold text-warning' : undefined),
         // The timestamp, never the printed duration: "1d 4h" sorts before "9h" as a string.
         sortValue: (job) => Date.parse(job.end_date),
         render: (job) =>
@@ -259,22 +268,13 @@ export function ActiveJobsPanel({
         sortValue: (job) => Date.parse(job.end_date),
         render: (job) => {
           const endDate = new Date(job.end_date);
-          return (
-            <time dateTime={endDate.toISOString()} title={endDate.toLocaleString()}>
-              {endDate.toLocaleString(undefined, {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </time>
-          );
+          return <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>;
         },
       },
     ];
-  }, [t, now, types]);
+  }, [t, now, nameForBlueprint]);
 
-  /** Right-click any row for the shared item menu — the product where there is one, else the blueprint. */
+  /** Right-click any row for the shared item menu. */
   const jobContextMenu = (job: ActiveJob, tr: ReactElement): ReactElement => {
     const menuTypeId = contextMenuTypeId(job);
     return (
@@ -401,8 +401,8 @@ export function ActiveJobsPanel({
           {filteredJobs.length === 0 ? (
             <EmptyState title={t('industry.jobsFilteredEmptyTitle')} className="py-4" />
           ) : (
-            // Six columns are wider than the 20rem-plus-content grid below at
-            // tablet widths, and `.dt-stack` only rescues below `sm`.
+            // Six columns overflow the route's `lg:grid-cols-[20rem_1fr]`
+            // column at tablet widths; `.dt-stack` only rescues below `sm`.
             <div className="overflow-x-auto">
               <DataTable
                 columns={columns}
@@ -411,13 +411,7 @@ export function ActiveJobsPanel({
                 label={t('industry.jobsTitle')}
                 defaultSort={{ columnId: 'endsIn', direction: 'asc' }}
                 density="compact"
-                // Tint plus a left stripe: the card this replaces carried a
-                // full warning border, and a tint alone reads weaker than it.
-                rowClassName={(job) =>
-                  !isJobDone(job, now) && isCompletingSoon(job, now)
-                    ? 'bg-warning/10 shadow-[inset_3px_0_0_var(--color-warning)]'
-                    : undefined
-                }
+                rowClassName={(job) => (isCompletingSoon(job, now) ? 'bg-warning/10' : undefined)}
                 rowContextMenu={jobContextMenu}
               />
             </div>
