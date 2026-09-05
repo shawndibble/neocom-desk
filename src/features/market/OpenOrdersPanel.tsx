@@ -1,13 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  FilterChip,
   IconButton,
   Panel,
   ReauthBanner,
+  SearchInput,
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
@@ -47,6 +49,57 @@ async function loadOpenOrdersSnapshot(
   return { ordersResult, ordersNeedsReauth, typeNames };
 }
 
+interface OrdersFilter {
+  text: string;
+  side: 'buy' | 'sell' | null;
+}
+
+const EMPTY_ORDERS_FILTER: OrdersFilter = { text: '', side: null };
+
+function filterOrders(
+  orders: readonly MarketOrder[],
+  filter: OrdersFilter,
+  typeNames: ReadonlyMap<number, string>
+): MarketOrder[] {
+  const query = filter.text.trim().toLowerCase();
+  return orders.filter((order) => {
+    if (filter.side === 'buy' && !order.is_buy_order) return false;
+    if (filter.side === 'sell' && order.is_buy_order) return false;
+    if (query && !(typeNames.get(order.type_id) ?? '').toLowerCase().includes(query)) return false;
+    return true;
+  });
+}
+
+interface OrdersFilterBarProps {
+  filter: OrdersFilter;
+  onChange: (filter: OrdersFilter) => void;
+}
+
+/** Search plus buy/sell filter chips above a market orders table. */
+function OrdersFilterBar({ filter, onChange }: OrdersFilterBarProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+      <SearchInput
+        value={filter.text}
+        onChange={(event) => onChange({ ...filter, text: event.target.value })}
+        placeholder={t('orders.searchPlaceholder')}
+        className="min-w-48 flex-1"
+      />
+      <FilterChip
+        label={t('orders.buy')}
+        selected={filter.side === 'buy'}
+        onToggle={() => onChange({ ...filter, side: filter.side === 'buy' ? null : 'buy' })}
+      />
+      <FilterChip
+        label={t('orders.sell')}
+        selected={filter.side === 'sell'}
+        onToggle={() => onChange({ ...filter, side: filter.side === 'sell' ? null : 'sell' })}
+      />
+    </div>
+  );
+}
+
 /** Market's Open Orders tab: a character's currently active market orders. */
 export function OpenOrdersPanel() {
   const { t } = useTranslation();
@@ -57,10 +110,16 @@ export function OpenOrdersPanel() {
   const ordersNeedsReauth = data?.ordersNeedsReauth ?? false;
   const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
   const nameFor = (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`;
+  const [filter, setFilter] = useState<OrdersFilter>(EMPTY_ORDERS_FILTER);
 
   const orders = useMemo(
     () => [...(ordersResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
     [ordersResult]
+  );
+
+  const filteredOrders = useMemo(
+    () => filterOrders(orders, filter, typeNames),
+    [orders, filter, typeNames]
   );
 
   const columns = useMemo<DataTableColumn<MarketOrder>[]>(
@@ -68,6 +127,7 @@ export function OpenOrdersPanel() {
       {
         id: 'item',
         header: t('orders.item'),
+        sortValue: (order) => typeNames.get(order.type_id) ?? `Type #${order.type_id}`,
         render: (order) => (
           <MarketItemLink typeId={order.type_id}>
             {typeNames.get(order.type_id) ?? `Type #${order.type_id}`}
@@ -77,6 +137,7 @@ export function OpenOrdersPanel() {
       {
         id: 'side',
         header: t('orders.side'),
+        sortValue: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
         render: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
       },
       {
@@ -84,6 +145,7 @@ export function OpenOrdersPanel() {
         header: t('orders.price'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (order) => order.price,
         render: (order) => formatIsk(order.price, 2),
       },
       {
@@ -91,6 +153,7 @@ export function OpenOrdersPanel() {
         header: t('orders.remaining'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (order) => order.volume_remain,
         render: (order) =>
           `${order.volume_remain.toLocaleString()} / ${order.volume_total.toLocaleString()}`,
       },
@@ -98,6 +161,7 @@ export function OpenOrdersPanel() {
         id: 'issued',
         header: t('orders.issued'),
         className: 'whitespace-nowrap text-text-dim',
+        sortValue: (order) => new Date(order.issued).getTime(),
         render: (order) => new Date(order.issued).toLocaleDateString(),
       },
     ],
@@ -141,8 +205,10 @@ export function OpenOrdersPanel() {
                 size="sm"
                 icon={<Icon.Download />}
                 label={t('orders.exportCsvOpen')}
-                disabled={orders.length === 0}
-                onClick={() => downloadCsv('orders-open', orders, ordersCsvColumns(t, nameFor))}
+                disabled={filteredOrders.length === 0}
+                onClick={() =>
+                  downloadCsv('orders-open', filteredOrders, ordersCsvColumns(t, nameFor))
+                }
               />
               <DataAgeBadge date={ordersResult.fetchedAt} />
             </>
@@ -168,12 +234,17 @@ export function OpenOrdersPanel() {
               {t('common.offlineTitle')}
             </p>
           )}
-          <DataTable
-            columns={columns}
-            rows={orders}
-            rowKey={(order) => order.order_id}
-            label={t('orders.openTab')}
-          />
+          <OrdersFilterBar filter={filter} onChange={setFilter} />
+          {filteredOrders.length === 0 ? (
+            <EmptyState title={t('orders.noResults')} className="py-8" />
+          ) : (
+            <DataTable
+              columns={columns}
+              rows={filteredOrders}
+              rowKey={(order) => order.order_id}
+              label={t('orders.openTab')}
+            />
+          )}
         </>
       )}
     </Panel>

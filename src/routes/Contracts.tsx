@@ -154,6 +154,7 @@ export function Contracts() {
       {
         id: 'type',
         header: t('contracts.type'),
+        sortValue: (contract) => contract.title || t(CONTRACT_TYPE_KEY[contract.type]),
         render: (contract) => (
           <button
             type="button"
@@ -169,6 +170,7 @@ export function Contracts() {
         header: t('contracts.status'),
         className: 'font-semibold',
         cellClassName: (contract) => STATUS_TONE[contract.status],
+        sortValue: (contract) => t(CONTRACT_STATUS_KEY[contract.status]),
         render: (contract) => {
           const label = t(CONTRACT_STATUS_KEY[contract.status]);
           return isStale(contract) ? (
@@ -183,6 +185,7 @@ export function Contracts() {
       {
         id: 'issuer',
         header: t('contracts.issuer'),
+        sortValue: (contract) => issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`,
         render: (contract) => (
           <IssuerLink
             issuerId={contract.issuer_id}
@@ -196,6 +199,7 @@ export function Contracts() {
         header: t('contracts.price'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (contract) => contract.price ?? contract.reward,
         render: (contract) =>
           contract.price !== undefined
             ? formatIsk(contract.price, 2)
@@ -207,6 +211,7 @@ export function Contracts() {
         id: 'expires',
         header: t('contracts.expires'),
         className: 'whitespace-nowrap text-text-dim',
+        sortValue: (contract) => new Date(contract.date_expired).getTime(),
         render: (contract) => new Date(contract.date_expired).toLocaleString(),
       },
     ],
