@@ -971,7 +971,7 @@ describe('MaterialsTable build-here control', () => {
     const hammerControl = within(row('Mechanical Parts')).getByRole('button', {
       name: 'Build Mechanical Parts here instead of buying it',
     });
-    expect(hammerControl.querySelector('svg')?.parentElement).toHaveClass('text-isk-pos');
+    expect(hammerControl).toHaveClass('text-isk-pos');
 
     // Already building: the toggle shows the cart, dim — not green, even
     // though this is the row actually being built.
@@ -983,7 +983,7 @@ describe('MaterialsTable build-here control', () => {
     const cartControl = within(
       within(buildingRow.container).getByText('Mechanical Parts').closest('tr')!
     ).getByRole('button', { name: 'Buy Mechanical Parts instead of building it' });
-    expect(cartControl.querySelector('svg')?.parentElement).toHaveClass('text-text-dim');
+    expect(cartControl).toHaveClass('text-text-dim');
   });
 
   it('carries the make-or-buy price rationale into the toggle’s tooltip, keeping the accessible name to the short action', async () => {

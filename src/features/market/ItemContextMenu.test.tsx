@@ -53,7 +53,10 @@ describe('ItemContextMenu — build-here toggle', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('offers "Add material components" for a material not yet being built, and invokes it on select', async () => {
+  it.each([
+    ['Add material components', 'Buy instead', false],
+    ['Buy instead', 'Add material components', true],
+  ])('offers "%s" and invokes it on select', async (offeredLabel, omittedLabel, buildingHere) => {
     const onToggleBuildHere = vi.fn();
     render(
       <MemoryRouter initialEntries={['/industry']}>
@@ -65,7 +68,7 @@ describe('ItemContextMenu — build-here toggle', () => {
           quickbarAvailable
           onShowInfo={vi.fn()}
           onToggleBuildHere={onToggleBuildHere}
-          buildingHere={false}
+          buildingHere={buildingHere}
         >
           <button type="button">Tritanium</button>
         </ItemContextMenu>
@@ -73,40 +76,11 @@ describe('ItemContextMenu — build-here toggle', () => {
     );
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
 
-    const item = await screen.findByRole('menuitem', { name: 'Add material components' });
+    const item = await screen.findByRole('menuitem', { name: offeredLabel });
     fireEvent.click(item);
 
     expect(onToggleBuildHere).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('menuitem', { name: 'Buy instead' })).not.toBeInTheDocument();
-  });
-
-  it('offers "Buy instead" once the material is being built', async () => {
-    const onToggleBuildHere = vi.fn();
-    render(
-      <MemoryRouter initialEntries={['/industry']}>
-        <ItemContextMenu
-          typeId={TRITANIUM}
-          itemName="Tritanium"
-          blueprintTypeID={null}
-          onAddToQuickbar={vi.fn()}
-          quickbarAvailable
-          onShowInfo={vi.fn()}
-          onToggleBuildHere={onToggleBuildHere}
-          buildingHere
-        >
-          <button type="button">Tritanium</button>
-        </ItemContextMenu>
-      </MemoryRouter>
-    );
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
-
-    const item = await screen.findByRole('menuitem', { name: 'Buy instead' });
-    fireEvent.click(item);
-
-    expect(onToggleBuildHere).toHaveBeenCalledTimes(1);
-    expect(
-      screen.queryByRole('menuitem', { name: 'Add material components' })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: omittedLabel })).not.toBeInTheDocument();
   });
 });
 

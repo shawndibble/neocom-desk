@@ -308,10 +308,12 @@ export function BuildPlanDetail({
     [recipes]
   );
 
-  // The one place "can this be built here" is decided (manufacturing only —
-  // one level deep, docs/context/decisions). Shared by the materials table's
-  // own toggle and the row context menu, so a future change to the rule
-  // (a new method, say) touches this and nothing else.
+  // The one place the *method* half of "can this be built here" is decided
+  // (manufacturing only, docs/context/decisions) — a future new method only
+  // needs to change this. The *depth* half (never on an indented row, which
+  // is what keeps the feature to one level) is each call site's own
+  // `!material.isSubInput` check, since this answers per typeID and cannot
+  // see whether a given row is one.
   const canBuildHere = useMemo(
     () =>
       (typeID: number): boolean =>
@@ -332,13 +334,23 @@ export function BuildPlanDetail({
   );
 
   /**
-   * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
-   * the table and the CSV export rather than per row render.
-   *
-   * Gated on `pricesReady` for the same reason the results panel is: without
-   * live adjusted prices and a system cost index there is no job fee, and a
-   * fee-free quote would call almost everything worth building.
+   * The facility/rig/security/tax inputs every engine context on this plan
+   * needs — the "where and how a job runs" half, which doesn't depend on
+   * whether prices have loaded yet. Shared by `makeOrBuyContext` below and
+   * `expanded`'s own `ctx`, which each then add their own pricing fields with
+   * their own fallback policy (one waits for real prices, the other tolerates
+   * their absence so a plan still renders while they load).
    */
+  const facilityContext = useMemo(
+    () => ({
+      facility: facilityPreset,
+      rig: plan.rigLevel,
+      security: plan.security,
+      facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
+    }),
+    [facilityPreset, plan.rigLevel, plan.security, plan.facilityTaxPct]
+  );
+
   /**
    * The pricing context every make-or-buy verdict on this plan needs — shared
    * by `advice` and `subInputAdvice` below, so a plan's own materials and an
@@ -352,17 +364,18 @@ export function BuildPlanDetail({
       return null;
     }
     return {
-      facility: facilityPreset,
-      rig: plan.rigLevel,
-      security: plan.security,
-      facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
+      ...facilityContext,
       systemCostIndex: snapshot.systemCostIndex,
       adjustedPrices: snapshot.adjustedPrices,
       hubPrices: snapshot.hubPrices,
       skills,
     };
-  }, [snapshot, facilityPreset, plan.rigLevel, plan.security, plan.facilityTaxPct, skills]);
+  }, [facilityContext, snapshot, skills]);
 
+  /**
+   * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
+   * the table and the CSV export rather than per row render.
+   */
   const advice = useMemo(() => {
     const verdicts = new Map<number, MakeOrBuy>();
     if (!result || !makeOrBuyContext) return verdicts;
@@ -387,27 +400,13 @@ export function BuildPlanDetail({
         hubPrices: snapshot?.hubPrices ?? {},
         sourcing: plan.materialSourcing,
         ctx: {
-          facility: facilityPreset,
-          rig: plan.rigLevel,
-          security: plan.security,
-          facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
+          ...facilityContext,
           systemCostIndex: snapshot?.systemCostIndex ?? 0,
           adjustedPrices: snapshot?.adjustedPrices ?? {},
           skills,
         },
       }),
-    [
-      result,
-      plan.buildHere,
-      plan.materialSourcing,
-      plan.rigLevel,
-      plan.security,
-      plan.facilityTaxPct,
-      facilityPreset,
-      recipeFor,
-      snapshot,
-      skills,
-    ]
+    [result, plan.buildHere, plan.materialSourcing, facilityContext, recipeFor, snapshot, skills]
   );
 
   const visibleMaterials = useMemo(

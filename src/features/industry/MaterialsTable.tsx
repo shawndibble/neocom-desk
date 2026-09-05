@@ -318,30 +318,25 @@ export function MaterialsTable({
                 // something here can produce — hammer to start building it,
                 // cart to go back to buying it, the same two glyphs and tones
                 // the advice-only marker uses for those two errands: the
-                // hammer is always green and the cart always dim, the same
-                // way regardless of which one this row currently shows — the
-                // colour rides with the glyph, not with the row's toggle
-                // state, so it stays a fixed "this action means build" /
-                // "this action means buy" cue rather than flipping meaning
-                // from row to row. Set on this inner span so it wins over the
-                // button's own default text colour regardless of Tailwind's
-                // utility ordering. There is nothing left to say in a second,
-                // separate icon once this one already reads as "switch this
-                // row to that": the plan's own context menu
+                // hammer is always `positive` (green) and the cart always the
+                // default dim, the same way regardless of which one this row
+                // currently shows — the tone rides with the glyph, not with
+                // the row's toggle state, so it stays a fixed "this action
+                // means build" / "this action means buy" cue rather than
+                // flipping meaning from row to row. There is nothing left to
+                // say in a second, separate icon once this one already reads
+                // as "switch this row to that": the plan's own context menu
                 // (`ItemContextMenu`'s "Add material components") reaches the
                 // identical toggle for a right-click or long-press.
                 <IconButton
                   size="sm"
                   variant="plain"
+                  tone={building ? 'default' : 'positive'}
                   icon={
                     building ? (
-                      <span className="text-text-dim">
-                        <Icon.Buy size={Icon.ICON_SIZE.sm} />
-                      </span>
+                      <Icon.Buy size={Icon.ICON_SIZE.sm} />
                     ) : (
-                      <span className="text-isk-pos">
-                        <Icon.Build size={Icon.ICON_SIZE.sm} />
-                      </span>
+                      <Icon.Build size={Icon.ICON_SIZE.sm} />
                     )
                   }
                   label={actionLabel}
