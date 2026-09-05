@@ -23,6 +23,13 @@ interface BuildPlanListProps {
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
+  /** Compare mode (issue #453): a per-row checkbox replaces plain row selection for building a comparison set. */
+  compareMode: boolean;
+  compareSelectedIds: ReadonlySet<string>;
+  onToggleCompareMode: () => void;
+  onToggleCompareSelected: (id: string) => void;
+  /** Opens the comparison table for the checked plans (disabled below 2 selections). */
+  onOpenCompare: () => void;
 }
 
 function PlanRow({
@@ -32,9 +39,15 @@ function PlanRow({
   onDuplicate,
   onDelete,
   onRename,
+  compareMode,
+  compareSelected,
+  onToggleCompareSelected,
 }: {
   plan: BuildPlanRecord;
   active: boolean;
+  compareMode: boolean;
+  compareSelected: boolean;
+  onToggleCompareSelected: (id: string) => void;
 } & Pick<BuildPlanListProps, 'onSelect' | 'onDuplicate' | 'onDelete' | 'onRename'>) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
@@ -53,6 +66,15 @@ function PlanRow({
         active ? 'bg-panel-2' : ''
       }`}
     >
+      {compareMode && (
+        <input
+          type="checkbox"
+          checked={compareSelected}
+          onChange={() => onToggleCompareSelected(plan.id)}
+          aria-label={t('industry.compareSelectFor', { name: plan.name })}
+          className="size-4 shrink-0 cursor-pointer accent-accent"
+        />
+      )}
       {renaming ? (
         <TextInput
           size="sm"
@@ -113,7 +135,7 @@ function PlanRow({
   );
 }
 
-/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete (confirm), rename inline. */
+/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete (confirm), rename inline. Also owns Compare mode's row checkboxes (issue #453) — the comparison itself renders in `Industry.tsx`'s detail pane. */
 export function BuildPlanList({
   plans,
   catalog,
@@ -123,6 +145,11 @@ export function BuildPlanList({
   onDuplicate,
   onDelete,
   onRename,
+  compareMode,
+  compareSelectedIds,
+  onToggleCompareMode,
+  onToggleCompareSelected,
+  onOpenCompare,
 }: BuildPlanListProps) {
   const { t } = useTranslation();
   const [creating, setCreating] = useState(false);
@@ -133,13 +160,36 @@ export function BuildPlanList({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('industry.title')}
         </h2>
-        <Button variant="primary" size="sm" onClick={() => setCreating((c) => !c)}>
-          {t('industry.create')}
-        </Button>
+        <div className="flex items-center gap-2">
+          {compareMode ? (
+            <>
+              <Button size="sm" onClick={onToggleCompareMode}>
+                {t('industry.compareCancel')}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={compareSelectedIds.size < 2}
+                onClick={onOpenCompare}
+              >
+                {t('industry.compareHandle', { count: compareSelectedIds.size })}
+              </Button>
+            </>
+          ) : (
+            plans.length > 1 && (
+              <Button size="sm" onClick={onToggleCompareMode}>
+                {t('industry.compareToggle')}
+              </Button>
+            )
+          )}
+          <Button variant="primary" size="sm" onClick={() => setCreating((c) => !c)}>
+            {t('industry.create')}
+          </Button>
+        </div>
       </div>
 
       {creating && (
@@ -194,6 +244,9 @@ export function BuildPlanList({
                   onDuplicate={onDuplicate}
                   onDelete={onDelete}
                   onRename={onRename}
+                  compareMode={compareMode}
+                  compareSelected={compareSelectedIds.has(plan.id)}
+                  onToggleCompareSelected={onToggleCompareSelected}
                 />
               ))}
             </ul>
