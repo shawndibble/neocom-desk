@@ -473,8 +473,11 @@ describe('Industry: build plan settings grouping (#120)', () => {
     expect(screen.getByLabelText('Runs')).toBeInTheDocument();
     expect(screen.getByLabelText('ME %')).toBeInTheDocument();
     expect(screen.getByLabelText('TE %')).toBeInTheDocument();
-    expect(screen.getByLabelText('Rig')).toBeInTheDocument();
     expect(screen.getByLabelText('Trade hub')).toBeInTheDocument();
+    // Rig and facility tax belong to a player structure. The seeded plan is an
+    // NPC station, which has neither, so neither control is on screen.
+    expect(screen.queryByLabelText('Rig')).toBeNull();
+    expect(screen.queryByLabelText('Facility tax %')).toBeNull();
     // Facility and Build system fold behind "Override" — the search box fills
     // both, and the line under it states what the plan is set to.
     expect(screen.getByRole('button', { name: 'Override' })).toBeInTheDocument();

@@ -624,32 +624,22 @@ export function BuildPlanDetail({
               </BuildLocationPicker>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <label className="flex flex-col gap-1 text-xs">
-                  {t('industry.rigLevel')}
-                  <NativeSelect
-                    value={plan.rigLevel}
-                    disabled={!facilityPreset.structure}
-                    onChange={(e) => update({ rigLevel: e.target.value as RigLevel })}
-                  >
-                    <option value="none">{t('industry.rigNone')}</option>
-                    <option value="t1">{t('industry.rigT1')}</option>
-                    <option value="t2">{t('industry.rigT2')}</option>
-                  </NativeSelect>
-                </label>
-
-                <label className="flex flex-col gap-1 text-xs">
-                  {t('industry.tradeHub')}
-                  <NativeSelect
-                    value={plan.hubId}
-                    onChange={(e) => update({ hubId: e.target.value as BuildPlanRecord['hubId'] })}
-                  >
-                    {TRADE_HUBS.map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {h.name}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </label>
+                {/* Only a player structure has rig slots or an owner-set tax, so an
+                    NPC station shows neither rather than showing them dead. Both
+                    are already cleared on the plan when the facility changes. */}
+                {facilityPreset.structure && (
+                  <label className="flex flex-col gap-1 text-xs">
+                    {t('industry.rigLevel')}
+                    <NativeSelect
+                      value={plan.rigLevel}
+                      onChange={(e) => update({ rigLevel: e.target.value as RigLevel })}
+                    >
+                      <option value="none">{t('industry.rigNone')}</option>
+                      <option value="t1">{t('industry.rigT1')}</option>
+                      <option value="t2">{t('industry.rigT2')}</option>
+                    </NativeSelect>
+                  </label>
+                )}
 
                 {facilityPreset.structure && (
                   <div className="flex flex-col gap-1 text-xs">
@@ -673,6 +663,20 @@ export function BuildPlanDetail({
                     />
                   </div>
                 )}
+
+                <label className="flex flex-col gap-1 text-xs">
+                  {t('industry.tradeHub')}
+                  <NativeSelect
+                    value={plan.hubId}
+                    onChange={(e) => update({ hubId: e.target.value as BuildPlanRecord['hubId'] })}
+                  >
+                    {TRADE_HUBS.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </label>
 
                 <OwnedStockScopeControl
                   scope={plan.ownedStockScope}
