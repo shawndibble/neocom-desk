@@ -1,7 +1,9 @@
 # NeoCom Desk — Architecture Map
 
 For agents locating or adding code. Terms match `CONTEXT.md` — read that first
-for glossary (Character, Skill Plan, Build Plan, Remap Marker, etc.).
+for glossary (Character, Skill Plan, Build Plan, Remap Marker, etc.). Past
+scope decisions (including everything the "CONTEXT.md round N" comments below
+cite) live one per file in `docs/context/decisions/`; `grep` that directory.
 
 ## 1. System overview
 
