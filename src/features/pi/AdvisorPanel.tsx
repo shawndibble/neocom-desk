@@ -35,7 +35,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState, NativeSelect, Panel, ReauthBanner, Spinner, StatChip } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { formatIsk } from '@/lib/isk';
-import { loadPi } from '@/sde/loadSde';
+import { loadPi, loadPiPlanetRadius } from '@/sde/loadSde';
 import { db } from '@/db';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { loadPlanPrices } from './planPrices';
@@ -100,6 +100,8 @@ interface Snapshot {
   typeNames: Map<number, string>;
   /** This character's saved resource rankings, by planetId. Absent means unranked. */
   richness: Map<number, number[]>;
+  /** Planet radius in km by planetId, for costing links (#440). */
+  planetRadiusKm: Map<number, number>;
   /**
    * Hub prices for every P0 the character's systems can yield, so an unbuilt
    * planet's estimate can be valued. A type the hub does not quote is absent,
@@ -110,8 +112,12 @@ interface Snapshot {
 
 async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   const nowMs = Date.now();
-  const [pi, { cached, needsReauth }, ccLevel] = await Promise.all([
+  const [pi, planetRadiusRaw, { cached, needsReauth }, ccLevel] = await Promise.all([
     loadPi(),
+    // Its own payload, and a big one, so a failure here must not take the tab
+    // down: an unresolved radius leaves that colony's link cost unknown, which
+    // the card already knows how to say.
+    loadPiPlanetRadius().catch(() => ({}) as Record<string, number>),
     loadCharacterPlanets(characterId),
     loadCommandCenterUpgrades(characterId, nowMs),
   ]);
@@ -230,6 +236,9 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     typeNames,
     richness,
     p0Prices,
+    planetRadiusKm: new Map(
+      Object.entries(planetRadiusRaw).map(([planetId, km]) => [Number(planetId), km])
+    ),
   };
 }
 
@@ -419,6 +428,16 @@ function BuiltCard({
           />
         </div>
 
+        {colony.pinLoad.linkLoad !== null && colony.linkCount > 0 && (
+          <p className="text-[0.6875rem] text-text-dim">
+            {t('piAdvisor.linkDraw', {
+              count: colony.linkCount,
+              cpu: Math.round(colony.pinLoad.linkLoad.cpu).toLocaleString(),
+              powergrid: Math.round(colony.pinLoad.linkLoad.powergrid).toLocaleString(),
+            })}
+          </p>
+        )}
+
         {colony.pinLoad.unknownTypeIds.length > 0 && (
           <p className="text-[0.6875rem] text-text-dim">
             {t('piAdvisor.unknownPins', { count: colony.pinLoad.unknownTypeIds.length })}
@@ -433,9 +452,12 @@ function BuiltCard({
             "room for 12 factories" to a pilot whose colony is full is the one
             failure this tab exists to avoid.
           */}
-          {colony.linkCount > 0 ? (
-            <p className="text-[0.6875rem] text-warning">
-              {t('piAdvisor.roomUnknownLinks', { count: colony.linkCount })}
+          {colony.linkCount > 0 && colony.pinLoad.linkLoad === null ? (
+            // Only when the radius itself did not resolve. Links are charged
+            // for now (#440), so this is a rare data gap rather than the
+            // standing state it used to be.
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('piAdvisor.roomUnknownRadius', { count: colony.linkCount })}
             </p>
           ) : (
             <CardLine label={t('piAdvisor.roomForLabel')}>
@@ -636,6 +658,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
         planets: snapshot.planetsBySystem.get(activeSystem.systemId) ?? [],
         colonies: activeSystem.colonies,
         details: snapshot.details,
+        planetRadiusKm: snapshot.planetRadiusKm,
       },
       snapshot.pi
     );

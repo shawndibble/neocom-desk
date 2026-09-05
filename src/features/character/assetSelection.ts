@@ -30,6 +30,13 @@ export function toggleSelection(
   return next;
 }
 
+/** Forces every id into the selection, regardless of current state — unlike `toggleSelection`, never deselects (issue #415's "Select all in view"). */
+export function selectAll(selected: ReadonlySet<number>, ids: readonly number[]): Set<number> {
+  const next = new Set(selected);
+  for (const id of ids) next.add(id);
+  return next;
+}
+
 export function namesForSelection(
   itemIds: readonly number[],
   assetsByItemId: ReadonlyMap<number, { type_id: number }>,

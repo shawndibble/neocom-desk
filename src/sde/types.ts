@@ -149,6 +149,22 @@ export interface PiCommandCenterLevel {
  * The colony budget and the pin costs it pays for — the numbers a pin-layout
  * plan is sized against, all of them the same for every planet type.
  */
+/**
+ * The Link type's own cost attributes (2280). A link draws CPU and Powergrid
+ * like any other pin, plus a per-km term over the distance between the two
+ * pins it joins — which is why `pi-planet-radius.json` ships alongside this.
+ */
+export interface PiLinkSpec {
+  /** Base cost, before the per-km term. */
+  cpu: number;
+  powergrid: number;
+  cpuPerKm: number;
+  powergridPerKm: number;
+  /** Applied as a power of the link's level. See `engine/pi/linkCost.ts`. */
+  cpuLevelModifier: number;
+  powergridLevelModifier: number;
+}
+
 export interface PiInfrastructure {
   /** Per-pin CPU/Powergrid cost and capacity, one entry per `PiPinKind`. */
   pins: Record<PiPinKind, PiPinSpec>;
@@ -180,6 +196,7 @@ export interface PiInfrastructure {
    * SDE carries; see `scripts/build-sde.mjs` for where the rest come from and
    * what the build asserts about them.
    */
+  link: PiLinkSpec;
   commandCenterUpgrades: PiCommandCenterLevel[];
 }
 
