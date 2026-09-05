@@ -204,7 +204,6 @@ describe('Industry: Build Plan CRUD', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'New plan' }));
     const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
@@ -285,7 +284,6 @@ describe('Industry: Build Plan CRUD', () => {
     render(<App />);
 
     await screen.findByRole('button', { name: 'Parts run' });
-    await user.click(screen.getByRole('button', { name: 'New plan' }));
     const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
@@ -409,7 +407,6 @@ describe('Industry: owned-blueprint prefill', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'New plan' }));
     const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
@@ -436,7 +433,7 @@ describe('Industry: owned-blueprint prefill', () => {
 
     expect(await screen.findByText('Log in again to see owned blueprints')).toBeInTheDocument();
     // The Build Plan list and Active Jobs panel still render.
-    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+    expect(await screen.findByRole('searchbox', { name: 'Add build plan' })).toBeInTheDocument();
     expect(screen.getByText('Active jobs')).toBeInTheDocument();
   });
 });
@@ -571,7 +568,9 @@ describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => 
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
-    const listPanel = (await screen.findByRole('button', { name: 'New plan' })).closest('section');
+    const listPanel = (await screen.findByRole('searchbox', { name: 'Add build plan' })).closest(
+      'section'
+    );
     expect(listPanel).not.toHaveClass('hidden');
     // The detail isn't merely hidden while collapsed away — it isn't mounted,
     // so it can't spend a narrow-screen visitor's bandwidth fetching prices
@@ -611,14 +610,16 @@ describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => 
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
-    const listPanel = (await screen.findByRole('button', { name: 'New plan' })).closest('section');
+    const listPanel = (await screen.findByRole('searchbox', { name: 'Add build plan' })).closest(
+      'section'
+    );
     const detailPane = (await screen.findByRole('heading', { name: 'Rifter' })).closest('article');
     expect(listPanel).not.toHaveClass('hidden');
     expect(detailPane).not.toHaveClass('hidden');
     expect(screen.queryByRole('button', { name: 'Back to build plans' })).not.toBeInTheDocument();
 
     // The two panes are columns of one grid, each with its own scroller: the
-    // list's is the row list alone, so the heading and create button stay
+    // list's is the row list alone, so the heading and blueprint picker stay
     // put; the detail's is `lg:`-gated so a phone doesn't nest a
     // viewport-sized editor inside a scroll region, and is capped against
     // the live viewport height rather than a flat constant (#237-class fix).
@@ -828,27 +829,6 @@ describe('Industry: make-or-buy marker on materials', () => {
     expect(await screen.findByText('Price data unavailable')).toBeInTheDocument();
 
     expect(await markerFor('Mechanical Parts')).toBeNull();
-  });
-});
-
-describe('Industry: hide fully-owned material rows (#409)', () => {
-  it('hides a fully-owned material row when toggled, and shows it again when toggled off', async () => {
-    await db.buildPlans.add(
-      seedPlan({ materialSourcing: { 34: { ownedQuantity: 100 } } }) // Tritanium: fully owned (needs 100)
-    );
-    render(<App />);
-
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('Pyerite')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
-
-    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
-    expect(screen.getByText('Pyerite')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
-
-    expect(screen.getByText('Tritanium')).toBeInTheDocument();
   });
 });
 

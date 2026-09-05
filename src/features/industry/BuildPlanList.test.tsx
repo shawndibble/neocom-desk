@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
-import type { BlueprintCatalog } from './blueprintCatalog';
+import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { BuildPlanList } from './BuildPlanList';
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string; name: string }): BuildPlanRecord {
@@ -22,6 +22,23 @@ function plan(overrides: Partial<BuildPlanRecord> & { id: string; name: string }
   };
 }
 
+const RIFTER_ENTRY: BlueprintCatalogEntry = {
+  blueprintTypeID: 638,
+  blueprint: { name: 'Rifter Blueprint', time: 1200, materials: [], products: [], skills: [] },
+  productTypeID: 587,
+  productName: 'Rifter',
+  productNameLower: 'rifter',
+};
+
+const CATALOG: BlueprintCatalog = {
+  entries: [RIFTER_ENTRY],
+  byBlueprintTypeID: new Map([[RIFTER_ENTRY.blueprintTypeID, RIFTER_ENTRY]]),
+  byProductTypeID: new Map<number, BlueprintCatalogEntry>([
+    [RIFTER_ENTRY.productTypeID!, RIFTER_ENTRY],
+  ]),
+  typesById: {},
+};
+
 const EMPTY_CATALOG: BlueprintCatalog = {
   entries: [],
   byBlueprintTypeID: new Map(),
@@ -37,20 +54,20 @@ const NOOP_COMPARE_PROPS = {
   onOpenCompare: () => {},
 };
 
-describe('BuildPlanList: search and sort UI (#409)', () => {
+describe('BuildPlanList', () => {
   const PLANS = [
-    plan({ id: 'a', name: 'Rifter', updatedAt: 300 }),
+    plan({ id: 'a', name: 'Merlin run', updatedAt: 300 }),
     plan({ id: 'b', name: 'Astero', updatedAt: 100 }),
   ];
 
-  function renderList() {
+  function renderList(onCreate = () => {}) {
     return render(
       <BuildPlanList
         plans={PLANS}
-        catalog={EMPTY_CATALOG}
+        catalog={CATALOG}
         selectedId={null}
         onSelect={() => {}}
-        onCreate={() => {}}
+        onCreate={onCreate}
         onDuplicate={() => {}}
         onDelete={() => {}}
         onRename={() => {}}
@@ -59,37 +76,27 @@ describe('BuildPlanList: search and sort UI (#409)', () => {
     );
   }
 
-  it('filters the rendered list as the search box is typed into', async () => {
+  it('always shows the blueprint picker, with no separate "new plan" button', () => {
     renderList();
-    expect(screen.getByText('Rifter')).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Add build plan' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New plan' })).not.toBeInTheDocument();
+  });
+
+  it('creates a plan directly from the always-visible search', async () => {
+    const onCreate = vi.fn();
+    renderList(onCreate);
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add build plan' }), 'Rift');
+    await userEvent.click(await screen.findByRole('button', { name: /Rifter/ }));
+
+    expect(onCreate).toHaveBeenCalledWith(RIFTER_ENTRY);
+  });
+
+  it('lists every plan with no search or sort controls', () => {
+    renderList();
+    expect(screen.getByText('Merlin run')).toBeInTheDocument();
     expect(screen.getByText('Astero')).toBeInTheDocument();
-
-    await userEvent.type(screen.getByRole('searchbox'), 'rift');
-
-    expect(screen.getByText('Rifter')).toBeInTheDocument();
-    expect(screen.queryByText('Astero')).not.toBeInTheDocument();
-  });
-
-  it('shows a no-results state when the search matches nothing', async () => {
-    renderList();
-    await userEvent.type(screen.getByRole('searchbox'), 'zzz');
-    expect(screen.getByText('No build plans match this search')).toBeInTheDocument();
-  });
-
-  it('re-sorts the rendered list by last updated', async () => {
-    const { container } = renderList();
-    // Default (alphabetical): Astero before Rifter.
-    let names = [...container.querySelectorAll('li > button:first-of-type')].map(
-      (el) => el.textContent
-    );
-    expect(names).toEqual(['Astero', 'Rifter']);
-
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'lastUpdated');
-
-    names = [...container.querySelectorAll('li > button:first-of-type')].map(
-      (el) => el.textContent
-    );
-    expect(names).toEqual(['Rifter', 'Astero']); // Rifter (updatedAt 300) is most recently updated.
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 });
 
