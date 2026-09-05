@@ -16,7 +16,9 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  FilterBar,
   FilterChip,
+  FilterField,
   Modal,
   Panel,
   PageHeader,
@@ -411,76 +413,103 @@ export function LoyaltyStore() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchInput
-          placeholder={t('loyaltyStore.searchPlaceholder')}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="min-w-40 flex-1"
-        />
-        {/* Radix, to match the revenue-basis select beside it: side by side,
-            two selects that open into different-looking lists read as a seam. */}
-        <Select value={hubId} onValueChange={(value) => void setHubId(value as typeof hubId)}>
-          <SelectTrigger aria-label={t('loyaltyStore.hubLabel')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {TRADE_HUBS.map((h) => (
-              <SelectItem key={h.id} value={h.id}>
-                {h.systemName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {/*
-          Radix rather than `NativeSelect`, the one thing a real `<select>`
-          can't do: the trigger shows just "Sell"/"Buy" while the open list
-          spells out what each basis means. A native option's text is the same
-          in both places, so the closed box had to carry "(list order)" —
-          twelve characters of explanation sitting permanently in a filter row.
-        */}
-        <Select
-          value={priceBasis}
-          onValueChange={(value) => void setPriceBasis(value as PriceBasis)}
-        >
-          {/*
-            An `aria-label` on the trigger ends name computation, so nothing
-            inside it is ever announced — including the selection. The visible
-            text is deliberately short here, so the label carries the long form
-            and the current basis itself.
-          */}
-          <SelectTrigger
-            aria-label={`${t('loyaltyStore.priceBasisLabel')}: ${t(
-              priceBasis === 'buy' ? 'loyaltyStore.priceBasisBuy' : 'loyaltyStore.priceBasisSell'
-            )}`}
-          >
-            <SelectValue>
-              {t(
-                priceBasis === 'buy'
-                  ? 'loyaltyStore.priceBasisBuyShort'
-                  : 'loyaltyStore.priceBasisSellShort'
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="sell">{t('loyaltyStore.priceBasisSell')}</SelectItem>
-            <SelectItem value="buy">{t('loyaltyStore.priceBasisBuy')}</SelectItem>
-          </SelectContent>
-        </Select>
-        <FilterChip
-          label={t('loyaltyStore.affordableFilter')}
-          selected={affordableOnly}
-          onToggle={() => setAffordableOnly((v) => !v)}
-          count={affordableCount}
-          size="md"
-        />
-        <FilterChip
-          label={t('loyaltyStore.blueprintsFilter')}
-          selected={blueprintsOnly}
-          onToggle={() => setBlueprintsOnly((v) => !v)}
-          size="md"
-        />
-      </div>
+      <FilterBar
+        value={{ hubId, priceBasis, affordableOnly, blueprintsOnly }}
+        onChange={(next) => {
+          // Persisted preferences (hub, price basis) are written here and only
+          // here, so a Cancel in the mobile sheet never has a store write to
+          // roll back — the draft was local until this point.
+          if (next.hubId !== hubId) void setHubId(next.hubId);
+          if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
+          setAffordableOnly(next.affordableOnly);
+          setBlueprintsOnly(next.blueprintsOnly);
+        }}
+        activeCount={(affordableOnly ? 1 : 0) + (blueprintsOnly ? 1 : 0)}
+        search={
+          <SearchInput
+            placeholder={t('loyaltyStore.searchPlaceholder')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="min-w-40 flex-1"
+          />
+        }
+      >
+        {(draft, setDraft) => (
+          <>
+            {/* Radix, to match the revenue-basis select beside it: side by side,
+                two selects that open into different-looking lists read as a seam. */}
+            <FilterField label={t('loyaltyStore.hubLabel')}>
+              <Select
+                value={draft.hubId}
+                onValueChange={(value) => setDraft({ ...draft, hubId: value as typeof hubId })}
+              >
+                <SelectTrigger aria-label={t('loyaltyStore.hubLabel')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRADE_HUBS.map((h) => (
+                    <SelectItem key={h.id} value={h.id}>
+                      {h.systemName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            {/*
+              Radix rather than `NativeSelect`, the one thing a real `<select>`
+              can't do: the trigger shows just "Sell"/"Buy" while the open list
+              spells out what each basis means. A native option's text is the same
+              in both places, so the closed box had to carry "(list order)" —
+              twelve characters of explanation sitting permanently in a filter row.
+            */}
+            <FilterField label={t('loyaltyStore.priceBasisLabel')}>
+              <Select
+                value={draft.priceBasis}
+                onValueChange={(value) => setDraft({ ...draft, priceBasis: value as PriceBasis })}
+              >
+                {/*
+                  An `aria-label` on the trigger ends name computation, so nothing
+                  inside it is ever announced — including the selection. The visible
+                  text is deliberately short here, so the label carries the long form
+                  and the current basis itself.
+                */}
+                <SelectTrigger
+                  aria-label={`${t('loyaltyStore.priceBasisLabel')}: ${t(
+                    draft.priceBasis === 'buy'
+                      ? 'loyaltyStore.priceBasisBuy'
+                      : 'loyaltyStore.priceBasisSell'
+                  )}`}
+                >
+                  <SelectValue>
+                    {t(
+                      draft.priceBasis === 'buy'
+                        ? 'loyaltyStore.priceBasisBuyShort'
+                        : 'loyaltyStore.priceBasisSellShort'
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sell">{t('loyaltyStore.priceBasisSell')}</SelectItem>
+                  <SelectItem value="buy">{t('loyaltyStore.priceBasisBuy')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterChip
+              label={t('loyaltyStore.affordableFilter')}
+              selected={draft.affordableOnly}
+              onToggle={() => setDraft({ ...draft, affordableOnly: !draft.affordableOnly })}
+              count={affordableCount}
+              size="md"
+            />
+            <FilterChip
+              label={t('loyaltyStore.blueprintsFilter')}
+              selected={draft.blueprintsOnly}
+              onToggle={() => setDraft({ ...draft, blueprintsOnly: !draft.blueprintsOnly })}
+              size="md"
+            />
+          </>
+        )}
+      </FilterBar>
 
       {offersFromCache && (
         <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>

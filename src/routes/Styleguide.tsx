@@ -18,7 +18,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
+  FilterBar,
   FilterChip,
+  FilterField,
   IconButton,
   LogoMark,
   NativeSelect,
@@ -155,6 +157,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function Styleguide() {
   const [tab, setTab] = useState('open');
   const [chip, setChip] = useState<string | null>('skills');
+  const [barFilter, setBarFilter] = useState({
+    text: '',
+    refType: 'all',
+    unreadOnly: false,
+  });
   const [region, setRegion] = useState('the-forge');
 
   return (
@@ -374,6 +381,54 @@ export function Styleguide() {
               onToggle={() => setChip(chip === 'blueprints' ? null : 'blueprints')}
             />
           </div>
+        </Panel>
+      </Section>
+
+      <Section title="FilterBar">
+        <Panel>
+          <p className="pb-2 text-xs text-text-dim">
+            Inline here at desktop width. Narrow the window past 48rem and the filters collapse
+            behind a funnel trigger beside the search box, into an Apply/Cancel sheet.
+          </p>
+          <FilterBar
+            value={barFilter}
+            onChange={setBarFilter}
+            activeCount={(barFilter.unreadOnly ? 1 : 0) + (barFilter.refType === 'all' ? 0 : 1)}
+            search={
+              <SearchInput
+                aria-label="Search entries"
+                placeholder="Search entries"
+                value={barFilter.text}
+                onChange={(e) => setBarFilter({ ...barFilter, text: e.target.value })}
+                className="min-w-40 flex-1"
+              />
+            }
+          >
+            {(draft, setDraft) => (
+              <>
+                <FilterField label="Ref type">
+                  <Select
+                    value={draft.refType}
+                    onValueChange={(refType) => setDraft({ ...draft, refType })}
+                  >
+                    <SelectTrigger aria-label="Ref type" className="w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any ref type</SelectItem>
+                      <SelectItem value="bounty">Bounty prizes</SelectItem>
+                      <SelectItem value="market">Market transaction</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FilterField>
+                <FilterChip
+                  label="Unread only"
+                  selected={draft.unreadOnly}
+                  onToggle={() => setDraft({ ...draft, unreadOnly: !draft.unreadOnly })}
+                />
+              </>
+            )}
+          </FilterBar>
         </Panel>
       </Section>
 

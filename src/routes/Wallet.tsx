@@ -5,6 +5,8 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  FilterBar,
+  FilterField,
   IconButton,
   PageHeader,
   Panel,
@@ -18,6 +20,7 @@ import {
   Spinner,
   Tabs,
   TextInput,
+  useFilterSurface,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -37,11 +40,13 @@ import {
   loadCorporationWalletJournal,
   loadCorporationWallets,
 } from '@/features/corp/wallet';
+import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
+  activeWalletJournalFilterCount,
   filterWalletJournal,
   journalRefTypes,
   type WalletJournalFilter,
@@ -72,60 +77,109 @@ interface JournalFilterBarProps {
  */
 const ALL_REF_TYPES = '__all';
 
-function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBarProps) {
+/**
+ * The journal's From/To pair, kept on one line in the mobile sheet.
+ *
+ * A visible `<label>` rather than a `FilterField`: a date input reads as
+ * nothing without its caption, so this one is wanted in the row as well as in
+ * the sheet, where `FilterField`'s caption is sheet-only. Its own component
+ * because `useFilterSurface` is a hook — `FilterBar` calls its `children`
+ * during its own render, so a bare fragment there would read the default
+ * surface rather than the sheet's.
+ *
+ * Inline, the wrapper is `display: contents`, so the two labels stay direct
+ * items of the toolbar row and keep the widths they had before this existed.
+ * In the sheet it becomes a real row and the two fields split it, which is
+ * what stops a range reading as two unrelated filters stacked apart.
+ */
+function JournalDateRange({
+  draft,
+  setDraft,
+}: {
+  draft: WalletJournalFilter;
+  setDraft: (next: WalletJournalFilter) => void;
+}) {
   const { t } = useTranslation();
+  const sheet = useFilterSurface() === 'sheet';
+  const labelClassName = cx(
+    'flex items-center gap-1 text-xs text-text-dim',
+    sheet && 'min-w-0 flex-1'
+  );
+  const fieldClassName = sheet ? 'w-full min-w-0' : 'w-36';
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-      <SearchInput
-        value={filter.text}
-        onChange={(event) => onChange({ ...filter, text: event.target.value })}
-        placeholder={t('wallet.journalSearchPlaceholder')}
-        className="min-w-48 flex-1"
-      />
-      <Select
-        value={filter.refType ?? ALL_REF_TYPES}
-        onValueChange={(value) =>
-          onChange({ ...filter, refType: value === ALL_REF_TYPES ? null : value })
-        }
-      >
-        <SelectTrigger aria-label={t('wallet.refTypeFilterLabel')} className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_REF_TYPES}>{t('wallet.refTypeFilterAll')}</SelectItem>
-          {refTypeOptions.map((refType) => (
-            <SelectItem key={refType} value={refType}>
-              {humanizeRefType(refType)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <label className="flex items-center gap-1 text-xs text-text-dim">
+    <div className={sheet ? 'flex w-full items-center gap-2' : 'contents'}>
+      <label className={labelClassName}>
         {t('wallet.dateFromLabel')}
         <TextInput
           type="date"
-          className="w-36"
-          value={filter.startDate ?? ''}
+          className={fieldClassName}
+          value={draft.startDate ?? ''}
           onChange={(event) =>
-            onChange({
-              ...filter,
+            setDraft({
+              ...draft,
               startDate: event.target.value === '' ? null : event.target.value,
             })
           }
         />
       </label>
-      <label className="flex items-center gap-1 text-xs text-text-dim">
+      <label className={labelClassName}>
         {t('wallet.dateToLabel')}
         <TextInput
           type="date"
-          className="w-36"
-          value={filter.endDate ?? ''}
+          className={fieldClassName}
+          value={draft.endDate ?? ''}
           onChange={(event) =>
-            onChange({ ...filter, endDate: event.target.value === '' ? null : event.target.value })
+            setDraft({ ...draft, endDate: event.target.value === '' ? null : event.target.value })
           }
         />
       </label>
     </div>
+  );
+}
+
+function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBarProps) {
+  const { t } = useTranslation();
+  return (
+    <FilterBar
+      value={filter}
+      onChange={onChange}
+      activeCount={activeWalletJournalFilterCount(filter)}
+      className="border-b border-line px-3 py-2"
+      search={
+        <SearchInput
+          value={filter.text}
+          onChange={(event) => onChange({ ...filter, text: event.target.value })}
+          placeholder={t('wallet.journalSearchPlaceholder')}
+          className="min-w-48 flex-1"
+        />
+      }
+    >
+      {(draft, setDraft) => (
+        <>
+          <FilterField label={t('wallet.refTypeFilterLabel')}>
+            <Select
+              value={draft.refType ?? ALL_REF_TYPES}
+              onValueChange={(value) =>
+                setDraft({ ...draft, refType: value === ALL_REF_TYPES ? null : value })
+              }
+            >
+              <SelectTrigger aria-label={t('wallet.refTypeFilterLabel')} className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_REF_TYPES}>{t('wallet.refTypeFilterAll')}</SelectItem>
+                {refTypeOptions.map((refType) => (
+                  <SelectItem key={refType} value={refType}>
+                    {humanizeRefType(refType)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+          <JournalDateRange draft={draft} setDraft={setDraft} />
+        </>
+      )}
+    </FilterBar>
   );
 }
 

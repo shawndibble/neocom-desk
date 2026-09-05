@@ -5,6 +5,7 @@ import {
   filterContracts,
   contractStatusOptions,
   contractTypeOptions,
+  activeContractsFilterCount,
   type ContractsFilter,
 } from './contractsFilter';
 
@@ -115,5 +116,17 @@ describe('contractTypeOptions', () => {
 
   it('returns an empty array for no rows', () => {
     expect(contractTypeOptions([])).toEqual([]);
+  });
+});
+
+describe('activeContractsFilterCount', () => {
+  it('is zero for the identity filter', () => {
+    expect(activeContractsFilterCount(EMPTY_CONTRACTS_FILTER)).toBe(0);
+  });
+
+  it('counts status and type, but not the search text', () => {
+    expect(
+      activeContractsFilterCount({ status: 'outstanding', type: 'courier', text: 'trader' })
+    ).toBe(2);
   });
 });

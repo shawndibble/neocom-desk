@@ -8,7 +8,9 @@ import {
   CharacterAvatar,
   DataAgeBadge,
   EmptyState,
+  FilterBar,
   FilterChip,
+  FilterField,
   IconButton,
   Modal,
   PageHeader,
@@ -541,34 +543,60 @@ export function Characters() {
         <EmptyState title={t('characters.emptyTitle')} hint={t('characters.emptyHint')} />
       ) : (
         <>
-          <SearchInput
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('characters.searchPlaceholder')}
-          />
+          <FilterBar
+            value={{ sortKey, sortDirection }}
+            onChange={(next) => {
+              setSortKey(next.sortKey);
+              setSortDirection(next.sortDirection);
+            }}
+            search={
+              <SearchInput
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('characters.searchPlaceholder')}
+                className="min-w-40 flex-1"
+              />
+            }
+          >
+            {(draft, setDraft) => (
+              <>
+                <FilterField label={t('characters.sortBy')}>
+                  <Select
+                    value={draft.sortKey}
+                    onValueChange={(value) =>
+                      setDraft({ ...draft, sortKey: value as CharacterSortKey })
+                    }
+                  >
+                    <SelectTrigger size="md" aria-label={t('characters.sortBy')} className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SORT_KEYS.map((key) => (
+                        <SelectItem key={key} value={key}>
+                          {t(`characters.sortKeys.${key}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilterField>
+                <FilterField label={t('characters.sortDirection')} stretch={false}>
+                  <IconButton
+                    size="md"
+                    icon={draft.sortDirection === 'asc' ? <Icon.Ascending /> : <Icon.Descending />}
+                    label={t('characters.sortDirection')}
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        sortDirection: draft.sortDirection === 'asc' ? 'desc' : 'asc',
+                      })
+                    }
+                  />
+                </FilterField>
+              </>
+            )}
+          </FilterBar>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Select
-                value={sortKey}
-                onValueChange={(value) => setSortKey(value as CharacterSortKey)}
-              >
-                <SelectTrigger size="md" aria-label={t('characters.sortBy')} className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SORT_KEYS.map((key) => (
-                    <SelectItem key={key} value={key}>
-                      {t(`characters.sortKeys.${key}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <IconButton
-                size="md"
-                icon={sortDirection === 'asc' ? <Icon.Ascending /> : <Icon.Descending />}
-                label={t('characters.sortDirection')}
-                onClick={() => setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))}
-              />
               {addingGroup ? (
                 <TextInput
                   autoFocus

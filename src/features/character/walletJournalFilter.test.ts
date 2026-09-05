@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
+  activeWalletJournalFilterCount,
   filterWalletJournal,
   journalRefTypes,
   type WalletJournalFilter,
@@ -89,5 +90,28 @@ describe('journalRefTypes', () => {
 
   it('returns an empty array for no rows', () => {
     expect(journalRefTypes([])).toEqual([]);
+  });
+});
+
+describe('activeWalletJournalFilterCount', () => {
+  it('is zero for the identity filter', () => {
+    expect(activeWalletJournalFilterCount(EMPTY_WALLET_JOURNAL_FILTER)).toBe(0);
+  });
+
+  it('counts each active criterion', () => {
+    expect(
+      activeWalletJournalFilterCount({
+        refType: 'bounty_prizes',
+        startDate: '2026-01-01',
+        endDate: null,
+        text: '',
+      })
+    ).toBe(2);
+  });
+
+  it('ignores the search text, which stays in the row rather than the sheet', () => {
+    expect(
+      activeWalletJournalFilterCount({ ...EMPTY_WALLET_JOURNAL_FILTER, text: 'concord' })
+    ).toBe(0);
   });
 });
