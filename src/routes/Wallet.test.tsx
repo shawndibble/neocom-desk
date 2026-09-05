@@ -204,7 +204,9 @@ describe('Wallet', () => {
       'aria-pressed',
       'true'
     );
-    expect(await screen.findByRole('combobox', { name: 'Wallet division' })).toHaveValue('3');
+    expect(await screen.findByRole('combobox', { name: 'Wallet division' })).toHaveTextContent(
+      'SRP'
+    );
     expect(screen.getByText(/250\.00/)).toBeInTheDocument();
   });
 
@@ -249,7 +251,9 @@ describe('Wallet', () => {
     window.history.pushState({}, '', '/wallet?owner=corporation&division=0');
     render(<App />);
 
-    expect(await screen.findByRole('combobox', { name: 'Wallet division' })).toHaveValue('1');
+    expect(await screen.findByRole('combobox', { name: 'Wallet division' })).toHaveTextContent(
+      'Division 1'
+    );
     expect(screen.getByText(/1,000,000\.00/)).toBeInTheDocument();
   });
 
@@ -309,7 +313,8 @@ describe('Wallet', () => {
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
-    await user.selectOptions(screen.getByLabelText('Ref type'), 'bounty_prize');
+    await user.click(screen.getByRole('combobox', { name: 'Ref type' }));
+    await user.click(await screen.findByRole('option', { name: 'Bounty prize' }));
 
     expect(screen.getByText('Bounty')).toBeInTheDocument();
     expect(screen.queryByText('Donation')).toBeNull();

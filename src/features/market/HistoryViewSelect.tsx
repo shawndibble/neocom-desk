@@ -1,5 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { InfoTooltip, NativeSelect } from '@/components/ui';
+import {
+  InfoTooltip,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui';
 
 /** The two views behind the History tab. `history` is the one it opens on. */
 export type HistoryView = 'history' | 'transactions';
@@ -24,16 +31,15 @@ export function HistoryViewSelect({ value, onChange }: HistoryViewSelectProps) {
   const { t } = useTranslation();
   return (
     <span className="flex items-center gap-1">
-      <NativeSelect
-        size="sm"
-        className="w-32"
-        aria-label={t('market.sections.historyViews')}
-        value={value}
-        onChange={(e) => onChange(e.target.value as HistoryView)}
-      >
-        <option value="history">{t('market.sections.historyOrders')}</option>
-        <option value="transactions">{t('market.sections.transactions')}</option>
-      </NativeSelect>
+      <Select value={value} onValueChange={(value) => onChange(value as HistoryView)}>
+        <SelectTrigger size="sm" className="w-32" aria-label={t('market.sections.historyViews')}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="history">{t('market.sections.historyOrders')}</SelectItem>
+          <SelectItem value="transactions">{t('market.sections.transactions')}</SelectItem>
+        </SelectContent>
+      </Select>
       <InfoTooltip
         label={t('market.sections.historyViewsTooltipLabel')}
         content={t('market.sections.historyViewsTooltip')}

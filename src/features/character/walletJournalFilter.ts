@@ -40,7 +40,12 @@ export function filterWalletJournal(
   });
 }
 
-/** The distinct raw `ref_type` values present in a journal, sorted. */
+/**
+ * The distinct raw `ref_type` values present in a journal, sorted. Empties are
+ * dropped: an empty option value reads as "nothing selected" to the filter's
+ * Radix `Select`, so one blank ESI row would give the list an entry that blanks
+ * the control when picked.
+ */
 export function journalRefTypes(entries: readonly WalletJournalEntry[]): string[] {
-  return [...new Set(entries.map((entry) => entry.ref_type))].sort();
+  return [...new Set(entries.map((entry) => entry.ref_type))].filter(Boolean).sort();
 }

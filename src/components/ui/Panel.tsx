@@ -3,6 +3,13 @@ import { forwardRef, type CSSProperties, type ReactNode } from 'react';
 interface PanelProps {
   title?: string;
   actions?: ReactNode;
+  /**
+   * Sits to the left of the title, inside the same left-hand group. For a
+   * control that belongs *to* the title rather than beside it — the Market
+   * Browser's mobile back arrow, which reads as "back from this item", not as
+   * a panel-wide action parked on the far right.
+   */
+  leading?: ReactNode;
   children: ReactNode;
   /** Set false for flush content like tables. */
   padded?: boolean;
@@ -39,7 +46,7 @@ interface PanelProps {
  * own, defeats it).
  */
 export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
-  { title, actions, children, padded = true, fill = false, className = '', style },
+  { title, actions, leading, children, padded = true, fill = false, className = '', style },
   ref
 ) {
   const contentClassName = [padded ? 'p-3' : '', fill ? 'flex min-h-0 flex-1 flex-col' : '']
@@ -51,13 +58,21 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
       className={`rounded-xs border border-line bg-panel/85 backdrop-blur-sm ${className}`}
       style={style}
     >
-      {(title || actions) && (
-        <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
-          {title && (
-            <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {title}
-            </h2>
-          )}
+      {(title || actions || leading) && (
+        // A `leading` control carries its own tap padding, so the header's
+        // own left inset would read as a double gap — drop it and let the
+        // control sit against the edge, the way `Assets`' breadcrumb bar does.
+        <header
+          className={`flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 md:min-h-9 ${leading ? 'pl-1' : 'pl-3'}`}
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            {leading}
+            {title && (
+              <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {title}
+              </h2>
+            )}
+          </div>
           {actions && <div className="flex items-center gap-1">{actions}</div>}
         </header>
       )}

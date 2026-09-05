@@ -36,7 +36,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { EmptyState, NativeSelect, Panel, ReauthBanner, Spinner, StatChip } from '@/components/ui';
+import {
+  EmptyState,
+  Panel,
+  ReauthBanner,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
+  StatChip,
+} from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { formatIsk } from '@/lib/isk';
 import { loadPi, loadPiPlanetRadius } from '@/sde/loadSde';
@@ -866,16 +877,21 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('piAdvisor.system')}
             </span>
-            <NativeSelect
+            <Select
               value={String(activeSystem.systemId)}
-              onChange={(event) => onSystemIdChange(Number(event.target.value))}
+              onValueChange={(value) => onSystemIdChange(Number(value))}
             >
-              {systems.map((system) => (
-                <option key={system.systemId} value={system.systemId}>
-                  {system.name ?? t('piAdvisor.systemLabel', { id: system.systemId })}
-                </option>
-              ))}
-            </NativeSelect>
+              <SelectTrigger aria-label={t('piAdvisor.system')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {systems.map((system) => (
+                  <SelectItem key={system.systemId} value={String(system.systemId)}>
+                    {system.name ?? t('piAdvisor.systemLabel', { id: system.systemId })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <div className="flex flex-wrap gap-2">
             <StatChip

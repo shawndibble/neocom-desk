@@ -198,7 +198,8 @@ describe('Wallet: the corporation side (AC 2, AC 3)', () => {
     await user.click(screen.getByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Master division payout')).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('Wallet division'), '2');
+    await user.click(screen.getByRole('combobox', { name: 'Wallet division' }));
+    await user.click(await screen.findByRole('option', { name: 'SRP' }));
 
     expect(await screen.findByText('SRP division payout')).toBeInTheDocument();
     expect(screen.queryByText('Master division payout')).toBeNull();
@@ -249,7 +250,8 @@ describe('Wallet: the corporation side (AC 2, AC 3)', () => {
       /^neocom-corp-wallet-journal-master-wallet-\d{4}-\d{2}-\d{2}\.csv$/
     );
 
-    await user.selectOptions(screen.getByLabelText('Wallet division'), '2');
+    await user.click(screen.getByRole('combobox', { name: 'Wallet division' }));
+    await user.click(await screen.findByRole('option', { name: 'SRP' }));
     await screen.findByText('SRP division payout');
 
     await user.click(screen.getByRole('button', { name: 'Export CSV' }));
@@ -347,9 +349,11 @@ describe('Wallet: the corporation side (AC 2, AC 3)', () => {
 
     await user.click(within(group).getByRole('button', { name: 'Corporation' }));
 
-    const select = await screen.findByLabelText('Wallet division');
+    const select = await screen.findByRole('combobox', { name: 'Wallet division' });
     expect(select).toBeInTheDocument();
-    expect(within(select as HTMLSelectElement).getByText('SRP')).toBeInTheDocument();
+    await user.click(select);
+    expect(await screen.findByRole('option', { name: 'SRP' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
 
     await user.click(within(group).getByRole('button', { name: 'Personal' }));
     expect(screen.queryByLabelText('Wallet division')).toBeNull();

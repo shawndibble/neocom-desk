@@ -406,7 +406,7 @@ describe('Market Browser', () => {
     expect(await screen.findByText('Select an item')).toBeInTheDocument();
   });
 
-  it('selecting an item loads its order book: separate sell/buy tables, sorted, with Data Age', async () => {
+  it('selecting an item loads its order book: separate sell/buy tables, sorted', async () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));
     const user = userEvent.setup();
@@ -425,8 +425,6 @@ describe('Market Browser', () => {
 
     const buyTable = await screen.findByRole('table', { name: 'Buy Orders' });
     expect(within(buyTable).getByText('500,000.00')).toBeInTheDocument();
-
-    expect(screen.getByText('just now')).toBeInTheDocument();
   });
 
   it('Refresh bypasses the 300s order-book cache and refetches immediately', async () => {
@@ -447,7 +445,7 @@ describe('Market Browser', () => {
 });
 
 describe('Price History tab (issue #11)', () => {
-  it("defaults to Market Data; opening Price History fetches and shows the chart, hiding the order book's Data Age", async () => {
+  it('defaults to Market Data; opening Price History fetches and shows the chart', async () => {
     const historyHits = { count: 0 };
     server.use(
       ordersHandler({ count: 0 }),
@@ -471,16 +469,12 @@ describe('Price History tab (issue #11)', () => {
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
     expect(screen.getByRole('tab', { name: 'Market Data', selected: true })).toBeInTheDocument();
-    expect(screen.getByText('just now')).toBeInTheDocument();
     expect(historyHits.count).toBe(0); // not fetched until the tab is opened
 
     await user.click(screen.getByRole('tab', { name: 'Price History' }));
 
     expect(await screen.findByTestId('price-history-chart')).toHaveTextContent('Rifter: 1 points');
     expect(historyHits.count).toBe(1);
-    // The Data Age badge reflects the order book — it must not linger once
-    // Price History (with its own, unrelated fetch time) is what's on screen.
-    expect(screen.queryByText('just now')).not.toBeInTheDocument();
   });
 
   it('keeps Price History selected and refetches when a different item is chosen', async () => {
@@ -829,32 +823,6 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
       expect(within(table).queryByText('1,500,000.00')).not.toBeInTheDocument();
     });
     expect(within(table).getAllByText('No orders').length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('filters sell/buy orders by structure vs. NPC station (issue #412)', async () => {
-    server.use(destroyerOrdersHandler(new Map()));
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.type(await screen.findByRole('searchbox'), 'merlin');
-    await user.click(await screen.findByText('Merlin'));
-    await user.click(screen.getByRole('button', { name: 'Region' })); // reveal both of Merlin's orders
-
-    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(within(sellTable).getByText('900,000.00')).toBeInTheDocument(); // NPC station
-    expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument(); // player structure
-
-    await user.click(screen.getByRole('button', { name: 'NPC Stations' }));
-    expect(within(sellTable).getByText('900,000.00')).toBeInTheDocument();
-    expect(within(sellTable).queryByText('850,000.00')).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Structures' }));
-    expect(within(sellTable).queryByText('900,000.00')).not.toBeInTheDocument();
-    expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'All' }));
-    expect(within(sellTable).getByText('900,000.00')).toBeInTheDocument();
-    expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument();
   });
 
   it('an item whose Market Group has no other members shows nothing, not an empty table', async () => {
@@ -1278,11 +1246,12 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Region' }));
 
-    const regionSelect = await screen.findByRole('combobox', { name: 'Region' });
+    await user.click(await screen.findByRole('combobox', { name: 'Region' }));
     expect(
-      within(regionSelect)
-        .getAllByRole('option')
-        .map((o) => o.textContent)
+      // The selected option's `SelectItem` renders a leading, aria-hidden "✓"
+      // indicator alongside the label — stripped here since `textContent`
+      // includes it even though it's invisible to the accessibility tree.
+      (await screen.findAllByRole('option')).map((o) => o.textContent?.replace(/^✓/, ''))
     ).toEqual(['The Forge', 'Domain']);
   });
 

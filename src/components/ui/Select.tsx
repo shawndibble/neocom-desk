@@ -5,13 +5,20 @@ import * as Icon from './icons';
 import { fieldBaseClassName, fieldSizeClassName, type ControlSize } from './controlStyles';
 
 /**
- * Listbox select. Wraps `radix-ui`'s Select — see docs/adr/0004 for why:
- * focus movement, typeahead, roving tabindex and screen-reader behaviour are
- * exactly the parts worth not hand-rolling.
+ * Listbox select, and the default one: every select in the app is this.
+ * Wraps `radix-ui`'s Select — see docs/adr/0004 for why: focus movement,
+ * typeahead, roving tabindex and screen-reader behaviour are exactly the parts
+ * worth not hand-rolling.
  *
- * For a short, static option list inside a form, reach for `NativeSelect`
- * instead — both draw from the same `controlStyles` tokens, so the choice is
- * about behaviour, never about how it looks.
+ * `NativeSelect` is the exception, for a caller that needs the OS picker
+ * specifically; both draw from the same `controlStyles` tokens, so they differ
+ * only once opened.
+ *
+ * Two things a real `<select>` gives free and this does not. The trigger is a
+ * `<button>`, so a wrapping `<label>` — or `htmlFor` — will not name it; pass
+ * `aria-label`. And its values are strings, so a numeric id needs `String()`
+ * going in and `Number()` coming back out, or the trigger silently renders
+ * empty.
  */
 export const Select = SelectPrimitive.Root;
 export const SelectValue = SelectPrimitive.Value;
@@ -97,6 +104,28 @@ export function SelectItem({
       </SelectPrimitive.ItemIndicator>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
+  );
+}
+
+/**
+ * A titled block of items — the Radix answer to `<optgroup>`. Wrap items in a
+ * `SelectGroup` and give it one `SelectLabel`; the label is announced as the
+ * group's name rather than read as another option.
+ */
+export const SelectGroup = SelectPrimitive.Group;
+
+export function SelectLabel({ className, ...props }: ComponentProps<typeof SelectPrimitive.Label>) {
+  return (
+    <SelectPrimitive.Label
+      // Indented to `pl-7` like an item's text, so a group's title and its
+      // members share one left edge — the item indent exists to clear the
+      // check mark, and a label sitting outside it reads as ragged.
+      className={cx(
+        'px-2 pt-2 pb-1 pl-7 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase',
+        className
+      )}
+      {...props}
+    />
   );
 }
 
