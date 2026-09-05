@@ -18,7 +18,7 @@ function entry(overrides: Partial<WalletJournalEntry> = {}): WalletJournalEntry 
 }
 
 describe('walletJournalCsvColumns', () => {
-  it('orders columns date, ref type, description, amount, balance using the wallet DataTable headers', () => {
+  it('orders columns date, ref type, description, amount, balance, then the widened detail columns', () => {
     const columns = walletJournalCsvColumns(t);
     expect(columns.map((c) => c.header)).toEqual([
       'wallet.date',
@@ -26,6 +26,49 @@ describe('walletJournalCsvColumns', () => {
       'wallet.description',
       'wallet.amount',
       'wallet.balanceCol',
+      'wallet.tax',
+      'wallet.reason',
+      'wallet.contextId',
+      'wallet.contextIdType',
+      'wallet.firstPartyId',
+      'wallet.secondPartyId',
+    ]);
+  });
+
+  it('emits the widened columns blank when ESI omitted them', () => {
+    const columns = walletJournalCsvColumns(t);
+    const row = entry({
+      tax: undefined,
+      reason: undefined,
+      context_id: undefined,
+      context_id_type: undefined,
+      first_party_id: undefined,
+      second_party_id: undefined,
+    });
+    const csv = toCsv([row], columns);
+    const fields = csv.split('\r\n')[1].split(',');
+    expect(fields.slice(5)).toEqual(['', '', '', '', '', '']);
+  });
+
+  it('passes tax, reason, context id/type, and party ids through when present', () => {
+    const columns = walletJournalCsvColumns(t);
+    const row = entry({
+      tax: 12.5,
+      reason: 'Contract collateral',
+      context_id: 555,
+      context_id_type: 'contract_id',
+      first_party_id: 1001,
+      second_party_id: 2002,
+    });
+    const csv = toCsv([row], columns);
+    const fields = csv.split('\r\n')[1].split(',');
+    expect(fields.slice(5)).toEqual([
+      '12.5',
+      'Contract collateral',
+      '555',
+      'contract_id',
+      '1001',
+      '2002',
     ]);
   });
 
