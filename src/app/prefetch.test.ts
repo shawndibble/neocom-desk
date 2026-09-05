@@ -81,13 +81,24 @@ describe('prefetchTasksFor', () => {
 });
 
 describe('prefetchCharacterData', () => {
-  it('does nothing when the Character has no token row', async () => {
-    const task = { id: 'x', endpoints: [], run: vi.fn(async () => {}) };
+  it('runs no task at all when the Character has no token row', async () => {
+    // Including the tasks on public endpoints, which need no grant: no token
+    // row is no session, and nothing should reach the network for a Character
+    // who is not signed in. This used to fall out of `prefetchTasksFor([])`
+    // being empty; it stopped being free the moment a task had no scope.
+    const run = vi.fn(async () => {});
+    const publicTask: PrefetchTask = {
+      id: 'public',
+      endpoints: ['getCharacterCorporationHistory'],
+      run,
+    };
+    expect(prefetchTasksFor([], [publicTask])).toHaveLength(1);
     vi.spyOn(db.tokens, 'get').mockResolvedValue(undefined);
 
     await prefetchCharacterData(CHAR_ID);
 
-    expect(task.run).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    expect(isPrefetching(usePrefetch.getState())).toBe(false);
     vi.restoreAllMocks();
   });
 
