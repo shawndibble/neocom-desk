@@ -23,6 +23,7 @@ import { resolveNames } from '@/features/character/names';
 import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { CorpAssetInput } from '@/engine/corp/assetDivisions';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadCorpPaginatedWithCacheStatus } from './corpRead';
 
 /**
@@ -85,6 +86,11 @@ const UPWELL_STRUCTURE_ID_FLOOR = 1_000_000_000_000;
  * A structure the reading Character is not on the ACL for resolves to
  * nothing and the view falls back to the raw id, exactly as `members.ts` and
  * the personal Assets page both do.
+ *
+ * The structure resolves are capped at `ESI_FANOUT_CONCURRENCY` (issue #420):
+ * a large corp's distinct Upwell structures can number well past ten, and
+ * each is its own `/universe/structures/{id}` call against a rate-limited
+ * endpoint, so a bare `Promise.all` over all of them risks 429s.
  */
 async function resolveAssetLocationNames(
   characterId: number,
@@ -95,12 +101,10 @@ async function resolveAssetLocationNames(
   const bulkIds = unique.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
 
   const names = await resolveNames(bulkIds);
-  const structureNames = await Promise.all(
-    structureIds.map(async (id) => [id, await loadStructureName(characterId, id)] as const)
-  );
-  for (const [id, name] of structureNames) {
+  await mapWithConcurrencyLimit(structureIds, ESI_FANOUT_CONCURRENCY, async (id) => {
+    const name = await loadStructureName(characterId, id);
     if (name !== null) names.set(id, name);
-  }
+  });
   return names;
 }
 

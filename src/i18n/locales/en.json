@@ -1900,6 +1900,9 @@
       "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this corporation has more.",
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE only opens the corporation asset list to a Director. No other corporation role can see it, and granting access here will not change that.",
+      "loadFailedTitle": "Could not load corp assets",
+      "loadFailedHint": "The corporation asset read failed and nothing is cached yet. Try refreshing.",
+      "searchPlaceholder": "Search items…",
       "flag": {
         "officeFolder": "Office",
         "corpDeliveries": "Deliveries",

@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { db } from '@/db';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
 import {
@@ -11,6 +12,10 @@ import {
   type CorpAccess,
   type CorpAccessState,
 } from '@/features/corp/useCorpAccess';
+import {
+  NO_EXPANDED_DIVISIONS,
+  useCorpAssetsExpanded,
+} from '@/features/corp/assetsExpandPreference';
 import type { CorporationAsset, CorporationDivisions } from '@/esi/endpoints';
 import * as boardData from '@/features/corp/boardData';
 import * as corpAssets from '@/features/corp/assets';
@@ -87,10 +92,15 @@ async function divisionList(): Promise<HTMLElement> {
   return waitFor(() => screen.getByRole('button', { name: /Division 1/ }));
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   vi.setSystemTime(NOW);
+  // The expand-state store persists to `db.settings` (issue #420); clearing
+  // the table, not just the in-memory store, keeps one test's toggles from
+  // being read back by the next test's `hydrate()`.
+  await db.settings.clear();
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+  useCorpAssetsExpanded.setState({ value: NO_EXPANDED_DIVISIONS, hydrated: false });
 
   mocked.loadCorporationId.mockResolvedValue(CORPORATION_ID);
   mocked.loadCorporationAssets.mockResolvedValue(cached([asset({ item_id: 1 })]));
@@ -285,9 +295,19 @@ describe('failed vs. genuinely empty reads', () => {
   it('shows a load-failed state rather than an empty corporation when the assets read itself failed', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(READ_FAILED);
     renderAssets();
-    expect(await screen.findByText('Could not load')).toBeInTheDocument();
+    expect(await screen.findByText('Could not load corp assets')).toBeInTheDocument();
     expect(screen.queryByText('No corporation assets')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Division 1/ })).not.toBeInTheDocument();
+  });
+
+  /** AC5: "no access", "read failed" and "empty" must not share one generic message. */
+  it('gives the load-failed state its own copy, distinct from "no access" and "empty"', async () => {
+    mocked.loadCorporationAssets.mockResolvedValue(READ_FAILED);
+    renderAssets();
+    const loadFailedText = await screen.findByText('Could not load corp assets');
+    expect(loadFailedText).toBeInTheDocument();
+    expect(screen.queryByText('Corp assets need Director')).not.toBeInTheDocument();
+    expect(screen.queryByText('No corporation assets')).not.toBeInTheDocument();
   });
 
   it('shows the empty state when the corporation genuinely owns nothing', async () => {
@@ -295,5 +315,90 @@ describe('failed vs. genuinely empty reads', () => {
     renderAssets();
     expect(await screen.findByText('No corporation assets')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Division 1/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('row context menu (issue #420)', () => {
+  it('offers View in Market and Copy name on an asset row, with no Build Plan lookup', async () => {
+    renderAssets();
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Division 1/ }));
+    const row = (await screen.findByText('Tritanium')).closest('tr');
+    if (!row) throw new Error('expected a Tritanium row');
+    fireEvent.contextMenu(row);
+
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    // `blueprintTypeID` is `null`, not `undefined` — corp assets never loads
+    // the blueprint catalog, so this must resolve instantly rather than
+    // dangling in "checking…" forever.
+    expect(screen.getByRole('menuitem', { name: 'No blueprint options' })).toBeInTheDocument();
+  });
+});
+
+describe('search (issue #420)', () => {
+  beforeEach(() => {
+    mocked.loadCorporationAssets.mockResolvedValue(
+      cached([
+        asset({ item_id: 1, type_id: 34, location_flag: 'CorpSAG1' }),
+        asset({ item_id: 2, type_id: 35, location_flag: 'CorpSAG7' }),
+      ])
+    );
+    mocked.loadCorpAssetLabels.mockResolvedValue({
+      types: new Map([
+        [34, 'Tritanium'],
+        [35, 'Pyerite'],
+      ]),
+      locations: new Map([[60003760, 'Jita IV - Moon 4']]),
+    });
+  });
+
+  /**
+   * The bug a naive "filter rows inside whatever's expanded" implementation
+   * has: every division starts collapsed (no expand state persisted yet),
+   * so a search would show nothing at all unless the user had already opened
+   * the matching division by hand. A search box that only works after
+   * manually finding the division first isn't filtering "across divisions".
+   */
+  it('surfaces a match from a fully collapsed start, with no division opened by hand', async () => {
+    renderAssets();
+    await screen.findByRole('button', { name: /Division 1/ });
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+
+    await userEvent.setup().type(screen.getByPlaceholderText('Search items…'), 'tri');
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+  });
+
+  it('filters items across divisions by resolved name', async () => {
+    renderAssets();
+    await userEvent.setup().type(await screen.findByPlaceholderText('Search items…'), 'tri');
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+  });
+
+  it('clearing the search returns to the persisted collapse state rather than leaving everything open', async () => {
+    const user = userEvent.setup();
+    renderAssets();
+    const search = await screen.findByPlaceholderText('Search items…');
+    await user.type(search, 'tri');
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+
+    await user.clear(search);
+
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+  });
+});
+
+describe('persisted expand state (issue #420)', () => {
+  it('keeps a division expanded across a remount instead of resetting to fully collapsed', async () => {
+    const { unmount } = renderAssets();
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Division 1/ }));
+    expect(await screen.findByRole('table', { name: /Division 1 assets/ })).toBeInTheDocument();
+    unmount();
+
+    renderAssets();
+    expect(await screen.findByRole('table', { name: /Division 1 assets/ })).toBeInTheDocument();
   });
 });
