@@ -56,8 +56,14 @@ export function computeBuildPlan({
 }: ComputeBuildPlanInput): ComputeBuildPlanResult {
   const facility = FACILITY_PRESETS[plan.facility];
   const runs = clampInt(plan.runs, 1, 100_000);
-  const me = clampInt(plan.me, 0, 10);
-  const te = clampInt(plan.te, 0, 20);
+  // Reaction formulas have no material/time efficiency — the SDE carries no
+  // research activity for any of them (issue #460 triage; verified against
+  // industryActivity.csv), so they always run at 0/0 regardless of what a
+  // stored plan happens to hold (e.g. a formula picked up in the same
+  // ME/TE fields a manufacturing blueprint uses).
+  const isReaction = blueprint.activity === 'reaction';
+  const me = isReaction ? 0 : clampInt(plan.me, 0, 10);
+  const te = isReaction ? 0 : clampInt(plan.te, 0, 20);
   const facilityTaxPct = facility.structure ? plan.facilityTaxPct : undefined;
 
   try {

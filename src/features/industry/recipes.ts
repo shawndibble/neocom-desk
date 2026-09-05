@@ -54,6 +54,12 @@ function ownedMaterialEfficiency(
 export function materialRecipe(typeID: number, sources: RecipeSources): MaterialRecipe | null {
   const entry = sources.catalog.byProductTypeID.get(typeID);
   if (entry) {
+    // A reaction formula (issue #460) shares the catalog with manufacturing
+    // blueprints, but has no ME — unlike a blueprint, no owned-copy lookup
+    // applies to it.
+    if (entry.blueprint.activity === 'reaction') {
+      return { method: 'reaction', blueprint: toIndustryBlueprint(entry.blueprint) };
+    }
     return {
       method: 'manufacturing',
       blueprint: toIndustryBlueprint(entry.blueprint),

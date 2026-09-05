@@ -50,6 +50,27 @@ describe('materialModifier', () => {
     expect(materialModifier(10, npcRigged)).toBeCloseTo(0.9, 12);
   });
 
+  it('scales reactor rig bonus by the reaction security table, not the manufacturing one', () => {
+    // Tatara T2 rig nullsec: 2.4% * 1.1 (reaction table) = 2.64% -> 0.9736,
+    // vs. manufacturing's 2.4% * 2.1 = 5.04% -> 0.9496 for the same rig level.
+    const tataraT2Null: FacilityContext = {
+      facility: FACILITY_PRESETS.tatara,
+      rig: 't2',
+      security: 'nullsec',
+    };
+    expect(materialModifier(0, tataraT2Null)).toBeCloseTo(0.9736, 12);
+  });
+
+  it('leaves reactor rig bonus unscaled in lowsec (reaction table is 1x there)', () => {
+    const athanorT1Low: FacilityContext = {
+      facility: FACILITY_PRESETS.athanor,
+      rig: 't1',
+      security: 'lowsec',
+    };
+    // 2% * 1 (reaction lowsec multiplier) = 2% -> 0.98
+    expect(materialModifier(0, athanorT1Low)).toBeCloseTo(0.98, 12);
+  });
+
   it('rejects ME outside 0..10', () => {
     expect(() => materialModifier(-1, npc)).toThrow(RangeError);
     expect(() => materialModifier(11, npc)).toThrow(RangeError);

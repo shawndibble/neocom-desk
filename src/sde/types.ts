@@ -34,17 +34,18 @@ export interface BlueprintSkill {
   level: number;
 }
 
-/** One value in public/data/blueprints.json (manufacturing activity only). */
+/** One value in public/data/blueprints.json: a manufacturing blueprint or a reaction formula (issue #460). */
 export interface BlueprintType {
   name: string;
-  /** base manufacturing time in seconds */
+  /** base job time in seconds */
   time: number;
   materials: BlueprintQuantity[];
   products: BlueprintQuantity[];
   skills: BlueprintSkill[];
+  activity: 'manufacturing' | 'reaction';
 }
 
-/** public/data/blueprints.json: blueprint typeID -> BlueprintType */
+/** public/data/blueprints.json: blueprint/formula typeID -> BlueprintType */
 export type BlueprintMap = Record<string, BlueprintType>;
 
 /** One value in public/data/types.json. */

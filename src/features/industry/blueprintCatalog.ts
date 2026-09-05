@@ -107,5 +107,6 @@ export function toIndustryBlueprint(blueprint: BlueprintType): IndustryBlueprint
     time: blueprint.time,
     materials: blueprint.materials,
     products: blueprint.products,
+    activity: blueprint.activity,
   };
 }

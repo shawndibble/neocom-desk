@@ -826,6 +826,23 @@ describe('MaterialsTable make-or-buy marker', () => {
     expect(glyph(planetary.container)).not.toEqual(glyph(manufacturing.container));
   });
 
+  it('names reacting rather than manufacturing for a reaction formula (issue #460)', () => {
+    renderTable(advise({ ...buildIt, method: 'reaction', me: null }));
+    expect(within(row('Mechanical Parts')).getByRole('img')).toHaveAccessibleName(
+      /Cheaper to react: 42\.96 a unit to react at an unfitted Athanor/
+    );
+  });
+
+  it('gives a reaction build its own glyph, distinct from manufacturing and planetary', () => {
+    const reaction = renderTable(advise({ ...buildIt, method: 'reaction', me: null }));
+    const planetary = renderTable(advise({ ...buildIt, method: 'planetary', me: null }));
+    const manufacturing = renderTable(advise(buildIt));
+    const glyph = (c: HTMLElement) => c.querySelector('[role="img"] svg')?.innerHTML;
+    expect(glyph(reaction.container)).toBeTruthy();
+    expect(glyph(reaction.container)).not.toEqual(glyph(manufacturing.container));
+    expect(glyph(reaction.container)).not.toEqual(glyph(planetary.container));
+  });
+
   it('leaves a material with no verdict unmarked', () => {
     renderTable(advise(buildIt));
     expect(within(row('Tritanium')).queryByRole('img')).toBeNull();

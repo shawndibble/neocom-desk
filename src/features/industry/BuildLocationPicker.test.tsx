@@ -44,7 +44,11 @@ beforeEach(() => {
 
 function renderPicker(onPick = vi.fn()) {
   render(
-    <BuildLocationPicker summary="NPC station · Jita · Highsec" onPick={onPick}>
+    <BuildLocationPicker
+      summary="NPC station · Jita · Highsec"
+      onPick={onPick}
+      activity="manufacturing"
+    >
       <label>
         Facility
         <input />
@@ -133,7 +137,12 @@ describe('BuildLocationPicker', () => {
     await screen.findByText('K2-18 R&D');
 
     expect(searchBuildLocations).toHaveBeenCalledOnce();
-    expect(searchBuildLocations).toHaveBeenCalledWith(91, 'K2-18', expect.any(AbortSignal));
+    expect(searchBuildLocations).toHaveBeenCalledWith(
+      91,
+      'K2-18',
+      'manufacturing',
+      expect.any(AbortSignal)
+    );
   });
 
   it('hands over every field in one call, and clears itself', async () => {

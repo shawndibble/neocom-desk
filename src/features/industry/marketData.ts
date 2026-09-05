@@ -11,9 +11,10 @@
  * degrades unreachable Fuzzwork to per-type nulls, not a throw).
  */
 import { getHubPrices, getAdjustedPrices, HUB_PRICE_TTL_MS } from '@/market/prices';
-import { fetchSystemCostIndices } from '@/market/cost-index';
+import { fetchSystemCostIndices, systemCostIndexByActivity } from '@/market/cost-index';
+import type { SystemCostIndices } from '@/esi/endpoints';
 import type { TradeHub } from '@/market/hubs';
-import type { AdjustedPrices, HubPrices } from '@/engine/industry/types';
+import type { AdjustedPrices, HubPrices, IndustryActivity } from '@/engine/industry/types';
 
 export interface MarketSnapshot {
   /** Lowest sell at the hub, materials + product. Missing key = unpriceable at this hub. */
@@ -39,25 +40,34 @@ export interface MarketSnapshot {
 /** Reuses the hub-price TTL: both are "how often do market conditions change" caches. */
 const COST_INDEX_TTL_MS = HUB_PRICE_TTL_MS;
 
-let costIndexCache: { value: Map<number, number>; expiresAt: number } | null = null;
+/**
+ * One raw fetch shared by every activity — ESI returns every system's full
+ * `cost_indices` list in one call, so a manufacturing plan and a reaction
+ * plan open in the same TTL window derive their two different numbers from
+ * the same cached response rather than each fetching and parsing it again
+ * (issue #460).
+ */
+let rawCostIndexCache: { value: SystemCostIndices[]; expiresAt: number } | null = null;
 
 /** Test-only: production callers rely on TTL expiry instead of clearing. */
 export function clearCostIndexCache(): void {
-  costIndexCache = null;
+  rawCostIndexCache = null;
 }
 
 async function loadSystemCostIndices(
+  activity: IndustryActivity,
   now: () => number = Date.now
 ): Promise<Map<number, number> | null> {
   const nowMs = now();
-  if (costIndexCache && costIndexCache.expiresAt > nowMs) return costIndexCache.value;
-  try {
-    const value = await fetchSystemCostIndices();
-    costIndexCache = { value, expiresAt: nowMs + COST_INDEX_TTL_MS };
-    return value;
-  } catch {
-    return null;
+  if (!rawCostIndexCache || rawCostIndexCache.expiresAt <= nowMs) {
+    try {
+      const value = await fetchSystemCostIndices();
+      rawCostIndexCache = { value, expiresAt: nowMs + COST_INDEX_TTL_MS };
+    } catch {
+      return null;
+    }
   }
+  return systemCostIndexByActivity(rawCostIndexCache.value, activity);
 }
 
 /**
@@ -70,11 +80,16 @@ async function loadSystemCostIndices(
  * is charged by the build system alone. Callers with no build system of their
  * own (the LP store, planetary plans) omit it and keep the hub's index, which
  * is what every caller got before the argument existed.
+ *
+ * `activity` picks which of ESI's per-activity indices to read (issue #460);
+ * every caller before reactions existed got 'manufacturing', so it defaults
+ * to that rather than becoming a required argument everywhere.
  */
 export async function loadMarketSnapshot(
   hub: TradeHub,
   typeIds: number[],
-  costIndexSystemId?: number
+  costIndexSystemId?: number,
+  activity: IndustryActivity = 'manufacturing'
 ): Promise<MarketSnapshot> {
   const hubAggregates = await getHubPrices(hub, typeIds);
   const hubPrices: HubPrices = {};
@@ -95,7 +110,7 @@ export async function loadMarketSnapshot(
     adjustedPrices = null;
   }
 
-  const costIndices = await loadSystemCostIndices();
+  const costIndices = await loadSystemCostIndices(activity);
   const systemCostIndex = costIndices?.get(costIndexSystemId ?? hub.systemId) ?? null;
 
   return { hubPrices, hubBuyPrices, adjustedPrices, systemCostIndex };

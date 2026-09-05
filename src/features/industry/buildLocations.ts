@@ -15,7 +15,9 @@
 import { securityBand } from '@/engine/securityStatus';
 import {
   FACILITY_KIND_BY_STRUCTURE_TYPE_ID,
+  FACILITY_PRESETS,
   type FacilityKind,
+  type IndustryActivity,
   type SecurityBand,
 } from '@/engine/industry/types';
 
@@ -60,9 +62,17 @@ export interface BuildLocationOption {
   security: SecurityBand;
 }
 
+/**
+ * `activity` narrows the result to places that can host that job — an NPC
+ * station always qualifies for manufacturing but never for a reaction (no
+ * NPC-station equivalent exists; issue #460), and a resolved structure whose
+ * facility preset serves the other activity is dropped the same way an
+ * unrecognized typeID already was.
+ */
 export function buildLocationOptions(
   places: readonly LocatablePlace[],
-  systems: ReadonlyMap<number, SystemSummary>
+  systems: ReadonlyMap<number, SystemSummary>,
+  activity: IndustryActivity
 ): BuildLocationOption[] {
   const options: BuildLocationOption[] = [];
   for (const place of places) {
@@ -70,6 +80,7 @@ export function buildLocationOptions(
       ? 'npcStation'
       : FACILITY_KIND_BY_STRUCTURE_TYPE_ID[place.typeId];
     if (!facility) continue;
+    if (FACILITY_PRESETS[facility].activity !== activity) continue;
     // Without the system there is no security band, and inventing one would
     // pick a rig multiplier (1x, 1.9x or 2.1x) out of thin air.
     const system = systems.get(place.systemId);

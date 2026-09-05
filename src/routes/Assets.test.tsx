@@ -749,6 +749,7 @@ describe('item context menu (issue #83)', () => {
         materials: [{ typeID: 34, quantity: 10 }],
         products: [{ typeID: 9998, quantity: 1 }],
         skills: [],
+        activity: 'manufacturing',
       },
     });
     await db.buildPlans.add({

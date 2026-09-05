@@ -121,6 +121,47 @@ describe('makeOrBuy', () => {
     expect(makeOrBuy(line(), { ...manufacturing, me: 42 }, ctx)).toBeNull();
   });
 
+  describe('reactions (issue #460)', () => {
+    /** 5 Reinforced Carbon Fiber (9840, reused id) per run from 20 Tritanium. */
+    const reactionFormula: IndustryBlueprint = {
+      ...partsBlueprint,
+      activity: 'reaction',
+    };
+    const reaction: MaterialRecipe = { method: 'reaction', blueprint: reactionFormula };
+
+    it('prices a reaction material at its own job cost, quoted against an unfitted Athanor', () => {
+      const result = makeOrBuy(line(), reaction, ctx);
+      // 60 Tritanium at 5 = 300 (Athanor's 0% material bonus, same as ME0),
+      // plus a job fee on an EIV of 240: index 12 + SCC 9.6 + Athanor's 0%
+      // default tax (unlike the NPC station's fixed 0.25%) = 21.6.
+      expect(result).toEqual({
+        method: 'reaction',
+        verdict: 'build',
+        makeUnitPrice: 321.6 / 15,
+        buyUnitPrice: 100,
+        savings: (100 - 321.6 / 15) * 12,
+        me: null,
+      });
+    });
+
+    it("ignores the parent plan's own facility/rig — an engineering complex cannot host a reaction", () => {
+      // A Raitaru's 1%/3% bonuses and a fitted rig would price this cheaper
+      // if they leaked through. The quote must stay pinned to Athanor/none
+      // regardless of what the parent plan is set to.
+      const raitaruParent: MakeOrBuyContext = {
+        ...ctx,
+        facility: FACILITY_PRESETS.raitaru,
+        rig: 't2',
+      };
+      const result = makeOrBuy(line(), reaction, raitaruParent);
+      expect(result?.makeUnitPrice).toBeCloseTo(321.6 / 15, 10);
+    });
+
+    it('is null when an input has no hub price', () => {
+      expect(makeOrBuy(line(), reaction, { ...ctx, hubPrices: {} })).toBeNull();
+    });
+  });
+
   describe('planetary industry', () => {
     const water: MaterialRecipe = {
       method: 'planetary',
