@@ -613,9 +613,10 @@ describe('SkillPlans editor: add-skill picker', () => {
       expect(items[3].textContent).toMatch(/prereq/i);
       expect(items[4].textContent).not.toMatch(/prereq/i);
 
-      // Column headers label the two time columns (UX-REVIEW #9).
-      expect(within(panel).getByText('Per-level')).toBeInTheDocument();
-      expect(within(panel).getByText('Cumulative')).toBeInTheDocument();
+      // Column headers label the two time columns (UX-REVIEW #9), by what
+      // each one means rather than by the jargon they used to carry.
+      expect(within(panel).getByText('Takes')).toBeInTheDocument();
+      expect(within(panel).getByText('Done by')).toBeInTheDocument();
     } finally {
       window.matchMedia = realMatchMedia;
     }
@@ -691,9 +692,9 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
       expect(items).toHaveLength(2);
       expect(items[1].textContent).toContain('Gunnery III');
       // Exact-match: a span reading precisely "0m" only happens at zero
-      // duration (any real duration formats to something like "2h 5m") —
-      // the row's per-level and cumulative columns both read zero.
-      expect(within(items[1]).getAllByText('0m')).toHaveLength(2);
+      // duration (any real duration formats to something like "2h 5m"). One
+      // cell, not two: the running-total column now reads as a finish date.
+      expect(within(items[1]).getAllByText('0m')).toHaveLength(1);
     });
   });
 });
@@ -727,7 +728,7 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
     await waitFor(() => {
       const items = within(panel).getAllByRole('listitem');
       expect(items).toHaveLength(2);
-      expect(within(items[1]).getAllByText('0m')).toHaveLength(2);
+      expect(within(items[1]).getAllByText('0m')).toHaveLength(1);
     });
   });
 
@@ -1696,11 +1697,11 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     vi.useRealTimers();
   });
 
-  it("projects a plan finish date that matches the entry row's own finish, and starts it at the plan start (#20)", async () => {
+  it("projects a plan finish date that matches the entry row's own finish (#20)", async () => {
     // Gunnery I..V is a multi-day train at these attributes, so start and
     // finish land on different calendar dates. #112: this is now a single
     // aggregated entry row (Gunnery V), not five per-level rows, so its own
-    // timeline line must span from the plan start to the plan finish.
+    // "Done by" date is the plan's own finish.
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 5 }] }));
     goToPlanEditor();
     render(<App />);
@@ -1713,11 +1714,12 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     const finishNote = within(panel).getByText(/^Finishes \d{4}-\d{2}-\d{2}$/);
     const planFinishDate = finishNote.textContent!.replace('Finishes ', '');
 
-    // The row starts exactly at the plan's wall-clock start...
-    expect(items[1].textContent).toContain('2026-08-29 → ');
-    // ...and its own finish is the same value the panel header projects —
-    // one number, computed one way (#20 acceptance criterion).
-    expect(items[1].textContent).toContain(`→ ${planFinishDate}`);
+    // The row's own finish is the same value the panel header projects —
+    // one number, computed one way (#20 acceptance criterion). The separate
+    // start→finish line is gone: it restated the running total a third way
+    // and cost every row a line it couldn't spare on a phone.
+    expect(items[1].textContent).toContain(planFinishDate);
+    expect(items[1].textContent).not.toContain('→');
   });
 
   it('shows no projected finish date, and no invented start time, for an empty plan (#20)', async () => {
