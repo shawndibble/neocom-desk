@@ -319,9 +319,9 @@ describe('Industry: owned-blueprint prefill', () => {
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 
     await screen.findByRole('button', { name: 'Rifter' });
-    expect(screen.getByLabelText('ME')).toHaveValue(8);
-    expect(screen.getByLabelText('TE')).toHaveValue(16);
-    expect(screen.getByText('Owned, ME8/TE16')).toBeInTheDocument();
+    expect(screen.getByLabelText('ME %')).toHaveValue(8);
+    expect(screen.getByLabelText('TE %')).toHaveValue(16);
+    expect(screen.getByText('Owned, ME 8% / TE 16%')).toBeInTheDocument();
 
     const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).first();
     expect(stored?.me).toBe(8);
@@ -350,9 +350,9 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
-    // Labels stay exact ("ME"/"TE") — the tooltip trigger lives outside the <label>.
-    expect(screen.getByLabelText('ME')).toBeInTheDocument();
-    expect(screen.getByLabelText('TE')).toBeInTheDocument();
+    // Labels stay exact ("ME %"/"TE %") — the tooltip trigger lives outside the <label>.
+    expect(screen.getByLabelText('ME %')).toBeInTheDocument();
+    expect(screen.getByLabelText('TE %')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About ME' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About TE' })).toBeInTheDocument();
 
@@ -374,8 +374,8 @@ describe('Industry: build plan settings grouping (#120)', () => {
 
     // All the original fields still render, just regrouped.
     expect(screen.getByLabelText('Runs')).toBeInTheDocument();
-    expect(screen.getByLabelText('ME')).toBeInTheDocument();
-    expect(screen.getByLabelText('TE')).toBeInTheDocument();
+    expect(screen.getByLabelText('ME %')).toBeInTheDocument();
+    expect(screen.getByLabelText('TE %')).toBeInTheDocument();
     expect(screen.getByLabelText('Facility')).toBeInTheDocument();
     expect(screen.getByLabelText('Rig')).toBeInTheDocument();
     expect(screen.getByLabelText('Security')).toBeInTheDocument();
@@ -677,7 +677,7 @@ describe('Industry: make-or-buy marker on materials', () => {
     // the market snapshot behind it.
     await waitFor(async () =>
       expect(await markerFor('Mechanical Parts')).toHaveAccessibleName(
-        'Cheaper to build: 42.96 a unit to manufacture at ME0, against 50.00 to buy. ' +
+        'Cheaper to build: 42.96 a unit to manufacture at ME 0%, against 50.00 to buy. ' +
           'Worth 70 across the 10 units still to buy.'
       )
     );
@@ -703,7 +703,7 @@ describe('Industry: make-or-buy marker on materials', () => {
 
     // ME10 takes the same 2 runs down to 36 Tritanium: 389.6 over 10 units.
     await waitFor(async () =>
-      expect(await markerFor('Mechanical Parts')).toHaveAccessibleName(/38\.96 a unit .* at ME10/)
+      expect(await markerFor('Mechanical Parts')).toHaveAccessibleName(/38\.96 a unit .* at ME 10%/)
     );
   });
 
