@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { PriceHistoryPanel } from './PriceHistoryPanel';
 import { loadPriceHistory } from './priceHistory';
@@ -91,6 +92,7 @@ describe('PriceHistoryPanel', () => {
   });
 
   it('narrows the chart to the selected date range', async () => {
+    const user = userEvent.setup();
     mockedLoad.mockResolvedValue({
       points: [
         { date: '2026-07-20', average: 5, volume: 50 }, // within 30d (default) but outside 7d
@@ -104,7 +106,8 @@ describe('PriceHistoryPanel', () => {
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
     expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 2 points');
 
-    fireEvent.change(screen.getByLabelText('Range'), { target: { value: '7d' } });
+    await user.click(screen.getByRole('combobox', { name: 'Range' }));
+    await user.click(await screen.findByRole('option', { name: '7 days' }));
     expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 1 points');
   });
 });

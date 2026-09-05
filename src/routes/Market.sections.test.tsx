@@ -152,7 +152,8 @@ describe('Market top-level tabs', () => {
     expect(await screen.findByText('expired')).toBeInTheDocument();
 
     // The second view is picked from the table's own header, not a nested tab.
-    await user.selectOptions(screen.getByLabelText('History view'), 'transactions');
+    await user.click(screen.getByRole('combobox', { name: 'History view' }));
+    await user.click(await screen.findByRole('option', { name: 'Transactions' }));
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
@@ -202,14 +203,17 @@ describe('Market top-level tabs', () => {
     // header's select says which of the two is showing.
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByLabelText('History view')).toHaveValue('transactions');
+    expect(screen.getByRole('combobox', { name: 'History view' })).toHaveTextContent(
+      'Transactions'
+    );
     expect(
       screen.getByRole('button', { name: 'About Orders and Transactions' })
     ).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText('History view'), 'history');
+    await user.click(screen.getByRole('combobox', { name: 'History view' }));
+    await user.click(await screen.findByRole('option', { name: 'Orders' }));
     expect(await screen.findByText('expired')).toBeInTheDocument();
-    expect(screen.getByLabelText('History view')).toHaveValue('history');
+    expect(screen.getByRole('combobox', { name: 'History view' })).toHaveTextContent('Orders');
   });
 });
 

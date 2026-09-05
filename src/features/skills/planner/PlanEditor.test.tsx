@@ -745,7 +745,8 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     const section = sectionFor('Attributes');
     expect(within(section).getByText('22 + 3 = 25')).toBeInTheDocument();
 
-    await user.selectOptions(within(section).getByLabelText('What-if implants'), '+5');
+    await user.click(within(section).getByRole('combobox', { name: 'What-if implants' }));
+    await user.click(await screen.findByRole('option', { name: '+5' }));
 
     // The lens re-costs the plan; it does not rewrite the character. "Current
     // attributes" has to keep meaning current, or the page has no honest
@@ -876,7 +877,8 @@ describe('PlanEditor grouping toggle (#115)', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.selectOptions(screen.getByLabelText('Group by'), 'Attribute pair');
+    await user.click(screen.getByRole('combobox', { name: 'Group by' }));
+    await user.click(await screen.findByRole('option', { name: 'Attribute pair' }));
 
     expect(screen.queryByText('High priority')).not.toBeInTheDocument();
     expect(screen.getByText('PER/WIL attributes')).toBeInTheDocument();
@@ -895,7 +897,7 @@ describe('PlanEditor what-if implants', () => {
     renderWithImplants();
     await openTools(user);
 
-    expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('current');
+    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('Current');
     expect(bonusInputValues()).toEqual(['0', '3', '4', '0', '0']);
   });
 
@@ -923,11 +925,16 @@ describe('PlanEditor what-if implants', () => {
     renderWithImplants();
     await openTools(user);
 
-    await user.selectOptions(screen.getByLabelText('What-if implants'), '+4');
+    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
+    await user.click(await screen.findByRole('option', { name: '+4' }));
 
     expect(bonusInputValues()).toEqual(['4', '4', '4', '4', '4']);
     // "Custom" is not offered while a preset is in force — you become custom
-    // by editing a value, not by picking it.
+    // by editing a value, not by picking it. Reopen the list (Radix closes it
+    // on selection) to check what it currently offers; wait for a known
+    // option first so the list is confirmed open, not just not-yet-rendered.
+    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
+    expect(await screen.findByRole('option', { name: '+4' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Custom' })).toBeNull();
   });
 
@@ -936,13 +943,14 @@ describe('PlanEditor what-if implants', () => {
     renderWithImplants();
     await openTools(user);
 
-    await user.selectOptions(screen.getByLabelText('What-if implants'), '+4');
+    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
+    await user.click(await screen.findByRole('option', { name: '+4' }));
     const perception = screen.getByLabelText('Perception implant bonus');
     await user.clear(perception);
     await user.type(perception, '5');
 
     expect(bonusInputValues()).toEqual(['4', '4', '5', '4', '4']);
-    expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('custom');
+    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('Custom');
   });
 
   it('clamps a slot to the documented +0..+5 range', async () => {
@@ -962,13 +970,15 @@ describe('PlanEditor what-if implants', () => {
     renderWithImplants();
     await openTools(user);
 
-    await user.selectOptions(screen.getByLabelText('What-if implants'), '+5');
+    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
+    await user.click(await screen.findByRole('option', { name: '+5' }));
     const charisma = screen.getByLabelText('Charisma implant bonus');
     await user.clear(charisma);
     await user.type(charisma, '1');
-    expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('custom');
+    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('Custom');
 
-    await user.selectOptions(screen.getByLabelText('What-if implants'), 'current');
+    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
+    await user.click(await screen.findByRole('option', { name: 'Current' }));
 
     expect(bonusInputValues()).toEqual(['0', '3', '4', '0', '0']);
   });
@@ -1075,7 +1085,8 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const { onUpdate } = renderEditor(vi.fn(), { implants: FITTED });
     await openTools(user);
 
-    await user.selectOptions(screen.getByLabelText('What-if implants'), '+4');
+    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
+    await user.click(await screen.findByRole('option', { name: '+4' }));
 
     expect(onUpdate).toHaveBeenCalledWith({ whatIfImplants: { kind: 'preset', preset: '+4' } });
   });
@@ -1105,7 +1116,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     });
     await openTools(user);
 
-    expect(screen.getByLabelText<HTMLSelectElement>('What-if implants').value).toBe('+5');
+    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
     expect(bonusInputValues()).toEqual(['5', '5', '5', '5', '5']);
   });
 

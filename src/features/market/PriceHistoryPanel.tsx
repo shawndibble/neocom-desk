@@ -1,6 +1,14 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, NativeSelect, Spinner } from '@/components/ui';
+import {
+  EmptyState,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
+} from '@/components/ui';
 import { loadPriceHistory } from './priceHistory';
 import { formatIsk } from '@/lib/isk';
 import {
@@ -139,18 +147,18 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
             <span className="text-text-dim">{t('market.priceHistory.summaryNone')}</span>
           )}
         </div>
-        <NativeSelect
-          size="sm"
-          aria-label={t('market.priceHistory.range')}
-          value={range}
-          onChange={(e) => onRangeChange(e.target.value as PriceHistoryRange)}
-        >
-          {PRICE_HISTORY_RANGES.map((r) => (
-            <option key={r} value={r}>
-              {t(`market.priceHistory.range${r}`)}
-            </option>
-          ))}
-        </NativeSelect>
+        <Select value={range} onValueChange={(value) => onRangeChange(value as PriceHistoryRange)}>
+          <SelectTrigger size="sm" aria-label={t('market.priceHistory.range')} className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PRICE_HISTORY_RANGES.map((r) => (
+              <SelectItem key={r} value={r}>
+                {t(`market.priceHistory.range${r}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <Suspense fallback={<ChartFallback label={t('common.loading')} />}>
         <LazyPriceHistoryChart points={filtered} itemName={itemName} />

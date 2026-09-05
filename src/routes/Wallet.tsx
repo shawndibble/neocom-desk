@@ -6,11 +6,15 @@ import {
   DataTable,
   EmptyState,
   IconButton,
-  NativeSelect,
   PageHeader,
   Panel,
   ReauthBanner,
   SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   Tabs,
   TextInput,
@@ -61,6 +65,13 @@ interface JournalFilterBarProps {
 }
 
 /** The ref-type / date-range / text filter row above a journal table (issue #413). */
+/**
+ * "Any ref type" sentinel. Prefixed so it cannot collide with a real ESI
+ * `ref_type`, which is what fills the rest of the list; Radix needs some value
+ * here, and the empty string reads to it as "nothing selected".
+ */
+const ALL_REF_TYPES = '__all';
+
 function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBarProps) {
   const { t } = useTranslation();
   return (
@@ -71,21 +82,24 @@ function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBar
         placeholder={t('wallet.journalSearchPlaceholder')}
         className="min-w-48 flex-1"
       />
-      <NativeSelect
-        className="w-44"
-        aria-label={t('wallet.refTypeFilterLabel')}
-        value={filter.refType ?? ''}
-        onChange={(event) =>
-          onChange({ ...filter, refType: event.target.value === '' ? null : event.target.value })
+      <Select
+        value={filter.refType ?? ALL_REF_TYPES}
+        onValueChange={(value) =>
+          onChange({ ...filter, refType: value === ALL_REF_TYPES ? null : value })
         }
       >
-        <option value="">{t('wallet.refTypeFilterAll')}</option>
-        {refTypeOptions.map((refType) => (
-          <option key={refType} value={refType}>
-            {humanizeRefType(refType)}
-          </option>
-        ))}
-      </NativeSelect>
+        <SelectTrigger aria-label={t('wallet.refTypeFilterLabel')} className="w-44">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_REF_TYPES}>{t('wallet.refTypeFilterAll')}</SelectItem>
+          {refTypeOptions.map((refType) => (
+            <SelectItem key={refType} value={refType}>
+              {humanizeRefType(refType)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <label className="flex items-center gap-1 text-xs text-text-dim">
         {t('wallet.dateFromLabel')}
         <TextInput
@@ -685,19 +699,21 @@ export function Wallet() {
             corporationLabel={t('wallet.ownerCorporation')}
           />
           {showingCorp && divisions.length > 0 && (
-            <NativeSelect
-              size="sm"
-              className="w-56"
-              aria-label={t('wallet.corpDivisionLabel')}
-              value={effectiveDivision}
-              onChange={(event) => setDivision(Number(event.target.value))}
+            <Select
+              value={String(effectiveDivision)}
+              onValueChange={(value) => setDivision(Number(value))}
             >
-              {divisions.map((entry) => (
-                <option key={entry.division} value={entry.division}>
-                  {divisionLabel(entry)}
-                </option>
-              ))}
-            </NativeSelect>
+              <SelectTrigger size="sm" aria-label={t('wallet.corpDivisionLabel')} className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {divisions.map((entry) => (
+                  <SelectItem key={entry.division} value={String(entry.division)}>
+                    {divisionLabel(entry)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </div>
       )}

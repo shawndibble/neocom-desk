@@ -4,15 +4,18 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   Button,
   Caret,
-  DataAgeBadge,
   DataTable,
   EmptyState,
   FilterChip,
   IconButton,
-  NativeSelect,
   PageHeader,
   Panel,
   SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   Tabs,
 } from '@/components/ui';
@@ -72,7 +75,6 @@ import {
   filterOrdersByLocation,
   orderExpiry,
   summarizeOrderBook,
-  isNpcStationOrder,
   type NpcStationLookup,
   type SolarSystemLookup,
   type OrderBookSummary,
@@ -511,11 +513,6 @@ export function Market() {
   // The order row context menu's "filter to this station" action (CONTEXT.md
   // round 10); undone via the banner rendered above the tables.
   const [stationFilter, setStationFilter] = useState<number | null>(null);
-  // Separate from Location Mode/station filter (both narrow by *where*): this
-  // narrows by *what kind of seller* — a player structure never has a
-  // resolvable name (ADR 0003), which some traders want to exclude entirely
-  // rather than see as "unknown structure" rows.
-  const [locationKindFilter, setLocationKindFilter] = useState<'all' | 'npc' | 'structure'>('all');
   // Market Data / Price History (issue #11). Market Data selected by default.
   const [itemTab, setItemTab] = useState<'orders' | 'history'>('orders');
   // "Adjusting state when a prop changes" (react.dev): resets the previous
@@ -743,26 +740,12 @@ export function Market() {
     [buy, stationFilter]
   );
   const sortedSell = useMemo(
-    () =>
-      filteredSell
-        .filter(
-          (o) =>
-            locationKindFilter === 'all' ||
-            isNpcStationOrder(o, npcStationMap) === (locationKindFilter === 'npc')
-        )
-        .sort((a, b) => a.price - b.price),
-    [filteredSell, locationKindFilter, npcStationMap]
+    () => [...filteredSell].sort((a, b) => a.price - b.price),
+    [filteredSell]
   );
   const sortedBuy = useMemo(
-    () =>
-      filteredBuy
-        .filter(
-          (o) =>
-            locationKindFilter === 'all' ||
-            isNpcStationOrder(o, npcStationMap) === (locationKindFilter === 'npc')
-        )
-        .sort((a, b) => b.price - a.price),
-    [filteredBuy, locationKindFilter, npcStationMap]
+    () => [...filteredBuy].sort((a, b) => b.price - a.price),
+    [filteredBuy]
   );
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
@@ -925,26 +908,20 @@ export function Market() {
     !catalogueError &&
     (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
   const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
+  // Narrow screens only: on desktop the item finder is already on screen
+  // beside the item, so there is nothing to go back to. It sits in the
+  // Panel's `leading` slot, immediately left of the item name — it means
+  // "back from this item", so it belongs against the name rather than parked
+  // on the opposite edge of the header.
   const showBackControl = !isDesktop && selectedTypeId !== null;
-  // The Data Age badge reflects the order book, so it only belongs on the
-  // Market Data tab — showing it while Price History is open would misreport
-  // the history's own fetch time as the order book's.
-  const itemPanelActions =
-    showBackControl || (itemTab === 'orders' && orderBookResult) ? (
-      <>
-        {showBackControl && (
-          <IconButton
-            size="sm"
-            icon={<Icon.Back />}
-            label={t('market.backToFinder')}
-            onClick={handleBackToFinder}
-          />
-        )}
-        {itemTab === 'orders' && orderBookResult && (
-          <DataAgeBadge date={new Date(orderBookResult.fetchedAt)} />
-        )}
-      </>
-    ) : undefined;
+  const itemPanelLeading = showBackControl ? (
+    <IconButton
+      size="sm"
+      icon={<Icon.Back />}
+      label={t('market.backToFinder')}
+      onClick={handleBackToFinder}
+    />
+  ) : undefined;
 
   // Variations (CONTEXT.md round 6): the selected item's Tech/Meta/Faction
   // variation group, falling back to Market Group siblings, re-anchored
@@ -1067,33 +1044,41 @@ export function Market() {
                 />
               </div>
               {effectiveLocation.mode === 'hub' ? (
-                <NativeSelect
-                  size="sm"
-                  className="w-32 sm:w-44"
-                  aria-label={t('market.tradeHub')}
+                <Select
                   value={effectiveHub.id}
-                  onChange={(e) => handleHubChange(e.target.value as TradeHub['id'])}
+                  onValueChange={(value) => handleHubChange(value as TradeHub['id'])}
                 >
-                  {TRADE_HUBS.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.systemName}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  <SelectTrigger
+                    size="sm"
+                    aria-label={t('market.tradeHub')}
+                    className="w-32 sm:w-44"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRADE_HUBS.map((h) => (
+                      <SelectItem key={h.id} value={h.id}>
+                        {h.systemName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : (
-                <NativeSelect
-                  size="sm"
-                  className="w-32 sm:w-44"
-                  aria-label={t('market.region')}
-                  value={chosenRegionId}
-                  onChange={(e) => handleRegionChange(Number(e.target.value))}
+                <Select
+                  value={String(chosenRegionId)}
+                  onValueChange={(value) => handleRegionChange(Number(value))}
                 >
-                  {(marketRegions ?? []).map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </NativeSelect>
+                  <SelectTrigger size="sm" aria-label={t('market.region')} className="w-32 sm:w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(marketRegions ?? []).map((r) => (
+                      <SelectItem key={r.id} value={String(r.id)}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
               <IconButton
                 size="sm"
@@ -1201,7 +1186,7 @@ export function Market() {
             className={isDesktop || selectedTypeId !== null ? '' : 'hidden'}
             title={selectedItem?.name}
             padded={selectedTypeId === null}
-            actions={itemPanelActions}
+            leading={itemPanelLeading}
           >
             {selectedTypeId === null ? (
               <EmptyState
@@ -1242,28 +1227,6 @@ export function Market() {
                         })}
                       </p>
                     )}
-                    <div
-                      role="group"
-                      aria-label={t('market.locationKind.label')}
-                      className="flex flex-wrap gap-2 px-3 pt-2"
-                    >
-                      <FilterChip
-                        label={t('market.locationKind.all')}
-                        selected={locationKindFilter === 'all'}
-                        onToggle={() => setLocationKindFilter('all')}
-                      />
-                      <FilterChip
-                        label={t('market.locationKind.npc')}
-                        selected={locationKindFilter === 'npc'}
-                        onToggle={() => setLocationKindFilter('npc')}
-                      />
-                      <FilterChip
-                        label={t('market.locationKind.structure')}
-                        selected={locationKindFilter === 'structure'}
-                        onToggle={() => setLocationKindFilter('structure')}
-                      />
-                    </div>
-
                     <div className="divide-y divide-line">
                       {stationFilter !== null && (
                         <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
@@ -1399,20 +1362,27 @@ export function Market() {
                       </div>
                     </div>
 
+                    {/*
+                      A gap, so the buy table stops butting straight into the
+                      Variations hairline — it reads as one more row block
+                      otherwise, not as a separate section.
+                    */}
                     {variationsResult && (
-                      <VariationsTable
-                        rows={variationsResult.rows}
-                        totalCount={variationsResult.totalCount}
-                        truncated={variationsResult.truncated}
-                        prices={variationPrices}
-                        onSelect={handleSelectItem}
-                        onCompare={() => setCompareModalOpen(true)}
-                        blueprintCatalog={blueprintCatalog}
-                        onRequestBlueprintCatalog={ensureBlueprintCatalog}
-                        onAddToQuickbar={handleAddToQuickbar}
-                        quickbarAvailable={activeCharacterId !== null}
-                        onShowInfo={handleShowInfo}
-                      />
+                      <div className="mt-3">
+                        <VariationsTable
+                          rows={variationsResult.rows}
+                          totalCount={variationsResult.totalCount}
+                          truncated={variationsResult.truncated}
+                          prices={variationPrices}
+                          onSelect={handleSelectItem}
+                          onCompare={() => setCompareModalOpen(true)}
+                          blueprintCatalog={blueprintCatalog}
+                          onRequestBlueprintCatalog={ensureBlueprintCatalog}
+                          onAddToQuickbar={handleAddToQuickbar}
+                          quickbarAvailable={activeCharacterId !== null}
+                          onShowInfo={handleShowInfo}
+                        />
+                      </div>
                     )}
                   </>
                 )}

@@ -18,10 +18,14 @@ import {
   EmptyState,
   FilterChip,
   Modal,
-  NativeSelect,
   Panel,
   PageHeader,
   SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   StatChip,
   type DataTableColumn,
@@ -302,7 +306,10 @@ export function LoyaltyStore() {
           <span className="inline-flex items-center gap-1.5">
             <span className="text-text">{row.itemName}</span>
             {row.isBlueprint && (
-              <span className="rounded-xs border border-warning/40 px-1 text-[0.5625rem] font-bold tracking-wide text-warning uppercase">
+              // `shrink-0` + `whitespace-nowrap`: as a flex item next to a
+              // long item name the badge was being squeezed until "BP" broke
+              // across two lines, one letter each.
+              <span className="shrink-0 rounded-xs border border-warning/40 px-1 text-[0.5625rem] font-bold tracking-wide whitespace-nowrap text-warning uppercase">
                 BP
               </span>
             )}
@@ -411,27 +418,55 @@ export function LoyaltyStore() {
           onChange={(e) => setSearch(e.target.value)}
           className="min-w-40 flex-1"
         />
-        <NativeSelect
-          aria-label={t('loyaltyStore.hubLabel')}
-          value={hubId}
-          onChange={(e) => void setHubId(e.target.value as typeof hubId)}
-          className="w-auto"
-        >
-          {TRADE_HUBS.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.systemName}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          aria-label={t('loyaltyStore.priceBasisLabel')}
+        {/* Radix, to match the revenue-basis select beside it: side by side,
+            two selects that open into different-looking lists read as a seam. */}
+        <Select value={hubId} onValueChange={(value) => void setHubId(value as typeof hubId)}>
+          <SelectTrigger aria-label={t('loyaltyStore.hubLabel')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TRADE_HUBS.map((h) => (
+              <SelectItem key={h.id} value={h.id}>
+                {h.systemName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/*
+          Radix rather than `NativeSelect`, the one thing a real `<select>`
+          can't do: the trigger shows just "Sell"/"Buy" while the open list
+          spells out what each basis means. A native option's text is the same
+          in both places, so the closed box had to carry "(list order)" —
+          twelve characters of explanation sitting permanently in a filter row.
+        */}
+        <Select
           value={priceBasis}
-          onChange={(e) => void setPriceBasis(e.target.value as PriceBasis)}
-          className="w-auto"
+          onValueChange={(value) => void setPriceBasis(value as PriceBasis)}
         >
-          <option value="sell">{t('loyaltyStore.priceBasisSell')}</option>
-          <option value="buy">{t('loyaltyStore.priceBasisBuy')}</option>
-        </NativeSelect>
+          {/*
+            An `aria-label` on the trigger ends name computation, so nothing
+            inside it is ever announced — including the selection. The visible
+            text is deliberately short here, so the label carries the long form
+            and the current basis itself.
+          */}
+          <SelectTrigger
+            aria-label={`${t('loyaltyStore.priceBasisLabel')}: ${t(
+              priceBasis === 'buy' ? 'loyaltyStore.priceBasisBuy' : 'loyaltyStore.priceBasisSell'
+            )}`}
+          >
+            <SelectValue>
+              {t(
+                priceBasis === 'buy'
+                  ? 'loyaltyStore.priceBasisBuyShort'
+                  : 'loyaltyStore.priceBasisSellShort'
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="sell">{t('loyaltyStore.priceBasisSell')}</SelectItem>
+            <SelectItem value="buy">{t('loyaltyStore.priceBasisBuy')}</SelectItem>
+          </SelectContent>
+        </Select>
         <FilterChip
           label={t('loyaltyStore.affordableFilter')}
           selected={affordableOnly}
