@@ -107,9 +107,10 @@ describe('ActiveJobsPanel: rendering', () => {
     expect(screen.getByText('Widget Beta')).toBeInTheDocument();
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
 
-    // Scoped to the job list, not the filter chips row above it (#409 added a
-    // chip per activity type, so these names now also appear there).
-    const jobList = within(container.querySelector('ul')!);
+    // Scoped to the table body, not the filter chips row above it (#409 added
+    // a chip per activity type, so these names now also appear there) and not
+    // the column headers.
+    const jobList = within(container.querySelector('tbody')!);
     expect(jobList.getByText('Manufacturing')).toBeInTheDocument();
     expect(jobList.getByText('Material efficiency research')).toBeInTheDocument();
     expect(jobList.getByText('Invention')).toBeInTheDocument();
@@ -134,7 +135,7 @@ describe('ActiveJobsPanel: rendering', () => {
 
     // Absolute end date exposed via dateTime (ISO, TZ-stable) as secondary/hover text.
     // Scoped to the job list: the panel header's DataAgeBadge also renders a <time>.
-    const timeEls = container.querySelectorAll('ul time');
+    const timeEls = container.querySelectorAll('tbody time');
     expect(Array.from(timeEls).map((el) => el.getAttribute('dateTime'))).toEqual([
       new Date(NOW.getTime() - 10 * 60_000).toISOString(),
       new Date(NOW.getTime() + 30 * 60_000).toISOString(),
@@ -375,7 +376,7 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
     // The row itself still shows the blueprint's name (unchanged); the context
     // menu it opens targets the job's product typeID.
-    const row = (await screen.findByText('Widget Alpha')).closest('li')!;
+    const row = (await screen.findByText('Widget Alpha')).closest('tr')!;
     fireEvent.contextMenu(row);
 
     const quickbarItem = await screen.findByText('Add to Quickbar');
@@ -404,7 +405,7 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
       </MemoryRouter>
     );
 
-    const row = (await screen.findByText('Widget Alpha')).closest('li')!;
+    const row = (await screen.findByText('Widget Alpha')).closest('tr')!;
     fireEvent.contextMenu(row);
 
     expect(await screen.findByText(/no blueprint/i)).toBeInTheDocument();
@@ -487,5 +488,72 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
     expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
     expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
+  });
+});
+
+describe('ActiveJobsPanel: table columns', () => {
+  it('renders one sortable column set and re-sorts on a header click', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json([
+          {
+            job_id: 1,
+            activity_id: 1,
+            blueprint_type_id: 100,
+            product_type_id: 100,
+            facility_id: 60003760,
+            station_id: 60003760,
+            runs: 250,
+            start_date: new Date(NOW.getTime() - 60 * 60_000).toISOString(),
+            end_date: new Date(NOW.getTime() + 60 * 60_000).toISOString(),
+            status: 'active',
+          },
+          {
+            job_id: 2,
+            activity_id: 11,
+            blueprint_type_id: 200,
+            product_type_id: 200,
+            facility_id: 60003760,
+            station_id: 60003760,
+            runs: 3,
+            start_date: new Date(NOW.getTime() - 60 * 60_000).toISOString(),
+            end_date: new Date(NOW.getTime() + 180 * 60_000).toISOString(),
+            status: 'active',
+          },
+        ])
+      )
+    );
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { container } = render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await screen.findByText('Widget Alpha');
+
+    // Every column the desktop table adds over the old card, header and value.
+    for (const header of ['Blueprint', 'Activity', 'Runs', 'Progress', 'Ends in', 'Ends']) {
+      expect(screen.getByRole('columnheader', { name: header })).toBeInTheDocument();
+    }
+    const rows = within(container.querySelector('tbody')!).getAllByRole('row');
+    expect(within(rows[0]).getByText('250')).toBeInTheDocument();
+    // Absolute end time as a machine-readable <time>, one per row.
+    expect(container.querySelectorAll('tbody time')).toHaveLength(2);
+
+    // Default sort is soonest-ending; sorting by runs ascending flips the pair.
+    expect(within(rows[0]).getByText('Widget Alpha')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Runs' }));
+    const resorted = within(container.querySelector('tbody')!).getAllByRole('row');
+    expect(within(resorted[0]).getByText('Widget Beta')).toBeInTheDocument();
   });
 });
