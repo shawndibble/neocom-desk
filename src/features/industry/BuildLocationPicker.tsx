@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, SearchInput, Spinner } from '@/components/ui';
+import { Button, Disclosure, SearchInput, Spinner } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import { beginEveLogin } from '@/app/loginFlow';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { moveHighlight, type ComboboxNavKey } from './comboboxNav';
 import { MIN_SEARCH_LENGTH, searchBuildLocations } from './searchBuildLocations';
 import type { BuildLocationOption } from './buildLocations';
+
+const LISTBOX_ID = 'build-location-listbox';
+const optionId = (structureId: number) => `build-location-option-${structureId}`;
 
 interface BuildLocationPickerProps {
   /** What the plan is set to right now, already translated. Always the plan's own values. */
@@ -59,6 +64,12 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<BuildLocationOption[] | null>(null);
   const [searching, setSearching] = useState(false);
+  // Which result Arrow/Home/End has highlighted, without moving DOM focus off
+  // the input — the input stays the list's one tab stop.
+  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
+  // Escape hides an already-fetched list without re-searching: the query is
+  // untouched, so nothing in the effect below reruns until it changes.
+  const [dismissed, setDismissed] = useState(false);
   // Distinct from "no results": a 403, a 500 and being offline all used to
   // render "Nothing found. Try more of the name.", which sends the pilot off
   // retyping a name that was never the problem.
@@ -82,6 +93,8 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
     setResults(null);
     setFailed(false);
     setSearching(searchKey !== '');
+    setHighlightedIndex(null);
+    setDismissed(false);
   }
 
   // Only the newest query may write results: ESI answers out of order, and a
@@ -112,6 +125,67 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
     };
   }, [searchKey, characterId]);
 
+  // Narrowed rather than a plain boolean: every read below needs the array
+  // itself, and TS can carry the `results !== null` check through this
+  // ternary into the non-null branch, so nothing downstream needs `results!`.
+  const openResults =
+    !dismissed && !searching && results !== null && results.length > 0 ? results : null;
+
+  // ESI can withhold a structure's name; both the row and the sr-only
+  // highlight announcement need the same "what and where" fallback.
+  function optionLabel(option: BuildLocationOption) {
+    return (
+      option.name ??
+      t('industry.buildLocationUnnamed', {
+        facility: FACILITY_PRESETS[option.facility].name,
+        system: option.systemName,
+      })
+    );
+  }
+
+  function pick(option: BuildLocationOption) {
+    onPick(option);
+    // The searchKey-change block below resets results/highlight/dismissed
+    // once this clears the query on the next render — the same reset every
+    // other query edit already goes through.
+    setQuery('');
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (openResults === null) return;
+    switch (e.key) {
+      case 'ArrowDown':
+      case 'ArrowUp':
+      case 'Home':
+      case 'End':
+        e.preventDefault();
+        setHighlightedIndex((current) =>
+          moveHighlight(e.key as ComboboxNavKey, current, openResults.length)
+        );
+        break;
+      case 'Enter':
+        if (highlightedIndex !== null) {
+          e.preventDefault();
+          pick(openResults[highlightedIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setDismissed(true);
+        setHighlightedIndex(null);
+        break;
+    }
+  }
+
+  // Named for the sr-only status region below: count alone on open, plus the
+  // highlighted row's own label once one is picked out — the two things
+  // "Arrow keys move a highlighted option ... a screen reader announces the
+  // option count and the highlighted option" (#505) asks a screen reader to
+  // say.
+  const highlightedOption =
+    openResults !== null && highlightedIndex !== null ? openResults[highlightedIndex] : null;
+  const highlightedName = highlightedOption ? optionLabel(highlightedOption) : null;
+
   const searchBox =
     granted === undefined ? null : canSearch ? (
       <div className="relative flex flex-col gap-1">
@@ -121,7 +195,26 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
           value={query}
           placeholder={t('industry.buildLocationPlaceholder')}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={openResults !== null}
+          aria-controls={LISTBOX_ID}
+          aria-activedescendant={
+            highlightedOption ? optionId(highlightedOption.structureId) : undefined
+          }
         />
+        <span role="status" aria-live="polite" className="sr-only">
+          {!searching &&
+            !failed &&
+            results !== null &&
+            (highlightedName
+              ? t('industry.buildLocationHighlighted', {
+                  count: results.length,
+                  name: highlightedName,
+                })
+              : t('industry.buildLocationResultsCount', { count: results.length }))}
+        </span>
         {searching && (
           <span className="flex items-center gap-1 text-text-dim">
             <Spinner size="sm" label={t('industry.buildLocationSearching')} />
@@ -135,33 +228,32 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
         {!searching && !failed && results !== null && results.length === 0 && (
           <span className="text-text-dim">{t('industry.buildLocationNoResults')}</span>
         )}
-        {!searching && results !== null && results.length > 0 && (
-          <ul className="max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">
-            {results.map((option) => (
-              <li key={option.structureId} className="border-b border-line last:border-b-0">
-                <button
-                  type="button"
-                  className="flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left hover:bg-panel-2"
-                  onClick={() => {
-                    onPick(option);
-                    setQuery('');
-                    setResults(null);
-                  }}
-                >
-                  <span className="truncate">
-                    {option.name ??
-                      t('industry.buildLocationUnnamed', {
-                        facility: FACILITY_PRESETS[option.facility].name,
-                        system: option.systemName,
-                      })}
-                  </span>
-                  <span className="text-text-dim">
-                    {t('industry.buildLocationDetail', {
-                      facility: FACILITY_PRESETS[option.facility].name,
-                      system: option.systemName,
-                    })}
-                  </span>
-                </button>
+        {openResults !== null && (
+          <ul
+            id={LISTBOX_ID}
+            role="listbox"
+            className="max-h-56 overflow-y-auto rounded-xs border border-line bg-panel"
+          >
+            {openResults.map((option, index) => (
+              <li
+                key={option.structureId}
+                id={optionId(option.structureId)}
+                role="option"
+                aria-selected={index === highlightedIndex}
+                className={cx(
+                  'flex cursor-pointer flex-col items-start gap-0.5 border-b border-line px-2 py-1.5 last:border-b-0',
+                  index === highlightedIndex ? 'bg-panel-2' : 'hover:bg-panel-2'
+                )}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(option)}
+              >
+                <span className="truncate">{optionLabel(option)}</span>
+                <span className="text-text-dim">
+                  {t('industry.buildLocationDetail', {
+                    facility: FACILITY_PRESETS[option.facility].name,
+                    system: option.systemName,
+                  })}
+                </span>
               </li>
             ))}
           </ul>
@@ -183,19 +275,15 @@ export function BuildLocationPicker({ summary, children, onPick }: BuildLocation
     <div className="flex flex-col gap-1.5 text-xs">
       {searchBox}
 
-      <p className="text-text-dim">
-        {summary}{' '}
-        <button
-          type="button"
-          className="underline"
-          aria-expanded={overriding}
-          onClick={() => setOverriding((open) => !open)}
-        >
-          {t(overriding ? 'industry.overrideHide' : 'industry.overrideShow')}
-        </button>
-      </p>
-
-      {overriding && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{children}</div>}
+      <Disclosure
+        label={t('industry.override')}
+        trailing={summary}
+        expanded={overriding}
+        onToggle={() => setOverriding((open) => !open)}
+        className="rounded-xs border border-line"
+      >
+        <div className="grid grid-cols-2 gap-3 p-2 sm:grid-cols-3">{children}</div>
+      </Disclosure>
     </div>
   );
 }
