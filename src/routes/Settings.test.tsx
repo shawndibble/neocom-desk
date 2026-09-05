@@ -153,6 +153,69 @@ describe('Settings', () => {
     expect(await screen.findByText('Public')).toBeInTheDocument();
     expect(screen.getByText('Needs re-login')).toBeInTheDocument();
   });
+
+  it('shows a full date, not just time, on a logged entry (issue #422)', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    const timestamp = new Date('2026-01-15T09:30:00Z').getTime();
+
+    act(() => {
+      useActivityLog.getState().record({
+        endpointId: 'getCharacterSkills',
+        characterId: CHAR_ID,
+        timestamp,
+        outcome: 'success',
+      });
+    });
+
+    const table = screen.getByRole('table', { name: /activity log/i });
+    expect(
+      await within(table).findByText(new Date(timestamp).toLocaleString())
+    ).toBeInTheDocument();
+  });
+
+  it('clears the log on demand, disabled when there is nothing to clear (issue #422)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(screen.getByRole('button', { name: /clear log/i })).toBeDisabled();
+
+    act(() => {
+      useActivityLog.getState().record({
+        endpointId: 'getCharacterSkills',
+        characterId: CHAR_ID,
+        timestamp: Date.now(),
+        outcome: 'success',
+      });
+    });
+    await within(screen.getByRole('table', { name: /activity log/i })).findByText('Pilot One');
+
+    const clearButton = screen.getByRole('button', { name: /clear log/i });
+    expect(clearButton).toBeEnabled();
+    await user.click(clearButton);
+
+    expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/log cleared/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear log/i })).toBeDisabled();
+  });
+
+  it('clears cached ESI data on demand (issue #422)', async () => {
+    const user = userEvent.setup();
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'skills',
+      value: { total_sp: 1 },
+      fetchedAt: 1,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(screen.getByRole('button', { name: /clear cached esi data/i }));
+
+    expect(await screen.findByText(/cache cleared/i)).toBeInTheDocument();
+    expect(await db.esiCache.count()).toBe(0);
+  });
 });
 
 const ALL_NOTIFICATION_SCOPES = [...new Set(NOTIFICATION_EVENTS.map((event) => event.scope))];

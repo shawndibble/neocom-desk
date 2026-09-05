@@ -26,6 +26,8 @@ interface ActivityLogState {
   /** Most recent first. */
   entries: ActivityLogEntry[];
   record: (event: ActivityEvent) => void;
+  /** User-initiated clear (Settings). Session-only store, so there is nothing to purge elsewhere. */
+  clear: () => void;
 }
 
 let nextId = 1;
@@ -37,6 +39,7 @@ export const useActivityLog = create<ActivityLogState>((set) => ({
       entries: [{ ...event, id: nextId++ }, ...state.entries].slice(0, MAX_ACTIVITY_ENTRIES),
     }));
   },
+  clear: () => set({ entries: [] }),
 }));
 
 /** Subscribe the store to `esi`'s activity signal; returns an unsubscribe. */

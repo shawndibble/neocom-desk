@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+  Button,
   DataTable,
   EmptyState,
   FilterChip,
@@ -38,10 +39,27 @@ const OUTCOME_TONE: Record<ActivityOutcome, string> = {
   error: 'text-danger',
 };
 
+/** Transient "it worked" note beside the button that produced it (same pattern as the skill planner's tools pane). */
+function ActionConfirmation({ message }: { message: string }) {
+  return (
+    <p role="status" aria-live="polite" className="text-xs text-success">
+      {message}
+    </p>
+  );
+}
+
 function ActivityLogPanel() {
   const { t } = useTranslation();
   const entries = useActivityLog((state) => state.entries);
+  const clearLog = useActivityLog((state) => state.clear);
   const characters = useLiveQuery(() => db.characters.toArray());
+  const [clearedConfirm, setClearedConfirm] = useState(false);
+
+  function handleClear() {
+    clearLog();
+    setClearedConfirm(true);
+    setTimeout(() => setClearedConfirm(false), 2000);
+  }
   // Empty until the live query resolves — a lookup miss reads as "unknown", not "no characters".
   const characterNames = useMemo(
     () => new Map(characters?.map((c) => [c.characterId, c.name]) ?? []),
@@ -68,7 +86,9 @@ function ActivityLogPanel() {
         id: 'time',
         header: t('activityLog.columnTime'),
         className: 'whitespace-nowrap text-text-dim',
-        render: (entry) => new Date(entry.timestamp).toLocaleTimeString(),
+        // Full date, not just time-of-day: a session that crosses midnight
+        // otherwise makes two entries on different days read as minutes apart.
+        render: (entry) => new Date(entry.timestamp).toLocaleString(),
       },
       {
         id: 'outcome',
@@ -82,9 +102,17 @@ function ActivityLogPanel() {
   );
 
   return (
-    <Panel title={t('activityLog.title')}>
+    <Panel
+      title={t('activityLog.title')}
+      actions={
+        <Button size="sm" onClick={handleClear} disabled={entries.length === 0}>
+          {t('activityLog.clearLog')}
+        </Button>
+      }
+    >
       <div className="space-y-2">
         <p className="text-xs text-text-dim">{t('activityLog.hint')}</p>
+        {clearedConfirm && <ActionConfirmation message={t('activityLog.clearedConfirm')} />}
         {entries.length === 0 ? (
           <EmptyState title={t('activityLog.emptyTitle')} hint={t('activityLog.emptyHint')} />
         ) : (
@@ -96,6 +124,32 @@ function ActivityLogPanel() {
             density="compact"
           />
         )}
+      </div>
+    </Panel>
+  );
+}
+
+function DataPanel() {
+  const { t } = useTranslation();
+  const [clearedConfirm, setClearedConfirm] = useState(false);
+
+  async function handleClearCache() {
+    // Blunt on purpose, matching `esi/cachePurge.ts`'s own tier-2 fallback:
+    // every character's rows, global reference data included. `esiCache` is
+    // 100% re-derivable from ESI, so over-clearing costs a refetch, not data.
+    await db.esiCache.clear();
+    setClearedConfirm(true);
+    setTimeout(() => setClearedConfirm(false), 2000);
+  }
+
+  return (
+    <Panel title={t('settings.dataTitle')}>
+      <div className="space-y-2">
+        <p className="text-xs text-text-dim">{t('settings.dataHint')}</p>
+        <Button size="sm" onClick={() => void handleClearCache()}>
+          {t('settings.clearCache')}
+        </Button>
+        {clearedConfirm && <ActionConfirmation message={t('settings.clearCacheConfirm')} />}
       </div>
     </Panel>
   );
@@ -171,6 +225,7 @@ export function Settings() {
       <div id="corp-access" className="scroll-mt-4">
         <CorpAccessPanel />
       </div>
+      <DataPanel />
       <ActivityLogPanel />
     </div>
   );
