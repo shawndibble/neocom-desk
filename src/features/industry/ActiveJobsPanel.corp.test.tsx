@@ -7,7 +7,7 @@
  * byte-identical, and everything the switch adds is asserted here.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -290,8 +290,10 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     expect(screen.queryByText('Widget Alpha')).toBeNull();
     expect(corpRequests).toBe(1);
     // Same table, different owner — the corp rows render through the very same
-    // row markup, runs count included.
-    expect(screen.getByText('4 run(s)')).toBeInTheDocument();
+    // columns, runs count included.
+    expect(
+      within(screen.getByRole('row', { name: /Widget Beta/ })).getByText('4')
+    ).toBeInTheDocument();
   });
 
   it('gives the corp side its own DataAgeBadge value, not the personal side', async () => {

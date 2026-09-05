@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
+  DataTable,
   EmptyState,
   FilterChip,
   IconButton,
   Panel,
   ReauthBanner,
   Spinner,
+  type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -26,6 +28,7 @@ import {
   type JobsLoadResult,
 } from './jobs';
 import { formatDuration } from '@/lib/duration';
+import { formatEveDateTime } from '@/lib/eveTime';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { jobsCsvColumns } from './jobsCsv';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -120,7 +123,10 @@ export function ActiveJobsPanel({
     return () => clearInterval(id);
   }, []);
 
-  const types = data?.types ?? {};
+  // Stable `{}` fallback: `nameForBlueprint` closes over `types`, and
+  // react-hooks/exhaustive-deps rejects a dependency that is a fresh object
+  // on every render.
+  const types = useMemo(() => data?.types ?? {}, [data]);
   // Each side keeps its own result, so the badge below reports the age of the
   // data actually on screen — the two have different cache windows and must
   // never share one value.
@@ -161,7 +167,133 @@ export function ActiveJobsPanel({
     });
   }
 
-  const nameForBlueprint = (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`;
+  const nameForBlueprint = useCallback(
+    (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`,
+    [types]
+  );
+
+  /** One binding of the warning state: the row tint, the stripe, the badge and the bar all read it. */
+  const soon = useCallback((job: ActiveJob) => isCompletingSoon(job, now), [now]);
+
+  /**
+   * Rebuilt on every countdown tick — the remaining time, the progress
+   * fraction and the warning tone are all relative to `now`, so memoising on
+   * `t` alone would freeze the clock.
+   */
+  const columns = useMemo<DataTableColumn<ActiveJob>[]>(
+    () => [
+      {
+        id: 'blueprint',
+        header: t('industry.jobsColBlueprint'),
+        className: 'font-medium',
+        sortValue: (job) => nameForBlueprint(job.blueprint_type_id),
+        // The row's warning stripe. On a `<tr>` this would be a `box-shadow`,
+        // which Chromium drops under the `border-collapse: collapse` every
+        // table here inherits; a cell border paints. Held behind `sm:` — once
+        // `.dt-stack` blocks the cell there is no row edge to stripe, and the
+        // card's tint already carries the state.
+        cellClassName: (job) => (soon(job) ? 'sm:border-l sm:border-l-warning' : undefined),
+        render: (job) => (
+          <span className="flex items-center gap-1.5">
+            <span>{nameForBlueprint(job.blueprint_type_id)}</span>
+            {soon(job) && (
+              <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
+                {t('industry.jobsCompletingSoon')}
+              </span>
+            )}
+          </span>
+        ),
+      },
+      {
+        id: 'activity',
+        header: t('industry.jobsColActivity'),
+        className: 'text-text-dim',
+        sortValue: (job) => t(activityI18nKey(job.activity_id), { id: job.activity_id }),
+        render: (job) => t(activityI18nKey(job.activity_id), { id: job.activity_id }),
+      },
+      {
+        id: 'runs',
+        header: t('industry.jobsColRuns'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (job) => job.runs,
+        render: (job) => job.runs.toLocaleString(),
+      },
+      {
+        id: 'progress',
+        header: t('industry.jobsColProgress'),
+        // Sorts on the raw fraction, not the rounded percent the cell prints.
+        sortValue: (job) => jobProgress(job, now),
+        render: (job) => {
+          const progress = Math.round(jobProgress(job, now) * 100);
+          return (
+            // Fixed track: `flex-1` in a shrink-to-fit cell has no width to
+            // fill and collapses. Nothing may right-align itself below `sm`
+            // either (docs/DESIGN.md §4a) — hence `sm:text-right`.
+            <span className="flex items-center gap-2">
+              <span
+                role="progressbar"
+                aria-label={t('industry.jobsProgress', {
+                  name: nameForBlueprint(job.blueprint_type_id),
+                })}
+                aria-valuenow={progress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-panel sm:w-24"
+              >
+                <span
+                  className={`block h-full ${soon(job) ? 'bg-warning' : 'bg-accent'}`}
+                  style={{ width: `${progress}%` }}
+                />
+              </span>
+              <span className="w-8 shrink-0 tabular-nums text-text-dim sm:text-right">
+                {progress}%
+              </span>
+            </span>
+          );
+        },
+      },
+      {
+        id: 'endsIn',
+        header: t('industry.jobsColEndsIn'),
+        align: 'right',
+        className: 'tabular-nums whitespace-nowrap',
+        cellClassName: (job) => (soon(job) ? 'font-semibold text-warning' : undefined),
+        // The timestamp, never the printed duration: "1d 4h" sorts before "9h" as a string.
+        sortValue: (job) => Date.parse(job.end_date),
+        render: (job) =>
+          isJobDone(job, now) ? t('industry.jobsDone') : formatDuration(secondsRemaining(job, now)),
+      },
+      {
+        id: 'ends',
+        header: t('industry.jobsColEnds'),
+        className: 'whitespace-nowrap text-text-dim',
+        sortValue: (job) => Date.parse(job.end_date),
+        render: (job) => {
+          const endDate = new Date(job.end_date);
+          return <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>;
+        },
+      },
+    ],
+    [t, now, soon, nameForBlueprint]
+  );
+
+  /** Right-click any row for the shared item menu. */
+  const jobContextMenu = (job: ActiveJob, tr: ReactElement): ReactElement => {
+    const menuTypeId = contextMenuTypeId(job);
+    return (
+      <ItemContextMenu
+        typeId={menuTypeId}
+        itemName={nameForBlueprint(menuTypeId)}
+        blueprintTypeID={job.product_type_id !== undefined ? job.blueprint_type_id : null}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable={quickbarAvailable}
+        onShowInfo={onShowInfo}
+      >
+        {tr}
+      </ItemContextMenu>
+    );
+  };
 
   return (
     <Panel
@@ -273,75 +405,20 @@ export function ActiveJobsPanel({
           {filteredJobs.length === 0 ? (
             <EmptyState title={t('industry.jobsFilteredEmptyTitle')} className="py-4" />
           ) : (
-            <ul className="space-y-2">
-              {filteredJobs.map((job) => {
-                const name = nameForBlueprint(job.blueprint_type_id);
-                const done = isJobDone(job, now);
-                const soon = !done && isCompletingSoon(job, now);
-                const progress = Math.round(jobProgress(job, now) * 100);
-                const endDate = new Date(job.end_date);
-                const menuTypeId = contextMenuTypeId(job);
-                const menuItemName = nameForBlueprint(menuTypeId);
-                return (
-                  <ItemContextMenu
-                    key={job.job_id}
-                    typeId={menuTypeId}
-                    itemName={menuItemName}
-                    blueprintTypeID={
-                      job.product_type_id !== undefined ? job.blueprint_type_id : null
-                    }
-                    onAddToQuickbar={onAddToQuickbar}
-                    quickbarAvailable={quickbarAvailable}
-                    onShowInfo={onShowInfo}
-                  >
-                    <li
-                      className={`rounded-xs border px-3 py-2 ${
-                        soon ? 'border-warning/60 bg-warning/10' : 'border-line bg-panel-2'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="font-medium">{name}</span>
-                        <span className="flex items-center gap-1.5">
-                          {soon && (
-                            <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
-                              {t('industry.jobsCompletingSoon')}
-                            </span>
-                          )}
-                          <span className="text-text-dim">
-                            {t(activityI18nKey(job.activity_id), { id: job.activity_id })}
-                          </span>
-                        </span>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between gap-2 text-[0.6875rem] text-text-dim">
-                        <span>{t('industry.jobsRuns', { count: job.runs })}</span>
-                        <time
-                          dateTime={endDate.toISOString()}
-                          title={endDate.toLocaleString()}
-                          className={`tabular-nums ${done ? '' : soon ? 'font-semibold text-warning' : ''}`}
-                        >
-                          {done
-                            ? t('industry.jobsDone')
-                            : formatDuration(secondsRemaining(job, now))}
-                        </time>
-                      </div>
-                      <div
-                        role="progressbar"
-                        aria-label={t('industry.jobsProgress', { name })}
-                        aria-valuenow={progress}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        className="mt-2 h-1.5 overflow-hidden rounded-full bg-panel"
-                      >
-                        <div
-                          className={`h-full ${soon ? 'bg-warning' : 'bg-accent'}`}
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                    </li>
-                  </ItemContextMenu>
-                );
-              })}
-            </ul>
+            // Six columns overflow the route's `lg:grid-cols-[20rem_1fr]`
+            // column at tablet widths; `.dt-stack` only rescues below `sm`.
+            <div className="overflow-x-auto">
+              <DataTable
+                columns={columns}
+                rows={filteredJobs}
+                rowKey={(job) => job.job_id}
+                label={t('industry.jobsTitle')}
+                defaultSort={{ columnId: 'endsIn', direction: 'asc' }}
+                density="compact"
+                rowClassName={(job) => (soon(job) ? 'bg-warning/10' : undefined)}
+                rowContextMenu={jobContextMenu}
+              />
+            </div>
           )}
         </div>
       )}
