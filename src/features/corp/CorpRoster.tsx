@@ -12,13 +12,22 @@
  * the bottom. Sorting on the date instead would put the people still playing
  * first, which answers a question nobody opened this page to ask.
  */
-import { useMemo } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, EmptyState, StatChip, type DataTableColumn } from '@/components/ui';
+import {
+  DataTable,
+  EmptyState,
+  FilterChip,
+  StatChip,
+  Tooltip,
+  type DataTableColumn,
+} from '@/components/ui';
 import { formatAge } from '@/lib/age';
 import {
   DARK_AFTER_DAYS,
+  DASH,
   isEmptyRosterDiff,
+  label,
   type MemberStanding,
   type RosterDiff,
 } from '@/engine/corp/members';
@@ -34,15 +43,6 @@ export interface RosterRow {
   locationName: string | null;
   locationId: number | null;
   startMs: number | null;
-}
-
-/** The repo's placeholder for a cell with nothing in it (Contacts, Characters). */
-const DASH = '—';
-
-/** A name we could not resolve degrades to the id, never to a blank cell. */
-function label(name: string | null, id: number | null): string {
-  if (name !== null) return name;
-  return id === null ? DASH : `#${id}`;
 }
 
 export function CorpRosterSummary({
@@ -80,24 +80,47 @@ export function CorpRosterSummary({
   );
 }
 
-/** The two figures the page exists to produce, as a stat strip. */
-export function CorpRosterStats({ rows }: { rows: readonly RosterRow[] }) {
+/**
+ * The two figures the page exists to produce, as a stat strip. The dark count
+ * doubles as the "dark only" filter toggle (issue #421, AC3): a `FilterChip`
+ * rather than the `StatChip` it replaces, since `StatChip` is deliberately
+ * the non-interactive readout (`components/ui/FilterChip.tsx`) and this is
+ * the one figure a director actually wants to click through to.
+ */
+export function CorpRosterStats({
+  rows,
+  darkOnly,
+  onToggleDarkOnly,
+}: {
+  rows: readonly RosterRow[];
+  darkOnly: boolean;
+  onToggleDarkOnly: () => void;
+}) {
   const { t } = useTranslation();
   const dark = rows.filter((row) => row.standing.isDark).length;
   return (
     <div className="flex flex-wrap gap-2">
       <StatChip label={t('corp.members.total')} value={rows.length} />
-      <StatChip
-        label={t('corp.members.dark', { days: DARK_AFTER_DAYS })}
-        value={dark}
-        tone={dark > 0 ? 'warning' : 'default'}
-        tooltip={t('corp.members.darkHint', { days: DARK_AFTER_DAYS })}
-      />
+      <Tooltip content={t('corp.members.darkHint', { days: DARK_AFTER_DAYS })}>
+        <FilterChip
+          label={t('corp.members.dark', { days: DARK_AFTER_DAYS })}
+          count={dark}
+          selected={darkOnly}
+          onToggle={onToggleDarkOnly}
+        />
+      </Tooltip>
     </div>
   );
 }
 
-export function CorpRosterTable({ rows }: { rows: readonly RosterRow[] }) {
+export function CorpRosterTable({
+  rows,
+  rowContextMenu,
+}: {
+  rows: readonly RosterRow[];
+  /** Row context menu (issue #421): Show Info + Copy Character Name. */
+  rowContextMenu?: (row: RosterRow, tr: ReactElement) => ReactElement;
+}) {
   const { t } = useTranslation();
   const columns = useMemo<DataTableColumn<RosterRow>[]>(
     () => [
@@ -164,6 +187,7 @@ export function CorpRosterTable({ rows }: { rows: readonly RosterRow[] }) {
     <DataTable
       columns={columns}
       rows={rows}
+      rowContextMenu={rowContextMenu}
       rowKey={(row) => row.characterId}
       label={t('corp.members.tableLabel')}
       density="compact"

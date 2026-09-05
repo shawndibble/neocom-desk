@@ -17,9 +17,17 @@
  * The `unknown` / `ready` asymmetry and the mount-on-`ready` split are
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, EmptyState, IconButton, PageHeader, Panel, Spinner } from '@/components/ui';
+import {
+  DataAgeBadge,
+  EmptyState,
+  IconButton,
+  PageHeader,
+  Panel,
+  SearchInput,
+  Spinner,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
@@ -29,6 +37,8 @@ import {
   CorpRosterTable,
   type RosterRow,
 } from '@/features/corp/CorpRoster';
+import { MemberContextMenu } from '@/features/corp/MemberContextMenu';
+import { membersCsvColumns } from '@/features/corp/membersCsv';
 import { loadCorporationId } from '@/features/corp/boardData';
 import {
   EMPTY_MEMBER_LABELS,
@@ -42,11 +52,17 @@ import { readPreviousRoster, recordRoster } from '@/features/corp/rosterState';
 import {
   EMPTY_ROSTER_DIFF,
   diffRoster,
+  filterRosterRows,
+  label,
   memberStanding,
   type MemberActivity,
   type RosterDiff,
 } from '@/engine/corp/members';
+import { downloadCsv } from '@/lib/downloadCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+
+/** Same debounce shape as `CorpAssets.tsx`/`Assets.tsx`: the input stays responsive, only the filter waits. */
+const SEARCH_DEBOUNCE_MS = 250;
 
 interface MembersSnapshot {
   corporationId: number | null;
@@ -143,6 +159,32 @@ function CorpMembersView() {
     }));
   }, [data]);
 
+  // Search + dark-only filter (issue #421, AC2/AC3): AND-composed, same
+  // stacking rule as Mail's search-and-label filters (CONTEXT.md round 55).
+  // The stat strip's dark count stays computed from the full roster — only
+  // the table narrows.
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [search]);
+  const [darkOnly, setDarkOnly] = useState(false);
+  const visibleRows = useMemo(() => {
+    const searched = filterRosterRows(rows, debouncedSearch);
+    return darkOnly ? searched.filter((row) => row.standing.isDark) : searched;
+  }, [rows, debouncedSearch, darkOnly]);
+
+  // Row context menu (issue #421, AC1): the shared Public Info Modal is the
+  // one entry point, same as every other list with a Show Info action.
+  function memberRowContextMenu(row: RosterRow, tr: ReactElement) {
+    return (
+      <MemberContextMenu characterId={row.characterId} name={label(row.name, row.characterId)}>
+        {tr}
+      </MemberContextMenu>
+    );
+  }
+
   if (!snapshot.hydrated) return <Spinner />;
 
   return (
@@ -168,16 +210,36 @@ function CorpMembersView() {
       {snapshot.loading && data === null ? (
         <Spinner />
       ) : (
-        <Panel padded={false}>
-          <div className="space-y-2 p-3">
-            <CorpRosterStats rows={rows} />
-            <CorpRosterSummary
-              diff={data?.diff ?? EMPTY_ROSTER_DIFF}
-              names={data?.labels.characters ?? EMPTY_MEMBER_LABELS.characters}
-            />
-          </div>
-          <CorpRosterTable rows={rows} />
-        </Panel>
+        <div className="space-y-2">
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('corp.members.searchPlaceholder')}
+          />
+          <Panel padded={false}>
+            <div className="space-y-2 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CorpRosterStats
+                  rows={rows}
+                  darkOnly={darkOnly}
+                  onToggleDarkOnly={() => setDarkOnly((value) => !value)}
+                />
+                <IconButton
+                  size="sm"
+                  icon={<Icon.Download />}
+                  label={t('corp.members.exportCsv')}
+                  disabled={visibleRows.length === 0}
+                  onClick={() => downloadCsv('corp-members', visibleRows, membersCsvColumns(t))}
+                />
+              </div>
+              <CorpRosterSummary
+                diff={data?.diff ?? EMPTY_ROSTER_DIFF}
+                names={data?.labels.characters ?? EMPTY_MEMBER_LABELS.characters}
+              />
+            </div>
+            <CorpRosterTable rows={visibleRows} rowContextMenu={memberRowContextMenu} />
+          </Panel>
+        </div>
       )}
     </div>
   );

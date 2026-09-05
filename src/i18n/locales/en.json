@@ -1898,7 +1898,13 @@
       "empty": "No member activity",
       "emptyHint": "EVE reported no tracking rows for this corporation.",
       "noAccessTitle": "Member tracking needs Director",
-      "noAccessHint": "EVE only opens the member list and its last-login dates to a Director. No other corporation role can see them, and granting access here will not change that."
+      "noAccessHint": "EVE only opens the member list and its last-login dates to a Director. No other corporation role can see them, and granting access here will not change that.",
+      "searchPlaceholder": "Search name, ship, location…",
+      "exportCsv": "Export CSV",
+      "contextMenu": {
+        "showInfo": "Show Info",
+        "copyName": "Copy Character Name"
+      }
     },
     "assets": {
       "title": "Assets",
