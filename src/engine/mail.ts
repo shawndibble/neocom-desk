@@ -72,19 +72,6 @@ export function unreadCountsByTab(labels: readonly SystemLabel[]): ReadonlyMap<M
   return map;
 }
 
-/**
- * A character's own labels, minus the four System Labels — surfaced as
- * selectable filters distinct from the fixed 5-tab strip (CONTEXT.md round
- * 22, reversing round 18's deferral), not folded into the tab bar. A label with no name is
- * dropped too: there is nothing to show on its filter chip.
- */
-export function buildCustomLabelList<L extends SystemLabel>(labels: readonly L[]): L[] {
-  return labels.filter((label) => {
-    if (!label.name) return false;
-    return NAME_TO_TAB[label.name.trim().toLowerCase()] === undefined;
-  });
-}
-
 interface MailHeaderLike {
   mail_id: number;
 }
