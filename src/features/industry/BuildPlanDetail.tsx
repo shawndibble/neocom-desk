@@ -14,7 +14,6 @@ import * as Icon from '@/components/ui/icons';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type {
-  EffectiveMaterial,
   FacilityKind,
   MaterialSourcing,
   RigLevel,
@@ -37,7 +36,7 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
 import { hasShoppingList, shoppingListText } from './shoppingList';
-import { expandBuildPlan, subBuildTableRows } from './subBuildPlan';
+import { expandBuildPlan, subBuildTableRows, type MaterialTableRow } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
@@ -309,6 +308,19 @@ export function BuildPlanDetail({
     [recipes]
   );
 
+  // The one place the *method* half of "can this be built here" is decided
+  // (manufacturing only, docs/context/decisions) — a future new method only
+  // needs to change this. The *depth* half (never on an indented row, which
+  // is what keeps the feature to one level) is each call site's own
+  // `!material.isSubInput` check, since this answers per typeID and cannot
+  // see whether a given row is one.
+  const canBuildHere = useMemo(
+    () =>
+      (typeID: number): boolean =>
+        recipeFor(typeID)?.method === 'manufacturing',
+    [recipeFor]
+  );
+
   // "Use all detected" fills only rows with nothing typed in them: a
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
   // action. The per-row action is the one that overwrites — clicking it on that
@@ -322,42 +334,57 @@ export function BuildPlanDetail({
   );
 
   /**
-   * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
-   * the table and the CSV export rather than per row render.
-   *
-   * Gated on `pricesReady` for the same reason the results panel is: without
-   * live adjusted prices and a system cost index there is no job fee, and a
-   * fee-free quote would call almost everything worth building.
+   * The facility/rig/security/tax inputs every engine context on this plan
+   * needs — the "where and how a job runs" half, which doesn't depend on
+   * whether prices have loaded yet. Shared by `makeOrBuyContext` below and
+   * `expanded`'s own `ctx`, which each then add their own pricing fields with
+   * their own fallback policy (one waits for real prices, the other tolerates
+   * their absence so a plan still renders while they load).
    */
-  const advice = useMemo(() => {
-    const verdicts = new Map<number, MakeOrBuy>();
-    if (!result || !snapshot || snapshot.adjustedPrices === null) return verdicts;
-    if (snapshot.systemCostIndex === null) return verdicts;
-    const context = {
+  const facilityContext = useMemo(
+    () => ({
       facility: facilityPreset,
       rig: plan.rigLevel,
       security: plan.security,
       facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
+    }),
+    [facilityPreset, plan.rigLevel, plan.security, plan.facilityTaxPct]
+  );
+
+  /**
+   * The pricing context every make-or-buy verdict on this plan needs — shared
+   * by `advice` and `subInputAdvice` below, so a plan's own materials and an
+   * expanded row's own inputs are always judged against identical numbers.
+   * Null until live prices land, for the same reason the results panel
+   * waits: without adjusted prices and a system cost index there is no job
+   * fee, and a fee-free quote would call almost everything worth building.
+   */
+  const makeOrBuyContext = useMemo(() => {
+    if (!snapshot || snapshot.adjustedPrices === null || snapshot.systemCostIndex === null) {
+      return null;
+    }
+    return {
+      ...facilityContext,
       systemCostIndex: snapshot.systemCostIndex,
       adjustedPrices: snapshot.adjustedPrices,
       hubPrices: snapshot.hubPrices,
       skills,
     };
+  }, [facilityContext, snapshot, skills]);
+
+  /**
+   * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
+   * the table and the CSV export rather than per row render.
+   */
+  const advice = useMemo(() => {
+    const verdicts = new Map<number, MakeOrBuy>();
+    if (!result || !makeOrBuyContext) return verdicts;
     for (const material of result.materials) {
-      const verdict = makeOrBuy(material, recipeFor(material.typeID), context);
+      const verdict = makeOrBuy(material, recipeFor(material.typeID), makeOrBuyContext);
       if (verdict) verdicts.set(material.typeID, verdict);
     }
     return verdicts;
-  }, [
-    result,
-    snapshot,
-    facilityPreset,
-    plan.rigLevel,
-    plan.security,
-    plan.facilityTaxPct,
-    skills,
-    recipeFor,
-  ]);
+  }, [result, makeOrBuyContext, recipeFor]);
 
   /**
    * The plan with the player's chosen sub-builds applied: materials they asked
@@ -373,32 +400,48 @@ export function BuildPlanDetail({
         hubPrices: snapshot?.hubPrices ?? {},
         sourcing: plan.materialSourcing,
         ctx: {
-          facility: facilityPreset,
-          rig: plan.rigLevel,
-          security: plan.security,
-          facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
+          ...facilityContext,
           systemCostIndex: snapshot?.systemCostIndex ?? 0,
           adjustedPrices: snapshot?.adjustedPrices ?? {},
           skills,
         },
       }),
-    [
-      result,
-      plan.buildHere,
-      plan.materialSourcing,
-      plan.rigLevel,
-      plan.security,
-      plan.facilityTaxPct,
-      facilityPreset,
-      recipeFor,
-      snapshot,
-      skills,
-    ]
+    [result, plan.buildHere, plan.materialSourcing, facilityContext, recipeFor, snapshot, skills]
   );
 
   const visibleMaterials = useMemo(
     () => (result ? subBuildTableRows(result.materials, expanded) : []),
     [result, expanded]
+  );
+
+  /**
+   * Make-or-buy verdicts for the indented rows a build introduced — the same
+   * advice a plan's own materials get, computed separately from `advice`
+   * above rather than by widening `recipeFor`'s reach: that memo's whole job
+   * is to answer "nothing produces this" for a type outside the blueprint's
+   * own materials, which is what keeps the build-here control off an
+   * indented row (its doc comment). This one only ever feeds the
+   * informational marker — cart, hammer or planet, telling the player
+   * whether that recipe input is itself worth building, even though nothing
+   * here lets them act on it a second level down (docs/context/decisions).
+   */
+  const subInputAdvice = useMemo(() => {
+    const verdicts = new Map<number, MakeOrBuy>();
+    if (!makeOrBuyContext) return verdicts;
+    const own = new Set((result?.materials ?? []).map((material) => material.typeID));
+    for (const material of expanded.materials) {
+      if (own.has(material.typeID)) continue;
+      const recipe = materialRecipe(material.typeID, { catalog, pi, ownedBlueprints });
+      const verdict = makeOrBuy(material, recipe, makeOrBuyContext);
+      if (verdict) verdicts.set(material.typeID, verdict);
+    }
+    return verdicts;
+  }, [expanded, result, makeOrBuyContext, catalog, pi, ownedBlueprints]);
+
+  /** `advice` plus `subInputAdvice`, so the table and the CSV export never disagree about which rows have a verdict. */
+  const materialAdvice = useMemo(
+    () => new Map([...advice, ...subInputAdvice]),
+    [advice, subInputAdvice]
   );
 
   /** Wall-clock the sub-jobs add before the main run can even be installed. */
@@ -451,8 +494,12 @@ export function BuildPlanDetail({
    * the action lands back here with `?product=`, creating or selecting that
    * material's own plan so its build-vs-buy read can be compared with this one.
    */
-  function materialContextMenu(material: EffectiveMaterial, tr: ReactElement) {
+  function materialContextMenu(material: MaterialTableRow, tr: ReactElement) {
     const name = nameForType(catalog, material.typeID);
+    // Same one-level-deep rule the inline marker in `MaterialsTable` follows:
+    // never offered on a row that only exists because another build already
+    // introduced it (docs/context/decisions).
+    const buildable = !material.isSubInput && canBuildHere(material.typeID);
     return (
       <ItemContextMenu
         typeId={material.typeID}
@@ -461,6 +508,8 @@ export function BuildPlanDetail({
         onAddToQuickbar={onAddToQuickbar}
         quickbarAvailable={quickbarAvailable}
         onShowInfo={onShowInfo}
+        onToggleBuildHere={buildable ? () => toggleBuildHere(material.typeID) : undefined}
+        buildingHere={material.subBuild !== undefined}
       >
         {tr}
       </ItemContextMenu>
@@ -500,7 +549,7 @@ export function BuildPlanDetail({
         (typeID) => nameForType(catalog, typeID),
         plan.materialSourcing,
         pricesReady,
-        advice
+        materialAdvice
       )
     );
   }
@@ -781,8 +830,8 @@ export function BuildPlanDetail({
               onSourcingChange={onSourcingChange}
               detection={detection}
               rowContextMenu={materialContextMenu}
-              makeOrBuy={advice}
-              canBuildHere={(typeID) => recipeFor(typeID)?.method === 'manufacturing'}
+              makeOrBuy={materialAdvice}
+              canBuildHere={canBuildHere}
               onToggleBuildHere={toggleBuildHere}
             />
             {/*

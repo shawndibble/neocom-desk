@@ -33,12 +33,14 @@ interface IconButtonProps extends Omit<
   variant?: 'ghost' | 'plain';
   /**
    * `danger` is the destructive treatment, matching `Button variant="danger"`.
-   * It lives here rather than as a caller `className` because the base classes
+   * `positive` is the "worth doing" treatment (`text-isk-pos`, the app's
+   * savings-green) — a make-or-buy call worth acting on, say. Either lives
+   * here rather than as a caller `className` because the base classes
    * already set a text colour: two colour utilities on one element resolve by
    * stylesheet order, not by the order they appear in the attribute, so an
    * override passed in from outside is not reliably an override.
    */
-  tone?: 'default' | 'danger';
+  tone?: 'default' | 'danger' | 'positive';
   /** `md` (default) is the toolbar size; `sm` is for controls nested inside a dense row. */
   size?: 'md' | 'sm';
   className?: string;
@@ -107,13 +109,15 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
                   !disabled && 'hover:bg-danger/10',
                   variant === 'ghost' && !disabled && 'hover:border-danger'
                 )
-              : cx(
-                  'text-text-dim',
-                  variant === 'ghost' && 'border-line',
-                  !disabled && 'hover:text-text',
-                  variant === 'ghost' && 'bg-panel-2',
-                  variant === 'ghost' && !disabled && 'hover:border-line-bright'
-                ),
+              : tone === 'positive'
+                ? cx('text-isk-pos', variant === 'ghost' && 'border-line')
+                : cx(
+                    'text-text-dim',
+                    variant === 'ghost' && 'border-line',
+                    !disabled && 'hover:text-text',
+                    variant === 'ghost' && 'bg-panel-2',
+                    variant === 'ghost' && !disabled && 'hover:border-line-bright'
+                  ),
           className
         )}
       >

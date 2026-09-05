@@ -42,6 +42,48 @@ function renderMenu(typeId: number, itemName: string) {
   );
 }
 
+describe('ItemContextMenu — build-here toggle', () => {
+  it("omits the action when the caller supplies nothing — most items are never a plan's own materials", async () => {
+    renderMenu(TRITANIUM, 'Tritanium');
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+
+    await screen.findByRole('menuitem', { name: /Build Plan|No blueprint options/ });
+    expect(
+      screen.queryByRole('menuitem', { name: /Add material components|Buy instead/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['Add material components', 'Buy instead', false],
+    ['Buy instead', 'Add material components', true],
+  ])('offers "%s" and invokes it on select', async (offeredLabel, omittedLabel, buildingHere) => {
+    const onToggleBuildHere = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/industry']}>
+        <ItemContextMenu
+          typeId={TRITANIUM}
+          itemName="Tritanium"
+          blueprintTypeID={null}
+          onAddToQuickbar={vi.fn()}
+          quickbarAvailable
+          onShowInfo={vi.fn()}
+          onToggleBuildHere={onToggleBuildHere}
+          buildingHere={buildingHere}
+        >
+          <button type="button">Tritanium</button>
+        </ItemContextMenu>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+
+    const item = await screen.findByRole('menuitem', { name: offeredLabel });
+    fireEvent.click(item);
+
+    expect(onToggleBuildHere).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menuitem', { name: omittedLabel })).not.toBeInTheDocument();
+  });
+});
+
 describe('ItemContextMenu — View in Industry as material (issue #414)', () => {
   it('offers the action when the caller supplies it, and invokes it on select', async () => {
     const onViewInIndustryAsMaterial = vi.fn();
