@@ -143,8 +143,8 @@ export function SourcingInput({
 }
 
 /**
- * The row's make-or-buy verdict (CONTEXT.md round 29). Two distinct glyphs
- * rather than one glyph in two tones: the verdict has to survive greyscale
+ * The row's make-or-buy verdict (CONTEXT.md round 29). Distinct glyphs
+ * rather than one glyph in several tones: the verdict has to survive greyscale
  * and a screen reader (docs/DESIGN.md §7), so the shape carries it and the
  * label spells it out with both prices. Deliberately not a control — it has
  * nothing to click, so it takes no tab stop from the sourcing inputs on the
@@ -183,13 +183,25 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
     );
   }
   const label = sentences.join(' ');
-  const Glyph = building ? Icon.Build : Icon.Buy;
+  // Three glyphs, not two: "build" covers two different errands. A hammer sends
+  // the player to an industry slot, a planet sends them to a colony, and the
+  // two are not interchangeable — nothing about the manufacturing icon told a
+  // player which one a "build" row meant. The tooltip already said so; the
+  // marker now says it at a glance. Planetary keeps its own tone (`text-accent`,
+  // the app's blue) rather than sharing manufacturing's green, so the split
+  // reads without hovering, and the shapes still carry it in greyscale
+  // (docs/DESIGN.md §7).
+  const planetary = building && advice.method === 'planetary';
+  const Glyph = planetary ? Icon.Planetary : building ? Icon.Build : Icon.Buy;
   return (
     <Tooltip content={label}>
       <span
         role="img"
         aria-label={label}
-        className={cx('shrink-0', building ? 'text-isk-pos' : 'text-text-dim')}
+        className={cx(
+          'shrink-0',
+          planetary ? 'text-accent' : building ? 'text-isk-pos' : 'text-text-dim'
+        )}
       >
         <Glyph size={Icon.ICON_SIZE.sm} />
       </span>

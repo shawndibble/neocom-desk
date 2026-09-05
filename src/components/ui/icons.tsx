@@ -127,6 +127,10 @@ export const Close = withWeight(X);
 export const Rename = withWeight(PencilSimple);
 /** Copy a saved plan to a new one. */
 export const Duplicate = withWeight(Copy);
+/** Put text on the clipboard — the same glyph as `Duplicate`, named for the other sense of "copy". */
+export const CopyToClipboard = withWeight(Copy);
+/** Confirms an action that leaves nothing on screen to look at, e.g. a copy that went to the clipboard. */
+export const Done = withWeight(Check);
 /** Overflow menu. */
 export const More = withWeight(DotsThreeVertical);
 /** Send the plan queue to the clipboard or a CSV download (#224 icon-only toolbar). */

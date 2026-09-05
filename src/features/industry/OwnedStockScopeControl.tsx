@@ -54,34 +54,43 @@ export function OwnedStockScopeControl({
     onChange({ mode: 'selected', locations: next });
   }
 
+  // Two grid children, not one. The picker is a plain select the width of
+  // every other control in the row, so it belongs in a normal cell beside
+  // them — it only ever spanned the full row because the chip list underneath
+  // it needed the width. Splitting them lets the select take the cell after
+  // Facility tax and leaves the chips their own full-width row below, which
+  // also stops the row's height from jumping when "Selected" is chosen.
   return (
-    <div className="col-span-full flex flex-col gap-1 text-xs">
-      <label htmlFor="build-plan-owned-stock-scope">{t('industry.ownedStockScopeLabel')}</label>
-      <NativeSelect
-        id="build-plan-owned-stock-scope"
-        className="max-w-xs"
-        value={mode}
-        onChange={(e) => {
-          const nextMode = e.target.value;
-          // Pre-selecting every currently known location when a player first
-          // switches to "Selected" leaves the count unchanged at the moment
-          // of the switch — flipping the toggle must not silently zero out
-          // "use detected" before the player has chosen anything to exclude.
-          onChange(
-            nextMode === 'selected'
-              ? { mode: 'selected', locations: selected.length > 0 ? selected : locations }
-              : undefined
-          );
-        }}
-      >
-        <option value="everywhere">{t('industry.ownedStockScopeEverywhere')}</option>
-        <option value="selected">{t('industry.ownedStockScopeSelected')}</option>
-      </NativeSelect>
+    <>
+      <div className="flex flex-col gap-1 text-xs">
+        <label htmlFor="build-plan-owned-stock-scope">{t('industry.ownedStockScopeLabel')}</label>
+        <NativeSelect
+          id="build-plan-owned-stock-scope"
+          value={mode}
+          onChange={(e) => {
+            const nextMode = e.target.value;
+            // Pre-selecting every currently known location when a player first
+            // switches to "Selected" leaves the count unchanged at the moment
+            // of the switch — flipping the toggle must not silently zero out
+            // "use detected" before the player has chosen anything to exclude.
+            onChange(
+              nextMode === 'selected'
+                ? { mode: 'selected', locations: selected.length > 0 ? selected : locations }
+                : undefined
+            );
+          }}
+        >
+          <option value="everywhere">{t('industry.ownedStockScopeEverywhere')}</option>
+          <option value="selected">{t('industry.ownedStockScopeSelected')}</option>
+        </NativeSelect>
+      </div>
       {mode === 'selected' &&
         (locations.length === 0 ? (
-          <span className="text-text-dim">{t('industry.ownedStockScopeNoLocations')}</span>
+          <span className="col-span-full text-xs text-text-dim">
+            {t('industry.ownedStockScopeNoLocations')}
+          </span>
         ) : (
-          <div className="mt-1 flex flex-wrap gap-1.5">
+          <div className="col-span-full flex flex-wrap gap-1.5">
             {locations.map((location) => (
               <FilterChip
                 key={ownedStockLocationKey(location)}
@@ -92,6 +101,6 @@ export function OwnedStockScopeControl({
             ))}
           </div>
         ))}
-    </div>
+    </>
   );
 }

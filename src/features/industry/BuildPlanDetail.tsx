@@ -33,9 +33,11 @@ import { buildPlanTypeIds, materialRecipe } from './recipes';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
+import { writeToClipboard } from '@/lib/clipboard';
 import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
+import { hasShoppingList, shoppingListText } from './shoppingList';
 import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
   stockLocationLabel,
@@ -162,6 +164,14 @@ export function BuildPlanDetail({
   // the "prices unavailable" warning on every fresh load before the first
   // response landed.
   const [pricesLoading, setPricesLoading] = useState(true);
+  /**
+   * What the shopping-list button says right now. A clipboard write leaves
+   * nothing on screen to look at, so the control has to report itself —
+   * `null` is the resting label, and the other two states replace it for a
+   * moment. Same beside-the-control confirmation the skill planner's export
+   * uses, in the one form a toolbar IconButton has: its own icon and label.
+   */
+  const [copyState, setCopyState] = useState<'copied' | 'failed' | null>(null);
   // Reset to loading the instant a new fetch is due (hub/typeIds/manual
   // refresh), in the same commit rather than the effect's next tick — same
   // derived-and-cleared-during-render shape as PlanEditor's stale-result
@@ -298,6 +308,16 @@ export function BuildPlanDetail({
     ownedBlueprints,
   ]);
 
+  // The copy confirmation is a flash, not a state the panel keeps. Cleared by
+  // an effect rather than a `setTimeout` inside the handler so unmounting mid-
+  // flash, or clicking again before it fades, cancels the pending timer instead
+  // of setting state on a gone component.
+  useEffect(() => {
+    if (copyState === null) return;
+    const timer = setTimeout(() => setCopyState(null), 2000);
+    return () => clearTimeout(timer);
+  }, [copyState]);
+
   if (!entry || !blueprint) {
     return <EmptyState title={t('industry.blueprintMissing')} className="py-8" />;
   }
@@ -328,6 +348,25 @@ export function BuildPlanDetail({
         {tr}
       </ItemContextMenu>
     );
+  }
+
+  /**
+   * Puts the plan's outstanding materials on the clipboard as multibuy text,
+   * so the whole run can be ordered in one paste in-game.
+   *
+   * The rejection is caught and shown, not left to `void`: a browser that
+   * denies clipboard access (permission refused, or a page that lost focus
+   * between the click and the write) is a real path, and the same silent
+   * failure on the read side is already surfaced by ImportClipboardDialog.
+   */
+  async function copyShoppingList() {
+    if (!result) return;
+    try {
+      await writeToClipboard(shoppingListText(result.materials, (id) => nameForType(catalog, id)));
+      setCopyState('copied');
+    } catch {
+      setCopyState('failed');
+    }
   }
 
   function exportMaterialsCsv() {
@@ -522,9 +561,10 @@ export function BuildPlanDetail({
         actions={
           // `flex-wrap` because this is the one converted toolbar that needs a
           // saved build plan to reach, so it is the one I could not screenshot
-          // at 390px. Four items — badge, two controls, duration — beside the
-          // panel title; if they ever do run out of room, wrapping inside the
-          // (min-height, not fixed) header beats clipping.
+          // at 390px. Five items — badge, three controls, duration — beside the
+          // panel title, since the shopping-list copy joined the row; if they
+          // ever do run out of room, wrapping inside the (min-height, not
+          // fixed) header beats clipping.
           <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-text-dim">
             {fetchedAt && <DataAgeBadge date={fetchedAt} />}
             {bulkDetectedPatches.length > 0 && (
@@ -532,6 +572,35 @@ export function BuildPlanDetail({
                 {t('industry.useAllDetected')}
               </Button>
             )}
+            {/*
+              Gated on there being a remainder to order, not on the table
+              having rows: a plan whose every material is already owned still
+              renders a full table, and the list it would copy is empty.
+            */}
+            <IconButton
+              size="sm"
+              icon={
+                copyState === 'copied' ? (
+                  <Icon.Done />
+                ) : copyState === 'failed' ? (
+                  <Icon.Warn />
+                ) : (
+                  <Icon.CopyToClipboard />
+                )
+              }
+              // Both outcomes change the glyph as well as the tone, so neither
+              // is carried by colour alone (docs/DESIGN.md §7).
+              tone={copyState === 'failed' ? 'danger' : 'default'}
+              label={
+                copyState === 'copied'
+                  ? t('industry.copyShoppingListDone')
+                  : copyState === 'failed'
+                    ? t('industry.copyShoppingListFailed')
+                    : t('industry.copyShoppingList')
+              }
+              onClick={() => void copyShoppingList()}
+              disabled={!!error || !result || !hasShoppingList(result.materials)}
+            />
             <IconButton
               size="sm"
               icon={<Icon.Download />}
