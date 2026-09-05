@@ -63,7 +63,9 @@ _Recorded 2026-09-05._
   read the cache first and ask only for ids they have no name for. A lapsed
   name (`STALE_AFTER.static`) is returned at once and refreshed behind the
   caller; an unknown one still blocks, because there is nothing to show
-  instead.
+  instead. Type names get the same window rather than none: CCP does rename
+  items (tiericide renamed hundreds), and a `type:` row with no window would be
+  the one place in the app a rename never arrived.
 
 - **`STALE_AFTER.static` keys keep their blocking read in `loadPastWindow`.**
   A lapsed static row still plain-awaits rather than racing the 250ms grace.
@@ -71,3 +73,12 @@ _Recorded 2026-09-05._
 STALE_AFTER.static` loader already serves from its window without a request —
   and giving it the grace race would trade a documented decision for a
   stale-then-swap flash across a whole asset list.
+
+- **The regression test for all of this is an e2e spec, not a unit test.**
+  `e2e/cachedNavigation.spec.ts` logs in, opens Employment, leaves, and comes
+  back. A retained snapshot only exists on a view's _second_ mount, and
+  `vitest.setup.ts` resets that store before every test — so no unit test can
+  cross a route transition. The spec clears the `esiCache` rows rather than
+  expiring them before the return visit: an expired row is still served after
+  `STALE_GRACE_MS`, so expiring alone cannot tell the retained snapshot apart
+  from the grace path. It was confirmed to fail with `cacheKey` removed.

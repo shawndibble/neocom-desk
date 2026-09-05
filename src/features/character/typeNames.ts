@@ -25,7 +25,13 @@
 import { EsiError } from '@/esi/client';
 import { getUniverseType, postUniverseNames } from '@/esi/endpoints';
 import { loadTypes } from '@/sde/loadSde';
-import { GLOBAL_CACHE_CHARACTER_ID, readCached, readCachedEntries, writeCached } from '@/esi/cache';
+import {
+  GLOBAL_CACHE_CHARACTER_ID,
+  STALE_AFTER,
+  readCached,
+  readCachedEntries,
+  writeCached,
+} from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
 /** ESI's documented cap on ids per /universe/names request (maxItems in the spec). */
@@ -44,25 +50,47 @@ function chunk<T>(items: T[], size: number): T[][] {
 /**
  * Resolves whatever the SDE snapshot doesn't cover, via esiCache then ESI.
  *
- * Cache first, not cache-as-fallback. A type name is as immutable as the SDE
- * snapshot this backstops — nothing re-reads that at runtime either — so an id
- * resolved once has no reason to cost a request ever again. Reading it last,
- * as this used to, meant a page holding any market- or asset-only type (which
- * the slim snapshot deliberately omits) blocked on a live POST on every single
- * render.
+ * Cache first, not cache-as-fallback — reading it last, as this used to, meant
+ * a page holding any market- or asset-only type (which the slim snapshot
+ * deliberately omits) blocked on a live POST on every single render.
+ *
+ * The same three tiers as `names.ts`, and the same `STALE_AFTER.static`
+ * window: a type name is near-immutable but not actually immutable (tiericide
+ * renamed hundreds of items), and a row with no window at all would be the one
+ * place in the app a rename never arrived. Only an id with no cached name
+ * makes the caller wait.
  */
 async function resolveViaEsi(typeIds: number[]): Promise<Map<number, string>> {
   const map = new Map<number, string>();
   const cached = await readCachedEntries<string>(GLOBAL_CACHE_CHARACTER_ID, typeIds.map(cacheKey));
+  const now = Date.now();
   const unknown: number[] = [];
+  const lapsed: number[] = [];
   for (const id of typeIds) {
     const row = cached.get(cacheKey(id));
-    if (row === undefined) unknown.push(id);
-    else map.set(id, row.value);
+    if (row === undefined) {
+      unknown.push(id);
+      continue;
+    }
+    map.set(id, row.value);
+    if (now - row.fetchedAt >= STALE_AFTER.static) lapsed.push(id);
   }
-  if (unknown.length === 0) return map;
+  if (unknown.length === 0) {
+    // Never awaited, and never re-entering this function: `fetchFromEsi` does
+    // no cache read of its own, so a background refresh cannot schedule
+    // another one.
+    if (lapsed.length > 0) void fetchFromEsi(lapsed).catch(() => {});
+    return map;
+  }
+  // One request for both tiers when the caller is waiting anyway.
+  for (const [id, name] of await fetchFromEsi([...unknown, ...lapsed])) map.set(id, name);
+  return map;
+}
 
-  for (const ids of chunk(unknown, NAMES_BATCH_LIMIT)) {
+/** The network half: batched POST, per-id fallback, then whatever is cached. Never rejects. */
+async function fetchFromEsi(typeIds: number[]): Promise<Map<number, string>> {
+  const map = new Map<number, string>();
+  for (const ids of chunk(typeIds, NAMES_BATCH_LIMIT)) {
     let unresolved = ids;
     try {
       const resolved = await postUniverseNames(ids);

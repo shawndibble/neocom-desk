@@ -244,7 +244,12 @@ describe('loadTypeNames', () => {
     // page that resolved it once must not go back to ESI for it on every
     // later render.
     let called = false;
-    await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
+    await db.esiCache.put({
+      characterId: 0,
+      key: 'type:100',
+      value: 'Widget 100',
+      fetchedAt: Date.now(),
+    });
     server.use(
       http.post(`${ESI_BASE_URL}/universe/names`, () => {
         called = true;
@@ -260,7 +265,12 @@ describe('loadTypeNames', () => {
 
   it('asks only for the SDE-missing ids it has no cached name for', async () => {
     let asked: number[] = [];
-    await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
+    await db.esiCache.put({
+      characterId: 0,
+      key: 'type:100',
+      value: 'Widget 100',
+      fetchedAt: Date.now(),
+    });
     server.use(
       http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
         asked = (await request.json()) as number[];
@@ -273,6 +283,30 @@ describe('loadTypeNames', () => {
     expect(asked).toEqual([101]);
     expect(names.get(100)).toBe('Widget 100');
     expect(names.get(101)).toBe('Widget 101');
+  });
+
+  it('returns a lapsed cached name at once and refreshes it behind the caller', async () => {
+    // CCP does rename items (tiericide renamed hundreds), so a `type:` row
+    // gets the same `STALE_AFTER.static` window every other static key has —
+    // it just never makes the caller wait for it.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Old Name', fetchedAt: 1 });
+    server.use(
+      http.post(`${ESI_BASE_URL}/universe/names`, async () => {
+        await held;
+        return HttpResponse.json([{ id: 100, name: 'New Name', category: 'inventory_type' }]);
+      })
+    );
+
+    expect((await loadTypeNames([100])).get(100)).toBe('Old Name');
+
+    release();
+    await vi.waitFor(async () =>
+      expect((await db.esiCache.get([0, 'type:100']))?.value).toBe('New Name')
+    );
   });
 
   it('falls back to cached names when ESI is unreachable (offline)', async () => {
