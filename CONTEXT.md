@@ -2645,6 +2645,12 @@ at all.
   (`read_character_orders` vs `read_character_wallet`) and different
   pagination (all pages vs the last five), so a single loader would fail as a
   unit where two fail independently.
+- **The view is picked from a select in the table's own header, not a second
+  row of tabs.** Tabs under tabs read as a hierarchy that isn't there, and
+  these are two readings of one past rather than two places to be. The select
+  carries an `InfoTooltip` beside it, because "Orders" and "Transactions"
+  sound interchangeable until you have hit the difference: an order is what
+  you asked for, a transaction is what actually changed hands.
 - **`?section=history` and `?section=transactions` are unchanged.** The views
   keep their own `section` values rather than moving behind a nested param, so
   every existing link still lands where it did, and each view keeps its own

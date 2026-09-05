@@ -45,6 +45,7 @@ import {
   filterMarketTree,
   addAncestors,
   MARKET_TREE_MATCH_LIMIT,
+  MARKET_TREE_MIN_QUERY_LENGTH,
 } from '@/features/market/marketTree';
 import {
   getOrderBook,
@@ -71,6 +72,7 @@ import {
   filterOrdersByLocation,
   orderExpiry,
   summarizeOrderBook,
+  isNpcStationOrder,
   type NpcStationLookup,
   type SolarSystemLookup,
   type OrderBookSummary,
@@ -85,12 +87,14 @@ import {
 } from '@/engine/market/urlState';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
+import { typeIconUrl } from '@/lib/eveImages';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { orderBookCsvColumns, rangeLabel } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
+import type { HistoryView } from '@/features/market/HistoryViewSelect';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 
 /** Debounce for the catalogue search, so a fast typist doesn't re-filter the tree on every keystroke. */
@@ -109,18 +113,17 @@ const ROW_CAP = 15;
  * `history` and `transactions` are one tab wearing two hats: both are the
  * character's past, they overlap on item and side, and they answer the same
  * question from either end — which orders ended, and which fills paid out.
- * So History is the tab and they are its two views. They stay separate
- * `section` values rather than a nested param because that keeps every
- * existing `?section=` link working and lets each view keep its own
- * `useRouteSnapshot`, so opening one never fetches the other.
+ * So History is the tab, and the view is picked from a select in the table's
+ * own header (`HistoryViewSelect`) rather than a second row of tabs. They
+ * stay separate `section` values rather than a nested param because that
+ * keeps every existing `?section=` link working and lets each view keep its
+ * own `useRouteSnapshot`, so opening one never fetches the other.
  */
 type MarketSection = 'browser' | 'orders' | 'history' | 'transactions';
 function parseMarketSection(value: string | null): MarketSection {
   return value === 'orders' || value === 'history' || value === 'transactions' ? value : 'browser';
 }
 
-/** The two views behind the History tab. `history` is the one it opens on. */
-type HistoryView = Extract<MarketSection, 'history' | 'transactions'>;
 function isHistoryView(section: MarketSection): section is HistoryView {
   return section === 'history' || section === 'transactions';
 }
@@ -245,11 +248,12 @@ function MarketGroupTree({
                       onClick={() => onSelect(item.typeId)}
                       style={{ paddingLeft: `${(depth + 1) * 0.75 + 0.75}rem` }}
                       aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
-                      className={`w-full truncate py-1 text-left text-xs hover:text-accent ${
+                      className={`flex w-full items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent ${
                         selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
                       }`}
                     >
-                      {item.name}
+                      <img src={typeIconUrl(item.typeId, 32)} alt="" className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.name}</span>
                     </button>
                   </ItemContextMenu>
                 </li>
@@ -490,6 +494,11 @@ export function Market() {
   // The order row context menu's "filter to this station" action (CONTEXT.md
   // round 10); undone via the banner rendered above the tables.
   const [stationFilter, setStationFilter] = useState<number | null>(null);
+  // Separate from Location Mode/station filter (both narrow by *where*): this
+  // narrows by *what kind of seller* — a player structure never has a
+  // resolvable name (ADR 0003), which some traders want to exclude entirely
+  // rather than see as "unknown structure" rows.
+  const [locationKindFilter, setLocationKindFilter] = useState<'all' | 'npc' | 'structure'>('all');
   // Market Data / Price History (issue #11). Market Data selected by default.
   const [itemTab, setItemTab] = useState<'orders' | 'history'>('orders');
   // "Adjusting state when a prop changes" (react.dev): resets the previous
@@ -507,6 +516,12 @@ export function Market() {
     setBuyShowAll(false);
     setOrderBookResult(null);
     setStationFilter(null);
+    // Set in the same render as the reset above, not left for the fetch
+    // effect a tick later — otherwise the one commit in between paints
+    // `orderBookLoading: false` alongside the just-cleared `orderBookResult`,
+    // which the table below reads as "loaded, and empty" and flashes the
+    // empty state before the spinner.
+    if (selectedTypeId !== null) setOrderBookLoading(true);
   }
 
   useEffect(() => {
@@ -711,12 +726,26 @@ export function Market() {
     [buy, stationFilter]
   );
   const sortedSell = useMemo(
-    () => [...filteredSell].sort((a, b) => a.price - b.price),
-    [filteredSell]
+    () =>
+      filteredSell
+        .filter(
+          (o) =>
+            locationKindFilter === 'all' ||
+            isNpcStationOrder(o, npcStationMap) === (locationKindFilter === 'npc')
+        )
+        .sort((a, b) => a.price - b.price),
+    [filteredSell, locationKindFilter, npcStationMap]
   );
   const sortedBuy = useMemo(
-    () => [...filteredBuy].sort((a, b) => b.price - a.price),
-    [filteredBuy]
+    () =>
+      filteredBuy
+        .filter(
+          (o) =>
+            locationKindFilter === 'all' ||
+            isNpcStationOrder(o, npcStationMap) === (locationKindFilter === 'npc')
+        )
+        .sort((a, b) => b.price - a.price),
+    [filteredBuy, locationKindFilter, npcStationMap]
   );
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
@@ -837,8 +866,23 @@ export function Market() {
 
   function handleRefresh() {
     // Manual refresh must bypass getOrderBook's 300s TTL cache (CONTEXT.md
-    // "Data Age": refresh happens on app open + manual button only).
-    clearOrderBookCache();
+    // "Data Age": refresh happens on app open + manual button only) — scoped
+    // to what's actually on screen (the selected item, plus the Variations
+    // table rows beneath it, which reuse this same tick to refetch their own
+    // prices in place), not a global wipe. That's the difference from the
+    // Compare Drawer: its rows aren't part of this page's own render, so
+    // they keep whatever's still within TTL instead of being forced to
+    // refetch just because something else on the page was refreshed. (The
+    // button is disabled without a selection, so resolvedRegion is only null
+    // here on an unlucky race with the catalogue still hydrating; skip the
+    // clear rather than wipe everything in that window.)
+    if (resolvedRegion && selectedTypeId !== null) {
+      clearOrderBookCache(resolvedRegion.regionId, selectedTypeId);
+    }
+    for (const row of variationsResultRef.current?.rows ?? []) {
+      const region = resolveOrderBookRegion(row.typeId, chosenRegionId, globalMarketsMap);
+      clearOrderBookCache(region.regionId, row.typeId);
+    }
     setRefreshTick((n) => n + 1);
   }
 
@@ -894,6 +938,14 @@ export function Market() {
       selectedItem ? getVariationRows(variationIndex, typesByGroup, typesById, selectedItem) : null,
     [variationIndex, typesByGroup, typesById, selectedItem]
   );
+  // Latest-ref pattern (useCompareRows.ts): handleRefresh is declared above
+  // this memo (it needs to be in scope for the header's onClick) and reads
+  // this value only on click, well after it settles — a ref sidesteps that
+  // ordering entirely instead of asking the render function to read ahead.
+  const variationsResultRef = useRef(variationsResult);
+  useEffect(() => {
+    variationsResultRef.current = variationsResult;
+  });
 
   const [variationPrices, setVariationPrices] = useState<
     ReadonlyMap<number, OrderBookSummary | undefined>
@@ -1056,20 +1108,8 @@ export function Market() {
 
       {section === 'orders' && <OpenOrdersPanel />}
 
-      {isHistoryView(section) && (
-        <>
-          <Tabs
-            label={t('market.sections.historyViews')}
-            value={section}
-            onChange={(id) => handleSectionChange(id as MarketSection)}
-            tabs={[
-              { id: 'history', label: t('market.sections.historyOrders') },
-              { id: 'transactions', label: t('market.sections.transactions') },
-            ]}
-          />
-          {section === 'history' ? <OrderHistoryPanel /> : <TransactionsPanel />}
-        </>
-      )}
+      {section === 'history' && <OrderHistoryPanel onViewChange={handleSectionChange} />}
+      {section === 'transactions' && <TransactionsPanel onViewChange={handleSectionChange} />}
 
       {section === 'browser' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
@@ -1081,6 +1121,13 @@ export function Market() {
               placeholder={t('market.searchPlaceholder')}
               aria-label={t('market.searchLabel')}
             />
+
+            {rawQuery.trim().length > 0 &&
+              rawQuery.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
+                <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
+                  {t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH })}
+                </p>
+              )}
 
             {filterResult?.capped && (
               <p className="pt-2 text-[0.6875rem] text-warning uppercase">
@@ -1178,6 +1225,28 @@ export function Market() {
                         })}
                       </p>
                     )}
+                    <div
+                      role="group"
+                      aria-label={t('market.locationKind.label')}
+                      className="flex flex-wrap gap-2 px-3 pt-2"
+                    >
+                      <FilterChip
+                        label={t('market.locationKind.all')}
+                        selected={locationKindFilter === 'all'}
+                        onToggle={() => setLocationKindFilter('all')}
+                      />
+                      <FilterChip
+                        label={t('market.locationKind.npc')}
+                        selected={locationKindFilter === 'npc'}
+                        onToggle={() => setLocationKindFilter('npc')}
+                      />
+                      <FilterChip
+                        label={t('market.locationKind.structure')}
+                        selected={locationKindFilter === 'structure'}
+                        onToggle={() => setLocationKindFilter('structure')}
+                      />
+                    </div>
+
                     <div className="divide-y divide-line">
                       {stationFilter !== null && (
                         <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
