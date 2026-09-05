@@ -214,9 +214,10 @@ describe('SkillCompare', () => {
     await user.type(input, 'Miners{Enter}');
     expect(await screen.findByText('Miners')).toBeInTheDocument();
 
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const row = screen.getByText('Miners').closest('li')!;
     await user.click(within(row).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('Miners')).not.toBeInTheDocument());
     expect(screen.getByText('No saved comparisons yet.')).toBeInTheDocument();
   });
@@ -253,6 +254,51 @@ describe('SkillCompare', () => {
 
     expect(await screen.findByText('No skill data cached')).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: 'Skill comparison' })).not.toBeInTheDocument();
+  });
+
+  it('differing-only toggle hides rows where every compared character matches', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_B}/skills`, () =>
+        HttpResponse.json({
+          skills: [
+            // Matches Pilot One's Gunnery level exactly.
+            { skill_id: GUNNERY, trained_skill_level: 3, skillpoints_in_skill: 24_000 },
+            { skill_id: SPACESHIP_COMMAND, trained_skill_level: 2, skillpoints_in_skill: 8000 },
+          ],
+          total_sp: 32_000,
+          unallocated_sp: 0,
+        })
+      )
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(within(await picker()).getByRole('button', { name: /Pilot One/ }));
+    await user.click(within(await picker()).getByRole('button', { name: /Pilot Two/ }));
+
+    const table = await screen.findByRole('table', { name: 'Skill comparison' });
+    expect(rowByFirstCell(table, 'Gunnery')).toBeInTheDocument();
+    expect(rowByFirstCell(table, 'Spaceship Command')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Differing only' }));
+
+    expect(() => rowByFirstCell(table, 'Gunnery')).toThrow();
+    expect(rowByFirstCell(table, 'Spaceship Command')).toBeInTheDocument();
+  });
+
+  it('group column toggle removes the group column from the table', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(within(await picker()).getByRole('button', { name: /Pilot One/ }));
+
+    const table = await screen.findByRole('table', { name: 'Skill comparison' });
+    expect(within(table).getByRole('columnheader', { name: 'Group' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Group column' }));
+
+    expect(within(table).queryByRole('columnheader', { name: 'Group' })).not.toBeInTheDocument();
   });
 
   it('clicking Save again for the same selection updates the saved entry instead of duplicating it', async () => {

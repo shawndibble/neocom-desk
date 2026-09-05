@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { StrictMode } from 'react';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -49,6 +49,7 @@ beforeEach(async () => {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
+  await db.stationPins.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
 });
 
@@ -76,6 +77,42 @@ describe('Callback', () => {
     expect(tokenRequests).toBe(1);
     expect(await db.characters.get(CHAR_ID)).toMatchObject({ name: 'CCP Alpha' });
     expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
+  });
+
+  it('gives the newly-added Character the account-wide pins the account holds (#432)', async () => {
+    // End to end through the real route: an existing Character holds an
+    // account-wide station pin, and the Character signing in here has never
+    // been on this device. Round 7's fan-out wrote that pin only for the
+    // Characters known at the time, so without the backfill the new one lands
+    // without it.
+    await db.characters.put({
+      characterId: 90_000_001,
+      name: 'Existing Pilot',
+      ownerHash: 'owner-hash-0',
+      addedAt: 1,
+    });
+    await db.stationPins.put({
+      id: '90000001:60003760',
+      characterId: 90_000_001,
+      locationId: 60_003_760,
+      scope: 'account',
+      updatedAt: 12_345,
+    });
+    sessionStorage.setItem('neocom.sso.state', 'state-1');
+    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    await vi.waitFor(async () => {
+      expect(await db.stationPins.get(`${CHAR_ID}:60003760`)).toMatchObject({
+        characterId: CHAR_ID,
+        locationId: 60_003_760,
+        scope: 'account',
+        // Carried, not restamped — a `Date.now()` here would out-rank any
+        // tombstone this Character holds on another device.
+        updatedAt: 12_345,
+      });
+    });
   });
 
   it('shows an i18n error with a retry link on state mismatch', async () => {

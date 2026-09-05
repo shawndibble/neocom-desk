@@ -7,6 +7,7 @@
 // pulling in the ~160 KB Firebase bundle.
 
 import { db } from '@/db';
+import type { LocalTombstone } from './merge';
 
 export const INTERNAL_PREFIX = 'sync.__';
 
@@ -20,6 +21,18 @@ export const quickbarTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}quickbarTombstones.${characterId}`;
 export const stationPinTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}stationPinTombstones.${characterId}`;
+
+/**
+ * One Character's tombstone list for a collection, by its bookkeeping key.
+ *
+ * Lives here rather than in planSync.ts so a Firebase-free module can read
+ * tombstones — `accountWideBackfill.ts` has to, and importing planSync would
+ * drag the ~160 KB Firebase bundle into a Dexie-only path.
+ */
+export async function readTombstones(key: string): Promise<LocalTombstone[]> {
+  const record = await db.settings.get(key);
+  return Array.isArray(record?.value) ? (record.value as LocalTombstone[]) : [];
+}
 
 /**
  * Drop every device-local sync bookkeeping key for one Character (owner-hash

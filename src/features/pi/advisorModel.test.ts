@@ -41,8 +41,11 @@ function colony(planetId: number, planetType: CharacterPlanet['planet_type']): C
   };
 }
 
-function detail(pins: PlanetPin[]): CharacterPlanetDetail {
-  return { links: [], pins, routes: [] };
+function detail(
+  pins: PlanetPin[],
+  links: CharacterPlanetDetail['links'] = []
+): CharacterPlanetDetail {
+  return { links, pins, routes: [] };
 }
 
 /** A Temperate ECU on CCP's own worked baseline: 6,965 a cycle, 30-minute cycles, 14 days. */
@@ -269,5 +272,45 @@ describe('systemAdvice', () => {
     if (advice.kind !== 'built') throw new Error('unreachable');
     expect(advice.colony.detailLoaded).toBe(false);
     expect(advice.colony.extractors).toEqual([]);
+  });
+});
+
+describe('link cost', () => {
+  it('reports how many links the colony has, because their cost is not in the load', () => {
+    // A link draws CPU and Powergrid (dogma 15/49 base, 1633/1634 per km) and
+    // nothing here charges for it — the distance term needs a per-planet
+    // radius the app has no source for. So the count is surfaced and the card
+    // stops claiming headroom it cannot stand behind.
+    const advice = systemAdvice(
+      {
+        planets: [{ planetId: 40_000_001, name: 'Somewhere I', typeId: 11 }],
+        colonies: [colony(40_000_001, 'temperate')],
+        details: new Map([
+          [
+            40_000_001,
+            detail(
+              [extractorPin(1, 2073)],
+              [{ source_pin_id: 1, destination_pin_id: 2, link_level: 0 }]
+            ),
+          ],
+        ]),
+      },
+      pi
+    );
+
+    expect(advice[0]).toMatchObject({ kind: 'built', colony: { linkCount: 1 } });
+  });
+
+  it('reports zero links for a colony that has none', () => {
+    const advice = systemAdvice(
+      {
+        planets: [{ planetId: 40_000_001, name: 'Somewhere I', typeId: 11 }],
+        colonies: [colony(40_000_001, 'temperate')],
+        details: new Map([[40_000_001, detail([extractorPin(1, 2073)])]]),
+      },
+      pi
+    );
+
+    expect(advice[0]).toMatchObject({ kind: 'built', colony: { linkCount: 0 } });
   });
 });

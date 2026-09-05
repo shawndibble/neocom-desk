@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { completeLogin } from '@/auth/session';
+import { addCharacter } from '@/features/character/addCharacter';
 import { Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 /**
- * EVE SSO redirect target. Exchanges the code exactly once — completeLogin
- * consumes the one-time PKCE stash, so a ref guards against React 19
- * StrictMode running the effect twice.
+ * EVE SSO redirect target. Exchanges the code exactly once — the login inside
+ * `addCharacter` consumes the one-time PKCE stash, so a ref guards against
+ * React 19 StrictMode running the effect twice.
  */
 export function Callback() {
   const { t } = useTranslation();
@@ -26,7 +26,7 @@ export function Callback() {
     Promise.resolve()
       .then(() => {
         if (!code || !state) throw new Error('missing code or state param');
-        return completeLogin({ code, state });
+        return addCharacter({ code, state });
       })
       .then(async (character) => {
         // First login becomes the active character automatically.

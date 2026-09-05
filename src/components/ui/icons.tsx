@@ -37,6 +37,7 @@ import {
   EyeSlash,
   Export as ExportIcon,
   Factory,
+  FileText,
   Flag,
   Gauge,
   GraduationCap,
@@ -172,3 +173,5 @@ export const Extraction = withWeight(Gauge);
 export const Social = withWeight(EnvelopeSimple);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
+/** Contracts — courier, item exchange, auction. */
+export const Contracts = withWeight(FileText);

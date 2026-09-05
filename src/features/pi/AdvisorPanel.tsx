@@ -383,22 +383,35 @@ function BuiltCard({
         )}
 
         <div className="mt-auto border-t border-line pt-2">
-          <CardLine label={t('piAdvisor.roomForLabel')}>
-            {room.length === 0 ? (
-              <span className="text-text-dim">{t('piAdvisor.roomForNothing')}</span>
-            ) : (
-              <span className="text-text-dim">
-                {room
-                  .map((kind) =>
-                    t('piAdvisor.roomForItem', {
-                      count: headroom[kind],
-                      pin: t(`piAdvisor.pinKind.${kind}`),
-                    })
-                  )
-                  .join(' · ')}
-              </span>
-            )}
-          </CardLine>
+          {/*
+            A colony with links has a load this app cannot fully measure, so it
+            gets no headroom figure at all — the same rule the unbuilt cards
+            follow: name what is true, print no number that isn't. Showing
+            "room for 12 factories" to a pilot whose colony is full is the one
+            failure this tab exists to avoid.
+          */}
+          {colony.linkCount > 0 ? (
+            <p className="text-[0.6875rem] text-warning">
+              {t('piAdvisor.roomUnknownLinks', { count: colony.linkCount })}
+            </p>
+          ) : (
+            <CardLine label={t('piAdvisor.roomForLabel')}>
+              {room.length === 0 ? (
+                <span className="text-text-dim">{t('piAdvisor.roomForNothing')}</span>
+              ) : (
+                <span className="text-text-dim">
+                  {room
+                    .map((kind) =>
+                      t('piAdvisor.roomForItem', {
+                        count: headroom[kind],
+                        pin: t(`piAdvisor.pinKind.${kind}`),
+                      })
+                    )
+                    .join(' · ')}
+                </span>
+              )}
+            </CardLine>
+          )}
         </div>
       </>
     </PlanetCard>

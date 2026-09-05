@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildComparisonRows } from './compareSkills';
+import { buildComparisonRows, hasDifferingLevels, idsNeedingFetch } from './compareSkills';
+import type { ComparisonRow } from './compareSkills';
 import type { TrainedSkill } from '@/engine/types';
 
 const GUNNERY = 1;
@@ -86,5 +87,65 @@ describe('buildComparisonRows', () => {
 
   it('returns no rows for a character id with no entry in the map at all', () => {
     expect(buildComparisonRows([1], new Map(), CATALOG)).toEqual([]);
+  });
+});
+
+function row(levels: [number, number][]): ComparisonRow {
+  return {
+    skillTypeID: GUNNERY,
+    name: 'Gunnery',
+    groupName: 'Gunnery',
+    levels: new Map(levels),
+    maxLevel: Math.max(0, ...levels.map(([, level]) => level)),
+  };
+}
+
+describe('hasDifferingLevels', () => {
+  it('is false when every compared character has the same level', () => {
+    expect(
+      hasDifferingLevels(
+        row([
+          [1, 3],
+          [2, 3],
+        ])
+      )
+    ).toBe(false);
+  });
+
+  it('is true when levels differ between compared characters', () => {
+    expect(
+      hasDifferingLevels(
+        row([
+          [1, 3],
+          [2, 5],
+        ])
+      )
+    ).toBe(true);
+  });
+
+  it('is false for a single compared character, trivially equal to itself', () => {
+    expect(hasDifferingLevels(row([[1, 4]]))).toBe(false);
+  });
+
+  it('is false when there are no compared characters at all', () => {
+    expect(hasDifferingLevels(row([]))).toBe(false);
+  });
+});
+
+describe('idsNeedingFetch', () => {
+  it('returns only ids not already cached, in selection order', () => {
+    expect(idsNeedingFetch([1, 2, 3], new Set([2]), false)).toEqual([1, 3]);
+  });
+
+  it('returns nothing when every selected id is already cached', () => {
+    expect(idsNeedingFetch([1, 2], new Set([1, 2]), false)).toEqual([]);
+  });
+
+  it('returns every selected id when forced, ignoring the cache', () => {
+    expect(idsNeedingFetch([1, 2], new Set([1, 2]), true)).toEqual([1, 2]);
+  });
+
+  it('returns everything when the cache is empty', () => {
+    expect(idsNeedingFetch([1, 2], new Set(), false)).toEqual([1, 2]);
   });
 });
