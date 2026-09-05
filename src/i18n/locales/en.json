@@ -698,6 +698,7 @@
     "reauthHint": "Log in again to fetch this character's assets.",
     "reauthAction": "Log in again with EVE Online",
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
+    "fetchTruncatedRetry": "Retry",
     "unknownValue": "-",
     "security": {
       "ariaLabel": "Security status: {{value}}"
@@ -705,6 +706,7 @@
     "crossCharacterToggle": "Search all characters",
     "crossCharacterLoading": "Searching other characters…",
     "crossCharacterBadge": "From {{character}}",
+    "crossCharacterCsvNote": "CSV export only includes this character's own items.",
     "bay": {
       "cargoHold": "Cargo Hold",
       "droneBay": "Drone Bay",
@@ -744,6 +746,8 @@
       "stationAriaLabel": "Select all items at {{station}}",
       "selectedCount_one": "{{count}} item selected",
       "selectedCount_other": "{{count}} items selected",
+      "selectAllInView": "Select all in view",
+      "deselectAll": "Deselect all",
       "addToQuickbar": "Add to Quickbar",
       "addToCompare": "Add to Compare",
       "copyNames": "Copy names"

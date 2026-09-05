@@ -319,8 +319,11 @@ describe('Assets', () => {
     render(<App />);
     await screen.findByText(JITA);
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
+    // Search is debounced (issue #415) — wait it out rather than reading
+    // results synchronously right after typing, same convention as
+    // SkillPicker.test.tsx.
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
-    expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 
   it('clearing the search returns to the root location list', async () => {
@@ -407,6 +410,27 @@ describe('Assets', () => {
     );
     render(<App />);
     expect(await screen.findByText(/only the first 25 assets were fetched/i)).toBeInTheDocument();
+  });
+
+  it('the truncation notice has a retry action, not just a bare notice (issue #415)', async () => {
+    let requestCount = 0;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
+        requestCount += 1;
+        const page = Number(new URL(request.url).searchParams.get('page')) || 1;
+        return HttpResponse.json([{ ...assetPage1[0], item_id: page }], {
+          headers: { 'X-Pages': '30' },
+        });
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(/only the first 25 assets were fetched/i);
+    const requestsBeforeRetry = requestCount;
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(requestCount).toBeGreaterThan(requestsBeforeRetry));
   });
 
   it('virtualizes a large asset list, rendering far fewer rows than exist (issue #86)', async () => {
@@ -803,6 +827,60 @@ describe('cross-character search (issue #85)', () => {
     expect(await screen.findByText(/no items match your search/i)).toBeInTheDocument();
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
+
+  it('caches the other characters’ assets — flipping the toggle off then on again for the same character does not refetch (issue #415)', async () => {
+    let fetchCount = 0;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/assets`, () => {
+        fetchCount += 1;
+        return HttpResponse.json(
+          [
+            {
+              item_id: 200,
+              type_id: 35,
+              quantity: 3,
+              location_id: 60003762,
+              location_type: 'station' as const,
+              location_flag: 'Hangar',
+              is_singleton: false,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        );
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+
+    const toggle = screen.getByRole('button', { name: /search all characters/i });
+    await user.click(toggle);
+    await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(fetchCount).toBe(1);
+
+    await user.click(toggle);
+    await user.click(toggle);
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(fetchCount).toBe(1);
+  });
+
+  it('explains why cross-character results are excluded from CSV export, only while they’re actually showing', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+
+    await user.type(screen.getByPlaceholderText(/search items/i), 'tritanium');
+    await screen.findByText('Tritanium');
+    expect(screen.queryByText(/CSV export only includes this character/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /search all characters/i }));
+    await user.clear(screen.getByPlaceholderText(/search items/i));
+    await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
+
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(screen.getByText(/CSV export only includes this character/i)).toBeInTheDocument();
+  });
 });
 
 describe('jumps-away distance (issue #87)', () => {
@@ -1191,5 +1269,73 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith('Tritanium\nPyerite');
     });
+  });
+
+  it('"Select all in view" selects every item at the current level without needing to check each one (issue #415)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            { ...assetPage1[0], item_id: 1, type_id: 34 },
+            { ...assetPage1[0], item_id: 2, type_id: 35 },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+    await screen.findByText('Tritanium');
+    await screen.findByText('Pyerite');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('button', { name: 'Select all in view' }));
+
+    expect(await screen.findByText('2 items selected')).toBeInTheDocument();
+    for (const checkbox of screen.getAllByRole('checkbox')) {
+      expect(checkbox).toBeChecked();
+    }
+  });
+
+  it('"Deselect all" clears the selection in one action', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+        HttpResponse.json(
+          [
+            { ...assetPage1[0], item_id: 1, type_id: 34 },
+            { ...assetPage1[0], item_id: 2, type_id: 35 },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+    await screen.findByText('Tritanium');
+    await screen.findByText('Pyerite');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+    await user.click(screen.getByRole('button', { name: 'Select all in view' }));
+    expect(await screen.findByText('2 items selected')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Deselect all' }));
+
+    expect(screen.queryByText(/items selected/)).not.toBeInTheDocument();
+    for (const checkbox of screen.getAllByRole('checkbox')) {
+      expect(checkbox).not.toBeChecked();
+    }
+  });
+
+  it('"Deselect all" is disabled until something is selected', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+    await screen.findByText('Tritanium');
+
+    await user.click(screen.getByRole('button', { name: 'Select' }));
+
+    expect(screen.getByRole('button', { name: 'Deselect all' })).toBeDisabled();
   });
 });
