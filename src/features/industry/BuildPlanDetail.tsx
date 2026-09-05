@@ -50,6 +50,7 @@ import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { ResultsSummary } from './ResultsSummary';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
+import { buildLocationPatch } from './buildLocationPatch';
 
 /** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
 export type PlanPatch = Partial<
@@ -571,14 +572,7 @@ export function BuildPlanDetail({
                   system: buildSystem?.name ?? hub.systemName,
                   security: t(`industry.${plan.security}`),
                 })}
-                onPick={(option) =>
-                  update({
-                    facility: option.facility,
-                    security: option.security,
-                    buildSystemId: option.systemId,
-                    buildSystemName: option.systemName,
-                  })
-                }
+                onPick={(option) => update(buildLocationPatch(option))}
               >
                 <label className="flex flex-col gap-1 text-xs">
                   {t('industry.facility')}
