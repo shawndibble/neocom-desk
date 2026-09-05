@@ -61,6 +61,12 @@ function newBuildPlan(
     rigLevel: defaultsFrom?.rigLevel ?? 'none',
     security: defaultsFrom?.security ?? 'highsec',
     hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
+    // Carried like facility/rig/hub: a pilot who builds in one system builds
+    // their next thing there too, and re-typing it every plan is the annoyance
+    // issue #456 removed for the settings beside it.
+    ...(defaultsFrom?.buildSystemId !== undefined
+      ? { buildSystemId: defaultsFrom.buildSystemId, buildSystemName: defaultsFrom.buildSystemName }
+      : {}),
     ...(defaultsFrom?.facilityTaxPct !== undefined
       ? { facilityTaxPct: defaultsFrom.facilityTaxPct }
       : {}),
