@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -144,7 +144,9 @@ describe('Market top-level tabs', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Open' }));
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('Sell')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('table', { name: 'Open' })).getByText('Sell')
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'History' }));
     expect(await screen.findByText('expired')).toBeInTheDocument();
@@ -216,7 +218,9 @@ describe('Market Open Orders tab', () => {
     window.history.pushState({}, '', '/market?section=orders');
     render(<App />);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('Sell')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('table', { name: 'Open' })).getByText('Sell')
+    ).toBeInTheDocument();
   });
 
   it('falls back to cached orders offline', async () => {

@@ -1,13 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  FilterChip,
   IconButton,
   Panel,
   ReauthBanner,
+  SearchInput,
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
@@ -52,6 +54,73 @@ async function loadOrderHistorySnapshot(
   return { historyResult, historyNeedsReauth, historyTruncated, typeNames };
 }
 
+interface HistoryFilter {
+  text: string;
+  side: 'buy' | 'sell' | null;
+  state: MarketOrderHistory['state'] | null;
+}
+
+const EMPTY_HISTORY_FILTER: HistoryFilter = { text: '', side: null, state: null };
+
+function filterHistory(
+  history: readonly MarketOrderHistory[],
+  filter: HistoryFilter,
+  typeNames: ReadonlyMap<number, string>
+): MarketOrderHistory[] {
+  const query = filter.text.trim().toLowerCase();
+  return history.filter((order) => {
+    if (filter.side === 'buy' && !order.is_buy_order) return false;
+    if (filter.side === 'sell' && order.is_buy_order) return false;
+    if (filter.state && order.state !== filter.state) return false;
+    if (query && !(typeNames.get(order.type_id) ?? '').toLowerCase().includes(query)) return false;
+    return true;
+  });
+}
+
+interface HistoryFilterBarProps {
+  filter: HistoryFilter;
+  onChange: (filter: HistoryFilter) => void;
+}
+
+/** Search plus buy/sell/state filter chips above the order history table. */
+function HistoryFilterBar({ filter, onChange }: HistoryFilterBarProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+      <SearchInput
+        value={filter.text}
+        onChange={(event) => onChange({ ...filter, text: event.target.value })}
+        placeholder={t('orders.searchPlaceholder')}
+        className="min-w-48 flex-1"
+      />
+      <FilterChip
+        label={t('orders.buy')}
+        selected={filter.side === 'buy'}
+        onToggle={() => onChange({ ...filter, side: filter.side === 'buy' ? null : 'buy' })}
+      />
+      <FilterChip
+        label={t('orders.sell')}
+        selected={filter.side === 'sell'}
+        onToggle={() => onChange({ ...filter, side: filter.side === 'sell' ? null : 'sell' })}
+      />
+      <FilterChip
+        label={t('orders.stateExpired')}
+        selected={filter.state === 'expired'}
+        onToggle={() =>
+          onChange({ ...filter, state: filter.state === 'expired' ? null : 'expired' })
+        }
+      />
+      <FilterChip
+        label={t('orders.stateCancelled')}
+        selected={filter.state === 'cancelled'}
+        onToggle={() =>
+          onChange({ ...filter, state: filter.state === 'cancelled' ? null : 'cancelled' })
+        }
+      />
+    </div>
+  );
+}
+
 interface OrderHistoryPanelProps {
   /** Switches the History tab to its other view; the picker lives in this panel's header. */
   onViewChange: (view: HistoryView) => void;
@@ -68,10 +137,16 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   const historyTruncated = data?.historyTruncated ?? false;
   const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
   const nameFor = (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`;
+  const [filter, setFilter] = useState<HistoryFilter>(EMPTY_HISTORY_FILTER);
 
   const history = useMemo(
     () => [...(historyResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
     [historyResult]
+  );
+
+  const filteredHistory = useMemo(
+    () => filterHistory(history, filter, typeNames),
+    [history, filter, typeNames]
   );
 
   const columns = useMemo<DataTableColumn<MarketOrderHistory>[]>(
@@ -79,6 +154,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
       {
         id: 'item',
         header: t('orders.item'),
+        sortValue: (order) => typeNames.get(order.type_id) ?? `Type #${order.type_id}`,
         render: (order) => (
           <MarketItemLink typeId={order.type_id}>
             {typeNames.get(order.type_id) ?? `Type #${order.type_id}`}
@@ -88,6 +164,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
       {
         id: 'side',
         header: t('orders.side'),
+        sortValue: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
         render: (order) => (order.is_buy_order ? t('orders.buy') : t('orders.sell')),
       },
       {
@@ -95,6 +172,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
         header: t('orders.price'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (order) => order.price,
         render: (order) => formatIsk(order.price, 2),
       },
       {
@@ -102,6 +180,7 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
         header: t('orders.remaining'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (order) => order.volume_remain,
         render: (order) =>
           `${order.volume_remain.toLocaleString()} / ${order.volume_total.toLocaleString()}`,
       },
@@ -109,12 +188,14 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
         id: 'issued',
         header: t('orders.issued'),
         className: 'whitespace-nowrap text-text-dim',
+        sortValue: (order) => new Date(order.issued).getTime(),
         render: (order) => new Date(order.issued).toLocaleDateString(),
       },
       {
         id: 'state',
         header: t('orders.state'),
         className: 'text-text-dim',
+        sortValue: (order) => order.state,
         render: (order) => order.state,
       },
     ],
@@ -160,11 +241,11 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
                   size="sm"
                   icon={<Icon.Download />}
                   label={t('orders.exportCsvHistory')}
-                  disabled={history.length === 0}
+                  disabled={filteredHistory.length === 0}
                   onClick={() =>
                     downloadCsv(
                       'orders-history',
-                      history,
+                      filteredHistory,
                       orderHistoryCsvColumns(t, nameFor),
                       new Date(),
                       historyTruncated
@@ -205,12 +286,17 @@ export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
               {t('common.incompleteTitle')}
             </p>
           )}
-          <DataTable
-            columns={columns}
-            rows={history}
-            rowKey={(order) => order.order_id}
-            label={t('orders.historyTab')}
-          />
+          <HistoryFilterBar filter={filter} onChange={setFilter} />
+          {filteredHistory.length === 0 ? (
+            <EmptyState title={t('orders.noResults')} className="py-8" />
+          ) : (
+            <DataTable
+              columns={columns}
+              rows={filteredHistory}
+              rowKey={(order) => order.order_id}
+              label={t('orders.historyTab')}
+            />
+          )}
         </>
       )}
     </Panel>
