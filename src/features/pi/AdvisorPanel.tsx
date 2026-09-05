@@ -464,9 +464,6 @@ function StopTierLine({
           units: Math.round(best.unitsPerHour).toLocaleString(),
         })}
       </div>
-      <p className="mt-1 text-[0.6875rem] text-text-dim">
-        {t('piAdvisor.stopTierBasis', { count: best.blocks })}
-      </p>
     </CardLine>
   );
 }

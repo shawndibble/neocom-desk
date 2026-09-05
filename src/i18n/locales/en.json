@@ -1114,8 +1114,6 @@
     "stopTierMake": "{{name}} (P{{tier}})",
     "stopTierSellRaw": "Keep selling {{name}} raw",
     "stopTierValue": "{{isk}} an hour, at {{units}} an hour of output",
-    "stopTierBasis_one": "A whole-colony fit, not an addition to what is on the ground: one ratio block against this colony’s own budget less its measured link draw, at its own extraction rate.",
-    "stopTierBasis_other": "A whole-colony fit, not an addition to what is on the ground: {{count}} ratio blocks against this colony’s own budget less its measured link draw, at its own extraction rate.",
     "stopTierNeedsRate": "No build advice: no extractor here reports a complete program, so this colony has no rate of its own to size a chain against.",
     "roomUnknownRadius_one": "Headroom unknown: this colony has {{count}} link and this planet's radius did not load, so the link's cost cannot be worked out.",
     "roomUnknownRadius_other": "Headroom unknown: this colony has {{count}} links and this planet's radius did not load, so their cost cannot be worked out.",
