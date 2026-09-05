@@ -5,6 +5,8 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  FilterBar,
+  FilterField,
   IconButton,
   PageHeader,
   Panel,
@@ -42,6 +44,7 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import {
   EMPTY_WALLET_JOURNAL_FILTER,
+  activeWalletJournalFilterCount,
   filterWalletJournal,
   journalRefTypes,
   type WalletJournalFilter,
@@ -75,57 +78,73 @@ const ALL_REF_TYPES = '__all';
 function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBarProps) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-      <SearchInput
-        value={filter.text}
-        onChange={(event) => onChange({ ...filter, text: event.target.value })}
-        placeholder={t('wallet.journalSearchPlaceholder')}
-        className="min-w-48 flex-1"
-      />
-      <Select
-        value={filter.refType ?? ALL_REF_TYPES}
-        onValueChange={(value) =>
-          onChange({ ...filter, refType: value === ALL_REF_TYPES ? null : value })
-        }
-      >
-        <SelectTrigger aria-label={t('wallet.refTypeFilterLabel')} className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_REF_TYPES}>{t('wallet.refTypeFilterAll')}</SelectItem>
-          {refTypeOptions.map((refType) => (
-            <SelectItem key={refType} value={refType}>
-              {humanizeRefType(refType)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <label className="flex items-center gap-1 text-xs text-text-dim">
-        {t('wallet.dateFromLabel')}
-        <TextInput
-          type="date"
-          className="w-36"
-          value={filter.startDate ?? ''}
-          onChange={(event) =>
-            onChange({
-              ...filter,
-              startDate: event.target.value === '' ? null : event.target.value,
-            })
-          }
+    <FilterBar
+      value={filter}
+      onChange={onChange}
+      activeCount={activeWalletJournalFilterCount(filter)}
+      className="border-b border-line px-3 py-2"
+      search={
+        <SearchInput
+          value={filter.text}
+          onChange={(event) => onChange({ ...filter, text: event.target.value })}
+          placeholder={t('wallet.journalSearchPlaceholder')}
+          className="min-w-48 flex-1"
         />
-      </label>
-      <label className="flex items-center gap-1 text-xs text-text-dim">
-        {t('wallet.dateToLabel')}
-        <TextInput
-          type="date"
-          className="w-36"
-          value={filter.endDate ?? ''}
-          onChange={(event) =>
-            onChange({ ...filter, endDate: event.target.value === '' ? null : event.target.value })
-          }
-        />
-      </label>
-    </div>
+      }
+    >
+      {(draft, setDraft) => (
+        <>
+          <FilterField label={t('wallet.refTypeFilterLabel')}>
+            <Select
+              value={draft.refType ?? ALL_REF_TYPES}
+              onValueChange={(value) =>
+                setDraft({ ...draft, refType: value === ALL_REF_TYPES ? null : value })
+              }
+            >
+              <SelectTrigger aria-label={t('wallet.refTypeFilterLabel')} className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_REF_TYPES}>{t('wallet.refTypeFilterAll')}</SelectItem>
+                {refTypeOptions.map((refType) => (
+                  <SelectItem key={refType} value={refType}>
+                    {humanizeRefType(refType)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+          <label className="flex items-center gap-1 text-xs text-text-dim">
+            {t('wallet.dateFromLabel')}
+            <TextInput
+              type="date"
+              className="w-36"
+              value={draft.startDate ?? ''}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  startDate: event.target.value === '' ? null : event.target.value,
+                })
+              }
+            />
+          </label>
+          <label className="flex items-center gap-1 text-xs text-text-dim">
+            {t('wallet.dateToLabel')}
+            <TextInput
+              type="date"
+              className="w-36"
+              value={draft.endDate ?? ''}
+              onChange={(event) =>
+                setDraft({
+                  ...draft,
+                  endDate: event.target.value === '' ? null : event.target.value,
+                })
+              }
+            />
+          </label>
+        </>
+      )}
+    </FilterBar>
   );
 }
 

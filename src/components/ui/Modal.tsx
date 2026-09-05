@@ -1,7 +1,8 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
+import { PortalContainerProvider } from './portalContainer';
 
 export type ModalPlacement = 'center' | 'sheet' | 'wide';
 
@@ -34,6 +35,9 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  // State, not a ref: a Radix portal needs to re-render once the node exists,
+  // and a ref assignment alone would not schedule that render.
+  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -99,7 +103,9 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
               onClick={onClose}
             />
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
+          <div ref={setPortalContainer} className="min-h-0 flex-1 overflow-y-auto p-3">
+            <PortalContainerProvider value={portalContainer}>{children}</PortalContainerProvider>
+          </div>
         </div>
       )}
     </dialog>

@@ -1263,7 +1263,9 @@
     "detailItemsRequested": "Requested",
     "detailItemName": "Name",
     "detailQuantity": "Qty",
-    "detailNoItems": "No item data for this contract"
+    "detailNoItems": "No item data for this contract",
+    "statusFilterLabel": "Status",
+    "typeFilterLabel": "Contract type"
   },
   "contacts": {
     "title": "Contacts",
@@ -2006,5 +2008,12 @@
     "ticker": "Ticker",
     "memberCount": "Members",
     "ceo": "CEO"
+  },
+  "filters": {
+    "title": "Filters",
+    "open": "Filters",
+    "openWithCount": "Filters ({{count}} active)",
+    "apply": "Apply",
+    "cancel": "Cancel"
   }
 }

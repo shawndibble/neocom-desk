@@ -57,3 +57,12 @@ export function contractTypeOptions(contracts: readonly Contract[]): Contract['t
   const present = new Set(contracts.map((contract) => contract.type));
   return (Object.keys(CONTRACT_TYPE_KEY) as Contract['type'][]).filter((type) => present.has(type));
 }
+
+/**
+ * How many criteria are active — what the mobile `FilterBar` trigger counts.
+ * Text is excluded for the same reason as `activeWalletJournalFilterCount`:
+ * the search box never moves into the sheet.
+ */
+export function activeContractsFilterCount(filter: ContractsFilter): number {
+  return [filter.status, filter.type].filter((v) => v !== null).length;
+}

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import '@/i18n';
+import { Modal } from './Modal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './Select';
 
 function Harness() {
@@ -69,6 +71,28 @@ describe('Select', () => {
     expect(await screen.findByRole('listbox')).toBeInTheDocument();
 
     await user.keyboard('{ArrowDown}{Enter}');
+    expect(screen.getByRole('combobox', { name: 'Region' })).toHaveTextContent('Domain');
+  });
+
+  /**
+   * `Modal` runs on `showModal()`, so the dialog sits in the browser's top
+   * layer with everything outside it inert. A list portalled to `document.body`
+   * — Radix's default — would render behind that and take no clicks, which is
+   * the whole reason `SelectContent` reads a container off context.
+   */
+  it('portals its list inside a Modal, not to the body', async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal open onClose={() => {}} title="Filters">
+        <Harness />
+      </Modal>
+    );
+    await user.click(screen.getByRole('combobox', { name: 'Region' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Filters' });
+    expect(dialog).toContainElement(screen.getByRole('listbox'));
+
+    await user.click(screen.getByRole('option', { name: 'Domain' }));
     expect(screen.getByRole('combobox', { name: 'Region' })).toHaveTextContent('Domain');
   });
 });

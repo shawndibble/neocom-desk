@@ -49,3 +49,13 @@ export function filterWalletJournal(
 export function journalRefTypes(entries: readonly WalletJournalEntry[]): string[] {
   return [...new Set(entries.map((entry) => entry.ref_type))].filter(Boolean).sort();
 }
+
+/**
+ * How many criteria are active — what the mobile `FilterBar` trigger counts.
+ * Text is excluded: the search box stays visible in the row at every width, so
+ * counting it on the trigger would attribute a filter to a control that is not
+ * behind it.
+ */
+export function activeWalletJournalFilterCount(filter: WalletJournalFilter): number {
+  return [filter.refType, filter.startDate, filter.endDate].filter((v) => v !== null).length;
+}

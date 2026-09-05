@@ -43,6 +43,7 @@ import {
   Factory,
   FileText,
   Flag,
+  Funnel,
   Gauge,
   GraduationCap,
   Hammer,
@@ -160,6 +161,8 @@ export const OptimizeRemaps = withWeight(Sliders);
 export const AddMarker = withWeight(Flag);
 /** Tune remaps against the plan's existing markers (#224 icon-only toolbar). */
 export const OptimizeAtMarkers = withWeight(Target);
+/** Open the mobile filter sheet — the one control a narrow filter row collapses to (`FilterBar`). */
+export const Filter = withWeight(Funnel);
 /** Reorder the queue by priority/attribute pair (#224 icon-only toolbar). */
 export const SuggestReorder = withWeight(ArrowsDownUp);
 /** A build plan material this character is better off manufacturing or growing than buying. */

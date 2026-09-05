@@ -1,6 +1,7 @@
 import { Select as SelectPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
+import { usePortalContainer } from './portalContainer';
 import * as Icon from './icons';
 import { fieldBaseClassName, fieldSizeClassName, type ControlSize } from './controlStyles';
 
@@ -64,8 +65,11 @@ export function SelectContent({
   children,
   ...props
 }: ComponentProps<typeof SelectPrimitive.Content>) {
+  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
+  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
+  const container = usePortalContainer();
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={container}>
       <SelectPrimitive.Content
         position="popper"
         sideOffset={4}

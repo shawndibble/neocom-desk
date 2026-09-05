@@ -24,6 +24,8 @@ export { CharacterAvatar } from './CharacterAvatar';
 export { characterAvatarBoxClassName } from './characterAvatarBox';
 export type { CharacterAvatarSize } from './characterAvatarBox';
 export { FilterChip } from './FilterChip';
+export { FilterBar, FilterField } from './FilterBar';
+export { useFilterSurface } from './filterSurface';
 export { Disclosure, Caret } from './Disclosure';
 export { LogoMark } from './LogoMark';
 export {

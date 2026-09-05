@@ -6,6 +6,7 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  FilterBar,
   FilterChip,
   IconButton,
   PageHeader,
@@ -23,6 +24,7 @@ import { ContractDetailModal } from '@/features/character/ContractDetailModal';
 import { IssuerLink } from '@/features/character/IssuerLink';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
 import {
+  activeContractsFilterCount,
   contractStatusOptions,
   contractTypeOptions,
   filterContracts,
@@ -107,30 +109,55 @@ function ContractsFilterBar({
 }: ContractsFilterBarProps) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-      <SearchInput
-        value={filter.text}
-        onChange={(event) => onChange({ ...filter, text: event.target.value })}
-        placeholder={t('contracts.searchPlaceholder')}
-        className="min-w-48 flex-1"
-      />
-      {statusOptions.map((status) => (
-        <FilterChip
-          key={status}
-          label={t(CONTRACT_STATUS_KEY[status])}
-          selected={filter.status === status}
-          onToggle={() => onChange({ ...filter, status: filter.status === status ? null : status })}
+    <FilterBar
+      value={filter}
+      onChange={onChange}
+      activeCount={activeContractsFilterCount(filter)}
+      className="border-b border-line px-3 py-2"
+      search={
+        <SearchInput
+          value={filter.text}
+          onChange={(event) => onChange({ ...filter, text: event.target.value })}
+          placeholder={t('contracts.searchPlaceholder')}
+          className="min-w-48 flex-1"
         />
-      ))}
-      {typeOptions.map((type) => (
-        <FilterChip
-          key={type}
-          label={t(CONTRACT_TYPE_KEY[type])}
-          selected={filter.type === type}
-          onToggle={() => onChange({ ...filter, type: filter.type === type ? null : type })}
-        />
-      ))}
-    </div>
+      }
+    >
+      {(draft, setDraft) => (
+        <>
+          <div
+            role="group"
+            aria-label={t('contracts.statusFilterLabel')}
+            className="flex flex-wrap gap-2"
+          >
+            {statusOptions.map((status) => (
+              <FilterChip
+                key={status}
+                label={t(CONTRACT_STATUS_KEY[status])}
+                selected={draft.status === status}
+                onToggle={() =>
+                  setDraft({ ...draft, status: draft.status === status ? null : status })
+                }
+              />
+            ))}
+          </div>
+          <div
+            role="group"
+            aria-label={t('contracts.typeFilterLabel')}
+            className="flex flex-wrap gap-2"
+          >
+            {typeOptions.map((type) => (
+              <FilterChip
+                key={type}
+                label={t(CONTRACT_TYPE_KEY[type])}
+                selected={draft.type === type}
+                onToggle={() => setDraft({ ...draft, type: draft.type === type ? null : type })}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </FilterBar>
   );
 }
 

@@ -176,6 +176,7 @@ Built in `src/components/ui/` (✓) or planned (○):
 | `Modal`           | ✓      | Native `<dialog>` + `showModal()`. Platform-supplied focus trap, inert background, Escape-to-close and `::backdrop` — never hand-roll a focus trap. `placement="center"` (default), `"sheet"` (bottom-anchored, mobile nav) or `"wide"` (`max-w-5xl`, for multi-column content such as a comparison matrix). Escape and backdrop click both close.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `DataTable`       | ✓      | Dense table: hairline-underlined uppercase header row (no fill — matches every shipped table), hairline row separators, tabular-nums right-aligned numerics, row hover `panel-2`. No empty branch — callers branch to `EmptyState` themselves. Sorting is opt-in per column via `sortValue`: a column that declares one gets a clickable header (`aria-sort`, ascending/descending toggle, missing values sink to the end); a table that declares none behaves exactly as before. Below `sm` each row collapses into a labelled card — see §4a.                                                                                                                                                                                                                                                                |
 | `CharacterAvatar` | ✓      | ESI portrait, `rounded-xs` (house radius, §3), 1px `line` ring; sizes `sm`/`md`/`lg`; accent ring when selected. Decorative by default — pass `alt` only for standalone use.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `FilterBar`       | ✓      | A page's filter row: search box plus its filters inline on a pointer viewport, everything but the search collapsed behind one funnel trigger below `md`, where the sheet's edits are a draft committed with Apply or dropped with Cancel. Filters are written once, as `children(draft, setDraft)`, so the two surfaces cannot drift. `FilterField` captions a control in the sheet only. Reach for it wherever a search box shares its row with selects, date fields or chips — see §4b.                                                                                                                                                                                                                                                                                                                      |
 | `FilterChip`      | ✓      | Toggleable filter pill. `StatChip`'s dimensions, but interactive: a real `<button>` with `aria-pressed`, accent when on, optional trailing count.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `SkillBar`        | ✓      | 5-segment level indicator (filled accent squares = trained, warning segment = training, `line` = untrained).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `LogoMark`        | ✓      | The app mark, inline SVG. Decorative (`aria-hidden`) — every placement sits beside the app name. Size it with `size-*`; corner brackets follow `currentColor`, defaulting to accent. Simplified from the artwork, see §2b.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -247,6 +248,45 @@ is a fine trade once the page's own "differing only" toggle keeps the row
 count down to what's actually worth scanning — and a sideways-scrolling
 matrix couldn't show more than about two characters on a 390px screen
 anyway, so the opt-out was buying less than it looked like.
+
+## 4b. Filters on a phone
+
+A filter row is fine at 1280px and is most of the screen at 390px. Wallet's
+journal filters — a search box, a ref-type select and two date fields — wrap
+to four stacked rows above the table they exist to narrow.
+
+`FilterBar` is the answer, and every page whose search box shares its row with
+selects, date fields or chips uses it. Below `md` it keeps the search box in
+the row (it is the panel's primary affordance) and collapses everything else
+behind one funnel `IconButton`; that opens a `Modal placement="sheet"` holding
+the same controls, stacked full width, over a sticky Apply / Cancel bar.
+
+Three things about it are deliberate:
+
+- **The sheet is a draft, the row is not.** Inline, an edit lands on the page
+  immediately, which is right when the list is visible beside the control. In
+  the sheet the list is behind the modal, so edits accumulate and commit on
+  Apply. A route with a persisted preference in its filters (the LP Store's
+  trade hub and price basis) writes it in `onChange` and nowhere else, so
+  Cancel has no store write to undo.
+- **It is a conditional render, not a CSS collapse** — deliberately unlike
+  `DataTable` in §4a. "One DOM at every width" cannot hold here: Apply/Cancel
+  needs the sheet's controls bound to different state than the row's, and CSS
+  cannot fork state. What is preserved instead is that the controls are
+  _written_ once, as `children(draft, setDraft)`, so no control is mounted
+  twice and neither surface can drift.
+- **The trigger carries a number, not a tint.** `activeCount` renders as a
+  badge and repeats inside the button's `label`, so "this list is filtered"
+  survives a viewer who cannot tell the two border colours apart (§7). Each
+  route supplies the count from its own defaults; there is no generic
+  deep-compare.
+
+Two shapes are _not_ this component. Controls that live in a `PageHeader`
+`actions` slot rather than beside a search box (Market's location mode) are a
+page toolbar, not a filter row. So are the sort selects in a `Panel`'s own
+header (Assets' per-location sort) — they already wrap sensibly and have no
+search box to sit inline with. And a lone chip (Mail's "hide read") is not
+worth a trigger: the trigger costs the same room the chip does.
 
 ## 5. Icons
 
