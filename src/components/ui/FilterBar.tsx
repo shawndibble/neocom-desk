@@ -42,7 +42,9 @@ export function FilterField({ label, children, stretch = true, className = '' }:
   // bar. The child selector outspecifies the utility on the control itself, so
   // no call site has to hold two widths.
   return (
-    <div className={cx('flex flex-col items-start gap-1', stretch && '[&>*]:w-full', className)}>
+    <div
+      className={cx('flex flex-col items-start gap-1', stretch && 'w-full [&>*]:w-full', className)}
+    >
       <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
       </span>
@@ -201,7 +203,12 @@ function FilterSheet<T>({
         placement="sheet"
       >
         <FilterSurfaceContext.Provider value="sheet">
-          <div className="flex flex-col gap-3">{children(draft, setDraft)}</div>
+          {/*
+            `items-start` so a chip keeps its own width in the column — only a
+            `FilterField` marked `stretch` fills the sheet, and a full-width
+            uppercase pill reads as a field it is not.
+          */}
+          <div className="flex flex-col items-start gap-3">{children(draft, setDraft)}</div>
         </FilterSurfaceContext.Provider>
         {/*
           Sticky rather than a `Modal` footer prop: the sheet's body is the
