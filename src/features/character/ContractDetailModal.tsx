@@ -23,6 +23,8 @@ import {
   CONTRACT_STATUS_KEY,
   CONTRACT_TYPE_KEY,
 } from './contractLabels';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { IssuerLink } from './IssuerLink';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
 import type { Contract, ContractItem } from '@/esi/endpoints';
@@ -105,16 +107,18 @@ export function ContractDetailModal({
       id: 'name',
       header: t('contracts.detailItemName'),
       render: (item) => (
-        <span className="flex items-center gap-1.5">
-          <img
-            src={typeIconUrl(item.type_id, 32)}
-            alt=""
-            width={20}
-            height={20}
-            className="shrink-0 rounded-xs border border-line"
-          />
-          {items.typeNames.get(item.type_id) ?? `#${item.type_id}`}
-        </span>
+        <MarketItemLink typeId={item.type_id}>
+          <span className="flex items-center gap-1.5">
+            <img
+              src={typeIconUrl(item.type_id, 32)}
+              alt=""
+              width={20}
+              height={20}
+              className="shrink-0 rounded-xs border border-line"
+            />
+            {items.typeNames.get(item.type_id) ?? `#${item.type_id}`}
+          </span>
+        </MarketItemLink>
       ),
     },
     {
@@ -138,7 +142,9 @@ export function ContractDetailModal({
             <dd>{t(CONTRACT_STATUS_KEY[contract.status])}</dd>
 
             <dt className="text-text-dim uppercase">{t('contracts.detailIssuedBy')}</dt>
-            <dd>{issuerName}</dd>
+            <dd>
+              <IssuerLink issuerId={contract.issuer_id} name={issuerName} />
+            </dd>
 
             <dt className="text-text-dim uppercase">{t('contracts.detailAvailability')}</dt>
             <dd>{t(CONTRACT_AVAILABILITY_KEY[contract.availability])}</dd>
