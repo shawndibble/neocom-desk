@@ -443,7 +443,7 @@ describe('BuildPlanDetail build system', () => {
    * below reads or edits one of them, so each opens it first.
    */
   async function openOverride(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(screen.getByRole('button', { name: 'Override' }));
+    await user.click(screen.getByRole('button', { name: /Override/ }));
   }
 
   afterEach(() => {
