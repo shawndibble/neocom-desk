@@ -117,6 +117,34 @@ lands in `revalidationFailures` (keyed like `inFlightLoads`), which
 the signal cannot loop. No substitution happens for a manual refresh (it must
 report what actually happened) or for `STALE_AFTER.static` keys.
 
+**Retained route snapshots.** All of the above kept the _rows_ local; it did
+not keep them _rendered_. `useRouteSnapshot` holds its result in `useState`,
+which React Router discards when it unmounts a route, so every tab visit
+restarted at `data === null` with `loading` true. `lib/routeSnapshotCache.ts`
+is the in-memory, session-only store that closes that gap: pass
+`{ cacheKey: '<view>' }` and the hook writes each successful snapshot under
+`` `${cacheKey}:${characterId}` `` and reads it back _during render_, so the
+first frame after a navigation already has rows. Views spin on
+`loading && !data`, never `loading` alone — `loading` stays honest for the
+Refresh button. The key is an explicit string because several call sites pass
+an inline loader whose identity changes every render. `esi/cachePurge.ts`
+publishes `onCachePurged` (a character id, or `null` for the cache-wide
+fallback tier), which this store subscribes to, so a consent purge takes the
+in-memory copies with it — `purgeCorpScopedCache` included, since a retained
+snapshot is a whole rendered board and cannot be forgotten by `corp:` prefix.
+`features/corp/useCorpSnapshot.ts` opts in the same way via
+`{ name, characterId }`, folding its own key (character + corporation +
+division) into the retained name.
+
+**Name lookups are cache-first.** `features/character/names.ts`
+(`resolveNames`) and `typeNames.ts` (`resolveViaEsi`) both used to POST
+`/universe/names` first and read `esiCache` only as an offline fallback, so
+every render of a view holding a name blocked on a live round-trip. Both now
+read the cache first and ask only for ids they have no name for. `resolveNames`
+returns a lapsed name (`STALE_AFTER.static`) at once and refreshes it behind
+the caller; a type name has no window at all, being as immutable as the SDE
+snapshot it backstops.
+
 **Boot prefetch.** `app/prefetch.ts` warms every granted surface into
 `esiCache` on app start and on each character switch, wired from the same
 `App.tsx` effect shape as `triggerSync`. It is a thin orchestrator over the

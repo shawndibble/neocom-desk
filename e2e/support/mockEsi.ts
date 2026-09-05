@@ -87,6 +87,7 @@ const PREFETCHED_EMPTY = new Set(
     'calendar',
     'contacts',
     'contracts',
+    'corporationhistory',
     'industry/jobs',
     'mail',
     'notifications',

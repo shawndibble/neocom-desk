@@ -783,8 +783,11 @@ function parsePositiveInt(value: string | null): number | null {
 export function PlanetaryIndustry() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadPiSnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadPiSnapshot,
+    undefined,
+    { cacheKey: 'planetary-industry' }
+  );
   // Multi-open accordion: any number of colonies' drilldowns can be on
   // screen at once. Keyed by `${characterId}:${planetId}`, not the planet id
   // alone — two characters can each hold a colony on the same planet.
@@ -964,7 +967,7 @@ export function PlanetaryIndustry() {
           typeId={plannedTypeId}
           onTypeIdChange={setPlannedTypeId}
         />
-      ) : loading ? (
+      ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

@@ -28,15 +28,40 @@ import { CORP_CACHE_KEY_PREFIX, GLOBAL_CACHE_CHARACTER_ID } from './cache';
  * `GLOBAL_CACHE_CHARACTER_ID` rows are public reference data owned by no
  * character, so no revoked consent can apply to them — skipped.
  */
+/**
+ * Listeners notified after cached rows are purged, so in-memory copies of
+ * those same rows go with them. `null` means every Character — the cache-wide
+ * `db.esiCache.clear()` fallback tier. Same one-way shape as
+ * `cache.ts`'s `onCacheRevalidated`: `esi` publishes, the React layer
+ * (`lib/routeSnapshotCache.ts`) subscribes, and `esi` gains no dependency on
+ * it.
+ */
+type PurgedListener = (characterId: number | null) => void;
+const purgedListeners = new Set<PurgedListener>();
+
+export function onCachePurged(listener: PurgedListener): () => void {
+  purgedListeners.add(listener);
+  return () => purgedListeners.delete(listener);
+}
+
+function emitCachePurged(characterId: number | null): void {
+  for (const listener of purgedListeners) listener(characterId);
+}
+
 export async function purgeCharacterCache(characterId: number): Promise<number> {
   if (characterId === GLOBAL_CACHE_CHARACTER_ID) return 0;
   // The compound primary key [characterId+key] is the only index — no
   // standalone characterId one — so this is a range delete, not an equality
   // match.
-  return db.esiCache
+  const deleted = await db.esiCache
     .where('[characterId+key]')
     .between([characterId, Dexie.minKey], [characterId, Dexie.maxKey], true, true)
     .delete();
+  // Emitted even for a zero-row delete: the in-memory listeners hold copies
+  // this range delete cannot see, so "nothing in Dexie" is not "nothing to
+  // forget".
+  emitCachePurged(characterId);
+  return deleted;
 }
 
 /**
@@ -70,10 +95,17 @@ export async function purgeCorpScopedCache(characterId: number): Promise<number>
   // so `corp0…` falls under the lower bound, and below every letter, so
   // `corporation-history` falls over the upper one.
   const upperBound = CORP_CACHE_KEY_PREFIX + String.fromCharCode(0xffff);
-  return db.esiCache
+  const deleted = await db.esiCache
     .where('[characterId+key]')
     .between([characterId, CORP_CACHE_KEY_PREFIX], [characterId, upperBound], true, true)
     .delete();
+  // The in-memory listeners hold whole rendered snapshots, not `corp:`-keyed
+  // rows, so this surgical delete still needs the blunt signal: without it the
+  // corp board, roster and assets views would render the *previous*
+  // corporation's data on their first frame after a corp change — exactly what
+  // `corpCacheKey` exists to make impossible.
+  emitCachePurged(characterId);
+  return deleted;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,9 +244,15 @@ export async function purgeCharacterCacheOrSuppress(
   try {
     await purgeCharacterCache(characterId);
   } catch {
+    // Tier 1 threw before its own emit, and the in-memory copies must go
+    // whichever tier ends up doing the durable work — including tier 3, which
+    // does none.
+    emitCachePurged(characterId);
     try {
       // Tier 2: everything, global rows included. Correctness over churn.
       await db.esiCache.clear();
+      // `null`: this tier took every Character's rows, not just this one's.
+      emitCachePurged(null);
       outcome = 'full';
     } catch {
       await markCachePurgePending(characterId);

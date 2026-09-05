@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { invalidateFreshness, onCacheRevalidated } from '@/esi/cache';
+import { readRouteSnapshot, writeRouteSnapshot } from './routeSnapshotCache';
 
 /**
  * Flipped by the effect cleanup when the character changes, a refresh starts,
@@ -45,6 +46,19 @@ interface StampedSnapshot<T> {
 
 export interface RouteSnapshotOptions {
   /**
+   * Route-stable id under which this view's last successful snapshot is kept
+   * across unmounts, in `lib/routeSnapshotCache.ts`. Supply it and a return
+   * visit renders that snapshot on its very first frame — no spinner — while
+   * the loader re-reads behind it; omit it and the view keeps the old
+   * spinner-on-every-mount behaviour.
+   *
+   * An explicit string rather than the `load` identity: several call sites
+   * pass an inline arrow (`Corp.tsx`), whose identity changes every render and
+   * would silently never hit. It must be unique per view — two views sharing
+   * one id would hand each other the wrong snapshot shape.
+   */
+  cacheKey?: string;
+  /**
    * Keep the last successfully-loaded data visible while a manual `refresh()`
    * is in flight, instead of `data` going back to `null` until the reload
    * lands (issue #418). Off by default: most callers already gate their whole
@@ -61,11 +75,12 @@ export interface RouteSnapshotOptions {
 export interface RouteSnapshot<T> {
   /**
    * Data for the current character + refresh, or null while loading or
-   * failed — except mid-refresh with `staleWhileRevalidate`, where this is
-   * the last successful load instead. `loading` still flips true in that
-   * window (a refresh is genuinely in flight), so a caller wanting "is this
-   * fresh" keeps using `loading`; a caller wanting "do I have something to
-   * show" uses `data`.
+   * failed — except that with `staleWhileRevalidate` (mid-refresh) or
+   * `cacheKey` (a return visit) this is the last successful load instead.
+   * `loading` still flips true in those windows (a load is genuinely in
+   * flight), so a caller wanting "is this fresh" keeps using `loading`; a
+   * caller wanting "do I have something to show" uses `data`. Views should
+   * spin on `loading && !data`, never on `loading` alone.
    */
   data: T | null;
   /** Whatever the loader threw. Views must offer a way out — `loading` alone would strand them. */
@@ -91,6 +106,7 @@ export function useRouteSnapshot<T>(
   options?: RouteSnapshotOptions
 ): RouteSnapshot<T> {
   const staleWhileRevalidate = options?.staleWhileRevalidate ?? false;
+  const cacheKey = options?.cacheKey;
   const storeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const storeHydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = propCharacterId ?? storeCharacterId;
@@ -163,6 +179,7 @@ export function useRouteSnapshot<T>(
         if (!signal.cancelled) {
           setSnapshot({ epoch, data, error: null });
           if (staleWhileRevalidate) setLastGoodData(data);
+          if (cacheKey !== undefined) writeRouteSnapshot(cacheKey, characterId, data);
         }
       } catch (error) {
         // Stamping the failure is what clears `loading` and re-enables Refresh.
@@ -185,12 +202,27 @@ export function useRouteSnapshot<T>(
     // declaration for why that distinction is what keeps the view from
     // blinking. `staleWhileRevalidate` is a primitive, stable per call site —
     // safe to depend on directly rather than routing it through a ref.
-  }, [characterId, epoch, revalidation, staleWhileRevalidate]);
+  }, [characterId, epoch, revalidation, staleWhileRevalidate, cacheKey]);
 
   const current = snapshot?.epoch === epoch ? snapshot : null;
 
+  /**
+   * What this view rendered the last time it was mounted for this Character.
+   * Read during render, not in an effect, so the very first frame after a
+   * navigation already has rows — an effect would still cost one spinner
+   * frame. Only consulted while nothing is loaded for the current epoch: a
+   * a load has produced data for the current epoch — including, as with
+   * `staleWhileRevalidate`, when the newest attempt *failed*: the view reads
+   * `error` before `data`, so keeping rows behind a failure never presents
+   * them as the fresh answer.
+   */
+  const retained =
+    cacheKey !== undefined && activeCharacterId !== null
+      ? readRouteSnapshot<T>(cacheKey, activeCharacterId)
+      : null;
+
   return {
-    data: current?.data ?? (staleWhileRevalidate ? lastGoodData : null),
+    data: current?.data ?? (staleWhileRevalidate ? lastGoodData : null) ?? retained,
     error: current?.error ?? null,
     loading: current === null,
     hydrated,

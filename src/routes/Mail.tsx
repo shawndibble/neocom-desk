@@ -117,8 +117,11 @@ async function loadMailSnapshot(
 /** Mail: tabbed, two-pane client — list beside reading pane, each scrolling independently (CONTEXT.md round 18). */
 export function Mail() {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadMailSnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadMailSnapshot,
+    undefined,
+    { cacheKey: 'mail' }
+  );
 
   // Last-picked tab, per character (issue #416) — in-memory only, the same
   // persistence tier the label filter below already uses ("survives a
@@ -313,7 +316,7 @@ export function Mail() {
         }
       />
 
-      {loading ? (
+      {loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

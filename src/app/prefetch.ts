@@ -44,6 +44,7 @@ import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { loadCalendarEvents } from '@/features/character/calendar';
 import { loadContacts } from '@/features/character/contacts';
 import { loadCharacterClones } from '@/features/character/clones';
+import { loadEmploymentHistory } from '@/features/character/employmentHistory';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
@@ -124,6 +125,14 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
     id: 'clones',
     endpoints: ['getCharacterClones'],
     run: loadCharacterClones,
+  },
+  {
+    // Public, so every Character has it — and the Character overview's
+    // Employment tab has no other read, which made it the one tab that was
+    // cold on first open no matter how long the session had been running.
+    id: 'employment-history',
+    endpoints: ['getCharacterCorporationHistory'],
+    run: loadEmploymentHistory,
   },
   {
     id: 'contacts',
@@ -213,9 +222,15 @@ export async function prefetchCharacterData(
   signal: PrefetchSignal = { cancelled: false }
 ): Promise<void> {
   const token = await db.tokens.get(characterId);
-  // No token row is no grant at all, not a permissive default — same reading
+  // No token row is no session for this Character at all, so there is nothing
+  // to warm — not even the tasks on public endpoints, which need no grant but
+  // still have no reason to fire for somebody who is not signed in. (Before
+  // there was a public task, `prefetchTasksFor([])` was empty and this fell
+  // out for free.)
+  if (token === undefined) return;
+  // No *scope* is no grant, not a permissive default — same reading
   // `useGrantedScopes` gives it.
-  const tasks = prefetchTasksFor(token?.scopes ?? []);
+  const tasks = prefetchTasksFor(token.scopes);
   if (signal.cancelled || tasks.length === 0) return;
 
   const { begin, advance, finish } = usePrefetch.getState();

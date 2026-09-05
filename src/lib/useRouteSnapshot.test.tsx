@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useRouteSnapshot, type RouteSnapshotSignal } from './useRouteSnapshot';
+import { forgetRouteSnapshots, resetRouteSnapshots } from './routeSnapshotCache';
 
 const CHAR_A = 91;
 const CHAR_B = 92;
@@ -31,6 +32,7 @@ function setCharacter(characterId: number | null, hydrated = true) {
 
 beforeEach(() => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+  resetRouteSnapshots();
 });
 
 describe('useRouteSnapshot', () => {
@@ -375,5 +377,87 @@ describe('useRouteSnapshot', () => {
       await act(async () => calls[1].resolve('fresh'));
       expect(result.current.data).toBe('fresh');
     });
+  });
+});
+
+describe('useRouteSnapshot cacheKey', () => {
+  it("renders the previous visit's data on the first frame after a remount", async () => {
+    const load = vi.fn(async () => 'data-a');
+    setCharacter(CHAR_A);
+    const first = renderHook(() => useRouteSnapshot(load, undefined, { cacheKey: 'demo' }));
+    await waitFor(() => expect(first.result.current.data).toBe('data-a'));
+    first.unmount();
+
+    // The second mount's own load is parked, so anything on screen can only
+    // have come from the retained snapshot.
+    const { calls, load: parked } = deferredLoader();
+    const second = renderHook(() => useRouteSnapshot(parked, undefined, { cacheKey: 'demo' }));
+
+    expect(second.result.current.data).toBe('data-a');
+    // `loading` stays honest — a load really is in flight, and Refresh reads it.
+    expect(second.result.current.loading).toBe(true);
+
+    act(() => calls[0].resolve('data-a2'));
+    await waitFor(() => expect(second.result.current.data).toBe('data-a2'));
+  });
+
+  it('does not retain anything without a cacheKey', async () => {
+    const load = vi.fn(async () => 'data-a');
+    setCharacter(CHAR_A);
+    const first = renderHook(() => useRouteSnapshot(load));
+    await waitFor(() => expect(first.result.current.data).toBe('data-a'));
+    first.unmount();
+
+    const { load: parked } = deferredLoader();
+    const second = renderHook(() => useRouteSnapshot(parked));
+    expect(second.result.current.data).toBeNull();
+  });
+
+  it("never shows one character's retained snapshot under another", async () => {
+    const load = vi.fn(async (characterId: number) => `data-${characterId}`);
+    setCharacter(CHAR_A);
+    const first = renderHook(() => useRouteSnapshot(load, undefined, { cacheKey: 'demo' }));
+    await waitFor(() => expect(first.result.current.data).toBe(`data-${CHAR_A}`));
+    first.unmount();
+
+    const { calls, load: parked } = deferredLoader();
+    setCharacter(CHAR_B);
+    const second = renderHook(() => useRouteSnapshot(parked, undefined, { cacheKey: 'demo' }));
+    expect(second.result.current.data).toBeNull();
+
+    act(() => calls[0].resolve('data-b'));
+    await waitFor(() => expect(second.result.current.data).toBe('data-b'));
+  });
+
+  it("drops the retained snapshot when that character's cache is purged", async () => {
+    const load = vi.fn(async () => 'data-a');
+    setCharacter(CHAR_A);
+    const first = renderHook(() => useRouteSnapshot(load, undefined, { cacheKey: 'demo' }));
+    await waitFor(() => expect(first.result.current.data).toBe('data-a'));
+    first.unmount();
+
+    forgetRouteSnapshots(CHAR_A);
+
+    const { load: parked } = deferredLoader();
+    const second = renderHook(() => useRouteSnapshot(parked, undefined, { cacheKey: 'demo' }));
+    expect(second.result.current.data).toBeNull();
+  });
+
+  it('surfaces a failed reload while keeping the retained rows on screen', async () => {
+    const load = vi.fn(async () => 'data-a');
+    setCharacter(CHAR_A);
+    const first = renderHook(() => useRouteSnapshot(load, undefined, { cacheKey: 'demo' }));
+    await waitFor(() => expect(first.result.current.data).toBe('data-a'));
+    first.unmount();
+
+    const failing = vi.fn(async () => {
+      throw new Error('offline');
+    });
+    const second = renderHook(() => useRouteSnapshot(failing, undefined, { cacheKey: 'demo' }));
+    await waitFor(() => expect(second.result.current.error).toBeInstanceOf(Error));
+    // Same contract `staleWhileRevalidate` already had for a failed refresh:
+    // the error is reported and the views branch on it first, so the rows are
+    // never presented as the fresh answer.
+    expect(second.result.current.data).toBe('data-a');
   });
 });

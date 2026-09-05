@@ -704,6 +704,27 @@ export async function readCachedRows<T>(
   return found;
 }
 
+/**
+ * Many keys for one character, with each row's `fetchedAt`. One purge check
+ * and one `bulkGet` rather than a read per key: `resolveNames` asks for a name
+ * per distinct entity on a page, which is hundreds on an asset list.
+ */
+export async function readCachedEntries<T>(
+  characterId: number,
+  keys: readonly string[]
+): Promise<Map<string, { value: T; fetchedAt: number }>> {
+  const found = new Map<string, { value: T; fetchedAt: number }>();
+  if (keys.length === 0) return found;
+  if (await isCachePurgePending(characterId)) return found;
+
+  const rows = await db.esiCache.bulkGet(keys.map((key): [number, string] => [characterId, key]));
+  rows.forEach((row, i) => {
+    if (!row) return;
+    found.set(keys[i], { value: row.value as T, fetchedAt: row.fetchedAt });
+  });
+  return found;
+}
+
 /** Raw cache read, for callers doing their own batch/partial-resolution (names.ts, typeNames.ts). */
 export async function readCached<T>(characterId: number, key: string): Promise<T | undefined> {
   const row = await readCachedRow(characterId, key);

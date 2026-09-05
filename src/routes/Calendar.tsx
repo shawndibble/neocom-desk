@@ -50,8 +50,11 @@ async function loadCalendarSnapshot(characterId: number): Promise<Snapshot> {
 /** Calendar: Month/Week/Agenda views + detail modal. Read-only (no respond), cached for offline. */
 export function Calendar() {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadCalendarSnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadCalendarSnapshot,
+    undefined,
+    { cacheKey: 'calendar' }
+  );
 
   const viewMode = useCalendarView((state) => state.value);
   const setViewMode = useCalendarView((state) => state.setValue);
@@ -187,7 +190,7 @@ export function Calendar() {
         )}
       </div>
 
-      {loading ? (
+      {loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

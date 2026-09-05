@@ -287,7 +287,9 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
     undefined,
     // Keeps the board on screen during a manual refresh (issue #418) — a
     // triage-oriented view losing its rows on every refresh defeats the point.
-    { staleWhileRevalidate: true }
+    // `cacheKey` extends that across a navigation, which the inline loader
+    // above could never key on by identity.
+    { staleWhileRevalidate: true, cacheKey: 'corp' }
   );
   const data = snapshot.data;
 

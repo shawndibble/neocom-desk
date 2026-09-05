@@ -484,7 +484,7 @@ export function Wallet() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
-    useRouteSnapshot(loadWalletSnapshot);
+    useRouteSnapshot(loadWalletSnapshot, undefined, { cacheKey: 'wallet' });
 
   // A notification's `?tab=` deep link (`notificationOptions.ts`) picks the
   // opening tab; read once on mount, same as the `Tabs` control's own local
@@ -510,7 +510,8 @@ export function Wallet() {
     async () =>
       activeCharacterId === null || corporationId === null
         ? null
-        : loadCorpBalances(activeCharacterId, corporationId)
+        : loadCorpBalances(activeCharacterId, corporationId),
+    { name: 'wallet:corp-balances', characterId: activeCharacterId }
   );
 
   const divisions = useMemo<WalletDivision[]>(
@@ -561,7 +562,8 @@ export function Wallet() {
     async () =>
       activeCharacterId === null || corporationId === null
         ? null
-        : loadCorporationWalletJournal(activeCharacterId, corporationId, effectiveDivision)
+        : loadCorporationWalletJournal(activeCharacterId, corporationId, effectiveDivision),
+    { name: 'wallet:corp-journal', characterId: activeCharacterId }
   );
 
   const divisionLabel = (entry: WalletDivision) =>
@@ -786,10 +788,10 @@ export function Wallet() {
         <CorpWalletView
           tab={tab}
           balances={corpBalances.data}
-          balancesLoading={corpBalances.loading}
+          balancesLoading={corpBalances.loading && corpBalances.data === null}
           journalResult={corpJournalResult}
           journal={corpJournalEntries}
-          journalLoading={corpJournal.loading}
+          journalLoading={corpJournal.loading && corpJournal.data === null}
           journalColumns={journalColumns}
           journalFilter={journalFilter}
           onJournalFilterChange={setJournalFilter}
@@ -801,7 +803,7 @@ export function Wallet() {
               : 'common.offlineTitle'
           }
         />
-      ) : loading ? (
+      ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

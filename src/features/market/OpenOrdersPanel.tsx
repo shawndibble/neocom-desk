@@ -103,8 +103,11 @@ function OrdersFilterBar({ filter, onChange }: OrdersFilterBarProps) {
 /** Market's Open Orders tab: a character's currently active market orders. */
 export function OpenOrdersPanel() {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } =
-    useRouteSnapshot(loadOpenOrdersSnapshot);
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadOpenOrdersSnapshot,
+    undefined,
+    { cacheKey: 'market:open-orders' }
+  );
 
   const ordersResult = data?.ordersResult ?? null;
   const ordersNeedsReauth = data?.ordersNeedsReauth ?? false;
@@ -177,7 +180,7 @@ export function OpenOrdersPanel() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label={t('common.loading')} />

@@ -62,3 +62,30 @@ export async function expireCachedEsiRows(page: Page): Promise<void> {
     database.close();
   });
 }
+
+/**
+ * Deletes every `esiCache` row, leaving the app with no local copy of anything.
+ *
+ * Stronger than `expireCachedEsiRows` and used for a different question. An
+ * expired row is still served: `esi/cache.ts` races the live call for
+ * `STALE_GRACE_MS` and then hands the stored row over, so a spec that only
+ * expires rows cannot tell a retained route snapshot
+ * (`lib/routeSnapshotCache.ts`) from that grace path. With the rows gone, what
+ * a view renders can only be what it was already holding.
+ */
+export async function clearCachedEsiRows(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('neocom');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction('esiCache', 'readwrite');
+      tx.objectStore('esiCache').clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    database.close();
+  });
+}

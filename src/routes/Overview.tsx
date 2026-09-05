@@ -154,11 +154,24 @@ function SummaryTile({
 
 export function Overview() {
   const { t } = useTranslation();
-  const walletSnapshot = useRouteSnapshot(loadWalletPanel);
-  const skillsQueueSnapshot = useRouteSnapshot(loadSkillsQueuePanel);
-  const industrySnapshot = useRouteSnapshot(loadIndustryTile);
-  const contractsSnapshot = useRouteSnapshot(loadContractsTile);
-  const ordersSnapshot = useRouteSnapshot(loadOrdersTile);
+  // One `cacheKey` per panel, not one for the page: they load independently,
+  // so a return visit should restore each as soon as that panel's own last
+  // result exists.
+  const walletSnapshot = useRouteSnapshot(loadWalletPanel, undefined, {
+    cacheKey: 'overview:wallet',
+  });
+  const skillsQueueSnapshot = useRouteSnapshot(loadSkillsQueuePanel, undefined, {
+    cacheKey: 'overview:skill-queue',
+  });
+  const industrySnapshot = useRouteSnapshot(loadIndustryTile, undefined, {
+    cacheKey: 'overview:industry',
+  });
+  const contractsSnapshot = useRouteSnapshot(loadContractsTile, undefined, {
+    cacheKey: 'overview:contracts',
+  });
+  const ordersSnapshot = useRouteSnapshot(loadOrdersTile, undefined, {
+    cacheKey: 'overview:orders',
+  });
   const { hydrated, activeCharacterId } = walletSnapshot;
 
   const queueEntries = skillsQueueSnapshot.data?.queueResult?.data ?? null;
@@ -244,7 +257,7 @@ export function Overview() {
           }
         >
           <div className="flex flex-1 flex-col justify-center">
-            {walletSnapshot.loading ? (
+            {walletSnapshot.loading && !walletData ? (
               <Spinner label={t('common.loading')} />
             ) : walletSnapshot.error ? (
               <EmptyState
@@ -302,7 +315,7 @@ export function Overview() {
               </>
             }
           >
-            {skillsQueueSnapshot.loading ? (
+            {skillsQueueSnapshot.loading && !skillsQueueData ? (
               <Spinner label={t('common.loading')} />
             ) : skillsQueueSnapshot.error ? (
               <EmptyState
