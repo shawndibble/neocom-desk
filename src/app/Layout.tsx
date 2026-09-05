@@ -48,8 +48,14 @@ function PrefetchIndicator() {
   );
 }
 
+// `min-h-11 md:min-h-0`: this class is shared by the desktop rail (`hidden
+// md:flex`, mouse-operated, room to spare) and the mobile-only More sheet
+// (`MobileMoreSheet`, reached only through the `md:hidden` bottom tab bar).
+// Unqualified, both got the rail's compact ~34px row — fine for a pointer,
+// too short for adjacent full-width rows a thumb taps in a scrolling sheet.
+// The `md:` qualifier means only the phone-only rendering ever sees `min-h-11`.
 const NAV_LINK =
-  'flex items-center gap-2 rounded-xs border border-transparent px-3 py-2 text-xs font-semibold tracking-widest uppercase transition-colors';
+  'flex min-h-11 items-center gap-2 rounded-xs border border-transparent px-3 py-2 text-xs font-semibold tracking-widest uppercase transition-colors md:min-h-0';
 const NAV_ACTIVE = 'border-line-bright bg-panel-2 text-accent';
 const NAV_IDLE = 'text-text-dim hover:bg-panel-2 hover:text-text';
 

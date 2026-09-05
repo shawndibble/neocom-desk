@@ -14,6 +14,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import type { CachedResult } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { rememberSpSummary, getLastKnownSpSummary } from '@/features/character/characterSp';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { loadContracts, isActiveContractStatus } from '@/features/character/contracts';
 import { loadOrders } from '@/features/character/orders';
@@ -59,6 +60,15 @@ async function loadSkillsQueuePanel(characterId: number): Promise<SkillsQueuePan
     loadCorrectedSkills(characterId, Date.now()),
     loadSkillCatalog(),
   ]);
+  // Feeds the same cache `characterSp.ts` keeps for Clones/Employment History,
+  // so switching to either of those tabs can seed the shared header from
+  // Overview's own read instead of blanking it while its own load is in
+  // flight — this view already has both numbers without a second /skills
+  // call, so cost is zero.
+  rememberSpSummary(characterId, {
+    totalSp: corrected.totalSp,
+    unallocatedSp: corrected.skillsResult?.data.unallocated_sp ?? null,
+  });
   return {
     skillsResult: corrected.skillsResult,
     queueResult: corrected.queueResult,
@@ -189,8 +199,11 @@ export function Overview() {
     <div className="mx-auto max-w-6xl space-y-4">
       <CharacterHeader
         characterId={activeCharacterId}
-        totalSp={skillsQueueData?.totalSp ?? null}
-        unallocatedSp={skillsQueueData?.skillsResult?.data?.unallocated_sp ?? null}
+        totalSp={skillsQueueData?.totalSp ?? getLastKnownSpSummary(activeCharacterId).totalSp}
+        unallocatedSp={
+          skillsQueueData?.skillsResult?.data?.unallocated_sp ??
+          getLastKnownSpSummary(activeCharacterId).unallocatedSp
+        }
       />
       <OverviewSubNav />
 

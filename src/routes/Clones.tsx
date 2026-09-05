@@ -19,7 +19,7 @@ import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { loadCharacterClones } from '@/features/character/clones';
 import {
   loadCharacterSpSummary,
-  NO_SP_SUMMARY,
+  getLastKnownSpSummary,
   type CharacterSpSummary,
 } from '@/features/character/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
@@ -127,7 +127,11 @@ export function Clones() {
   const infomorphLevel = data?.infomorphLevel ?? 0;
   const implantNames = data?.implantNames ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
-  const sp = data?.sp ?? NO_SP_SUMMARY;
+  // Falls back to the last SP another tab already loaded for this character,
+  // not straight to "—": this tab's own read is still in flight the instant
+  // it mounts, and the shared header must not blank out a number the user
+  // just saw on Overview or Employment History a moment ago.
+  const sp = data?.sp ?? getLastKnownSpSummary(activeCharacterId);
   const loadedAt = data?.loadedAt ?? 0;
 
   const clones = clonesResult?.data.jump_clones ?? [];

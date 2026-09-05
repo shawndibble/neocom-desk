@@ -89,6 +89,17 @@ interface CharacterCardProps {
   onRemove: (characterId: number, name: string) => void;
 }
 
+/**
+ * The staler of two optional fetch times — the card's one combined age badge
+ * reads as "how stale is the worst part of this card", never the freshest
+ * field alone, so it can't imply everything is fresher than it is.
+ */
+function olderOf(a: Date | null | undefined, b: Date | null | undefined): Date | undefined {
+  if (!a) return b ?? undefined;
+  if (!b) return a;
+  return a.getTime() <= b.getTime() ? a : b;
+}
+
 function CharacterCard({
   character,
   info,
@@ -101,90 +112,105 @@ function CharacterCard({
   onRemove,
 }: CharacterCardProps) {
   const { t } = useTranslation();
+  // One badge for the whole card, not one per stat (that was the actual
+  // complaint — three "Xm ago"s in a row): the oldest of whichever fields
+  // this character has cached, so the card never overstates its freshness.
+  const lastSynced = olderOf(
+    olderOf(stats?.skillPointsFetchedAt, stats?.walletFetchedAt),
+    queue?.fetchedAt
+  );
+
   return (
-    <li className="flex items-center gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2">
-      <button
-        type="button"
-        aria-label={t('characters.select', { name: character.name })}
-        onClick={() => onSelect(character.characterId)}
-        className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      >
-        <CharacterAvatar
-          characterId={character.characterId}
-          size="lg"
-          loading="lazy"
-          alt={t('characters.portraitAlt', { name: character.name })}
-        />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold">{character.name}</span>
-          <span className="block truncate text-xs text-text-dim">
-            {info?.corporationName ?? t('common.unknown')}
-          </span>
-          <span className="block truncate text-xs text-text-faint">
-            {info?.allianceName ?? t('common.unknown')}
-          </span>
-          <span className="mt-1 flex flex-wrap items-center gap-2">
-            <StatChip
-              label={t('characters.spLabel')}
-              value={
-                stats?.skillPoints === undefined
-                  ? t('common.unknown')
-                  : formatCompactNumber(stats.skillPoints)
-              }
-            />
-            {stats?.skillPointsFetchedAt && <DataAgeBadge date={stats.skillPointsFetchedAt} />}
-            <StatChip
-              label={t('characters.walletLabel')}
-              value={
-                stats?.wallet === undefined ? t('common.unknown') : formatIskCompact(stats.wallet)
-              }
-            />
-            {stats?.walletFetchedAt && <DataAgeBadge date={stats.walletFetchedAt} />}
-            {queue && (
-              <>
-                <StatChip
-                  label={t('characters.queueState')}
-                  tone={QUEUE_STATE_TONE[queue.state]}
-                  value={t(`characters.queueStates.${queue.state}`)}
-                />
-                {queue.fetchedAt && <DataAgeBadge date={queue.fetchedAt} />}
-              </>
-            )}
-          </span>
-        </span>
-      </button>
-      {groups.length > 0 && (
-        <Select
-          value={groupId ?? UNGROUPED_VALUE}
-          onValueChange={(value) =>
-            onMoveToGroup(character.characterId, value === UNGROUPED_VALUE ? null : value)
-          }
+    <li className="flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2">
+      <div className="flex flex-wrap items-start gap-2">
+        <button
+          type="button"
+          aria-label={t('characters.select', { name: character.name })}
+          onClick={() => onSelect(character.characterId)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <SelectTrigger
-            size="sm"
-            aria-label={t('characters.groupFor', { name: character.name })}
-            className="w-32 shrink-0"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={UNGROUPED_VALUE}>{t('characters.ungrouped')}</SelectItem>
-            {groups.map((group) => (
-              <SelectItem key={group.id} value={group.id}>
-                {group.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-      <Button
-        variant="danger"
-        size="sm"
-        onClick={() => onRemove(character.characterId, character.name)}
-        aria-label={t('characters.removeButtonLabel', { name: character.name })}
-      >
-        {t('characters.remove')}
-      </Button>
+          <CharacterAvatar
+            characterId={character.characterId}
+            size="lg"
+            loading="lazy"
+            alt={t('characters.portraitAlt', { name: character.name })}
+          />
+          <span className="min-w-0">
+            {/* The dot rides the name's own line, not a corner of the card:
+                it needs no room of its own, so the identity block loses
+                nothing to make space for it. `min-w-0` on this row (not just
+                the outer `span`) is what lets the name still truncate instead
+                of pushing the dot off — and shrinking the name never touches
+                the corp/alliance lines below, which are separate rows. */}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-sm font-semibold">{character.name}</span>
+              {lastSynced && <DataAgeBadge date={lastSynced} dotOnly className="shrink-0" />}
+            </span>
+            <span className="block truncate text-xs text-text-dim">
+              {info?.corporationName ?? t('common.unknown')}
+            </span>
+            <span className="block truncate text-xs text-text-faint">
+              {info?.allianceName ?? t('common.unknown')}
+            </span>
+          </span>
+        </button>
+        {/* Group and remove: the card's own controls, not part of the
+            name/corp/alliance identity block, so they sit at the top right
+            rather than crowding the stat row below. */}
+        <div className="flex shrink-0 items-center gap-2">
+          {groups.length > 0 && (
+            <Select
+              value={groupId ?? UNGROUPED_VALUE}
+              onValueChange={(value) =>
+                onMoveToGroup(character.characterId, value === UNGROUPED_VALUE ? null : value)
+              }
+            >
+              <SelectTrigger
+                size="sm"
+                aria-label={t('characters.groupFor', { name: character.name })}
+                className="w-32 shrink-0"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNGROUPED_VALUE}>{t('characters.ungrouped')}</SelectItem>
+                {groups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    {group.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <IconButton
+            icon={<Icon.Close />}
+            tone="danger"
+            label={t('characters.removeButtonLabel', { name: character.name })}
+            onClick={() => onRemove(character.characterId, character.name)}
+          />
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <StatChip
+          label={t('characters.spLabel')}
+          value={
+            stats?.skillPoints === undefined
+              ? t('common.unknown')
+              : formatCompactNumber(stats.skillPoints)
+          }
+        />
+        <StatChip
+          label={t('characters.walletLabel')}
+          value={stats?.wallet === undefined ? t('common.unknown') : formatIskCompact(stats.wallet)}
+        />
+        {queue && (
+          <StatChip
+            label={t('characters.queueState')}
+            tone={QUEUE_STATE_TONE[queue.state]}
+            value={t(`characters.queueStates.${queue.state}`)}
+          />
+        )}
+      </div>
     </li>
   );
 }
@@ -504,7 +530,7 @@ export function Characters() {
               back, so unioning with the *active* Character's grant would ask
               the newcomer to consent to scopes aimed at somebody else (#295).
             */}
-            <Button variant="primary" size="sm" onClick={() => void beginAddCharacterLogin()}>
+            <Button variant="primary" size="md" onClick={() => void beginAddCharacterLogin()}>
               {t('characters.add')}
             </Button>
           </>
@@ -526,7 +552,7 @@ export function Characters() {
                 value={sortKey}
                 onValueChange={(value) => setSortKey(value as CharacterSortKey)}
               >
-                <SelectTrigger size="sm" aria-label={t('characters.sortBy')} className="w-40">
+                <SelectTrigger size="md" aria-label={t('characters.sortBy')} className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -538,7 +564,7 @@ export function Characters() {
                 </SelectContent>
               </Select>
               <IconButton
-                size="sm"
+                size="md"
                 icon={sortDirection === 'asc' ? <Icon.Ascending /> : <Icon.Descending />}
                 label={t('characters.sortDirection')}
                 onClick={() => setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))}
@@ -546,7 +572,7 @@ export function Characters() {
               {addingGroup ? (
                 <TextInput
                   autoFocus
-                  size="sm"
+                  size="md"
                   value={newGroupName}
                   aria-label={t('characters.newGroupName')}
                   onChange={(e) => setNewGroupName(e.target.value)}
@@ -561,15 +587,20 @@ export function Characters() {
                   className="w-40"
                 />
               ) : (
-                <Button size="sm" onClick={() => setAddingGroup(true)}>
+                <Button size="md" onClick={() => setAddingGroup(true)}>
                   {t('characters.newGroup')}
                 </Button>
               )}
             </div>
-            <div role="group" aria-label={t('characters.densityLabel')} className="flex gap-2">
+            <div
+              role="group"
+              aria-label={t('characters.densityLabel')}
+              className="flex flex-wrap gap-2"
+            >
               {FONT_SCALE_STEPS.map((step) => (
                 <FilterChip
                   key={step}
+                  size="md"
                   label={t(DENSITY_LABEL_KEYS[step])}
                   selected={density === step}
                   onToggle={() => void setDensity(step)}

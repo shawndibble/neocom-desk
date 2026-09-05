@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCharacterSpSummary } from './characterSp';
+import { loadCharacterSpSummary, getLastKnownSpSummary, NO_SP_SUMMARY } from './characterSp';
 
 const CHAR_ID = 91;
 const NOW = Date.parse('2026-09-01T00:00:00Z');
@@ -32,9 +32,9 @@ const queuePayload = [
 
 const server = setupServer();
 
-async function seedGrant(scopes: readonly string[]): Promise<void> {
+async function seedGrant(scopes: readonly string[], characterId = CHAR_ID): Promise<void> {
   await db.tokens.put({
-    characterId: CHAR_ID,
+    characterId,
     accessToken: 'access',
     refreshToken: 'refresh',
     expiresAt: Date.now() + 3_600_000,
@@ -130,6 +130,50 @@ describe('loadCharacterSpSummary', () => {
     expect(await loadCharacterSpSummary(CHAR_ID, NOW)).toEqual({
       totalSp: null,
       unallocatedSp: null,
+    });
+  });
+});
+
+describe('getLastKnownSpSummary', () => {
+  // Its own character id: `loadCharacterSpSummary` above populates the same
+  // module-level cache, and a shared id would make this describe's outcome
+  // depend on suite ordering.
+  const OTHER_CHAR_ID = 92;
+
+  it('is empty for a character nothing has loaded yet', () => {
+    expect(getLastKnownSpSummary(OTHER_CHAR_ID)).toEqual(NO_SP_SUMMARY);
+  });
+
+  it('is empty when asked with no character at all', () => {
+    expect(getLastKnownSpSummary(null)).toEqual(NO_SP_SUMMARY);
+  });
+
+  it('remembers a successful load so a later tab can seed from it instead of blanking', async () => {
+    await seedGrant([SKILLS_SCOPE], OTHER_CHAR_ID);
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_CHAR_ID}/skills`, () =>
+        HttpResponse.json(skillsPayload)
+      )
+    );
+
+    await loadCharacterSpSummary(OTHER_CHAR_ID, NOW);
+
+    expect(getLastKnownSpSummary(OTHER_CHAR_ID)).toEqual({
+      totalSp: 5_000_000,
+      unallocatedSp: 12_000,
+    });
+  });
+
+  it('keeps the last good value rather than overwriting it with an all-null read', async () => {
+    // Simulates a tab whose own load can't reach /skills (no grant, offline,
+    // whatever) mounting after another tab already found real numbers — it
+    // must not blank what the previous tab already established.
+    await db.tokens.delete(OTHER_CHAR_ID);
+
+    expect(await loadCharacterSpSummary(OTHER_CHAR_ID, NOW)).toEqual(NO_SP_SUMMARY);
+    expect(getLastKnownSpSummary(OTHER_CHAR_ID)).toEqual({
+      totalSp: 5_000_000,
+      unallocatedSp: 12_000,
     });
   });
 });
