@@ -13,7 +13,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
-import { parseMarketParams, buildMarketParams } from '@/engine/market/urlState';
+import { marketLinkParams } from '@/engine/market/urlState';
 import { usePiPlannable } from '@/features/pi/usePiPlannable';
 import { useCompareSet } from './compareSet';
 
@@ -93,21 +93,7 @@ export function ItemContextMenu({
         )}
         <ContextMenuItem
           onSelect={() => {
-            // Preserves an existing region/hub param when already on
-            // /market (e.g. clicking this from another item's order book —
-            // region wins over hub, matching resolveMarketLocation's own
-            // precedence); a caller arriving from elsewhere (Assets) starts
-            // with neither, so this falls back to the device's Location
-            // Mode default, same as opening /market?type=… fresh.
-            const parsed = parseMarketParams((key) =>
-              new URLSearchParams(location.search).get(key)
-            );
-            const params =
-              parsed.regionId !== null
-                ? buildMarketParams(typeId, { mode: 'region', regionId: parsed.regionId })
-                : parsed.hubId !== null
-                  ? buildMarketParams(typeId, { mode: 'hub', hubId: parsed.hubId })
-                  : { type: String(typeId) };
+            const params = marketLinkParams(typeId, location.search);
             navigate(`/market?${new URLSearchParams(params).toString()}`);
           }}
         >

@@ -4,6 +4,7 @@ import {
   buildMarketParams,
   resolveAgainstCatalogue,
   resolveMarketLocation,
+  marketLinkParams,
   type MarketLocationParam,
 } from './urlState';
 
@@ -126,5 +127,33 @@ describe('resolveMarketLocation', () => {
         fallback
       )
     ).toBe(fallback);
+  });
+});
+
+describe('marketLinkParams', () => {
+  // Shared by ItemContextMenu's "View in Market" and ImplantChip's Market
+  // link (#405): preserve whatever region/hub the current page is already
+  // scoped to, so a link from inside /market carries that scope over rather
+  // than resetting to the device's Location Mode default.
+  it('preserves an existing region param', () => {
+    expect(marketLinkParams(587, '?region=10000002')).toEqual({
+      type: '587',
+      region: '10000002',
+    });
+  });
+
+  it('preserves an existing hub param when there is no region', () => {
+    expect(marketLinkParams(587, '?hub=jita')).toEqual({ type: '587', hub: 'jita' });
+  });
+
+  it('prefers region over hub when both are present', () => {
+    expect(marketLinkParams(587, '?region=10000002&hub=jita')).toEqual({
+      type: '587',
+      region: '10000002',
+    });
+  });
+
+  it('falls back to just the typeId when arriving with neither param (e.g. from Skills)', () => {
+    expect(marketLinkParams(587, '')).toEqual({ type: '587' });
   });
 });
