@@ -579,7 +579,7 @@ export function Characters() {
                     </SelectContent>
                   </Select>
                 </FilterField>
-                <FilterField label={t('characters.sortDirection')}>
+                <FilterField label={t('characters.sortDirection')} stretch={false}>
                   <IconButton
                     size="md"
                     icon={draft.sortDirection === 'asc' ? <Icon.Ascending /> : <Icon.Descending />}

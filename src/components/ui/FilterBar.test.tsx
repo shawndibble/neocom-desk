@@ -149,6 +149,14 @@ describe('FilterBar', () => {
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument();
   });
 
+  it('names the trigger for more than one active filter', () => {
+    useNarrowViewport();
+    render(<Harness initial={{ ...EMPTY, unreadOnly: true, from: 'CONCORD' }} />);
+    // `count` is i18next's plural selector, not a plain interpolation — this
+    // pins that the base key still resolves for the non-one case.
+    expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
+  });
+
   it('captions each field in the sheet only', async () => {
     render(<Harness />);
     expect(screen.queryByText('From')).not.toBeInTheDocument();

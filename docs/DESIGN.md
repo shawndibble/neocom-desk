@@ -255,8 +255,9 @@ A filter row is fine at 1280px and is most of the screen at 390px. Wallet's
 journal filters — a search box, a ref-type select and two date fields — wrap
 to four stacked rows above the table they exist to narrow.
 
-`FilterBar` is the answer, and every page whose search box shares its row with
-selects, date fields or chips uses it. Below `md` it keeps the search box in
+`FilterBar` is the answer, and a page reaches for it once its search box shares
+a row with enough filters that collapsing them buys back real height — two or
+more controls, in practice. Below `md` it keeps the search box in
 the row (it is the panel's primary affordance) and collapses everything else
 behind one funnel `IconButton`; that opens a `Modal placement="sheet"` holding
 the same controls, stacked full width, over a sticky Apply / Cancel bar.

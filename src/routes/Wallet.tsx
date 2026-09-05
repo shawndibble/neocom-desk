@@ -114,6 +114,11 @@ function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBar
               </SelectContent>
             </Select>
           </FilterField>
+          {/*
+            A visible `<label>` rather than a `FilterField`: a date input reads
+            as nothing without its caption, so this one is wanted in the row as
+            well as in the sheet, where `FilterField`'s caption is sheet-only.
+          */}
           <label className="flex items-center gap-1 text-xs text-text-dim">
             {t('wallet.dateFromLabel')}
             <TextInput

@@ -12,6 +12,12 @@ interface FilterFieldProps {
   /** Already-translated. Rendered in the sheet only; inline the control's own `aria-label` carries it. */
   label: string;
   children: ReactNode;
+  /**
+   * Whether the control fills the sheet's width. True for anything that reads
+   * as a field; false for a control whose size *is* its shape, such as an
+   * `IconButton`, which a full-width stretch would leave as a wide short box.
+   */
+  stretch?: boolean;
   className?: string;
 }
 
@@ -23,15 +29,20 @@ interface FilterFieldProps {
  * the controls are stacked full-width with no neighbours to give them context,
  * so each gets its caption there.
  */
-export function FilterField({ label, children, className = '' }: FilterFieldProps) {
+export function FilterField({ label, children, stretch = true, className = '' }: FilterFieldProps) {
   const surface = useFilterSurface();
   if (surface === 'inline') return <>{children}</>;
   // A `<div>`, not a `<label>`: most of what goes in here is a button — a
   // Radix `SelectTrigger`, a chip, an `IconButton` — and a button is not a
   // labelable element, so the caption would name nothing. The control's own
   // `aria-label` is what a screen reader gets; this caption is for the eye.
+  // `[&>*]:w-full` because the control carries the width it needs *in the row*
+  // — `w-44` on Wallet's ref-type trigger, `w-36` on its date fields. Stacked
+  // in the sheet those read as half-empty fields against a full-width Apply
+  // bar. The child selector outspecifies the utility on the control itself, so
+  // no call site has to hold two widths.
   return (
-    <div className={cx('flex flex-col gap-1', className)}>
+    <div className={cx('flex flex-col items-start gap-1', stretch && '[&>*]:w-full', className)}>
       <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
       </span>
