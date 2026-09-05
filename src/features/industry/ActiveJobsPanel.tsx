@@ -172,24 +172,27 @@ export function ActiveJobsPanel({
     [types]
   );
 
+  /** One binding of the warning state: the row tint, the stripe, the badge and the bar all read it. */
+  const soon = useCallback((job: ActiveJob) => isCompletingSoon(job, now), [now]);
+
   /**
    * Rebuilt on every countdown tick — the remaining time, the progress
    * fraction and the warning tone are all relative to `now`, so memoising on
    * `t` alone would freeze the clock.
    */
-  const columns = useMemo<DataTableColumn<ActiveJob>[]>(() => {
-    const soon = (job: ActiveJob) => isCompletingSoon(job, now);
-    return [
+  const columns = useMemo<DataTableColumn<ActiveJob>[]>(
+    () => [
       {
         id: 'blueprint',
         header: t('industry.jobsColBlueprint'),
-        primary: true,
         className: 'font-medium',
         sortValue: (job) => nameForBlueprint(job.blueprint_type_id),
         // The row's warning stripe. On a `<tr>` this would be a `box-shadow`,
         // which Chromium drops under the `border-collapse: collapse` every
-        // table here inherits; a cell border paints either way.
-        cellClassName: (job) => (soon(job) ? 'border-l-2 border-l-warning' : undefined),
+        // table here inherits; a cell border paints. Held behind `sm:` — once
+        // `.dt-stack` blocks the cell there is no row edge to stripe, and the
+        // card's tint already carries the state.
+        cellClassName: (job) => (soon(job) ? 'sm:border-l sm:border-l-warning' : undefined),
         render: (job) => (
           <span className="flex items-center gap-1.5">
             <span>{nameForBlueprint(job.blueprint_type_id)}</span>
@@ -271,8 +274,9 @@ export function ActiveJobsPanel({
           return <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>;
         },
       },
-    ];
-  }, [t, now, nameForBlueprint]);
+    ],
+    [t, now, soon, nameForBlueprint]
+  );
 
   /** Right-click any row for the shared item menu. */
   const jobContextMenu = (job: ActiveJob, tr: ReactElement): ReactElement => {
@@ -411,7 +415,7 @@ export function ActiveJobsPanel({
                 label={t('industry.jobsTitle')}
                 defaultSort={{ columnId: 'endsIn', direction: 'asc' }}
                 density="compact"
-                rowClassName={(job) => (isCompletingSoon(job, now) ? 'bg-warning/10' : undefined)}
+                rowClassName={(job) => (soon(job) ? 'bg-warning/10' : undefined)}
                 rowContextMenu={jobContextMenu}
               />
             </div>
