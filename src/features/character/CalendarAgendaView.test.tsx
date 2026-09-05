@@ -24,7 +24,9 @@ const EVENTS: CalendarEventSummary[] = [
 
 describe('CalendarAgendaView', () => {
   it('renders one row per event with title and response', () => {
-    render(<CalendarAgendaView events={EVENTS} onSelectEvent={() => {}} />);
+    render(
+      <CalendarAgendaView events={EVENTS} onSelectEvent={() => {}} onAddToMonthView={() => {}} />
+    );
     expect(screen.getByText('Fleet Op')).toBeInTheDocument();
     expect(screen.getByText('Accepted')).toBeInTheDocument();
     expect(screen.getByText('CTA')).toBeInTheDocument();
@@ -34,8 +36,31 @@ describe('CalendarAgendaView', () => {
   it('calls onSelectEvent with the clicked event', async () => {
     const user = userEvent.setup();
     const onSelectEvent = vi.fn();
-    render(<CalendarAgendaView events={EVENTS} onSelectEvent={onSelectEvent} />);
+    render(
+      <CalendarAgendaView
+        events={EVENTS}
+        onSelectEvent={onSelectEvent}
+        onAddToMonthView={() => {}}
+      />
+    );
     await user.click(screen.getByText('Fleet Op'));
     expect(onSelectEvent).toHaveBeenCalledWith(EVENTS[0]);
+  });
+
+  it('offers "Add to Month view" on an event\'s context menu, with the event\'s date', async () => {
+    const user = userEvent.setup();
+    const onAddToMonthView = vi.fn();
+    render(
+      <CalendarAgendaView
+        events={EVENTS}
+        onSelectEvent={() => {}}
+        onAddToMonthView={onAddToMonthView}
+      />
+    );
+    await user.pointer({ keys: '[MouseRight]', target: screen.getByText('Fleet Op') });
+    await user.click(await screen.findByText('Add to Month view'));
+    expect(onAddToMonthView).toHaveBeenCalledTimes(1);
+    const date = onAddToMonthView.mock.calls[0][0] as Date;
+    expect(date.getUTCDate()).toBe(1);
   });
 });

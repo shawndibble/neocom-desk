@@ -10,6 +10,7 @@ import {
   PageHeader,
   Panel,
   ReauthBanner,
+  SearchInput,
   Spinner,
   Tabs,
 } from '@/components/ui';
@@ -19,6 +20,7 @@ import {
   loadMailHeaders,
   loadMailBody,
   loadMailLabels,
+  loadMailingLists,
   loadMoreMailHeaders,
 } from '@/features/character/mail';
 import type { CachedResult } from '@/esi/cache';
@@ -33,11 +35,16 @@ import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import {
   buildCustomLabelList,
   buildLabelTabMap,
+  capHeadersForDisplay,
+  mailSearchMatches,
   resolveMailTab,
   unreadCountsByTab,
   type MailTab,
 } from '@/engine/mail';
-import type { MailBody, MailHeader, MailLabel, MailLabels } from '@/esi/endpoints';
+import type { MailBody, MailHeader, MailLabel, MailLabels, MailingList } from '@/esi/endpoints';
+
+// Matches Market.tsx's/SkillPicker.tsx's/Assets.tsx's own search debounce.
+const SEARCH_DEBOUNCE_MS = 250;
 
 type ActiveTab = 'all' | MailTab;
 
@@ -57,11 +64,14 @@ interface Snapshot {
   names: Map<number, string>;
   /** True when a `last_mail_id` page beyond this list may exist (issue #161). */
   headersHasMore: boolean;
+  /** This character's mailing lists, for resolving a `mailing_list` recipient's real name (issue #416). */
+  mailingLists: MailingList[];
 }
 
 /** Stable identity for the loading/failed fallback, so it doesn't churn every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_LABELS: readonly MailLabel[] = [];
+const NO_MAILING_LISTS: readonly MailingList[] = [];
 
 /**
  * Sender + recipient ids to look up for these headers. Mailing-list recipient
@@ -85,7 +95,12 @@ async function loadMailSnapshot(
   const [
     { cached: headersResult, needsReauth: headersNeedsReauth, hasMore: headersHasMore },
     { cached: labelsResult, needsReauth: labelsNeedsReauth },
-  ] = await Promise.all([loadMailHeaders(characterId), loadMailLabels(characterId)]);
+    { cached: listsResult, needsReauth: listsNeedsReauth },
+  ] = await Promise.all([
+    loadMailHeaders(characterId),
+    loadMailLabels(characterId),
+    loadMailingLists(characterId),
+  ]);
 
   // Already superseded: skip the name lookup, its result would be discarded.
   const ids = signal.cancelled ? [] : namePartyIds(headersResult?.data ?? []);
@@ -93,9 +108,10 @@ async function loadMailSnapshot(
   return {
     headersResult,
     labelsResult,
-    needsReauth: headersNeedsReauth || labelsNeedsReauth,
+    needsReauth: headersNeedsReauth || labelsNeedsReauth || listsNeedsReauth,
     names,
     headersHasMore,
+    mailingLists: listsResult?.data ?? [],
   };
 }
 
@@ -105,8 +121,55 @@ export function Mail() {
   const { data, error, loading, hydrated, activeCharacterId, refresh } =
     useRouteSnapshot(loadMailSnapshot);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('all');
+  // Last-picked tab, per character (issue #416) — in-memory only, the same
+  // persistence tier the label filter below already uses ("survives a
+  // refresh", not a real page reload). State, not a ref: React forbids
+  // reading a ref during render, and restoring the right tab on a character
+  // switch has to happen in the render that first shows that character.
+  const [tabByCharacter, setTabByCharacter] = useState<ReadonlyMap<number, ActiveTab>>(new Map());
+  const [activeTabState, setActiveTabState] = useState<ActiveTab>('all');
+  const [tabCharacterId, setTabCharacterId] = useState(activeCharacterId);
+  if (activeCharacterId !== tabCharacterId) {
+    setTabCharacterId(activeCharacterId);
+    setActiveTabState(
+      (activeCharacterId !== null && tabByCharacter.get(activeCharacterId)) || 'all'
+    );
+  }
+  const activeTab = activeTabState;
+  function setActiveTab(tab: ActiveTab) {
+    if (activeCharacterId !== null) {
+      setTabByCharacter((previous) => new Map(previous).set(activeCharacterId, tab));
+    }
+    setActiveTabState(tab);
+  }
+
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Session-only local "mark read" (issue #416): never written to ESI — this
+  // app has no mail write scope at all. Dims a mail the same way ESI's own
+  // `is_read` does; never reset, so it survives a manual refresh and only
+  // resets on an actual page reload, same tier as the ESI-derived read flag
+  // it's layered on top of.
+  const [locallyReadIds, setLocallyReadIds] = useState<ReadonlySet<number>>(new Set());
+  const [hideRead, setHideRead] = useState(false);
+  function toggleLocalRead(mailId: number) {
+    setLocallyReadIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(mailId)) next.delete(mailId);
+      else next.add(mailId);
+      return next;
+    });
+  }
+
+  const [search, setSearch] = useState('');
+  // Debounced separately from `search` (matches Assets.tsx/Market.tsx/
+  // SkillPicker.tsx's own search debounce, issue #416): the input stays
+  // instantly responsive, only the filter over potentially hundreds of
+  // headers below waits out the debounce.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [search]);
   const [bodySnapshot, setBodySnapshot] = useState<{
     selectedId: number;
     result: CachedResult<MailBody> | null;
@@ -163,6 +226,12 @@ export function Mail() {
   const labelTabById = useMemo(() => buildLabelTabMap(labels), [labels]);
   const unreadByTab = useMemo(() => unreadCountsByTab(labels), [labels]);
   const customLabels = useMemo(() => buildCustomLabelList(labels), [labels]);
+  const mailingListNames = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const list of data?.mailingLists ?? NO_MAILING_LISTS)
+      map.set(list.mailing_list_id, list.name);
+    return map;
+  }, [data]);
 
   const headers = useMemo(
     () =>
@@ -178,10 +247,32 @@ export function Mail() {
         if (activeTab !== 'all' && resolveMailTab(h.labels, labelTabById) !== activeTab) {
           return false;
         }
-        if (selectedLabelIds.size === 0) return true;
-        return (h.labels ?? []).some((id) => selectedLabelIds.has(id));
+        if (selectedLabelIds.size > 0 && !(h.labels ?? []).some((id) => selectedLabelIds.has(id))) {
+          return false;
+        }
+        const isRead = h.is_read || locallyReadIds.has(h.mail_id);
+        if (hideRead && isRead) return false;
+        const senderName = h.from === undefined ? undefined : names.get(h.from);
+        return mailSearchMatches(h, senderName, debouncedSearch);
       }),
-    [headers, activeTab, labelTabById, selectedLabelIds]
+    [
+      headers,
+      activeTab,
+      labelTabById,
+      selectedLabelIds,
+      hideRead,
+      locallyReadIds,
+      names,
+      debouncedSearch,
+    ]
+  );
+
+  // Rendered-list cap (issue #416): applied after every filter, so it caps
+  // what's actually mapped into DOM rows rather than the underlying fetch
+  // list — "load more"'s own pagination cursor is untouched by this.
+  const { headers: cappedHeaders, truncated: headersTruncated } = useMemo(
+    () => capHeadersForDisplay(visibleHeaders),
+    [visibleHeaders]
   );
 
   const selectedHeader = headers.find((h) => h.mail_id === selectedId) ?? null;
@@ -318,6 +409,23 @@ export function Mail() {
             </div>
           )}
 
+          {(isDesktop || selectedId === null) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('mail.searchPlaceholder')}
+                aria-label={t('mail.searchLabel')}
+                className="min-w-0 flex-1"
+              />
+              <FilterChip
+                label={t('mail.hideRead')}
+                selected={hideRead}
+                onToggle={() => setHideRead((v) => !v)}
+              />
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
             <Panel padded={false} className={isDesktop || selectedId === null ? '' : 'hidden'}>
               {visibleHeaders.length === 0 ? (
@@ -327,16 +435,17 @@ export function Mail() {
                 // renders below this list in the same column, so sizing the
                 // list to all remaining viewport height would push it off-screen.
                 <ul className="max-h-[32rem] divide-y divide-line overflow-y-auto">
-                  {visibleHeaders.map((header) => {
+                  {cappedHeaders.map((header) => {
                     const tab = resolveMailTab(header.labels, labelTabById);
-                    const unread = header.is_read ? 'text-text-dim' : 'font-semibold';
+                    const isRead = header.is_read || locallyReadIds.has(header.mail_id);
+                    const unread = isRead ? 'text-text-dim' : 'font-semibold';
                     return (
-                      <li key={header.mail_id}>
+                      <li key={header.mail_id} className="flex items-center">
                         <button
                           type="button"
                           onClick={() => setSelectedId(header.mail_id)}
                           aria-current={selectedId === header.mail_id}
-                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-panel-2 ${
+                          className={`flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-panel-2 ${
                             selectedId === header.mail_id ? 'bg-panel-2' : ''
                           }`}
                         >
@@ -359,10 +468,22 @@ export function Mail() {
                             {t(TAB_LABEL_KEY[tab])}
                           </span>
                         </button>
+                        <IconButton
+                          size="sm"
+                          icon={isRead ? <Icon.MarkUnread /> : <Icon.MarkRead />}
+                          label={isRead ? t('mail.markUnread') : t('mail.markRead')}
+                          onClick={() => toggleLocalRead(header.mail_id)}
+                          className="mr-1 shrink-0"
+                        />
                       </li>
                     );
                   })}
                 </ul>
+              )}
+              {headersTruncated && (
+                <p className="border-t border-line p-2 text-[0.6875rem] text-text-dim">
+                  {t('mail.capNotice', { count: cappedHeaders.length })}
+                </p>
               )}
               {hasMore && (
                 <div className="border-t border-line p-2">
@@ -410,7 +531,7 @@ export function Mail() {
                       {recipients
                         .map((r) =>
                           r.recipient_type === 'mailing_list'
-                            ? t('mail.mailingList')
+                            ? (mailingListNames.get(r.recipient_id) ?? t('mail.mailingList'))
                             : (names.get(r.recipient_id) ?? t('mail.unknownRecipient'))
                         )
                         .join(', ')}

@@ -2,14 +2,21 @@
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
+import { EventContextMenu } from './EventContextMenu';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
 export interface CalendarAgendaViewProps {
   events: CalendarEventSummary[];
   onSelectEvent: (event: CalendarEventSummary) => void;
+  /** Row context menu's "Add to Month View" (issue #416): jumps Month view to an event's date. */
+  onAddToMonthView: (date: Date) => void;
 }
 
-export function CalendarAgendaView({ events, onSelectEvent }: CalendarAgendaViewProps) {
+export function CalendarAgendaView({
+  events,
+  onSelectEvent,
+  onAddToMonthView,
+}: CalendarAgendaViewProps) {
   const { t } = useTranslation();
 
   return (
@@ -17,19 +24,25 @@ export function CalendarAgendaView({ events, onSelectEvent }: CalendarAgendaView
       <ul aria-label={t('calendar.agendaListLabel')} className="divide-y divide-line">
         {events.map((event) => (
           <li key={event.event_id}>
-            <button
-              type="button"
-              onClick={() => onSelectEvent(event)}
-              className="grid w-full grid-cols-[9rem_1fr_auto] items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-panel-2"
+            <EventContextMenu
+              eventId={event.event_id}
+              eventDate={new Date(event.event_date)}
+              onAddToMonthView={onAddToMonthView}
             >
-              <span className="truncate text-text-faint">
-                {new Date(event.event_date).toLocaleString()}
-              </span>
-              <span className="truncate font-semibold">{event.title}</span>
-              <span className={`shrink-0 ${RESPONSE_TEXT_TONE[event.event_response]}`}>
-                {t(RESPONSE_KEY[event.event_response])}
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => onSelectEvent(event)}
+                className="grid w-full grid-cols-[9rem_1fr_auto] items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-panel-2"
+              >
+                <span className="truncate text-text-faint">
+                  {new Date(event.event_date).toLocaleString()}
+                </span>
+                <span className="truncate font-semibold">{event.title}</span>
+                <span className={`shrink-0 ${RESPONSE_TEXT_TONE[event.event_response]}`}>
+                  {t(RESPONSE_KEY[event.event_response])}
+                </span>
+              </button>
+            </EventContextMenu>
           </li>
         ))}
       </ul>

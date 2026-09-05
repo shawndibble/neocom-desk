@@ -10,6 +10,7 @@ import {
   formatWeekLabel,
   groupByDayKey,
   isSameDay,
+  parseJumpDate,
   startOfWeek,
   weekdayLabels,
 } from './calendarGrid';
@@ -147,5 +148,25 @@ describe('groupByDayKey', () => {
 
   it('returns an empty map for no items', () => {
     expect(groupByDayKey([], (item: { date: Date }) => item.date).size).toBe(0);
+  });
+});
+
+describe('parseJumpDate', () => {
+  it('parses a valid YYYY-MM-DD input (the native date input contract) as local midnight', () => {
+    const date = parseJumpDate('2026-09-03');
+    expect(date).not.toBeNull();
+    expect(date?.getFullYear()).toBe(2026);
+    expect(date?.getMonth()).toBe(8);
+    expect(date?.getDate()).toBe(3);
+    expect(date?.getHours()).toBe(0);
+  });
+
+  it('returns null for an empty string', () => {
+    expect(parseJumpDate('')).toBeNull();
+  });
+
+  it('returns null for a malformed string', () => {
+    expect(parseJumpDate('not-a-date')).toBeNull();
+    expect(parseJumpDate('2026-13-40')).toBeNull();
   });
 });

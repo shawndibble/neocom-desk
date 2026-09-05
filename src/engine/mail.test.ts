@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCustomLabelList,
   buildLabelTabMap,
+  capHeadersForDisplay,
+  mailSearchMatches,
   mergeMailHeaderPage,
   resolveMailTab,
   unreadCountsByTab,
@@ -169,5 +171,52 @@ describe('mergeMailHeaderPage', () => {
   it('defaults the page size to 50', () => {
     const page = Array.from({ length: 50 }, (_, i) => ({ mail_id: i }));
     expect(mergeMailHeaderPage([], page).hasMore).toBe(true);
+  });
+});
+
+describe('mailSearchMatches', () => {
+  const header = { subject: 'Fleet up now', from: 1 } as const;
+
+  it('matches on subject substring, case-insensitively', () => {
+    expect(mailSearchMatches(header, 'Sender Name', 'FLEET')).toBe(true);
+    expect(mailSearchMatches(header, 'Sender Name', 'market')).toBe(false);
+  });
+
+  it('matches on sender name substring, case-insensitively', () => {
+    expect(mailSearchMatches(header, 'Fleet Commander', 'commander')).toBe(true);
+  });
+
+  it('treats an undefined sender name as no match for that half', () => {
+    expect(mailSearchMatches(header, undefined, 'commander')).toBe(false);
+  });
+
+  it('treats a blank query as matching everything', () => {
+    expect(mailSearchMatches(header, undefined, '')).toBe(true);
+    expect(mailSearchMatches(header, undefined, '   ')).toBe(true);
+  });
+
+  it('matches a header with no subject only via the sender', () => {
+    expect(mailSearchMatches({ subject: undefined }, 'Fleet Commander', 'fleet')).toBe(true);
+    expect(mailSearchMatches({ subject: undefined }, undefined, 'fleet')).toBe(false);
+  });
+});
+
+describe('capHeadersForDisplay', () => {
+  it('returns the list unchanged, not truncated, when at or under the cap', () => {
+    const headers = [{ mail_id: 1 }, { mail_id: 2 }];
+    const result = capHeadersForDisplay(headers, 2);
+    expect(result).toEqual({ headers, truncated: false });
+  });
+
+  it('keeps only the first `cap` entries (caller-ordered) and marks truncated', () => {
+    const headers = [{ mail_id: 1 }, { mail_id: 2 }, { mail_id: 3 }];
+    const result = capHeadersForDisplay(headers, 2);
+    expect(result.headers.map((h) => h.mail_id)).toEqual([1, 2]);
+    expect(result.truncated).toBe(true);
+  });
+
+  it('defaults to MAIL_HEADER_DISPLAY_CAP', () => {
+    const headers = Array.from({ length: 10 }, (_, i) => ({ mail_id: i }));
+    expect(capHeadersForDisplay(headers).truncated).toBe(false);
   });
 });
