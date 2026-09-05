@@ -215,8 +215,38 @@ describe('schema upgrade v6 -> v7', () => {
     await Dexie.delete(NAME);
   });
 
-  it('the shipped database is at version 7 with the new index live', () => {
-    expect(db.verno).toBe(7);
+  it('the shipped database is at its current version with v7’s index live', () => {
+    expect(db.verno).toBe(8);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
+  });
+});
+
+describe('schema upgrade v7 -> v8', () => {
+  it('adds planetRichness, indexed the way the Advisor reads it', () => {
+    // One system's planets at a time (planetId), and one Character's whole
+    // ranking set on load (characterId) — both are queried, so both are
+    // indexed rather than scanned.
+    expect(db.planetRichness.schema.indexes.map((i) => i.name).sort()).toEqual([
+      'characterId',
+      'planetId',
+    ]);
+  });
+
+  it('leaves every v7 table in place, because the upgrade is additive', () => {
+    const tables = db.tables.map((table) => table.name).sort();
+    expect(tables).toEqual(
+      [
+        'buildPlans',
+        'characters',
+        'esiCache',
+        'notificationFeed',
+        'planetRichness',
+        'quickbars',
+        'settings',
+        'skillPlans',
+        'stationPins',
+        'tokens',
+      ].sort()
+    );
   });
 });

@@ -110,6 +110,7 @@ const PLANS_PATH = 'characters/char:1/plans';
 const BUILD_PLANS_PATH = 'characters/char:1/buildPlans';
 const QUICKBARS_PATH = 'characters/char:1/quickbars';
 const STATION_PINS_PATH = 'characters/char:1/stationPins';
+const PLANET_RICHNESS_PATH = 'characters/char:1/planetRichness';
 const SETTINGS_PATH = 'characters/char:1/settings';
 const NOTIFICATION_FEED_PATH = 'characters/char:1/notificationFeed';
 const HASH = 'hash-a';
@@ -235,6 +236,7 @@ beforeEach(async () => {
     db.buildPlans.clear(),
     db.quickbars.clear(),
     db.stationPins.clear(),
+    db.planetRichness.clear(),
     db.settings.clear(),
     db.esiCache.clear(),
     db.notificationFeed.clear(),
@@ -456,9 +458,9 @@ describe('triggerSync: plans', () => {
 describe('triggerSync: ownerHash-scoped reads', () => {
   it('queries every collection filtered by the character ownerHash', async () => {
     await triggerSync(1);
-    // plans + buildPlans + quickbars + stationPins + notificationFeed + settings,
-    // each read through a where clause.
-    expect(vi.mocked(where)).toHaveBeenCalledTimes(6);
+    // plans + buildPlans + quickbars + stationPins + planetRichness +
+    // notificationFeed + settings, each read through a where clause.
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(7);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
       expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
@@ -734,6 +736,65 @@ describe('triggerSync: quickbar', () => {
     ]);
     await triggerSync(1);
     expect((await db.quickbars.get('1'))?.items).toEqual([{ typeId: 2, name: 'New' }]);
+  });
+});
+
+describe('triggerSync: planet richness (#425)', () => {
+  it('pushes a local-only ranking with ownerHash and deleted: false', async () => {
+    await db.planetRichness.put({
+      id: '1:40000001',
+      characterId: 1,
+      planetId: 40_000_001,
+      order: [2073, 2268],
+      updatedAt: 5_000,
+    });
+    await triggerSync(1);
+    expect(remoteStore.get(PLANET_RICHNESS_PATH)?.get('1:40000001')).toEqual({
+      id: '1:40000001',
+      characterId: 1,
+      planetId: 40_000_001,
+      order: [2073, 2268],
+      updatedAt: 5_000,
+      ownerHash: HASH,
+      deleted: false,
+    });
+  });
+
+  it('pulls a remote-only ranking into Dexie without remote-only fields', async () => {
+    seedRemote(PLANET_RICHNESS_PATH, [
+      {
+        id: '1:40000001',
+        characterId: 1,
+        planetId: 40_000_001,
+        order: [2268, 2073],
+        updatedAt: 5_000,
+        ownerHash: HASH,
+        deleted: false,
+      },
+    ]);
+    await triggerSync(1);
+    expect(await db.planetRichness.get('1:40000001')).toEqual({
+      id: '1:40000001',
+      characterId: 1,
+      planetId: 40_000_001,
+      order: [2268, 2073],
+      updatedAt: 5_000,
+    });
+  });
+
+  it('keeps the ordering itself intact, since order is the entire payload', async () => {
+    // A ranking is only meaningful as a sequence — a round trip that sorted,
+    // deduped or reversed it would silently invert what the pilot recorded.
+    const order = [2270, 2073, 2268, 2267];
+    await db.planetRichness.put({
+      id: '1:40000001',
+      characterId: 1,
+      planetId: 40_000_001,
+      order,
+      updatedAt: 5_000,
+    });
+    await triggerSync(1);
+    expect(remoteStore.get(PLANET_RICHNESS_PATH)?.get('1:40000001')).toMatchObject({ order });
   });
 });
 
@@ -1068,7 +1129,7 @@ describe('sync orchestration', () => {
 
     release();
     await Promise.all([p1, p2]);
-    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(6);
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(7);
   });
 
   it('a queued sync still runs after the previous one fails', async () => {
@@ -1085,9 +1146,9 @@ describe('sync orchestration', () => {
     scheduleSync(1, 20);
     // One sync = one getDocs per collection (plans + buildPlans + quickbars +
     // stationPins + notificationFeed + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(6));
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(7));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(6);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(7);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
   });
 });

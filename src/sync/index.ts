@@ -74,6 +74,21 @@ export async function clearStationPin(locationId: number): Promise<void> {
   return clearStationPin(locationId);
 }
 
+/**
+ * Record a planet's best-to-worst resource ranking for the whole account
+ * (issue #425). Fanned out to every Character, like an account-wide pin.
+ */
+export async function setPlanetRichness(planetId: number, order: number[]): Promise<void> {
+  const { setPlanetRichness } = await import('./planSync');
+  return setPlanetRichness(planetId, order);
+}
+
+/** Forget a planet's ranking, tombstoned so it does not resurrect on sync. */
+export async function clearPlanetRichness(planetId: number): Promise<void> {
+  const { clearPlanetRichness } = await import('./planSync');
+  return clearPlanetRichness(planetId);
+}
+
 /** Write a synced setting ('sync.'-prefixed key) and stamp it for LWW merging. */
 export async function setSyncedSetting(key: string, value: unknown): Promise<void> {
   const { setSyncedSetting } = await import('./planSync');

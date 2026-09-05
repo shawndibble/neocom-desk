@@ -21,6 +21,8 @@ export const quickbarTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}quickbarTombstones.${characterId}`;
 export const stationPinTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}stationPinTombstones.${characterId}`;
+export const planetRichnessTombstonesKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}planetRichnessTombstones.${characterId}`;
 
 /**
  * One Character's tombstone list for a collection, by its bookkeeping key.
@@ -47,5 +49,6 @@ export async function clearCharacterSyncBookkeeping(characterId: number): Promis
     buildPlanTombstonesKey(characterId),
     quickbarTombstonesKey(characterId),
     stationPinTombstonesKey(characterId),
+    planetRichnessTombstonesKey(characterId),
   ]);
 }
