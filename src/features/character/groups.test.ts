@@ -9,9 +9,11 @@ import {
   moveCharacterToGroup,
   reorderGroups,
   sortCharacterIds,
+  rosterSortStats,
   type CharacterGroup,
   type CharacterSortStats,
 } from './groups';
+import type { RosterEntry } from './roster';
 
 describe('pruneGroups', () => {
   it('drops character ids that no longer exist, keeping the group', () => {
@@ -126,5 +128,73 @@ describe('sortCharacterIds', () => {
 
   it('keeps original relative order for ids missing from stats entirely', () => {
     expect(sortCharacterIds([9, 1], stats, 'name', 'asc')).toEqual([1, 9]);
+  });
+});
+
+describe('rosterSortStats', () => {
+  const spFetchedAt = new Date('2026-01-01T00:00:00Z');
+  const walletFetchedAt = new Date('2026-01-02T00:00:00Z');
+
+  function entry(overrides: Partial<RosterEntry>): RosterEntry {
+    return {
+      characterId: 1,
+      name: 'Zed',
+      wallet: null,
+      skills: null,
+      queue: null,
+      correctedTotalSp: null,
+      ...overrides,
+    };
+  }
+
+  it('carries each field alongside its own fetchedAt', () => {
+    const stats = rosterSortStats([
+      entry({
+        characterId: 1,
+        wallet: { data: 500, fetchedAt: walletFetchedAt, fromCache: true, truncated: false },
+        skills: {
+          data: { skills: [], total_sp: 1000 },
+          fetchedAt: spFetchedAt,
+          fromCache: true,
+          truncated: false,
+        },
+        correctedTotalSp: 1000,
+      }),
+    ]);
+    expect(stats.get(1)).toEqual({
+      name: 'Zed',
+      skillPoints: 1000,
+      skillPointsFetchedAt: spFetchedAt,
+      wallet: 500,
+      walletFetchedAt,
+    });
+  });
+
+  it('leaves both value and fetchedAt undefined for a never-fetched field', () => {
+    const stats = rosterSortStats([entry({ characterId: 2, name: 'Mid' })]);
+    expect(stats.get(2)).toEqual({
+      name: 'Mid',
+      skillPoints: undefined,
+      skillPointsFetchedAt: undefined,
+      wallet: undefined,
+      walletFetchedAt: undefined,
+    });
+  });
+
+  it('a stat with no value carries no timestamp — skills cached but corrected SP unavailable', () => {
+    const stats = rosterSortStats([
+      entry({
+        characterId: 3,
+        skills: {
+          data: { skills: [], total_sp: 1000 },
+          fetchedAt: spFetchedAt,
+          fromCache: true,
+          truncated: false,
+        },
+        correctedTotalSp: null,
+      }),
+    ]);
+    expect(stats.get(3)?.skillPoints).toBeUndefined();
+    expect(stats.get(3)?.skillPointsFetchedAt).toBeUndefined();
   });
 });

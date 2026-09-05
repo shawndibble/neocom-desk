@@ -557,6 +557,8 @@
       "skillPoints": "Skill points",
       "wallet": "Wallet"
     },
+    "spLabel": "SP",
+    "walletLabel": "Wallet",
     "queueState": "Queue",
     "queueStates": {
       "training": "Training",

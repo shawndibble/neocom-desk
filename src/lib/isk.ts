@@ -4,6 +4,7 @@
  * zero-clamped first, because `Intl.NumberFormat` renders negative zero as
  * "-0", which reads as a loss that isn't real.
  */
+import { formatCompactNumber } from './compactNumber';
 
 const formatters = new Map<number, Intl.NumberFormat>();
 
@@ -33,6 +34,11 @@ export function clampIskZero(value: number, decimals: number): number {
 
 export function formatIsk(value: number, decimals = 0): string {
   return formatterFor(decimals).format(clampIskZero(value, decimals));
+}
+
+/** Abbreviated ISK (`"5.2M"`) for tight spaces — the character card, not Wallet's own precise figures. */
+export function formatIskCompact(value: number): string {
+  return formatCompactNumber(clampIskZero(value, 0));
 }
 
 const ISK_SHORTHAND_MULTIPLIERS: Readonly<Record<string, number>> = {
