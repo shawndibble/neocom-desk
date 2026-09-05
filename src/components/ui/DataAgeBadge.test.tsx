@@ -36,6 +36,13 @@ describe('DataAgeBadge', () => {
     expect(screen.getByText('5m ago')).toHaveAttribute('dateTime', date.toISOString());
   });
 
+  it('is hidden below the md breakpoint — mobile gets the age from Settings’ Data Age tab instead', () => {
+    const date = new Date(NOW.getTime() - 5 * 60_000);
+    render(<DataAgeBadge date={date} />);
+    expect(screen.getByText('5m ago').className).toMatch(/(?:^|\s)hidden(?:\s|$)/);
+    expect(screen.getByText('5m ago').className).toContain('md:inline-flex');
+  });
+
   it('says nothing beyond the timestamp when no note is given', () => {
     const date = new Date(NOW.getTime() - 5 * 60_000);
     render(<DataAgeBadge date={date} />);

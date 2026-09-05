@@ -1744,6 +1744,11 @@
   },
   "settings": {
     "title": "Settings",
+    "tabs": {
+      "general": "General",
+      "dataAge": "Data Age",
+      "activity": "Activity Log"
+    },
     "displayTitle": "Display",
     "fontScaleLabel": "Text size",
     "fontScaleHint": "Scales text and controls together. Applies immediately and stays on this device.",
@@ -1851,6 +1856,15 @@
     "emptyHint": "Requests the app makes will appear here as you use it.",
     "clearLog": "Clear log",
     "clearedConfirm": "Log cleared."
+  },
+  "dataAge": {
+    "title": "Data Age",
+    "hint": "The most recent successful update behind each view, so this stays available on a phone even though the on-screen badge doesn't show there. Session-only, cleared on reload.",
+    "columnEndpoint": "Endpoint",
+    "columnCharacter": "Character",
+    "columnUpdated": "Last updated",
+    "emptyTitle": "Nothing fetched yet",
+    "emptyHint": "Data ages appear here once the app fetches something from EVE's servers."
   },
   "corp": {
     "title": "Corporation",
