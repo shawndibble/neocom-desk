@@ -1543,7 +1543,9 @@
       "openOrders": "Open",
       "history": "History",
       "historyOrders": "Orders",
-      "historyViews": "History views",
+      "historyViews": "History view",
+      "historyViewsTooltipLabel": "About Orders and Transactions",
+      "historyViewsTooltip": "Orders are the orders you placed that ended — cancelled or expired. Transactions are the fills that moved ISK. One order can make many fills, and an order nobody took makes none.",
       "transactions": "Transactions"
     },
     "priceHistory": {
