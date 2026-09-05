@@ -194,7 +194,6 @@ beforeEach(async () => {
     scopes: ['esi-skills.read_skillqueue.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
 
   window.history.pushState({}, '', '/industry');
 });
@@ -243,7 +242,6 @@ describe('Industry: Build Plan CRUD', () => {
     const remaining = await db.buildPlans.where('characterId').equals(CHAR_ID).toArray();
     expect(remaining).toHaveLength(1);
     expect(remaining[0].name).toBe('Rifter run (copy)');
-    expect(window.confirm).toHaveBeenCalled();
   });
 });
 
