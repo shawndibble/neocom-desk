@@ -56,3 +56,23 @@ export async function loadStructureSystemId(
 ): Promise<number | null> {
   return (await loadStructure(characterId, structureId))?.solar_system_id ?? null;
 }
+
+/**
+ * Everything the Build Plan's location search needs from one structure, off
+ * the same cached row `loadStructureName` reads. `null` for a structure this
+ * character is not on the ACL of — a normal outcome, never an auth failure.
+ */
+export async function loadStructureSummary(
+  characterId: number,
+  structureId: number
+): Promise<{ name: string; systemId: number; typeId: number } | null> {
+  const structure = await loadStructure(characterId, structureId);
+  // `type_id` is optional in ESI's own schema; without it there is no facility
+  // preset to map to, which is the whole reason the search wants the row.
+  if (!structure || structure.type_id === undefined) return null;
+  return {
+    name: structure.name,
+    systemId: structure.solar_system_id,
+    typeId: structure.type_id,
+  };
+}

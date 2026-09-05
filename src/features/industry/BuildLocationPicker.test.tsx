@@ -1,32 +1,30 @@
 /**
- * The picker's own behaviour, with the corp gate and the structure load mocked.
- * The end-to-end corp path (scopes, roles, MSW) is already pinned by
- * `ActiveJobsPanel.corp.test.tsx`; what matters here is the hide rule, the
- * opt-in fetch, and that picking fills every field in one edit.
+ * The picker's own behaviour, with the search and the grant state mocked. The
+ * search's ESI path is pinned by `searchBuildLocations.test.ts`; what matters
+ * here is the scope prompt, the debounce, and that picking hands over every
+ * field in one call.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import type { BuildStructureOption } from './buildStructures';
 
-const corpOwner = vi.hoisted(() => ({
-  value: {
-    owner: 'personal' as const,
-    setOwner: vi.fn(),
-    available: true,
-    corporationId: 98 as number | null,
-  },
+const grant = vi.hoisted(() => ({
+  scopes: ['esi-search.search_structures.v1'] as string[] | undefined,
 }));
-vi.mock('@/features/corp/owner', () => ({ useCorpOwner: () => corpOwner.value }));
+vi.mock('@/app/useGrantedScopes', () => ({ useGrantedScopes: () => grant.scopes }));
 vi.mock('@/stores/activeCharacter', () => ({
   useActiveCharacter: (select: (s: { activeCharacterId: number | null }) => unknown) =>
     select({ activeCharacterId: 91 }),
 }));
 
-const loadBuildStructureOptions = vi.hoisted(() => vi.fn());
-vi.mock('./loadBuildStructures', () => ({ loadBuildStructureOptions }));
+const beginEveLogin = vi.hoisted(() => vi.fn());
+vi.mock('@/app/loginFlow', () => ({ beginEveLogin }));
+
+const searchBuildLocations = vi.hoisted(() => vi.fn());
+vi.mock('./searchBuildLocations', () => ({ searchBuildLocations, MIN_SEARCH_LENGTH: 3 }));
 
 const AZBEL: BuildStructureOption = {
   structureId: 1035,
@@ -38,9 +36,10 @@ const AZBEL: BuildStructureOption = {
 };
 
 beforeEach(() => {
-  corpOwner.value = { owner: 'personal', setOwner: vi.fn(), available: true, corporationId: 98 };
-  loadBuildStructureOptions.mockReset();
-  loadBuildStructureOptions.mockResolvedValue([AZBEL]);
+  grant.scopes = ['esi-search.search_structures.v1'];
+  beginEveLogin.mockReset();
+  searchBuildLocations.mockReset();
+  searchBuildLocations.mockResolvedValue([AZBEL]);
 });
 
 function renderPicker(onPick = vi.fn()) {
@@ -48,68 +47,85 @@ function renderPicker(onPick = vi.fn()) {
   return onPick;
 }
 
+const searchBox = () => screen.getByLabelText('Build location');
+
 describe('BuildLocationPicker', () => {
-  it('fetches nothing until the pilot asks — the corp read is opt-in', () => {
+  it('offers the grant instead of the search when the scope is missing', async () => {
+    const user = userEvent.setup();
+    grant.scopes = [];
     renderPicker();
 
-    expect(loadBuildStructureOptions).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Fill from a corp structure' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Build location')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Grant access' }));
+
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 91, groups: ['search'] });
   });
 
-  it('fills facility, security and build system in a single edit', async () => {
+  it('renders nothing at all while the grant is still unknown', () => {
+    grant.scopes = undefined;
+    const { container } = render(<BuildLocationPicker onPick={vi.fn()} />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('searches what was typed and lists what came back', async () => {
+    const user = userEvent.setup();
+    renderPicker();
+
+    await user.type(searchBox(), 'K2-18');
+
+    expect(await screen.findByText('K2-18 R&D')).toBeInTheDocument();
+    expect(screen.getByText('Azbel · Badivefi')).toBeInTheDocument();
+  });
+
+  it('never searches below three characters', async () => {
+    const user = userEvent.setup();
+    renderPicker();
+
+    await user.type(searchBox(), 'K2');
+
+    await waitFor(() => expect(searchBuildLocations).not.toHaveBeenCalled());
+  });
+
+  it('debounces a burst of typing into one request', async () => {
+    const user = userEvent.setup();
+    renderPicker();
+
+    await user.type(searchBox(), 'K2-18');
+    await screen.findByText('K2-18 R&D');
+
+    expect(searchBuildLocations).toHaveBeenCalledExactlyOnceWith(91, 'K2-18');
+  });
+
+  it('hands over every field in one call, and clears itself', async () => {
     const user = userEvent.setup();
     const onPick = renderPicker();
 
-    await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
-    await user.selectOptions(await screen.findByLabelText('Corp structure'), '1035');
+    await user.type(searchBox(), 'K2-18');
+    await user.click(await screen.findByRole('button', { name: /K2-18 R&D/ }));
 
     expect(onPick).toHaveBeenCalledExactlyOnceWith(AZBEL);
+    expect((searchBox() as HTMLInputElement).value).toBe('');
+    expect(screen.queryByText('K2-18 R&D')).toBeNull();
+  });
+
+  it('says so when the search finds nothing', async () => {
+    const user = userEvent.setup();
+    searchBuildLocations.mockResolvedValue([]);
+    renderPicker();
+
+    await user.type(searchBox(), 'Nowhere');
+
+    expect(await screen.findByText('Nothing found. Try more of the name.')).toBeInTheDocument();
   });
 
   it('labels a structure ESI withheld a name for by what and where it is', async () => {
     const user = userEvent.setup();
-    loadBuildStructureOptions.mockResolvedValue([{ ...AZBEL, name: null }]);
+    searchBuildLocations.mockResolvedValue([{ ...AZBEL, name: null }]);
     renderPicker();
 
-    await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
+    await user.type(searchBox(), 'K2-18');
 
-    expect(await screen.findByRole('option', { name: 'Azbel in Badivefi' })).toBeInTheDocument();
-  });
-
-  it('keeps showing the structure that was picked', async () => {
-    const user = userEvent.setup();
-    renderPicker();
-
-    await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
-    const select = await screen.findByLabelText('Corp structure');
-    await user.selectOptions(select, '1035');
-
-    expect((select as HTMLSelectElement).value).toBe('1035');
-  });
-
-  it('says so when the corp owns no manufacturing structure', async () => {
-    const user = userEvent.setup();
-    loadBuildStructureOptions.mockResolvedValue([]);
-    renderPicker();
-
-    await user.click(screen.getByRole('button', { name: 'Fill from a corp structure' }));
-
-    expect(
-      await screen.findByText('No manufacturing structures in this corp.')
-    ).toBeInTheDocument();
-  });
-
-  it('renders no corp control at all for a Character without the capability', () => {
-    // The hide rule (CONTEXT.md round 35): no lock, no disabled button, nothing.
-    corpOwner.value = {
-      owner: 'personal',
-      setOwner: vi.fn(),
-      available: false,
-      corporationId: null,
-    };
-    renderPicker();
-
-    expect(screen.queryByRole('button', { name: 'Fill from a corp structure' })).toBeNull();
-    expect(screen.queryByLabelText('Corp structure')).toBeNull();
+    expect(await screen.findByText('Azbel in Badivefi')).toBeInTheDocument();
   });
 });

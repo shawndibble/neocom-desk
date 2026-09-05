@@ -43,17 +43,19 @@ _Recorded 2026-09-05. Issue #499._
   multiplier (1x, 1.9x or 2.1x) out of thin air. Half-filling the plan is worse
   than leaving the row out of a list the pilot can still bypass by typing.
 
-- **The corp read stays opt-in.** `/corporations/{id}/structures` is role-gated
-  and rate-limited, and `useCorpSnapshot` exists so a corp call fires only when
-  the user asks for it. The picker is a button first and a select second, and
-  for a Character with no corp capability the button does not render at all —
-  the hide rule, same as every other corp surface.
+- **The one scope it needs is a new opt-in group, `search`, not the base
+  grant.** `esi-search.search_structures.v1` is the only addition —
+  `esi-universe.read_structures.v1`, which reads the structure the search
+  found, is already in the base grant because Assets resolves structure names
+  with it. Putting the search scope in the base grant would put "search the
+  structures you can dock at" on the consent screen of everyone who never opens
+  a Build Plan, which is the cost `corp` was grouped to avoid. Instead the
+  prompt appears in the panel, at the moment the pilot asks for the search, and
+  grants that one Character.
 
-- **Structures outside the corp stay out of scope.** They need
-  `esi-search.search_structures.v1` and `esi-universe.read_structures.v1`, and
-  whether those belong in the base grant or a scope group is a product
-  decision, not a mechanical one. The typed Build system field remains the
-  fallback for them.
+- **The typed Build system field stays, and is not behind the grant.** It is
+  the whole feature for anyone who declines the scope, and the only way to name
+  a system with no station in it at all.
 
 - **`securityBand` bands the rounded status, not ESI's raw float.** Balle is
   `0.4608891` in ESI and a 0.5 highsec system in game. Banding the raw value

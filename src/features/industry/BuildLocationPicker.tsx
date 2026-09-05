@@ -1,98 +1,155 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, NativeSelect, Spinner } from '@/components/ui';
-import { useCorpOwner } from '@/features/corp/owner';
+import { Button, SearchInput, Spinner } from '@/components/ui';
+import { beginEveLogin } from '@/app/loginFlow';
+import { scopesForGroup } from '@/esi/scopes';
+import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
-import { loadBuildStructureOptions } from './loadBuildStructures';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { MIN_SEARCH_LENGTH, searchBuildLocations } from './searchBuildLocations';
 import type { BuildStructureOption } from './buildStructures';
 
 interface BuildLocationPickerProps {
   onPick: (option: BuildStructureOption) => void;
 }
 
+/** Derived from the registry, like `CorpGrantPrompt` — this file stays hand-edit-free. */
+const SEARCH_GROUP_SCOPES = scopesForGroup('search');
+
+/** Long enough that a typed word is one request, short enough to feel live. */
+const DEBOUNCE_MS = 300;
+
 /**
- * Fills the location fields from a structure the corporation owns.
+ * Finds the station or structure the job runs in, and fills the fields that
+ * follow from it: facility preset, build system, and the security band the
+ * system settles.
  *
- * Facility and build system are two ways of saying "this structure", and a
- * pilot who has one in mind should not have to translate it into two fields.
- * Picking one fills both — and the security band follows the system, so that
- * is settled too. The fields stay visible and editable for anyone whose
- * structure is not in the list; this is a shortcut, never the only way in.
+ * A search rather than a list, because the list ESI can give us is the wrong
+ * one: a corporation's own structures leave out the alliance tower, the rented
+ * Raitaru and every NPC station. `GET /characters/{id}/search` is the only
+ * route that finds a structure by name, and it returns what this Character can
+ * actually dock at — CCP's ACL, not ours.
  *
- * **Fill-once, by decision.** Nothing records which structure was picked. The
- * summary always reads the plan's own values, so it cannot drift from them,
- * and a later edit to any field is just an edit — not a conflict with a stored
- * link. The picker is a shortcut, not a binding.
+ * **Fill-once, by decision.** Nothing records which place was picked. Every
+ * field on screen reads the plan's own values, so nothing can drift from them,
+ * and a later edit is just an edit rather than a conflict with a stored link.
  *
- * The corp read is opt-in: `useCorpSnapshot`'s key stays null until the pilot
- * presses the button, because `/corporations/{id}/structures` is role-gated and
- * rate-limited and must not fire on every Build Plan that opens. For a
- * Character with no corp capability the button never renders at all — the hide
- * rule (CONTEXT.md round 35), same as every other corp surface.
+ * The one scope it needs is opt-in (`search` group): the prompt appears here,
+ * at the moment the pilot asks for the search, and never on anyone's sign-in
+ * consent screen.
  */
 export function BuildLocationPicker({ onPick }: BuildLocationPickerProps) {
   const { t } = useTranslation();
-  const [asked, setAsked] = useState(false);
-  // Which row the select shows, so a pick does not snap the control back to
-  // the placeholder. Session-only on purpose: fill-once means the plan stores
-  // no structure, so this is a display echo of what was just clicked, cleared
-  // whenever the panel remounts on a different plan.
-  const [pickedId, setPickedId] = useState('');
-
-  const { available, corporationId } = useCorpOwner('canReadStructures');
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  const granted = useGrantedScopes();
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<BuildStructureOption[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
-  const structures = useCorpSnapshot<BuildStructureOption[]>(
-    asked && available && corporationId !== null && characterId !== null
-      ? `${characterId}:${corporationId}`
-      : null,
-    async () =>
-      characterId === null || corporationId === null
-        ? []
-        : loadBuildStructureOptions(characterId, corporationId)
-  );
+  const canSearch =
+    granted !== undefined && SEARCH_GROUP_SCOPES.every((scope) => granted.includes(scope));
+
+  // What the effect is actually allowed to search for: empty until the query
+  // clears ESI's three-character floor and the scope is in hand. Derived
+  // during render, and the two display states reset with it — the same
+  // adjust-during-render idiom `BuildPlanDetail` uses for its snapshot key,
+  // and the reason nothing here sets state from inside an effect body.
+  const trimmed = query.trim();
+  const searchKey = canSearch && trimmed.length >= MIN_SEARCH_LENGTH ? trimmed : '';
+  const [prevSearchKey, setPrevSearchKey] = useState(searchKey);
+  if (prevSearchKey !== searchKey) {
+    setPrevSearchKey(searchKey);
+    setResults(null);
+    setSearching(searchKey !== '');
+  }
+
+  // Only the newest query may write results: ESI answers out of order, and a
+  // three-letter search started first can land after the five-letter one.
+  const latest = useRef(0);
+  useEffect(() => {
+    if (searchKey === '' || characterId === null) return;
+    const ticket = ++latest.current;
+    const timer = setTimeout(() => {
+      void searchBuildLocations(characterId, searchKey)
+        .then((found) => {
+          if (ticket !== latest.current) return;
+          setResults(found);
+          setSearching(false);
+        })
+        .catch(() => {
+          if (ticket !== latest.current) return;
+          setResults([]);
+          setSearching(false);
+        });
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchKey, characterId]);
+
+  if (granted === undefined) return null;
+
+  if (!canSearch) {
+    return (
+      <div className="flex flex-col gap-1.5 rounded-xs border border-line p-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+        <span className="text-text-dim">{t('industry.buildLocationGrantHint')}</span>
+        <Button
+          size="sm"
+          onClick={() =>
+            void beginEveLogin({ characterId: characterId ?? undefined, groups: ['search'] })
+          }
+        >
+          {t('industry.buildLocationGrant')}
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-1.5 text-xs">
-      {available && (
-        <div className="flex items-center gap-2">
-          {!asked ? (
-            <Button size="sm" onClick={() => setAsked(true)}>
-              {t('industry.useCorpStructure')}
-            </Button>
-          ) : structures.loading ? (
-            <Spinner size="sm" label={t('industry.corpStructuresLoading')} />
-          ) : structures.data && structures.data.length > 0 ? (
-            <label className="flex flex-1 flex-col gap-1">
-              {t('industry.buildLocation')}
-              <NativeSelect
-                value={pickedId}
-                onChange={(e) => {
-                  setPickedId(e.target.value);
-                  const picked = structures.data?.find(
-                    (option) => String(option.structureId) === e.target.value
-                  );
-                  if (picked) onPick(picked);
+    <div className="relative flex flex-col gap-1 text-xs">
+      <label htmlFor="build-plan-location">{t('industry.buildLocation')}</label>
+      <SearchInput
+        id="build-plan-location"
+        value={query}
+        placeholder={t('industry.buildLocationPlaceholder')}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {searching && (
+        <span className="flex items-center gap-1 text-text-dim">
+          <Spinner size="sm" label={t('industry.buildLocationSearching')} />
+        </span>
+      )}
+      {!searching && results !== null && results.length === 0 && (
+        <span className="text-text-dim">{t('industry.buildLocationNoResults')}</span>
+      )}
+      {!searching && results !== null && results.length > 0 && (
+        <ul className="max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">
+          {results.map((option) => (
+            <li key={option.structureId} className="border-b border-line last:border-b-0">
+              <button
+                type="button"
+                className="flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left hover:bg-panel-2"
+                onClick={() => {
+                  onPick(option);
+                  setQuery('');
+                  setResults(null);
                 }}
               >
-                <option value="">{t('industry.buildLocationPlaceholder')}</option>
-                {structures.data.map((option) => (
-                  <option key={option.structureId} value={option.structureId}>
-                    {option.name ??
-                      t('industry.buildLocationUnnamed', {
-                        facility: FACILITY_PRESETS[option.facility].name,
-                        system: option.systemName,
-                      })}
-                  </option>
-                ))}
-              </NativeSelect>
-            </label>
-          ) : (
-            <span className="text-text-dim">{t('industry.corpStructuresNone')}</span>
-          )}
-        </div>
+                <span className="truncate">
+                  {option.name ??
+                    t('industry.buildLocationUnnamed', {
+                      facility: FACILITY_PRESETS[option.facility].name,
+                      system: option.systemName,
+                    })}
+                </span>
+                <span className="text-text-dim">
+                  {t('industry.buildLocationDetail', {
+                    facility: FACILITY_PRESETS[option.facility].name,
+                    system: option.systemName,
+                  })}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
