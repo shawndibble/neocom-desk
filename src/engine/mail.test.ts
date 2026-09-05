@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildCustomLabelList,
   buildLabelTabMap,
   capHeadersForDisplay,
   mailSearchMatches,
@@ -96,40 +95,6 @@ describe('unreadCountsByTab', () => {
   it('defaults a missing unread_count to 0', () => {
     const map = unreadCountsByTab([{ label_id: 1, name: 'Inbox' }]);
     expect(map.get('inbox')).toBe(0);
-  });
-});
-
-describe('buildCustomLabelList', () => {
-  it('keeps a label whose name is not one of the four System Labels', () => {
-    const list = buildCustomLabelList([
-      { label_id: 1, name: 'Inbox' },
-      { label_id: 100, name: 'Miners' },
-    ]);
-    expect(list).toEqual([{ label_id: 100, name: 'Miners' }]);
-  });
-
-  it('preserves extra fields (e.g. color) on the returned label', () => {
-    const list = buildCustomLabelList([{ label_id: 100, name: 'Miners', color: '#ffaabb' }]);
-    expect(list).toEqual([{ label_id: 100, name: 'Miners', color: '#ffaabb' }]);
-  });
-
-  it('omits all four System Labels', () => {
-    const list = buildCustomLabelList([
-      { label_id: 1, name: 'Inbox' },
-      { label_id: 2, name: 'Sent' },
-      { label_id: 3, name: 'Corp' },
-      { label_id: 4, name: 'Alliance' },
-    ]);
-    expect(list).toEqual([]);
-  });
-
-  it('omits a label with no name (nothing to display as a filter)', () => {
-    const list = buildCustomLabelList([{ label_id: 100 }]);
-    expect(list).toEqual([]);
-  });
-
-  it('returns an empty list for a character with no custom labels', () => {
-    expect(buildCustomLabelList([])).toEqual([]);
   });
 });
 

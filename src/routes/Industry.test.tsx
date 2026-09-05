@@ -470,7 +470,8 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
     expect(screen.queryByRole('button', { name: 'About facility tax' })).not.toBeInTheDocument();
     // Facility folds behind "Override" now that the location search fills it.
     await user.click(screen.getByRole('button', { name: /Override/ }));
-    await user.selectOptions(screen.getByLabelText('Facility'), 'raitaru');
+    await user.click(screen.getByRole('combobox', { name: 'Facility' }));
+    await user.click(await screen.findByRole('option', { name: 'Raitaru' }));
     expect(screen.getByLabelText('Facility tax %')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About facility tax' })).toBeInTheDocument();
   });
@@ -882,16 +883,18 @@ describe('Industry: make-or-buy marker on materials', () => {
 
 describe('Industry: owned-stock scope (#454)', () => {
   it('defaults to Everywhere, and persists Selected locations to the plan', async () => {
+    const user = userEvent.setup();
     const plan = seedPlan();
     await db.buildPlans.add(plan);
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
-    const select = screen.getByLabelText('Owned Material Source') as HTMLSelectElement;
-    expect(select).toHaveValue('everywhere');
+    const select = screen.getByRole('combobox', { name: 'Owned Material Source' });
+    expect(select).toHaveTextContent('Everywhere');
 
-    await userEvent.selectOptions(select, 'Selected locations');
-    expect(select).toHaveValue('selected');
+    await user.click(select);
+    await user.click(await screen.findByRole('option', { name: 'Selected locations' }));
+    expect(select).toHaveTextContent('Selected locations');
 
     // No Characters are authenticated in this test, so there is no detected
     // stock to choose locations from yet.
@@ -906,7 +909,8 @@ describe('Industry: owned-stock scope (#454)', () => {
       });
     });
 
-    await userEvent.selectOptions(select, 'Everywhere');
+    await user.click(select);
+    await user.click(await screen.findByRole('option', { name: 'Everywhere' }));
     await waitFor(async () => {
       expect((await db.buildPlans.get(plan.id))?.ownedStockScope).toBeUndefined();
     });

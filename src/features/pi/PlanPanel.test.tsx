@@ -113,7 +113,8 @@ describe('PlanPanel', () => {
     await setCustomsRate('15');
     expect(isNegative(ledgerValue(await verdict(), 'Margin per unit'))).toBe(false);
 
-    await user.selectOptions(screen.getByLabelText('Factory layout'), 'planet-per-tier');
+    await user.click(screen.getByRole('combobox', { name: 'Factory layout' }));
+    await user.click(await screen.findByRole('option', { name: 'One planet per tier' }));
 
     const after = await verdict();
     expect(isNegative(ledgerValue(after, 'Margin per unit'))).toBe(true);
@@ -181,7 +182,8 @@ describe('PlanPanel', () => {
     const user = userEvent.setup();
     renderPanel();
     await verdict();
-    await user.selectOptions(screen.getByLabelText('Colony space'), 'nullsec');
+    await user.click(screen.getByRole('combobox', { name: 'Colony space' }));
+    await user.click(await screen.findByRole('option', { name: 'Nullsec' }));
     expect(screen.getByLabelText('Customs rate (%)')).toHaveValue(0);
     expect(screen.getByText(/player POCO has no NPC component/)).toBeInTheDocument();
   });
@@ -266,7 +268,8 @@ describe('PlanPanel', () => {
     const { onTypeIdChange } = renderPanel();
     await verdict();
 
-    await user.selectOptions(screen.getByLabelText('Product'), '9828');
+    await user.click(screen.getByRole('combobox', { name: 'Product' }));
+    await user.click(await screen.findByRole('option', { name: 'Silicon' }));
 
     expect(onTypeIdChange).toHaveBeenCalledWith(9828);
   });

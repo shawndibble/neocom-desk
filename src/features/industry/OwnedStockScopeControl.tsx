@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FilterChip, NativeSelect } from '@/components/ui';
+import {
+  FilterChip,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui';
 import {
   collectStockLocations,
   ownedStockLocationKey,
@@ -70,29 +77,29 @@ export function OwnedStockScopeControl({
   return (
     <>
       <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:gap-2">
-        <label htmlFor="build-plan-owned-stock-scope" className="whitespace-nowrap">
-          {t('industry.ownedStockScopeLabel')}
-        </label>
-        <NativeSelect
-          id="build-plan-owned-stock-scope"
-          className="w-auto"
+        <span className="whitespace-nowrap">{t('industry.ownedStockScopeLabel')}</span>
+        <Select
           value={mode}
-          onChange={(e) => {
-            const nextMode = e.target.value;
+          onValueChange={(value) => {
             // Pre-selecting every currently known location when a player first
             // switches to "Selected" leaves the count unchanged at the moment
             // of the switch — flipping the toggle must not silently zero out
             // "use detected" before the player has chosen anything to exclude.
             onChange(
-              nextMode === 'selected'
+              value === 'selected'
                 ? { mode: 'selected', locations: selected.length > 0 ? selected : locations }
                 : undefined
             );
           }}
         >
-          <option value="everywhere">{t('industry.ownedStockScopeEverywhere')}</option>
-          <option value="selected">{t('industry.ownedStockScopeSelected')}</option>
-        </NativeSelect>
+          <SelectTrigger aria-label={t('industry.ownedStockScopeLabel')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="everywhere">{t('industry.ownedStockScopeEverywhere')}</SelectItem>
+            <SelectItem value="selected">{t('industry.ownedStockScopeSelected')}</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       {mode === 'selected' &&
         (locations.length === 0 ? (

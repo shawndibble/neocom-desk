@@ -33,7 +33,11 @@ import {
   SearchInput,
   Tooltip,
   TextInput,
-  NativeSelect,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { db } from '@/db';
@@ -501,33 +505,41 @@ export function NotificationsPanel() {
                                   <div className="border-t border-line bg-panel/60 px-6 py-1.5">
                                     <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
                                       {t('settings.notifications.structureFuelLowThresholdLabel')}
-                                      <NativeSelect
-                                        size="sm"
-                                        className="w-auto"
-                                        value={thresholds.structureFuelLowDays}
-                                        onChange={(e) =>
+                                      <Select
+                                        value={String(thresholds.structureFuelLowDays)}
+                                        onValueChange={(value) =>
                                           void updatePrefs(
                                             character.characterId,
                                             withCharacterEventThreshold(
                                               prefsValue,
                                               character.characterId,
                                               'structureFuelLowDays',
-                                              Number(e.target.value)
+                                              Number(value)
                                             )
                                           )
                                         }
                                       >
-                                        {STRUCTURE_FUEL_LOW_DAY_OPTIONS.map((days) => (
-                                          <option key={days} value={days}>
-                                            {t(
-                                              'settings.notifications.structureFuelLowThresholdOption',
-                                              {
-                                                count: days,
-                                              }
-                                            )}
-                                          </option>
-                                        ))}
-                                      </NativeSelect>
+                                        <SelectTrigger
+                                          size="sm"
+                                          aria-label={t(
+                                            'settings.notifications.structureFuelLowThresholdLabel'
+                                          )}
+                                        >
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {STRUCTURE_FUEL_LOW_DAY_OPTIONS.map((days) => (
+                                            <SelectItem key={days} value={String(days)}>
+                                              {t(
+                                                'settings.notifications.structureFuelLowThresholdOption',
+                                                {
+                                                  count: days,
+                                                }
+                                              )}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
                                     </label>
                                     {/*
                                       Issue #299's own words: "say so in the

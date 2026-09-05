@@ -13,8 +13,12 @@ import {
   IconButton,
   InfoTooltip,
   Modal,
-  NativeSelect,
   Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   TextInput,
   Tooltip,
 } from '@/components/ui';
@@ -1276,31 +1280,38 @@ export function PlanEditor({
           <div className="flex items-center gap-1">
             <label className="flex flex-1 items-center justify-between gap-2">
               {t('plans.whatIfImplants')}
-              <NativeSelect
-                size="md"
+              <Select
                 value={whatIf.kind === 'custom' ? 'custom' : whatIf.preset}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // 'custom' is a readout of the grid below, never a thing to
-                  // pick — it is only in the list while it is already the state.
-                  if (value !== 'custom') {
-                    setWhatIf({ kind: 'preset', preset: value as WhatIfImplantPreset });
-                  }
-                }}
+                // 'custom' is a readout of the grid below, never a thing to
+                // pick: it is in the list only while it is already the state,
+                // and its `disabled` SelectItem is what keeps Radix from
+                // firing this for it.
+                onValueChange={(value) =>
+                  setWhatIf({ kind: 'preset', preset: value as WhatIfImplantPreset })
+                }
               >
-                {WHAT_IF_IMPLANT_PRESETS.map((preset) => (
-                  <option key={preset} value={preset}>
-                    {preset === 'none'
-                      ? t('plans.whatIfNone')
-                      : preset === 'current'
-                        ? t('plans.whatIfCurrent')
-                        : preset}
-                  </option>
-                ))}
-                {whatIf.kind === 'custom' && (
-                  <option value="custom">{t('plans.whatIfCustom')}</option>
-                )}
-              </NativeSelect>
+                <SelectTrigger size="md" aria-label={t('plans.whatIfImplants')} className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WHAT_IF_IMPLANT_PRESETS.map((preset) => (
+                    <SelectItem key={preset} value={preset}>
+                      {preset === 'none'
+                        ? t('plans.whatIfNone')
+                        : preset === 'current'
+                          ? t('plans.whatIfCurrent')
+                          : preset}
+                    </SelectItem>
+                  ))}
+                  {whatIf.kind === 'custom' && (
+                    // Readout only — disabled so it displays as the trigger's
+                    // current value but can never be picked from the list.
+                    <SelectItem value="custom" disabled>
+                      {t('plans.whatIfCustom')}
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </label>
             {marketGroupLink(t('plans.whatIfMarketLink'), ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID)}
           </div>
@@ -1493,20 +1504,23 @@ export function PlanEditor({
                 <>
                   <label className="flex items-center gap-1">
                     {t('plans.groupBy')}
-                    <NativeSelect
-                      size="sm"
-                      aria-label={t('plans.groupBy')}
+                    <Select
                       value={groupingMode}
-                      onChange={(e) => void setGroupingMode(e.target.value as GroupingMode)}
+                      onValueChange={(value) => void setGroupingMode(value as GroupingMode)}
                     >
-                      {GROUPING_MODES.map((mode) => (
-                        <option key={mode} value={mode}>
-                          {mode === 'priority'
-                            ? t('plans.groupByPriority')
-                            : t('plans.groupByAttributePair')}
-                        </option>
-                      ))}
-                    </NativeSelect>
+                      <SelectTrigger size="sm" aria-label={t('plans.groupBy')} className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GROUPING_MODES.map((mode) => (
+                          <SelectItem key={mode} value={mode}>
+                            {mode === 'priority'
+                              ? t('plans.groupByPriority')
+                              : t('plans.groupByAttributePair')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </label>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

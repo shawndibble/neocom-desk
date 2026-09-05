@@ -6,8 +6,12 @@ import {
   EmptyState,
   IconButton,
   InfoTooltip,
-  NativeSelect,
   Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -652,10 +656,10 @@ export function BuildPlanDetail({
               >
                 <label className="flex flex-col gap-1 text-xs">
                   {t('industry.facility')}
-                  <NativeSelect
+                  <Select
                     value={plan.facility}
-                    onChange={(e) => {
-                      const facility = e.target.value as FacilityKind;
+                    onValueChange={(value) => {
+                      const facility = value as FacilityKind;
                       const structure = FACILITY_PRESETS[facility].structure;
                       update(
                         structure
@@ -664,17 +668,22 @@ export function BuildPlanDetail({
                       );
                     }}
                   >
-                    {/* Only facilities that can actually run this plan's
-                        activity — an Athanor can't manufacture, a Raitaru
-                        can't react (issue #460). */}
-                    {Object.values(FACILITY_PRESETS)
-                      .filter((f) => f.activity === activity)
-                      .map((f) => (
-                        <option key={f.kind} value={f.kind}>
-                          {f.name}
-                        </option>
-                      ))}
-                  </NativeSelect>
+                    <SelectTrigger aria-label={t('industry.facility')}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* Only facilities that can actually run this plan's
+                          activity — an Athanor can't manufacture, a Raitaru
+                          can't react (issue #460). */}
+                      {Object.values(FACILITY_PRESETS)
+                        .filter((f) => f.activity === activity)
+                        .map((f) => (
+                          <SelectItem key={f.kind} value={f.kind}>
+                            {f.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </label>
 
                 <BuildSystemInput
@@ -705,14 +714,19 @@ export function BuildPlanDetail({
                 {facilityPreset.structure && (
                   <label className="flex flex-col gap-1 text-xs">
                     {t('industry.rigLevel')}
-                    <NativeSelect
+                    <Select
                       value={plan.rigLevel}
-                      onChange={(e) => update({ rigLevel: e.target.value as RigLevel })}
+                      onValueChange={(value) => update({ rigLevel: value as RigLevel })}
                     >
-                      <option value="none">{t('industry.rigNone')}</option>
-                      <option value="t1">{t('industry.rigT1')}</option>
-                      <option value="t2">{t('industry.rigT2')}</option>
-                    </NativeSelect>
+                      <SelectTrigger aria-label={t('industry.rigLevel')}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">{t('industry.rigNone')}</SelectItem>
+                        <SelectItem value="t1">{t('industry.rigT1')}</SelectItem>
+                        <SelectItem value="t2">{t('industry.rigT2')}</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </label>
                 )}
 
@@ -741,16 +755,21 @@ export function BuildPlanDetail({
 
                 <label className="flex flex-col gap-1 text-xs">
                   {t('industry.tradeHub')}
-                  <NativeSelect
+                  <Select
                     value={plan.hubId}
-                    onChange={(e) => update({ hubId: e.target.value as BuildPlanRecord['hubId'] })}
+                    onValueChange={(value) => update({ hubId: value as BuildPlanRecord['hubId'] })}
                   >
-                    {TRADE_HUBS.map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {h.name}
-                      </option>
-                    ))}
-                  </NativeSelect>
+                    <SelectTrigger aria-label={t('industry.tradeHub')}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRADE_HUBS.map((h) => (
+                        <SelectItem key={h.id} value={h.id}>
+                          {h.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </label>
               </div>
             </div>

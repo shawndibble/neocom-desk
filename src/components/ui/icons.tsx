@@ -36,7 +36,6 @@ import {
   Copy,
   DotsThreeVertical,
   DownloadSimple,
-  EnvelopeOpen,
   EnvelopeSimple,
   Eye,
   EyeSlash,
@@ -199,10 +198,6 @@ export const Planetary = withWeight(Planet);
 export const Extraction = withWeight(Gauge);
 /** Mail, calendar and contacts, grouped as one row. */
 export const Social = withWeight(EnvelopeSimple);
-/** Local "mark read" action on a mail row (issue #416) — never written to ESI. */
-export const MarkRead = withWeight(EnvelopeOpen);
-/** Local "mark unread" action on a mail row (issue #416) — never written to ESI. */
-export const MarkUnread = withWeight(EnvelopeSimple);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
 /** Contracts — courier, item exchange, auction. */

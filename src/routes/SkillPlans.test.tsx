@@ -1487,8 +1487,9 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const durationBefore = durationHeader().textContent;
 
     const select = screen.getByRole('combobox', { name: 'What-if implants' });
-    expect(select).toHaveValue('current');
-    await user.selectOptions(select, '+5');
+    expect(select).toHaveTextContent('Current');
+    await user.click(select);
+    await user.click(await screen.findByRole('option', { name: '+5' }));
 
     await waitFor(() => {
       expect(durationHeader().textContent).not.toBe(durationBefore);
@@ -1543,7 +1544,8 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     const first = render(<App />);
     await openPlanTools();
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'What-if implants' }), '+5');
+    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
+    await user.click(await screen.findByRole('option', { name: '+5' }));
     await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
     await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
 
@@ -1564,7 +1566,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     await openPlanTools();
 
     expect(await screen.findByLabelText('Expires')).toHaveValue('2099-01-01T00:00');
-    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveValue('+5');
+    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
     expect(screen.getByRole('checkbox', { name: 'Booster' })).toBeChecked();
   });
 });

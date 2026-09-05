@@ -51,6 +51,8 @@ export {
   SelectTrigger,
   SelectContent,
   SelectItem,
+  SelectGroup,
+  SelectLabel,
   SelectSeparator,
 } from './Select';
 export { NativeSelect } from './NativeSelect';

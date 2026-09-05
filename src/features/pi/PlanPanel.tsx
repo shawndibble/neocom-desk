@@ -24,8 +24,14 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   EmptyState,
-  NativeSelect,
   Panel,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   TextInput,
   buttonClassName,
@@ -298,23 +304,28 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
       <Panel title={t('piPlan.controlsTitle')}>
         <div className="space-y-3">
           <Field label={t('piPlan.product')}>
-            <NativeSelect
-              value={selected.typeId}
-              onChange={(event) => onTypeIdChange(Number(event.target.value))}
-              className="w-full"
+            <Select
+              value={String(selected.typeId)}
+              onValueChange={(value) => onTypeIdChange(Number(value))}
             >
-              {[1, 2, 3, 4].map((tier) => (
-                <optgroup key={tier} label={t('piPlan.productGroup', { tier })}>
-                  {products
-                    .filter((product) => product.tier === tier)
-                    .map((product) => (
-                      <option key={product.typeId} value={product.typeId}>
-                        {product.name}
-                      </option>
-                    ))}
-                </optgroup>
-              ))}
-            </NativeSelect>
+              <SelectTrigger aria-label={t('piPlan.product')} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4].map((tier) => (
+                  <SelectGroup key={tier}>
+                    <SelectLabel>{t('piPlan.productGroup', { tier })}</SelectLabel>
+                    {products
+                      .filter((product) => product.tier === tier)
+                      .map((product) => (
+                        <SelectItem key={product.typeId} value={String(product.typeId)}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
 
           <Field label={t('piPlan.outputPerDay')}>
@@ -329,36 +340,41 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
           </Field>
 
           <Field label={t('piPlan.hub')}>
-            <NativeSelect
-              value={hubId}
-              onChange={(event) => setHubId(event.target.value as TradeHub['id'])}
-              className="w-full"
-            >
-              {TRADE_HUBS.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.systemName}
-                </option>
-              ))}
-            </NativeSelect>
+            <Select value={hubId} onValueChange={(value) => setHubId(value as TradeHub['id'])}>
+              <SelectTrigger aria-label={t('piPlan.hub')} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TRADE_HUBS.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.systemName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
 
           <Field label={t('piPlan.space')} hint={t('piPlan.spaceHint')}>
-            <NativeSelect
+            <Select
               value={space}
-              onChange={(event) => {
-                setSpace(event.target.value as ColonySpace);
+              onValueChange={(value) => {
+                setSpace(value as ColonySpace);
                 // Back to the band's own default: an override carried across a
                 // band change would silently misprice the new one.
                 setRatePercentText(null);
               }}
-              className="w-full"
             >
-              {COLONY_SPACES.map((candidate) => (
-                <option key={candidate} value={candidate}>
-                  {t(`common.spaceOption.${candidate}`)}
-                </option>
-              ))}
-            </NativeSelect>
+              <SelectTrigger aria-label={t('piPlan.space')} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COLONY_SPACES.map((candidate) => (
+                  <SelectItem key={candidate} value={candidate}>
+                    {t(`common.spaceOption.${candidate}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
 
           <Field
@@ -396,17 +412,18 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
           </Field>
 
           <Field label={t('piPlan.layout')} hint={t('piPlan.layoutHint')}>
-            <NativeSelect
-              value={layout}
-              onChange={(event) => setLayout(event.target.value as ChainLayout)}
-              className="w-full"
-            >
-              {LAYOUTS.map((candidate) => (
-                <option key={candidate} value={candidate}>
-                  {t(`piPlan.layoutOption.${candidate}`)}
-                </option>
-              ))}
-            </NativeSelect>
+            <Select value={layout} onValueChange={(value) => setLayout(value as ChainLayout)}>
+              <SelectTrigger aria-label={t('piPlan.layout')} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LAYOUTS.map((candidate) => (
+                  <SelectItem key={candidate} value={candidate}>
+                    {t(`piPlan.layoutOption.${candidate}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
 
           <div className="space-y-1">

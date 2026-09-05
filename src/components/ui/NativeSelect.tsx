@@ -13,16 +13,17 @@ interface NativeSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>
 /**
  * A real `<select>` in the house treatment.
  *
- * The sibling of `Select` (Radix), not a replacement for it: this is the right
- * pick for a short, static option list inside a form, where the platform
- * control already does everything and the native mobile picker is better than
- * anything a popover can be. `Select` earns its weight when the list is long,
- * searchable, or needs custom option rendering.
+ * The exception to `Select` (Radix), not its peer — reach for `Select` first.
+ * This once claimed the short-static-list-in-a-form case on the strength of
+ * the native mobile picker, and the app has since gone the other way: closed,
+ * the two are indistinguishable; open, one is the OS menu and the other is our
+ * panel, and that difference is visible the moment two selects share a row. So
+ * it has no product call sites today — only the Styleguide. It stays for a
+ * caller that can name why it needs the platform picker specifically.
  *
  * The two are styled from the same `controlStyles` tokens and carry the same
- * caret glyph, so a form can mix them without the seam showing — which is the
- * whole point, since before this the raw `<select>`s ran `h-6`/`h-7`/`h-8`
- * against `Select`'s `h-9`.
+ * caret glyph, so a form can mix them without the *closed* seam showing —
+ * which is why the difference hid for as long as it did.
  *
  * `appearance-none` plus our own caret, because the platform arrow is drawn in
  * the OS accent colour and ignores `--color-text-dim` — on the dark palette

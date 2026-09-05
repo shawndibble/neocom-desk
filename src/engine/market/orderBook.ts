@@ -112,11 +112,3 @@ export function orderExpiry(order: { issued: string; duration: number }): Date {
   const issued = new Date(order.issued);
   return new Date(issued.getTime() + order.duration * 86_400_000);
 }
-
-/** Structure-vs-NPC-station order filter: true for a recognized NPC station, false for an unresolved player structure. */
-export function isNpcStationOrder(
-  order: { location_id: number },
-  npcStations: ReadonlyMap<number, NpcStationLookup>
-): boolean {
-  return npcStations.has(order.location_id);
-}

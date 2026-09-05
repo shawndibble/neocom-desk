@@ -15,8 +15,10 @@ import type { PiData } from '@/sde/types';
 
 /** The ticket's worked example, and the Plan tab's own default product. */
 const BROADCAST_NODE = 2867;
+const BROADCAST_NODE_NAME = 'Broadcast Node';
 /** A P2 inside that chain, and deliberately *not* the default — see the deep-link test. */
 const TRANSMITTER = 9840;
+const TRANSMITTER_NAME = 'Transmitter';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -586,7 +588,7 @@ describe('PlanetaryIndustry', () => {
 
     await screen.findByRole('heading', { name: 'Verdict' });
     expect(screen.getByRole('tab', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true');
-    expect(await screen.findByLabelText('Product')).toHaveValue(String(BROADCAST_NODE));
+    expect(await screen.findByLabelText('Product')).toHaveTextContent(BROADCAST_NODE_NAME);
   });
 
   it('plans the commodity the URL names, not the tier-4 default', async () => {
@@ -598,7 +600,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Verdict' });
-    expect(await screen.findByLabelText('Product')).toHaveValue(String(TRANSMITTER));
+    expect(await screen.findByLabelText('Product')).toHaveTextContent(TRANSMITTER_NAME);
   });
 
   it('falls back to the colony view rather than crashing on a tab it does not know', async () => {

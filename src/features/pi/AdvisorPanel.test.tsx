@@ -468,8 +468,8 @@ describe('AdvisorPanel', () => {
     );
     renderPanel(onSystemIdChange);
 
-    const select = await screen.findByLabelText('System');
-    await userEvent.selectOptions(select, '30000002');
+    await userEvent.click(await screen.findByRole('combobox', { name: 'System' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Amarr' }));
     expect(onSystemIdChange).toHaveBeenCalledWith(30_000_002);
   });
 });
