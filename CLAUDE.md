@@ -1,5 +1,16 @@
 # NeoCom Desk — agent instructions
 
+- **All work happens in a git worktree, never in this main checkout.** The
+  main repo directory (`C:/Users/shawn/OneDrive/Documents/GitHub/neocom-desk`)
+  is reserved for manually running/testing the app in a browser (`npm run
+dev`) — Shawn frequently has another agent working there at the same
+  time, and editing it races with that. Branch into a sibling worktree
+  first: `git worktree add ../neocom-desk.worktrees/<name> -b <branch>` (or
+  `../neocom-desk-<short-name>`), then `npm ci` inside it — `node_modules`
+  isn't shared across worktrees. `scripts/next-ticket/setup-worktree.mjs`
+  does this automatically for the ticket loop. For cleanup or admin git
+  commands that must target the main repo, use `git -C <main-repo-path>
+...` rather than `cd`, so the other agent's working tree isn't disturbed.
 - Architecture map: docs/ARCHITECTURE.md — read before locating or adding features.
 - Read `CONTEXT.md` first: the glossary. Use its terms exactly.
 - **Never append a scope decision to `CONTEXT.md`.** Scope decisions live one
