@@ -142,7 +142,7 @@ describe('Market top-level tabs', () => {
     render(<App />);
     await screen.findByRole('tab', { name: 'Market' });
 
-    await user.click(screen.getByRole('tab', { name: 'Open Orders' }));
+    await user.click(screen.getByRole('tab', { name: 'Open' }));
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Sell')).toBeInTheDocument();
 
