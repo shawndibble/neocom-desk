@@ -401,18 +401,26 @@ export function ActiveJobsPanel({
           {filteredJobs.length === 0 ? (
             <EmptyState title={t('industry.jobsFilteredEmptyTitle')} className="py-4" />
           ) : (
-            <DataTable
-              columns={columns}
-              rows={filteredJobs}
-              rowKey={(job) => job.job_id}
-              label={t('industry.jobsTitle')}
-              defaultSort={{ columnId: 'endsIn', direction: 'asc' }}
-              density="compact"
-              rowClassName={(job) =>
-                !isJobDone(job, now) && isCompletingSoon(job, now) ? 'bg-warning/10' : undefined
-              }
-              rowContextMenu={jobContextMenu}
-            />
+            // Six columns are wider than the 20rem-plus-content grid below at
+            // tablet widths, and `.dt-stack` only rescues below `sm`.
+            <div className="overflow-x-auto">
+              <DataTable
+                columns={columns}
+                rows={filteredJobs}
+                rowKey={(job) => job.job_id}
+                label={t('industry.jobsTitle')}
+                defaultSort={{ columnId: 'endsIn', direction: 'asc' }}
+                density="compact"
+                // Tint plus a left stripe: the card this replaces carried a
+                // full warning border, and a tint alone reads weaker than it.
+                rowClassName={(job) =>
+                  !isJobDone(job, now) && isCompletingSoon(job, now)
+                    ? 'bg-warning/10 shadow-[inset_3px_0_0_var(--color-warning)]'
+                    : undefined
+                }
+                rowContextMenu={jobContextMenu}
+              />
+            </div>
           )}
         </div>
       )}

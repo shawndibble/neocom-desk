@@ -450,7 +450,6 @@
     "jobsCorpNoneActiveTitle": "No active corp jobs",
     "jobsCorpNoneActiveHint": "This corporation has no industry jobs running right now.",
     "jobsCorpEmptyHint": "Refresh once you're back online to fetch this corporation's running industry jobs.",
-    "jobsRuns": "{{count}} run(s)",
     "jobsDone": "Done",
     "jobsCompletingSoon": "Completing soon",
     "jobsProgress": "{{name}} progress",
