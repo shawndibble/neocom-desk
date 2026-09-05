@@ -78,6 +78,16 @@ export interface CorpBoardItem {
   timing: CorpBoardTiming;
   severity: CorpBoardSeverity;
   /**
+   * The item's own market-relevant item, or `null` when it has none.
+   *
+   * Only a job carries one — its product (or, lacking that, its blueprint) —
+   * which is what lets the view offer "Check Market"/"Show info" for a job
+   * row and neither for a structure or a moon chunk (issue #419's context
+   * menu). The board does not resolve a name or render a menu; it only
+   * carries the id through from `BoardJobSource`.
+   */
+  typeId: number | null;
+  /**
    * This item's countdown is shorter than the window its data is cached for,
    * so the board cannot honestly present it as live.
    *
@@ -134,6 +144,8 @@ export interface BoardJobSource {
   /** Epoch ms the job finished (or will). */
   endMs: number;
   status: 'active' | 'cancelled' | 'delivered' | 'paused' | 'ready' | 'reverted';
+  /** The job's product, or its blueprint lacking one; `null` when neither resolved. */
+  typeId: number | null;
 }
 
 export interface CorpBoardSources {
@@ -179,7 +191,7 @@ export function severityForRemaining(remainingMs: number | null): CorpBoardSever
 }
 
 /** The per-source half of an item; the two builders below add every derived field. */
-type ItemBase = Pick<CorpBoardItem, 'id' | 'kind' | 'subject' | 'detail'>;
+type ItemBase = Pick<CorpBoardItem, 'id' | 'kind' | 'subject' | 'detail' | 'typeId'>;
 
 /** Shared shape-building, so no source can invent its own severity or staleness rule. */
 function timedItem(
@@ -225,6 +237,7 @@ function structureItems(
     kind: 'structureFuel',
     subject: name,
     detail: '',
+    typeId: null,
   };
   items.push(
     structure.fuelExpiresMs === null
@@ -242,6 +255,7 @@ function structureItems(
           kind: 'structureTimer',
           subject: name,
           detail: structure.state ?? 'unknown',
+          typeId: null,
         },
         structure.stateTimerEndMs,
         clock
@@ -260,6 +274,7 @@ function structureItems(
           kind: 'structureTimer',
           subject: name,
           detail: 'unanchoring',
+          typeId: null,
         },
         structure.unanchorsAtMs,
         clock
@@ -279,6 +294,7 @@ function structureItems(
           kind: 'serviceOffline',
           subject: name,
           detail: service.name,
+          typeId: null,
         },
         'untimed'
       )
@@ -303,6 +319,7 @@ function extractionItem(
       kind: 'moonExtraction',
       subject: extraction.subject,
       detail: arrived ? 'decay' : 'arrival',
+      typeId: null,
     },
     arrived ? extraction.naturalDecayMs : extraction.chunkArrivalMs,
     clock
@@ -316,7 +333,13 @@ function jobItem(
   // Dated from when it finished, so a job that has sat for a month outranks one
   // that finished an hour ago — see `remainingMs` on why that stays unclamped.
   return timedItem(
-    { id: `job:${job.jobId}`, kind: 'jobDelivery', subject: job.subject, detail: '' },
+    {
+      id: `job:${job.jobId}`,
+      kind: 'jobDelivery',
+      subject: job.subject,
+      detail: '',
+      typeId: job.typeId,
+    },
     job.endMs,
     clock
   );

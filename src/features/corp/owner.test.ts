@@ -72,6 +72,28 @@ describe('useCorpOwner', () => {
     expect(result.current.owner).toBe('personal');
   });
 
+  /**
+   * The vitals rail's division link (issue #419) lands `/wallet` straight on
+   * Corporation rather than making the user flip the switch a second time.
+   */
+  it('starts on Corporation when given an initial owner, while available', async () => {
+    const { result } = renderHook(() => useCorpOwner('canReadWallet', 'corporation'));
+    await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
+    expect(result.current.owner).toBe('corporation');
+  });
+
+  /**
+   * The same forced-Personal guarantee as a lost capability: an initial owner
+   * of Corporation must not survive when the capability was never held —
+   * a bad or unreachable deep link degrades to the page's normal default.
+   */
+  it('ignores an initial owner of Corporation without the capability', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', {}));
+    const { result } = renderHook(() => useCorpOwner('canReadWallet', 'corporation'));
+    await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
+    expect(result.current.owner).toBe('personal');
+  });
+
   it('is unavailable without the capability, even with a known corporation', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', {}));
     const { result } = renderHook(() => useCorpOwner('canReadWallet'));

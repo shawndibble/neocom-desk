@@ -378,6 +378,31 @@ function walletTabFromParam(param: string | null): 'balance' | 'journal' {
 }
 
 /**
+ * Parses the `?owner=` deep link the vitals rail's division links use (issue
+ * #419); anything else lands on Personal. `useCorpOwner`'s own `available`
+ * check still forces Personal for a Character who never held the capability,
+ * so a stale or forged link degrades to the page's normal default rather
+ * than stranding the view on Corporation with no switch to get back.
+ */
+function walletOwnerFromParam(param: string | null): 'personal' | 'corporation' {
+  return param === 'corporation' ? 'corporation' : 'personal';
+}
+
+/**
+ * Parses the `?division=` deep link; anything outside ESI's own 1-7 division
+ * range falls back to 1. Division is used to build the corp journal's cache
+ * key (`corpJournalBaseKey`) before `divisions` has necessarily loaded, so an
+ * out-of-range value can't be left for `effectiveDivision`'s own fallback to
+ * catch later — that one only self-heals once the division list is populated,
+ * and a bare `Number.isInteger` check would let `?division=0` (or a negative)
+ * straight through to a `/wallets/0/journal` read in the meantime.
+ */
+function walletDivisionFromParam(param: string | null): number {
+  const parsed = param === null ? NaN : Number(param);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 7 ? parsed : 1;
+}
+
+/**
  * Wallet: ISK balance and journal. Read-only, cached for offline. Recent
  * transactions moved to Market's own Transactions tab.
  *
@@ -406,7 +431,7 @@ export function Wallet() {
     setOwner,
     available: corpAvailable,
     corporationId,
-  } = useCorpOwner('canReadWallet');
+  } = useCorpOwner('canReadWallet', walletOwnerFromParam(searchParams.get('owner')));
   const showingCorp =
     owner === 'corporation' && corporationId !== null && activeCharacterId !== null;
 
@@ -431,8 +456,12 @@ export function Wallet() {
 
   // Derived, not effect-synced, the same way Industry picks its selected plan:
   // falls back to the first division whenever the chosen one isn't in this
-  // corporation's list — which is exactly what a corp change looks like.
-  const [division, setDivision] = useState(1);
+  // corporation's list — which is exactly what a corp change looks like, and
+  // also what a `?division=` deep link (issue #419) that named a division
+  // this corporation doesn't have looks like.
+  const [division, setDivision] = useState(() =>
+    walletDivisionFromParam(searchParams.get('division'))
+  );
   const effectiveDivision = divisions.some((entry) => entry.division === division)
     ? division
     : (divisions[0]?.division ?? division);

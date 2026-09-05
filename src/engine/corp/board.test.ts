@@ -246,6 +246,7 @@ describe('industry jobs', () => {
     subject: 'Hobgoblin II',
     endMs: at(-3 * DAY),
     status: 'ready',
+    typeId: null,
     ...overrides,
   });
 
@@ -255,6 +256,28 @@ describe('industry jobs', () => {
     expect(item.subject).toBe('Hobgoblin II');
     expect(item.deadlineMs).toBe(at(-3 * DAY));
     expect(item.severity).toBe('critical');
+  });
+
+  /**
+   * The board never resolves a name or opens a menu; it only carries the
+   * product's type id through so the view can (issue #419's context menu —
+   * "check Market for a job's product"). `null` on every other kind — a
+   * structure or a moon chunk has no market-relevant item of its own.
+   */
+  it('carries the job source’s type id through, and null for every other kind', () => {
+    const [jobItem] = board({
+      nowMs: NOW,
+      staleWindowMs: STALE_WINDOW,
+      jobs: [job({ typeId: 1001 })],
+    });
+    expect(jobItem.typeId).toBe(1001);
+
+    const [structureItem] = board({
+      nowMs: NOW,
+      staleWindowMs: STALE_WINDOW,
+      structures: [structure({ fuelExpiresMs: at(2 * DAY) })],
+    });
+    expect(structureItem.typeId).toBeNull();
   });
 
   it('ignores jobs that are still running or already dealt with', () => {
@@ -318,7 +341,15 @@ describe('the interleaved board', () => {
           naturalDecayMs: at(4 * DAY),
         },
       ],
-      jobs: [{ jobId: 9, subject: 'Nanite Repair Paste', endMs: at(-6 * HOUR), status: 'ready' }],
+      jobs: [
+        {
+          jobId: 9,
+          subject: 'Nanite Repair Paste',
+          endMs: at(-6 * HOUR),
+          status: 'ready',
+          typeId: null,
+        },
+      ],
     });
 
     expect(items.map((item) => item.kind)).toEqual([
@@ -342,8 +373,8 @@ describe('the interleaved board', () => {
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
       jobs: [
-        { jobId: 20, subject: 'Second job', endMs: sameInstant, status: 'ready' },
-        { jobId: 10, subject: 'First job', endMs: sameInstant, status: 'ready' },
+        { jobId: 20, subject: 'Second job', endMs: sameInstant, status: 'ready', typeId: null },
+        { jobId: 10, subject: 'First job', endMs: sameInstant, status: 'ready', typeId: null },
       ],
       structures: [structure({ structureId: 7, name: 'Tied', fuelExpiresMs: sameInstant })],
     });
@@ -406,7 +437,7 @@ describe('short timers against an hour-stale cache', () => {
     const items = board({
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
-      jobs: [{ jobId: 1, subject: 'Done', endMs: at(-5 * MINUTE), status: 'ready' }],
+      jobs: [{ jobId: 1, subject: 'Done', endMs: at(-5 * MINUTE), status: 'ready', typeId: null }],
     });
     expect(items[0].withinStaleWindow).toBe(false);
   });
@@ -440,7 +471,7 @@ describe('CORP_BOARD_ITEM_KINDS', () => {
           naturalDecayMs: at(2 * DAY),
         },
       ],
-      jobs: [{ jobId: 1, subject: 'Job', endMs: at(DAY), status: 'ready' }],
+      jobs: [{ jobId: 1, subject: 'Job', endMs: at(DAY), status: 'ready', typeId: null }],
     });
     const produced = new Set(items.map((item) => item.kind));
     expect([...produced].sort()).toEqual([...CORP_BOARD_ITEM_KINDS].sort());

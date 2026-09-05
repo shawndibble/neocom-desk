@@ -156,6 +156,103 @@ describe('Wallet', () => {
     expect(screen.getByRole('tab', { name: 'Journal' })).toHaveAttribute('aria-selected', 'true');
   });
 
+  /**
+   * The corp ops board's vitals rail links a division balance straight here
+   * (issue #419) — `?owner=corporation&division=` must open on the matching
+   * division rather than landing on Personal with the params unused.
+   */
+  it('opens straight to a corporation division when the vitals rail’s link deep-links here', async () => {
+    const CORPORATION_ID = 98000001;
+    await db.characters.put({
+      characterId: CHAR_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh',
+      addedAt: 1,
+      corporationId: CORPORATION_ID,
+    });
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'access-token',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: [
+        'esi-wallet.read_character_wallet.v1',
+        'esi-characters.read_loyalty.v1',
+        'esi-wallet.read_corporation_wallets.v1',
+        'esi-corporations.read_divisions.v1',
+      ],
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/roles`, () =>
+        HttpResponse.json({ roles: ['Accountant'] })
+      ),
+      http.get(`https://esi.evetech.net/corporations/${CORPORATION_ID}/wallets`, () =>
+        HttpResponse.json([
+          { division: 1, balance: 1_000_000 },
+          { division: 3, balance: 250 },
+        ])
+      ),
+      http.get(`https://esi.evetech.net/corporations/${CORPORATION_ID}/divisions`, () =>
+        HttpResponse.json({ wallet: [{ division: 3, name: 'SRP' }] })
+      )
+    );
+
+    window.history.pushState({}, '', '/wallet?owner=corporation&division=3');
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'Corporation' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(await screen.findByRole('combobox', { name: 'Wallet division' })).toHaveValue('3');
+    expect(screen.getByText(/250\.00/)).toBeInTheDocument();
+  });
+
+  /**
+   * ESI divisions are 1-7 — a `?division=0` (or any other out-of-range value)
+   * must not reach `loadCorporationWalletJournal` as a division number, which
+   * is what a bare `Number.isInteger` check would let through.
+   */
+  it('falls back to division 1 for an out-of-range ?division= deep link', async () => {
+    const CORPORATION_ID = 98000001;
+    await db.characters.put({
+      characterId: CHAR_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh',
+      addedAt: 1,
+      corporationId: CORPORATION_ID,
+    });
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'access-token',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: [
+        'esi-wallet.read_character_wallet.v1',
+        'esi-characters.read_loyalty.v1',
+        'esi-wallet.read_corporation_wallets.v1',
+        'esi-corporations.read_divisions.v1',
+      ],
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/roles`, () =>
+        HttpResponse.json({ roles: ['Accountant'] })
+      ),
+      http.get(`https://esi.evetech.net/corporations/${CORPORATION_ID}/wallets`, () =>
+        HttpResponse.json([{ division: 1, balance: 1_000_000 }])
+      ),
+      http.get(`https://esi.evetech.net/corporations/${CORPORATION_ID}/divisions`, () =>
+        HttpResponse.json({})
+      )
+    );
+
+    window.history.pushState({}, '', '/wallet?owner=corporation&division=0');
+    render(<App />);
+
+    expect(await screen.findByRole('combobox', { name: 'Wallet division' })).toHaveValue('1');
+    expect(screen.getByText(/1,000,000\.00/)).toBeInTheDocument();
+  });
+
   it('humanizes the raw ESI ref_type into readable text', async () => {
     const user = userEvent.setup();
     render(<App />);
