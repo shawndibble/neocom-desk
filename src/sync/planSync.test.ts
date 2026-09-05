@@ -11,6 +11,7 @@ import {
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
+import { backfillAccountWideData } from './accountWideBackfill';
 import { remotePurgePendingKey } from './characterPurge';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
@@ -365,6 +366,20 @@ describe('triggerSync: plans', () => {
     seedRemote(PLANS_PATH, [remoteDoc({ deleted: true, updatedAt: Date.now() - 100 })]);
     await triggerSync(1);
     expect(await db.skillPlans.get('p1')).toBeUndefined();
+  });
+
+  it('a learned remote tombstone is recorded locally, not just acted on (#436)', async () => {
+    // Every collection gets this, not just account-wide ones (see the
+    // decision doc for #436): a deletion pulled from remote previously left
+    // no local trace once the row itself was gone, so a sibling Character's
+    // own accountWideBackfill.ts scan could never see a deletion this device
+    // only *learned* rather than originated.
+    const deletedAt = Date.now() - 100;
+    await db.skillPlans.put(plan({ updatedAt: Date.now() - 5000 }));
+    seedRemote(PLANS_PATH, [remoteDoc({ deleted: true, updatedAt: deletedAt })]);
+    await triggerSync(1);
+    const tombstones = await db.settings.get('sync.__tombstones.1');
+    expect(tombstones?.value).toEqual([{ id: 'p1', deletedAt }]);
   });
 
   it('purges remote tombstones older than 30 days', async () => {
@@ -826,6 +841,47 @@ describe('triggerSync: planet richness (#425)', () => {
     await triggerSync(1);
     expect(remoteStore.get(PLANET_RICHNESS_PATH)?.get('1:40000001')).toMatchObject({ order });
   });
+
+  it('a Character added on a fully-stale device does not resurrect a deleted ranking (#436)', async () => {
+    // Same scenario as the station pins case below, proving the accountWide
+    // check is genuinely generic (issue #436's AC#4) rather than only wired
+    // up for station pins: every planet richness row is account-wide by
+    // definition (no `scope` to opt out of, unlike station pins).
+    const now = Date.now();
+    const staleUpdatedAt = now - 10_000;
+    const deletedAt = now - 5_000;
+
+    await db.planetRichness.put({
+      id: '1:40000001',
+      characterId: 1,
+      planetId: 40_000_001,
+      order: [2073, 2268],
+      updatedAt: staleUpdatedAt,
+    });
+    seedRemote(PLANET_RICHNESS_PATH, [
+      {
+        id: '1:40000001',
+        characterId: 1,
+        planetId: 40_000_001,
+        order: [2073, 2268],
+        updatedAt: deletedAt,
+        ownerHash: HASH,
+        deleted: true,
+      },
+    ]);
+
+    await db.characters.put({ characterId: 4, name: 'Alt', ownerHash: HASH, addedAt: 1 });
+    expect(await backfillAccountWideData(4)).toBe(true);
+    expect(await db.planetRichness.get('4:40000001')).toMatchObject({ updatedAt: staleUpdatedAt });
+
+    await triggerSync(1);
+    await triggerSync(4);
+
+    expect(await db.planetRichness.get('4:40000001')).toBeUndefined();
+    expect(remoteStore.get('characters/char:4/planetRichness')?.get('4:40000001')?.deleted).toBe(
+      true
+    );
+  });
 });
 
 describe('triggerSync: station pins', () => {
@@ -899,6 +955,86 @@ describe('triggerSync: station pins', () => {
     expect(doc?.deleted).toBe(true);
     const tombstones = await db.settings.get('sync.__stationPinTombstones.1');
     expect(tombstones?.value).toEqual([]);
+  });
+
+  it('a Character added on a fully-stale device does not resurrect a deletion learned during the same sync (#436)', async () => {
+    const now = Date.now();
+    const staleUpdatedAt = now - 10_000;
+    const deletedAt = now - 5_000;
+
+    // This device never pulled Character 1's deletion: its local copy of the
+    // account-wide pin still predates it.
+    await db.stationPins.put(
+      stationPin({ id: '1:60003760', scope: 'account', updatedAt: staleUpdatedAt })
+    );
+    // Another device already deleted it and pushed the tombstone remotely.
+    seedRemote(STATION_PINS_PATH, [
+      {
+        id: '1:60003760',
+        characterId: 1,
+        locationId: 60003760,
+        scope: 'account',
+        updatedAt: deletedAt,
+        ownerHash: HASH,
+        deleted: true,
+      },
+    ]);
+
+    // A Character new to this device is added; the backfill clones the
+    // still-local, still-stale row onto it — no tombstone anywhere names
+    // '4:60003760' yet.
+    await db.characters.put({ characterId: 4, name: 'Alt', ownerHash: HASH, addedAt: 1 });
+    expect(await backfillAccountWideData(4)).toBe(true);
+    expect(await db.stationPins.get('4:60003760')).toMatchObject({ updatedAt: staleUpdatedAt });
+
+    // Sync both, per the acceptance criteria: Character 1 first, learning the
+    // deletion it had not yet pulled locally...
+    await triggerSync(1);
+    // ...then the newly added Character, whose sync must not push the stale
+    // clone now that the account-wide deletion is known locally.
+    await triggerSync(4);
+
+    expect(await db.stationPins.get('4:60003760')).toBeUndefined();
+    expect(remoteStore.get('characters/char:4/stationPins')?.get('4:60003760')?.deleted).toBe(true);
+  });
+
+  it("records the account-wide tombstone at the real deletion time, not a stale remote copy's (#436)", async () => {
+    const now = Date.now();
+    const staleUpdatedAt = now - 10_000;
+    const deletedAt = now - 5_000;
+
+    // A resurrected clone that was already pushed remotely on an earlier,
+    // pre-fix sync — its remote copy is live, not a tombstone, and shares the
+    // resurrected row's own (stale) updatedAt.
+    await db.characters.put({ characterId: 4, name: 'Alt', ownerHash: HASH, addedAt: 1 });
+    await db.stationPins.put(
+      stationPin({ id: '4:60003760', characterId: 4, scope: 'account', updatedAt: staleUpdatedAt })
+    );
+    seedRemote('characters/char:4/stationPins', [
+      {
+        id: '4:60003760',
+        characterId: 4,
+        locationId: 60003760,
+        scope: 'account',
+        updatedAt: staleUpdatedAt,
+        ownerHash: HASH,
+        deleted: false,
+      },
+    ]);
+    // Character 1 already learned the account-wide deletion on an earlier sync.
+    await db.settings.put({
+      key: 'sync.__stationPinTombstones.1',
+      value: [{ id: '1:60003760', deletedAt }],
+    });
+
+    await triggerSync(4);
+
+    expect(await db.stationPins.get('4:60003760')).toBeUndefined();
+    const doc = remoteStore.get('characters/char:4/stationPins')?.get('4:60003760');
+    // The real deletion time, not the stale live doc's updatedAt.
+    expect(doc).toMatchObject({ deleted: true, updatedAt: deletedAt });
+    const tombstones = await db.settings.get('sync.__stationPinTombstones.4');
+    expect(tombstones?.value).toEqual([{ id: '4:60003760', deletedAt }]);
   });
 });
 

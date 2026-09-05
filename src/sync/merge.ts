@@ -84,11 +84,38 @@ export interface MergeResult<L extends SyncRecord, R extends RemoteDoc> {
   clearLocalTombstones: string[];
 }
 
+/**
+ * A second, shared-key deletion signal for account-wide collections (issue
+ * #436), layered on top of `LocalTombstone`'s per-id one.
+ *
+ * `accountWideBackfill.ts`'s `cloneOnto` re-keys a row onto a Character added
+ * after the delete, preserving the source row's own `updatedAt` — an id no
+ * per-id tombstone names. Without this, `mergeRecords` sees a plain new local
+ * row (`l && !r`, or `l && r` already in sync) and pushes or leaves it,
+ * permanently resurrecting the deletion. `deletedAtByKey` is keyed by
+ * whatever `sharedKey` returns rather than by record id, so it recognizes the
+ * deletion regardless of which id the row was copied onto.
+ */
+export interface AccountWideTombstones<L extends SyncRecord> {
+  /**
+   * What makes two records the same piece of account state, ignoring which
+   * Character holds them (mirrors `AccountWideCollection.sharedKey` in
+   * accountWideBackfill.ts). Returning `undefined` opts a record out — e.g. a
+   * Station Pin's `character`-scoped rows share their `locationId` with any
+   * `account`-scoped one at the same station, and must not be caught by a
+   * deletion that only ever applied to the account-wide row.
+   */
+  sharedKey: (record: L) => string | undefined;
+  /** The latest recorded deletion time for each shared key, from `deletedAtByKey()`. */
+  deletedAtByKey: Map<string, number>;
+}
+
 export function mergeRecords<L extends SyncRecord, R extends RemoteDoc>(
   local: L[],
   localTombstones: LocalTombstone[],
   remote: R[],
-  now: number
+  now: number,
+  accountWide?: AccountWideTombstones<L>
 ): MergeResult<L, R> {
   const result: MergeResult<L, R> = {
     pushUpserts: [],
@@ -143,6 +170,22 @@ export function mergeRecords<L extends SyncRecord, R extends RemoteDoc>(
         result.pushTombstones.push(t);
       }
       continue;
+    }
+
+    if (l && accountWide) {
+      const key = accountWide.sharedKey(l);
+      const deletedAt = key === undefined ? undefined : accountWide.deletedAtByKey.get(key);
+      if (deletedAt !== undefined && deletedAt > l.updatedAt) {
+        // Some Character known locally has recorded (or learned) a deletion
+        // of this shared state after this row was last edited — whether `r`
+        // is absent (a fresh clone, #436) or already equal to `l` (a clone
+        // pushed before that signal existed). Either way it is stale: drop
+        // it locally and assert the deletion under its own id, exactly like
+        // an ordinary local tombstone above.
+        result.deleteLocal.push(id);
+        result.pushTombstones.push({ id, deletedAt });
+        continue;
+      }
     }
 
     if (l && !r) {

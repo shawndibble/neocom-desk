@@ -176,6 +176,58 @@ describe('mergeRecords', () => {
   });
 });
 
+describe('mergeRecords: account-wide tombstones (#436)', () => {
+  // A Character added after an account-wide delete has no per-Character
+  // tombstone naming its cloned row (accountWideBackfill.ts's cloneOnto keeps
+  // the source row's own updatedAt), so `l && !r` would otherwise push it as
+  // a brand-new remote doc nothing can out-rank. `accountWide` lets a caller
+  // supply a second, shared-key-only deletion signal that catches this
+  // regardless of which id the row was copied onto.
+  const sharedKey = (record: SkillPlanRecord) => String(record.characterId);
+
+  it('drops a stale row instead of pushing it when the account-wide tombstone postdates it', () => {
+    const result = mergeRecords([localPlan({ updatedAt: NOW - 2000 })], [], [], NOW, {
+      sharedKey,
+      deletedAtByKey: new Map([['1', NOW - 1000]]),
+    });
+    expect(result.pushUpserts).toEqual([]);
+    expect(result.deleteLocal).toEqual(['p1']);
+    expect(result.pushTombstones).toEqual([{ id: 'p1', deletedAt: NOW - 1000 }]);
+  });
+
+  it('self-heals a row already resurrected in sync with remote', () => {
+    const result = mergeRecords(
+      [localPlan({ updatedAt: NOW - 2000 })],
+      [],
+      [remotePlan({ updatedAt: NOW - 2000 })],
+      NOW,
+      { sharedKey, deletedAtByKey: new Map([['1', NOW - 1000]]) }
+    );
+    expect(result.pullUpserts).toEqual([]);
+    expect(result.pushUpserts).toEqual([]);
+    expect(result.deleteLocal).toEqual(['p1']);
+    expect(result.pushTombstones).toEqual([{ id: 'p1', deletedAt: NOW - 1000 }]);
+  });
+
+  it('leaves a row edited after the account-wide tombstone alone', () => {
+    const result = mergeRecords([localPlan({ updatedAt: NOW - 500 })], [], [], NOW, {
+      sharedKey,
+      deletedAtByKey: new Map([['1', NOW - 1000]]),
+    });
+    expect(result.pushUpserts.map((p) => p.id)).toEqual(['p1']);
+    expect(result.deleteLocal).toEqual([]);
+  });
+
+  it('opts a row out of the check when sharedKey returns undefined', () => {
+    const result = mergeRecords([localPlan({ updatedAt: NOW - 2000 })], [], [], NOW, {
+      sharedKey: () => undefined,
+      deletedAtByKey: new Map([['1', NOW - 1000]]),
+    });
+    expect(result.pushUpserts.map((p) => p.id)).toEqual(['p1']);
+    expect(result.deleteLocal).toEqual([]);
+  });
+});
+
 describe('mergeSettings', () => {
   const EMPTY_RESULT = {
     push: [],
