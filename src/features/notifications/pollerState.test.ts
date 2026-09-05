@@ -66,7 +66,7 @@ const WALLET_SNAPSHOT: WalletSnapshot = {
 };
 
 const MARKET_ORDER_SNAPSHOT: MarketOrderSnapshot = {
-  entries: [{ orderId: 1, filled: true }],
+  entries: [{ orderId: 1, filled: true, isBuyOrder: false, typeId: 34, quantity: 100 }],
   nowMs: 999,
 };
 

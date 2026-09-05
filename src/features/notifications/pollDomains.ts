@@ -665,10 +665,26 @@ export const walletDomain = defineDomain<
 /* Market orders                                                               */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Deliberately strict about the buy/sell and item fields, so a baseline
+ * written before they existed fails validation rather than being read with
+ * them missing. `pollerState.ts` parses a state it does not recognise as
+ * `null`, and `diffMarketOrderFilled` fires nothing without a baseline — so
+ * the upgrade costs one quiet poll and then a fresh, complete snapshot. The
+ * tolerant alternative (default the missing fields) would have every stored
+ * buy order read as a sell order exactly once, which is the notification this
+ * change exists to stop.
+ */
 function isMarketOrderEntrySnapshot(raw: unknown): raw is MarketOrderEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  return typeof r.orderId === 'number' && typeof r.filled === 'boolean';
+  return (
+    typeof r.orderId === 'number' &&
+    typeof r.filled === 'boolean' &&
+    typeof r.isBuyOrder === 'boolean' &&
+    typeof r.typeId === 'number' &&
+    typeof r.quantity === 'number'
+  );
 }
 
 /**
@@ -683,13 +699,22 @@ export function deriveMarketOrderEntries(
   history: readonly MarketOrderHistory[]
 ): MarketOrderEntrySnapshot[] {
   const openIds = new Set(openOrders.map((order) => order.order_id));
-  const entries: MarketOrderEntrySnapshot[] = openOrders.map((order) => ({
+  // ESI omits `is_buy_order` entirely on a sell order rather than sending
+  // false, so absent has to read as "sell" — the same shape the Market views
+  // already assume of this field.
+  const common = (order: MarketOrder) => ({
     orderId: order.order_id,
+    isBuyOrder: order.is_buy_order === true,
+    typeId: order.type_id,
+    quantity: order.volume_total,
+  });
+  const entries: MarketOrderEntrySnapshot[] = openOrders.map((order) => ({
+    ...common(order),
     filled: false,
   }));
   for (const order of history) {
     if (openIds.has(order.order_id)) continue;
-    entries.push({ orderId: order.order_id, filled: order.volume_remain === 0 });
+    entries.push({ ...common(order), filled: order.volume_remain === 0 });
   }
   return entries;
 }
