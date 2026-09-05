@@ -338,6 +338,105 @@ export interface NotificationFeedRecord {
   dismissedAt?: number;
 }
 
+/**
+ * A manually logged Production Run (issue #525, CONTEXT.md): a snapshot of
+ * one production batch off a Build Plan — materials cost, job fee, and
+ * quantity as they stood at logging time, user-overridable and never
+ * re-derived afterward. Exists to answer "what did this batch actually cost
+ * and actually sell for", which a Build Plan's own live-recomputed
+ * `BuildResult` cannot: that number moves with the market and blueprint
+ * inputs on every render, and a realized-profit figure has to hold still
+ * against the price the pilot actually paid.
+ *
+ * Deliberately holds no list of linked sales — see `ProductionSaleLinkRecord`
+ * and `ProductionOrderWatchRecord` below for why each linked sale is its own
+ * record rather than a field on this one.
+ */
+export interface ProductionRunRecord {
+  id: string;
+  characterId: number;
+  buildPlanId: string;
+  productTypeID: number;
+  /** Units produced by this run. */
+  quantity: number;
+  materialCost: number;
+  jobFee: number;
+  totalCost: number;
+  /** Epoch ms the run was logged. */
+  loggedAt: number;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
+/**
+ * One past wallet sale linked to a Production Run's output ("Link Past
+ * Sale", issue #525) — a picker over the character's already-cached
+ * `WalletTransaction[]` (`features/character/wallet.ts`), never a new ESI
+ * surface.
+ *
+ * One record per linked transaction, not an array field on
+ * `ProductionRunRecord`: `sync/merge.ts` is last-write-wins per whole
+ * document, so two devices linking *different* sales to the same run before
+ * syncing would have one allocation silently overwrite the other if they
+ * shared a document. Giving each link its own record, keyed deterministically
+ * off ESI's own `transaction_id` (`${characterId}:txn:${transactionId}`,
+ * `sync/planSync.ts`), makes that race structurally impossible instead of
+ * merely handled: two devices linking different sales write two different
+ * documents, and the deterministic id makes the same sale linked twice on
+ * two devices collide into one document rather than double-count. Mirrors
+ * the Notification Feed's Occurrence Key precedent (CONTEXT.md).
+ */
+export interface ProductionSaleLinkRecord {
+  /** Always `${characterId}:txn:${transactionId}` — see the type doc above. */
+  id: string;
+  characterId: number;
+  runId: string;
+  transactionId: number;
+  quantity: number;
+  unitPrice: number;
+  /** Epoch ms the pilot linked this sale. */
+  linkedAt: number;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
+/**
+ * One of the character's own open sell orders, watched for fills against a
+ * Production Run's output ("Watch Open Order", issue #525) — tracks
+ * `volume_remain` directly rather than a wallet-transaction lookup, so it
+ * can't age out of ESI's rolling wallet-transaction window the way a
+ * historical sale can.
+ *
+ * Same one-record-per-allocation shape as `ProductionSaleLinkRecord`, and for
+ * the same reason: keyed deterministically off ESI's own `order_id`
+ * (`${characterId}:order:${orderId}`).
+ *
+ * There is no background poller for orders — `lastKnownVolumeRemain` only
+ * moves when the pilot refreshes the Production Runs panel
+ * (`engine/industry/orderWatch.ts`'s `computeOrderFillQuantity` does the
+ * diffing). `closed` is set once the order no longer appears among the
+ * character's open orders (fully filled, cancelled, or expired) — realized
+ * quantity is only ever the confirmed drop in `volume_remain` up to that
+ * point, never extrapolated from disappearance, since a cancelled order
+ * would otherwise be counted as a sale it never made.
+ */
+export interface ProductionOrderWatchRecord {
+  /** Always `${characterId}:order:${orderId}` — see the type doc above. */
+  id: string;
+  characterId: number;
+  runId: string;
+  orderId: number;
+  unitPrice: number;
+  initialVolumeRemain: number;
+  lastKnownVolumeRemain: number;
+  /** True once the order no longer appears among the character's open orders. */
+  closed: boolean;
+  /** Epoch ms the watch was created. */
+  watchedAt: number;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -349,6 +448,9 @@ export const db = new Dexie('neocom') as Dexie & {
   stationPins: EntityTable<StationPinRecord, 'id'>;
   planetRichness: EntityTable<PlanetRichnessRecord, 'id'>;
   notificationFeed: EntityTable<NotificationFeedRecord, 'id'>;
+  productionRuns: EntityTable<ProductionRunRecord, 'id'>;
+  productionSaleLinks: EntityTable<ProductionSaleLinkRecord, 'id'>;
+  productionOrderWatches: EntityTable<ProductionOrderWatchRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -445,4 +547,24 @@ db.version(8).stores({
   stationPins: 'id, characterId, locationId',
   planetRichness: 'id, characterId, planetId',
   notificationFeed: 'id, characterId, firedAt',
+});
+
+// Additive: v1-v8 stores unchanged, plus Production Runs and their two
+// linking-record tables (issue #525). `buildPlanId` is indexed on runs so the
+// panel can query one plan's runs directly; `runId` is indexed on both link
+// tables so a run's linked sales/watches can be queried without a table scan.
+db.version(9).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
 });

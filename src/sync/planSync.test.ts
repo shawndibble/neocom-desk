@@ -4,6 +4,9 @@ import {
   db,
   type BuildPlanRecord,
   type NotificationFeedRecord,
+  type ProductionOrderWatchRecord,
+  type ProductionRunRecord,
+  type ProductionSaleLinkRecord,
   type QuickbarRecord,
   type SkillPlanRecord,
   type StationPinRecord,
@@ -20,6 +23,9 @@ import {
   getSyncStatus,
   markBuildPlanDeleted,
   markPlanDeleted,
+  markProductionRunDeleted,
+  removeProductionOrderWatch,
+  removeProductionSaleLink,
   scheduleSync,
   setAccountStationPin,
   setCharacterStationPin,
@@ -112,6 +118,9 @@ const BUILD_PLANS_PATH = 'characters/char:1/buildPlans';
 const QUICKBARS_PATH = 'characters/char:1/quickbars';
 const STATION_PINS_PATH = 'characters/char:1/stationPins';
 const PLANET_RICHNESS_PATH = 'characters/char:1/planetRichness';
+const PRODUCTION_RUNS_PATH = 'characters/char:1/productionRuns';
+const PRODUCTION_SALE_LINKS_PATH = 'characters/char:1/productionSaleLinks';
+const PRODUCTION_ORDER_WATCHES_PATH = 'characters/char:1/productionOrderWatches';
 const SETTINGS_PATH = 'characters/char:1/settings';
 const NOTIFICATION_FEED_PATH = 'characters/char:1/notificationFeed';
 const HASH = 'hash-a';
@@ -183,6 +192,60 @@ function remoteStationPinDoc(overrides: DocData = {}): DocData {
   return { ...stationPin(), ownerHash: HASH, deleted: false, ...overrides };
 }
 
+function productionRun(overrides: Partial<ProductionRunRecord> = {}): ProductionRunRecord {
+  return {
+    id: 'run-1',
+    characterId: 1,
+    buildPlanId: 'b1',
+    productTypeID: 999,
+    quantity: 10,
+    materialCost: 500_000,
+    jobFee: 50_000,
+    totalCost: 550_000,
+    loggedAt: Date.now() - 2000,
+    updatedAt: Date.now() - 1000,
+    ...overrides,
+  };
+}
+
+function remoteProductionRunDoc(overrides: DocData = {}): DocData {
+  return { ...productionRun(), ownerHash: HASH, deleted: false, ...overrides };
+}
+
+function productionSaleLink(
+  overrides: Partial<ProductionSaleLinkRecord> = {}
+): ProductionSaleLinkRecord {
+  return {
+    id: '1:txn:1001',
+    characterId: 1,
+    runId: 'run-1',
+    transactionId: 1001,
+    quantity: 5,
+    unitPrice: 90_000,
+    linkedAt: Date.now() - 1000,
+    updatedAt: Date.now() - 1000,
+    ...overrides,
+  };
+}
+
+function productionOrderWatch(
+  overrides: Partial<ProductionOrderWatchRecord> = {}
+): ProductionOrderWatchRecord {
+  return {
+    id: '1:order:2001',
+    characterId: 1,
+    runId: 'run-1',
+    orderId: 2001,
+    unitPrice: 95_000,
+    initialVolumeRemain: 5,
+    lastKnownVolumeRemain: 5,
+    closed: false,
+    watchedAt: Date.now() - 1000,
+    updatedAt: Date.now() - 1000,
+    ...overrides,
+  };
+}
+
 const FEED_ROW_FIRED_AT = Date.now() - 1000;
 
 function feedRow(overrides: Partial<NotificationFeedRecord> = {}): NotificationFeedRecord {
@@ -241,6 +304,9 @@ beforeEach(async () => {
     db.settings.clear(),
     db.esiCache.clear(),
     db.notificationFeed.clear(),
+    db.productionRuns.clear(),
+    db.productionSaleLinks.clear(),
+    db.productionOrderWatches.clear(),
   ]);
   await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: HASH, addedAt: 1 });
 });
@@ -432,15 +498,24 @@ describe('triggerSync: plans', () => {
     await db.buildPlans.put(buildPlan());
     await db.quickbars.put(quickbar());
     await db.stationPins.put(stationPin());
+    await db.productionRuns.put(productionRun());
+    await db.productionSaleLinks.put(productionSaleLink());
+    await db.productionOrderWatches.put(productionOrderWatch());
     await triggerSync(1);
     expect(await db.skillPlans.count()).toBe(0);
     expect(await db.buildPlans.count()).toBe(0);
     expect(await db.quickbars.count()).toBe(0);
     expect(await db.stationPins.count()).toBe(0);
+    expect(await db.productionRuns.count()).toBe(0);
+    expect(await db.productionSaleLinks.count()).toBe(0);
+    expect(await db.productionOrderWatches.count()).toBe(0);
     expect(remoteStore.get(PLANS_PATH)?.get('p1')).toBeUndefined();
     expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')).toBeUndefined();
     expect(remoteStore.get(QUICKBARS_PATH)?.get('1')).toBeUndefined();
     expect(remoteStore.get(STATION_PINS_PATH)?.get('1:60003760')).toBeUndefined();
+    expect(remoteStore.get(PRODUCTION_RUNS_PATH)?.get('run-1')).toBeUndefined();
+    expect(remoteStore.get(PRODUCTION_SALE_LINKS_PATH)?.get('1:txn:1001')).toBeUndefined();
+    expect(remoteStore.get(PRODUCTION_ORDER_WATCHES_PATH)?.get('1:order:2001')).toBeUndefined();
     expect((await db.settings.get('sync.__ownerHash.1'))?.value).toBe(HASH);
   });
 
@@ -474,8 +549,9 @@ describe('triggerSync: ownerHash-scoped reads', () => {
   it('queries every collection filtered by the character ownerHash', async () => {
     await triggerSync(1);
     // plans + buildPlans + quickbars + stationPins + planetRichness +
+    // productionRuns + productionSaleLinks + productionOrderWatches +
     // notificationFeed + settings, each read through a where clause.
-    expect(vi.mocked(where)).toHaveBeenCalledTimes(7);
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(10);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
       expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
@@ -924,6 +1000,110 @@ describe('triggerSync: planet richness (#425)', () => {
   });
 });
 
+describe('triggerSync: Production Log (#525)', () => {
+  it('pushes a locally-logged Production Run', async () => {
+    await db.productionRuns.put(productionRun());
+    await triggerSync(1);
+    expect(remoteStore.get(PRODUCTION_RUNS_PATH)?.get('run-1')).toMatchObject({
+      id: 'run-1',
+      characterId: 1,
+      buildPlanId: 'b1',
+      quantity: 10,
+      materialCost: 500_000,
+      jobFee: 50_000,
+      totalCost: 550_000,
+      ownerHash: HASH,
+      deleted: false,
+    });
+  });
+
+  it('pulls a remote-only Production Run into Dexie', async () => {
+    seedRemote(PRODUCTION_RUNS_PATH, [remoteProductionRunDoc()]);
+    await triggerSync(1);
+    expect(await db.productionRuns.get('run-1')).toMatchObject({
+      id: 'run-1',
+      buildPlanId: 'b1',
+      quantity: 10,
+    });
+  });
+
+  it('deletes a Production Run remotely via markProductionRunDeleted', async () => {
+    await db.productionRuns.put(productionRun());
+    await triggerSync(1);
+    expect(remoteStore.get(PRODUCTION_RUNS_PATH)?.get('run-1')).toBeDefined();
+
+    await markProductionRunDeleted(1, 'run-1');
+    await triggerSync(1);
+
+    expect(await db.productionRuns.get('run-1')).toBeUndefined();
+    expect(remoteStore.get(PRODUCTION_RUNS_PATH)?.get('run-1')?.deleted).toBe(true);
+  });
+
+  it('cascades markProductionRunDeleted to the run’s sale links and order watches', async () => {
+    await db.productionRuns.put(productionRun());
+    await db.productionSaleLinks.put(productionSaleLink());
+    await db.productionOrderWatches.put(productionOrderWatch());
+    await triggerSync(1);
+
+    await markProductionRunDeleted(1, 'run-1');
+    await triggerSync(1);
+
+    expect(await db.productionSaleLinks.get('1:txn:1001')).toBeUndefined();
+    expect(await db.productionOrderWatches.get('1:order:2001')).toBeUndefined();
+    expect(remoteStore.get(PRODUCTION_SALE_LINKS_PATH)?.get('1:txn:1001')?.deleted).toBe(true);
+    expect(remoteStore.get(PRODUCTION_ORDER_WATCHES_PATH)?.get('1:order:2001')?.deleted).toBe(true);
+  });
+
+  it('gives two sale links against the same run independent documents, so linking different sales on two devices never collides (issue #525 finding 1/2)', async () => {
+    // "Device A" links transaction 1001, "device B" links transaction 1002 —
+    // both to the same run, before either has seen the other's write. Because
+    // each link is keyed on its own deterministic transaction id rather than
+    // sharing one document (or an array field) with the run, both survive a
+    // sync with no field to be clobbered.
+    await db.productionRuns.put(productionRun());
+    await db.productionSaleLinks.put(productionSaleLink({ id: '1:txn:1001', transactionId: 1001 }));
+    await db.productionSaleLinks.put(productionSaleLink({ id: '1:txn:1002', transactionId: 1002 }));
+
+    await triggerSync(1);
+
+    expect(remoteStore.get(PRODUCTION_SALE_LINKS_PATH)?.get('1:txn:1001')).toBeDefined();
+    expect(remoteStore.get(PRODUCTION_SALE_LINKS_PATH)?.get('1:txn:1002')).toBeDefined();
+  });
+
+  it('removeProductionSaleLink tombstones just the one link, leaving its sibling intact', async () => {
+    await db.productionRuns.put(productionRun());
+    await db.productionSaleLinks.put(productionSaleLink({ id: '1:txn:1001', transactionId: 1001 }));
+    await db.productionSaleLinks.put(productionSaleLink({ id: '1:txn:1002', transactionId: 1002 }));
+    await triggerSync(1);
+
+    await removeProductionSaleLink(1, '1:txn:1001');
+    await triggerSync(1);
+
+    expect(await db.productionSaleLinks.get('1:txn:1001')).toBeUndefined();
+    expect(await db.productionSaleLinks.get('1:txn:1002')).toBeDefined();
+    expect(remoteStore.get(PRODUCTION_SALE_LINKS_PATH)?.get('1:txn:1001')?.deleted).toBe(true);
+    expect(remoteStore.get(PRODUCTION_SALE_LINKS_PATH)?.get('1:txn:1002')?.deleted).toBeFalsy();
+  });
+
+  it('pushes and removes an order watch', async () => {
+    await db.productionRuns.put(productionRun());
+    await db.productionOrderWatches.put(productionOrderWatch());
+    await triggerSync(1);
+    expect(remoteStore.get(PRODUCTION_ORDER_WATCHES_PATH)?.get('1:order:2001')).toMatchObject({
+      orderId: 2001,
+      initialVolumeRemain: 5,
+      lastKnownVolumeRemain: 5,
+      closed: false,
+    });
+
+    await removeProductionOrderWatch(1, '1:order:2001');
+    await triggerSync(1);
+
+    expect(await db.productionOrderWatches.get('1:order:2001')).toBeUndefined();
+    expect(remoteStore.get(PRODUCTION_ORDER_WATCHES_PATH)?.get('1:order:2001')?.deleted).toBe(true);
+  });
+});
+
 describe('triggerSync: station pins', () => {
   it('pushes a local-only station pin with ownerHash and deleted: false', async () => {
     const p = stationPin();
@@ -1335,7 +1515,9 @@ describe('sync orchestration', () => {
 
     release();
     await Promise.all([p1, p2]);
-    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(7);
+    // One getDocs per synced collection (see the collection-count comment in
+    // the "debounces scheduleSync" test above).
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(10);
   });
 
   it('a queued sync still runs after the previous one fails', async () => {
@@ -1351,10 +1533,11 @@ describe('sync orchestration', () => {
     scheduleSync(1, 20);
     scheduleSync(1, 20);
     // One sync = one getDocs per collection (plans + buildPlans + quickbars +
-    // stationPins + notificationFeed + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(7));
+    // stationPins + planetRichness + productionRuns + productionSaleLinks +
+    // productionOrderWatches + notificationFeed + settings).
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(10));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(7);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(10);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
   });
 });

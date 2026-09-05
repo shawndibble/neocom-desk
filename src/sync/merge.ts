@@ -14,10 +14,13 @@
 import type {
   BuildPlanRecord,
   PlanBooster,
+  PlanetRichnessRecord,
+  ProductionOrderWatchRecord,
+  ProductionRunRecord,
+  ProductionSaleLinkRecord,
   QuickbarRecord,
   SkillPlanRecord,
   StationPinRecord,
-  PlanetRichnessRecord,
   WhatIfImplantSelection,
 } from '@/db';
 import type { Attributes } from '@/engine/types';
@@ -61,6 +64,15 @@ export type RemoteStationPinDoc = StationPinRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/planetRichness/{id} (issue #425). */
 export type RemotePlanetRichnessDoc = PlanetRichnessRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/productionRuns/{id} (issue #525). */
+export type RemoteProductionRunDoc = ProductionRunRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/productionSaleLinks/{id} (issue #525). */
+export type RemoteProductionSaleLinkDoc = ProductionSaleLinkRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/productionOrderWatches/{id} (issue #525). */
+export type RemoteProductionOrderWatchDoc = ProductionOrderWatchRecord & RemoteDoc;
 
 /** Locally recorded deletion awaiting propagation to the remote store. */
 export interface LocalTombstone {

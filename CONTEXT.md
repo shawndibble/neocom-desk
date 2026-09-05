@@ -73,7 +73,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Detected Accelerator** — a cerebral accelerator inferred from a base sheet
   that is over budget, by the size of the excess. Prefilled into the Booster
   control; not a separate mechanism.
-- **Editable Data**: Data created inside the app (Skill Plans, Build Plans, settings). Synced across devices. Everything else is API-derived and re-pulled per device.
+- **Editable Data**: Data created inside the app (Skill Plans, Build Plans, Production Runs, settings). Synced across devices. Everything else is API-derived and re-pulled per device.
 - **EIV (Estimated Item Value)**: The SCC's reference price for the materials
   a manufacturing job consumes, at ME0 quantities. Used only to size the
   **Job Fee** — it is not what the materials actually cost to buy.
@@ -197,6 +197,25 @@ here — they go one per file in `docs/context/decisions/`.
   the most urgent entry that depends on it — the plan's banded view and the
   optimizer's "suggest full reorder" both key off this effective value, not
   each entry's own raw setting.
+- **Production Log**: The aggregate realized-profit view across a Build
+  Plan's own **Production Run**s (issue #525) — how much a plan's actual
+  builds actually cost and actually sold for, net of what's been linked so
+  far. Lives as a panel on the existing Build Plan detail, not a separate
+  route.
+- **Production Run**: A manual, pilot-entered snapshot of one production
+  batch off a **Build Plan** — materials cost, job fee, and quantity as they
+  stood at logging time, overridable at creation and never re-derived
+  afterward (issue #525). Distinct from a Build Plan's own live `BuildResult`,
+  which is a forward _estimate_ that moves with the market on every render; a
+  Production Run holds still so realized profit can be measured against what
+  was actually paid. Deliberately correct-by-construction rather than
+  reconstructed from ESI wallet history (see the decisions folder for why
+  automated FIFO matching was rejected) — the pilot links what actually sold
+  via "Link Past Sale" (a picker over cached wallet transactions) or "Watch
+  Open Order" (tracks one of the pilot's own open sell orders'
+  `volume_remain` directly). Each linked sale or watched order is its own
+  synced record, never a field on the run itself, so two devices linking
+  different sales to the same run can never collide.
 - **Projection**: The set of rows a device uploads describing every Scheduled
   Push that becomes due inside the Projection Horizon — one row per
   occurrence, carrying its **Occurrence Key**, its `fireAt`, and its

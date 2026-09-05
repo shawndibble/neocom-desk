@@ -23,6 +23,12 @@ export const stationPinTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}stationPinTombstones.${characterId}`;
 export const planetRichnessTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}planetRichnessTombstones.${characterId}`;
+export const productionRunTombstonesKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}productionRunTombstones.${characterId}`;
+export const productionSaleLinkTombstonesKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}productionSaleLinkTombstones.${characterId}`;
+export const productionOrderWatchTombstonesKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}productionOrderWatchTombstones.${characterId}`;
 
 /**
  * One Character's tombstone list for a collection, by its bookkeeping key.
@@ -38,9 +44,9 @@ export async function readTombstones(key: string): Promise<LocalTombstone[]> {
 
 /**
  * Drop every device-local sync bookkeeping key for one Character (owner-hash
- * bookmark + the three tombstone lists). Called when a Character is removed —
- * its skillPlans/buildPlans/quickbars rows are already gone by then, so there
- * is nothing left for these to describe.
+ * bookmark + every collection's tombstone list). Called when a Character is
+ * removed — its skillPlans/buildPlans/quickbars/etc. rows are already gone by
+ * then, so there is nothing left for these to describe.
  */
 export async function clearCharacterSyncBookkeeping(characterId: number): Promise<void> {
   await db.settings.bulkDelete([
@@ -50,5 +56,8 @@ export async function clearCharacterSyncBookkeeping(characterId: number): Promis
     quickbarTombstonesKey(characterId),
     stationPinTombstonesKey(characterId),
     planetRichnessTombstonesKey(characterId),
+    productionRunTombstonesKey(characterId),
+    productionSaleLinkTombstonesKey(characterId),
+    productionOrderWatchTombstonesKey(characterId),
   ]);
 }

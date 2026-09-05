@@ -89,6 +89,30 @@ export async function clearPlanetRichness(planetId: number): Promise<void> {
   return clearPlanetRichness(planetId);
 }
 
+/**
+ * Delete a Production Run and every sale link/order watch attributed to it
+ * (issue #525), tombstoned so none of it resurrects on sync.
+ */
+export async function markProductionRunDeleted(characterId: number, runId: string): Promise<void> {
+  const { markProductionRunDeleted } = await import('./planSync');
+  return markProductionRunDeleted(characterId, runId);
+}
+
+/** Unlink a past sale from a Production Run, tombstoned so it does not resurrect. */
+export async function removeProductionSaleLink(characterId: number, linkId: string): Promise<void> {
+  const { removeProductionSaleLink } = await import('./planSync');
+  return removeProductionSaleLink(characterId, linkId);
+}
+
+/** Stop watching an open sell order for a Production Run, tombstoned so it does not resurrect. */
+export async function removeProductionOrderWatch(
+  characterId: number,
+  watchId: string
+): Promise<void> {
+  const { removeProductionOrderWatch } = await import('./planSync');
+  return removeProductionOrderWatch(characterId, watchId);
+}
+
 /** Write a synced setting ('sync.'-prefixed key) and stamp it for LWW merging. */
 export async function setSyncedSetting(key: string, value: unknown): Promise<void> {
   const { setSyncedSetting } = await import('./planSync');

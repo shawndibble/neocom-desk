@@ -225,7 +225,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(8);
+    expect(db.verno).toBe(9);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -240,8 +240,25 @@ describe('schema upgrade v7 -> v8', () => {
       'planetId',
     ]);
   });
+});
 
-  it('leaves every v7 table in place, because the upgrade is additive', () => {
+describe('schema upgrade v8 -> v9 (Production Log, issue #525)', () => {
+  it('adds Production Runs and their two linking-record tables', () => {
+    expect(db.productionRuns.schema.indexes.map((i) => i.name).sort()).toEqual([
+      'buildPlanId',
+      'characterId',
+    ]);
+    expect(db.productionSaleLinks.schema.indexes.map((i) => i.name).sort()).toEqual([
+      'characterId',
+      'runId',
+    ]);
+    expect(db.productionOrderWatches.schema.indexes.map((i) => i.name).sort()).toEqual([
+      'characterId',
+      'runId',
+    ]);
+  });
+
+  it('leaves every v8 table in place, because the upgrade is additive', () => {
     const tables = db.tables.map((table) => table.name).sort();
     expect(tables).toEqual(
       [
@@ -250,6 +267,9 @@ describe('schema upgrade v7 -> v8', () => {
         'esiCache',
         'notificationFeed',
         'planetRichness',
+        'productionOrderWatches',
+        'productionRuns',
+        'productionSaleLinks',
         'quickbars',
         'settings',
         'skillPlans',
