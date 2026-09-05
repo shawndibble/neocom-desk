@@ -46,6 +46,12 @@ function stubNotification(permission: NotificationPermission) {
   return requestPermission;
 }
 
+/** Switches Settings' own tab bar (General / Data Age / Activity Log) — not app navigation. */
+async function openTab(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
+  await screen.findByRole('heading', { level: 1, name: /settings/i });
+  await user.click(screen.getByRole('tab', { name }));
+}
+
 // Rendered through <App /> rather than in isolation: /settings has a nav
 // entry now, so routing to it through the shell is part of what's asserted.
 // Settings makes no requests, hence no msw server.
@@ -108,16 +114,18 @@ describe('Settings', () => {
   });
 
   it('shows an empty state when nothing has been fetched yet (issue #32)', async () => {
+    const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await openTab(user, /activity log/i);
 
     expect(screen.getByRole('heading', { name: /activity log/i })).toBeInTheDocument();
     expect(screen.getByText(/no activity yet/i)).toBeInTheDocument();
   });
 
   it('lists a recorded entry by route template, character name, and outcome (issue #32)', async () => {
+    const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await openTab(user, /activity log/i);
 
     act(() => {
       useActivityLog.getState().record({
@@ -139,8 +147,9 @@ describe('Settings', () => {
   });
 
   it('labels a public call and an auth-failure outcome distinctly (issue #32)', async () => {
+    const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await openTab(user, /activity log/i);
 
     act(() => {
       useActivityLog.getState().record({
@@ -155,8 +164,9 @@ describe('Settings', () => {
   });
 
   it('shows a full date, not just time, on a logged entry (issue #422)', async () => {
+    const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await openTab(user, /activity log/i);
     const timestamp = new Date('2026-01-15T09:30:00Z').getTime();
 
     act(() => {
@@ -182,7 +192,7 @@ describe('Settings', () => {
   it('clears the log on demand, disabled when there is nothing to clear (issue #422)', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await openTab(user, /activity log/i);
 
     expect(screen.getByRole('button', { name: /clear log/i })).toBeDisabled();
 
@@ -224,6 +234,53 @@ describe('Settings', () => {
 
     expect(await screen.findByText(/cache cleared/i)).toBeInTheDocument();
     expect(await db.esiCache.count()).toBe(0);
+  });
+
+  it('Data Age tab shows an empty state when nothing has succeeded yet', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openTab(user, /data age/i);
+
+    expect(screen.getByRole('heading', { name: /data age/i })).toBeInTheDocument();
+    expect(screen.getByText(/nothing fetched yet/i)).toBeInTheDocument();
+  });
+
+  it('Data Age tab lists only the latest successful fetch per endpoint/character, skipping failures (issue #32)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openTab(user, /data age/i);
+
+    act(() => {
+      const log = useActivityLog.getState();
+      // Older success, superseded by the newer one below — must not double-list.
+      log.record({
+        endpointId: 'getCharacterSkills',
+        characterId: CHAR_ID,
+        timestamp: 1_000,
+        outcome: 'success',
+      });
+      // A failed call after that never updated anything, so it's excluded
+      // even though it's the most recent event for this endpoint/character.
+      log.record({
+        endpointId: 'getCharacterSkills',
+        characterId: CHAR_ID,
+        timestamp: 3_000,
+        outcome: 'error',
+      });
+      log.record({
+        endpointId: 'getCharacterSkills',
+        characterId: CHAR_ID,
+        timestamp: 2_000,
+        outcome: 'success',
+      });
+    });
+
+    const table = await screen.findByRole('table', { name: /data age/i });
+    const rows = within(table).getAllByRole('row');
+    // Header row plus exactly one data row — the superseded success and the
+    // failure both collapse into it, not two rows.
+    expect(rows).toHaveLength(2);
+    expect(within(table).getByTitle(new Date(2_000).toLocaleString())).toBeInTheDocument();
   });
 });
 

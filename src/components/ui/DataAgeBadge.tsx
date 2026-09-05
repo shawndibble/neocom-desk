@@ -36,7 +36,13 @@ function toneFor(ms: number): string {
   return 'text-danger';
 }
 
-/** Relative age of API-derived data. Required on every ESI-backed view. */
+/**
+ * Relative age of API-derived data. Required on every ESI-backed view — but
+ * hidden below `md`: on a phone-width header it was the thing crowding out
+ * the title and actions, and Settings' Data Age tab carries the same
+ * information for every view at once, so mobile loses nothing by dropping it
+ * here (see docs/context/decisions for the write-up).
+ */
 export function DataAgeBadge({ date, note, dotOnly = false, className = '' }: DataAgeBadgeProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
@@ -56,7 +62,7 @@ export function DataAgeBadge({ date, note, dotOnly = false, className = '' }: Da
     <time
       dateTime={date.toISOString()}
       title={title}
-      className={`inline-flex items-center gap-1.5 text-[0.6875rem] tabular-nums ${toneFor(ms)} ${className}`}
+      className={`hidden items-center gap-1.5 text-[0.6875rem] tabular-nums md:inline-flex ${toneFor(ms)} ${className}`}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {!dotOnly && age}
