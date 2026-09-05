@@ -19,6 +19,7 @@ import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import {
+  buildPlansByMaterialTypeID,
   loadBlueprintCatalog,
   type BlueprintCatalog,
   type BlueprintCatalogEntry,
@@ -188,6 +189,31 @@ export function Industry() {
     setSearchParams,
     createPlan,
   ]);
+
+  // Assets' item context menu "View in Industry as material" action (issue
+  // #414) lands here with `?material=<typeId>`. Unlike `?product=`, this
+  // never creates a plan — the action only renders when at least one of the
+  // character's own plans already consumes that material, so it just
+  // selects that plan.
+  const materialParam = searchParams.get('material');
+  const materialPlanByTypeID = useMemo(
+    () => (plans && catalog ? buildPlansByMaterialTypeID(plans, catalog) : null),
+    [plans, catalog]
+  );
+  const materialPlan = materialParam
+    ? (materialPlanByTypeID?.get(Number(materialParam)) ?? null)
+    : null;
+
+  if (materialPlan && selectedId !== materialPlan.id) {
+    setSelectedId(materialPlan.id);
+  }
+
+  useEffect(() => {
+    if (!materialParam || !plans || !catalog) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('material');
+    setSearchParams(next, { replace: true });
+  }, [materialParam, plans, catalog, searchParams, setSearchParams]);
 
   // Derived, not effect-synced: falls back to the first plan whenever the
   // explicitly selected one is missing (first load, or it was just deleted).

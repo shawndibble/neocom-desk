@@ -7,6 +7,7 @@
 import { loadBlueprints, loadTypes } from '@/sde/loadSde';
 import type { BlueprintType, TypeMap } from '@/sde/types';
 import type { IndustryBlueprint } from '@/engine/industry/types';
+import type { BuildPlanRecord } from '@/db';
 
 export interface BlueprintCatalogEntry {
   blueprintTypeID: number;
@@ -74,6 +75,29 @@ export function searchByProductName(
   const q = query.trim().toLowerCase();
   if (!q) return [];
   return catalog.entries.filter((e) => e.productNameLower.includes(q));
+}
+
+/**
+ * First owned Build Plan whose blueprint consumes a given material typeID,
+ * keyed by that typeID — mirrors `byProductTypeID`'s first-wins shape.
+ * Backs Assets' "View in Industry as material" action (issue #414): it
+ * links off the character's own plans, not a full-SDE reverse index over
+ * every blueprint in the game (CONTEXT.md round 49 — materials are matched
+ * by SDE type against a Build Plan's own materials list).
+ */
+export function buildPlansByMaterialTypeID(
+  plans: readonly BuildPlanRecord[],
+  catalog: BlueprintCatalog
+): Map<number, BuildPlanRecord> {
+  const map = new Map<number, BuildPlanRecord>();
+  for (const plan of plans) {
+    const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
+    if (!entry) continue;
+    for (const material of entry.blueprint.materials) {
+      if (!map.has(material.typeID)) map.set(material.typeID, plan);
+    }
+  }
+  return map;
 }
 
 /** Adapt an SDE BlueprintType to the shape src/engine/industry consumes (drops skills). */

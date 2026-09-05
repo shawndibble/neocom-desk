@@ -127,6 +127,7 @@ beforeEach(async () => {
   await db.settings.clear();
   await db.esiCache.clear();
   await db.stationPins.clear();
+  await db.buildPlans.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useCompareSet.setState({ items: [] });
@@ -712,6 +713,124 @@ describe('item context menu (issue #83)', () => {
       expect(window.location.pathname).toBe('/market');
     });
     expect(window.location.search).toContain('type=34');
+  });
+
+  it('offers "View in Industry as material" when an owned Build Plan consumes the item, and jumps to Industry', async () => {
+    const user = userEvent.setup();
+    const { loadBlueprints } = await import('@/sde/loadSde');
+    vi.mocked(loadBlueprints).mockResolvedValueOnce({
+      '9999': {
+        name: 'Widget Blueprint',
+        time: 100,
+        materials: [{ typeID: 34, quantity: 10 }],
+        products: [{ typeID: 9998, quantity: 1 }],
+        skills: [],
+      },
+    });
+    await db.buildPlans.add({
+      id: 'bp-1',
+      characterId: CHAR_ID,
+      name: 'Widget run',
+      blueprintTypeID: 9999,
+      runs: 1,
+      me: 0,
+      te: 0,
+      facility: 'npcStation',
+      rigLevel: 'none',
+      security: 'highsec',
+      hubId: 'jita',
+      updatedAt: 1,
+    });
+    render(<App />);
+    await openLocation(user, JITA);
+    const item = await screen.findByText('Tritanium');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    const action = await screen.findByRole('menuitem', { name: 'View in Industry as material' });
+    await user.click(action);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/industry'));
+  });
+
+  it('omits "View in Industry as material" when no owned Build Plan consumes the item', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+    const item = await screen.findByText('Tritanium');
+    item.focus();
+    fireEvent.contextMenu(item);
+
+    await screen.findByRole('menuitem', { name: 'No blueprint options' });
+    expect(
+      screen.queryByRole('menuitem', { name: 'View in Industry as material' })
+    ).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+  });
+});
+
+describe('all items view, min-value filter, and sort (issue #414)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', () =>
+        HttpResponse.json([
+          { type_id: 34, average_price: 5 }, // Tritanium stack: 500 x 5 = 2,500 ISK
+          { type_id: 35, average_price: 5000 }, // Pyerite stack: 10 x 5,000 = 50,000 ISK
+        ])
+      )
+    );
+  });
+
+  it('shows every item across every location, without drilling in, once toggled on', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+  });
+
+  it('hides items below the minimum value threshold', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await screen.findByText('Tritanium');
+
+    await user.type(screen.getByLabelText('Minimum value'), '10000');
+
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+  });
+
+  it('sorts the flat list by value, highest first', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await screen.findByText('Tritanium');
+
+    await user.click(screen.getByLabelText('Sort'));
+    await user.click(await screen.findByRole('option', { name: 'Value' }));
+
+    const names = screen.getAllByText(/^(Tritanium|Pyerite)$/).map((el) => el.textContent);
+    expect(names).toEqual(['Pyerite', 'Tritanium']);
+  });
+
+  it('applies the same min-value filter and sort to active search results', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+    await user.type(screen.getByPlaceholderText(/search items/i), 'i');
+    await screen.findByText('Tritanium');
+
+    await user.type(screen.getByLabelText('Minimum value'), '10000');
+
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
   });
 });
 

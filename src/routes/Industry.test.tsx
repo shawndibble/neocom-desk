@@ -294,6 +294,45 @@ describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', 
   });
 });
 
+describe('Industry: "View in Industry as material" from Assets (issue #414)', () => {
+  it("selects the character's existing plan whose blueprint consumes the material, then clears the query param", async () => {
+    await db.buildPlans.add(seedPlan());
+    window.history.pushState({}, '', '/industry?material=34');
+    render(<App />);
+
+    const row = await screen.findByRole('button', { name: 'Rifter run' });
+    await waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    await waitFor(() => expect(window.location.search).toBe(''));
+    // Never creates a plan — only selects among the character's existing ones.
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
+  });
+
+  it('selects the correct plan when it is not first in the list', async () => {
+    // Material 35 (Pyerite) is a Rifter-only input — 9841 (Mechanical Parts)
+    // doesn't consume it, unlike Tritanium (34), which both blueprints share.
+    await db.buildPlans.add(seedPlan({ id: 'bp-0', name: 'Other plan', blueprintTypeID: 9841 }));
+    await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', blueprintTypeID: 638 }));
+    window.history.pushState({}, '', '/industry?material=35');
+    render(<App />);
+
+    const row = await screen.findByRole('button', { name: 'Rifter run' });
+    await waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    expect(screen.getByRole('button', { name: 'Other plan' }).closest('li')).not.toHaveClass(
+      'bg-panel-2'
+    );
+  });
+
+  it('clears the query param without selecting or creating anything when no plan consumes that material', async () => {
+    await db.buildPlans.add(seedPlan({ blueprintTypeID: 9841 }));
+    window.history.pushState({}, '', '/industry?material=34');
+    render(<App />);
+
+    await screen.findByRole('button', { name: 'Rifter run' });
+    await waitFor(() => expect(window.location.search).toBe(''));
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
+  });
+});
+
 describe('Industry: owned-blueprint prefill', () => {
   it('prefills ME/TE from the best owned copy and shows the owned hint', async () => {
     server.use(
