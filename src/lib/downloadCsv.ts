@@ -24,7 +24,9 @@ export type CsvSurface =
   | 'mail'
   | 'calendar'
   | 'market-sell'
-  | 'market-buy';
+  | 'market-buy'
+  | 'market-variations'
+  | 'market-compare';
 
 /**
  * Serialize and hand the browser a file. Composes the pure serializer with

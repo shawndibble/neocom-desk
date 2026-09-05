@@ -1551,6 +1551,7 @@
       "columnBestBuy": "Best Buy",
       "columnSpread": "Spread",
       "columnVolume": "Volume",
+      "exportCsv": "Export Compare Set to CSV",
       "remove": "Remove {{name}}",
       "clearAll": "Clear all",
       "expand": "Expand",
@@ -1571,7 +1572,8 @@
       "buy": "Buy",
       "noOrders": "No orders",
       "capped": "Showing {{limit}} of {{total}}",
-      "compare": "Compare"
+      "compare": "Compare",
+      "exportCsv": "Export Variations to CSV"
     },
     "variationsCompare": {
       "title": "Compare Variations",
@@ -1582,6 +1584,8 @@
     },
     "itemDetail": {
       "volume": "Volume: {{volume}} m3",
+      "bestSell": "Best sell:",
+      "bestBuy": "Best buy:",
       "planetaryTitle": "Planetary production",
       "planetaryCycle": "{{quantity}} per {{duration}} cycle",
       "planetaryInput": "{{quantity}} x {{name}}",

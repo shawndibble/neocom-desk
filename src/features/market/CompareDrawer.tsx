@@ -7,13 +7,16 @@
  */
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, Spinner } from '@/components/ui';
+import { Button, DataTable, IconButton, Spinner } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { useCompareSet } from './compareSet';
 import { useCompareRows, type CompareRow } from './useCompareRows';
 import type { LocationMode } from './locationMode';
 import type { GlobalMarketOverride } from '@/engine/market/locationMode';
+import { compareCsvColumns } from './compareCsv';
 import { formatVolume } from './format';
+import { downloadCsv } from '@/lib/downloadCsv';
 import { formatIsk } from '@/lib/isk';
 
 const DRAWER_ID = 'compare-drawer';
@@ -207,6 +210,13 @@ export function CompareDrawer({
               {t('market.compare.handle', { count: items.length })}
             </h2>
             <div className="flex items-center gap-2">
+              <IconButton
+                size="sm"
+                icon={<Icon.Download />}
+                label={t('market.compare.exportCsv')}
+                disabled={rows.length === 0}
+                onClick={() => downloadCsv('market-compare', rows, compareCsvColumns(t))}
+              />
               <Button size="sm" onClick={() => setMode((m) => (m === 'full' ? 'open' : 'full'))}>
                 {mode === 'full' ? t('market.compare.restore') : t('market.compare.expand')}
               </Button>
