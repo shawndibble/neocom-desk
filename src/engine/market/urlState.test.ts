@@ -6,6 +6,7 @@ import {
   resolveAgainstCatalogue,
   resolveMarketLocation,
   marketLinkParams,
+  marketItemUrl,
   type MarketLocationParam,
 } from './urlState';
 
@@ -178,5 +179,15 @@ describe('marketLinkParams', () => {
 
   it('falls back to just the typeId when arriving with neither param (e.g. from Skills)', () => {
     expect(marketLinkParams(587, '')).toEqual({ type: '587' });
+  });
+});
+
+describe('marketItemUrl', () => {
+  it('serialises marketLinkParams to a /market path', () => {
+    expect(marketItemUrl(587, '?region=10000002')).toBe('/market?type=587&region=10000002');
+  });
+
+  it('falls back to just the typeId when arriving with neither param', () => {
+    expect(marketItemUrl(587, '')).toBe('/market?type=587');
   });
 });

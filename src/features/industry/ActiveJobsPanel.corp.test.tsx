@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -29,6 +30,8 @@ const TYPES: TypeMap = {
 
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
+  // The row context menu (issue #409) asks usePiPlannable, which reads this.
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
 const CHAR_ID = 91;
@@ -133,7 +136,16 @@ describe('ActiveJobsPanel: the switch is hidden without the capability (AC 1)', 
     });
     server.use(http.get(rolesUrl(CHAR_ID), () => HttpResponse.json({})));
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
     await screen.findByText('Widget Alpha');
 
     expect(screen.queryByRole('group', { name: 'Job owner' })).toBeNull();
@@ -158,7 +170,16 @@ describe('ActiveJobsPanel: the switch is hidden without the capability (AC 1)', 
     });
     server.use(http.get(rolesUrl(CHAR_ID), () => HttpResponse.json({ roles: ['Director'] })));
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
     await screen.findByText('Widget Alpha');
 
     expect(screen.queryByRole('group', { name: 'Job owner' })).toBeNull();
@@ -185,7 +206,16 @@ describe('ActiveJobsPanel: the switch is hidden without the capability (AC 1)', 
     });
     server.use(http.get(rolesUrl(CHAR_ID), () => HttpResponse.json({ roles: ['Director'] })));
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
     await screen.findByText('Widget Alpha');
 
     expect(screen.queryByRole('group', { name: 'Job owner' })).toBeNull();
@@ -209,7 +239,16 @@ describe('ActiveJobsPanel: the switch is hidden without the capability (AC 1)', 
     });
     server.use(http.get(rolesUrl(CHAR_ID), () => HttpResponse.json({ roles: ['Accountant'] })));
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
     await screen.findByText('Widget Alpha');
 
     expect(screen.queryByRole('group', { name: 'Job owner' })).toBeNull();
@@ -228,7 +267,16 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     await seedCorpCapableCharacter();
     const user = userEvent.setup();
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
 
     const corpChip = await screen.findByRole('button', { name: 'Corp jobs' });
     await screen.findByText('Widget Alpha');
@@ -257,7 +305,16 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     await seedCorpCapableCharacter();
     const user = userEvent.setup();
 
-    const { container } = render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    const { container } = render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
 
     await screen.findByText('Widget Alpha');
     const personalBadge = container.querySelector('header time')?.getAttribute('dateTime');
@@ -276,7 +333,16 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     await seedCorpCapableCharacter();
     const user = userEvent.setup();
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
     await user.click(await screen.findByRole('button', { name: 'Corp jobs' }));
 
     expect(await screen.findByText('No active corp jobs')).toBeInTheDocument();
@@ -293,7 +359,16 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     await seedCorpCapableCharacter();
     const user = userEvent.setup();
 
-    render(<ActiveJobsPanel characterId={CHAR_ID} />);
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
     await user.click(await screen.findByRole('button', { name: 'Corp jobs' }));
 
     expect(await screen.findByText('No active jobs cached')).toBeInTheDocument();
@@ -328,7 +403,16 @@ describe('ActiveJobsPanel: the selection resets on a character switch (AC 4)', (
     // Mirrors /industry: the panel is always handed the active Character.
     function Harness() {
       const characterId = useActiveCharacter((state) => state.activeCharacterId);
-      return characterId === null ? null : <ActiveJobsPanel characterId={characterId} />;
+      return characterId === null ? null : (
+        <MemoryRouter>
+          <ActiveJobsPanel
+            characterId={characterId}
+            onAddToQuickbar={() => {}}
+            quickbarAvailable={true}
+            onShowInfo={() => {}}
+          />
+        </MemoryRouter>
+      );
     }
 
     render(<Harness />);

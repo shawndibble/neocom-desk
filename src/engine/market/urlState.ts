@@ -88,6 +88,11 @@ export function marketLinkParams(typeId: number, currentSearch: string): Record<
   return { type: String(typeId) };
 }
 
+/** `marketLinkParams`, serialised to the `/market?...` path a cross-link navigates to. */
+export function marketItemUrl(typeId: number, currentSearch: string): string {
+  return `/market?${new URLSearchParams(marketLinkParams(typeId, currentSearch)).toString()}`;
+}
+
 /**
  * The Market Browser's Location Mode precedence (CONTEXT.md round 7/9,
  * issue #4): a valid region param wins, then a valid hub param, then the

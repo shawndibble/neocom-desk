@@ -459,7 +459,9 @@ describe('Industry: results panel', () => {
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByText('20m')).toBeInTheDocument(); // formatDuration(1200s)
 
-    expect(screen.getByText('Price data unavailable')).toBeInTheDocument();
+    // findByText: the results panel now shows a distinct "fetching" state
+    // (#409) until the (mocked-to-fail) price fetch settles.
+    expect(await screen.findByText('Price data unavailable')).toBeInTheDocument();
     expect(screen.queryByText('Not enough price data for a build-vs-buy verdict.')).toBeNull();
   });
 });
@@ -728,5 +730,26 @@ describe('Industry: make-or-buy marker on materials', () => {
     expect(await screen.findByText('Price data unavailable')).toBeInTheDocument();
 
     expect(await markerFor('Mechanical Parts')).toBeNull();
+  });
+});
+
+describe('Industry: hide fully-owned material rows (#409)', () => {
+  it('hides a fully-owned material row when toggled, and shows it again when toggled off', async () => {
+    await db.buildPlans.add(
+      seedPlan({ materialSourcing: { 34: { ownedQuantity: 100 } } }) // Tritanium: fully owned (needs 100)
+    );
+    render(<App />);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
+
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
+
+    expect(screen.getByText('Tritanium')).toBeInTheDocument();
   });
 });

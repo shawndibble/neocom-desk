@@ -19,7 +19,10 @@ import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { usePriceBasis } from './priceBasis';
-import { useDetectedOwnedStock } from '@/features/industry/useDetectedOwnedStock';
+import {
+  useDetectedOwnedStock,
+  useOwnedStockSnapshot,
+} from '@/features/industry/useDetectedOwnedStock';
 import type { MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { computeLoyaltyOfferRows, type LoyaltyOfferRow } from './offerRows';
@@ -152,7 +155,8 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     };
   }, [offerTypeIds]);
 
-  const { stock } = useDetectedOwnedStock(materialTypeIds);
+  const ownedStockSnapshot = useOwnedStockSnapshot();
+  const { stock } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
 
   const materialSourcing = useMemo<MaterialSourcingMap | undefined>(() => {
     if (stock.size === 0) return undefined;

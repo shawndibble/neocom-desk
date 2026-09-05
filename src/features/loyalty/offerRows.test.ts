@@ -13,6 +13,7 @@ function makeCatalog(): BlueprintCatalog {
     blueprintTypeID: ASTERO_BP_ID,
     productTypeID: ASTERO_ID,
     productName: 'Astero',
+    productNameLower: 'astero',
     blueprint: {
       name: 'Astero Blueprint',
       time: 3600,

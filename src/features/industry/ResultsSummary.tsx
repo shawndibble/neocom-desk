@@ -1,9 +1,18 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, Disclosure, EmptyState, FilterChip, InfoTooltip } from '@/components/ui';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  DataTable,
+  Disclosure,
+  EmptyState,
+  FilterChip,
+  InfoTooltip,
+  Spinner,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
+import { marketItemUrl } from '@/engine/market/urlState';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent } from './format';
@@ -63,8 +72,17 @@ interface ResultsSummaryProps {
   result: BuildResult;
   /** False when adjusted prices / cost index couldn't be fetched live (no local cache — offline). */
   pricesReady: boolean;
+  /**
+   * True while the market snapshot's initial fetch for this plan is still in
+   * flight. Distinct from `!pricesReady`: without this, "just opened, nothing
+   * back yet" and "the live ESI call genuinely failed" read as the same
+   * state and the failure copy would flash on every fresh load.
+   */
+  pricesLoading: boolean;
   systemCostIndex: number | null;
   productName: string;
+  /** The product's typeID, for the unpriced-product warning's Market link; null when the blueprint has no product. */
+  productTypeID: number | null;
   /** Product's lowest hub sell price (per unit); null when unpriced at this hub. */
   productUnitPrice: number | null;
   /** Units produced by the job (per-run product quantity x runs); null when the blueprint has no product. */
@@ -83,13 +101,17 @@ interface ResultsSummaryProps {
 export function ResultsSummary({
   result,
   pricesReady,
+  pricesLoading,
   systemCostIndex,
   productName,
+  productTypeID,
   productUnitPrice,
   productQuantity,
   costIndexSystemName,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
   const [profitView, setProfitView] = useState<'net' | 'gross'>('net');
 
@@ -121,6 +143,14 @@ export function ResultsSummary({
     [t]
   );
 
+  if (pricesLoading) {
+    return (
+      <div className="flex justify-center py-6">
+        <Spinner size="sm" label={t('industry.pricesLoading')} />
+      </div>
+    );
+  }
+
   if (!pricesReady) {
     return (
       <EmptyState
@@ -143,7 +173,18 @@ export function ResultsSummary({
           {result.unpricedMaterials.length > 0 &&
             t('industry.unpricedMaterialsWarning', { count: result.unpricedMaterials.length })}
           {result.unpricedMaterials.length > 0 && result.buyCost === null && ' '}
-          {result.buyCost === null && t('industry.productUnpriced', { name: productName })}
+          {result.buyCost === null &&
+            (productTypeID !== null ? (
+              <button
+                type="button"
+                className="underline"
+                onClick={() => navigate(marketItemUrl(productTypeID, location.search))}
+              >
+                {t('industry.productUnpriced', { name: productName })}
+              </button>
+            ) : (
+              t('industry.productUnpriced', { name: productName })
+            ))}
         </p>
       )}
 
