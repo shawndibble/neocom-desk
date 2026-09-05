@@ -6,6 +6,14 @@ import { IconButton } from './IconButton';
 const glyph = <svg data-testid="glyph" />;
 
 describe('IconButton', () => {
+  it('shortens only the tooltip when `tooltip` is given, keeping the full accessible name', async () => {
+    render(<IconButton icon={glyph} label="Delete Rifter run" tooltip="Delete" />);
+    const button = screen.getByRole('button', { name: 'Delete Rifter run' });
+
+    fireEvent.pointerMove(button);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete');
+  });
+
   it('names the button after its label, so it is never announced as just "button"', () => {
     render(<IconButton icon={glyph} label="Collapse all" />);
     expect(screen.getByRole('button', { name: 'Collapse all' })).toBeInTheDocument();

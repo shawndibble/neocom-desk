@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterMarketTree, MARKET_TREE_MATCH_LIMIT } from './marketTree';
+import { filterMarketTree, addAncestors, MARKET_TREE_MATCH_LIMIT } from './marketTree';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
 // Ships (1)
@@ -21,6 +21,38 @@ const TYPES: MarketTypeEntry[] = [
   { typeId: 597, name: 'Punisher', marketGroupId: 2 },
   { typeId: 620, name: 'Rupture', marketGroupId: 3 },
 ];
+
+describe('addAncestors', () => {
+  const groupsById = new Map(GROUPS.map((g) => [g.id, g]));
+
+  it('adds a group and every ancestor up to the root', () => {
+    const into = new Set<number>();
+    addAncestors(2, groupsById, into);
+    expect(into).toEqual(new Set([2, 1]));
+  });
+
+  it('stops at a root with no parent', () => {
+    const into = new Set<number>();
+    addAncestors(4, groupsById, into);
+    expect(into).toEqual(new Set([4]));
+  });
+
+  it('is a no-op once the id is already in `into` — the cycle guard', () => {
+    const into = new Set([2]);
+    addAncestors(2, groupsById, into);
+    expect(into).toEqual(new Set([2]));
+  });
+
+  it('stops instead of looping forever on a cyclic parentId chain', () => {
+    const cyclic = new Map([
+      [10, { id: 10, name: 'A', parentId: 11, hasTypes: false }],
+      [11, { id: 11, name: 'B', parentId: 10, hasTypes: false }],
+    ]);
+    const into = new Set<number>();
+    addAncestors(10, cyclic, into);
+    expect(into).toEqual(new Set([10, 11]));
+  });
+});
 
 describe('filterMarketTree', () => {
   it('returns null (no filter) for a query under 3 characters', () => {

@@ -13,7 +13,6 @@ import {
   SkillBar,
   Spinner,
   StatChip,
-  Tooltip,
   IconButton,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -22,6 +21,7 @@ import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import { ImplantChip } from '@/features/skills/ImplantChip';
 import { SkillInspector } from '@/features/skills/SkillInspector';
+import { SkillRowContextMenu } from '@/features/skills/SkillRowContextMenu';
 import { buildSkillRequirements } from '@/features/skills/skillRequirements';
 import {
   loadSkillCatalog,
@@ -30,6 +30,7 @@ import {
   type SkillCatalog,
 } from '@/features/skills/skillMap';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
+import { progressToNextLevel } from '@/engine/sp';
 import {
   loadCharacterAttributes,
   loadCharacterImplants,
@@ -47,10 +48,22 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 
+/** A character has 5 implant slots (game mechanic, not a config value — see `whatIfImplants.ts`'s own "always all five keys"). */
+const IMPLANT_SLOTS = 5;
+
 interface ImplantDetail {
   typeId: number;
   name: string;
   description: string | null;
+  /**
+   * Whether this implant fills one of the 5 attribute-enhancer slots, vs. a
+   * skill hardwiring or other implant type (slots 6-10) — ESI's
+   * `/characters/{id}/implants` returns every fitted implant undifferentiated
+   * by slot, so "N of 5 slots empty" (#405) has to derive slot occupancy from
+   * whether the implant carries one of `dogma.ts`'s attribute-bonus
+   * attributes, the same signal `implantBonuses` already keys off of.
+   */
+  attributeSlot: boolean;
 }
 
 interface Snapshot {
@@ -97,6 +110,7 @@ async function loadSkillsSnapshot(
       typeId: id,
       name: info?.name ?? `#${id}`,
       description: info?.description ? stripEveMarkup(info.description) : null,
+      attributeSlot: Object.keys(extractAttributeBonuses(info?.dogma_attributes)).length > 0,
     };
   });
   const implantBonuses = sumAttributeBonuses(
@@ -134,6 +148,7 @@ export function Skills() {
   const completedSp = data?.completedSp ?? 0;
   const fetchedAt = data?.fetchedAt ?? null;
   const implantDetails = data?.implantDetails ?? [];
+  const attributeSlotsFilled = implantDetails.filter((i) => i.attributeSlot).length;
   const implantBonuses = data?.implantBonuses ?? {};
   const attributeBaseline = data?.attributeBaseline ?? null;
 
@@ -161,6 +176,7 @@ export function Skills() {
         level,
         sp,
         description: info?.description ? stripEveMarkup(info.description) : null,
+        rank: info?.rank ?? 1,
       });
       byGroup.set(groupName, list);
     };
@@ -304,17 +320,26 @@ export function Skills() {
                 {t('skills.implants')}
               </p>
               {implantDetails.length > 0 ? (
-                <ul className="mt-1 flex flex-wrap gap-2 text-xs">
-                  {implantDetails.map((implant) => (
-                    <li key={implant.typeId}>
-                      <ImplantChip
-                        typeId={implant.typeId}
-                        name={implant.name}
-                        description={implant.description}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <ul className="mt-1 flex flex-wrap gap-2 text-xs">
+                    {implantDetails.map((implant) => (
+                      <li key={implant.typeId}>
+                        <ImplantChip
+                          typeId={implant.typeId}
+                          name={implant.name}
+                          description={implant.description}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                  {attributeSlotsFilled < IMPLANT_SLOTS && (
+                    <p className="mt-1 text-xs text-text-dim">
+                      {t('skills.implantsSlotsEmpty', {
+                        count: IMPLANT_SLOTS - attributeSlotsFilled,
+                      })}
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="mt-1 text-xs text-text-dim">{t('skills.implantsNone')}</p>
               )}
@@ -332,7 +357,7 @@ export function Skills() {
           )}
 
           {groups.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-bg py-2">
               <SearchInput
                 value={groupSearch}
                 onChange={(e) => setGroupSearch(e.target.value)}
@@ -388,6 +413,10 @@ export function Skills() {
                       <ul className="divide-y divide-line">
                         {skillsToShow.map((skill) => {
                           const selected = selectedSkillTypeID === skill.skillTypeID;
+                          const progress =
+                            skill.sp === null
+                              ? null
+                              : progressToNextLevel(skill.rank, skill.level, skill.sp);
                           const row = (
                             <button
                               type="button"
@@ -402,7 +431,7 @@ export function Skills() {
                               }`}
                             >
                               <span className="flex-1 truncate">{skill.name}</span>
-                              <SkillBar level={skill.level} />
+                              <SkillBar level={skill.level} progress={progress} />
                               <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
                                 {skill.sp === null
                                   ? t('common.unknown')
@@ -412,13 +441,14 @@ export function Skills() {
                           );
                           return (
                             <li key={skill.skillTypeID}>
-                              {skill.description ? (
-                                <Tooltip content={skill.description} className="w-full">
-                                  {row}
-                                </Tooltip>
-                              ) : (
-                                row
-                              )}
+                              <SkillRowContextMenu
+                                activeCharacterId={activeCharacterId}
+                                skillTypeID={skill.skillTypeID}
+                                currentLevel={skill.level}
+                                tooltipContent={skill.description}
+                              >
+                                {row}
+                              </SkillRowContextMenu>
                             </li>
                           );
                         })}

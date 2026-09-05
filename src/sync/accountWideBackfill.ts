@@ -58,9 +58,13 @@
  */
 
 import { db } from '@/db';
-import type { StationPinRecord } from '@/db';
+import type { PlanetRichnessRecord, StationPinRecord } from '@/db';
 import type { SyncRecord } from './merge';
-import { readTombstones, stationPinTombstonesKey } from './localBookkeeping';
+import {
+  planetRichnessTombstonesKey,
+  readTombstones,
+  stationPinTombstonesKey,
+} from './localBookkeeping';
 
 /**
  * One account-wide collection, for `ACCOUNT_WIDE_COLLECTIONS` below.
@@ -150,8 +154,52 @@ const stationPins: AccountWideCollection<StationPinRecord> = {
 // every entry vacuously — a collection missing `updatedAt` would compile, and
 // its rows would then compare `undefined > undefined` and quietly make the
 // union order-dependent.
+/**
+ * A planet's resource ranking (issue #425). Account-wide with no per-Character
+ * variant at all — a planet's richness is the same fact for every Character —
+ * so unlike `stationPins` there is no `scope` to filter on: every row is
+ * shared by definition.
+ */
+const planetRichness: AccountWideCollection<PlanetRichnessRecord> = {
+  loadShared: async (exceptCharacterId) => {
+    const rows = await db.planetRichness.toArray();
+    return rows.filter((row) => row.characterId !== exceptCharacterId);
+  },
+  sharedKey: (row) => String(row.planetId),
+  deletedAtByKey: async () => {
+    const characters = await db.characters.toCollection().primaryKeys();
+    const latest = new Map<string, number>();
+    for (const characterId of characters) {
+      for (const tombstone of await readTombstones(
+        planetRichnessTombstonesKey(Number(characterId))
+      )) {
+        const planetId = tombstone.id.split(':')[1];
+        if (!planetId) continue;
+        const held = latest.get(planetId) ?? 0;
+        if (tombstone.deletedAt > held) latest.set(planetId, tombstone.deletedAt);
+      }
+    }
+    return latest;
+  },
+  cloneOnto: (row, characterId) => ({
+    ...row,
+    id: `${characterId}:${row.planetId}`,
+    characterId,
+    // Copied, not shared: two Characters' rows must not alias one array, or
+    // reordering one would silently reorder the other.
+    order: [...row.order],
+  }),
+  bulkPut: (rows) => db.planetRichness.bulkPut(rows),
+  existingIds: async (characterId) => {
+    const rows = await db.planetRichness.where('characterId').equals(characterId).toArray();
+    return new Set(rows.map((row) => row.id));
+  },
+  inWriteTransaction: (run) => db.transaction('rw', db.planetRichness, run),
+};
+
 const ACCOUNT_WIDE_COLLECTIONS: ((characterId: number) => Promise<boolean>)[] = [
   (characterId) => backfillCollection(stationPins, characterId),
+  (characterId) => backfillCollection(planetRichness, characterId),
 ];
 
 async function backfillCollection<T extends SyncRecord>(

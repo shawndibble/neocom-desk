@@ -30,11 +30,23 @@
  * `/universe/systems/{id}`, so unbuilt planets in a system the character is
  * already in do appear, which is where the useful comparison is anyway.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, NativeSelect, Panel, ReauthBanner, Spinner, StatChip } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
+import { formatIsk } from '@/lib/isk';
 import { loadPi } from '@/sde/loadSde';
+import { db } from '@/db';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { loadPlanPrices } from './planPrices';
+import { clearPlanetRichness, setPlanetRichness } from '@/sync';
+import { RichnessRanker } from './RichnessRanker';
+import {
+  assumedExtractionRate,
+  estimateUnbuiltPlanet,
+  rankedResources,
+  type AssumedRate,
+} from './richnessEstimate';
 import type { PiData, PiPinKind } from '@/sde/types';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetType } from '@/esi/endpoints';
 import { EXTRACTOR_HEADS_MAX, spareCapacity } from '@/engine/pi/pinBudget';
@@ -65,6 +77,10 @@ const HEADROOM_KINDS: readonly PiPinKind[] = [
  */
 const HEADROOM_EXTRACTOR_HEADS = EXTRACTOR_HEADS_MAX;
 
+/** Stable identities, so an unranked planet's card does not remount every render. */
+const EMPTY_ORDER: readonly number[] = [];
+const EMPTY_RICHNESS: ReadonlyMap<number, number[]> = new Map();
+
 interface SystemGroup {
   systemId: number;
   name: string | null;
@@ -82,6 +98,14 @@ interface Snapshot {
   needsReauth: boolean;
   schematicNames: Map<number, string>;
   typeNames: Map<number, string>;
+  /** This character's saved resource rankings, by planetId. Absent means unranked. */
+  richness: Map<number, number[]>;
+  /**
+   * Hub prices for every P0 the character's systems can yield, so an unbuilt
+   * planet's estimate can be valued. A type the hub does not quote is absent,
+   * never zero — `estimateUnbuiltPlanet` refuses rather than pricing at nothing.
+   */
+  p0Prices: Record<number, number>;
 }
 
 async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
@@ -143,6 +167,23 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     );
   });
 
+  // The character's own rows only. The ranking is account-wide and fanned out
+  // one row per Character (round 7), so reading this Character's rows reads
+  // the account's ranking.
+  const richness = new Map<number, number[]>(
+    (await db.planetRichness.where('characterId').equals(characterId).toArray()).map((row) => [
+      row.planetId,
+      row.order,
+    ])
+  );
+
+  const p0TypeIds = [...new Set(pi.raw.map((resource) => resource.typeID))];
+  // Failure here is not fatal: an unpriced estimate refuses with
+  // `needs-price` rather than taking the whole panel down with it.
+  const p0Prices = await loadPlanPrices(DEFAULT_TRADE_HUB, p0TypeIds)
+    .then((result) => result.prices)
+    .catch(() => ({}) as Record<number, number>);
+
   const flatDetails = new Map<number, CharacterPlanetDetail>();
   for (const [planetId, result] of details) {
     const data = result.cached?.data;
@@ -187,6 +228,8 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     needsReauth,
     schematicNames,
     typeNames,
+    richness,
+    p0Prices,
   };
 }
 
@@ -418,8 +461,29 @@ function BuiltCard({
   );
 }
 
-function UnbuiltCard({ advice }: { advice: Extract<PlanetAdvice, { kind: 'unbuilt' }> }) {
+function UnbuiltCard({
+  advice,
+  order,
+  rate,
+  prices,
+  onOrderChange,
+}: {
+  advice: Extract<PlanetAdvice, { kind: 'unbuilt' }>;
+  order: readonly number[];
+  rate: AssumedRate;
+  prices: Readonly<Record<number, number>>;
+  onOrderChange: (planetId: number, order: number[]) => void;
+}) {
   const { t } = useTranslation();
+  const localResources = advice.localResources.map((resource) => resource.typeID);
+  const nameByType = new Map(advice.localResources.map((r) => [r.typeID, r.name]));
+
+  const ranked = rankedResources(localResources, order);
+  const rankedIds = ranked.filter((entry) => entry.rank !== null).map((entry) => entry.typeId);
+  const unrankedIds = ranked.filter((entry) => entry.rank === null).map((entry) => entry.typeId);
+
+  const estimate = estimateUnbuiltPlanet({ localResources, order, rate, prices });
+
   return (
     <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType} dashed>
       <>
@@ -428,7 +492,46 @@ function UnbuiltCard({ advice }: { advice: Extract<PlanetAdvice, { kind: 'unbuil
             {advice.localResources.map((resource) => resource.name).join(', ')}
           </span>
         </CardLine>
-        <p className="mt-auto text-[0.6875rem] text-text-dim">{t('piAdvisor.needsScanHint')}</p>
+
+        <RichnessRanker
+          ranked={rankedIds}
+          unranked={unrankedIds}
+          resourceName={(typeId) => nameByType.get(typeId) ?? String(typeId)}
+          onChange={(next) => onOrderChange(advice.planetId, next)}
+        />
+
+        {/*
+          Every branch here either shows a figure explicitly labelled an
+          estimate, or says which input is missing. There is deliberately no
+          fourth branch that prints a number with a caveat beside it: a caveat
+          is easy to miss, an absent number is not.
+        */}
+        <div className="mt-auto">
+          {estimate.kind === 'estimate' ? (
+            <CardLine label={t('piAdvisor.estimatedValueLabel')}>
+              <span className="text-text-dim">
+                <span className="mr-1 rounded-xs border border-warning/60 px-1 text-[0.625rem] tracking-widest text-warning uppercase">
+                  {t('piAdvisor.estimateBadge')}
+                </span>
+                {t('piAdvisor.estimatedIskPerHour', {
+                  isk: formatIsk(estimate.iskPerHour),
+                  name: nameByType.get(estimate.typeId) ?? String(estimate.typeId),
+                })}
+              </span>
+            </CardLine>
+          ) : null}
+          <p className="text-[0.6875rem] text-text-dim">
+            {estimate.kind === 'estimate'
+              ? t('piAdvisor.estimateBasis', { count: estimate.rate.sampleSize })
+              : estimate.kind === 'needs-ranking'
+                ? t('piAdvisor.needsScanHint')
+                : estimate.kind === 'needs-measured-extraction'
+                  ? t('piAdvisor.needsMeasuredExtraction')
+                  : t('piAdvisor.needsPrice', {
+                      name: nameByType.get(estimate.typeId) ?? String(estimate.typeId),
+                    })}
+          </p>
+        </div>
       </>
     </PlanetCard>
   );
@@ -499,6 +602,33 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   const systems = snapshot?.systems ?? [];
   const activeSystem = systems.find((system) => system.systemId === systemId) ?? systems[0] ?? null;
 
+  // Edits made since the snapshot loaded, layered over it rather than copied
+  // into their own state. Copying would mean a `setState` in an effect keyed
+  // on the snapshot (which `PlanPanel` avoids for the same reason) and would
+  // silently drop an edit made while a reload was in flight. Layering keeps
+  // the reorder repainting immediately — AC: "reordering updates the estimate
+  // without a page reload" — with no second source of truth.
+  const [edits, setEdits] = useState<ReadonlyMap<number, number[]>>(EMPTY_RICHNESS);
+  const richness = useMemo(() => {
+    const merged = new Map(snapshot?.richness ?? EMPTY_RICHNESS);
+    for (const [planetId, order] of edits) {
+      if (order.length === 0) merged.delete(planetId);
+      else merged.set(planetId, order);
+    }
+    return merged;
+  }, [snapshot, edits]);
+
+  const handleOrderChange = useCallback((planetId: number, order: number[]) => {
+    // An empty order is kept as an explicit empty entry, not deleted: it has
+    // to out-rank whatever the snapshot still holds, or clearing a ranking
+    // would immediately fall back to the stored one.
+    setEdits((current) => new Map(current).set(planetId, order));
+    // Fire-and-forget, like every other Editable Data write here: the layer
+    // above is what the card renders, and a failed write must not take the
+    // panel down.
+    void (order.length === 0 ? clearPlanetRichness(planetId) : setPlanetRichness(planetId, order));
+  }, []);
+
   const advice = useMemo(() => {
     if (!snapshot || !activeSystem) return [];
     return systemAdvice(
@@ -510,6 +640,19 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
       snapshot.pi
     );
   }, [snapshot, activeSystem]);
+
+  /**
+   * The rate every unbuilt estimate is projected at: the mean of what this
+   * character's own extractors are measurably sustaining, across every system
+   * — not this system alone, since a bigger sample is a better assumption and
+   * an extractor's rate is a property of its program, not its neighbourhood.
+   */
+  const assumedRate = useMemo(() => {
+    const measured = advice.flatMap((entry) =>
+      entry.kind === 'built' ? entry.colony.extractedPerHour : []
+    );
+    return assumedExtractionRate(measured);
+  }, [advice]);
 
   if (failed) {
     return <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />;
@@ -608,7 +751,14 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 typeNames={snapshot.typeNames}
               />
             ) : entry.kind === 'unbuilt' ? (
-              <UnbuiltCard key={entry.planetId} advice={entry} />
+              <UnbuiltCard
+                key={entry.planetId}
+                advice={entry}
+                order={richness.get(entry.planetId) ?? EMPTY_ORDER}
+                rate={assumedRate}
+                prices={snapshot.p0Prices}
+                onOrderChange={handleOrderChange}
+              />
             ) : entry.kind === 'unknown-type' ? (
               <UnknownTypeCard key={entry.planetId} advice={entry} />
             ) : (

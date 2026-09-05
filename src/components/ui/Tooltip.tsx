@@ -24,7 +24,7 @@ interface TooltipProps {
 }
 
 /**
- * Accessible tooltip built on Radix's `Tooltip` primitive (docs/adr/0004):
+ * Accessible tooltip built on Radix's `Tooltip` primitive (docs/adr/0008):
  * placement is collision-aware — Radix flips side and shifts along its axis
  * so the bubble never renders partially off-screen, and it portals to
  * `document.body` so a clipping scroll container can't cut it off either.
@@ -93,7 +93,7 @@ export function Tooltip({ content, children, className = '' }: TooltipProps) {
             sideOffset={4}
             collisionPadding={8}
             onPointerDownOutside={dismissTouch}
-            className="pointer-events-none z-50 w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
+            className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
           >
             {content}
           </TooltipPrimitive.Content>

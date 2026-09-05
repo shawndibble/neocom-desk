@@ -12,6 +12,22 @@ export const MARKET_TREE_MIN_QUERY_LENGTH = 3;
 /** Cap on matched items shown, so a broad query doesn't dump the whole catalogue into the tree. */
 export const MARKET_TREE_MATCH_LIMIT = 50;
 
+/**
+ * Walks `id`'s ancestor chain to the root, adding each level to `into`. Stops
+ * at a level already present — a shared-ancestor short-circuit that doubles as a cycle guard.
+ */
+export function addAncestors(
+  id: number,
+  groupsById: ReadonlyMap<number, MarketGroupNode>,
+  into: Set<number>
+): void {
+  let cur: number | null = id;
+  while (cur !== null && !into.has(cur)) {
+    into.add(cur);
+    cur = groupsById.get(cur)?.parentId ?? null;
+  }
+}
+
 export interface MarketTreeFilterResult {
   /** Every group id that must render: matched leaf groups plus their ancestors. */
   visibleGroupIds: ReadonlySet<number>;
@@ -52,13 +68,7 @@ export function filterMarketTree(
       matchedTypesByGroup.set(type.marketGroupId, list);
     }
     list.push(type);
-
-    // Walk the ancestor chain to the root, marking every level visible.
-    let groupId: number | null = type.marketGroupId;
-    while (groupId !== null && !visibleGroupIds.has(groupId)) {
-      visibleGroupIds.add(groupId);
-      groupId = groupsById.get(groupId)?.parentId ?? null;
-    }
+    addAncestors(type.marketGroupId, groupsById, visibleGroupIds);
   }
 
   return { visibleGroupIds, matchedTypesByGroup, totalMatches, capped };

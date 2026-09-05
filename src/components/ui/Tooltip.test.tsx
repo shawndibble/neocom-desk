@@ -30,6 +30,21 @@ describe('Tooltip', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
   });
 
+  it('sizes the bubble to its content, capped — short text gets no dead space', async () => {
+    render(
+      <Tooltip content="Delete">
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    fireEvent.pointerMove(screen.getByRole('button', { name: 'Trigger' }));
+
+    // Only a cap, never a fixed width: Radix's popper wrapper shrink-wraps
+    // the bubble, so `w-56` was what padded "Delete" out to 14rem.
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip.className).toContain('max-w-56');
+    expect(tooltip.className).not.toMatch(/(^|\s)w-\d/);
+  });
+
   it('merges a caller-supplied className onto the trigger element', () => {
     render(
       <Tooltip content="One-line explanation." className="w-full">

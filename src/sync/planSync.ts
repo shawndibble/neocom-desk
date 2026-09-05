@@ -33,6 +33,7 @@ import {
   type QuickbarRecord,
   type SkillPlanRecord,
   type StationPinRecord,
+  type PlanetRichnessRecord,
 } from '@/db';
 import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
@@ -52,6 +53,7 @@ import {
   planTombstonesKey,
   quickbarTombstonesKey,
   stationPinTombstonesKey,
+  planetRichnessTombstonesKey,
   readTombstones,
 } from './localBookkeeping';
 import { setStatus } from './status';
@@ -67,6 +69,7 @@ import {
   type RemotePlanDoc,
   type RemoteQuickbarDoc,
   type RemoteStationPinDoc,
+  type RemotePlanetRichnessDoc,
   type RemoteSyncedSetting,
   type SyncedSettingTombstone,
   type SyncedSettingValue,
@@ -224,6 +227,50 @@ export async function clearStationPin(locationId: number): Promise<void> {
   );
 }
 
+function planetRichnessId(characterId: number, planetId: number): string {
+  return `${characterId}:${planetId}`;
+}
+
+/**
+ * Record a planet's best-to-worst resource ranking for the whole account.
+ *
+ * Fans out exactly like `setAccountStationPin`: one row per Character known on
+ * this device, each synced under its own ownerHash, because there is no shared
+ * account identity to key a single record off. Unlike a station pin there is
+ * no per-Character variant to preserve — a planet's richness is the same fact
+ * for every Character — so this always writes every row.
+ */
+export async function setPlanetRichness(planetId: number, order: number[]): Promise<void> {
+  const characters = await db.characters.toArray();
+  const now = Date.now();
+  await db.planetRichness.bulkPut(
+    characters.map((c) => ({
+      id: planetRichnessId(c.characterId, planetId),
+      characterId: c.characterId,
+      planetId,
+      order: [...order],
+      updatedAt: now,
+    }))
+  );
+  for (const c of characters) scheduleSync(c.characterId);
+}
+
+/**
+ * Forget a planet's ranking, tombstoning it under every Character it was
+ * written for so the removal propagates rather than resurrecting on the next
+ * sync — the same reason `clearStationPin` exists rather than a bare delete.
+ */
+export async function clearPlanetRichness(planetId: number): Promise<void> {
+  const rows = await db.planetRichness.where('planetId').equals(planetId).toArray();
+  await Promise.all(
+    rows.map((row) =>
+      recordDeletion(row.characterId, row.id, planetRichnessTombstonesKey(row.characterId), () =>
+        db.planetRichness.delete(row.id)
+      )
+    )
+  );
+}
+
 /** Write a synced setting ('sync.'-prefixed key) and stamp it for LWW merging. */
 export async function setSyncedSetting(key: string, value: unknown): Promise<void> {
   if (!isSyncedSettingKey(key)) {
@@ -340,10 +387,12 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     await db.buildPlans.where('characterId').equals(character.characterId).delete();
     await db.quickbars.where('characterId').equals(character.characterId).delete();
     await db.stationPins.where('characterId').equals(character.characterId).delete();
+    await db.planetRichness.where('characterId').equals(character.characterId).delete();
     await writeTombstones(planTombstonesKey(character.characterId), []);
     await writeTombstones(buildPlanTombstonesKey(character.characterId), []);
     await writeTombstones(quickbarTombstonesKey(character.characterId), []);
     await writeTombstones(stationPinTombstonesKey(character.characterId), []);
+    await writeTombstones(planetRichnessTombstonesKey(character.characterId), []);
     // Cached wallet/mail/assets belong to the previous owner just as much as
     // the plans do. `auth/session` purges on the same signal at login; this
     // covers a transfer noticed between logins. Degrades rather than throws
@@ -567,6 +616,30 @@ const stationPinSpec: CollectionSpec<StationPinRecord, RemoteStationPinDoc> = {
   bulkDeleteLocal: (ids) => db.stationPins.bulkDelete(ids),
 };
 
+const planetRichnessSpec: CollectionSpec<PlanetRichnessRecord, RemotePlanetRichnessDoc> = {
+  name: 'planetRichness',
+  tombstoneKey: planetRichnessTombstonesKey,
+  loadLocal: (characterId) => db.planetRichness.where('characterId').equals(characterId).toArray(),
+  toRemoteDoc: (row, ownerHash) => ({
+    id: row.id,
+    characterId: row.characterId,
+    planetId: row.planetId,
+    order: row.order,
+    updatedAt: row.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    planetId: r.planetId,
+    order: r.order,
+    updatedAt: r.updatedAt,
+  }),
+  bulkPutLocal: (records) => db.planetRichness.bulkPut(records),
+  bulkDeleteLocal: (ids) => db.planetRichness.bulkDelete(ids),
+};
+
 // ---------------------------------------------------------------------------
 // Notification Feed sync (issue #362)
 //
@@ -673,6 +746,7 @@ async function syncCharacter(characterId: number): Promise<void> {
   await syncEditableCollection(buildPlanSpec, ctx);
   await syncEditableCollection(quickbarSpec, ctx);
   await syncEditableCollection(stationPinSpec, ctx);
+  await syncEditableCollection(planetRichnessSpec, ctx);
   await syncFeed(ctx);
 
   // ---- Synced settings ----

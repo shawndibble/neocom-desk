@@ -48,6 +48,7 @@ export async function removeCharacter(
   await db.buildPlans.where('characterId').equals(characterId).delete();
   await db.quickbars.where('characterId').equals(characterId).delete();
   await db.stationPins.where('characterId').equals(characterId).delete();
+  await db.planetRichness.where('characterId').equals(characterId).delete();
   // Orphaned feed rows are invisible in the UI (both the Overview list and the
   // other-character counts skip ids with no Character) but `refreshAppBadge`
   // counts the whole table — leaving an app-icon count nothing can dismiss.

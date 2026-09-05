@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { spForLevel, spBetween, remainingSpForLevel, trainingRate, timeToTrain } from '@/engine/sp';
+import {
+  spForLevel,
+  spBetween,
+  remainingSpForLevel,
+  progressToNextLevel,
+  trainingRate,
+  timeToTrain,
+} from '@/engine/sp';
 
 // Canonical cumulative SP totals for rank 1 (EVE University wiki, in-game values)
 describe('spForLevel', () => {
@@ -106,6 +113,41 @@ describe('remainingSpForLevel', () => {
     expect(() => remainingSpForLevel(1, 0, 0)).toThrow(RangeError);
     expect(() => remainingSpForLevel(1, 6, 0)).toThrow(RangeError);
     expect(() => remainingSpForLevel(0, 3, 0)).toThrow(RangeError);
+  });
+});
+
+describe('progressToNextLevel', () => {
+  it('is null at level 5 — there is no next level to progress toward', () => {
+    expect(progressToNextLevel(1, 5, spForLevel(1, 5))).toBeNull();
+    expect(progressToNextLevel(6, 5, 10_000_000)).toBeNull();
+  });
+
+  it('is zero at the level boundary, before any SP is banked into the next level', () => {
+    expect(progressToNextLevel(1, 1, spForLevel(1, 1))).toBe(0);
+    expect(progressToNextLevel(1, 0, 0)).toBe(0);
+  });
+
+  it('is the fraction of the next level already banked', () => {
+    // Level 1 -> 2 for rank 1: 250 -> 1415, a 1165 SP span. Halfway banked
+    // into it is 250 + 582.5 = 832.5 total SP.
+    expect(progressToNextLevel(1, 1, 250 + 1165 / 2)).toBe(0.5);
+    expect(progressToNextLevel(6, 3, spForLevel(6, 3) + spBetween(6, 3, 4) / 4)).toBe(0.25);
+  });
+
+  it('clamps to 1 once the next level is fully paid for, never past it', () => {
+    expect(progressToNextLevel(1, 1, spForLevel(1, 2))).toBe(1);
+    expect(progressToNextLevel(1, 1, 10_000_000)).toBe(1);
+  });
+
+  it('clamps to 0 for SP below the level in progress, rather than going negative', () => {
+    expect(progressToNextLevel(1, 2, 0)).toBe(0);
+    expect(progressToNextLevel(1, 2, -500)).toBe(0);
+  });
+
+  it('rejects invalid level or rank, like the rest of this module', () => {
+    expect(() => progressToNextLevel(1, -1, 0)).toThrow(RangeError);
+    expect(() => progressToNextLevel(1, 6, 0)).toThrow(RangeError);
+    expect(() => progressToNextLevel(0, 3, 0)).toThrow(RangeError);
   });
 });
 

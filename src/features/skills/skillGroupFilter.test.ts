@@ -6,13 +6,13 @@ const GROUPS: SkillGroup[] = [
   {
     groupName: 'Gunnery',
     skills: [
-      { skillTypeID: 1, name: 'Small Hybrid Turret', level: 5, sp: 256000 },
-      { skillTypeID: 2, name: 'Gunnery', level: 4, sp: 45000 },
+      { skillTypeID: 1, name: 'Small Hybrid Turret', level: 5, sp: 256000, rank: 1 },
+      { skillTypeID: 2, name: 'Gunnery', level: 4, sp: 45000, rank: 1 },
     ],
   },
   {
     groupName: 'Spaceship Command',
-    skills: [{ skillTypeID: 3, name: 'Frigate', level: 3, sp: 8000 }],
+    skills: [{ skillTypeID: 3, name: 'Frigate', level: 3, sp: 8000, rank: 1 }],
   },
 ];
 

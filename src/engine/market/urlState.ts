@@ -10,6 +10,8 @@ export interface ParsedMarketParams {
   typeId: number | null;
   hubId: string | null;
   regionId: number | null;
+  /** A Market Group to land expanded-open on — independent of typeId/location. */
+  groupId: number | null;
 }
 
 export type MarketLocationParam =
@@ -30,6 +32,7 @@ export function parseMarketParams(get: (key: string) => string | null): ParsedMa
     typeId: parsePositiveInt(get('type')),
     hubId: nonEmpty(get('hub')),
     regionId: parsePositiveInt(get('region')),
+    groupId: parsePositiveInt(get('group')),
   };
 }
 
@@ -42,6 +45,14 @@ export function buildMarketParams(
   if (location.mode === 'hub') params.hub = location.hubId;
   else params.region = String(location.regionId);
   return params;
+}
+
+/**
+ * A bare `?group=` cross-link: no typeId, no location — the caller has
+ * neither, and Market Browser's own Location Mode default already covers it.
+ */
+export function buildMarketGroupParams(groupId: number): Record<string, string> {
+  return { group: String(groupId) };
 }
 
 /**
@@ -59,6 +70,27 @@ export function resolveAgainstCatalogue<T>(
   if (id === null) return false;
   if (catalogue === null) return true;
   return catalogue.some((item) => matches(item, id));
+}
+
+/**
+ * Query params for a link into the Market Browser preselecting `typeId`,
+ * preserving whatever region/hub the current page is already scoped to
+ * (region wins, matching `resolveMarketLocation`'s own precedence) rather
+ * than resetting to the device's Location Mode default. A caller arriving
+ * with neither (e.g. Skills' implant chips, #405) gets just the typeId, same
+ * as opening `/market?type=…` fresh.
+ */
+export function marketLinkParams(typeId: number, currentSearch: string): Record<string, string> {
+  const parsed = parseMarketParams((key) => new URLSearchParams(currentSearch).get(key));
+  if (parsed.regionId !== null)
+    return buildMarketParams(typeId, { mode: 'region', regionId: parsed.regionId });
+  if (parsed.hubId !== null) return buildMarketParams(typeId, { mode: 'hub', hubId: parsed.hubId });
+  return { type: String(typeId) };
+}
+
+/** `marketLinkParams`, serialised to the `/market?...` path a cross-link navigates to. */
+export function marketItemUrl(typeId: number, currentSearch: string): string {
+  return `/market?${new URLSearchParams(marketLinkParams(typeId, currentSearch)).toString()}`;
 }
 
 /**

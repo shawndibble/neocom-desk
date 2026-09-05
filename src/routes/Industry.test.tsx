@@ -222,6 +222,11 @@ describe('Industry: Build Plan CRUD', () => {
     expect(await screen.findByRole('button', { name: 'Rifter run' })).toBeInTheDocument();
 
     const row = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
+    // The row action names the plan for a screen reader, but the bubble a
+    // pointer user sees is the bare verb — they can already see the row.
+    fireEvent.pointerMove(within(row).getByRole('button', { name: 'Delete Rifter run' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Delete$/);
+
     await user.click(within(row).getByRole('button', { name: 'Duplicate Rifter run' }));
     expect(await screen.findByRole('button', { name: 'Rifter run (copy)' })).toBeInTheDocument();
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
@@ -314,9 +319,9 @@ describe('Industry: owned-blueprint prefill', () => {
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 
     await screen.findByRole('button', { name: 'Rifter' });
-    expect(screen.getByLabelText('ME')).toHaveValue(8);
-    expect(screen.getByLabelText('TE')).toHaveValue(16);
-    expect(screen.getByText('Owned, ME8/TE16')).toBeInTheDocument();
+    expect(screen.getByLabelText('ME %')).toHaveValue(8);
+    expect(screen.getByLabelText('TE %')).toHaveValue(16);
+    expect(screen.getByText('Owned, ME 8% / TE 16%')).toBeInTheDocument();
 
     const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).first();
     expect(stored?.me).toBe(8);
@@ -345,9 +350,9 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
-    // Labels stay exact ("ME"/"TE") — the tooltip trigger lives outside the <label>.
-    expect(screen.getByLabelText('ME')).toBeInTheDocument();
-    expect(screen.getByLabelText('TE')).toBeInTheDocument();
+    // Labels stay exact ("ME %"/"TE %") — the tooltip trigger lives outside the <label>.
+    expect(screen.getByLabelText('ME %')).toBeInTheDocument();
+    expect(screen.getByLabelText('TE %')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About ME' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About TE' })).toBeInTheDocument();
 
@@ -369,8 +374,8 @@ describe('Industry: build plan settings grouping (#120)', () => {
 
     // All the original fields still render, just regrouped.
     expect(screen.getByLabelText('Runs')).toBeInTheDocument();
-    expect(screen.getByLabelText('ME')).toBeInTheDocument();
-    expect(screen.getByLabelText('TE')).toBeInTheDocument();
+    expect(screen.getByLabelText('ME %')).toBeInTheDocument();
+    expect(screen.getByLabelText('TE %')).toBeInTheDocument();
     expect(screen.getByLabelText('Facility')).toBeInTheDocument();
     expect(screen.getByLabelText('Rig')).toBeInTheDocument();
     expect(screen.getByLabelText('Security')).toBeInTheDocument();
@@ -454,7 +459,9 @@ describe('Industry: results panel', () => {
     expect(screen.getByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByText('20m')).toBeInTheDocument(); // formatDuration(1200s)
 
-    expect(screen.getByText('Price data unavailable')).toBeInTheDocument();
+    // findByText: the results panel now shows a distinct "fetching" state
+    // (#409) until the (mocked-to-fail) price fetch settles.
+    expect(await screen.findByText('Price data unavailable')).toBeInTheDocument();
     expect(screen.queryByText('Not enough price data for a build-vs-buy verdict.')).toBeNull();
   });
 });
@@ -672,7 +679,7 @@ describe('Industry: make-or-buy marker on materials', () => {
     // the market snapshot behind it.
     await waitFor(async () =>
       expect(await markerFor('Mechanical Parts')).toHaveAccessibleName(
-        'Cheaper to build: 42.96 a unit to manufacture at ME0, against 50.00 to buy. ' +
+        'Cheaper to build: 42.96 a unit to manufacture at ME 0%, against 50.00 to buy. ' +
           'Worth 70 across the 10 units still to buy.'
       )
     );
@@ -698,7 +705,7 @@ describe('Industry: make-or-buy marker on materials', () => {
 
     // ME10 takes the same 2 runs down to 36 Tritanium: 389.6 over 10 units.
     await waitFor(async () =>
-      expect(await markerFor('Mechanical Parts')).toHaveAccessibleName(/38\.96 a unit .* at ME10/)
+      expect(await markerFor('Mechanical Parts')).toHaveAccessibleName(/38\.96 a unit .* at ME 10%/)
     );
   });
 
@@ -723,5 +730,26 @@ describe('Industry: make-or-buy marker on materials', () => {
     expect(await screen.findByText('Price data unavailable')).toBeInTheDocument();
 
     expect(await markerFor('Mechanical Parts')).toBeNull();
+  });
+});
+
+describe('Industry: hide fully-owned material rows (#409)', () => {
+  it('hides a fully-owned material row when toggled, and shows it again when toggled off', async () => {
+    await db.buildPlans.add(
+      seedPlan({ materialSourcing: { 34: { ownedQuantity: 100 } } }) // Tritanium: fully owned (needs 100)
+    );
+    render(<App />);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
+
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
+
+    expect(screen.getByText('Tritanium')).toBeInTheDocument();
   });
 });

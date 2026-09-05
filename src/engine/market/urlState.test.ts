@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   parseMarketParams,
   buildMarketParams,
+  buildMarketGroupParams,
   resolveAgainstCatalogue,
   resolveMarketLocation,
+  marketLinkParams,
+  marketItemUrl,
   type MarketLocationParam,
 } from './urlState';
 
@@ -17,11 +20,17 @@ describe('parseMarketParams', () => {
       typeId: 587,
       hubId: 'jita',
       regionId: 10000002,
+      groupId: null,
     });
   });
 
   it('returns nulls when params are absent', () => {
-    expect(parseMarketParams(paramsOf({}))).toEqual({ typeId: null, hubId: null, regionId: null });
+    expect(parseMarketParams(paramsOf({}))).toEqual({
+      typeId: null,
+      hubId: null,
+      regionId: null,
+      groupId: null,
+    });
   });
 
   it('rejects a non-numeric type or region as malformed', () => {
@@ -29,6 +38,7 @@ describe('parseMarketParams', () => {
       typeId: null,
       hubId: null,
       regionId: null,
+      groupId: null,
     });
   });
 
@@ -39,6 +49,21 @@ describe('parseMarketParams', () => {
 
   it('treats an empty hub param as absent', () => {
     expect(parseMarketParams(paramsOf({ hub: '' })).hubId).toBeNull();
+  });
+
+  it('parses a valid group id', () => {
+    expect(parseMarketParams(paramsOf({ group: '618' })).groupId).toBe(618);
+  });
+
+  it('rejects a non-numeric or non-positive group id', () => {
+    expect(parseMarketParams(paramsOf({ group: 'abc' })).groupId).toBeNull();
+    expect(parseMarketParams(paramsOf({ group: '0' })).groupId).toBeNull();
+  });
+});
+
+describe('buildMarketGroupParams', () => {
+  it('builds a bare group param', () => {
+    expect(buildMarketGroupParams(618)).toEqual({ group: '618' });
   });
 });
 
@@ -126,5 +151,43 @@ describe('resolveMarketLocation', () => {
         fallback
       )
     ).toBe(fallback);
+  });
+});
+
+describe('marketLinkParams', () => {
+  // Shared by ItemContextMenu's "View in Market" and ImplantChip's Market
+  // link (#405): preserve whatever region/hub the current page is already
+  // scoped to, so a link from inside /market carries that scope over rather
+  // than resetting to the device's Location Mode default.
+  it('preserves an existing region param', () => {
+    expect(marketLinkParams(587, '?region=10000002')).toEqual({
+      type: '587',
+      region: '10000002',
+    });
+  });
+
+  it('preserves an existing hub param when there is no region', () => {
+    expect(marketLinkParams(587, '?hub=jita')).toEqual({ type: '587', hub: 'jita' });
+  });
+
+  it('prefers region over hub when both are present', () => {
+    expect(marketLinkParams(587, '?region=10000002&hub=jita')).toEqual({
+      type: '587',
+      region: '10000002',
+    });
+  });
+
+  it('falls back to just the typeId when arriving with neither param (e.g. from Skills)', () => {
+    expect(marketLinkParams(587, '')).toEqual({ type: '587' });
+  });
+});
+
+describe('marketItemUrl', () => {
+  it('serialises marketLinkParams to a /market path', () => {
+    expect(marketItemUrl(587, '?region=10000002')).toBe('/market?type=587&region=10000002');
+  });
+
+  it('falls back to just the typeId when arriving with neither param', () => {
+    expect(marketItemUrl(587, '')).toBe('/market?type=587');
   });
 });

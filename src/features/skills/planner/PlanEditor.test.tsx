@@ -2,6 +2,7 @@ import { useState, type ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { SkillType } from '@/sde/types';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
@@ -138,8 +139,19 @@ function renderEditor(
     );
   }
 
-  render(<Harness />);
+  render(
+    <MemoryRouter>
+      <Harness />
+      <LocationProbe />
+    </MemoryRouter>
+  );
   return { onUpdate };
+}
+
+/** Exposes wherever `navigate()` lands, for the Market cross-link tests below. */
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location-probe">{location.pathname + location.search}</div>;
 }
 
 /** The five per-slot What-If inputs, in INT/MEM/PER/WIL/CHA order. */
@@ -822,18 +834,20 @@ describe('PlanEditor prereq promotion', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(
-      <PlanEditor
-        characterId={1}
-        plan={{ ...PLAN, entries: [{ skillTypeID: 40, targetLevel: 3 }] }}
-        catalog={PREREQ_CATALOG}
-        trainedSkills={NO_TRAINED}
-        attributes={ATTRIBUTES}
-        implants={IMPLANTS}
-        attributesResult={null}
-        remapInfo={null}
-        listPane={<div data-testid="plan-list-pane" />}
-        onUpdate={onUpdate}
-      />
+      <MemoryRouter>
+        <PlanEditor
+          characterId={1}
+          plan={{ ...PLAN, entries: [{ skillTypeID: 40, targetLevel: 3 }] }}
+          catalog={PREREQ_CATALOG}
+          trainedSkills={NO_TRAINED}
+          attributes={ATTRIBUTES}
+          implants={IMPLANTS}
+          attributesResult={null}
+          remapInfo={null}
+          listPane={<div data-testid="plan-list-pane" />}
+          onUpdate={onUpdate}
+        />
+      </MemoryRouter>
     );
 
     expect(screen.getAllByText('Prereq')).toHaveLength(2);
@@ -957,6 +971,30 @@ describe('PlanEditor what-if implants', () => {
     await user.selectOptions(screen.getByLabelText('What-if implants'), 'current');
 
     expect(bonusInputValues()).toEqual(['0', '3', '4', '0', '0']);
+  });
+
+  it('links to Market, scoped to the attribute enhancer implants category (issue #407)', async () => {
+    const user = userEvent.setup();
+    renderWithImplants();
+    await openTools(user);
+
+    await user.click(
+      screen.getByRole('button', { name: 'View attribute enhancer implants in Market' })
+    );
+
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/market?group=532');
+  });
+});
+
+describe('PlanEditor booster market link (issue #407)', () => {
+  it('links to Market, scoped to the booster category', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'View boosters in Market' }));
+
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/market?group=977');
   });
 });
 
