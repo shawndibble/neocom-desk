@@ -98,6 +98,26 @@ export function formatWeekLabel(weekAnchor: Date): string {
   return `${startLabel} – ${dayFormatter.format(end)}, ${yearFormatter.format(end)}`;
 }
 
+const JUMP_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Parses a native `<input type="date">` value ("YYYY-MM-DD") as local
+ * midnight, matching every other date in this module — never as a UTC
+ * instant, which would shift the day in a timezone behind UTC. `null` for
+ * anything the input contract doesn't actually produce (empty, malformed).
+ */
+export function parseJumpDate(raw: string): Date | null {
+  const match = JUMP_DATE_PATTERN.exec(raw);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  // Rejects an out-of-range month/day the regex's fixed digit-width let
+  // through (e.g. "2026-13-40"): Date rolls those into the following
+  // month/year instead of throwing, so a round-trip check catches it.
+  if (date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) return null;
+  return date;
+}
+
 /** Buckets items by local day, each bucket sorted chronologically. */
 export function groupByDayKey<T>(
   items: readonly T[],

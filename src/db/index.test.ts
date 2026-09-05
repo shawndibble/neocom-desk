@@ -112,6 +112,10 @@ describe('neocom database', () => {
       security: 'nullsec',
       hubId: 'amarr',
       facilityTaxPct: 1.5,
+      ownedStockScope: {
+        mode: 'selected',
+        locations: [{ characterId: 999, locationId: 60003760, locationType: 'station' }],
+      },
       updatedAt: 1000,
     });
 
@@ -119,12 +123,17 @@ describe('neocom database', () => {
     expect(plan?.name).toBe('Rifter run');
     expect(plan?.blueprintTypeID).toBe(638);
     expect(plan?.facilityTaxPct).toBeUndefined();
+    expect(plan?.ownedStockScope).toBeUndefined();
 
     const forCharacter = await db.buildPlans.where('characterId').equals(2112625428).toArray();
     expect(forCharacter.map((p) => p.id)).toEqual(['bp-1']);
 
     const structurePlan = await db.buildPlans.get('bp-2');
     expect(structurePlan?.facilityTaxPct).toBe(1.5);
+    expect(structurePlan?.ownedStockScope).toEqual({
+      mode: 'selected',
+      locations: [{ characterId: 999, locationId: 60003760, locationType: 'station' }],
+    });
   });
 
   it('caches ESI values per character+key, keyed compositely', async () => {

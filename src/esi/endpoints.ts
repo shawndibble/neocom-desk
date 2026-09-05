@@ -564,6 +564,25 @@ export function getCharacterMailLabels(
   });
 }
 
+// --- GET /characters/{character_id}/mail/lists (esi-mail.read_mail.v1) ---
+
+/** One mailing list the character belongs to — resolves a mailing_list recipient's real name (issue #416), in place of a generic fallback. */
+export interface MailingList {
+  mailing_list_id: number;
+  name: string;
+}
+
+export function getCharacterMailingLists(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<MailingList[]>> {
+  return esiFetch<MailingList[]>(`/characters/${characterId}/mail/lists`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterMailingLists',
+  });
+}
+
 // --- GET /characters/{character_id}/notifications (esi-characters.read_notifications.v1) ---
 
 /**

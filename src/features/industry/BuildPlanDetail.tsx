@@ -4,7 +4,6 @@ import {
   Button,
   DataAgeBadge,
   EmptyState,
-  FilterChip,
   IconButton,
   InfoTooltip,
   NativeSelect,
@@ -30,26 +29,36 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
-import { materialRecipe, recipeInputTypeIds } from './recipes';
+import { buildPlanTypeIds, materialRecipe } from './recipes';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
-import { MaterialsTable } from './MaterialsTable';
+import { unmaskNumber } from '@/lib/numberMask';
+import { MaterialsTable, SourcingInput } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
-import { bulkOwnedStockSuggestions } from '@/engine/industry/ownedStock';
+import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
   stockLocationLabel,
   type OwnedStockDetection,
   type OwnedStockSnapshot,
 } from './ownedStockDetection';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
+import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { ResultsSummary } from './ResultsSummary';
 
 /** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
 export type PlanPatch = Partial<
   Pick<
     BuildPlanRecord,
-    'runs' | 'me' | 'te' | 'facility' | 'rigLevel' | 'security' | 'hubId' | 'facilityTaxPct'
+    | 'runs'
+    | 'me'
+    | 'te'
+    | 'facility'
+    | 'rigLevel'
+    | 'security'
+    | 'hubId'
+    | 'facilityTaxPct'
+    | 'ownedStockScope'
   >
 >;
 
@@ -100,6 +109,19 @@ function clampInt(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
 }
 
+/**
+ * `SourcingInput.parse` for Runs/ME/TE: unlike the materials sourcing
+ * fields it was built for, these three are always-defined numbers with no
+ * "unset" state, so blank or unusable input has nowhere to fall but back to
+ * `current` — which also, via `SourcingInput`'s "skip onCommit when
+ * unchanged" rule, is exactly what makes an emptied-then-abandoned field
+ * commit nothing instead of forcing a minimum.
+ */
+function parseOrKeep(current: number, raw: string, transform: (n: number) => number): number {
+  const n = unmaskNumber(raw);
+  return n === undefined ? current : transform(n);
+}
+
 /** Build Plan inputs (runs, ME/TE, facility, rig, security, hub, tax) + materials/results. */
 export function BuildPlanDetail({
   plan,
@@ -122,16 +144,14 @@ export function BuildPlanDetail({
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
 
+  // One level deeper than the plan itself needs: the make-or-buy marker
+  // quotes each material's own recipe, and a quote is only as good as the
+  // inputs it can price. Same batched Fuzzwork call either way. Shared with
+  // `useComparedBuildResults.ts` (issue #453) via `buildPlanTypeIds`, so the
+  // Compare table widens its price fetch exactly the same way this does.
   const typeIds = useMemo(() => {
     if (!blueprint) return [] as number[];
-    const ids = new Set(blueprint.materials.map((m) => m.typeID));
-    const product = blueprint.products[0];
-    if (product) ids.add(product.typeID);
-    // One level deeper than the plan itself needs: the make-or-buy marker
-    // quotes each material's own recipe, and a quote is only as good as the
-    // inputs it can price. Same batched Fuzzwork call either way.
-    for (const id of recipeInputTypeIds([...ids], { catalog, pi })) ids.add(id);
-    return [...ids];
+    return buildPlanTypeIds(blueprint, { catalog, pi });
   }, [blueprint, catalog, pi]);
 
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
@@ -189,15 +209,23 @@ export function BuildPlanDetail({
     incompleteCharacters,
   } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
 
+  // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
+  // itself stays the full, galaxy-wide picture the breakdown popover shows.
+  const scopedStock = useMemo(
+    () => filterStockByScope(detectedStock, plan.ownedStockScope),
+    [detectedStock, plan.ownedStockScope]
+  );
+
   const detection = useMemo<OwnedStockDetection>(
     () => ({
       stockFor: (typeID) => detectedStock.get(typeID),
+      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
       lowerBound: incompleteCharacters.length > 0,
       incompleteCharacters,
       characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
       locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
     }),
-    [detectedStock, characterNames, locationNames, incompleteCharacters, t]
+    [detectedStock, scopedStock, characterNames, locationNames, incompleteCharacters, t]
   );
 
   const { result, error } = useMemo(() => {
@@ -215,17 +243,7 @@ export function BuildPlanDetail({
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
 
-  // View-only toggle (not persisted): once a material is fully sourced from
-  // owned stock there's nothing left to shop for, so hiding it lets a long
-  // materials list focus on what still needs buying.
-  const [hideOwned, setHideOwned] = useState(false);
-
-  // CSV export deliberately keeps the full set regardless of the toggle: it's
-  // a shopping/accounting record, not the on-screen view the toggle curates.
-  const visibleMaterials = useMemo(() => {
-    if (!result) return [];
-    return hideOwned ? result.materials.filter((m) => m.remainingQuantity > 0) : result.materials;
-  }, [hideOwned, result]);
+  const visibleMaterials = useMemo(() => result?.materials ?? [], [result]);
 
   // "Use all detected" fills only rows with nothing typed in them: a
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
@@ -233,10 +251,10 @@ export function BuildPlanDetail({
   // row means it.
   const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
     () =>
-      bulkOwnedStockSuggestions(result?.materials ?? [], plan.materialSourcing, detectedStock).map(
+      bulkOwnedStockSuggestions(result?.materials ?? [], plan.materialSourcing, scopedStock).map(
         ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
       ),
-    [result, plan.materialSourcing, detectedStock]
+    [result, plan.materialSourcing, scopedStock]
   );
 
   /**
@@ -338,13 +356,16 @@ export function BuildPlanDetail({
             <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
               <label className="flex flex-col gap-1 text-xs">
                 {t('industry.runs')}
-                <TextInput
-                  type="number"
-                  min={1}
+                <SourcingInput
                   value={plan.runs}
-                  onChange={(e) =>
-                    update({ runs: Math.max(1, Math.round(Number(e.target.value) || 1)) })
-                  }
+                  label={t('industry.runs')}
+                  inputMode="numeric"
+                  widthClassName="w-full"
+                  // Blank/garbage reverts to the last committed value rather than
+                  // snapping to the minimum — clearing the box to retype "10" as
+                  // "100" must not overwrite it with 1 mid-edit.
+                  parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
+                  onCommit={(runs) => update({ runs })}
                 />
               </label>
 
@@ -356,13 +377,14 @@ export function BuildPlanDetail({
                     content={t('industry.meTooltip')}
                   />
                 </span>
-                <TextInput
+                <SourcingInput
                   id="build-plan-me"
-                  type="number"
-                  min={0}
-                  max={10}
                   value={plan.me}
-                  onChange={(e) => update({ me: clampInt(Number(e.target.value), 0, 10) })}
+                  label={t('industry.me')}
+                  inputMode="numeric"
+                  widthClassName="w-full"
+                  parse={(raw) => parseOrKeep(plan.me, raw, (n) => clampInt(n, 0, 10))}
+                  onCommit={(me) => update({ me })}
                 />
                 {ownedMatch && (
                   <span className="text-[0.6875rem] text-text-dim">
@@ -382,13 +404,14 @@ export function BuildPlanDetail({
                     content={t('industry.teTooltip')}
                   />
                 </span>
-                <TextInput
+                <SourcingInput
                   id="build-plan-te"
-                  type="number"
-                  min={0}
-                  max={20}
                   value={plan.te}
-                  onChange={(e) => update({ te: clampInt(Number(e.target.value), 0, 20) })}
+                  label={t('industry.te')}
+                  inputMode="numeric"
+                  widthClassName="w-full"
+                  parse={(raw) => parseOrKeep(plan.te, raw, (n) => clampInt(n, 0, 20))}
+                  onCommit={(te) => update({ te })}
                 />
               </div>
             </div>
@@ -482,6 +505,13 @@ export function BuildPlanDetail({
                   />
                 </div>
               )}
+
+              <OwnedStockScopeControl
+                scope={plan.ownedStockScope}
+                detectedStock={detectedStock}
+                detection={detection}
+                onChange={(ownedStockScope) => update({ ownedStockScope })}
+              />
             </div>
           </div>
         </div>
@@ -502,11 +532,6 @@ export function BuildPlanDetail({
                 {t('industry.useAllDetected')}
               </Button>
             )}
-            <FilterChip
-              label={t('industry.hideOwned')}
-              selected={hideOwned}
-              onToggle={() => setHideOwned((v) => !v)}
-            />
             <IconButton
               size="sm"
               icon={<Icon.Download />}

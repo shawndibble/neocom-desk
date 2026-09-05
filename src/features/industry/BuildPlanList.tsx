@@ -1,18 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  EmptyState,
-  IconButton,
-  NativeSelect,
-  SearchInput,
-  TextInput,
-} from '@/components/ui';
+import { Button, EmptyState, IconButton, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import { BlueprintPicker } from './BlueprintPicker';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
-import { filterAndSortPlans, type SortMode } from './buildPlanSort';
 
 interface BuildPlanListProps {
   plans: readonly BuildPlanRecord[];
@@ -23,6 +15,13 @@ interface BuildPlanListProps {
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
+  /** Compare mode (issue #453): a per-row checkbox replaces plain row selection for building a comparison set. */
+  compareMode: boolean;
+  compareSelectedIds: ReadonlySet<string>;
+  onToggleCompareMode: () => void;
+  onToggleCompareSelected: (id: string) => void;
+  /** Opens the comparison table for the checked plans (disabled below 2 selections). */
+  onOpenCompare: () => void;
 }
 
 function PlanRow({
@@ -32,9 +31,15 @@ function PlanRow({
   onDuplicate,
   onDelete,
   onRename,
+  compareMode,
+  compareSelected,
+  onToggleCompareSelected,
 }: {
   plan: BuildPlanRecord;
   active: boolean;
+  compareMode: boolean;
+  compareSelected: boolean;
+  onToggleCompareSelected: (id: string) => void;
 } & Pick<BuildPlanListProps, 'onSelect' | 'onDuplicate' | 'onDelete' | 'onRename'>) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
@@ -53,6 +58,15 @@ function PlanRow({
         active ? 'bg-panel-2' : ''
       }`}
     >
+      {compareMode && (
+        <input
+          type="checkbox"
+          checked={compareSelected}
+          onChange={() => onToggleCompareSelected(plan.id)}
+          aria-label={t('industry.compareSelectFor', { name: plan.name })}
+          className="size-4 shrink-0 cursor-pointer accent-accent"
+        />
+      )}
       {renaming ? (
         <TextInput
           size="sm"
@@ -111,7 +125,7 @@ function PlanRow({
   );
 }
 
-/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete, rename inline. */
+/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete, rename inline. Also owns Compare mode's row checkboxes (issue #453) — the comparison itself renders in `Industry.tsx`'s detail pane. */
 export function BuildPlanList({
   plans,
   catalog,
@@ -121,34 +135,44 @@ export function BuildPlanList({
   onDuplicate,
   onDelete,
   onRename,
+  compareMode,
+  compareSelectedIds,
+  onToggleCompareMode,
+  onToggleCompareSelected,
+  onOpenCompare,
 }: BuildPlanListProps) {
   const { t } = useTranslation();
-  const [creating, setCreating] = useState(false);
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<SortMode>('alphabetical');
-
-  const visiblePlans = useMemo(() => filterAndSortPlans(plans, query, sort), [plans, query, sort]);
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('industry.title')}
         </h2>
-        <Button variant="primary" size="sm" onClick={() => setCreating((c) => !c)}>
-          {t('industry.create')}
-        </Button>
+        {compareMode ? (
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={onToggleCompareMode}>
+              {t('industry.compareCancel')}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={compareSelectedIds.size < 2}
+              onClick={onOpenCompare}
+            >
+              {t('industry.compareHandle', { count: compareSelectedIds.size })}
+            </Button>
+          </div>
+        ) : (
+          plans.length > 1 && (
+            <Button size="sm" onClick={onToggleCompareMode}>
+              {t('industry.compareToggle')}
+            </Button>
+          )
+        )}
       </div>
 
-      {creating && (
-        <BlueprintPicker
-          catalog={catalog}
-          onPick={(entry) => {
-            onCreate(entry);
-            setCreating(false);
-          }}
-        />
-      )}
+      <BlueprintPicker catalog={catalog} onPick={onCreate} />
 
       {plans.length === 0 ? (
         <EmptyState
@@ -157,46 +181,25 @@ export function BuildPlanList({
           className="py-6"
         />
       ) : (
-        <>
-          <div className="flex items-center gap-2">
-            <SearchInput
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('industry.searchPlans')}
-              aria-label={t('industry.searchPlans')}
-              className="flex-1"
+        // The scroller is the row list alone, not the whole pane: the heading
+        // and the blueprint picker stay put while a long plan list scrolls
+        // under them, same as Mail's list.
+        <ul className="max-h-[28rem] overflow-y-auto rounded-xs border border-line">
+          {plans.map((plan) => (
+            <PlanRow
+              key={plan.id}
+              plan={plan}
+              active={plan.id === selectedId}
+              onSelect={onSelect}
+              onDuplicate={onDuplicate}
+              onDelete={onDelete}
+              onRename={onRename}
+              compareMode={compareMode}
+              compareSelected={compareSelectedIds.has(plan.id)}
+              onToggleCompareSelected={onToggleCompareSelected}
             />
-            <NativeSelect
-              size="md"
-              aria-label={t('industry.sortLabel')}
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortMode)}
-            >
-              <option value="alphabetical">{t('industry.sortAlphabetical')}</option>
-              <option value="lastUpdated">{t('industry.sortLastUpdated')}</option>
-            </NativeSelect>
-          </div>
-          {visiblePlans.length === 0 ? (
-            <EmptyState title={t('industry.searchNoResults')} className="py-4" />
-          ) : (
-            // The scroller is the row list alone, not the whole pane: the heading,
-            // the create button and the blueprint picker stay put while a long
-            // plan list scrolls under them, same as Mail's list.
-            <ul className="max-h-[28rem] overflow-y-auto rounded-xs border border-line">
-              {visiblePlans.map((plan) => (
-                <PlanRow
-                  key={plan.id}
-                  plan={plan}
-                  active={plan.id === selectedId}
-                  onSelect={onSelect}
-                  onDuplicate={onDuplicate}
-                  onDelete={onDelete}
-                  onRename={onRename}
-                />
-              ))}
-            </ul>
-          )}
-        </>
+          ))}
+        </ul>
       )}
     </div>
   );

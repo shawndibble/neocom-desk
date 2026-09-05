@@ -198,11 +198,6 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
               {t(offlineTitleKey)}
             </p>
           )}
-          {transactionsTruncated && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('wallet.transactionsCapped')}
-            </p>
-          )}
           <DataTable
             label={t('wallet.transactionsTab')}
             columns={columns}

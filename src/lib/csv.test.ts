@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toCsv, csvFilename } from './csv';
+import { toCsv, csvFilename, slugifyForFilename } from './csv';
 
 interface Row {
   name: string;
@@ -113,5 +113,23 @@ describe('csvFilename', () => {
       'neocom-assets-2026-08-05.csv'
     );
     expect(csvFilename('assets', new Date(2026, 7, 5))).toBe('neocom-assets-2026-08-05.csv');
+  });
+});
+
+describe('slugifyForFilename', () => {
+  it('lowercases and hyphenates spaces', () => {
+    expect(slugifyForFilename('Master Wallet')).toBe('master-wallet');
+  });
+
+  it('collapses runs of non-alphanumeric characters into one hyphen', () => {
+    expect(slugifyForFilename('SRP / Reimbursements!!')).toBe('srp-reimbursements');
+  });
+
+  it('trims leading and trailing hyphens', () => {
+    expect(slugifyForFilename('  Division 3  ')).toBe('division-3');
+  });
+
+  it('falls back to a placeholder when nothing alphanumeric survives', () => {
+    expect(slugifyForFilename('***')).toBe('unnamed');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -160,9 +160,12 @@ describe('Wallet', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
-    expect(await screen.findByText('Bounty prize')).toBeInTheDocument();
-    expect(screen.getByText('Player donation')).toBeInTheDocument();
-    expect(screen.queryByText('bounty_prize')).not.toBeInTheDocument();
+    // Scoped to the table: the same humanized strings also populate the
+    // ref-type filter's <option> list (issue #413).
+    const table = await screen.findByRole('table', { name: 'Journal' });
+    expect(await within(table).findByText('Bounty prize')).toBeInTheDocument();
+    expect(within(table).getByText('Player donation')).toBeInTheDocument();
+    expect(within(table).queryByText('bounty_prize')).not.toBeInTheDocument();
   });
 
   it('falls back to cached data when ESI is unreachable, showing the offline banner', async () => {
@@ -201,6 +204,42 @@ describe('Wallet', () => {
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.queryByText(/incomplete data/i)).not.toBeInTheDocument();
+  });
+
+  it('narrows the journal to rows matching the ref-type filter (issue #413)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    await user.selectOptions(screen.getByLabelText('Ref type'), 'bounty_prize');
+
+    expect(screen.getByText('Bounty')).toBeInTheDocument();
+    expect(screen.queryByText('Donation')).toBeNull();
+  });
+
+  it('narrows the journal by free text against the description (issue #413)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    await user.type(screen.getByPlaceholderText('Search description…'), 'Donation');
+
+    expect(screen.queryByText('Bounty')).toBeNull();
+    expect(screen.getByText('Donation')).toBeInTheDocument();
+  });
+
+  it('shows a filtered-empty message, not the no-data empty state, when the filter matches nothing (issue #413)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    await user.type(screen.getByPlaceholderText('Search description…'), 'nothing matches this');
+
+    expect(await screen.findByText('No journal entries match this filter.')).toBeInTheDocument();
+    expect(screen.queryByText(/reconnect to fetch/i)).not.toBeInTheDocument();
   });
 
   it('shows the empty state when there is no data at all', async () => {

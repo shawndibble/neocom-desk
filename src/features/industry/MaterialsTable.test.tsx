@@ -603,6 +603,9 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
         const entry = stock[typeID];
         return entry ? { quantity: entry.quantity, placements: entry.placements ?? [] } : undefined;
       },
+      // Defaults to the same total as `stockFor` — the "everywhere" scope,
+      // and today's only behavior before per-location scoping (#454) existed.
+      scopedQuantityFor: (typeID) => stock[typeID]?.quantity ?? 0,
       lowerBound: false,
       incompleteCharacters: [],
       characterNameFor: (characterId) => CHARACTER_NAMES[characterId] ?? 'Unknown',
@@ -712,6 +715,59 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent(
       'Asset data is incomplete for Alt Pilot, No Scope Pilot'
     );
+  });
+
+  it('scopes the headline and the "use detected" offer to selected locations, but keeps the full breakdown (#454)', async () => {
+    const user = userEvent.setup();
+    // Full detected total is 9,000 across two locations; the plan's scope
+    // only counts the 6,000 held by Main Pilot at Jita.
+    render(
+      <Harness
+        detection={detectionOf(TRIT_STOCK, {
+          scopedQuantityFor: (typeID) => (typeID === 34 ? 6000 : 0),
+        })}
+      />
+    );
+
+    const trigger = within(row('Tritanium')).getByRole('button', {
+      name: /detected for Tritanium/,
+    });
+    expect(trigger).toHaveTextContent('6,000 owned');
+
+    await user.click(trigger);
+    const menu = screen.getByRole('dialog');
+    // The breakdown still lists every placement, including the one outside
+    // the plan's selected scope, so the player sees the full picture.
+    expect(menu).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
+    expect(menu).toHaveTextContent('Alt Pilot — Amarr');
+
+    expect(
+      within(row('Tritanium')).getByRole('button', {
+        name: 'Use 1,000 detected owned for Tritanium',
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('shows "0 owned" with no use action when a material\'s stock all sits outside the selected scope (#454)', async () => {
+    const user = userEvent.setup();
+    // Real stock exists (9,000 across two locations), but none of it is
+    // inside the plan's selected locations — a state that could not occur
+    // before per-location scoping existed.
+    render(<Harness detection={detectionOf(TRIT_STOCK, { scopedQuantityFor: () => 0 })} />);
+
+    const trigger = within(row('Tritanium')).getByRole('button', {
+      name: /detected for Tritanium/,
+    });
+    expect(trigger).toHaveTextContent('0 owned');
+    expect(
+      within(row('Tritanium')).queryByRole('button', { name: /^Use \d/ })
+    ).not.toBeInTheDocument();
+
+    // The breakdown still shows the full, unfiltered picture.
+    await user.click(trigger);
+    const menu = screen.getByRole('dialog');
+    expect(menu).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
+    expect(menu).toHaveTextContent('Alt Pilot — Amarr');
   });
 });
 

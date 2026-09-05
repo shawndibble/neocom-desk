@@ -7,8 +7,8 @@
  * a planet (a schematic produces it), or neither — a mineral, an ice product,
  * a raw P0 resource. The three are mutually exclusive in the SDE.
  */
+import type { IndustryBlueprint, QuantityEntry } from '@/engine/industry/types';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
-import type { QuantityEntry } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
@@ -82,5 +82,21 @@ export function recipeInputTypeIds(typeIDs: readonly number[], sources: RecipeCa
   for (const typeID of typeIDs) {
     for (const input of recipeInputs(typeID, sources) ?? []) ids.add(input.typeID);
   }
+  return [...ids];
+}
+
+/**
+ * Every typeID a Build Plan's own price fetch needs: the blueprint's
+ * materials, its product, and (via `recipeInputTypeIds`) one level of their
+ * own recipe inputs, for the materials table's make-or-buy marker. Shared by
+ * `BuildPlanDetail.tsx` (the currently-open plan) and
+ * `useComparedBuildResults.ts` (issue #453 — every compared plan needs this
+ * same widening against its own blueprint) so the two never drift apart.
+ */
+export function buildPlanTypeIds(blueprint: IndustryBlueprint, sources: RecipeCatalog): number[] {
+  const ids = new Set(blueprint.materials.map((m) => m.typeID));
+  const product = blueprint.products[0];
+  if (product) ids.add(product.typeID);
+  for (const id of recipeInputTypeIds([...ids], sources)) ids.add(id);
   return [...ids];
 }

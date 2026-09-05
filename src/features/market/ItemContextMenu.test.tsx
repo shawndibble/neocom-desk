@@ -42,6 +42,43 @@ function renderMenu(typeId: number, itemName: string) {
   );
 }
 
+describe('ItemContextMenu — View in Industry as material (issue #414)', () => {
+  it('offers the action when the caller supplies it, and invokes it on select', async () => {
+    const onViewInIndustryAsMaterial = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/assets']}>
+        <ItemContextMenu
+          typeId={TRITANIUM}
+          itemName="Tritanium"
+          blueprintTypeID={null}
+          onAddToQuickbar={vi.fn()}
+          quickbarAvailable
+          onShowInfo={vi.fn()}
+          onViewInIndustryAsMaterial={onViewInIndustryAsMaterial}
+        >
+          <button type="button">Tritanium</button>
+        </ItemContextMenu>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+
+    const item = await screen.findByRole('menuitem', { name: 'View in Industry as material' });
+    fireEvent.click(item);
+
+    expect(onViewInIndustryAsMaterial).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the action when the caller supplies nothing (unknown, or no plan consumes it)', async () => {
+    renderMenu(TRITANIUM, 'Tritanium');
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+
+    await screen.findByRole('menuitem', { name: /Build Plan|No blueprint options/ });
+    expect(
+      screen.queryByRole('menuitem', { name: 'View in Industry as material' })
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('ItemContextMenu — PI Plan', () => {
   it('offers a PI Plan for a planetary commodity and lands on the plan tab', async () => {
     renderMenu(BROADCAST_NODE, 'Broadcast Node');

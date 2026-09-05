@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
+import type { BuildPlanRecord } from '@/db';
 
 const BLUEPRINTS: BlueprintMap = {
   '638': {
@@ -28,8 +29,31 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
 }));
 
-const { loadBlueprintCatalog, searchByProductName, toIndustryBlueprint, nameForType } =
-  await import('./blueprintCatalog');
+const {
+  loadBlueprintCatalog,
+  searchByProductName,
+  toIndustryBlueprint,
+  nameForType,
+  buildPlansByMaterialTypeID,
+} = await import('./blueprintCatalog');
+
+function plan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
+  return {
+    id: 'p1',
+    characterId: 1,
+    name: 'Rifter run',
+    blueprintTypeID: 638,
+    runs: 1,
+    me: 0,
+    te: 0,
+    facility: 'npcStation',
+    rigLevel: 'none',
+    security: 'highsec',
+    hubId: 'jita',
+    updatedAt: 0,
+    ...overrides,
+  };
+}
 
 describe('loadBlueprintCatalog', () => {
   it('keys entries by blueprint typeID and resolves the product name via types.json', async () => {
@@ -89,6 +113,34 @@ describe('toIndustryBlueprint', () => {
       materials: [{ typeID: 34, quantity: 4500 }],
       products: [{ typeID: 587, quantity: 1 }],
     });
+  });
+});
+
+describe('buildPlansByMaterialTypeID', () => {
+  it("maps a material typeID to the character's own plan whose blueprint consumes it", async () => {
+    const catalog = await loadBlueprintCatalog();
+    const p = plan();
+    const map = buildPlansByMaterialTypeID([p], catalog);
+    expect(map.get(34)).toBe(p);
+  });
+
+  it('has no entry for a material no owned plan consumes', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(buildPlansByMaterialTypeID([], catalog).has(34)).toBe(false);
+  });
+
+  it('has no entry for a plan whose blueprintTypeID matches no catalog entry', async () => {
+    const catalog = await loadBlueprintCatalog();
+    const map = buildPlansByMaterialTypeID([plan({ blueprintTypeID: 12345 })], catalog);
+    expect(map.size).toBe(0);
+  });
+
+  it('first plan wins when multiple owned plans consume the same material', async () => {
+    const catalog = await loadBlueprintCatalog();
+    const first = plan({ id: 'first' });
+    const second = plan({ id: 'second' });
+    const map = buildPlansByMaterialTypeID([first, second], catalog);
+    expect(map.get(34)).toBe(first);
   });
 });
 

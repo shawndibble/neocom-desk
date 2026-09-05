@@ -204,7 +204,6 @@ describe('Industry: Build Plan CRUD', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'New plan' }));
     const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
@@ -285,7 +284,6 @@ describe('Industry: Build Plan CRUD', () => {
     render(<App />);
 
     await screen.findByRole('button', { name: 'Parts run' });
-    await user.click(screen.getByRole('button', { name: 'New plan' }));
     const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
@@ -351,6 +349,45 @@ describe('Industry: "jump to a Build Plan" from the Market Browser (issue #6)', 
   });
 });
 
+describe('Industry: "View in Industry as material" from Assets (issue #414)', () => {
+  it("selects the character's existing plan whose blueprint consumes the material, then clears the query param", async () => {
+    await db.buildPlans.add(seedPlan());
+    window.history.pushState({}, '', '/industry?material=34');
+    render(<App />);
+
+    const row = await screen.findByRole('button', { name: 'Rifter run' });
+    await waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    await waitFor(() => expect(window.location.search).toBe(''));
+    // Never creates a plan — only selects among the character's existing ones.
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
+  });
+
+  it('selects the correct plan when it is not first in the list', async () => {
+    // Material 35 (Pyerite) is a Rifter-only input — 9841 (Mechanical Parts)
+    // doesn't consume it, unlike Tritanium (34), which both blueprints share.
+    await db.buildPlans.add(seedPlan({ id: 'bp-0', name: 'Other plan', blueprintTypeID: 9841 }));
+    await db.buildPlans.add(seedPlan({ id: 'bp-1', name: 'Rifter run', blueprintTypeID: 638 }));
+    window.history.pushState({}, '', '/industry?material=35');
+    render(<App />);
+
+    const row = await screen.findByRole('button', { name: 'Rifter run' });
+    await waitFor(() => expect(row.closest('li')).toHaveClass('bg-panel-2'));
+    expect(screen.getByRole('button', { name: 'Other plan' }).closest('li')).not.toHaveClass(
+      'bg-panel-2'
+    );
+  });
+
+  it('clears the query param without selecting or creating anything when no plan consumes that material', async () => {
+    await db.buildPlans.add(seedPlan({ blueprintTypeID: 9841 }));
+    window.history.pushState({}, '', '/industry?material=34');
+    render(<App />);
+
+    await screen.findByRole('button', { name: 'Rifter run' });
+    await waitFor(() => expect(window.location.search).toBe(''));
+    expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
+  });
+});
+
 describe('Industry: owned-blueprint prefill', () => {
   it('prefills ME/TE from the best owned copy and shows the owned hint', async () => {
     server.use(
@@ -370,14 +407,15 @@ describe('Industry: owned-blueprint prefill', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'New plan' }));
     const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
     await user.type(search, 'Rift');
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 
     await screen.findByRole('button', { name: 'Rifter' });
-    expect(screen.getByLabelText('ME %')).toHaveValue(8);
-    expect(screen.getByLabelText('TE %')).toHaveValue(16);
+    // Text fields now (issue #455's commit-on-blur fix), not `type="number"`
+    // spinbuttons — `toHaveValue` compares against the DOM string value.
+    expect(screen.getByLabelText('ME %')).toHaveValue('8');
+    expect(screen.getByLabelText('TE %')).toHaveValue('16');
     expect(screen.getByText('Owned, ME 8% / TE 16%')).toBeInTheDocument();
 
     const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).first();
@@ -395,7 +433,7 @@ describe('Industry: owned-blueprint prefill', () => {
 
     expect(await screen.findByText('Log in again to see owned blueprints')).toBeInTheDocument();
     // The Build Plan list and Active Jobs panel still render.
-    expect(await screen.findByRole('button', { name: 'New plan' })).toBeInTheDocument();
+    expect(await screen.findByRole('searchbox', { name: 'Add build plan' })).toBeInTheDocument();
     expect(screen.getByText('Active jobs')).toBeInTheDocument();
   });
 });
@@ -530,7 +568,9 @@ describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => 
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
-    const listPanel = (await screen.findByRole('button', { name: 'New plan' })).closest('section');
+    const listPanel = (await screen.findByRole('searchbox', { name: 'Add build plan' })).closest(
+      'section'
+    );
     expect(listPanel).not.toHaveClass('hidden');
     // The detail isn't merely hidden while collapsed away — it isn't mounted,
     // so it can't spend a narrow-screen visitor's bandwidth fetching prices
@@ -570,14 +610,16 @@ describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => 
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
-    const listPanel = (await screen.findByRole('button', { name: 'New plan' })).closest('section');
+    const listPanel = (await screen.findByRole('searchbox', { name: 'Add build plan' })).closest(
+      'section'
+    );
     const detailPane = (await screen.findByRole('heading', { name: 'Rifter' })).closest('article');
     expect(listPanel).not.toHaveClass('hidden');
     expect(detailPane).not.toHaveClass('hidden');
     expect(screen.queryByRole('button', { name: 'Back to build plans' })).not.toBeInTheDocument();
 
     // The two panes are columns of one grid, each with its own scroller: the
-    // list's is the row list alone, so the heading and create button stay
+    // list's is the row list alone, so the heading and blueprint picker stay
     // put; the detail's is `lg:`-gated so a phone doesn't nest a
     // viewport-sized editor inside a scroll region, and is capped against
     // the live viewport height rather than a flat constant (#237-class fix).
@@ -790,23 +832,35 @@ describe('Industry: make-or-buy marker on materials', () => {
   });
 });
 
-describe('Industry: hide fully-owned material rows (#409)', () => {
-  it('hides a fully-owned material row when toggled, and shows it again when toggled off', async () => {
-    await db.buildPlans.add(
-      seedPlan({ materialSourcing: { 34: { ownedQuantity: 100 } } }) // Tritanium: fully owned (needs 100)
-    );
+describe('Industry: owned-stock scope (#454)', () => {
+  it('defaults to Everywhere, and persists Selected locations to the plan', async () => {
+    const plan = seedPlan();
+    await db.buildPlans.add(plan);
     render(<App />);
 
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Rifter' });
+    const select = screen.getByLabelText('Count owned stock from') as HTMLSelectElement;
+    expect(select).toHaveValue('everywhere');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
+    await userEvent.selectOptions(select, 'Selected locations');
+    expect(select).toHaveValue('selected');
 
-    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
-    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+    // No Characters are authenticated in this test, so there is no detected
+    // stock to choose locations from yet.
+    expect(
+      screen.getByText('No detected owned stock yet to choose locations from.')
+    ).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Hide owned' }));
+    await waitFor(async () => {
+      expect((await db.buildPlans.get(plan.id))?.ownedStockScope).toEqual({
+        mode: 'selected',
+        locations: [],
+      });
+    });
 
-    expect(screen.getByText('Tritanium')).toBeInTheDocument();
+    await userEvent.selectOptions(select, 'Everywhere');
+    await waitFor(async () => {
+      expect((await db.buildPlans.get(plan.id))?.ownedStockScope).toBeUndefined();
+    });
   });
 });

@@ -255,6 +255,28 @@ describe('the roster table', () => {
   });
 });
 
+describe('manual refresh keeps the roster visible (issue #418)', () => {
+  it('does not blank the table while a refresh is in flight', async () => {
+    await rosterTable();
+
+    let resolveSecondFetch!: (
+      value: ReturnType<typeof cached<CorporationMemberTracking[]>>
+    ) => void;
+    mocked.loadCorporationMemberTracking.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSecondFetch = resolve;
+      })
+    );
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh member list' }));
+    expect(screen.getByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+
+    resolveSecondFetch(cached([tracking({ character_id: 1001 })]));
+    await waitFor(() => expect(mocked.loadCorporationMemberTracking).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+  });
+});
+
 describe('the joins/leaves summary', () => {
   it('shows nothing at all when the roster has not changed (AC6)', async () => {
     mocked.readPreviousRoster.mockResolvedValue([1001, 1002]);

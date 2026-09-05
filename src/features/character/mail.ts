@@ -3,9 +3,11 @@ import {
   getCharacterMailHeaders,
   getCharacterMail,
   getCharacterMailLabels,
+  getCharacterMailingLists,
   type MailHeader,
   type MailBody,
   type MailLabels,
+  type MailingList,
 } from '@/esi/endpoints';
 import {
   loadWithCache,
@@ -22,6 +24,7 @@ import { mergeMailHeaderPage, MAIL_HEADERS_PAGE_SIZE } from '@/engine/mail';
 const KEYS = {
   headers: 'mail:headers',
   labels: 'mail:labels',
+  lists: 'mail:lists',
   body: (mailId: number) => `mail:${mailId}`,
 } as const;
 
@@ -85,6 +88,16 @@ export function loadMailLabels(characterId: number): Promise<StatusResult<MailLa
     characterId,
     KEYS.labels,
     async () => (await getCharacterMailLabels(characterId)).data
+  );
+}
+
+/** A character's mailing-list memberships — resolves a `mailing_list` recipient's real name (issue #416). Membership changes rarely, so it gets the `static` freshness tier, same as a mail body. */
+export function loadMailingLists(characterId: number): Promise<StatusResult<MailingList[]>> {
+  return loadWithCacheStatus(
+    characterId,
+    KEYS.lists,
+    async () => (await getCharacterMailingLists(characterId)).data,
+    { staleAfterMs: STALE_AFTER.static }
   );
 }
 

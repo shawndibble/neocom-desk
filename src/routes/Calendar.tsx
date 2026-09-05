@@ -10,6 +10,7 @@ import {
   ReauthBanner,
   Spinner,
   Tabs,
+  TextInput,
 } from '@/components/ui';
 import type { TabItem } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -20,7 +21,14 @@ import { CalendarMonthView } from '@/features/character/CalendarMonthView';
 import { CalendarWeekView } from '@/features/character/CalendarWeekView';
 import { CalendarAgendaView } from '@/features/character/CalendarAgendaView';
 import { useCalendarView, type CalendarViewMode } from '@/features/character/calendarViewPref';
-import { addMonths, addWeeks, formatMonthLabel, formatWeekLabel } from '@/lib/calendarGrid';
+import {
+  addMonths,
+  addWeeks,
+  dayKey,
+  formatMonthLabel,
+  formatWeekLabel,
+  parseJumpDate,
+} from '@/lib/calendarGrid';
 import type { CachedResult } from '@/esi/cache';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -79,6 +87,20 @@ export function Calendar() {
   function expandDay(date: Date) {
     setWeekAnchor(date);
     void setViewMode('week');
+  }
+
+  /** Row context menu's "Add to Month View" (issue #416): jump Month view to an event's date, from Week or Agenda. */
+  function addToMonthView(date: Date) {
+    setMonthAnchor(date);
+    void setViewMode('month');
+  }
+
+  /** "Jump to date" (issue #416): moves whichever anchor the current view navigates by. Agenda has no anchor to jump — it shows every event unfiltered. */
+  function jumpToDate(raw: string) {
+    const date = parseJumpDate(raw);
+    if (!date) return;
+    if (viewMode === 'month') setMonthAnchor(date);
+    else if (viewMode === 'week') setWeekAnchor(date);
   }
 
   if (!hydrated) {
@@ -153,6 +175,14 @@ export function Calendar() {
                   : setWeekAnchor((d) => addWeeks(d, 1))
               }
             />
+            <TextInput
+              type="date"
+              size="sm"
+              aria-label={t('calendar.jumpToDate')}
+              value={dayKey(viewMode === 'month' ? monthAnchor : weekAnchor)}
+              onChange={(e) => jumpToDate(e.target.value)}
+              className="w-36"
+            />
           </div>
         )}
       </div>
@@ -190,10 +220,15 @@ export function Calendar() {
               weekAnchor={weekAnchor}
               events={events}
               onSelectEvent={setSelectedEvent}
+              onAddToMonthView={addToMonthView}
             />
           )}
           {viewMode === 'agenda' && (
-            <CalendarAgendaView events={events} onSelectEvent={setSelectedEvent} />
+            <CalendarAgendaView
+              events={events}
+              onSelectEvent={setSelectedEvent}
+              onAddToMonthView={addToMonthView}
+            />
           )}
         </>
       )}

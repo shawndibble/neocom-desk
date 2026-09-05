@@ -404,6 +404,23 @@ export function Market() {
     [searchParams]
   );
 
+  // Cross-page item links (MarketItemLink, ImplantChip, ItemContextMenu's
+  // "View in Market") land on `?type=...` without a `section`, since they
+  // mean "browse this item" regardless of which tab this page happened to be
+  // on. `section` state (above) only reads the URL on mount, so without this
+  // it silently stays on Orders/History and the click looks like a no-op.
+  // Every in-page tab switch (`handleSectionChange`) sets or deletes
+  // `section` explicitly, so `type` present with `section` absent
+  // unambiguously means "an external link just landed here" — adjusted
+  // during render (React's "adjusting state when a prop changes" pattern),
+  // not an effect, so it takes hold before the stale tab ever paints.
+  const crossLinkedToBrowser = searchParams.has('type') && !searchParams.has('section');
+  const [wasCrossLinkedToBrowser, setWasCrossLinkedToBrowser] = useState(crossLinkedToBrowser);
+  if (crossLinkedToBrowser !== wasCrossLinkedToBrowser) {
+    setWasCrossLinkedToBrowser(crossLinkedToBrowser);
+    if (crossLinkedToBrowser) setSection('browser');
+  }
+
   const typeIsValid = resolveAgainstCatalogue(
     parsedParams.typeId,
     types,

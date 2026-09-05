@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -61,6 +61,9 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () => HttpResponse.json(headers)),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/labels`, () =>
     HttpResponse.json(mailLabels)
+  ),
+  http.get('https://esi.evetech.net/characters/:characterId/mail/lists', () =>
+    HttpResponse.json([])
   ),
   http.post('https://esi.evetech.net/universe/names', () =>
     HttpResponse.json([
@@ -428,5 +431,117 @@ describe('Mail', () => {
 
     expect(screen.queryByText('Older mail')).not.toBeInTheDocument();
     expect(screen.getByText('Second pilot mail')).toBeInTheDocument();
+  });
+
+  it('filters headers by a subject/sender search box', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.getByText('Market report')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Search subject or sender'), 'fleet');
+    await waitFor(() => expect(screen.queryByText('Market report')).not.toBeInTheDocument());
+    expect(screen.getByText('Fleet up!')).toBeInTheDocument();
+  });
+
+  it('matches search against the resolved sender name, not just the subject', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+
+    await user.type(screen.getByLabelText('Search subject or sender'), 'market bot');
+    await waitFor(() => expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument());
+    expect(screen.getByText('Market report')).toBeInTheDocument();
+  });
+
+  it('locally marks a mail read/unread without writing back to ESI, and can hide read mail', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const fleetRow = (await screen.findByText('Fleet up!')).closest('li') as HTMLElement;
+
+    await user.click(within(fleetRow).getByRole('button', { name: 'Mark read' }));
+    expect(within(fleetRow).getByRole('button', { name: 'Mark unread' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Hide read' }));
+    expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
+    // The already-read fixture header ('Market report') is also hidden now.
+    expect(screen.queryByText('Market report')).not.toBeInTheDocument();
+  });
+
+  it("resolves a mailing list's real name instead of the generic fallback", async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/lists`, () =>
+        HttpResponse.json([{ mailing_list_id: 500, name: 'Fleet Announcements' }])
+      ),
+      // The reading pane's recipients come from the header list, not the body.
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          { ...headers[0], recipients: [{ recipient_id: 500, recipient_type: 'mailing_list' }] },
+          headers[1],
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet up!'));
+    expect(await screen.findByText(/Fleet Announcements/)).toBeInTheDocument();
+  });
+
+  it('falls back to the generic label for a mailing list with no resolved name', async () => {
+    server.use(
+      // No /mail/lists override — the default handler returns `[]`.
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          { ...headers[0], recipients: [{ recipient_id: 999, recipient_type: 'mailing_list' }] },
+          headers[1],
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet up!'));
+    expect(await screen.findByText(/Mailing list/)).toBeInTheDocument();
+  });
+
+  it('remembers the last-picked tab per character', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([...headers, { mail_id: 3, subject: 'Ore report', labels: [100] }])
+      )
+    );
+    await addSecondCharacter();
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail`, () =>
+        HttpResponse.json([
+          { mail_id: 4, subject: 'Second pilot mail', timestamp: '2026-08-03T00:00:00Z' },
+        ])
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/mail/labels`, () =>
+        HttpResponse.json({ labels: mailLabels.labels, total_unread_count: 0 })
+      )
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    const tablist = screen.getByRole('tablist', { name: 'Mail folders' });
+    await user.click(tablist.querySelector('[data-tab-id="corp"]') as HTMLElement);
+    expect(screen.queryByText('Market report')).not.toBeInTheDocument();
+
+    await act(async () => {
+      await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
+    });
+    await screen.findByText('Second pilot mail');
+    expect(
+      screen.getByRole('tablist', { name: 'Mail folders' }).querySelector('[aria-selected="true"]')
+    ).toHaveAttribute('data-tab-id', 'all');
+
+    await act(async () => {
+      await useActiveCharacter.getState().setActiveCharacter(CHAR_ID);
+    });
+    await screen.findByText('Fleet up!');
+    expect(
+      screen.getByRole('tablist', { name: 'Mail folders' }).querySelector('[aria-selected="true"]')
+    ).toHaveAttribute('data-tab-id', 'corp');
   });
 });

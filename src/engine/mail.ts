@@ -113,3 +113,47 @@ export function mergeMailHeaderPage<H extends MailHeaderLike>(
   for (const header of page) byId.set(header.mail_id, header);
   return { headers: Array.from(byId.values()), hasMore: page.length >= pageSize };
 }
+
+interface MailSearchable {
+  subject?: string;
+}
+
+/**
+ * Subject/sender substring match, case-insensitively (issue #416, reversing
+ * CONTEXT.md round 18's "no subject/sender search" — see round 55: "load
+ * more" (round 22) plus this ticket's own display cap mean a bucket is no
+ * longer necessarily small). A blank query matches everything, so callers can
+ * pass the raw (possibly-empty) search box value without a separate branch.
+ */
+export function mailSearchMatches(
+  header: MailSearchable,
+  senderName: string | undefined,
+  query: string
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (q === '') return true;
+  if ((header.subject ?? '').toLowerCase().includes(q)) return true;
+  return (senderName ?? '').toLowerCase().includes(q);
+}
+
+/** Rendered header-list cap (issue #416): "load more" can accumulate far past what's worth rendering as DOM rows. */
+export const MAIL_HEADER_DISPLAY_CAP = 200;
+
+export interface CappedHeaders<H> {
+  headers: H[];
+  /** True when the input list held more than `cap` and was cut down. */
+  truncated: boolean;
+}
+
+/**
+ * Truncates an already-ordered header list to the first `cap` entries. Order
+ * is the caller's responsibility (Mail.tsx sorts newest-first before this),
+ * not re-derived here — this is a display cap, not a recency policy.
+ */
+export function capHeadersForDisplay<H>(
+  headers: readonly H[],
+  cap: number = MAIL_HEADER_DISPLAY_CAP
+): CappedHeaders<H> {
+  if (headers.length <= cap) return { headers: [...headers], truncated: false };
+  return { headers: headers.slice(0, cap), truncated: true };
+}
