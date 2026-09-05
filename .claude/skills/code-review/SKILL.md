@@ -35,7 +35,7 @@ Look for the originating spec, in order:
 
 ### 3. Identify the standards sources
 
-Repo docs that describe how code should be written: `CLAUDE.md`, `CONTEXT.md`, `docs/DESIGN.md`, `docs/adr/`, `eslint.config.js`, `.prettierrc`.
+Repo docs that describe how code should be written: `CLAUDE.md`, `CONTEXT.md` (glossary), `docs/context/decisions/` (scope decisions — `grep` it for the area under review rather than reading all of it), `docs/DESIGN.md`, `docs/adr/`, `eslint.config.js`, `.prettierrc`.
 
 On top of the repo's own rules, the Standards axis always carries the **smell baseline**: a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing.
 
