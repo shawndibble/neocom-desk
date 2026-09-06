@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -92,13 +92,6 @@ interface Snapshot {
   systemSecurity: Map<number, number>;
   typeNames: Map<number, string>;
   unitPrices: Map<number, number>;
-  /**
-   * Payments the pilot already made (issue #540) — a secondary enhancement, so
-   * a missing wallet/contracts grant or an offline read just leaves this empty
-   * rather than gating the page (`routeScopes.ts` deliberately doesn't list
-   * either endpoint for `/moon-mining`).
-   */
-  madePayments: MadePayment[];
 }
 
 async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
@@ -111,7 +104,6 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
       systemSecurity: new Map(),
       typeNames: new Map(),
       unitPrices: new Map(),
-      madePayments: [],
     };
   }
   const unclassifiedTypeIds = result.unclassified.flatMap((u) => u.typeIds);
@@ -119,23 +111,13 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
     { systemNames, systemSecurity, typeNames: rowTypeNames },
     unitPrices,
     unclassifiedTypeNames,
-    madePayments,
   ] = await Promise.all([
     resolveRowNames(result.rows),
     loadJitaUnitPrices(result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))),
     loadTypeNames(unclassifiedTypeIds),
-    loadMadePayments(result.characters.map((c) => c.characterId)),
   ]);
   const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);
-  return {
-    ...result,
-    entries: result.rows,
-    systemNames,
-    systemSecurity,
-    typeNames,
-    unitPrices,
-    madePayments,
-  };
+  return { ...result, entries: result.rows, systemNames, systemSecurity, typeNames, unitPrices };
 }
 
 /**
@@ -256,14 +238,36 @@ export function MoonMiningTax() {
     [characterFiltered, data]
   );
 
-  // Payments already made that nothing accounts for, each with the Payee and
-  // entries it most likely settled (issue #540). Only payments with a
-  // plausible target survive `suggestLinks`, which is what lets the card stay
-  // a quiet offer rather than a standing alert.
+  /**
+   * Payments already made (issue #540), loaded *after* the ledger rather than
+   * as part of its snapshot. Two paginated ESI reads per tracked character —
+   * the wallet journal and contracts — must not sit in front of the table
+   * rendering: `SettleUpDialog` deferred the very same journal fetch out of
+   * its own open path for exactly this reason ("most settle-ups never get
+   * here"), and blocking here would invert that. The card appears when this
+   * resolves, and re-runs on `refresh()` so a just-linked payment drops off.
+   */
+  const [madePayments, setMadePayments] = useState<MadePayment[]>([]);
+  useEffect(() => {
+    const characterIds = data?.characters.map((c) => c.characterId) ?? [];
+    if (characterIds.length === 0) return;
+    let cancelled = false;
+    void loadMadePayments(characterIds).then((payments) => {
+      if (!cancelled) setMadePayments(payments);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
+
+  // Payments nothing accounts for, each with the Payee and entries it most
+  // likely settled. Only payments with a plausible target survive
+  // `suggestLinks`, which is what lets the card stay a quiet offer rather than
+  // a standing alert.
   const linkSuggestions = useMemo(() => {
     const everyAssignment = allDisplayRows.flatMap((dr) => allMembers(dr).map((m) => m.assignment));
-    return suggestLinks(unlinkedPayments(data?.madePayments ?? [], everyAssignment), balances);
-  }, [allDisplayRows, data, balances]);
+    return suggestLinks(unlinkedPayments(madePayments, everyAssignment), balances);
+  }, [allDisplayRows, madePayments, balances]);
 
   const visibleRows = useMemo(
     () => payeeFiltered.filter((dr) => statusFilter.has(dr.status)),

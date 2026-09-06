@@ -84,7 +84,20 @@ WINDOW`, not a symmetric ±N around either date. A payment that predates the
   to match against. Rather than ask for one up front — a field almost nobody
   would fill in — the first confirmed link records `second_party_id` /
   `assignee_id` on the Payee, and every later payment to that recipient matches
-  on identity. Rules out a name-equality heuristic as the primary signal.
+  on identity.
+
+- **Name equality is a separate, lower-ranked, self-declaring tier — never
+  folded into identity.** _(Amended during implementation; the original wording
+  ruled name-equality out altogether, which left no way to reach the first
+  confirmation.)_ A learned `entityId` only exists after some link has been
+  confirmed, so an identity-only rule can never bootstrap: a pilot who sends a
+  round 50M against a 47.3M balance would match on neither identity nor amount
+  and would never be offered the payment that would have taught the id. So a
+  Payee-name match is kept, but as its own `name` / `name-and-amount` confidence
+  ranked strictly below the `identity-*` tiers, and worded so it never claims to
+  know the recipient ("Name looks like X — check this is right"). A learned id
+  always wins over a namesake. What stays ruled out is name equality presented
+  _as_ identity, which is what the confidence label had wrong.
 
 - **No ignore-list for payments.** `payment` is optional and settle-up's later
   steps are skippable, so "already linked" has a real false-negative edge: a

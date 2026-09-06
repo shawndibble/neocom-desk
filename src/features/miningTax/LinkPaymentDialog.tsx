@@ -21,6 +21,17 @@ interface LinkPaymentDialogProps {
 }
 
 /**
+ * The payment's own date as a local calendar date, falling back to today.
+ * A contract carries `date_completed ?? date_issued` straight from ESI, so an
+ * unparseable value would otherwise reach `formatLocalDate` as an Invalid Date
+ * and write nonsense into a synced record.
+ */
+function paidOnFor(isoDate: string): string {
+  const parsed = new Date(isoDate);
+  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
+}
+
+/**
  * "I already paid this — what did it cover?" (issue #540), the mirror of
  * Settle up.
  *
@@ -95,7 +106,7 @@ export function LinkPaymentDialog({
       await markAssignmentsPaid(
         included.map((m) => m.assignment),
         {
-          paidOn: formatLocalDate(new Date(payment.date)),
+          paidOn: paidOnFor(payment.date),
           method: payment.method,
           amount: Math.round(recordedAmount),
           ...(payment.kind === 'journal'
