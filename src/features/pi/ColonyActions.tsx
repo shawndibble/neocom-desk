@@ -108,18 +108,35 @@ function IdleFacilities({
   );
   if (starved.length === 0) return null;
 
-  const idle = starved.reduce((sum, line) => sum + line.surplusPins, 0);
-  const facility: PiPinKind = starved[0].facility;
-  const gap = starved.map(shortfallOf).find((entry) => entry !== null) ?? null;
+  // One line per starved schematic, not one summed line. A colony refining two
+  // P0s can be short of both, and a single line would take its facility kind
+  // and its shortfall from the first while counting idle pins from all of them
+  // — naming one input as the reason pins short of a different one must go.
+  const perLine = starved.map((line) => {
+    const spec = pi.infrastructure.pins[line.facility];
+    return {
+      line,
+      gap: shortfallOf(line),
+      freed: {
+        cpu: (spec?.cpu ?? 0) * line.surplusPins,
+        powergrid: (spec?.powergrid ?? 0) * line.surplusPins,
+      },
+    };
+  });
 
+  // Extraction is only sized against a single starved schematic, for the same
+  // reason its head rate is only read off a single extracted resource: with
+  // two, "the shortfall" is not one number and buying to close one of them
+  // would be reported as closing both.
+  const only = perLine.length === 1 ? perLine[0] : null;
   const heads = colony.pinLoad.extractorHeads;
   const singleResource = colony.extractedPerHour.length === 1;
   const perHeadPerHour =
     singleResource && heads > 0 ? colony.extractedPerHour[0].unitsPerHour / heads : null;
 
   const upgrade = extractionUpgrade({
-    shortfallPerHour: gap?.unitsPerHour ?? 0,
-    perHeadPerHour,
+    shortfallPerHour: only?.gap?.unitsPerHour ?? 0,
+    perHeadPerHour: only ? perHeadPerHour : null,
     spare,
     newLinkCost,
     infrastructure: pi.infrastructure,
@@ -133,9 +150,13 @@ function IdleFacilities({
   // into facilities. Reading it as a per-pin rate silently reports that a
   // purchase feeds nothing.
   const perFacility =
-    starved[0].pins > 0 ? (starved[0].demandPerHour[0]?.unitsPerHour ?? 0) / starved[0].pins : 0;
+    only && only.line.pins > 0
+      ? (only.line.demandPerHour[0]?.unitsPerHour ?? 0) / only.line.pins
+      : 0;
   const wouldFeed =
-    perFacility > 0 ? Math.min(idle, Math.floor(upgrade.extraPerHour / perFacility)) : 0;
+    perFacility > 0
+      ? Math.min(only?.line.surplusPins ?? 0, Math.floor(upgrade.extraPerHour / perFacility))
+      : 0;
 
   return (
     <>
@@ -145,43 +166,54 @@ function IdleFacilities({
             units: upgrade.units,
             heads: upgrade.heads,
             extra: round(upgrade.extraPerHour),
-            name: gap?.name ?? '',
+            name: only?.gap?.name ?? '',
             fed: wouldFeed,
-            idle,
+            idle: only?.line.surplusPins ?? 0,
           })}
         </li>
       ) : null}
-      <li className="text-warning">
-        {t('piAdvisor.actionRemove', {
-          count: idle,
-          pin: t(`piAdvisor.pinKind.${facility}`),
-          demand: round(gap?.demand ?? 0),
-          input: gap?.name ?? '',
-          supply: round(gap?.supply ?? 0),
-          cpu: round(freed.cpu),
-          powergrid: round(freed.powergrid),
-        })}
-        {upgrade.status === 'needs-removal' && wouldFeed > 0 && (
-          <span className="block text-text-dim">
-            {t('piAdvisor.actionExtractOrRemove', {
-              count: idle,
-              heads: upgrade.heads,
-              extra: round(upgrade.extraPerHour),
-              name: gap?.name ?? '',
-              fed: wouldFeed,
-            })}
-          </span>
-        )}
-        {upgrade.status === 'no-room' && (
-          <span className="block text-text-dim">
-            {t('piAdvisor.actionExtractNoRoom', {
-              cpu: round(pi.infrastructure.pins.extractorControlUnit?.cpu ?? 0),
-              powergrid: round(pi.infrastructure.pins.extractorControlUnit?.powergrid ?? 0),
-              free: round(spare.powergrid),
-            })}
-          </span>
-        )}
-      </li>
+      {perLine.map(({ line, gap, freed: frees }) => (
+        <li key={line.typeId} className="text-warning">
+          {t('piAdvisor.actionRemove', {
+            count: line.surplusPins,
+            pin: t(`piAdvisor.pinKind.${line.facility}`),
+            demand: round(gap?.demand ?? 0),
+            input: gap?.name ?? '',
+            supply: round(gap?.supply ?? 0),
+            cpu: round(frees.cpu),
+            powergrid: round(frees.powergrid),
+          })}
+        </li>
+      ))}
+      {/*
+        The alternative to removing, when there is one. Its own list item and
+        conditional on there being something to say: an empty `<li>` renders as
+        a bullet with nothing after it.
+      */}
+      {(upgrade.status === 'no-room' || (upgrade.status === 'needs-removal' && wouldFeed > 0)) && (
+        <li className="text-text-dim">
+          {upgrade.status === 'needs-removal' && wouldFeed > 0 && (
+            <span className="block">
+              {t('piAdvisor.actionExtractOrRemove', {
+                count: only?.line.surplusPins ?? 0,
+                heads: upgrade.heads,
+                extra: round(upgrade.extraPerHour),
+                name: only?.gap?.name ?? '',
+                fed: wouldFeed,
+              })}
+            </span>
+          )}
+          {upgrade.status === 'no-room' && (
+            <span className="block">
+              {t('piAdvisor.actionExtractNoRoom', {
+                cpu: round(pi.infrastructure.pins.extractorControlUnit?.cpu ?? 0),
+                powergrid: round(pi.infrastructure.pins.extractorControlUnit?.powergrid ?? 0),
+                free: round(spare.powergrid),
+              })}
+            </span>
+          )}
+        </li>
+      )}
     </>
   );
 }
@@ -226,12 +258,25 @@ function AddFactories({
           </li>
         ))}
         <li>
-          {t('piAdvisor.actionAddEcon', {
-            units: round(line.unitsPerHour),
-            revenue: formatIsk(line.revenuePerHour),
-            cost: formatIsk(line.inputs.reduce((sum, input) => sum + input.costPerHour, 0)),
-            margin: formatIsk(line.marginPerHour),
-          })}
+          {/*
+            `buyCostPerHour`, not the total across every input. Routed material
+            costs the same number — its forgone sale — but that is not money
+            leaving the wallet, and printing one figure under one word for two
+            different things is how a pilot budgets for a purchase they are not
+            making.
+          */}
+          {line.buyCostPerHour > 0
+            ? t('piAdvisor.actionAddEconBuy', {
+                units: round(line.unitsPerHour),
+                revenue: formatIsk(line.revenuePerHour),
+                spend: formatIsk(line.buyCostPerHour),
+                margin: formatIsk(line.marginPerHour),
+              })
+            : t('piAdvisor.actionAddEcon', {
+                units: round(line.unitsPerHour),
+                revenue: formatIsk(line.revenuePerHour),
+                margin: formatIsk(line.marginPerHour),
+              })}
         </li>
       </ul>
     </li>

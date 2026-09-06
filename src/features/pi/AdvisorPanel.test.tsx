@@ -311,7 +311,9 @@ describe('AdvisorPanel', () => {
     // figure is worth having — a pilot checking the arithmetic needs it — but
     // as a footnote under a decision, not as the decision.
     renderPanel();
-    expect(await screen.findByText(/16,675 tf and 10,700 MW free after that/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/16,675 tf and 10,700 MW free as it stands/)
+    ).toBeInTheDocument();
   });
 
   it('leads with what to do here, not with a list of what would fit', async () => {
@@ -378,7 +380,7 @@ describe('AdvisorPanel', () => {
     // from, the footnote states the remainder and stops — quoting a link cost
     // this colony's geometry cannot support would be the invented number.
     renderPanel();
-    await screen.findByText(/16,675 tf and 10,700 MW free after that/);
+    await screen.findByText(/16,675 tf and 10,700 MW free as it stands/);
     expect(screen.queryByText(/A new pin also pays for its link/)).not.toBeInTheDocument();
   });
 
@@ -529,7 +531,7 @@ describe('AdvisorPanel', () => {
     renderPanel();
     // 7,600 tf and 16,700 MW drawn of 21,315 / 17,000 — so 13,715 tf spare and
     // 300 MW, against a High-Tech plant's 400 MW, the closest thing to fitting.
-    expect(await screen.findByText(/13,715 tf and 300 MW free after that/)).toBeInTheDocument();
+    expect(await screen.findByText(/13,715 tf and 300 MW free as it stands/)).toBeInTheDocument();
     const closest = screen.getByText(/Nothing more fits as it stands/);
     expect(closest).toHaveTextContent('High-Tech Production Plant');
     expect(closest).toHaveTextContent('400 MW');
