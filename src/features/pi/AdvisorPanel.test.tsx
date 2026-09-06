@@ -61,9 +61,13 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 const setPlanetRichness = vi.fn<(planetId: number, order: number[]) => Promise<void>>();
 const clearPlanetRichness = vi.fn<(planetId: number) => Promise<void>>();
+const setSyncedSetting = vi.fn<(key: string, value: unknown) => Promise<void>>();
+const scheduleSync = vi.fn();
 vi.mock('@/sync', () => ({
   setPlanetRichness: (planetId: number, order: number[]) => setPlanetRichness(planetId, order),
   clearPlanetRichness: (planetId: number) => clearPlanetRichness(planetId),
+  setSyncedSetting: (key: string, value: unknown) => setSyncedSetting(key, value),
+  scheduleSync: (characterId: number) => scheduleSync(characterId),
 }));
 const loadPlanPrices = vi.fn<(...args: unknown[]) => Promise<import('./planPrices').PlanPrices>>();
 vi.mock('./planPrices', () => ({
@@ -238,9 +242,12 @@ beforeEach(() => {
     loadCustomsCodeExpertise,
     loadInterplanetaryConsolidation,
     loadPlanPrices,
+    setSyncedSetting,
+    scheduleSync,
   ]) {
     mock.mockReset();
   }
+  setSyncedSetting.mockResolvedValue(undefined);
   // Level IV — five colonies — so the default fixture has slots to spare and
   // only the tests that care about the cap have to say so.
   loadInterplanetaryConsolidation.mockResolvedValue(4);
@@ -1448,8 +1455,45 @@ describe('AdvisorPanel build advice', () => {
     priceEverything();
     renderPanel();
     // Ashab at 0.5 security is highsec: the 10% NPC base less 1% per level of
-    // Customs Code Expertise IV.
-    expect(await screen.findByText('6%')).toBeInTheDocument();
+    // Customs Code Expertise IV. It is the field's default, not a value the
+    // pilot had to supply.
+    expect(await screen.findByLabelText('Customs rate')).toHaveValue(6);
+    expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
+  });
+
+  it('lets the pilot set a customs rate the derivation cannot know', async () => {
+    // Outside highsec the office is player-owned, its tax is in no ESI field,
+    // and the derived default is 0 — so every margin was overstated by
+    // whatever the POCO owner charges, with nothing on screen to say so.
+    priceEverything();
+    renderPanel();
+    const field = await screen.findByLabelText('Customs rate');
+    fireEvent.change(field, { target: { value: '17' } });
+
+    expect(setSyncedSetting).toHaveBeenCalledWith('sync.piCustomsRates', { [ASHAB]: 0.17 });
+    // Repainted from the layered edit, with no reload.
+    expect(await screen.findByLabelText('Customs rate')).toHaveValue(17);
+    // Scheduled off the write's own promise, so it lands a microtask later.
+    await vi.waitFor(() => expect(scheduleSync).toHaveBeenCalledWith(1));
+  });
+
+  it('ignores a half-typed rate rather than declaring the system tax-free', async () => {
+    priceEverything();
+    renderPanel();
+    const field = await screen.findByLabelText('Customs rate');
+    fireEvent.change(field, { target: { value: '' } });
+
+    expect(setSyncedSetting).not.toHaveBeenCalled();
+  });
+
+  it('resets a customs rate back to the derived one', async () => {
+    priceEverything();
+    renderPanel();
+    fireEvent.change(await screen.findByLabelText('Customs rate'), { target: { value: '17' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));
+
+    expect(setSyncedSetting).toHaveBeenLastCalledWith('sync.piCustomsRates', {});
+    expect(await screen.findByLabelText('Customs rate')).toHaveValue(6);
   });
 
   it('says the hub is the gap when nothing is quoted, not that the planet is poor', async () => {

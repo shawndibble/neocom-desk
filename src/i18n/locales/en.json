@@ -1552,7 +1552,6 @@
     "measuredOnlyHint": "Measured where it can be: pins and extraction rates come from ESI, and each rate is the whole program averaged over its decay curve rather than its opening cycle. Extractor headroom assumes a full ten heads. A build recommendation is a projection from those measurements, and an unbuilt planet’s value is an estimate — both say so where they appear.",
     "unknownTypeHint": "This planet’s type has not loaded, so nothing can be said about it yet. Refresh once you are back online.",
     "customsRate": "Customs rate",
-    "customsRateValue": "{{percent}}%",
     "customsRateSource": {
       "highsec-skill": "The 10% highsec NPC base, less 1% per level of your Customs Code Expertise (level {{level}}). A POCO owner’s own tax is on top and is not in ESI.",
       "highsec-unknown-skill": "No skill data for this character yet, so the untrained 10% highsec base is assumed. Your real rate is lower at every trained level.",
@@ -1626,7 +1625,9 @@
     "networkCount_one": "{{count}} combination",
     "networkCount_other": "{{count}} combinations",
     "chipLocalOn": "{{name}} · made on {{host}}",
-    "buyInputsNone": "None"
+    "buyInputsNone": "None",
+    "customsRateReset": "Reset",
+    "customsRateEdited": "Your own figure for this system, kept across your devices. Reset drops it back to the rate derived from the system’s security band and your Customs Code Expertise."
   },
   "employmentHistory": {
     "title": "Employment",

@@ -49,6 +49,7 @@ import {
   SelectValue,
   Spinner,
   StatChip,
+  TextInput,
 } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { formatIsk } from '@/lib/isk';
@@ -56,7 +57,7 @@ import { loadPi, loadPiPlanetRadius } from '@/sde/loadSde';
 import { db } from '@/db';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadPlanPrices } from './planPrices';
-import { clearPlanetRichness, setPlanetRichness } from '@/sync';
+import { clearPlanetRichness, scheduleSync, setPlanetRichness, setSyncedSetting } from '@/sync';
 import { ResourcePicker } from './ResourcePicker';
 import { assumedExtractionRate, type AssumedRate } from './richnessEstimate';
 import type { PiData } from '@/sde/types';
@@ -101,10 +102,19 @@ import {
   loadCustomsCodeExpertise,
   type CustomsRateSource,
 } from './customsRate';
+import {
+  customsRateFor,
+  parseCustomsOverrides,
+  withCustomsOverride,
+  withoutCustomsOverride,
+  SYNCED_PI_CUSTOMS_KEY,
+  type CustomsOverrides,
+} from './customsOverride';
 
 /** Stable identities, so an unranked planet's card does not remount every render. */
 const EMPTY_ORDER: readonly number[] = [];
 const EMPTY_RICHNESS: ReadonlyMap<number, number[]> = new Map();
+const EMPTY_CUSTOMS: CustomsOverrides = {};
 
 interface SystemGroup {
   systemId: number;
@@ -164,6 +174,12 @@ interface Snapshot {
   typeNames: Map<number, string>;
   /** This character's saved resource rankings, by planetId. Absent means unranked. */
   richness: Map<number, number[]>;
+  /**
+   * The pilot's own customs rates by systemId — Editable Data, so it arrives
+   * from Dexie wherever a sync last put it. Layered over in the component so
+   * an edit repaints without a reload.
+   */
+  customsOverrides: CustomsOverrides;
   /** Planet radius in km by planetId, for costing links (#440). */
   planetRadiusKm: Map<number, number>;
   /**
@@ -303,6 +319,12 @@ async function loadAdvisorSnapshot(characterId: number, priceHub: TradeHub): Pro
     ])
   );
 
+  // Whatever a sync last wrote, validated: this blob is not necessarily
+  // written by this version of the app.
+  const customsOverrides = parseCustomsOverrides(
+    (await db.settings.get(SYNCED_PI_CUSTOMS_KEY).catch(() => undefined))?.value
+  );
+
   const flatDetails = new Map<number, CharacterPlanetDetail>();
   for (const [planetId, result] of details) {
     const data = result.cached?.data;
@@ -421,6 +443,7 @@ async function loadAdvisorSnapshot(characterId: number, priceHub: TradeHub): Pro
     schematicNames,
     typeNames,
     richness,
+    customsOverrides,
     prices: prices.prices,
     revenuePrices: prices.revenuePrices,
     planetRadiusKm,
@@ -1009,6 +1032,25 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     return merged;
   }, [snapshot, edits]);
 
+  // Same layering as the picks above, for the same reason: an edit has to
+  // repaint the whole tab's margins immediately, and a `setState` in an effect
+  // keyed on the snapshot would drop one made while a reload was in flight.
+  const [customsEdits, setCustomsEdits] = useState<CustomsOverrides | null>(null);
+  const customsOverrides = customsEdits ?? snapshot?.customsOverrides ?? EMPTY_CUSTOMS;
+
+  const writeCustoms = useCallback(
+    (next: CustomsOverrides) => {
+      setCustomsEdits(next);
+      // Fire-and-forget, like every other Editable Data write here. The layer
+      // above is what the panel renders, and a failed write must not take it
+      // down.
+      void setSyncedSetting(SYNCED_PI_CUSTOMS_KEY, next)
+        .then(() => scheduleSync(characterId))
+        .catch(() => {});
+    },
+    [characterId]
+  );
+
   const handlePickedChange = useCallback((planetId: number, picked: number[]) => {
     // An empty pick is kept as an explicit empty entry, not deleted: it has to
     // out-rank whatever the snapshot still holds, or clearing the picks would
@@ -1080,6 +1122,14 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   // planet has to be in the same system. Only the *host's* customs office
   // enters a chain's cost (`chain.ts`), so spanning systems needs the rate per
   // planet rather than a second tax model.
+  // The rate this system's chains are actually costed at.
+  const activeRate = customsRateFor(
+    activeSystem.systemId,
+    customsOverrides,
+    activeSystem.customsRate
+  );
+  const customsEdited = customsOverrides[activeSystem.systemId] !== undefined;
+
   const networkAdvice = snapshot.systems.flatMap((system) =>
     systemAdvice(
       {
@@ -1112,7 +1162,10 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   const taxRateByPlanet = new Map<number, number>();
   for (const system of snapshot.systems) {
     for (const colony of system.colonies) {
-      taxRateByPlanet.set(colony.planet_id, system.customsRate);
+      taxRateByPlanet.set(
+        colony.planet_id,
+        customsRateFor(system.systemId, customsOverrides, system.customsRate)
+      );
     }
   }
   // The alts join the *plan*, never the cards: those planets are not this
@@ -1138,7 +1191,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     revenuePrices: snapshot.revenuePrices,
     allowMarketSourcing: buyInputs,
     taxRateByPlanet,
-    taxRate: activeSystem.customsRate,
+    taxRate: activeRate,
   });
   // Grouped once rather than filtered per card: the plan is one pass over a
   // handful of colonies, but a filter inside the render loop is a scan of the
@@ -1228,16 +1281,6 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               }
             />
             {/* Derived, so it says so: a derived number that does not reads as measured. */}
-            <StatChip
-              label={t('piAdvisor.customsRate')}
-              value={t('piAdvisor.customsRateValue', {
-                percent: customsRatePercent(activeSystem.customsRate),
-              })}
-              tooltip={customsTooltip(activeSystem.customsSource, t)}
-              tone={
-                activeSystem.customsSource.kind === 'highsec-unknown-skill' ? 'warning' : undefined
-              }
-            />
           </div>
           {/*
             A fact about the pilot, not about a planet — so one switch for the
@@ -1246,6 +1289,65 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             reach, and the Advisor should not price a standing freight run
             nobody agreed to.
           */}
+          {/*
+            Editable, and that is the point. The derived figure is exact in
+            highsec — the NPC base less the character's Customs Code Expertise
+            — but outside it the office is player-owned, its tax is in no ESI
+            field, and `defaultCustomsRate` returns 0. Every margin on a
+            lowsec, nullsec or wormhole colony was overstated by whatever the
+            POCO owner charges, with nothing on screen to say otherwise. The
+            derived rate stays the default, so a highsec pilot never types a
+            number the app can work out exactly.
+          */}
+          <label className="space-y-1">
+            <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('piAdvisor.customsRate')}
+              <InfoTooltip
+                label={t('common.aboutLabel', { label: t('piAdvisor.customsRate') })}
+                content={
+                  customsEdited
+                    ? t('piAdvisor.customsRateEdited')
+                    : customsTooltip(activeSystem.customsSource, t)
+                }
+              />
+            </span>
+            <div className="flex items-center gap-1.5">
+              <TextInput
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                inputMode="decimal"
+                aria-label={t('piAdvisor.customsRate')}
+                className="w-20"
+                value={String(customsRatePercent(activeRate))}
+                onChange={(event) => {
+                  const percent = Number(event.target.value);
+                  // An empty or half-typed field is not an edit yet — writing
+                  // NaN would declare the system tax-free until the pilot
+                  // noticed. `withCustomsOverride` refuses it; this keeps the
+                  // control from looking like it accepted one.
+                  if (event.target.value === '' || !Number.isFinite(percent)) return;
+                  writeCustoms(
+                    withCustomsOverride(customsOverrides, activeSystem.systemId, percent / 100)
+                  );
+                }}
+              />
+              <span className="text-xs text-text-dim">%</span>
+              {customsEdited && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    writeCustoms(withoutCustomsOverride(customsOverrides, activeSystem.systemId))
+                  }
+                  className="h-6 cursor-pointer px-1.5 text-[0.6875rem] text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+                >
+                  {t('piAdvisor.customsRateReset')}
+                </button>
+              )}
+            </div>
+          </label>
+
           <label className="space-y-1">
             <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('piAdvisor.buyInputsLabel')}
@@ -1306,7 +1408,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
           buyInputs={buyInputs}
           assumesRemoval={network.assumesRemoval}
           planetNames={planetNames}
-          taxRate={activeSystem.customsRate}
+          taxRate={activeRate}
           taxRateByPlanet={taxRateByPlanet}
         />
       )}
@@ -1327,7 +1429,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 typeNames={snapshot.typeNames}
                 prices={snapshot.prices}
                 revenuePrices={snapshot.revenuePrices}
-                taxRate={activeSystem.customsRate}
+                taxRate={activeRate}
                 ceiling={snapshot.ceiling}
                 opportunities={opportunitiesByHost.get(entry.planetId) ?? EMPTY_OPPORTUNITIES}
                 conversions={conversionsByHost.get(entry.planetId) ?? EMPTY_CONVERSIONS}
@@ -1345,7 +1447,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 assumedLinkCost={assumedLinkCost}
                 prices={snapshot.prices}
                 revenuePrices={snapshot.revenuePrices}
-                taxRate={activeSystem.customsRate}
+                taxRate={activeRate}
                 onPickedChange={handlePickedChange}
                 slots={snapshot.slots}
                 colonyCount={snapshot.colonyCount}
@@ -1387,7 +1489,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             typeNames={snapshot.typeNames}
             prices={snapshot.prices}
             revenuePrices={snapshot.revenuePrices}
-            taxRate={activeSystem.customsRate}
+            taxRate={activeRate}
             ceiling={snapshot.ceiling}
             opportunities={opportunitiesByHost.get(openColony.planetId) ?? EMPTY_OPPORTUNITIES}
             conversions={conversionsByHost.get(openColony.planetId) ?? EMPTY_CONVERSIONS}
