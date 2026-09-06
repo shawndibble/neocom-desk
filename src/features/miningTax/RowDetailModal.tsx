@@ -1,19 +1,12 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, StatChip, type StatChipTone } from '@/components/ui';
+import { Button, Modal, StatChip } from '@/components/ui';
+import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { formatIsk } from '@/lib/isk';
+import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
-
-/** Mirrors the tone conventions elsewhere (`Clones.tsx`, `PlanetaryIndustry.tsx`): `danger` for money still owed, `success` once paid, `warning` for a state needing a decision, `default` for anything settled or not-yet-decided. */
-const STATUS_TONE: Record<MiningTaxRowStatus, StatChipTone> = {
-  unassigned: 'default',
-  outstanding: 'danger',
-  'needs-review': 'warning',
-  paid: 'success',
-  dismissed: 'default',
-};
 
 interface RowDetailModalProps {
   open: boolean;
@@ -22,6 +15,8 @@ interface RowDetailModalProps {
   assignment: MiningTaxAssignmentRecord | null;
   status: MiningTaxRowStatus;
   systemName: string;
+  /** Undefined while still resolving, null when unresolvable — `SecurityValue` renders nothing either way. */
+  systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
   payeeDisplayName: string;
   unitPrices: ReadonlyMap<number, number>;
@@ -46,6 +41,7 @@ export function RowDetailModal({
   assignment,
   status,
   systemName,
+  systemSecurity,
   typeNames,
   payeeDisplayName,
   unitPrices,
@@ -70,11 +66,17 @@ export function RowDetailModal({
     >
       <div className="space-y-3 text-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <p>
-            <span className="text-text-dim">{row.characterName}</span>
-            <span className="mx-1.5 text-text-faint">·</span>
-            <span className="font-medium">{payeeDisplayName}</span>
-          </p>
+          <div>
+            <p>
+              <span className="text-text-dim">{row.characterName}</span>
+              <span className="mx-1.5 text-text-faint">·</span>
+              <span className="font-medium">{payeeDisplayName}</span>
+            </p>
+            <span className="flex items-center gap-1.5 text-xs text-text-dim">
+              {systemName}
+              <SecurityValue security={systemSecurity} t={t} />
+            </span>
+          </div>
           <StatChip
             label={t('miningTax.statusColumn')}
             value={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)}
@@ -94,7 +96,7 @@ export function RowDetailModal({
             <StatChip
               label={t('miningTax.taxOwedColumn')}
               value={`${formatIsk(assignment.taxOwed, 2)} ISK`}
-              tone={status === 'outstanding' ? 'danger' : status === 'paid' ? 'success' : 'default'}
+              tone={STATUS_TONE[status]}
             />
           )}
         </div>

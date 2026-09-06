@@ -20,6 +20,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
@@ -32,6 +33,7 @@ import {
 import { resolveRowNames } from '@/features/miningTax/names';
 import { loadJitaUnitPrices } from '@/features/miningTax/pricing';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
   deleteAssignment,
   dismissEntry,
@@ -39,6 +41,7 @@ import {
   resolveNeedsReview,
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
+import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
 import { AssignDialog } from '@/features/miningTax/AssignDialog';
 import { BulkPayConfirmDialog } from '@/features/miningTax/BulkPayConfirmDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
@@ -63,6 +66,7 @@ interface Snapshot {
   fetchedAt: Date | null;
   fromCache: boolean;
   systemNames: Map<number, string>;
+  systemSecurity: Map<number, number>;
   typeNames: Map<number, string>;
   unitPrices: Map<number, number>;
 }
@@ -74,21 +78,23 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
       ...result,
       entries: result.rows,
       systemNames: new Map(),
+      systemSecurity: new Map(),
       typeNames: new Map(),
       unitPrices: new Map(),
     };
   }
   const unclassifiedTypeIds = result.unclassified.flatMap((u) => u.typeIds);
-  const [{ systemNames, typeNames: rowTypeNames }, unitPrices, unclassifiedTypeNames] =
-    await Promise.all([
-      resolveRowNames(result.rows),
-      loadJitaUnitPrices(
-        result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))
-      ),
-      loadTypeNames(unclassifiedTypeIds),
-    ]);
+  const [
+    { systemNames, systemSecurity, typeNames: rowTypeNames },
+    unitPrices,
+    unclassifiedTypeNames,
+  ] = await Promise.all([
+    resolveRowNames(result.rows),
+    loadJitaUnitPrices(result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))),
+    loadTypeNames(unclassifiedTypeIds),
+  ]);
   const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);
-  return { ...result, entries: result.rows, systemNames, typeNames, unitPrices };
+  return { ...result, entries: result.rows, systemNames, systemSecurity, typeNames, unitPrices };
 }
 
 /** One flattened table row: an entry's covering Assignment, or its still-unassigned residual. */
@@ -165,6 +171,22 @@ export function MoonMiningTax() {
     return counts;
   }, [characterFiltered]);
 
+  // Across every status, deliberately unfiltered by the status chips below:
+  // "how much have I mined and what do I owe" shouldn't change just because
+  // Paid rows are currently hidden from the table.
+  const totals = useMemo(() => {
+    let estimatedMined = 0;
+    let taxOwed = 0;
+    let unpaidCount = 0;
+    for (const dr of characterFiltered) {
+      estimatedMined += estimatedValueOf(dr);
+      if (dr.assignment) taxOwed += dr.assignment.taxOwed;
+      if (dr.status === 'outstanding') unpaidCount += 1;
+    }
+    return { estimatedMined, taxOwed, unpaidCount };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characterFiltered, data]);
+
   const visibleRows = useMemo(
     () => characterFiltered.filter((dr) => statusFilter.has(dr.status)),
     [characterFiltered, statusFilter]
@@ -232,6 +254,10 @@ export function MoonMiningTax() {
 
   function systemName(dr: DisplayRow): string {
     return data?.systemNames.get(dr.row.entry.solarSystemId) ?? `#${dr.row.entry.solarSystemId}`;
+  }
+
+  function systemSecurityOf(dr: DisplayRow): number | undefined {
+    return data?.systemSecurity.get(dr.row.entry.solarSystemId);
   }
 
   /** Both the table's Value column and the sole Assignment-less rows: an unassigned entry has no `estimatedValue` of its own, so it's priced live from its still-unclaimed ore lines instead. */
@@ -370,7 +396,12 @@ export function MoonMiningTax() {
     {
       id: 'system',
       header: t('miningTax.systemColumn'),
-      render: (dr) => systemName(dr),
+      render: (dr) => (
+        <span className="flex items-center gap-1.5">
+          {systemName(dr)}
+          <SecurityValue security={systemSecurityOf(dr)} t={t} />
+        </span>
+      ),
       sortValue: (dr) => systemName(dr),
     },
     {
@@ -399,6 +430,8 @@ export function MoonMiningTax() {
     {
       id: 'status',
       header: t('miningTax.statusColumn'),
+      className: 'font-medium',
+      cellClassName: (dr) => STATUS_TEXT_CLASS[dr.status],
       render: (dr) => statusLabel(t, dr.status),
       sortValue: (dr) => statusLabel(t, dr.status),
     },
@@ -525,6 +558,37 @@ export function MoonMiningTax() {
             </div>
           )}
 
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Panel>
+              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('miningTax.totalMinedLabel')}
+              </p>
+              <p className="text-lg font-medium tabular-nums">
+                {formatIsk(totals.estimatedMined, 2)} ISK
+              </p>
+            </Panel>
+            <Panel>
+              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('miningTax.totalTaxOwedLabel')}
+              </p>
+              <p className="text-lg font-medium tabular-nums">{formatIsk(totals.taxOwed, 2)} ISK</p>
+            </Panel>
+            <Panel>
+              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('miningTax.unpaidCountLabel')}
+              </p>
+              <p
+                className={cx(
+                  'text-lg font-medium tabular-nums',
+                  totals.unpaidCount > 0 && 'text-danger'
+                )}
+              >
+                {totals.unpaidCount}
+              </p>
+            </Panel>
+          </div>
+          <p className="-mt-2 text-[0.6875rem] text-text-dim">{t('miningTax.totalsHint')}</p>
+
           <div className="flex flex-wrap items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -596,7 +660,6 @@ export function MoonMiningTax() {
                   rowKey={(dr) => dr.key}
                   label={t('miningTax.title')}
                   defaultSort={{ columnId: 'date', direction: 'desc' }}
-                  density="compact"
                   onRowClick={(dr) => setDetailTarget(dr)}
                 />
               </div>
@@ -643,6 +706,7 @@ export function MoonMiningTax() {
             data.systemNames.get(detailTarget.row.entry.solarSystemId) ??
             `#${detailTarget.row.entry.solarSystemId}`
           }
+          systemSecurity={data.systemSecurity.get(detailTarget.row.entry.solarSystemId)}
           typeNames={data.typeNames}
           payeeDisplayName={payeeDisplayName(detailTarget)}
           unitPrices={data.unitPrices}

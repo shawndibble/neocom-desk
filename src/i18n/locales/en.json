@@ -803,7 +803,11 @@
     "estimatedValueColumn": "Est. value",
     "taxOwedColumn": "Tax owed",
     "statusColumn": "Status",
-    "unknownPayee": "Unknown Payee"
+    "unknownPayee": "Unknown Payee",
+    "totalMinedLabel": "Total estimated mined",
+    "totalTaxOwedLabel": "Total tax owed",
+    "unpaidCountLabel": "Unpaid entries",
+    "totalsHint": "Across every status, not just what's shown below."
   },
   "assets": {
     "title": "Assets",
