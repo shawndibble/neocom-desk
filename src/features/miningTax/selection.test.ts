@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import type { DisplayRow } from './groupRows';
 import type { MoonMiningTaxRow } from './snapshot';
-import { combineEligibility, dismissableRows, settleUpMembers } from './selection';
+import { agreedTerms, combineEligibility, dismissableRows, settleUpMembers } from './selection';
 
 const CHAR_A = 1;
 const CHAR_B = 2;
@@ -180,6 +180,37 @@ describe('combineEligibility', () => {
       ok: false,
       reason: 'mixed-terms',
     });
+  });
+});
+
+describe('agreedTerms', () => {
+  it('reports the shared Payee and rate', () => {
+    expect(agreedTerms([assignment({ id: 'a1' }), assignment({ id: 'a2' })])).toEqual({
+      ok: true,
+      terms: { payeeId: 'payee-1', taxPct: 10 },
+    });
+  });
+
+  it('reports no terms at all for an empty set — nobody is assigned yet', () => {
+    expect(agreedTerms([])).toEqual({ ok: true, terms: null });
+  });
+
+  it('refuses a set that disagrees on Payee or rate', () => {
+    expect(agreedTerms([assignment(), assignment({ payeeId: 'payee-2' })])).toEqual({ ok: false });
+    expect(agreedTerms([assignment(), assignment({ taxPct: 5 })])).toEqual({ ok: false });
+  });
+
+  // The rule both join entry points must agree on. `joinAssignments` re-checks
+  // nothing, and `joinCandidatesFor` (the row-detail picker) only filters
+  // candidates against the *primary* — so with an unassigned primary it passes
+  // every assigned candidate through, and it is this function that has to
+  // catch two of them disagreeing.
+  it('refuses two assigned rows that disagree even when the primary is unassigned', () => {
+    const fromUnassignedPrimary = [
+      assignment({ id: 'a2', payeeId: 'payee-1' }),
+      assignment({ id: 'a3', payeeId: 'payee-2' }),
+    ];
+    expect(agreedTerms(fromUnassignedPrimary)).toEqual({ ok: false });
   });
 });
 

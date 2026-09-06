@@ -13,6 +13,7 @@ import {
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { typeIconUrl } from '@/lib/eveImages';
 import { joinAssignments, type JoinMemberInput } from './assignments';
+import { agreedTerms } from './selection';
 import type { MoonMiningTaxRow } from './snapshot';
 
 export interface JoinCandidate {
@@ -91,12 +92,25 @@ export function JoinAssignDialog({
   const [saving, setSaving] = useState(false);
 
   const selected = candidates.filter((c) => selectedKeys.has(candidateKey(c)));
-  const lockedTo =
-    primary.assignment ?? selected.map((c) => c.assignment).find((a) => a !== null) ?? null;
-  const effectivePayeeId = lockedTo ? lockedTo.payeeId : payeeId;
-  const effectiveTaxPct = lockedTo ? lockedTo.taxPct : Number(taxPct);
+  /**
+   * The merge rule, from the same place the selection toolbar gets it.
+   * `candidates` is pre-filtered against the *primary*, which is not enough
+   * once several can be ticked at once: when the primary is still unassigned
+   * that filter passes every assigned candidate through, so two of them on
+   * different Payees could otherwise be joined and one side's terms silently
+   * dropped.
+   */
+  const agreed = agreedTerms(
+    [primary, ...selected]
+      .map((c) => c.assignment)
+      .filter((a): a is MiningTaxAssignmentRecord => a !== null)
+  );
+  const lockedTerms = agreed.ok ? agreed.terms : null;
+  const effectivePayeeId = lockedTerms ? lockedTerms.payeeId : payeeId;
+  const effectiveTaxPct = lockedTerms ? lockedTerms.taxPct : Number(taxPct);
   const canJoin =
     selected.length > 0 &&
+    agreed.ok &&
     effectivePayeeId !== undefined &&
     effectivePayeeId !== null &&
     Number.isFinite(effectiveTaxPct) &&
@@ -211,11 +225,13 @@ export function JoinAssignDialog({
           </div>
         )}
 
-        {lockedTo ? (
+        {!agreed.ok ? (
+          <p className="text-xs text-warning">{t('miningTax.combineBlocked.mixed-terms')}</p>
+        ) : lockedTerms ? (
           <p className="text-xs text-text-dim">
             {t('miningTax.joinLockedToExistingHint', {
-              payee: payees.find((p) => p.id === lockedTo.payeeId)?.name ?? '',
-              pct: lockedTo.taxPct,
+              payee: payees.find((p) => p.id === lockedTerms.payeeId)?.name ?? '',
+              pct: lockedTerms.taxPct,
             })}
           </p>
         ) : (

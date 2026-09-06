@@ -94,9 +94,7 @@ export function LinkPaymentDialog({
   // Only shown for a real ISK payment, where a gap between what was sent and
   // what the ticked entries owe is worth noticing before committing.
   const difference =
-    selected?.payment.amount === null || selected === null
-      ? null
-      : selected.payment.amount - includedTotal;
+    selected && selected.payment.amount !== null ? selected.payment.amount - includedTotal : null;
 
   async function commit() {
     if (!selected || included.length === 0 || !amountValid) return;

@@ -248,17 +248,28 @@ export function MoonMiningTax() {
    * resolves, and re-runs on `refresh()` so a just-linked payment drops off.
    */
   const [madePayments, setMadePayments] = useState<MadePayment[]>([]);
+  /**
+   * Keyed on the character roster, never on `data`. `useRouteSnapshot`
+   * re-runs its loader on `onCacheRevalidated`, which is a *global* signal —
+   * an unrelated Jita price row lapsing anywhere in the app hands this route a
+   * brand-new `data` object. Keying the effect on that would refetch the
+   * journal and contracts for every character each time, to learn nothing.
+   *
+   * Nothing is lost by not refetching after a link is confirmed either: the
+   * just-linked payment disappears because `unlinkedPayments` now sees the
+   * Assignment referencing it, not because the payment list was reloaded.
+   */
+  const trackedCharacterIds = (data?.characters ?? []).map((c) => c.characterId).join(',');
   useEffect(() => {
-    const characterIds = data?.characters.map((c) => c.characterId) ?? [];
-    if (characterIds.length === 0) return;
+    if (trackedCharacterIds === '') return;
     let cancelled = false;
-    void loadMadePayments(characterIds).then((payments) => {
+    void loadMadePayments(trackedCharacterIds.split(',').map(Number)).then((payments) => {
       if (!cancelled) setMadePayments(payments);
     });
     return () => {
       cancelled = true;
     };
-  }, [data]);
+  }, [trackedCharacterIds]);
 
   // Payments nothing accounts for, each with the Payee and entries it most
   // likely settled. Only payments with a plausible target survive

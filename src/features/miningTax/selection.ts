@@ -4,6 +4,7 @@
  * rules that protect an existing join from being fractured — are testable
  * without the route's ESI/Dexie-backed snapshot.
  */
+import type { MiningTaxAssignmentRecord } from '@/db';
 import { allMembers, type DisplayRow, type GroupMember } from './groupRows';
 
 /** Why the current selection cannot be combined — each maps to a one-line reason in the toolbar. */
@@ -30,6 +31,32 @@ export type CombineEligibility =
       terms: CombineTerms | null;
     }
   | { ok: false; reason: CombineBlocker };
+
+/**
+ * The single Payee and rate a set of Assignments agrees on — the decision
+ * doc's merge rule, in one place.
+ *
+ * `terms: null` means none of them is assigned yet, so the pilot picks;
+ * `ok: false` means they disagree and must not be joined at all.
+ *
+ * Exported because `joinAssignments` deliberately re-checks nothing and trusts
+ * its caller — and it has two callers. The selection toolbar's Combine reaches
+ * it through `combineEligibility`; `JoinAssignDialog`'s own candidate picker
+ * reaches it directly. Two independent copies of this rule is precisely how
+ * the two paths drift apart.
+ */
+export function agreedTerms(
+  assignments: readonly MiningTaxAssignmentRecord[]
+): { ok: true; terms: CombineTerms | null } | { ok: false } {
+  if (new Set(assignments.map((a) => `${a.payeeId ?? ''}:${a.taxPct}`)).size > 1) {
+    return { ok: false };
+  }
+  const first = assignments[0];
+  return {
+    ok: true,
+    terms: first?.payeeId === undefined ? null : { payeeId: first.payeeId, taxPct: first.taxPct },
+  };
+}
 
 /**
  * Whether these rows can become one combined obligation, and on whose terms.
@@ -62,16 +89,10 @@ export function combineEligibility(selected: readonly DisplayRow[]): CombineElig
   );
   if (groupIds.size > 1) return { ok: false, reason: 'multiple-groups' };
 
-  const assignments = selected.flatMap((dr) => allMembers(dr)).map((m) => m.assignment);
-  const termKeys = new Set(assignments.map((a) => `${a.payeeId ?? ''}:${a.taxPct}`));
-  if (termKeys.size > 1) return { ok: false, reason: 'mixed-terms' };
+  const agreed = agreedTerms(selected.flatMap((dr) => allMembers(dr)).map((m) => m.assignment));
+  if (!agreed.ok) return { ok: false, reason: 'mixed-terms' };
 
-  const first = assignments[0];
-  return {
-    ok: true,
-    rows: [...selected],
-    terms: first?.payeeId === undefined ? null : { payeeId: first.payeeId, taxPct: first.taxPct },
-  };
+  return { ok: true, rows: [...selected], terms: agreed.terms };
 }
 
 /**
