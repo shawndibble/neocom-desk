@@ -190,11 +190,11 @@ describe('resolveNeedsReview', () => {
     solarSystemId: 1,
     oreLines: [
       { typeId: TYPE_A, quantity: 150 },
-      { typeId: TYPE_B, quantity: 999 }, // not covered by the assignment — must be ignored
+      { typeId: TYPE_B, quantity: 999 }, // a brand-new type, never assigned before
     ],
   };
 
-  it('re-snapshots oreLines/value/tax to the fresh totals and clears the review state', async () => {
+  it('as the sole Assignment, re-snapshots to the WHOLE fresh entry, including a brand-new type', async () => {
     const assignment: MiningTaxAssignmentRecord = {
       id: 'a1',
       characterId: CHAR_A,
@@ -211,14 +211,41 @@ describe('resolveNeedsReview', () => {
     };
     await db.miningTaxAssignments.put(assignment);
 
-    await resolveNeedsReview(assignment, freshEntry);
+    await resolveNeedsReview(assignment, freshEntry, 1);
+
+    const updated = await db.miningTaxAssignments.get('a1');
+    expect(updated?.oreLines).toEqual([
+      { typeId: TYPE_A, quantity: 150 },
+      { typeId: TYPE_B, quantity: 999 },
+    ]);
+    expect(updated?.estimatedValue).toBe(1500 + 999 * 4); // 150*10 + 999*4
+    expect(updated?.status).toBe('outstanding');
+    expect(updated?.reviewDiff).toBeUndefined();
+  });
+
+  it('as one of a split entry’s Assignments, re-snapshots only to the types it already claimed', async () => {
+    const assignment: MiningTaxAssignmentRecord = {
+      id: 'a1',
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'p',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      status: 'needs-review',
+      reviewDiff: [{ typeId: TYPE_A, before: 100, after: 150 }],
+      updatedAt: 1,
+    };
+    await db.miningTaxAssignments.put(assignment);
+
+    await resolveNeedsReview(assignment, freshEntry, 2);
 
     const updated = await db.miningTaxAssignments.get('a1');
     expect(updated?.oreLines).toEqual([{ typeId: TYPE_A, quantity: 150 }]);
     expect(updated?.estimatedValue).toBe(1500); // 150 * 10
     expect(updated?.taxOwed).toBe(150);
-    expect(updated?.status).toBe('outstanding');
-    expect(updated?.reviewDiff).toBeUndefined();
   });
 
   it('reverts to outstanding (and clears paidAt) even when the assignment had been paid', async () => {
@@ -239,7 +266,7 @@ describe('resolveNeedsReview', () => {
     };
     await db.miningTaxAssignments.put(assignment);
 
-    await resolveNeedsReview(assignment, freshEntry);
+    await resolveNeedsReview(assignment, freshEntry, 1);
 
     const updated = await db.miningTaxAssignments.get('a2');
     expect(updated?.status).toBe('outstanding');

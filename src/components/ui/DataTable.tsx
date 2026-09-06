@@ -40,6 +40,13 @@ export interface DataTableColumn<T> {
    * At most one column per table; later ones are ignored.
    */
   primary?: boolean;
+  /**
+   * Pins this cell to the stacked card's top-right corner instead of its own
+   * labelled row — for a purely decorative, non-tabular cell (an affordance
+   * icon) that reads as a stray unlabelled line when stacked normally. At
+   * most one column per table; later ones are ignored.
+   */
+  cardCorner?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -150,6 +157,7 @@ export function DataTable<T>({
     0,
     columns.findIndex((column) => column.primary)
   );
+  const cardCornerIndex = columns.findIndex((column) => column.cardCorner);
   const cellClass = columns.map((column) =>
     cx(cellPadding, column.align === 'right' && 'text-right', column.className)
   );
@@ -258,6 +266,7 @@ export function DataTable<T>({
                   className={cx(
                     cellClass[i],
                     i === primaryIndex && 'dt-primary',
+                    i === cardCornerIndex && 'dt-corner',
                     column.cellClassName?.(row)
                   )}
                 >

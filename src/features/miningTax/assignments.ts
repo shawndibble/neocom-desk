@@ -7,7 +7,7 @@
 import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
 import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { linesClaimedBy } from '@/engine/miningTax/rowStatus';
+import { linesOwnedByAssignment } from '@/engine/miningTax/rowStatus';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { loadJitaUnitPrices } from './pricing';
 
@@ -131,12 +131,23 @@ export async function deleteAssignment(assignment: MiningTaxAssignmentRecord): P
  * absorbed" rule exists to avoid is under-counting, not over-asking). A
  * Payee who genuinely already covered part of the new total is a one-click
  * "mark paid" away from being square again.
+ *
+ * `siblingAssignmentCount` (the total number of Assignments covering this
+ * entry, this one included) decides how much of the fresh entry it
+ * re-snapshots to: a sole Assignment claims the whole entry, including any
+ * brand-new ore type; a split entry (2+) keeps only the types it already
+ * named (`linesOwnedByAssignment`, rowStatus.ts).
  */
 export async function resolveNeedsReview(
   assignment: MiningTaxAssignmentRecord,
-  freshEntry: MiningLedgerEntry
+  freshEntry: MiningLedgerEntry,
+  siblingAssignmentCount: number
 ): Promise<void> {
-  const relevantFresh = linesClaimedBy(assignment.oreLines, freshEntry.oreLines);
+  const relevantFresh = linesOwnedByAssignment(
+    assignment.oreLines,
+    freshEntry.oreLines,
+    siblingAssignmentCount
+  );
   const prices = await loadJitaUnitPrices(relevantFresh.map((line) => line.typeId));
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,

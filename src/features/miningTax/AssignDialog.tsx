@@ -239,51 +239,67 @@ export function AssignDialog({
               </div>
             )}
 
-            <div className="space-y-1">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.taxPctLabel')}
-              </p>
-              <TextInput
-                type="number"
-                min={0}
-                max={100}
-                step="0.1"
-                value={taxPct}
-                onChange={(e) => setTaxPct(e.target.value)}
-                aria-label={t('miningTax.taxPctLabel')}
-              />
-            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="space-y-1">
+                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('miningTax.taxPctLabel')}
+                </p>
+                <div className="relative">
+                  <TextInput
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.1"
+                    value={taxPct}
+                    onChange={(e) => setTaxPct(e.target.value)}
+                    aria-label={t('miningTax.taxPctLabel')}
+                    className="pr-6"
+                  />
+                  {/* `5` not `0.05` — a bare number field gives no hint which
+                      scale it wants, so this pins the unit visibly rather
+                      than leaving it to the label alone. */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-xs text-text-dim"
+                  >
+                    %
+                  </span>
+                </div>
+              </div>
 
-            <div className="space-y-1">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.estimatedValueLabel')}
-              </p>
-              <TextInput
-                type="number"
-                min={0}
-                step="0.01"
-                value={
-                  estimatedValueOverride === ''
-                    ? String(round2(computed.estimatedValue))
-                    : estimatedValueOverride
-                }
-                onChange={(e) => setEstimatedValueOverride(e.target.value)}
-                aria-label={t('miningTax.estimatedValueLabel')}
-              />
-            </div>
+              <div className="space-y-1">
+                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('miningTax.estimatedValueLabel')}
+                </p>
+                <TextInput
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={
+                    estimatedValueOverride === ''
+                      ? String(round2(computed.estimatedValue))
+                      : estimatedValueOverride
+                  }
+                  onChange={(e) => setEstimatedValueOverride(e.target.value)}
+                  aria-label={t('miningTax.estimatedValueLabel')}
+                />
+              </div>
 
-            <div className="space-y-1">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.taxOwedLabel')}
-              </p>
-              <TextInput
-                type="number"
-                min={0}
-                step="0.01"
-                value={taxOwedOverride === '' ? String(round2(computed.taxOwed)) : taxOwedOverride}
-                onChange={(e) => setTaxOwedOverride(e.target.value)}
-                aria-label={t('miningTax.taxOwedLabel')}
-              />
+              <div className="space-y-1">
+                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('miningTax.taxOwedLabel')}
+                </p>
+                <TextInput
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={
+                    taxOwedOverride === '' ? String(round2(computed.taxOwed)) : taxOwedOverride
+                  }
+                  onChange={(e) => setTaxOwedOverride(e.target.value)}
+                  aria-label={t('miningTax.taxOwedLabel')}
+                />
+              </div>
             </div>
 
             <label className="flex items-center gap-2 text-sm">

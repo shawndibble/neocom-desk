@@ -158,7 +158,7 @@ export function PayeeManagerDialog({
               <li key={payee.id} className="flex items-center gap-2 py-1.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{payee.name}</p>
-                  <p className="text-[0.6875rem] text-text-dim">
+                  <p className="mt-0.5 text-[0.6875rem] text-text-dim">
                     {t('miningTax.defaultTaxPctValue', { pct: payee.defaultTaxPct })}
                   </p>
                 </div>
@@ -192,16 +192,25 @@ export function PayeeManagerDialog({
             placeholder={t('miningTax.payeeNamePlaceholder')}
             aria-label={t('miningTax.payeeNamePlaceholder')}
           />
-          <TextInput
-            type="number"
-            min={0}
-            max={100}
-            step="0.1"
-            value={draft.defaultTaxPct}
-            onChange={(e) => setDraft({ ...draft, defaultTaxPct: e.target.value })}
-            placeholder={t('miningTax.defaultTaxPctPlaceholder')}
-            aria-label={t('miningTax.defaultTaxPctPlaceholder')}
-          />
+          <div className="relative">
+            <TextInput
+              type="number"
+              min={0}
+              max={100}
+              step="0.1"
+              value={draft.defaultTaxPct}
+              onChange={(e) => setDraft({ ...draft, defaultTaxPct: e.target.value })}
+              placeholder={t('miningTax.defaultTaxPctPlaceholder')}
+              aria-label={t('miningTax.defaultTaxPctPlaceholder')}
+              className="pr-6"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-xs text-text-dim"
+            >
+              %
+            </span>
+          </div>
           {error && (
             <p role="alert" className="text-xs text-danger">
               {error}

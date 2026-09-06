@@ -1,11 +1,16 @@
 /**
  * Re-diffs every stored Assignment for one character against a fresh set of
  * Mining Ledger Entries, flipping one to `needs-review` (with an explicit
- * before/after diff) whenever ESI now reports more ore for a type it already
- * covers than it did when it was assigned or last resolved. Never silently
- * absorbed into `oreLines` (decision doc) — only `status`/`reviewDiff` move;
- * `resolveNeedsReview` (assignments.ts) is the one place `oreLines` itself
- * re-snapshots.
+ * before/after diff) whenever ESI now reports more ore than it did when it
+ * was assigned or last resolved. For a *sole* Assignment on an entry, "more
+ * ore" includes a brand-new ore type that shows up mid-session — a
+ * continuous mining session folds into the one existing Assignment instead
+ * of spawning a second, separately-assignable row (`linesOwnedByAssignment`,
+ * rowStatus.ts). A *split* entry (2+ Assignments) keeps the narrower
+ * per-type check, since a brand-new type has no obvious owner among several
+ * Payees. Never silently absorbed into `oreLines` either way (decision doc)
+ * — only `status`/`reviewDiff` move; `resolveNeedsReview` (assignments.ts) is
+ * the one place `oreLines` itself re-snapshots.
  *
  * Run once per character after loading its fresh ledger (see
  * `snapshot.ts`), not on every render — `sameDiffs` skips the write (and the
@@ -14,7 +19,7 @@
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { diffAssignedOreLines } from '@/engine/miningTax/needsReview';
-import { linesClaimedBy } from '@/engine/miningTax/rowStatus';
+import { linesOwnedByAssignment } from '@/engine/miningTax/rowStatus';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
 
 function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityDiff[]): boolean {
@@ -37,16 +42,29 @@ export async function reconcileAssignments(
   const freshByKey = new Map(
     freshEntries.map((entry) => [`${entry.date}:${entry.solarSystemId}`, entry])
   );
+  // How many Assignments cover each entry — `linesOwnedByAssignment` needs
+  // this to tell "sole Payee, owns the whole entry" from "split entry, only
+  // claim what I already named" (see rowStatus.ts).
+  const siblingCountByKey = new Map<string, number>();
+  for (const a of assignments) {
+    const key = `${a.date}:${a.solarSystemId}`;
+    siblingCountByKey.set(key, (siblingCountByKey.get(key) ?? 0) + 1);
+  }
   const now = Date.now();
   const updates: MiningTaxAssignmentRecord[] = [];
 
   for (const assignment of assignments) {
-    const entry = freshByKey.get(`${assignment.date}:${assignment.solarSystemId}`);
+    const key = `${assignment.date}:${assignment.solarSystemId}`;
+    const entry = freshByKey.get(key);
     // Absent from the fresh read means it aged out of ESI's 90-day retention
     // (or a character's grant lapsed this refresh) — leave the assignment as
     // it stands rather than treat "no fresh data" as "nothing was mined".
     if (!entry) continue;
-    const relevantFresh = linesClaimedBy(assignment.oreLines, entry.oreLines);
+    const relevantFresh = linesOwnedByAssignment(
+      assignment.oreLines,
+      entry.oreLines,
+      siblingCountByKey.get(key) ?? 1
+    );
     const diffs = diffAssignedOreLines(assignment.oreLines, relevantFresh);
     if (diffs.length === 0) continue;
     if (assignment.status === 'needs-review' && sameDiffs(assignment.reviewDiff, diffs)) continue;

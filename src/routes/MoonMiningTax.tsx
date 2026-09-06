@@ -12,7 +12,6 @@ import {
   EmptyState,
   FilterChip,
   IconButton,
-  Modal,
   PageHeader,
   Panel,
   Spinner,
@@ -23,7 +22,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import type { MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
+import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import {
   loadMoonMiningTaxSnapshot,
@@ -36,12 +35,14 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import {
   deleteAssignment,
   dismissEntry,
+  markAssignmentsPaid,
   resolveNeedsReview,
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { AssignDialog } from '@/features/miningTax/AssignDialog';
 import { BulkPayConfirmDialog } from '@/features/miningTax/BulkPayConfirmDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
+import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 
 const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
   'unassigned',
@@ -52,18 +53,6 @@ const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
 ];
 // Everything except Paid and Dismissed — both are "handled", opt-in to view (decision doc's Paid precedent).
 const DEFAULT_STATUSES = new Set<MiningTaxRowStatus>(['unassigned', 'needs-review', 'outstanding']);
-
-// Explicit map rather than munging the status string into a key (a stray
-// `.replace('-', '')` silently mis-keys the moment a second hyphenated
-// status is ever added) — the i18n keys read naturally instead of matching a
-// derived, unnatural form.
-const STATUS_LABEL_KEY: Record<MiningTaxRowStatus, string> = {
-  unassigned: 'unassigned',
-  'needs-review': 'needsReview',
-  outstanding: 'outstanding',
-  paid: 'paid',
-  dismissed: 'dismissed',
-};
 
 interface Snapshot {
   entries: MoonMiningTaxRow[];
@@ -135,19 +124,7 @@ function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): st
   return t(`miningTax.status.${STATUS_LABEL_KEY[status]}`);
 }
 
-function oreSummary(
-  lines: readonly { typeId: number; quantity: number }[],
-  typeNames: ReadonlyMap<number, string>
-): string {
-  return lines
-    .map(
-      (line) =>
-        `${typeNames.get(line.typeId) ?? `#${line.typeId}`} ×${line.quantity.toLocaleString()}`
-    )
-    .join(', ');
-}
-
-/** Moon Mining Tax ledger (issue #523): one continuously-filterable list, all tracked characters by default. */
+/** Moon Mining ledger (issue #523): one continuously-filterable list, all tracked characters by default. */
 export function MoonMiningTax() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -163,11 +140,8 @@ export function MoonMiningTax() {
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
   const [bulkPaySelection, setBulkPaySelection] = useState<ReadonlySet<string>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
-  const [resolveTarget, setResolveTarget] = useState<{
-    assignment: MiningTaxAssignmentRecord;
-    row: MoonMiningTaxRow;
-  } | null>(null);
-  const [resolving, setResolving] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
+  const [busy, setBusy] = useState(false);
 
   // Every tracked character, not just those with a Mining Ledger Entry this
   // refresh (CONTEXT.md: the point of the feature is not missing an alt's
@@ -215,18 +189,6 @@ export function MoonMiningTax() {
     });
   }
 
-  async function handleConfirmResolve() {
-    if (!resolveTarget) return;
-    setResolving(true);
-    try {
-      await resolveNeedsReview(resolveTarget.assignment, resolveTarget.row.entry);
-      setResolveTarget(null);
-      refresh();
-    } finally {
-      setResolving(false);
-    }
-  }
-
   async function handleTagAsMoonOre(typeId: number) {
     await tagAsMoonOre(typeId);
     refresh();
@@ -254,17 +216,75 @@ export function MoonMiningTax() {
     refresh();
   }
 
-  /** Undoes a dismissal (or, generically, any Assignment) — the ore returns to Unassigned. */
-  async function handleUndo(assignment: MiningTaxAssignmentRecord) {
-    await deleteAssignment(assignment);
-    refresh();
-  }
-
   function payeeName(characterId: number, payeeId: string | undefined): string {
     return (
       data?.payeesByCharacter.get(characterId)?.find((p) => p.id === payeeId)?.name ??
       t('miningTax.unknownPayee')
     );
+  }
+
+  /** The detail modal's Payee display: a resolved name, "No tax owed" for a dismissal, or a dash when unassigned. */
+  function payeeDisplayName(dr: DisplayRow): string {
+    if (!dr.assignment) return '—';
+    if (dr.assignment.status === 'dismissed') return t('miningTax.dismissedLabel');
+    return payeeName(dr.row.characterId, dr.assignment.payeeId);
+  }
+
+  async function handleAssignFromDetail() {
+    if (!detailTarget) return;
+    setAssignTarget(detailTarget.row);
+    setDetailTarget(null);
+  }
+
+  async function handleDismissFromDetail() {
+    if (!detailTarget) return;
+    setBusy(true);
+    try {
+      await handleDismiss(detailTarget.row);
+      setDetailTarget(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleMarkPaidFromDetail() {
+    if (!detailTarget?.assignment) return;
+    setBusy(true);
+    try {
+      await markAssignmentsPaid([detailTarget.assignment]);
+      setDetailTarget(null);
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResolveFromDetail() {
+    if (!detailTarget?.assignment) return;
+    setBusy(true);
+    try {
+      await resolveNeedsReview(
+        detailTarget.assignment,
+        detailTarget.row.entry,
+        detailTarget.row.assignments.length
+      );
+      setDetailTarget(null);
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleUndoFromDetail() {
+    if (!detailTarget?.assignment) return;
+    setBusy(true);
+    try {
+      await deleteAssignment(detailTarget.assignment);
+      setDetailTarget(null);
+      refresh();
+    } finally {
+      setBusy(false);
+    }
   }
 
   const bulkPayRows = useMemo(
@@ -282,33 +302,51 @@ export function MoonMiningTax() {
     [visibleRows, bulkPaySelection, data]
   );
 
+  // The Character column only earns its place when more than one character
+  // is actually in view — with a single tracked character (or a filter
+  // narrowed to one) it says the same thing on every row.
+  const showCharacterColumn = characters.length > 1;
+  // Same reasoning for the bulk-pay select column: with no Outstanding row on
+  // screen there's nothing to select, and an always-blank leading column just
+  // reads as unexplained whitespace before Date.
+  const showSelectColumn = visibleRows.some((dr) => dr.status === 'outstanding' && dr.assignment);
+
   const columns: DataTableColumn<DisplayRow>[] = [
-    {
-      id: 'select',
-      header: '',
-      className: 'w-8',
-      render: (dr) =>
-        dr.status === 'outstanding' && dr.assignment ? (
-          <input
-            type="checkbox"
-            aria-label={t('miningTax.selectForBulkPay')}
-            checked={bulkPaySelection.has(dr.key)}
-            onChange={() =>
-              setBulkPaySelection((previous) => {
-                const next = new Set(previous);
-                if (next.has(dr.key)) next.delete(dr.key);
-                else next.add(dr.key);
-                return next;
-              })
-            }
-          />
-        ) : null,
-    },
-    {
-      id: 'character',
-      header: t('miningTax.characterColumn'),
-      render: (dr) => dr.row.characterName,
-    },
+    ...(showSelectColumn
+      ? [
+          {
+            id: 'select',
+            header: '',
+            className: 'w-8 px-2',
+            render: (dr: DisplayRow) =>
+              dr.status === 'outstanding' && dr.assignment ? (
+                <input
+                  type="checkbox"
+                  aria-label={t('miningTax.selectForBulkPay')}
+                  checked={bulkPaySelection.has(dr.key)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() =>
+                    setBulkPaySelection((previous) => {
+                      const next = new Set(previous);
+                      if (next.has(dr.key)) next.delete(dr.key);
+                      else next.add(dr.key);
+                      return next;
+                    })
+                  }
+                />
+              ) : null,
+          } satisfies DataTableColumn<DisplayRow>,
+        ]
+      : []),
+    ...(showCharacterColumn
+      ? [
+          {
+            id: 'character',
+            header: t('miningTax.characterColumn'),
+            render: (dr: DisplayRow) => dr.row.characterName,
+          } satisfies DataTableColumn<DisplayRow>,
+        ]
+      : []),
     {
       id: 'date',
       header: t('miningTax.dateColumn'),
@@ -323,27 +361,16 @@ export function MoonMiningTax() {
         data?.systemNames.get(dr.row.entry.solarSystemId) ?? `#${dr.row.entry.solarSystemId}`,
     },
     {
-      id: 'ore',
-      header: t('miningTax.oreColumn'),
-      render: (dr) =>
-        oreSummary(
-          dr.assignment ? dr.assignment.oreLines : dr.row.unassignedOreLines,
-          data?.typeNames ?? new Map()
-        ),
-    },
-    {
       id: 'payee',
       header: t('miningTax.payeeColumn'),
-      render: (dr) => {
-        if (!dr.assignment) return '—';
-        if (dr.assignment.status === 'dismissed') return t('miningTax.dismissedLabel');
-        return payeeName(dr.row.characterId, dr.assignment.payeeId);
-      },
+      className: 'whitespace-nowrap',
+      render: (dr) => payeeDisplayName(dr),
     },
     {
       id: 'value',
       header: t('miningTax.estimatedValueColumn'),
       align: 'right',
+      className: 'whitespace-nowrap',
       render: (dr) => {
         const value = dr.assignment
           ? dr.assignment.estimatedValue
@@ -356,6 +383,7 @@ export function MoonMiningTax() {
       id: 'taxOwed',
       header: t('miningTax.taxOwedColumn'),
       align: 'right',
+      className: 'whitespace-nowrap',
       render: (dr) => (dr.assignment ? `${formatIsk(dr.assignment.taxOwed, 2)} ISK` : '—'),
     },
     {
@@ -364,54 +392,16 @@ export function MoonMiningTax() {
       render: (dr) => statusLabel(t, dr.status),
     },
     {
-      id: 'actions',
+      id: 'edit',
       header: '',
-      render: (dr) => {
-        if (dr.status === 'unassigned') {
-          return (
-            <div className="flex justify-end gap-1">
-              <IconButton
-                size="sm"
-                icon={<Icon.AddToPlan />}
-                label={t('miningTax.assignAction')}
-                onClick={() => setAssignTarget(dr.row)}
-              />
-              <IconButton
-                size="sm"
-                icon={<Icon.Close />}
-                label={t('miningTax.dismissAction')}
-                onClick={() => void handleDismiss(dr.row)}
-              />
-            </div>
-          );
-        }
-        if (dr.status === 'needs-review' && dr.assignment) {
-          return (
-            <Button
-              size="sm"
-              onClick={() =>
-                setResolveTarget({
-                  assignment: dr.assignment as MiningTaxAssignmentRecord,
-                  row: dr.row,
-                })
-              }
-            >
-              {t('miningTax.resolveAction')}
-            </Button>
-          );
-        }
-        if (dr.status === 'dismissed' && dr.assignment) {
-          return (
-            <Button
-              size="sm"
-              onClick={() => void handleUndo(dr.assignment as MiningTaxAssignmentRecord)}
-            >
-              {t('miningTax.undismissAction')}
-            </Button>
-          );
-        }
-        return null;
-      },
+      className: 'w-6 px-2',
+      cardCorner: true,
+      // Decorative only — the whole row is the click target (onRowClick
+      // below); this just signals that clicking opens something editable,
+      // now that the table carries no per-row action buttons of its own.
+      render: () => (
+        <Icon.Rename aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-faint" />
+      ),
     },
   ];
 
@@ -437,10 +427,7 @@ export function MoonMiningTax() {
         actions={
           <>
             {payeeManagerDefaultCharacterId !== null && (
-              <Button
-                size="sm"
-                onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}
-              >
+              <Button onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}>
                 {t('miningTax.managePayeesAction')}
               </Button>
             )}
@@ -598,6 +585,8 @@ export function MoonMiningTax() {
                   rowKey={(dr) => dr.key}
                   label={t('miningTax.title')}
                   defaultSort={{ columnId: 'date', direction: 'desc' }}
+                  density="compact"
+                  onRowClick={(dr) => setDetailTarget(dr)}
                 />
               </div>
             </Panel>
@@ -632,39 +621,27 @@ export function MoonMiningTax() {
         />
       )}
 
-      {resolveTarget && (
-        <Modal
-          open={resolveTarget !== null}
-          onClose={() => setResolveTarget(null)}
-          title={t('miningTax.resolveTitle')}
-        >
-          <div className="space-y-3">
-            <p className="text-xs text-text-dim">{t('miningTax.resolveHint')}</p>
-            <ul className="space-y-1 text-sm">
-              {(resolveTarget.assignment.reviewDiff ?? []).map((diff) => (
-                <li key={diff.typeId} className="flex items-center justify-between gap-2">
-                  <span>{data?.typeNames.get(diff.typeId) ?? `#${diff.typeId}`}</span>
-                  <span className="tabular-nums">
-                    {diff.before.toLocaleString()} → {diff.after.toLocaleString()}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="flex gap-2 pt-1">
-              <Button
-                variant="primary"
-                className="flex-1"
-                disabled={resolving}
-                onClick={() => void handleConfirmResolve()}
-              >
-                {t('miningTax.resolveConfirm')}
-              </Button>
-              <Button className="flex-1" onClick={() => setResolveTarget(null)}>
-                {t('filters.cancel')}
-              </Button>
-            </div>
-          </div>
-        </Modal>
+      {detailTarget && data && (
+        <RowDetailModal
+          open={detailTarget !== null}
+          onClose={() => setDetailTarget(null)}
+          row={detailTarget.row}
+          assignment={detailTarget.assignment}
+          status={detailTarget.status}
+          systemName={
+            data.systemNames.get(detailTarget.row.entry.solarSystemId) ??
+            `#${detailTarget.row.entry.solarSystemId}`
+          }
+          typeNames={data.typeNames}
+          payeeDisplayName={payeeDisplayName(detailTarget)}
+          unitPrices={data.unitPrices}
+          busy={busy}
+          onAssign={() => void handleAssignFromDetail()}
+          onDismiss={() => void handleDismissFromDetail()}
+          onMarkPaid={() => void handleMarkPaidFromDetail()}
+          onResolve={() => void handleResolveFromDetail()}
+          onUndo={() => void handleUndoFromDetail()}
+        />
       )}
 
       <BulkPayConfirmDialog

@@ -8,6 +8,7 @@ vi.mock('@/sync', () => syncMock);
 
 const CHAR_A = 1;
 const TYPE_A = 45490;
+const TYPE_B = 45491;
 
 function assignment(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningTaxAssignmentRecord {
   return {
@@ -141,5 +142,56 @@ describe('reconcileAssignments', () => {
       { typeId: TYPE_A, before: 100, after: 200 },
     ]);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('folds a brand-new ore type into the sole Assignment for that entry (a continuous mining session)', async () => {
+    await db.miningTaxAssignments.put(assignment()); // covers only TYPE_A
+    const fresh: MiningLedgerEntry[] = [
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [
+          { typeId: TYPE_A, quantity: 100 }, // unchanged
+          { typeId: TYPE_B, quantity: 40 }, // never assigned before
+        ],
+      },
+    ];
+
+    await reconcileAssignments(CHAR_A, fresh);
+
+    const updated = await db.miningTaxAssignments.get('a1');
+    expect(updated?.status).toBe('needs-review');
+    expect(updated?.reviewDiff).toEqual([{ typeId: TYPE_B, before: 0, after: 40 }]);
+  });
+
+  it('does NOT fold a brand-new ore type into either Assignment when the entry is split across two', async () => {
+    await db.miningTaxAssignments.put(assignment({ id: 'a1', payeeId: 'p1' })); // covers TYPE_A
+    await db.miningTaxAssignments.put(
+      assignment({
+        id: 'a2',
+        payeeId: 'p2',
+        oreLines: [{ typeId: TYPE_B, quantity: 20 }],
+      })
+    ); // covers TYPE_B
+    const TYPE_C = 45492;
+    const fresh: MiningLedgerEntry[] = [
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [
+          { typeId: TYPE_A, quantity: 100 },
+          { typeId: TYPE_B, quantity: 20 },
+          { typeId: TYPE_C, quantity: 5 }, // belongs to neither Payee
+        ],
+      },
+    ];
+
+    await reconcileAssignments(CHAR_A, fresh);
+
+    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
+    expect((await db.miningTaxAssignments.get('a2'))?.status).toBe('outstanding');
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 });
