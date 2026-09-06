@@ -9,6 +9,7 @@ import {
   type ProductionSaleLinkRecord,
 } from '@/db';
 import {
+  CollapsiblePanel,
   DataTable,
   EmptyState,
   FilterBar,
@@ -83,13 +84,12 @@ function groupByRunId<T extends { runId: string }>(rows: readonly T[]): Map<stri
 }
 
 /** One label-over-value block, matching the design's larger dashboard stat (distinct from the compact `StatChip`). */
-function BigStat({ label, value, tone }: { label: string; value: string; tone?: string }) {
+/** One ledger line of the Records rollup: uppercase label left, figure right. */
+function TotalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex min-w-36 flex-col gap-1 rounded-xs border border-line bg-panel-2 px-3 py-2">
-      <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </span>
-      <span className={`text-base font-semibold tabular-nums ${tone ?? 'text-text'}`}>{value}</span>
+    <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem]">
+      <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
+      <span className="font-medium tabular-nums">{value}</span>
     </div>
   );
 }
@@ -158,6 +158,8 @@ interface Rollup {
   totalCostLogged: number;
   totalRevenueLinked: number;
   openInventoryValue: number;
+  /** Realized profit over linked revenue, weighted — null until a sale is linked. */
+  avgMarginPct: number | null;
 }
 
 function buildRollup(
@@ -222,15 +224,18 @@ function buildRollup(
     }))
     .sort((a, b) => b.run.loggedAt - a.run.loggedAt);
 
+  const totalRealizedProfit = summaries.reduce((sum, s) => sum + s.profit.profit, 0);
+  const totalRevenueLinked = summaries.reduce((sum, s) => sum + s.profit.grossRevenue, 0);
   return {
     summaries,
     itemRows,
     runRows,
     filteredRunCount: filteredRuns.length,
-    totalRealizedProfit: summaries.reduce((sum, s) => sum + s.profit.profit, 0),
+    totalRealizedProfit,
     totalCostLogged: summaries.reduce((sum, s) => sum + s.run.totalCost, 0),
-    totalRevenueLinked: summaries.reduce((sum, s) => sum + s.profit.grossRevenue, 0),
+    totalRevenueLinked,
     openInventoryValue: summaries.reduce((sum, s) => sum + s.openInventoryValue, 0),
+    avgMarginPct: totalRevenueLinked > 0 ? (totalRealizedProfit / totalRevenueLinked) * 100 : null,
   };
 }
 
@@ -254,6 +259,9 @@ export function ProductionLogPanel({
 }: ProductionLogPanelProps) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<ProductionLogFilter>(EMPTY_PRODUCTION_LOG_FILTER);
+  // The per-run ledger folds away by default: "By item" is the read that
+  // says what is making money, the run list is the audit trail behind it.
+  const [runsExpanded, setRunsExpanded] = useState(false);
 
   const runs =
     useLiveQuery(
@@ -304,6 +312,7 @@ export function ProductionLogPanel({
     totalCostLogged,
     totalRevenueLinked,
     openInventoryValue,
+    avgMarginPct,
   } = rollup;
 
   const columns: DataTableColumn<ItemRow>[] = [
@@ -386,61 +395,92 @@ export function ProductionLogPanel({
         </FilterBar>
       }
     >
-      <div className="space-y-1">
-        <p className="text-[0.6875rem] text-text-dim">{t('industry.productionLogSubtitle')}</p>
-        <p className="text-[0.6875rem] text-text-faint">
-          {t('industry.productionLogCaveat', { runs: filteredRunCount, items: itemRows.length })}
-        </p>
-      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
+        <div className="space-y-2">
+          <div className="flex flex-col gap-1 rounded-xs border border-line bg-panel-2 px-3 py-2">
+            <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('industry.totalRealizedProfit')}
+            </span>
+            <span
+              className={`text-3xl leading-tight font-semibold tabular-nums ${iskToneClass(totalRealizedProfit)}`}
+            >
+              {formatIsk(totalRealizedProfit)} ISK
+            </span>
+            <span className="text-[0.6875rem] text-text-dim">
+              {t('industry.productionLogSubtitle')}
+            </span>
+            <span className="text-[0.6875rem] text-text-faint">
+              {t('industry.productionLogCaveat', {
+                runs: filteredRunCount,
+                items: itemRows.length,
+              })}
+            </span>
+          </div>
+          <div className="divide-y divide-line rounded-xs border border-line">
+            <TotalRow label={t('industry.totalCostLogged')} value={formatIsk(totalCostLogged)} />
+            <TotalRow
+              label={t('industry.totalRevenueLinked')}
+              value={formatIsk(totalRevenueLinked)}
+            />
+            <TotalRow
+              label={t('industry.openInventoryValue')}
+              value={formatIsk(openInventoryValue)}
+            />
+            <TotalRow
+              label={t('industry.avgMargin')}
+              value={avgMarginPct === null ? t('common.unknown') : formatPercent(avgMarginPct)}
+            />
+          </div>
+        </div>
 
-      <div className="my-3 flex flex-wrap gap-2">
-        <BigStat
-          label={t('industry.totalRealizedProfit')}
-          value={formatIsk(totalRealizedProfit)}
-          tone={iskToneClass(totalRealizedProfit)}
-        />
-        <BigStat label={t('industry.totalCostLogged')} value={formatIsk(totalCostLogged)} />
-        <BigStat label={t('industry.totalRevenueLinked')} value={formatIsk(totalRevenueLinked)} />
-        <BigStat label={t('industry.openInventoryValue')} value={formatIsk(openInventoryValue)} />
-      </div>
-
-      {runRows.length === 0 ? (
-        <EmptyState
-          title={t('industry.productionLogFilteredEmptyTitle')}
-          hint={t('industry.productionLogFilteredEmptyHint')}
-          className="py-6"
-        />
-      ) : (
-        <>
-          <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('industry.allProductionRuns')}
-          </h3>
-          <DataTable
-            columns={runColumns}
-            rows={runRows}
-            rowKey={(r) => r.run.id}
-            label={t('industry.allProductionRuns')}
-            density="compact"
-            className="mb-5"
-            // Only navigates when the run's own Build Plan still exists — a
-            // logged run is a locked financial record that outlives a
-            // deleted plan (see planSync.ts's markBuildPlanDeleted), so a
-            // click here has nowhere left to jump to.
-            onRowClick={onOpenRun ? (r) => r.planExists && onOpenRun(r.run.buildPlanId) : undefined}
+        {runRows.length === 0 ? (
+          <EmptyState
+            title={t('industry.productionLogFilteredEmptyTitle')}
+            hint={t('industry.productionLogFilteredEmptyHint')}
+            className="py-6"
           />
+        ) : (
+          <div className="min-w-0 space-y-4">
+            <div>
+              <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('industry.byItem')}
+              </h3>
+              <DataTable
+                columns={columns}
+                rows={itemRows}
+                rowKey={(r) => r.productTypeID}
+                label={t('industry.byItem')}
+                density="compact"
+              />
+            </div>
 
-          <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('industry.byItem')}
-          </h3>
-          <DataTable
-            columns={columns}
-            rows={itemRows}
-            rowKey={(r) => r.productTypeID}
-            label={t('industry.byItem')}
-            density="compact"
-          />
-        </>
-      )}
+            <CollapsiblePanel
+              title={t('industry.allProductionRuns')}
+              meta={<span className="text-xs tabular-nums text-text-dim">{runRows.length}</span>}
+              expanded={runsExpanded}
+              onToggle={() => setRunsExpanded((open) => !open)}
+              labels={{
+                show: t('industry.productionLogShowRuns'),
+                hide: t('industry.productionLogHideRuns'),
+              }}
+              padded={false}
+            >
+              <div className="overflow-x-auto">
+                <DataTable
+                  columns={runColumns}
+                  rows={runRows}
+                  rowKey={(r) => r.run.id}
+                  label={t('industry.allProductionRuns')}
+                  density="compact"
+                  onRowClick={
+                    onOpenRun ? (r) => r.planExists && onOpenRun(r.run.buildPlanId) : undefined
+                  }
+                />
+              </div>
+            </CollapsiblePanel>
+          </div>
+        )}
+      </div>
 
       <SaleLinkingModals sale={sale} />
     </Panel>

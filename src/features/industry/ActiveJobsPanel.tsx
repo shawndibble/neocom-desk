@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Caret,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -22,6 +23,7 @@ import {
   isJobDone,
   isCompletingSoon,
   secondsRemaining,
+  summarizeJobs,
   activityI18nKey,
   contextMenuTypeId,
   type ActiveJob,
@@ -94,6 +96,10 @@ export function ActiveJobsPanel({
   // matching how no chip pressed reads as no filter everywhere else in the app.
   const [activityFilter, setActivityFilter] = useState<ReadonlySet<number>>(new Set());
   const [completingSoonOnly, setCompletingSoonOnly] = useState(false);
+  // The list is folded away by default: the header's one-line read (how many
+  // run, what finishes next, a bar per job) is what a pilot glancing at the
+  // page wants, and the six-column table is one click away when they don't.
+  const [expanded, setExpanded] = useState(false);
   const { data, loading, refreshCount, refresh } = useRouteSnapshot(
     loadActiveJobsSnapshot,
     characterId,
@@ -140,6 +146,11 @@ export function ActiveJobsPanel({
   const listRefresh = showingCorp ? corp.refresh : refresh;
 
   const jobs = useMemo(() => sortJobsBySoonest<ActiveJob>(result?.cached?.data ?? []), [result]);
+  const summary = useMemo(() => summarizeJobs(jobs, now), [jobs, now]);
+  // Loading, re-auth and the empty states are the whole story; only a real
+  // list has anything to fold.
+  const collapsible = jobs.length > 0 && !listLoading && !result?.needsReauth;
+  const showList = !collapsible || expanded;
 
   // Chips only for activities actually present — a chip for an activity type
   // this character never runs would just be a permanently-dead toggle.
@@ -298,8 +309,58 @@ export function ActiveJobsPanel({
   return (
     <Panel
       title={t('industry.jobsTitle')}
+      meta={
+        collapsible && (
+          <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
+            <span className="text-text">
+              {t('industry.jobsSummary', { running: summary.running, done: summary.done })}
+            </span>
+            {summary.next && (
+              <span
+                className={soon(summary.next.job) ? 'font-semibold text-warning' : 'text-text-dim'}
+              >
+                {t('industry.jobsNextFinish', {
+                  name: nameForBlueprint(summary.next.job.blueprint_type_id),
+                  time: formatDuration(summary.next.seconds),
+                })}
+              </span>
+            )}
+          </span>
+        )
+      }
       actions={
         <span className="flex items-center gap-2">
+          {collapsible && !expanded && (
+            // One bar per job, desktop only: the fold's whole point is a
+            // glance, and at phone width the names would not fit beside them.
+            <span aria-hidden="true" className="hidden items-center gap-3 lg:flex">
+              {jobs.slice(0, 4).map((job) => {
+                const progress = Math.round(jobProgress(job, now) * 100);
+                return (
+                  <span
+                    key={job.job_id}
+                    className="flex items-center gap-1.5 text-[0.6875rem] text-text-dim"
+                  >
+                    <span className="max-w-28 truncate">
+                      {nameForBlueprint(job.blueprint_type_id)}
+                    </span>
+                    <span className="block h-1.5 w-14 overflow-hidden rounded-full bg-panel">
+                      <span
+                        className={`block h-full ${
+                          isJobDone(job, now)
+                            ? 'bg-success'
+                            : soon(job)
+                              ? 'bg-warning'
+                              : 'bg-accent'
+                        }`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </span>
+                  </span>
+                );
+              })}
+            </span>
+          )}
           {result?.cached?.fetchedAt && <DataAgeBadge date={result.cached.fetchedAt} />}
           <IconButton
             size="sm"
@@ -321,8 +382,18 @@ export function ActiveJobsPanel({
             onClick={listRefresh}
             disabled={listLoading}
           />
+          {collapsible && (
+            <IconButton
+              size="sm"
+              icon={<Caret expanded={expanded} />}
+              label={expanded ? t('industry.jobsHideList') : t('industry.jobsShowList')}
+              aria-expanded={expanded}
+              onClick={() => setExpanded((open) => !open)}
+            />
+          )}
         </span>
       }
+      padded={showList || corpAvailable}
     >
       {/*
         First row inside the body rather than beside the header's badge and two
@@ -331,7 +402,7 @@ export function ActiveJobsPanel({
       */}
       {corpAvailable && (
         <OwnerSwitch
-          className="mb-2"
+          className={showList ? 'mb-2' : undefined}
           value={owner}
           onChange={setOwner}
           label={t('industry.jobsOwnerLabel')}
@@ -339,7 +410,7 @@ export function ActiveJobsPanel({
           corporationLabel={t('industry.jobsOwnerCorporation')}
         />
       )}
-      {listLoading ? (
+      {!showList ? null : listLoading ? (
         <div className="flex justify-center py-4">
           <Spinner size="sm" label={t('common.loading')} />
         </div>

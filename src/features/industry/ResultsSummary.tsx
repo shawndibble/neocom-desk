@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  Button,
   DataTable,
   Disclosure,
   EmptyState,
@@ -11,7 +10,6 @@ import {
   InfoTooltip,
   Spinner,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
 import {
@@ -24,7 +22,6 @@ import { marketItemUrl } from '@/engine/market/urlState';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent } from './format';
-import { CalculationBreakdown, type BreakdownContext } from './CalculationBreakdown';
 
 interface CostRowProps {
   label: string;
@@ -108,8 +105,8 @@ interface ResultsSummaryProps {
   productQuantity: number | null;
   /** Short solar-system name the build's cost index applies to (UX-REVIEW #6/#8: makes the trade-hub <-> build-system coupling explicit in the label). */
   costIndexSystemName: string;
-  /** The inputs behind the numbers, quoted back by the calculation breakdown modal. */
-  breakdown: BreakdownContext;
+  /** Opens the Calculation Breakdown the hero owns — the break-even and owned-sale "?"s are doors into it. */
+  onOpenBreakdown: () => void;
   /**
    * What the materials the player already owns would fetch if sold instead of
    * consumed, quoted on both liquidation bases. Null while there is no result
@@ -122,8 +119,8 @@ interface ResultsSummaryProps {
 }
 
 /**
- * Job fee breakdown, cost, profit, margin, ISK/hour, and the build-vs-buy
- * verdict. Gated on `pricesReady`: without it there is nothing honest to
+ * Job fee breakdown, cost, revenue, profit, margin, ISK/hour and break-even —
+ * the working behind the verdicts `PlanVerdictHero` states. Gated on `pricesReady`: without it there is nothing honest to
  * show (job cost needs live adjusted prices + system cost index, neither of
  * which are cached locally) — materials + time stay visible in the sibling
  * panel regardless.
@@ -138,7 +135,7 @@ export function ResultsSummary({
   productUnitPrice,
   productQuantity,
   costIndexSystemName,
-  breakdown,
+  onOpenBreakdown,
   ownedSale,
   nameFor,
 }: ResultsSummaryProps) {
@@ -147,7 +144,6 @@ export function ResultsSummary({
   const location = useLocation();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
   const [profitView, setProfitView] = useState<'net' | 'gross'>('net');
-  const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [saleBasis, setSaleBasis] = useState<LiquidationBasis>('instant');
   const [saleLinesExpanded, setSaleLinesExpanded] = useState(false);
 
@@ -225,7 +221,6 @@ export function ResultsSummary({
     );
   }
 
-  const hasVerdict = result.recommendation !== 'unknown';
   // Always the net profit, never `displayProfit`: selling the materials pays
   // sales tax too, so both sides of this comparison have to be after fees.
   const useOrSell = ownedSale ? compareUseOrSell(result.profit, ownedSale[saleBasis]) : null;
@@ -235,24 +230,6 @@ export function ResultsSummary({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button
-          size="sm"
-          onClick={() => setBreakdownOpen(true)}
-          aria-haspopup="dialog"
-          aria-expanded={breakdownOpen}
-        >
-          <Icon.Info size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-          {t('industry.breakdownTrigger')}
-        </Button>
-      </div>
-      <CalculationBreakdown
-        open={breakdownOpen}
-        onClose={() => setBreakdownOpen(false)}
-        result={result}
-        context={breakdown}
-      />
-
       {result.unpriceable && (
         <p className="text-xs text-warning">
           {result.unpricedMaterials.length > 0 &&
@@ -398,61 +375,19 @@ export function ResultsSummary({
         </div>
       )}
 
-      <div className="space-y-1">
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('industry.acquisitionVerdictLabel')}
-        </p>
-        {hasVerdict ? (
-          <p
-            className={`text-sm font-semibold ${
-              result.recommendation === 'build' ? 'text-success' : 'text-warning'
-            }`}
-          >
-            {result.recommendation === 'build'
-              ? t('industry.verdictBuild', {
-                  amount: formatIsk((result.buyCost ?? 0) - result.totalCost),
-                })
-              : t('industry.verdictBuy', {
-                  amount: formatIsk(result.totalCost - (result.buyCost ?? 0)),
-                })}
-          </p>
-        ) : (
-          <p className="text-xs text-text-dim">{t('industry.verdictUnknown')}</p>
-        )}
-      </div>
-
-      <div className="space-y-1">
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('industry.saleProfitabilityLabel')}
-        </p>
-        {displayProfit !== null ? (
-          <p
-            className={`text-sm font-semibold ${displayProfit >= 0 ? 'text-success' : 'text-warning'}`}
-          >
-            {displayProfit >= 0
-              ? t('industry.saleProfitabilityProfit', { amount: formatIsk(displayProfit) })
-              : t('industry.saleProfitabilityLoss', { amount: formatIsk(Math.abs(displayProfit)) })}
-          </p>
-        ) : (
-          <p className="text-xs text-text-dim">{t('industry.saleProfitabilityUnknown')}</p>
-        )}
-        {result.breakEvenPrice !== null && (
-          <div className="divide-y divide-line rounded-xs border border-line">
-            <CostRow
-              label={t('industry.breakEvenPrice')}
-              value={formatIsk(result.breakEvenPrice)}
-              tooltip={t('industry.breakEvenPriceTooltip')}
-              onTooltipClick={() => setBreakdownOpen(true)}
-            />
-            {productUnitPrice !== null && (
-              <CostRow
-                label={t('industry.currentMarketPrice')}
-                value={formatIsk(productUnitPrice)}
-              />
-            )}
-          </div>
-        )}
-      </div>
+      {result.breakEvenPrice !== null && (
+        <div className="divide-y divide-line rounded-xs border border-line">
+          <CostRow
+            label={t('industry.breakEvenPrice')}
+            value={formatIsk(result.breakEvenPrice)}
+            tooltip={t('industry.breakEvenPriceTooltip')}
+            onTooltipClick={onOpenBreakdown}
+          />
+          {productUnitPrice !== null && (
+            <CostRow label={t('industry.currentMarketPrice')} value={formatIsk(productUnitPrice)} />
+          )}
+        </div>
+      )}
 
       {/* `ownedUnits` is the same on either basis — it counts stock, not prices. */}
       {ownedSale && ownedSale.instant.ownedUnits > 0 && (
@@ -482,7 +417,7 @@ export function ResultsSummary({
               label={t('industry.useOrSell.sellNet')}
               value={formatIsk(ownedSale[saleBasis].net)}
               tooltip={t('industry.useOrSell.sellNetTooltip')}
-              onTooltipClick={() => setBreakdownOpen(true)}
+              onTooltipClick={onOpenBreakdown}
             />
             {result.profit !== null && (
               <CostRow

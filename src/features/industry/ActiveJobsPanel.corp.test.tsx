@@ -81,6 +81,11 @@ function corpJobsUrl() {
   return `${ESI_BASE_URL}/corporations/${CORP_ID}/industry/jobs`;
 }
 
+/** The job list is folded by default (verdict-first header) — table rows only render once opened. */
+async function expandJobs(user: { click: (el: Element) => Promise<void> } = userEvent) {
+  await user.click(await screen.findByRole('button', { name: 'Show job list' }));
+}
+
 /** A Director with the corp grant, whose corporation is already known. */
 async function seedCorpCapableCharacter() {
   await db.characters.put({
@@ -289,6 +294,9 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     expect(await screen.findByText('Widget Beta')).toBeInTheDocument();
     expect(screen.queryByText('Widget Alpha')).toBeNull();
     expect(corpRequests).toBe(1);
+
+    // The corp list is also folded until opened.
+    await expandJobs(user);
     // Same table, different owner — the corp rows render through the very same
     // columns, runs count included.
     expect(

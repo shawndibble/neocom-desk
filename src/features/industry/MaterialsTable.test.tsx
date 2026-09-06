@@ -281,10 +281,12 @@ describe('MaterialsTable stacked card', () => {
       'items-start',
       'sm:items-end'
     );
-    // The price cell reaches the same right edge by mirroring rather than by
-    // `justify-end` — see the alignment test below — so what matters here is
-    // that it starts at the gutter on the card like everything else.
-    expect(tritanium.getByText('Hub').parentElement).toHaveClass('justify-start');
+    // The price cell stacks field over source tag; the column starts at the
+    // gutter on the card and hugs the right edge from sm up like the rest.
+    expect(tritanium.getByText('Hub').parentElement?.parentElement).toHaveClass(
+      'items-start',
+      'sm:items-end'
+    );
   });
 
   it('left-aligns the digits inside a sourcing field below sm, so they sit in the value column too', () => {
@@ -386,7 +388,7 @@ describe('MaterialsTable number mask', () => {
     render(<Harness hubPrices={BIG_PRICES} onChange={vi.fn()} />);
 
     const cell = priceInput('Tritanium').parentElement;
-    expect(cell).toHaveClass('sm:flex-row-reverse');
+    expect(cell).toHaveClass('flex-col', 'sm:items-end');
     expect(cell?.firstElementChild).toBe(priceInput('Tritanium'));
 
     // And it holds once a row grows a revert button: the field is a fixed

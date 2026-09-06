@@ -45,6 +45,16 @@ function jobsUrl() {
   return `${ESI_BASE_URL}/characters/${CHAR_ID}/industry/jobs`;
 }
 
+/**
+ * The job list is folded by default (verdict-first header); the table, chips,
+ * and offline/refresh-failed banner only render once opened. Accepts a
+ * caller's own `userEvent.setup()` instance (several tests run under fake
+ * timers) or falls back to the direct API for tests that have none.
+ */
+async function expandJobs(user: { click: (el: Element) => Promise<void> } = userEvent) {
+  await user.click(await screen.findByRole('button', { name: 'Show job list' }));
+}
+
 describe('ActiveJobsPanel: rendering', () => {
   it('renders jobs sorted soonest-ending first, with blueprint + activity names, countdown, "Done", and progress', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -92,6 +102,7 @@ describe('ActiveJobsPanel: rendering', () => {
       )
     );
 
+    const user = userEvent.setup();
     const { container } = render(
       <MemoryRouter>
         <ActiveJobsPanel
@@ -103,7 +114,7 @@ describe('ActiveJobsPanel: rendering', () => {
       </MemoryRouter>
     );
 
-    await screen.findByText('Widget Alpha');
+    await expandJobs(user);
     expect(screen.getByText('Widget Beta')).toBeInTheDocument();
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
 
@@ -115,7 +126,9 @@ describe('ActiveJobsPanel: rendering', () => {
     expect(jobList.getByText('Invention')).toBeInTheDocument();
 
     // Sort: job 3 (past, "done") first, then job 2 (30m left), then job 1 (1h30m left).
-    const text = container.textContent ?? '';
+    // Scoped to tbody — the header's own "finishes in" text names job 2 (Widget
+    // Beta) too, ahead of the table in DOM order, which would break the count.
+    const text = container.querySelector('tbody')!.textContent ?? '';
     expect(text.indexOf('Widget Alpha')).toBeLessThan(text.indexOf('Widget Beta'));
     expect(text.indexOf('Widget Beta')).toBeLessThan(text.indexOf('Widget Gamma'));
 
@@ -140,6 +153,71 @@ describe('ActiveJobsPanel: rendering', () => {
       new Date(NOW.getTime() + 30 * 60_000).toISOString(),
       new Date(NOW.getTime() + 90 * 60_000).toISOString(),
     ]);
+  });
+
+  it('folds the list by default: header states the summary, table stays hidden until opened', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+
+    // Same fixture as the sorting test: 2 running (30m, 90m left), 1 done.
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json([
+          {
+            job_id: 1,
+            activity_id: 8,
+            blueprint_type_id: 300,
+            facility_id: 60003760,
+            station_id: 60003760,
+            runs: 1,
+            start_date: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+            end_date: new Date(NOW.getTime() + 90 * 60_000).toISOString(),
+            status: 'active',
+          },
+          {
+            job_id: 2,
+            activity_id: 4,
+            blueprint_type_id: 200,
+            facility_id: 60003760,
+            station_id: 60003760,
+            runs: 1,
+            start_date: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+            end_date: new Date(NOW.getTime() + 30 * 60_000).toISOString(),
+            status: 'active',
+          },
+          {
+            job_id: 3,
+            activity_id: 1,
+            blueprint_type_id: 100,
+            facility_id: 60003760,
+            station_id: 60003760,
+            runs: 5,
+            start_date: new Date(NOW.getTime() - 120 * 60_000).toISOString(),
+            end_date: new Date(NOW.getTime() - 10 * 60_000).toISOString(),
+            status: 'ready',
+          },
+        ])
+      )
+    );
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    const caret = await screen.findByRole('button', { name: 'Show job list' });
+    expect(caret).toHaveAttribute('aria-expanded', 'false');
+
+    // Soonest unfinished job is job 2 (30m left); job 3 is done, excluded from "next".
+    expect(screen.getByText('2 running · 1 done')).toBeInTheDocument();
+    expect(screen.getByText('Widget Beta finishes in 30m')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('shows a "no active jobs" empty state (not the no-data-cached one) when ESI answers with zero jobs', async () => {
@@ -293,7 +371,8 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
+    await expandJobs();
+    expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see jobs')).toBeNull();
   });
@@ -330,6 +409,8 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
         />
       </MemoryRouter>
     );
+
+    await expandJobs(user);
 
     // Initial load falls back to cache too, but this is the generic banner, not "Refresh failed".
     expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
@@ -373,9 +454,11 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
       </MemoryRouter>
     );
 
+    await expandJobs();
+
     // The row itself still shows the blueprint's name (unchanged); the context
     // menu it opens targets the job's product typeID.
-    const row = (await screen.findByText('Widget Alpha')).closest('tr')!;
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
     fireEvent.contextMenu(row);
 
     const quickbarItem = await screen.findByText('Add to Quickbar');
@@ -404,7 +487,8 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
       </MemoryRouter>
     );
 
-    const row = (await screen.findByText('Widget Alpha')).closest('tr')!;
+    await expandJobs();
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
     fireEvent.contextMenu(row);
 
     expect(await screen.findByText(/no blueprint/i)).toBeInTheDocument();
@@ -437,7 +521,7 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
       </MemoryRouter>
     );
 
-    await screen.findByText('Widget Alpha');
+    await expandJobs(user);
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Manufacturing' }));
@@ -480,7 +564,7 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
       </MemoryRouter>
     );
 
-    await screen.findByText('Widget Alpha');
+    await expandJobs(user);
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Completing soon' }));
@@ -538,7 +622,7 @@ describe('ActiveJobsPanel: table columns', () => {
       </MemoryRouter>
     );
 
-    await screen.findByText('Widget Alpha');
+    await expandJobs(user);
 
     // Every table column, header and value.
     for (const header of ['Blueprint', 'Activity', 'Runs', 'Progress', 'Ends in', 'Ends (EVE)']) {

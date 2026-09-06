@@ -81,3 +81,21 @@ export function summarizeProductionRun(
     openInventoryValue: remaining * costPerUnit,
   };
 }
+
+/** What a collapsed Production Runs panel says about its rows. */
+export interface ProductionRunsRollup {
+  count: number;
+  realizedProfit: number;
+  /** Runs with units still unsold — `'new'` or `'open'`. */
+  openCount: number;
+}
+
+export function rollupProductionRuns(
+  rows: readonly Pick<ProductionRunSummary, 'profit' | 'status'>[]
+): ProductionRunsRollup {
+  return {
+    count: rows.length,
+    realizedProfit: rows.reduce((sum, row) => sum + row.profit.profit, 0),
+    openCount: rows.filter((row) => row.status !== 'closed').length,
+  };
+}
