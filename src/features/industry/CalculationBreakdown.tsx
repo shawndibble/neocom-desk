@@ -206,6 +206,7 @@ export function CalculationBreakdown({
         <Section title={t('industry.breakdown.useOrSellTitle')}>
           <p>{t('industry.breakdown.useOrSellBody')}</p>
           <p>{t('industry.breakdown.useOrSellBases')}</p>
+          <p>{t('industry.breakdown.useOrSellScope')}</p>
           <p>{t('industry.breakdown.useOrSellUnpriced')}</p>
         </Section>
 

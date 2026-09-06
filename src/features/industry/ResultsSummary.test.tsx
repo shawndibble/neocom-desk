@@ -432,7 +432,7 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
   });
 });
 
-describe('ResultsSummary: calculation breakdown (issue #531)', () => {
+describe('ResultsSummary: calculation breakdown', () => {
   it('opens a modal from the results and explains where material and product prices come from', async () => {
     renderSummary();
     await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
@@ -488,7 +488,7 @@ describe('ResultsSummary: calculation breakdown (issue #531)', () => {
   });
 });
 
-describe('ResultsSummary: use or sell the owned materials (issue #531)', () => {
+describe('ResultsSummary: use or sell the owned materials', () => {
   it('stays hidden when the player owns none of the materials', () => {
     renderSummary();
     expect(screen.queryByText(/use or sell your materials/i)).toBeNull();

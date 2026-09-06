@@ -559,11 +559,12 @@
       "useOrSellTitle": "Use or sell your materials",
       "useOrSellBody": "Owned units cost the plan nothing, so the profit above is what you make on top of materials you already have. Selling those units instead is the other option, and the comparison is a straight one: build if the profit beats what the materials would fetch, sell if it does not.",
       "useOrSellBases": "Sell now fills the standing buy orders — you get paid at once and pay sales tax only, because filling someone else’s order lists nothing. Sell order lists your own stack at the hub’s sell price: more ISK on paper, but you pay the broker fee (100 ISK minimum per stack) and you wait for a buyer.",
-      "useOrSellUnpriced": "A material with no order on the chosen side gets no verdict at all, rather than a total that quietly leaves it out."
+      "useOrSellUnpriced": "A material with no order on the chosen side gets no verdict at all, rather than a total that quietly leaves it out.",
+      "useOrSellScope": "Only the owned units this job consumes are valued: hold more than it needs and the surplus is outside the comparison, and a material you set to Built is counted as itself, not as the stock sitting behind its own recipe."
     },
     "useOrSell": {
       "label": "Use or sell your materials?",
-      "intro": "You already own some of what this job eats. This compares building with those materials against selling them and building nothing.",
+      "intro": "You already own some of what this job eats. This compares building with those units against selling them and building nothing. Only the units this job would consume are counted — stock beyond what it needs is not valued here.",
       "basisLabel": "How the owned materials would be sold",
       "basisInstant": "Sell now",
       "basisOrder": "Sell order",
