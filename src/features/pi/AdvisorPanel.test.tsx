@@ -1093,7 +1093,24 @@ describe('AdvisorPanel build advice', () => {
     // eats plus the extractor capacity it costs, so the raw floor wins.
     priceEverything();
     renderPanel();
-    expect(await screen.findByText('Keep selling Microorganisms raw')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Switch to extracting Microorganisms and sell it raw')
+    ).toBeInTheDocument();
+  });
+
+  it('says “keep” only when the winning ore is the one already coming out', async () => {
+    // `stopTier` scores every P0 the planet type yields, not just the one
+    // being extracted, and this colony's extractor runs Base Metals while
+    // Microorganisms wins. "Keep selling Microorganisms raw" reads as "carry
+    // on" to a pilot who is not extracting it — a false status-quo claim, and
+    // the one that made a reader take the recommended ore's price for the
+    // extracted ore's when checking the arithmetic.
+    priceEverything();
+    renderPanel();
+    await screen.findByText('Switch to extracting Microorganisms and sell it raw');
+    expect(screen.queryByText(/^Keep selling/)).not.toBeInTheDocument();
+    // And the output figure is flagged as a rebuilt colony's, not this one's.
+    expect(screen.getByText(/what this colony would make rebuilt around it/)).toBeInTheDocument();
   });
 
   it('states the derived customs rate rather than costing at a silent default', async () => {

@@ -578,20 +578,36 @@ function StopTierLine({
   }
 
   const { best } = result.advice;
+  // "Keep selling X raw" is a claim about the status quo, and `stopTier`
+  // enumerates *every* P0 this planet type yields — not just the one being
+  // extracted. On a gas planet running Base Metals it was recommending Ionic
+  // Solutions under a word that says nothing is changing, which reads as
+  // "carry on" and is the opposite of the advice. Naming the switch also warns
+  // that the output figure below is what a rebuilt colony would make, not what
+  // this one makes today.
+  const extractsBest =
+    best.tier === 0 && advice.colony.extractedPerHour.some((entry) => entry.typeId === best.typeId);
   return framed(
     <CardLine
       label={t(result.alreadyRunning ? 'piAdvisor.stopTierAtLabel' : 'piAdvisor.stopTierLabel')}
     >
       <span className="text-text">
         {best.tier === 0
-          ? t('piAdvisor.stopTierSellRaw', { name: best.name })
+          ? t(extractsBest ? 'piAdvisor.stopTierSellRaw' : 'piAdvisor.stopTierSwitchRaw', {
+              name: best.name,
+            })
           : t('piAdvisor.stopTierMake', { name: best.name, tier: best.tier })}
       </span>
       <div className="text-text-dim">
-        {t('piAdvisor.stopTierValue', {
-          isk: formatIsk(best.marginPerHour),
-          units: Math.round(best.unitsPerHour).toLocaleString(),
-        })}
+        {t(
+          best.tier === 0 && !extractsBest
+            ? 'piAdvisor.stopTierValueSwitch'
+            : 'piAdvisor.stopTierValue',
+          {
+            isk: formatIsk(best.marginPerHour),
+            units: Math.round(best.unitsPerHour).toLocaleString(),
+          }
+        )}
       </div>
     </CardLine>
   );

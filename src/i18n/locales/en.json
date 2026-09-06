@@ -1317,6 +1317,8 @@
     "stopTierLabel": "Build up to",
     "stopTierMake": "{{name}} (P{{tier}})",
     "stopTierSellRaw": "Keep selling {{name}} raw",
+    "stopTierSwitchRaw": "Switch to extracting {{name}} and sell it raw",
+    "stopTierValueSwitch": "{{isk}} an hour, at {{units}} an hour of output — what this colony would make rebuilt around it, not what it makes now",
     "stopTierValue": "{{isk}} an hour, at {{units}} an hour of output",
     "stopTierNeedsRate": "No build advice: no extractor here reports a complete program, so this colony has no rate of its own to size a chain against.",
     "roomUnknownRadius_one": "Headroom unknown: this colony has {{count}} link and this planet's radius did not load, so the link's cost cannot be worked out.",
