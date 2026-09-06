@@ -371,14 +371,23 @@ export interface MiningTaxQuantityDiff {
   after: number;
 }
 
-export type MiningTaxAssignmentStatus = 'outstanding' | 'paid' | 'needs-review';
+export type MiningTaxAssignmentStatus = 'outstanding' | 'paid' | 'needs-review' | 'dismissed';
 
 /**
  * An Assignment (CONTEXT.md, issue #523): links a Mining Ledger Entry (or a
  * split slice of its ore lines) to a Payee, snapshotting the tax percent and
  * ISK value **at assignment time** — invoice semantics, so neither a later
  * Jita price move nor an edited Payee default retroactively changes what an
- * already-assigned obligation shows as owed.
+ * already-assigned obligation shows as owed. Both the value and the tax
+ * percent are prefilled from the computed default but pilot-editable at
+ * assignment time, since Jita price and a Payee's default rate are both
+ * estimates that can be wrong for a specific haul.
+ *
+ * A `dismissed` Assignment ("I don't pay tax on this entry") carries no
+ * `payeeId` — there is no Payee to owe, so `taxPct`/`taxOwed` are always 0.
+ * It still snapshots `oreLines` and still participates in re-diffing (a
+ * dismissed entry that grows still surfaces for reconsideration, the same as
+ * a paid one).
  *
  * Re-diffed on every ledger refresh: if ESI reports *more* ore for the same
  * (characterId, date, solarSystemId) after assignment, `status` flips to
@@ -392,14 +401,15 @@ export interface MiningTaxAssignmentRecord {
   /** EVE/UTC calendar date, e.g. "2026-09-04". */
   date: string;
   solarSystemId: number;
-  payeeId: string;
+  /** Absent only when `status` is `dismissed` — every other status owes a real Payee. */
+  payeeId?: string;
   /** The ore lines this Assignment covers, snapshotted at assignment time. */
   oreLines: MiningTaxOreLine[];
-  /** Percent, 0-100, snapshotted from the Payee's default (or overridden) at assignment time. */
+  /** Percent, 0-100, snapshotted from the Payee's default (or overridden) at assignment time. Always 0 for `dismissed`. */
   taxPct: number;
-  /** ISK value of `oreLines` at Jita price, snapshotted at assignment time. */
+  /** ISK value of `oreLines` at Jita price, snapshotted at assignment time — pilot-editable at assignment. */
   estimatedValue: number;
-  /** `estimatedValue * taxPct / 100`, snapshotted at assignment time. */
+  /** Snapshotted at assignment time — defaults to `estimatedValue * taxPct / 100` but is pilot-editable. Always 0 for `dismissed`. */
   taxOwed: number;
   status: MiningTaxAssignmentStatus;
   /** Set only while `status` is `needs-review`. */

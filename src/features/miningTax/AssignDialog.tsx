@@ -13,7 +13,6 @@ import {
 import type { PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { formatIsk } from '@/lib/isk';
 import { createAssignment } from './assignments';
 import { updatePayee } from './payees';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -30,14 +29,28 @@ interface AssignDialogProps {
   onAssigned: () => void;
 }
 
+/** Rounds to the cent — what the editable ISK fields below prefill and display, since a raw float in a number input reads as noise. */
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 /**
  * Assign dialog (decision doc): picks a Payee for some or all of an entry's
  * still-unassigned ore, at a tax % that defaults from the Payee and can be
- * overridden, and defaults "I already sent this in-game" ON — unchecking it
- * is the only way to leave the assignment Outstanding. Line checkboxes are
- * the split-Payee mechanism: uncheck a line to leave it for a second
- * Assignment against a different Payee (the two-corps-one-system-one-day
- * case ESI itself cannot distinguish).
+ * overridden. Line checkboxes are the split-Payee mechanism: uncheck a line
+ * to leave it for a second Assignment against a different Payee (the
+ * two-corps-one-system-one-day case ESI itself cannot distinguish).
+ *
+ * Estimated value and tax owed are both prefilled from `computeAssignmentValue`
+ * (Jita price × tax %) but independently editable — a Jita price or a
+ * Payee's default rate can be wrong for a specific haul, and what actually
+ * gets persisted is whatever the pilot leaves in the field, not a silent
+ * recomputation. Clearing a field back to empty returns it to tracking the
+ * computed default.
+ *
+ * "I already paid this" defaults OFF: the ledger's own point is to catch
+ * what's still owed, and a renter who has genuinely already paid in-game
+ * checks it themselves rather than un-checking a box that assumed it for them.
  *
  * "Remember this system for <Payee>" is where a Payee's moon/system tag
  * actually gets set (CONTEXT.md's Payee entry) — the moment a pilot is
@@ -60,17 +73,22 @@ export function AssignDialog({
   // Deliberately no `?? payees[0]` fallback: the decision doc leaves the
   // multiple-moons-one-system case "deliberately unmatched... that's the one
   // case nothing can auto-resolve" — pre-selecting an arbitrary Payee here
-  // would, combined with `markPaid` defaulting on, let one click write a
-  // paid invoice against a Payee the pilot never actually chose.
+  // would let a pilot in a hurry create a real Assignment against a Payee
+  // they never actually chose.
   const autoMatch = payees.find((p) => p.systemId === row.entry.solarSystemId);
   const [payeeId, setPayeeId] = useState<string | null>(autoMatch?.id ?? null);
   const [taxPct, setTaxPct] = useState(String(autoMatch?.defaultTaxPct ?? ''));
   const [includedTypeIds, setIncludedTypeIds] = useState<ReadonlySet<number>>(
     new Set(row.unassignedOreLines.map((line) => line.typeId))
   );
-  const [markPaid, setMarkPaid] = useState(true);
+  const [markPaid, setMarkPaid] = useState(false);
   const [rememberSystem, setRememberSystem] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Empty means "track the computed default"; any other string is a pilot
+  // override that stops following `taxPct`/line-selection changes until
+  // cleared back to empty.
+  const [estimatedValueOverride, setEstimatedValueOverride] = useState('');
+  const [taxOwedOverride, setTaxOwedOverride] = useState('');
 
   // No reset-on-reopen effect: the route only ever renders one `AssignDialog`
   // at a time, keyed off `assignTarget` going from `null` to a row, so this
@@ -82,11 +100,14 @@ export function AssignDialog({
     [row.unassignedOreLines, includedTypeIds]
   );
   const pctValue = Number(taxPct);
-  const { estimatedValue, taxOwed } = computeAssignmentValue(
+  const computed = computeAssignmentValue(
     selectedLines,
     unitPrices,
     Number.isFinite(pctValue) ? pctValue : 0
   );
+  const estimatedValue =
+    estimatedValueOverride.trim() === '' ? computed.estimatedValue : Number(estimatedValueOverride);
+  const taxOwed = taxOwedOverride.trim() === '' ? computed.taxOwed : Number(taxOwedOverride);
 
   function toggleLine(typeId: number) {
     setIncludedTypeIds((previous) => {
@@ -102,7 +123,7 @@ export function AssignDialog({
     selectedPayee !== null && selectedPayee.systemId !== row.entry.solarSystemId;
 
   async function handleAssign() {
-    if (!payeeId || selectedLines.length === 0 || !Number.isFinite(pctValue)) return;
+    if (!canAssign || !payeeId) return;
     setSaving(true);
     try {
       if (rememberSystem && selectedPayee) {
@@ -119,6 +140,8 @@ export function AssignDialog({
         payeeId,
         oreLines: selectedLines,
         taxPct: pctValue,
+        estimatedValue,
+        taxOwed,
         markPaid,
       });
       onAssigned();
@@ -133,7 +156,11 @@ export function AssignDialog({
     selectedLines.length > 0 &&
     Number.isFinite(pctValue) &&
     pctValue >= 0 &&
-    pctValue <= 100;
+    pctValue <= 100 &&
+    Number.isFinite(estimatedValue) &&
+    estimatedValue >= 0 &&
+    Number.isFinite(taxOwed) &&
+    taxOwed >= 0;
 
   return (
     <Modal
@@ -227,14 +254,36 @@ export function AssignDialog({
               />
             </div>
 
-            <div className="rounded-xs border border-line bg-panel-2 p-2 text-xs">
-              <p>
-                {t('miningTax.estimatedValueLabel')}:{' '}
-                <strong>{formatIsk(estimatedValue, 2)} ISK</strong>
+            <div className="space-y-1">
+              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('miningTax.estimatedValueLabel')}
               </p>
-              <p>
-                {t('miningTax.taxOwedLabel')}: <strong>{formatIsk(taxOwed, 2)} ISK</strong>
+              <TextInput
+                type="number"
+                min={0}
+                step="0.01"
+                value={
+                  estimatedValueOverride === ''
+                    ? String(round2(computed.estimatedValue))
+                    : estimatedValueOverride
+                }
+                onChange={(e) => setEstimatedValueOverride(e.target.value)}
+                aria-label={t('miningTax.estimatedValueLabel')}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('miningTax.taxOwedLabel')}
               </p>
+              <TextInput
+                type="number"
+                min={0}
+                step="0.01"
+                value={taxOwedOverride === '' ? String(round2(computed.taxOwed)) : taxOwedOverride}
+                onChange={(e) => setTaxOwedOverride(e.target.value)}
+                aria-label={t('miningTax.taxOwedLabel')}
+              />
             </div>
 
             <label className="flex items-center gap-2 text-sm">

@@ -23,14 +23,21 @@ export interface AssignInput {
   oreLines: MiningTaxOreLine[];
   /** The Payee's default, or the user's override in the Assign dialog. */
   taxPct: number;
-  /** "I already sent this in-game" — the Assign dialog's default-on checkbox (decision doc). */
+  /**
+   * The Jita-priced default, or the pilot's own correction — the Assign
+   * dialog prefills both from `computeAssignmentValue` but leaves them
+   * editable, since a Jita price or a Payee's default rate can be wrong for
+   * a specific haul. Taken as given here rather than recomputed, so a
+   * pilot's edit is what actually gets persisted.
+   */
+  estimatedValue: number;
+  taxOwed: number;
+  /** "I already paid this" — the Assign dialog's checkbox, unchecked by default. */
   markPaid: boolean;
 }
 
-/** Creates one Assignment, snapshotting Jita price + tax right now. */
+/** Creates one Assignment, snapshotting the (possibly pilot-corrected) value and tax right now. */
 export async function createAssignment(input: AssignInput): Promise<MiningTaxAssignmentRecord> {
-  const prices = await loadJitaUnitPrices(input.oreLines.map((line) => line.typeId));
-  const { estimatedValue, taxOwed } = computeAssignmentValue(input.oreLines, prices, input.taxPct);
   const now = Date.now();
   const record: MiningTaxAssignmentRecord = {
     id: crypto.randomUUID(),
@@ -40,10 +47,45 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     payeeId: input.payeeId,
     oreLines: input.oreLines,
     taxPct: input.taxPct,
-    estimatedValue,
-    taxOwed,
+    estimatedValue: input.estimatedValue,
+    taxOwed: input.taxOwed,
     status: input.markPaid ? 'paid' : 'outstanding',
     ...(input.markPaid ? { paidAt: now } : {}),
+    updatedAt: now,
+  };
+  await db.miningTaxAssignments.put(record);
+  scheduleSync(input.characterId);
+  return record;
+}
+
+export interface DismissInput {
+  characterId: number;
+  date: string;
+  solarSystemId: number;
+  oreLines: MiningTaxOreLine[];
+  /** Informational only — a dismissed entry owes no tax regardless. */
+  estimatedValue: number;
+}
+
+/**
+ * Dismisses an entry ("I don't pay tax on this") — no Payee, no tax owed.
+ * Still snapshots `oreLines` and still participates in `reconcileAssignments`
+ * the same way a real Assignment does: growth on a dismissed entry surfaces
+ * for reconsideration (`needs-review`) rather than being silently absorbed
+ * into a standing "never taxed" verdict.
+ */
+export async function dismissEntry(input: DismissInput): Promise<MiningTaxAssignmentRecord> {
+  const now = Date.now();
+  const record: MiningTaxAssignmentRecord = {
+    id: crypto.randomUUID(),
+    characterId: input.characterId,
+    date: input.date,
+    solarSystemId: input.solarSystemId,
+    oreLines: input.oreLines,
+    taxPct: 0,
+    estimatedValue: input.estimatedValue,
+    taxOwed: 0,
+    status: 'dismissed',
     updatedAt: now,
   };
   await db.miningTaxAssignments.put(record);

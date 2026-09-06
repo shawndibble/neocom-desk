@@ -1,6 +1,7 @@
 import type { OreLine } from './types';
 
-export type MiningTaxRowStatus = 'unassigned' | 'outstanding' | 'paid' | 'needs-review';
+export type MiningTaxRowStatus =
+  'unassigned' | 'outstanding' | 'paid' | 'needs-review' | 'dismissed';
 
 /**
  * The entry's ore lines whose typeId no covering Assignment claims at all —

@@ -16,12 +16,15 @@ here — they go one per file in `docs/context/decisions/`.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
 - **Assignment**: Links a Mining Ledger Entry (or a split slice of its ore
   lines, for the two-corps-one-system-one-day case) to a Payee, snapshotting
-  the tax % and ISK value at assignment time — invoice semantics, so neither a
-  later Jita price move nor an edited Payee default retroactively changes what
-  it shows as owed. Re-diffed on every ledger refresh: if ESI reports _more_
-  ore for the same entry afterward, it flips to `needs-review` with an
-  explicit before/after diff rather than silently absorbing the growth (issue
-  #523).
+  the tax % and ISK value at assignment time — pilot-editable at that moment,
+  not just prefilled, and invoice semantics thereafter: neither a later Jita
+  price move nor an edited Payee default retroactively changes what it shows
+  as owed. Re-diffed on every ledger refresh: if ESI reports _more_ ore for
+  the same entry afterward, it flips to `needs-review` with an explicit
+  before/after diff rather than silently absorbing the growth. A `dismissed`
+  Assignment ("I don't pay tax on this entry") carries no Payee at all, but
+  still re-diffs the same way — growth on it still surfaces rather than
+  staying tax-free forever (issue #523).
 - **Base Grant**: What every Character is asked for at sign-in — `SCOPES`, and
   nothing from any Scope Group.
 - **Base sheet** — the character's attributes as base + remap alone: five

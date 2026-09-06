@@ -33,8 +33,12 @@ import {
 import { resolveRowNames } from '@/features/miningTax/names';
 import { loadJitaUnitPrices } from '@/features/miningTax/pricing';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { resolveNeedsReview } from '@/features/miningTax/assignments';
-import { tagAsMoonOre } from '@/features/miningTax/typeOverrides';
+import {
+  deleteAssignment,
+  dismissEntry,
+  resolveNeedsReview,
+} from '@/features/miningTax/assignments';
+import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { AssignDialog } from '@/features/miningTax/AssignDialog';
 import { BulkPayConfirmDialog } from '@/features/miningTax/BulkPayConfirmDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
@@ -44,8 +48,9 @@ const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
   'needs-review',
   'outstanding',
   'paid',
+  'dismissed',
 ];
-// Everything except Paid — Paid is opt-in (decision doc).
+// Everything except Paid and Dismissed — both are "handled", opt-in to view (decision doc's Paid precedent).
 const DEFAULT_STATUSES = new Set<MiningTaxRowStatus>(['unassigned', 'needs-review', 'outstanding']);
 
 // Explicit map rather than munging the status string into a key (a stray
@@ -57,6 +62,7 @@ const STATUS_LABEL_KEY: Record<MiningTaxRowStatus, string> = {
   'needs-review': 'needsReview',
   outstanding: 'outstanding',
   paid: 'paid',
+  dismissed: 'dismissed',
 };
 
 interface Snapshot {
@@ -226,6 +232,34 @@ export function MoonMiningTax() {
     refresh();
   }
 
+  async function handleTagAsIgnored(typeId: number) {
+    await tagAsIgnored(typeId);
+    refresh();
+  }
+
+  /** "I don't pay tax on this entry" — dismisses the whole unassigned residual in one action, no Payee needed. */
+  async function handleDismiss(row: MoonMiningTaxRow) {
+    const { estimatedValue } = computeAssignmentValue(
+      row.unassignedOreLines,
+      data?.unitPrices ?? new Map(),
+      0
+    );
+    await dismissEntry({
+      characterId: row.characterId,
+      date: row.entry.date,
+      solarSystemId: row.entry.solarSystemId,
+      oreLines: row.unassignedOreLines,
+      estimatedValue,
+    });
+    refresh();
+  }
+
+  /** Undoes a dismissal (or, generically, any Assignment) — the ore returns to Unassigned. */
+  async function handleUndo(assignment: MiningTaxAssignmentRecord) {
+    await deleteAssignment(assignment);
+    refresh();
+  }
+
   function payeeName(characterId: number, payeeId: string | undefined): string {
     return (
       data?.payeesByCharacter.get(characterId)?.find((p) => p.id === payeeId)?.name ??
@@ -300,7 +334,11 @@ export function MoonMiningTax() {
     {
       id: 'payee',
       header: t('miningTax.payeeColumn'),
-      render: (dr) => (dr.assignment ? payeeName(dr.row.characterId, dr.assignment.payeeId) : '—'),
+      render: (dr) => {
+        if (!dr.assignment) return '—';
+        if (dr.assignment.status === 'dismissed') return t('miningTax.dismissedLabel');
+        return payeeName(dr.row.characterId, dr.assignment.payeeId);
+      },
     },
     {
       id: 'value',
@@ -331,9 +369,20 @@ export function MoonMiningTax() {
       render: (dr) => {
         if (dr.status === 'unassigned') {
           return (
-            <Button size="sm" onClick={() => setAssignTarget(dr.row)}>
-              {t('miningTax.assignAction')}
-            </Button>
+            <div className="flex justify-end gap-1">
+              <IconButton
+                size="sm"
+                icon={<Icon.AddToPlan />}
+                label={t('miningTax.assignAction')}
+                onClick={() => setAssignTarget(dr.row)}
+              />
+              <IconButton
+                size="sm"
+                icon={<Icon.Close />}
+                label={t('miningTax.dismissAction')}
+                onClick={() => void handleDismiss(dr.row)}
+              />
+            </div>
           );
         }
         if (dr.status === 'needs-review' && dr.assignment) {
@@ -348,6 +397,16 @@ export function MoonMiningTax() {
               }
             >
               {t('miningTax.resolveAction')}
+            </Button>
+          );
+        }
+        if (dr.status === 'dismissed' && dr.assignment) {
+          return (
+            <Button
+              size="sm"
+              onClick={() => void handleUndo(dr.assignment as MiningTaxAssignmentRecord)}
+            >
+              {t('miningTax.undismissAction')}
             </Button>
           );
         }
@@ -453,9 +512,14 @@ export function MoonMiningTax() {
                       <span>
                         {u.characterName} — {data.typeNames.get(typeId) ?? `#${typeId}`}
                       </span>
-                      <Button size="sm" onClick={() => void handleTagAsMoonOre(typeId)}>
-                        {t('miningTax.tagAsMoonOre')}
-                      </Button>
+                      <div className="flex shrink-0 gap-1.5">
+                        <Button size="sm" onClick={() => void handleTagAsMoonOre(typeId)}>
+                          {t('miningTax.tagAsMoonOre')}
+                        </Button>
+                        <Button size="sm" onClick={() => void handleTagAsIgnored(typeId)}>
+                          {t('miningTax.ignoreOreAction')}
+                        </Button>
+                      </div>
                     </li>
                   ))
                 )}

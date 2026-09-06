@@ -15,7 +15,7 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 import { groupMiningLedger } from '@/engine/miningTax/groupLedger';
 import type { MiningLedgerEntry, MiningLedgerRow } from '@/engine/miningTax/types';
 import { loadMoonOreTypeIds, loadOreAndIceTypeIds } from '@/sde/loadSde';
-import { loadManualMoonOreTypeIds } from './typeOverrides';
+import { loadManualIgnoredTypeIds, loadManualMoonOreTypeIds } from './typeOverrides';
 
 export const KEYS = { ledger: 'miningTax:ledger' } as const;
 
@@ -53,16 +53,20 @@ export async function loadAllCharacterLedgers(): Promise<CharacterMiningLedger[]
   const characters: CharacterRecord[] = await db.characters.toArray();
   if (characters.length === 0) return [];
 
-  const [moonOreTypeIds, oreAndIceTypeIds, manualOverrides] = await Promise.all([
-    loadMoonOreTypeIds(),
-    loadOreAndIceTypeIds(),
-    loadManualMoonOreTypeIds(),
-  ]);
-  // A manually-tagged type_id (typeOverrides.ts's "unclassified ore" banner
-  // action) counts as moon ore from now on, in both sets: it groups into
-  // entries going forward, and it must stop showing up as unclassified.
-  const moonOreSet = new Set([...moonOreTypeIds, ...manualOverrides]);
-  const oreAndIceSet = new Set([...oreAndIceTypeIds, ...manualOverrides]);
+  const [moonOreTypeIds, oreAndIceTypeIds, manualMoonOreOverrides, manualIgnored] =
+    await Promise.all([
+      loadMoonOreTypeIds(),
+      loadOreAndIceTypeIds(),
+      loadManualMoonOreTypeIds(),
+      loadManualIgnoredTypeIds(),
+    ]);
+  // "Tag as moon ore" (typeOverrides.ts) counts as moon ore from now on, in
+  // both sets: it groups into entries going forward, and it must stop
+  // showing up as unclassified. "Ignore" only joins the broader set — it
+  // stops being flagged, but is never grouped into a moon-mining entry,
+  // exactly like an already-recognized asteroid ore or ice type.
+  const moonOreSet = new Set([...moonOreTypeIds, ...manualMoonOreOverrides]);
+  const oreAndIceSet = new Set([...oreAndIceTypeIds, ...manualMoonOreOverrides, ...manualIgnored]);
 
   const results: CharacterMiningLedger[] = characters.map((c) => ({
     characterId: c.characterId,

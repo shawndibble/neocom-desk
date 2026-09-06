@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { loadAllCharacterLedgers } from './ledger';
+import { tagAsIgnored, tagAsMoonOre } from './typeOverrides';
 
 const MOON_ORE = 45490; // Zeolites
 const ORDINARY_ORE = 1230; // Veldspar — recognized, not moon ore
@@ -22,6 +23,7 @@ beforeEach(async () => {
   sdeMock.loadOreAndIceTypeIds.mockResolvedValue([MOON_ORE, ORDINARY_ORE]);
   await db.characters.clear();
   await db.esiCache.clear();
+  await db.settings.clear();
 });
 
 async function seedCharacter(characterId: number, name: string): Promise<void> {
@@ -85,6 +87,47 @@ describe('loadAllCharacterLedgers', () => {
     const b = ledgers.find((l) => l.characterId === CHAR_B);
     expect(a?.entries[0].oreLines).toEqual([{ typeId: MOON_ORE, quantity: 10 }]);
     expect(b?.entries[0].oreLines).toEqual([{ typeId: MOON_ORE, quantity: 20 }]);
+  });
+
+  it('tags a previously-unknown type_id as moon ore, folding it into entries on the next read', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedLedger(CHAR_A, [
+      { date: '2026-09-04', quantity: 1, solar_system_id: 1, type_id: UNKNOWN_TYPE },
+    ]);
+    await tagAsMoonOre(UNKNOWN_TYPE);
+
+    const [ledger] = await loadAllCharacterLedgers();
+
+    expect(ledger.unclassifiedTypeIds).toEqual([]);
+    expect(ledger.entries).toEqual([
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [{ typeId: UNKNOWN_TYPE, quantity: 1 }],
+      },
+    ]);
+  });
+
+  it('tags a previously-unknown type_id as ignored, stopping the flag without grouping it as moon ore', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedLedger(CHAR_A, [
+      { date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: MOON_ORE },
+      { date: '2026-09-04', quantity: 1, solar_system_id: 1, type_id: UNKNOWN_TYPE },
+    ]);
+    await tagAsIgnored(UNKNOWN_TYPE);
+
+    const [ledger] = await loadAllCharacterLedgers();
+
+    expect(ledger.unclassifiedTypeIds).toEqual([]);
+    expect(ledger.entries).toEqual([
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [{ typeId: MOON_ORE, quantity: 100 }],
+      },
+    ]);
   });
 
   it('reports an empty ledger (no cached row, no live call reachable) rather than throwing', async () => {

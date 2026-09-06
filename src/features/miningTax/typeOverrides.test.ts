@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
-import { loadManualMoonOreTypeIds, tagAsMoonOre } from './typeOverrides';
+import {
+  loadManualIgnoredTypeIds,
+  loadManualMoonOreTypeIds,
+  tagAsIgnored,
+  tagAsMoonOre,
+} from './typeOverrides';
 
 beforeEach(async () => {
   await db.settings.clear();
@@ -28,5 +33,23 @@ describe('tagAsMoonOre', () => {
     await tagAsMoonOre(1);
     await tagAsMoonOre(2);
     expect(await loadManualMoonOreTypeIds()).toEqual([1, 2]);
+  });
+});
+
+describe('tagAsIgnored', () => {
+  it('is empty when nothing has been ignored', async () => {
+    expect(await loadManualIgnoredTypeIds()).toEqual([]);
+  });
+
+  it('adds a typeId to its own, independent override list', async () => {
+    await tagAsIgnored(888888);
+    expect(await loadManualIgnoredTypeIds()).toEqual([888888]);
+    expect(await loadManualMoonOreTypeIds()).toEqual([]);
+  });
+
+  it('is idempotent', async () => {
+    await tagAsIgnored(888888);
+    await tagAsIgnored(888888);
+    expect(await loadManualIgnoredTypeIds()).toEqual([888888]);
   });
 });

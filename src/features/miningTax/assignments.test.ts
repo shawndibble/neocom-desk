@@ -4,6 +4,7 @@ import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import {
   createAssignment,
   deleteAssignment,
+  dismissEntry,
   markAssignmentsPaid,
   resolveNeedsReview,
 } from './assignments';
@@ -33,7 +34,7 @@ beforeEach(async () => {
 });
 
 describe('createAssignment', () => {
-  it('snapshots Jita price and tax into estimatedValue/taxOwed', async () => {
+  it('persists exactly the value/tax the caller supplies, without recomputing them', async () => {
     const assignment = await createAssignment({
       characterId: CHAR_A,
       date: '2026-09-04',
@@ -41,6 +42,8 @@ describe('createAssignment', () => {
       payeeId: 'payee-1',
       oreLines: [{ typeId: TYPE_A, quantity: 100 }],
       taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
       markPaid: false,
     });
 
@@ -50,6 +53,26 @@ describe('createAssignment', () => {
     expect(assignment.paidAt).toBeUndefined();
     expect(await db.miningTaxAssignments.get(assignment.id)).toEqual(assignment);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    // No internal price lookup — the Assign dialog already resolved (and
+    // possibly corrected) the value before calling this.
+    expect(pricingMock.loadJitaUnitPrices).not.toHaveBeenCalled();
+  });
+
+  it('stores a pilot-corrected value verbatim, even when it disagrees with the Jita price', async () => {
+    const assignment = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 4200, // not what TYPE_A's price would compute to
+      taxOwed: 420,
+      markPaid: false,
+    });
+
+    expect(assignment.estimatedValue).toBe(4200);
+    expect(assignment.taxOwed).toBe(420);
   });
 
   it('marks paid immediately when markPaid is true, stamping paidAt', async () => {
@@ -60,11 +83,33 @@ describe('createAssignment', () => {
       payeeId: 'payee-1',
       oreLines: [{ typeId: TYPE_A, quantity: 100 }],
       taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
       markPaid: true,
     });
 
     expect(assignment.status).toBe('paid');
     expect(assignment.paidAt).toBeDefined();
+  });
+});
+
+describe('dismissEntry', () => {
+  it('creates a payee-less, zero-tax Assignment with status dismissed', async () => {
+    const dismissed = await dismissEntry({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      estimatedValue: 1000,
+    });
+
+    expect(dismissed.status).toBe('dismissed');
+    expect(dismissed.payeeId).toBeUndefined();
+    expect(dismissed.taxPct).toBe(0);
+    expect(dismissed.taxOwed).toBe(0);
+    expect(dismissed.estimatedValue).toBe(1000);
+    expect(await db.miningTaxAssignments.get(dismissed.id)).toEqual(dismissed);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
   });
 });
 
@@ -77,6 +122,8 @@ describe('markAssignmentsPaid', () => {
       payeeId: 'p',
       oreLines: [{ typeId: TYPE_A, quantity: 10 }],
       taxPct: 10,
+      estimatedValue: 100,
+      taxOwed: 10,
       markPaid: false,
     });
     const b = await createAssignment({
@@ -86,6 +133,8 @@ describe('markAssignmentsPaid', () => {
       payeeId: 'p',
       oreLines: [{ typeId: TYPE_A, quantity: 10 }],
       taxPct: 10,
+      estimatedValue: 100,
+      taxOwed: 10,
       markPaid: false,
     });
     vi.clearAllMocks();
@@ -113,10 +162,24 @@ describe('deleteAssignment', () => {
       payeeId: 'p',
       oreLines: [{ typeId: TYPE_A, quantity: 10 }],
       taxPct: 10,
+      estimatedValue: 100,
+      taxOwed: 10,
       markPaid: false,
     });
     await deleteAssignment(assignment);
     expect(syncMock.markMiningTaxAssignmentDeleted).toHaveBeenCalledWith(CHAR_A, assignment.id);
+  });
+
+  it('undoes a dismissal the same way', async () => {
+    const dismissed = await dismissEntry({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
+      estimatedValue: 100,
+    });
+    await deleteAssignment(dismissed);
+    expect(syncMock.markMiningTaxAssignmentDeleted).toHaveBeenCalledWith(CHAR_A, dismissed.id);
   });
 });
 
