@@ -12,10 +12,11 @@ import {
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import type { OreLine } from '@/engine/miningTax/types';
+import { planSplit } from '@/engine/miningTax/split';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
+import { unmaskNumber } from '@/lib/numberMask';
 import { splitAssignment } from './assignments';
 import type { MoonMiningTaxRow } from './snapshot';
 
@@ -70,15 +71,12 @@ export function SplitDialog({
   );
 
   const original = assignment.oreLines;
-  const movedLines: OreLine[] = original
-    .map((line) => ({ typeId: line.typeId, quantity: moves.get(line.typeId) ?? 0 }))
-    .filter((line) => line.quantity > 0);
-  const keptLines: OreLine[] = original
-    .map((line) => ({
-      typeId: line.typeId,
-      quantity: line.quantity - (moves.get(line.typeId) ?? 0),
-    }))
-    .filter((line) => line.quantity > 0);
+  // `setMove` clamps every quantity to what the line holds, so this never
+  // throws — and it is the same plan `splitAssignment` commits.
+  const { kept: keptLines, moved: movedLines } = planSplit(
+    original,
+    [...moves].map(([typeId, quantity]) => ({ typeId, quantity }))
+  );
   const pctValue = Number(taxPct);
   const keptValue = computeAssignmentValue(keptLines, unitPrices, assignment.taxPct);
   const newValue = computeAssignmentValue(
@@ -207,13 +205,13 @@ export function SplitDialog({
                     <TextInput
                       id={inputId}
                       size="sm"
-                      type="number"
+                      type="text"
                       inputMode="numeric"
-                      min={0}
-                      max={line.quantity}
-                      value={moved === 0 ? '' : String(moved)}
+                      value={moved === 0 ? '' : moved.toLocaleString()}
                       placeholder="0"
-                      onChange={(e) => setMove(line.typeId, Number(e.target.value), line.quantity)}
+                      onChange={(e) =>
+                        setMove(line.typeId, unmaskNumber(e.target.value) ?? 0, line.quantity)
+                      }
                       className={cx('w-28 text-right', moved > 0 && 'border-accent')}
                     />
                   </div>
@@ -269,7 +267,7 @@ export function SplitDialog({
             </p>
             <p className="tabular-nums">
               {formatIsk(keptValue.estimatedValue, 2)} ISK ·{' '}
-              <span className="text-danger">{formatIsk(keptValue.taxOwed, 2)} ISK</span>{' '}
+              <span className="text-isk-neg">{formatIsk(keptValue.taxOwed, 2)} ISK</span>{' '}
               {t('miningTax.splitAtPct', { pct: assignment.taxPct })}
             </p>
           </div>
@@ -286,7 +284,7 @@ export function SplitDialog({
             </p>
             <p className="tabular-nums">
               {formatIsk(newValue.estimatedValue, 2)} ISK ·{' '}
-              <span className="text-danger">{formatIsk(newValue.taxOwed, 2)} ISK</span>{' '}
+              <span className="text-isk-neg">{formatIsk(newValue.taxOwed, 2)} ISK</span>{' '}
               {t('miningTax.splitAtPct', { pct: Number.isFinite(pctValue) ? pctValue : 0 })}
             </p>
           </div>

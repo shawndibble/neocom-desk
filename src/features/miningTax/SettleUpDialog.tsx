@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput } from '@/components/ui';
+import { Button, FilterChip, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentMethod } from '@/db';
 import type { WalletJournalEntry } from '@/esi/endpoints';
@@ -10,7 +10,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { markAssignmentsPaid } from './assignments';
-import { findPaymentCandidates } from './paymentMatches';
+import { amountMatches, findPaymentCandidates } from './paymentMatches';
 
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
@@ -28,6 +28,8 @@ interface SettleUpDialogProps {
 }
 
 type Step = 1 | 2 | 3;
+/** Which of step 2's three copyable figures just went to the clipboard. */
+type CopyTarget = 'amount' | 'recipient' | 'reason';
 const METHODS: readonly MiningTaxPaymentMethod[] = ['donation', 'contract', 'other'];
 
 /** Today as a local `YYYY-MM-DD` — the date the pilot paid, in their own calendar, not EVE's. */
@@ -57,7 +59,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
   const [contractId, setContractId] = useState('');
   const [journalRefId, setJournalRefId] = useState<number | null>(null);
   const [candidates, setCandidates] = useState<WalletJournalEntry[] | null>(null);
-  const [copied, setCopied] = useState<'amount' | 'recipient' | 'reason' | null>(null);
+  const [copied, setCopied] = useState<CopyTarget | null>(null);
   const [saving, setSaving] = useState(false);
 
   const included = useMemo(
@@ -79,14 +81,9 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
       : dates[0] === dates[dates.length - 1]
         ? dates[0]
         : `${dates[0]} → ${dates[dates.length - 1]}`;
-  const systems = [
-    ...new Set(
-      included.map(
-        (r) =>
-          systemNames.get(r.assignment.solarSystemId) ?? `#${String(r.assignment.solarSystemId)}`
-      )
-    ),
-  ];
+  const systemName = (solarSystemId: number) =>
+    systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
+  const systems = [...new Set(included.map((r) => systemName(r.assignment.solarSystemId)))];
   const reason = t('miningTax.settleUpReasonText', {
     systems: systems.join('/'),
     range: dateRange,
@@ -117,7 +114,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
     });
   }
 
-  async function copy(kind: 'amount' | 'recipient' | 'reason', text: string) {
+  async function copy(kind: CopyTarget, text: string) {
     try {
       await writeToClipboard(text);
       setCopied(kind);
@@ -137,6 +134,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
           ? {
               paidOn,
               method,
+              amount: amountToSend,
               ...(journalRefId !== null ? { journalRefId } : {}),
               ...(method === 'contract' &&
               contractId.trim() !== '' &&
@@ -172,7 +170,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
     </span>
   );
 
-  const copyButton = (kind: 'amount' | 'recipient' | 'reason', text: string) => (
+  const copyButton = (kind: CopyTarget, text: string) => (
     <Button
       size="sm"
       onClick={() => void copy(kind, text)}
@@ -214,9 +212,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                       />
                       <span className="w-20 shrink-0 tabular-nums">{r.assignment.date}</span>
                       <span className="min-w-0 flex-1 truncate text-text-dim">
-                        {systemNames.get(r.assignment.solarSystemId) ??
-                          `#${String(r.assignment.solarSystemId)}`}{' '}
-                        · {r.characterName}
+                        {systemName(r.assignment.solarSystemId)} · {r.characterName}
                         {payeeNames.length > 1 && ` · ${r.payeeName}`}
                       </span>
                       <span className={cx('shrink-0 tabular-nums', !on && 'text-text-faint')}>
@@ -264,7 +260,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
               <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('miningTax.settleUpAmountLabel')}
               </p>
-              <p className="text-2xl font-semibold tabular-nums">{formatIsk(amountToSend, 0)}</p>
+              <p className="text-xl font-semibold tabular-nums">{formatIsk(amountToSend, 0)}</p>
               <p className="text-[0.6875rem] text-text-dim">{t('miningTax.settleUpAmountHint')}</p>
               <div className="pt-1">{copyButton('amount', String(amountToSend))}</div>
             </div>
@@ -295,6 +291,9 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
               <Button variant="primary" size="sm" onClick={() => setStep(3)}>
                 {t('miningTax.settleUpNextRecord')}
               </Button>
+              <Button size="sm" disabled={saving} onClick={() => void commit(false)}>
+                {t('miningTax.settleUpJustMarkPaid')}
+              </Button>
               <Button size="sm" onClick={() => setStep(1)}>
                 {t('miningTax.settleUpBack')}
               </Button>
@@ -323,15 +322,13 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                 </p>
                 <div className="flex gap-1.5">
                   {METHODS.map((m) => (
-                    <Button
+                    <FilterChip
                       key={m}
-                      size="sm"
-                      className={cx('flex-1', method === m && 'border-accent text-accent')}
-                      aria-pressed={method === m}
-                      onClick={() => setMethod(m)}
-                    >
-                      {t(`miningTax.settleUpMethod.${m}`)}
-                    </Button>
+                      label={t(`miningTax.settleUpMethod.${m}`)}
+                      selected={method === m}
+                      onToggle={() => setMethod(m)}
+                      className="flex-1 justify-center"
+                    />
                   ))}
                 </div>
               </div>
@@ -374,16 +371,13 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                     </label>
                   </li>
                   {candidates.map((entry) => {
-                    const match =
-                      entry.amount !== undefined &&
-                      Math.abs(Math.abs(entry.amount) - amountToSend) <=
-                        Math.max(1, amountToSend * 0.005);
+                    const match = amountMatches(entry, amountToSend);
                     return (
                       <li key={entry.id}>
                         <label
                           className={cx(
                             'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs',
-                            match && 'border-l-2 border-accent'
+                            match && 'border-l border-accent'
                           )}
                         >
                           <input
@@ -402,7 +396,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                             </span>
                           </span>
                           {match && (
-                            <span className="shrink-0 text-[0.625rem] font-semibold tracking-widest text-success uppercase">
+                            <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
                               {t('miningTax.settleUpJournalMatch')}
                             </span>
                           )}

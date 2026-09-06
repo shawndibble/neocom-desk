@@ -14,8 +14,9 @@ here — they go one per file in `docs/context/decisions/`.
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
-- **Assignment**: Links a Mining Ledger Entry (or a split slice of its ore
-  lines, for the two-corps-one-system-one-day case) to a Payee, snapshotting
+- **Assignment**: Links a Mining Ledger Entry (or a split slice of its ore —
+  whole lines or part of a line's quantity, for the two-corps-one-system-
+  one-day case, see Growth Collector) to a Payee, snapshotting
   the tax % and ISK value at assignment time — pilot-editable at that moment,
   not just prefilled, and invoice semantics thereafter: neither a later Jita
   price move nor an edited Payee default retroactively changes what it shows
@@ -111,6 +112,14 @@ here — they go one per file in `docs/context/decisions/`.
   the Notification Feed already shows as delivered (Occurrence Key, round
   44/#360).
 - **Freshness Window** (round 25): how long a cached row is served without asking ESI again. Ten minutes for a Character's own data, a day for game constants. Distinct from **Data Age**, which reports how old the shown data is; the window decides whether to go and get newer.
+- **Growth Collector**: On a Mining Ledger Entry covered by two or more
+  Assignments (a quantity split, issue #523), the one Assignment that
+  receives any ore ESI reports for that day _after_ the split — flagged
+  `collectsGrowth` on the record, chosen in the Split dialog. A sole
+  Assignment always collects. Per ore type the residual is the entry's
+  quantity minus every covering quantity; the collector owns it (flipping to
+  `needs-review` as usual), so nothing on a split day is ever silently
+  unassigned or doubly claimed (`engine/miningTax/ownership.ts`).
 - **Global Market Region**: A region that exists only to hold one item's
   cluster-wide market. PLEX is the only one today: its orders live in a region
   of their own, none of them in the normal regional books, yet each order still

@@ -21,7 +21,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import type { PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import {
@@ -29,7 +29,12 @@ import {
   type MoonMiningTaxRow,
   type TrackedCharacter,
 } from '@/features/miningTax/snapshot';
-import { allMembers, flatten, type DisplayRow } from '@/features/miningTax/groupRows';
+import {
+  allMembers,
+  flatten,
+  type DisplayRow,
+  type GroupMember,
+} from '@/features/miningTax/groupRows';
 import { resolveRowNames } from '@/features/miningTax/names';
 import { loadJitaUnitPrices } from '@/features/miningTax/pricing';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -187,10 +192,11 @@ export function MoonMiningTax() {
     () => computePayeeBalances(characterFiltered, allPayees),
     [characterFiltered, allPayees]
   );
-  const visibleBalances = showSettled ? balances : balances.filter((b) => b.owed > 0);
-  const settledCount = balances.length - balances.filter((b) => b.owed > 0).length;
-  const owedTotal = balances.reduce((sum, b) => sum + b.owed, 0);
-  const owedPayeeCount = balances.filter((b) => b.owed > 0).length;
+  const owedBalances = balances.filter((b) => b.owed > 0);
+  const visibleBalances = showSettled ? balances : owedBalances;
+  const settledCount = balances.length - owedBalances.length;
+  const owedTotal = owedBalances.reduce((sum, b) => sum + b.owed, 0);
+  const owedPayeeCount = owedBalances.length;
   const unassigned = useMemo(
     () => summarizeUnassigned(characterFiltered, estimatedValueOf),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -243,9 +249,7 @@ export function MoonMiningTax() {
   }
 
   /** "Pay them in one lump sum": every Outstanding Assignment behind one balance card, straight into Settle up. */
-  function settleUpBalance(
-    members: { row: MoonMiningTaxRow; assignment: MiningTaxAssignmentRecord }[]
-  ) {
+  function settleUpBalance(members: readonly GroupMember[]) {
     setSettleUpRows(
       members.map((m) => ({
         assignment: m.assignment,
@@ -752,13 +756,7 @@ export function MoonMiningTax() {
             {(visibleBalances.length > 0 || unassigned.entryCount > 0) && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {visibleBalances.map((balance) => (
-                  <Panel
-                    key={balance.payee.id}
-                    className={cx(
-                      'border-l-2',
-                      balance.owed > 0 ? 'border-l-danger' : 'border-l-success'
-                    )}
-                  >
+                  <Panel key={balance.payee.id}>
                     <div className="flex items-center justify-between gap-2">
                       <button
                         type="button"
@@ -773,18 +771,21 @@ export function MoonMiningTax() {
                       >
                         {balance.payee.name}
                       </button>
-                      <span className="shrink-0 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-                        {characters.length > 1
-                          ? (characters.find((c) => c.characterId === balance.payee.characterId)
-                              ?.characterName ?? '')
-                          : t('miningTax.balanceEntries', { count: balance.members.length })}
+                      <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                        {t('miningTax.balanceEntries', { count: balance.members.length })}
                       </span>
                     </div>
+                    {characters.length > 1 && (
+                      <p className="truncate text-[0.6875rem] text-text-dim">
+                        {characters.find((c) => c.characterId === balance.payee.characterId)
+                          ?.characterName ?? ''}
+                      </p>
+                    )}
                     <p className="mt-1 flex items-baseline gap-1.5">
                       <span
                         className={cx(
                           'text-xl font-semibold tabular-nums',
-                          balance.owed > 0 ? 'text-danger' : 'text-success'
+                          balance.owed > 0 ? 'text-isk-neg' : 'text-isk-pos'
                         )}
                       >
                         {formatIsk(balance.owed, 0)}
@@ -795,7 +796,6 @@ export function MoonMiningTax() {
                       {balance.owed > 0 ? (
                         <Button
                           size="sm"
-                          variant="primary"
                           className="w-full"
                           onClick={() => settleUpBalance(balance.members)}
                         >
@@ -810,12 +810,12 @@ export function MoonMiningTax() {
                   </Panel>
                 ))}
                 {unassigned.entryCount > 0 && (
-                  <div className="rounded-xs border border-dashed border-warning/60 bg-warning/5 p-3">
+                  <Panel className="border-dashed">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-semibold text-warning">
                         {t('miningTax.unassignedCardTitle')}
                       </span>
-                      <span className="shrink-0 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+                      <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                         {t('miningTax.balanceEntries', { count: unassigned.entryCount })}
                       </span>
                     </div>
@@ -832,7 +832,7 @@ export function MoonMiningTax() {
                         {t('miningTax.assignNextAction')}
                       </Button>
                     </div>
-                  </div>
+                  </Panel>
                 )}
               </div>
             )}

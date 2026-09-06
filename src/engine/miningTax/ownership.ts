@@ -19,8 +19,21 @@ export interface Ownership {
   ownedLines: Map<string, OreLine[]>;
 }
 
-function sortLines(lines: OreLine[]): OreLine[] {
-  return lines.sort((a, b) => a.typeId - b.typeId);
+function sortedByType(lines: readonly OreLine[]): OreLine[] {
+  return [...lines].sort((a, b) => a.typeId - b.typeId);
+}
+
+/** The fresh entry lines one Assignment should be diffed and re-snapshotted against — its own snapshot when the ownership rule has nothing more for it. */
+export function linesOwnedBy(
+  entryLines: readonly OreLine[],
+  covering: readonly CoveringAssignment[],
+  assignmentId: string
+): OreLine[] {
+  const own = covering.find((c) => c.id === assignmentId);
+  return (
+    computeOwnership(entryLines, covering).ownedLines.get(assignmentId) ??
+    (own ? [...own.oreLines] : [])
+  );
 }
 
 /**
@@ -52,7 +65,7 @@ export function computeOwnership(
 ): Ownership {
   const ownedLines = new Map<string, OreLine[]>();
   if (covering.length === 0) {
-    return { unassigned: sortLines([...entryLines]), ownedLines };
+    return { unassigned: sortedByType([...entryLines]), ownedLines };
   }
 
   const collector =
@@ -86,8 +99,8 @@ export function computeOwnership(
   for (const [id, byType] of ownedByType) {
     ownedLines.set(
       id,
-      sortLines([...byType.entries()].map(([typeId, quantity]) => ({ typeId, quantity })))
+      sortedByType([...byType.entries()].map(([typeId, quantity]) => ({ typeId, quantity })))
     );
   }
-  return { unassigned: sortLines(unassigned), ownedLines };
+  return { unassigned: sortedByType(unassigned), ownedLines };
 }

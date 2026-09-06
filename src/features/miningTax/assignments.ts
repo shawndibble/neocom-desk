@@ -12,7 +12,8 @@ import {
 } from '@/db';
 import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { computeOwnership } from '@/engine/miningTax/ownership';
+import { linesOwnedBy } from '@/engine/miningTax/ownership';
+import { planSplit } from '@/engine/miningTax/split';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { loadJitaUnitPrices } from './pricing';
 
@@ -197,6 +198,8 @@ export interface PaymentInput {
   /** Local calendar date the pilot paid, `YYYY-MM-DD`. */
   paidOn: string;
   method: MiningTaxPaymentMethod;
+  /** The lump sum actually sent in game — whole ISK, since the transfer field takes no fractions — so it matches the journal entry it may be linked to. */
+  amount: number;
   journalRefId?: number;
   contractId?: number;
 }
@@ -208,9 +211,9 @@ export interface PaymentInput {
  * range/total) before calling this.
  *
  * With `payment`, every Assignment additionally records how it was settled
- * under one shared `paymentId` and the lump-sum `amount` (the sum of their
- * `taxOwed`) — the Settle-up flow's "record it" step. Without it, only
- * `status`/`paidAt` move, as before.
+ * under one shared `paymentId` and the lump-sum `amount` actually sent — the
+ * Settle-up flow's "record it" step. Without it, only `status`/`paidAt`
+ * move, as before.
  */
 export async function markAssignmentsPaid(
   assignments: readonly MiningTaxAssignmentRecord[],
@@ -223,7 +226,7 @@ export async function markAssignmentsPaid(
         paymentId: crypto.randomUUID(),
         paidOn: payment.paidOn,
         method: payment.method,
-        amount: assignments.reduce((sum, a) => sum + a.taxOwed, 0),
+        amount: payment.amount,
         ...(payment.journalRefId !== undefined ? { journalRefId: payment.journalRefId } : {}),
         ...(payment.contractId !== undefined ? { contractId: payment.contractId } : {}),
       }
@@ -271,27 +274,9 @@ export async function splitAssignment(
   input: SplitInput,
   unitPrices: ReadonlyMap<number, number>
 ): Promise<{ kept: MiningTaxAssignmentRecord; created: MiningTaxAssignmentRecord }> {
-  const moveByType = new Map<number, number>();
-  for (const move of input.moves) {
-    if (move.quantity <= 0) continue;
-    const held = original.oreLines.find((l) => l.typeId === move.typeId)?.quantity ?? 0;
-    if (move.quantity > held) {
-      throw new Error(`Cannot move ${move.quantity} of type ${move.typeId}: only ${held} held`);
-    }
-    moveByType.set(move.typeId, move.quantity);
-  }
-  if (moveByType.size === 0) throw new Error('Nothing to move');
-
-  const keptLines = original.oreLines
-    .map((line) => ({
-      typeId: line.typeId,
-      quantity: line.quantity - (moveByType.get(line.typeId) ?? 0),
-    }))
-    .filter((line) => line.quantity > 0);
+  const { kept: keptLines, moved: movedLines } = planSplit(original.oreLines, input.moves);
+  if (movedLines.length === 0) throw new Error('Nothing to move');
   if (keptLines.length === 0) throw new Error('Cannot move every unit — unassign instead');
-  const movedLines: MiningTaxOreLine[] = original.oreLines
-    .filter((line) => moveByType.has(line.typeId))
-    .map((line) => ({ typeId: line.typeId, quantity: moveByType.get(line.typeId)! }));
 
   const now = Date.now();
   const keptValue = computeAssignmentValue(keptLines, unitPrices, original.taxPct);
@@ -353,11 +338,11 @@ export async function resolveNeedsReview(
   freshEntry: MiningLedgerEntry,
   siblings: readonly MiningTaxAssignmentRecord[]
 ): Promise<void> {
-  const relevantFresh =
-    computeOwnership(
-      freshEntry.oreLines,
-      siblings.some((s) => s.id === assignment.id) ? siblings : [...siblings, assignment]
-    ).ownedLines.get(assignment.id) ?? assignment.oreLines;
+  const relevantFresh = linesOwnedBy(
+    freshEntry.oreLines,
+    siblings.some((s) => s.id === assignment.id) ? siblings : [...siblings, assignment],
+    assignment.id
+  );
   const prices = await loadJitaUnitPrices(relevantFresh.map((line) => line.typeId));
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,

@@ -19,7 +19,7 @@
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { diffAssignedOreLines } from '@/engine/miningTax/needsReview';
-import { computeOwnership } from '@/engine/miningTax/ownership';
+import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
 
 function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityDiff[]): boolean {
@@ -60,10 +60,11 @@ export async function reconcileAssignments(
     // (or a character's grant lapsed this refresh) — leave the assignment as
     // it stands rather than treat "no fresh data" as "nothing was mined".
     if (!entry) continue;
-    const relevantFresh =
-      computeOwnership(entry.oreLines, siblingsByKey.get(key) ?? [assignment]).ownedLines.get(
-        assignment.id
-      ) ?? assignment.oreLines;
+    const relevantFresh = linesOwnedBy(
+      entry.oreLines,
+      siblingsByKey.get(key) ?? [assignment],
+      assignment.id
+    );
     const diffs = diffAssignedOreLines(assignment.oreLines, relevantFresh);
     if (diffs.length === 0) continue;
     if (assignment.status === 'needs-review' && sameDiffs(assignment.reviewDiff, diffs)) continue;

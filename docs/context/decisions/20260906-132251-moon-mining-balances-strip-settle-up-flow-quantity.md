@@ -41,7 +41,9 @@ the user described the two-local-days-one-EVE-day case).
 - **A lump-sum payment is recorded on the Assignments it covers, not as a
   new table.** `MiningTaxAssignmentRecord.payment?: { paymentId, paidOn,
 method, amount, journalRefId?, contractId? }` — additive, no Dexie
-  version bump, and nothing new to teach `planSync`/`merge`/purge. Every
+  version bump, nothing new for `merge`/purge, and only the two new optional
+  fields (`payment`, `collectsGrowth`) added to `planSync`'s explicit field
+  whitelist for the Assignment collection. Every
   Assignment in one settle-up shares a `paymentId`, so a per-Payee payment
   history is a group-by away when the "B" statement view is wanted later.
   Considered and rejected a `miningTaxPayments` table: a fourth synced

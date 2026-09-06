@@ -505,6 +505,7 @@ describe('markAssignmentsPaid with a payment', () => {
     await markAssignmentsPaid([a, b], {
       paidOn: '2026-09-06',
       method: 'donation',
+      amount: 150,
       journalRefId: 987,
     });
 

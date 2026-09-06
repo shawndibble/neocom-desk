@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, StatChip } from '@/components/ui';
+import { Button, InfoTooltip, Modal, StatChip } from '@/components/ui';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
@@ -65,6 +65,10 @@ export function GroupSummaryModal({
             system: systemName,
           })}
           <SecurityValue security={systemSecurity} t={t} />
+          <InfoTooltip
+            label={t('common.aboutLabel', { label: t('miningTax.dateColumn') })}
+            content={t('miningTax.dateEveHint')}
+          />
         </span>
       }
     >
