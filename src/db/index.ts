@@ -386,6 +386,16 @@ export interface PayeeRecord {
   defaultTaxPct: number;
   /** Solar system id this Payee collects on, for auto-match. Optional — a Payee need not be tied to one system. */
   systemId?: number;
+  /**
+   * The EVE character or corporation id this Payee *is* — the recipient of the
+   * ISK, so a donation or contract already sent can be matched back to what it
+   * paid off (issue #540). Never asked for up front: a Payee is a free-text
+   * label ("pick the moon, the corp, or the person, whichever is memorable"),
+   * and a field almost nobody would fill in is worse than none. It is learned
+   * instead, the first time a payment to that recipient is confirmed as
+   * settling this Payee's entries.
+   */
+  entityId?: number;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

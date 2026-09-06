@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
-import { createPayee, deletePayee, loadPayees, updatePayee } from './payees';
+import { createPayee, deletePayee, loadPayees, rememberPayeeEntity, updatePayee } from './payees';
 
 const syncMock = vi.hoisted(() => ({
   markPayeeDeleted: vi.fn(async () => {}),
@@ -36,6 +36,45 @@ describe('createPayee', () => {
 
     expect((await loadPayees(CHAR_A)).map((p) => p.name)).toEqual(['A Corp']);
     expect((await loadPayees(CHAR_B)).map((p) => p.name)).toEqual(['B Corp']);
+  });
+});
+
+describe('rememberPayeeEntity', () => {
+  it('records who the Payee is and schedules a sync', async () => {
+    const payee = await createPayee(CHAR_A, { name: 'Landlord', defaultTaxPct: 10 });
+    vi.clearAllMocks();
+
+    const updated = await rememberPayeeEntity(payee, 90_000_001);
+
+    expect(updated.entityId).toBe(90_000_001);
+    expect((await db.payees.get(payee.id))?.entityId).toBe(90_000_001);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('survives a later name or rate edit — updatePayee spreads the existing record', async () => {
+    const payee = await createPayee(CHAR_A, { name: 'Landlord', defaultTaxPct: 10 });
+    const learned = await rememberPayeeEntity(payee, 90_000_001);
+
+    const renamed = await updatePayee(learned, { name: 'Landlord Corp', defaultTaxPct: 12 });
+
+    expect(renamed.entityId).toBe(90_000_001);
+    expect((await db.payees.get(payee.id))?.entityId).toBe(90_000_001);
+  });
+
+  it('re-learns a different recipient — a landlord can start collecting elsewhere', async () => {
+    const payee = await createPayee(CHAR_A, { name: 'Landlord', defaultTaxPct: 10 });
+    const first = await rememberPayeeEntity(payee, 90_000_001);
+
+    expect((await rememberPayeeEntity(first, 90_000_002)).entityId).toBe(90_000_002);
+  });
+
+  it('writes nothing when the recipient is already recorded', async () => {
+    const payee = await createPayee(CHAR_A, { name: 'Landlord', defaultTaxPct: 10 });
+    const learned = await rememberPayeeEntity(payee, 90_000_001);
+    vi.clearAllMocks();
+
+    expect(await rememberPayeeEntity(learned, 90_000_001)).toBe(learned);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 });
 

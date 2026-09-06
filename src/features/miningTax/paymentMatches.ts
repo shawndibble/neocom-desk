@@ -18,13 +18,25 @@ export const PAYMENT_REF_TYPES: ReadonlySet<string> = new Set([
 
 /** How far back a payment is worth offering — a settle-up is recorded within days of paying, not months. */
 const LOOKBACK_DAYS = 30;
+/**
+ * How long after a Mining Ledger Entry a payment can still plausibly be
+ * settling it (issue #540). Deliberately used asymmetrically — see
+ * `withinLinkWindow` in `paymentLinks.ts`: a pilot pays *after* mining, so an
+ * entry dated well past its payment is not a match however close the amounts.
+ */
+export const LINK_WINDOW_DAYS = 14;
 /** Enough to find the right entry without the list becoming a second wallet journal. */
 const MAX_CANDIDATES = 8;
 
-/** True when `entry` is within half a percent (or one ISK, whichever is larger) of `amount`. */
+/** True when two ISK figures agree within half a percent (or one ISK, whichever is larger). */
+export function amountsMatch(a: number, b: number): boolean {
+  return Math.abs(a - b) <= Math.max(1, b * 0.005);
+}
+
+/** True when `entry`'s magnitude is within half a percent (or one ISK, whichever is larger) of `amount`. */
 export function amountMatches(entry: WalletJournalEntry, amount: number): boolean {
   if (entry.amount === undefined) return false;
-  return Math.abs(Math.abs(entry.amount) - amount) <= Math.max(1, amount * 0.005);
+  return amountsMatch(Math.abs(entry.amount), amount);
 }
 
 export function findPaymentCandidates(

@@ -4,6 +4,7 @@ import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import {
   createAssignment,
   deleteAssignment,
+  dismissEntries,
   dismissEntry,
   joinAssignments,
   markAssignmentsPaid,
@@ -147,6 +148,49 @@ describe('dismissEntry', () => {
     expect(dismissed.estimatedValue).toBe(1000);
     expect(await db.miningTaxAssignments.get(dismissed.id)).toEqual(dismissed);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+});
+
+describe('dismissEntries', () => {
+  it('dismisses every entry at once, scheduling one sync per distinct character', async () => {
+    const dismissed = await dismissEntries([
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+        estimatedValue: 1000,
+      },
+      {
+        characterId: CHAR_A,
+        date: '2026-09-05',
+        solarSystemId: 1,
+        oreLines: [{ typeId: TYPE_B, quantity: 50 }],
+        estimatedValue: 200,
+      },
+      {
+        characterId: 2,
+        date: '2026-09-05',
+        solarSystemId: 1,
+        oreLines: [{ typeId: TYPE_A, quantity: 10 }],
+        estimatedValue: 100,
+      },
+    ]);
+
+    expect(dismissed).toHaveLength(3);
+    expect(dismissed.every((d) => d.status === 'dismissed' && d.taxOwed === 0)).toBe(true);
+    expect(await db.miningTaxAssignments.count()).toBe(3);
+    // One schedule per character, not one per entry — a bulk dismiss of a
+    // week's entries must not fire a week's worth of syncs.
+    expect(syncMock.scheduleSync).toHaveBeenCalledTimes(2);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(2);
+  });
+
+  it('writes nothing and schedules nothing for an empty list', async () => {
+    expect(await dismissEntries([])).toEqual([]);
+    expect(await db.miningTaxAssignments.count()).toBe(0);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 });
 
