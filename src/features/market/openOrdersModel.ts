@@ -106,6 +106,12 @@ export interface OpenOrderRow {
 export interface CharacterSkills {
   accountingLevel: number;
   brokerRelationsLevel: number;
+  /** Reprocessing (3385), for the "refine and sell the materials" comparison. */
+  reprocessingLevel: number;
+  /** Reprocessing Efficiency (3389). */
+  reprocessingEfficiencyLevel: number;
+  /** Scrapmetal Processing (12196) — the specialisation that applies to the items a sell order holds. */
+  scrapmetalProcessingLevel: number;
 }
 
 export interface BuildRowsInput {

@@ -29,6 +29,8 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadNpcStations } from '@/sde/loadMarketSde';
+import { loadReprocessing } from '@/sde/loadSde';
+import type { ReprocessingType } from '@/sde/types';
 import type { NpcStationEntry } from '@/sde/marketTypes';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -76,6 +78,7 @@ import { stationPriceKey } from './stationPriceKey';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { OrderDetailModal } from './OrderDetailModal';
+import type { ReprocessingInput } from './orderExits';
 
 /** Healthy orders start collapsed (CONTEXT.md redesign) — the `showHealthy` toggle is the way back, not the funnel filter. */
 const DEFAULT_FILTER: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true };
@@ -216,6 +219,10 @@ async function loadOpenOrdersSnapshot(
     skillsByCharacter.set(entry.characterId, {
       accountingLevel: corrected.trained.get(SKILL_IDS.accounting)?.level ?? 0,
       brokerRelationsLevel: corrected.trained.get(SKILL_IDS.brokerRelations)?.level ?? 0,
+      reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
+      reprocessingEfficiencyLevel:
+        corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
+      scrapmetalProcessingLevel: corrected.trained.get(SKILL_IDS.scrapmetalProcessing)?.level ?? 0,
     });
   });
 
@@ -256,6 +263,18 @@ export function OpenOrdersPanel() {
   const [deepByKey, setDeepByKey] = useState<Map<string, RegionCompetition>>(new Map());
   const [deepLoadingKeys, setDeepLoadingKeys] = useState<ReadonlySet<string>>(new Set());
   const [jumpsByPair, setJumpsByPair] = useState<Map<string, JumpsAwayResult>>(new Map());
+  /**
+   * The refine comparison, per opened order: the baked yield for its item
+   * plus a price for each material AT THAT STATION. Keyed the same way as
+   * the other on-demand caches, and loaded only when a detail modal opens —
+   * `reprocessing.json` is 1.4 MB and no row on the worklist needs it.
+   */
+  const [reprocessingByKey, setReprocessingByKey] = useState<
+    Map<string, { entry: ReprocessingType; materialPrices: Record<number, number> }>
+  >(new Map());
+  const [reprocessingLoadingKeys, setReprocessingLoadingKeys] = useState<ReadonlySet<string>>(
+    new Set()
+  );
   const [historyByKey, setHistoryByKey] = useState<Map<string, PriceHistoryResult>>(new Map());
   const [historyLoadingKeys, setHistoryLoadingKeys] = useState<ReadonlySet<string>>(new Set());
 
@@ -314,6 +333,51 @@ export function OpenOrdersPanel() {
       })
       .finally(() => {
         setHistoryLoadingKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      });
+  }
+
+  /**
+   * The refine comparison for one order, on the same on-open pattern as
+   * `ensureHistoryLoaded`.
+   *
+   * Keyed by station AND item, not by item alone: the material prices are the
+   * ones at THIS station, and the same item held at two stations refines into
+   * materials worth different amounts. Left uncached on failure so the next
+   * open retries. An item with no reprocessing entry caches an empty
+   * materials list rather than retrying forever — "this refines into nothing"
+   * is an answer.
+   */
+  function ensureReprocessingLoaded(locationId: number, typeId: number) {
+    const key = stationPriceKey(locationId, typeId);
+    if (reprocessingByKey.has(key) || reprocessingLoadingKeys.has(key)) return;
+    setReprocessingLoadingKeys((prev) => new Set(prev).add(key));
+    void loadReprocessing()
+      .then(async (map) => {
+        const entry = map[String(typeId)] ?? { portionSize: 1, materials: [] };
+        const materialTypeIds = entry.materials.map((m) => m.typeID);
+        const materialPrices: Record<number, number> = {};
+        if (materialTypeIds.length > 0) {
+          const prices = await loadStationBestPrices([
+            { stationId: locationId, typeIds: materialTypeIds },
+          ]);
+          for (const materialTypeId of materialTypeIds) {
+            // The best BUY order: this exit sells the materials into orders
+            // that already exist, rather than listing them and waiting.
+            const buyMax = prices.get(stationPriceKey(locationId, materialTypeId))?.buyMax;
+            if (buyMax !== null && buyMax !== undefined) materialPrices[materialTypeId] = buyMax;
+          }
+        }
+        setReprocessingByKey((prev) => new Map(prev).set(key, { entry, materialPrices }));
+      })
+      .catch(() => {
+        // Left uncached on failure so the next open retries.
+      })
+      .finally(() => {
+        setReprocessingLoadingKeys((prev) => {
           const next = new Set(prev);
           next.delete(key);
           return next;
@@ -474,6 +538,7 @@ export function OpenOrdersPanel() {
     setDetailOrderId(row.orderId);
     ensureDeepChecked(row.regionId, row.typeId);
     ensureHistoryLoaded(row.regionId, row.typeId);
+    ensureReprocessingLoaded(row.locationId, row.typeId);
   }
 
   /**
@@ -1002,6 +1067,22 @@ export function OpenOrdersPanel() {
             return jumpsByPair.get(`${mySystemId}:${rival.systemId}`);
           })()}
           stationNameFor={(locationId) => snapshot.npcStations.get(locationId)?.name ?? null}
+          reprocessing={((): ReprocessingInput | undefined => {
+            const loaded = reprocessingByKey.get(
+              stationPriceKey(detailRow.locationId, detailRow.typeId)
+            );
+            const skills = snapshot.skillsByCharacter.get(detailRow.characterId);
+            if (!loaded || !skills) return undefined;
+            return {
+              entry: loaded.entry,
+              materialPrices: loaded.materialPrices,
+              skills: {
+                reprocessingLevel: skills.reprocessingLevel,
+                reprocessingEfficiencyLevel: skills.reprocessingEfficiencyLevel,
+                specialisationLevel: skills.scrapmetalProcessingLevel,
+              },
+            };
+          })()}
           onCheckDeeper={() => ensureDeepChecked(detailRow.regionId, detailRow.typeId)}
           onClose={() => setDetailOrderId(null)}
         />

@@ -8,12 +8,22 @@ import {
   type BuildRowsInput,
   type OpenOrderRow,
   summariseOrderGroup,
+  type CharacterSkills,
 } from './openOrdersModel';
 import type { OpenOrdersSnapshot, CharacterOpenOrders } from './openOrdersData';
 import type { OrderCostBasis } from './orderCostBasis';
 import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ORDER_PROBLEMS } from '@/engine/market/orderProblems';
+
+/** Every skill untrained: these fixtures test row shaping, not fee or yield maths. */
+const ZERO_SKILLS: CharacterSkills = {
+  accountingLevel: 0,
+  brokerRelationsLevel: 0,
+  reprocessingLevel: 0,
+  reprocessingEfficiencyLevel: 0,
+  scrapmetalProcessingLevel: 0,
+};
 
 const NOW = new Date('2026-09-06T00:00:00Z').getTime();
 
@@ -59,7 +69,7 @@ function baseInput(overrides: Partial<BuildRowsInput> = {}): BuildRowsInput {
     typeNames: new Map([[100, 'Tritanium']]),
     stationPrices: new Map(),
     costBases: new Map(),
-    skillsByCharacter: new Map([[1, { accountingLevel: 0, brokerRelationsLevel: 0 }]]),
+    skillsByCharacter: new Map([[1, ZERO_SKILLS]]),
     now: NOW,
     ...overrides,
   };
@@ -511,8 +521,8 @@ describe('buildOpenOrderRows — misc fields', () => {
           }),
         ]),
         skillsByCharacter: new Map([
-          [1, { accountingLevel: 0, brokerRelationsLevel: 0 }],
-          [2, { accountingLevel: 0, brokerRelationsLevel: 0 }],
+          [1, ZERO_SKILLS],
+          [2, ZERO_SKILLS],
         ]),
       })
     );

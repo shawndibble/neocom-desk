@@ -244,6 +244,12 @@ export const SKILL_IDS = {
   reactions: 45746,
   accounting: 16622,
   brokerRelations: 3446,
+  /** Reprocessing: +3% refining yield a level (issue #537). */
+  reprocessing: 3385,
+  /** Reprocessing Efficiency: +2% a level. */
+  reprocessingEfficiency: 3389,
+  /** Scrapmetal Processing: +2% a level, on items rather than ore. */
+  scrapmetalProcessing: 12196,
 } as const;
 
 /** Trained skill levels: skill typeID -> level (0..5). Missing = untrained. */

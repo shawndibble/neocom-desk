@@ -235,6 +235,17 @@ here — they go one per file in `docs/context/decisions/`.
   `expiringOrStale`, `outbid`, `healthy`, in that precedence. Each order is
   filed under exactly one — its worst — for grouping, while filters match
   against every problem an order has, since those can overlap.
+- **Reprocessing Yield**: What one type breaks down into when refined, baked
+  from the SDE into `public/data/reprocessing.json` (issue #537). Quantities
+  are per portion size, not per unit, so a part portion refines into
+  nothing at all — the portion size rides inside each entry so the quantities
+  cannot be read without it. `src/engine/industry/reprocessing.ts` turns a
+  yield plus the character's Reprocessing, Reprocessing Efficiency and
+  Scrapmetal Processing levels into an expected output. What it deliberately
+  does NOT model: a structure's own refining rate, its rigs, and the
+  standings-based station tax — none is readable from ESI for an arbitrary
+  location, so the base 50% station rate is stated on screen as an assumption
+  rather than presented as fact.
 - **Order Slots**: How many market orders a character may keep open at once —
   a base 5, plus 4 per level of Trade, 8 per Retail, 16 per Wholesale and 32
   per Tycoon, so 305 with all four at V. ESI reports the open orders but never

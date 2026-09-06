@@ -39,7 +39,8 @@ import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { orderVerdict, type OrderVerdictKind } from './orderVerdict';
-import { orderExits } from './orderExits';
+import { orderExits, type ReprocessingInput } from './orderExits';
+import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 
 export interface OrderDetailModalProps {
   open: boolean;
@@ -66,6 +67,8 @@ export interface OrderDetailModalProps {
   stationsLoaded: boolean;
   /** Undefined while not yet requested/resolved. */
   regionJumps: JumpsAwayResult | undefined;
+  /** The refine comparison, once its yield and material prices have loaded. Undefined keeps the row greyed as "not built for this item yet". */
+  reprocessing?: ReprocessingInput;
   /** Resolves a rival's location to a name, so the three scopes can be told apart when they quote the same seller. Returns null for a player structure. */
   stationNameFor: (locationId: number) => string | null;
   onCheckDeeper: () => void;
@@ -324,6 +327,7 @@ export function OrderDetailModal({
   stationChecked,
   stationsLoaded,
   regionJumps,
+  reprocessing,
   stationNameFor,
   onCheckDeeper,
   onClose,
@@ -359,7 +363,8 @@ export function OrderDetailModal({
     (system.kind === 'clear' || system.kind === 'unavailable' || system.kind === 'notChecked') &&
     region.kind === 'clear';
   const verdict = orderVerdict(row);
-  const exits = orderExits({ row, competitors: deep?.competitors });
+  const exits = orderExits({ row, competitors: deep?.competitors, reprocessing });
+  const refine = exits.find((exit) => exit.kind === 'reprocess');
   const rank = stationRank(row, deep);
   const netIfSellsAsListed = row.floor ? row.price - row.floor.fill : null;
 
@@ -754,16 +759,44 @@ export function OrderDetailModal({
               )}
               {/*
                 Named, not estimated: hauling needs hub prices this page does
-                not load, and reprocessing needs the refining data (issue
-                #537). Saying they exist and are not built beats a number
+                not load. Saying it exists and is not built beats a number
                 nothing can back.
               */}
-              {(['exitHaulNotBuilt', 'exitReprocessNotBuilt'] as const).map((key) => (
-                <p key={key} className="flex items-baseline justify-between gap-3 text-text-faint">
-                  <span>{t(`market.orders.${key}`)}</span>
+              <p className="flex items-baseline justify-between gap-3 text-text-faint">
+                <span>{t('market.orders.exitHaulNotBuilt')}</span>
+                <span className="shrink-0">{t('market.orders.exitNotBuilt')}</span>
+              </p>
+              {!reprocessing && (
+                <p className="flex items-baseline justify-between gap-3 text-text-faint">
+                  <span>{t('market.orders.exitReprocessNotBuilt')}</span>
                   <span className="shrink-0">{t('market.orders.exitNotBuilt')}</span>
                 </p>
-              ))}
+              )}
+              {refine && (
+                <>
+                  {/*
+                    The assumption, stated rather than folded into the number:
+                    a structure's own reprocessing rate, its rigs and the
+                    standings-based station tax are not readable from ESI, so
+                    this prices a plain NPC station with no tax deducted.
+                  */}
+                  <p className="text-text-dim">
+                    {t('market.orders.exitReprocessAssumption', {
+                      rate: Math.round(BASE_STATION_REPROCESSING_RATE * 100),
+                    })}
+                  </p>
+                  {refine.partial && (
+                    <p className="text-warning">{t('market.orders.exitReprocessPartial')}</p>
+                  )}
+                  {refine.unitsLeftOver !== undefined && refine.unitsLeftOver > 0 && (
+                    <p className="text-text-dim">
+                      {t('market.orders.exitReprocessLeftOver', {
+                        count: refine.unitsLeftOver,
+                      })}
+                    </p>
+                  )}
+                </>
+              )}
               <p className="text-text-faint">{t('market.orders.orderSoFarNotBuilt')}</p>
             </div>
           </section>

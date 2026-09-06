@@ -88,4 +88,71 @@ describe('orderExits', () => {
   it('offers nothing for a buy order', () => {
     expect(orderExits({ row: { ...BASE_ROW, isBuyOrder: true } })).toEqual([]);
   });
+
+  describe('reprocess and sell the materials', () => {
+    const SKILLS = {
+      reprocessingLevel: 0,
+      reprocessingEfficiencyLevel: 0,
+      specialisationLevel: 0,
+    };
+    /** 10 units refine into 1,000 Tritanium at 100%; at the assumed 50% station that is 500. */
+    const ENTRY = { portionSize: 10, materials: [{ typeID: 34, quantity: 1000 }] };
+
+    it('prices the materials across the units actually refined, not the units on hand', () => {
+      // 10 of the 10 units on hand refine -> 500 Tritanium at 2 ISK = 1,000
+      // ISK over 10 units = 100 a unit, against a fill floor of 380.
+      const exits = orderExits({
+        row: BASE_ROW,
+        reprocessing: { entry: ENTRY, skills: SKILLS, materialPrices: { 34: 2 } },
+      });
+      expect(exits).toContainEqual({
+        kind: 'reprocess',
+        price: 100,
+        netPerUnit: -280,
+        partial: false,
+        unitsLeftOver: 0,
+      });
+    });
+
+    it('reports the stock that cannot make up a whole portion', () => {
+      const exits = orderExits({
+        row: { ...BASE_ROW, volumeRemain: 23 },
+        reprocessing: { entry: ENTRY, skills: SKILLS, materialPrices: { 34: 2 } },
+      });
+      const refine = exits.find((e) => e.kind === 'reprocess');
+      expect(refine?.unitsLeftOver).toBe(3);
+    });
+
+    it('offers a worthless refine, rather than hiding it, when nothing makes up a portion', () => {
+      const exits = orderExits({
+        row: { ...BASE_ROW, volumeRemain: 3 },
+        reprocessing: { entry: ENTRY, skills: SKILLS, materialPrices: { 34: 2 } },
+      });
+      expect(exits).toContainEqual({
+        kind: 'reprocess',
+        price: 0,
+        netPerUnit: -380,
+        unitsLeftOver: 3,
+      });
+    });
+
+    it('flags the total as partial when a material has no price at this station', () => {
+      const twoMaterials = {
+        portionSize: 10,
+        materials: [
+          { typeID: 34, quantity: 1000 },
+          { typeID: 35, quantity: 100 },
+        ],
+      };
+      const exits = orderExits({
+        row: BASE_ROW,
+        reprocessing: { entry: twoMaterials, skills: SKILLS, materialPrices: { 34: 2 } },
+      });
+      expect(exits.find((e) => e.kind === 'reprocess')?.partial).toBe(true);
+    });
+
+    it('is absent until the refining data and prices have loaded', () => {
+      expect(orderExits({ row: BASE_ROW }).map((e) => e.kind)).toEqual(['hold']);
+    });
+  });
 });
