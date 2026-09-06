@@ -47,8 +47,9 @@ _Recorded 2026-09-05._
   plan drag a desktop off the plan being worked on.
 
 - **It feeds the fallback chain, not the explicit selection.** `selectedId`
-  also decides which column a narrow screen shows (CONTEXT.md round 25 — a
-  phone lands on the list, like Mail and Skill Plans). Reopening a plan is
+  also decides which column a narrow screen shows
+  (`20260902-110747-industry-side-by-side-layout.md` — a phone lands on the
+  list, like Mail and Skill Plans). Reopening a plan is
   about which plan is selected, so the remembered id is read only where the
   first-plan fallback was, and a phone still lands on the list.
 
@@ -57,6 +58,14 @@ _Recorded 2026-09-05._
   fallback are openings too, and the narrow-screen back control clears
   `selectedId` without changing which plan is open — recording at the source
   would have erased the memory on every back press.
+
+- **A picked structure's name is ACL-gated ESI data, and it now syncs.** Every
+  Build Plan field synced before was public — a solar system name, a facility
+  enum. A private citadel's name is visible only to Characters whose role
+  permits it, so this is the pilot's own privileged knowledge leaving the
+  device. It goes to the same per-Character Firestore document their plan names
+  and blueprint choices already occupy, under their own ownerHash and no one
+  else's, which is the boundary Editable Data already draws.
 
 - **A remembered plan that no longer exists needs no cleanup.** The id is
   adopted only when it is still in that Character's own plans, so a plan

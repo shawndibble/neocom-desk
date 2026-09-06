@@ -8,6 +8,7 @@ import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { IndustryActivity } from '@/engine/industry/types';
+import { buildLocationLabel } from './buildLocationLabel';
 import { moveHighlight, type ComboboxNavKey } from './comboboxNav';
 import { MIN_SEARCH_LENGTH, searchBuildLocations } from './searchBuildLocations';
 import type { BuildLocationOption } from './buildLocations';
@@ -18,13 +19,7 @@ const optionId = (structureId: number) => `build-location-option-${structureId}`
 interface BuildLocationPickerProps {
   /** What the plan is set to right now, already translated. Always the plan's own values. */
   summary: string;
-  /**
-   * The place the plan was pointed at, already labelled by the caller (which
-   * owns the stand-in copy for a structure ESI would not name). Shown in the
-   * box whenever the pilot is not mid-search, so the pick survives a reload,
-   * a plan switch and a navigation away — `null` for a plan that was never
-   * pointed at one.
-   */
+  /** The plan's own location, already labelled. Shown whenever no search is in progress. */
   selectedLabel: string | null;
   /** Facility and build system — revealed by "Override". */
   children: ReactNode;
@@ -57,12 +52,9 @@ const DEBOUNCE_MS = 300;
  * route that finds a structure by name, and it returns what this Character can
  * actually dock at — CCP's ACL, not ours.
  *
- * **The pick is remembered, for the label only.** The plan stores which place
- * was chosen (`buildLocationId`/`buildLocationName`) so this box can still name
- * it later; every number still comes from the fields the pick filled. A stale
- * pair is therefore a wrong label and never a wrong ISK figure — and the two
- * controls that could make it stale, the Facility select and the Build system
- * field, clear it as they edit.
+ * **The box states the plan's own stored pick** (`BuildPlanRecord.buildLocationId`),
+ * so it survives a reload rather than blanking the moment a choice fills the
+ * fields below it.
  *
  * Its scope is in the base grant, so a Character added from now on can search
  * straight away. One added *before* it existed holds a token without it —
@@ -86,10 +78,9 @@ export function BuildLocationPicker({
   // reload. A typed empty string is a different state: the pilot cleared the
   // box themselves, so it stays cleared until they pick again.
   const [query, setQuery] = useState<string | null>(null);
-  // What the pilot just chose, held only until the plan comes back carrying
-  // it. The parent's write is a Dexie round-trip, so without this the box
-  // would state the *previous* location for a frame after the click — the
-  // fill-once blankness this whole change removes, in miniature.
+  // What the pilot just chose, held until the plan comes back carrying it:
+  // the parent's write is a Dexie round-trip, and without this the box would
+  // state the *previous* location for a frame after the click.
   const [picked, setPicked] = useState<string | null>(null);
   const [results, setResults] = useState<BuildLocationOption[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -169,25 +160,19 @@ export function BuildLocationPicker({
   const openResults =
     !dismissed && !searching && results !== null && results.length > 0 ? results : null;
 
-  // ESI can withhold a structure's name; both the row and the sr-only
-  // highlight announcement need the same "what and where" fallback.
+  // Shared with the plan's own stored label, so a pick cannot change wording
+  // as the write lands. Feeds the row, the sr-only highlight announcement and
+  // `picked` below.
   function optionLabel(option: BuildLocationOption) {
-    return (
-      option.name ??
-      t('industry.buildLocationUnnamed', {
-        facility: FACILITY_PRESETS[option.facility].name,
-        system: option.systemName,
-      })
-    );
+    return buildLocationLabel(option.name, option.facility, option.systemName, t);
   }
 
   function pick(option: BuildLocationOption) {
     onPick(option);
-    // Back to reading the plan, which `onPick` has just rewritten — so the
-    // box states the place that was chosen instead of the fragment typed to
-    // find it. The searchKey-change block above resets
-    // results/highlight/dismissed on the next render, the same reset every
-    // other query edit already goes through.
+    // The box states the place chosen, not the fragment typed to find it:
+    // `picked` covers the gap until the plan's own label arrives. Clearing
+    // the query also resets results/highlight/dismissed through the
+    // searchKey block above, the same reset every other query edit takes.
     setQuery(null);
     setPicked(optionLabel(option));
   }
@@ -236,6 +221,11 @@ export function BuildLocationPicker({
           value={query ?? picked ?? selectedLabel ?? ''}
           placeholder={t('industry.buildLocationPlaceholder')}
           onChange={(e) => setQuery(e.target.value)}
+          // Abandoning the search gives the box back to the plan. Escape
+          // keeps the typed text — a near-miss is still there to correct —
+          // but once focus is gone there is nothing to correct. Result rows
+          // cancel their own mousedown, so clicking one never blurs first.
+          onBlur={() => setQuery(null)}
           onKeyDown={handleKeyDown}
           role="combobox"
           aria-autocomplete="list"

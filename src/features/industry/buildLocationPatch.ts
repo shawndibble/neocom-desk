@@ -21,8 +21,7 @@ export function buildLocationPatch(option: BuildLocationOption): BuildLocationPa
     security: option.security,
     buildSystemId: option.systemId,
     buildSystemName: option.systemName,
-    // Kept for the search box's own label, never for a calculation. The name
-    // is dropped rather than replaced when ESI withheld it: the stand-in
+    // Dropped rather than replaced when ESI withheld the name: the stand-in
     // label belongs to i18next, so only the id is data here.
     buildLocationId: option.structureId,
     buildLocationName: option.name ?? undefined,

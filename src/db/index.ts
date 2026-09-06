@@ -222,11 +222,11 @@ export interface BuildPlanRecord {
    * Unlike `buildSystemId`/`buildSystemName` these two are independently
    * optional: ESI withholds a structure's name from a Character whose role
    * cannot see it, and the id is still worth keeping — the label that stands
-   * in for the missing name is UI copy (`buildLocations.ts`), not data.
+   * in for the missing name is UI copy (`buildLocationLabel.ts`), not data.
    * Additive and unindexed, so no schema version bump.
    */
   buildLocationId?: number;
-  /** ESI's name for `buildLocationId`, absent where ESI withheld it. */
+  /** @see buildLocationId */
   buildLocationName?: string;
   /** Facility tax, percent of EIV. Structures only — NPC station tax is fixed. */
   facilityTaxPct?: number;

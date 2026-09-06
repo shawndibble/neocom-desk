@@ -116,10 +116,22 @@ export function Industry() {
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const plans = useLiveQuery(async () => {
+  // Stamped with the Character it was read for, because `useLiveQuery` holds
+  // its previous result in a ref across a deps change: for one render after
+  // the active Character changes, the rows belong to the Character who just
+  // left. Unstamped, every consumer below has to re-derive that — and the one
+  // that mounts `BuildPlanDetail` would open a plan this pilot does not own
+  // and fetch market prices for its materials, only to remount a tick later.
+  const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
-    return db.buildPlans.where('characterId').equals(activeCharacterId).toArray();
+    return {
+      characterId: activeCharacterId,
+      rows: await db.buildPlans.where('characterId').equals(activeCharacterId).toArray(),
+    };
   }, [activeCharacterId]);
+  // `undefined` means "not read yet" for the incoming Character exactly as it
+  // does on a first load, so every consumer's existing loading path covers it.
+  const plans = plansQuery?.characterId === activeCharacterId ? plansQuery.rows : undefined;
 
   // The materials table's item context menu (CONTEXT.md round 26) writes the
   // same Quickbar record the Market Browser and Assets do, and opens the same
@@ -295,11 +307,17 @@ export function Industry() {
   const effectiveSelectedId = useMemo(() => {
     if (!plans) return null;
     if (selectedId && plans.some((p) => p.id === selectedId)) return selectedId;
+    // Nothing until the memory has been read: the settings row and the Dexie
+    // plan query race, and taking the first-plan fallback before the answer
+    // arrives mounts the wrong plan, then swaps — a `key={plan.id}` remount
+    // and a second price fetch for a plan the pilot never asked for. A failed
+    // read still settles `hydrated`, so this cannot stall.
+    if (!lastOpenedHydrated) return null;
     const remembered =
       activeCharacterId === null ? null : lastOpenedPlanFor(lastOpened, activeCharacterId);
     if (remembered && plans.some((p) => p.id === remembered)) return remembered;
     return plans[0]?.id ?? null;
-  }, [plans, selectedId, lastOpened, activeCharacterId]);
+  }, [plans, selectedId, lastOpened, lastOpenedHydrated, activeCharacterId]);
 
   const selectedPlan = useMemo(
     () => plans?.find((p) => p.id === effectiveSelectedId) ?? null,
@@ -313,10 +331,14 @@ export function Industry() {
   // must not erase the memory. Waits for hydration, so the stored map is the
   // one being added to rather than an empty default overwriting it.
   useEffect(() => {
-    if (!lastOpenedHydrated || activeCharacterId === null || effectiveSelectedId === null) return;
-    if (lastOpenedPlanFor(lastOpened, activeCharacterId) === effectiveSelectedId) return;
-    void setLastOpened(withLastOpenedPlan(lastOpened, activeCharacterId, effectiveSelectedId));
-  }, [lastOpenedHydrated, lastOpened, activeCharacterId, effectiveSelectedId, setLastOpened]);
+    if (!lastOpenedHydrated || activeCharacterId === null) return;
+    // Against the plan, not the id: filing one pilot's plan under another's
+    // name loses the memory this map exists to keep apart, so the ownership
+    // the stamped query already guarantees is worth restating cheaply here.
+    if (selectedPlan?.characterId !== activeCharacterId) return;
+    if (lastOpenedPlanFor(lastOpened, activeCharacterId) === selectedPlan.id) return;
+    void setLastOpened(withLastOpenedPlan(lastOpened, activeCharacterId, selectedPlan.id));
+  }, [lastOpenedHydrated, lastOpened, activeCharacterId, selectedPlan, setLastOpened]);
 
   const comparePlans = useMemo(
     () => plans?.filter((p) => compareSelectedIds.has(p.id)) ?? [],

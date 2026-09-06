@@ -589,9 +589,8 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
       ...(p.buildSystemId !== undefined && p.buildSystemName !== undefined
         ? { buildSystemId: p.buildSystemId, buildSystemName: p.buildSystemName }
         : {}),
-      // Two independent fields, not a pair like the system above: the id is a
-      // label's subject and never a number's source, so an id whose name ESI
-      // withheld still travels — the picker composes the stand-in label.
+      // Independent, unlike the system pair above: an id whose name ESI
+      // withheld still travels, and the picker composes the stand-in label.
       ...(p.buildLocationId !== undefined ? { buildLocationId: p.buildLocationId } : {}),
       ...(p.buildLocationName !== undefined ? { buildLocationName: p.buildLocationName } : {}),
       ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),

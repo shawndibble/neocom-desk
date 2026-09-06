@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, within, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -700,6 +700,36 @@ describe('Industry: the plan you had open reopens', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Rifter' })).toBeInTheDocument();
+  });
+
+  it("never files one Character's plan under another Character's name", async () => {
+    // `useLiveQuery` keeps the previous Character's array for a render after
+    // the active Character changes, so a memory written from the id alone
+    // would overwrite the incoming Character's own remembered plan with a
+    // plan they do not even own.
+    const OTHER_ID = 92;
+    await db.characters.put({
+      characterId: OTHER_ID,
+      name: 'Pilot Two',
+      ownerHash: 'oh2',
+      addedAt: 2,
+    });
+    await seedTwoPlans();
+    await db.settings.put({
+      key: 'industryLastOpenedPlan',
+      value: { [CHAR_ID]: 'bp-parts', [OTHER_ID]: 'bp-other' },
+    });
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Mechanical Parts' });
+
+    await act(async () => {
+      useActiveCharacter.setState({ activeCharacterId: OTHER_ID, hydrated: true });
+    });
+
+    // Pilot Two owns no plans here, so nothing of theirs can be recorded —
+    // and Pilot One's plan must not be recorded against them either.
+    await waitFor(() => expect(useLastOpenedPlan.getState().value[OTHER_ID]).toBe('bp-other'));
+    expect(useLastOpenedPlan.getState().value[CHAR_ID]).toBe('bp-parts');
   });
 
   it('still lands a narrow screen on the list, remembered plan or not', async () => {
