@@ -5,6 +5,11 @@
 Accepted (2026-09-02). Amends ADR 0004 — `Tooltip` moves from hand-rolled CSS
 to Radix; ContextMenu, DropdownMenu and Select are unaffected.
 
+The touch layer described below changed on 2026-09-06: explain-only triggers
+open on a plain tap, and a touch-revealed tooltip no longer auto-dismisses.
+See `docs/context/decisions/20260906-130028-touch-tooltips-tap-to-open-explain-only-triggers.md`.
+The Radix decision itself is unchanged.
+
 ## Context
 
 `Tooltip` was hand-rolled CSS (`:hover`/`:focus-within` on a wrapping span,
@@ -25,9 +30,11 @@ the existing external API (`<Tooltip content>`, `<InfoTooltip>`) so no call
 site changes. Radix handles hover/focus, collision-aware flip/shift
 placement, and portaling to `document.body` (so a clipping scroll ancestor
 can't cut the bubble off either); the component still owns its own
-touch-and-hold long-press reveal and auto-dismiss, layered on top via a
-controlled `open` state — Radix's own pointer handling explicitly ignores
-touch and expects the app to supply this.
+touch reveal, layered on top via a controlled `open` state — Radix's own
+pointer handling explicitly ignores touch and expects the app to supply this.
+Every dismissal Radix does know about (Escape, scroll, outside pointerdown,
+another tooltip opening) is routed back through `onOpenChange` to clear that
+touch state, so the two halves can't disagree about whether the bubble is up.
 
 ## Consequences
 

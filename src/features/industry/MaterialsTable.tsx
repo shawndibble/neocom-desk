@@ -230,7 +230,7 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
   const planetary = building && advice.method === 'planetary';
   const Glyph = building ? BUILD_GLYPH[advice.method] : Icon.Buy;
   return (
-    <Tooltip content={label}>
+    <Tooltip content={label} openOnTap>
       <span
         role="img"
         aria-label={label}

@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type PointerEvent,
   type ReactElement,
   type TouchEvent,
 } from 'react';
@@ -41,8 +42,9 @@ interface TooltipProps {
  * touch reveals the tooltip via our own state, OR'd into Radix's controlled
  * `open`: a touch-and-hold by default, a plain tap under `openOnTap`. Neither
  * path ever calls `preventDefault`, so a trigger that acts on tap still acts.
- * A touch-revealed tooltip has no timeout — it stays up to be read, until a
- * tap outside it (or another tap on an `openOnTap` trigger) dismisses it.
+ * A touch-revealed tooltip has no timeout — it stays up to be read, until
+ * something dismisses it: a tap outside, a scroll, Escape, or another tap on
+ * an `openOnTap` trigger.
  */
 export function Tooltip({ content, children, openOnTap = false, className = '' }: TooltipProps) {
   const [hoverOpen, setHoverOpen] = useState(false);
@@ -50,44 +52,82 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const touchOrigin = useRef<{ x: number; y: number } | null>(null);
   const touchDragged = useRef(false);
-  /** Read at touch start so a tap toggles off even if Radix already dismissed the bubble in between. */
   const openAtTouchStart = useRef(false);
+  const captured = useRef(false);
 
   function cancelLongPress() {
     clearTimeout(longPressTimer.current);
   }
 
-  function handleTouchStart(event: TouchEvent) {
-    cancelLongPress();
-    const touch = event.touches[0];
-    touchOrigin.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
-    touchDragged.current = false;
+  /**
+   * A second tap has to close the bubble, and the pointerdown that dismisses
+   * it fires before `touchstart` — so read the open state at whichever of the
+   * two arrives first, before any dismissal can rewrite it.
+   */
+  function captureOpenState() {
+    if (captured.current) return;
+    captured.current = true;
     openAtTouchStart.current = touchOpen;
-    if (!openOnTap) {
+  }
+
+  function endTouchSequence() {
+    cancelLongPress();
+    captured.current = false;
+  }
+
+  function handlePointerDown(event: PointerEvent) {
+    if (event.pointerType !== 'mouse') captureOpenState();
+  }
+
+  function handleTouchStart(event: TouchEvent) {
+    captureOpenState();
+    cancelLongPress();
+    touchDragged.current = event.touches.length > 1;
+    const touch = event.touches.length === 1 ? event.touches[0] : undefined;
+    touchOrigin.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+    if (!openOnTap && !touchDragged.current) {
       longPressTimer.current = setTimeout(() => setTouchOpen(true), TOUCH_LONG_PRESS_MS);
     }
   }
 
   function handleTouchMove(event: TouchEvent) {
-    const touch = event.touches[0];
+    if (touchDragged.current) return;
     const origin = touchOrigin.current;
-    if (!touch || !origin) return;
+    const touch = event.touches.length === 1 ? event.touches[0] : undefined;
     const dragged =
-      Math.abs(touch.clientX - origin.x) > TOUCH_MOVE_TOLERANCE_PX ||
-      Math.abs(touch.clientY - origin.y) > TOUCH_MOVE_TOLERANCE_PX;
+      event.touches.length > 1 ||
+      (!!touch &&
+        !!origin &&
+        (Math.abs(touch.clientX - origin.x) > TOUCH_MOVE_TOLERANCE_PX ||
+          Math.abs(touch.clientY - origin.y) > TOUCH_MOVE_TOLERANCE_PX));
     if (dragged) {
       touchDragged.current = true;
       cancelLongPress();
     }
   }
 
-  function handleTouchEnd() {
-    cancelLongPress();
-    if (openOnTap && !touchDragged.current) setTouchOpen(!openAtTouchStart.current);
+  function handleTouchEnd(event: TouchEvent) {
+    const wasOpen = openAtTouchStart.current;
+    const lastFingerUp = event.touches.length === 0;
+    endTouchSequence();
+    if (openOnTap && lastFingerUp && !touchDragged.current) setTouchOpen(!wasOpen);
   }
 
-  function dismissTouch() {
-    setTouchOpen(false);
+  /** The browser took the gesture over (a scroll, usually) — no touchend is coming. */
+  function handleTouchCancel() {
+    touchDragged.current = true;
+    endTouchSequence();
+  }
+
+  /**
+   * Radix drives every dismissal it knows about — Escape, scroll, a tap
+   * outside, another tooltip opening, a mouse leaving on a hybrid device —
+   * through here. Clearing the touch reveal too is what keeps a timeout-free
+   * bubble from getting stuck open.
+   */
+  function handleOpenChange(open: boolean) {
+    setHoverOpen(open);
+    if (!open) setTouchOpen(false);
   }
 
   useEffect(() => cancelLongPress, []);
@@ -101,12 +141,14 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
 
   return (
     <TooltipPrimitive.Provider delayDuration={0}>
-      <TooltipPrimitive.Root open={hoverOpen || touchOpen} onOpenChange={setHoverOpen}>
+      <TooltipPrimitive.Root open={hoverOpen || touchOpen} onOpenChange={handleOpenChange}>
         <TooltipPrimitive.Trigger
           asChild
+          onPointerDown={handlePointerDown}
           onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchCancel}
         >
           {trigger}
         </TooltipPrimitive.Trigger>
@@ -114,7 +156,6 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
           <TooltipPrimitive.Content
             sideOffset={4}
             collisionPadding={8}
-            onPointerDownOutside={dismissTouch}
             className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
           >
             {content}
@@ -158,7 +199,7 @@ export function InfoTooltip({
         aria-label={label}
         onClick={onClick}
         aria-haspopup={ariaHasPopup}
-        className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line text-[0.625rem] leading-none text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${className}`}
+        className={`relative inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line before:absolute before:-inset-2 before:content-[''] text-[0.625rem] leading-none text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${className}`}
       >
         ?
       </button>
