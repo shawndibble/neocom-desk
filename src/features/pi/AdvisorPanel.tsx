@@ -1072,6 +1072,16 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     prices: snapshot.prices,
     taxRate: activeSystem.customsRate,
   });
+  // Grouped once rather than filtered per card: the plan is one pass over a
+  // handful of colonies, but a filter inside the render loop is a scan of the
+  // whole plan for every planet on screen, including the ones it never placed
+  // anything on.
+  const opportunitiesByHost = new Map<number, NetworkOpportunity[]>();
+  for (const line of network?.plan.opportunities ?? []) {
+    const forHost = opportunitiesByHost.get(line.hostPlanetId);
+    if (forHost) forHost.push(line);
+    else opportunitiesByHost.set(line.hostPlanetId, [line]);
+  }
   const planetNames = new Map(
     advice
       .filter((entry) => entry.name !== null)
@@ -1206,11 +1216,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 prices={snapshot.prices}
                 taxRate={activeSystem.customsRate}
                 ceiling={snapshot.ceiling}
-                opportunities={
-                  network?.plan.opportunities.filter(
-                    (line) => line.hostPlanetId === entry.planetId
-                  ) ?? EMPTY_OPPORTUNITIES
-                }
+                opportunities={opportunitiesByHost.get(entry.planetId) ?? EMPTY_OPPORTUNITIES}
                 planetNames={planetNames}
               />
             ) : entry.kind === 'unbuilt' ? (
