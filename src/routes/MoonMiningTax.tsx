@@ -47,6 +47,7 @@ import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
+import { SplitDialog } from '@/features/miningTax/SplitDialog';
 
 const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
   'unassigned',
@@ -121,6 +122,7 @@ export function MoonMiningTax() {
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
   const [joinTarget, setJoinTarget] = useState<DisplayRow | null>(null);
+  const [splitTarget, setSplitTarget] = useState<DisplayRow | null>(null);
   // Set only by the table's "Join selected" shortcut below — pins
   // `JoinAssignDialog`'s candidate list to exactly the one row picked via
   // checkbox, instead of the full same-system candidate list `RowDetailModal`'s
@@ -228,7 +230,10 @@ export function MoonMiningTax() {
       const base = previous === 'all' ? new Set(allPayees.map((p) => p.id)) : new Set(previous);
       if (base.has(payeeId)) base.delete(payeeId);
       else base.add(payeeId);
-      return base.size === allPayees.length ? 'all' : base;
+      // Every Payee, or none: both mean "don't filter". With a single Payee
+      // the only possible toggle used to leave an empty set, which showed an
+      // empty table and "Owed to 0 payees".
+      return base.size === allPayees.length || base.size === 0 ? 'all' : base;
     });
   }
 
@@ -530,6 +535,7 @@ export function MoonMiningTax() {
     {
       id: 'date',
       header: t('miningTax.dateColumn'),
+      headerTooltip: t('miningTax.dateEveHint'),
       render: (dr) => dateLabel(dr),
       sortValue: (dr) => dateRangeOf(dr)[0],
       primary: true,
@@ -928,6 +934,32 @@ export function MoonMiningTax() {
           onJoin={() => {
             setJoinTarget(detailTarget);
             setDetailTarget(null);
+          }}
+          onSplit={
+            detailTarget.assignment && !detailTarget.assignment.groupId
+              ? () => {
+                  setSplitTarget(detailTarget);
+                  setDetailTarget(null);
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {splitTarget && splitTarget.assignment && data && (
+        <SplitDialog
+          open={splitTarget !== null}
+          onClose={() => setSplitTarget(null)}
+          assignment={splitTarget.assignment}
+          row={splitTarget.row}
+          systemName={systemName(splitTarget)}
+          payees={data.payeesByCharacter.get(splitTarget.row.characterId) ?? []}
+          typeNames={data.typeNames}
+          unitPrices={data.unitPrices}
+          busy={busy}
+          onSplit={() => {
+            setSplitTarget(null);
+            refresh();
           }}
         />
       )}

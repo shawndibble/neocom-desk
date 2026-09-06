@@ -1,6 +1,8 @@
 import { Fragment, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import * as Icon from './icons';
+import { InfoTooltip } from './Tooltip';
 
 export interface DataTableSort {
   columnId: string;
@@ -23,6 +25,13 @@ export interface DataTableColumn<T> {
    * `text-text-dim` has no business on the header.
    */
   headerClassName?: string;
+  /**
+   * One-line plain-language note on what the column's values *are*, shown as
+   * a small info control beside the header text — e.g. that a ledger date is
+   * an EVE/UTC calendar day, not a local one. Only for a genuine ambiguity a
+   * reader could get wrong; most columns explain themselves.
+   */
+  headerTooltip?: string;
   render: (row: T) => ReactNode;
   /**
    * Declares the column sortable and extracts its comparable value.
@@ -134,6 +143,7 @@ export function DataTable<T>({
   onRowClick,
   responsive = 'stack',
 }: DataTableProps<T>) {
+  const { t } = useTranslation();
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
 
   const headerPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-2';
@@ -185,10 +195,26 @@ export function DataTable<T>({
       <thead role="rowgroup">
         <tr role="row" className="border-b border-line text-left text-text-dim">
           {columns.map((column, i) => {
+            // A real `<button>` of its own, never nested inside the sort
+            // button — so it sits beside that button in a wrapper instead.
+            const info = column.headerTooltip ? (
+              <InfoTooltip
+                label={t('common.aboutLabel', { label: column.header })}
+                content={column.headerTooltip}
+                className="normal-case"
+              />
+            ) : null;
             if (!column.sortValue) {
               return (
                 <th key={column.id} role="columnheader" scope="col" className={headerClass[i]}>
-                  {column.header}
+                  {info ? (
+                    <span className="inline-flex items-center gap-1">
+                      {column.header}
+                      {info}
+                    </span>
+                  ) : (
+                    column.header
+                  )}
                 </th>
               );
             }
@@ -201,6 +227,25 @@ export function DataTable<T>({
               : direction === 'asc'
                 ? Icon.Ascending
                 : Icon.Descending;
+            const sortButton = (
+              <button
+                type="button"
+                onClick={() => toggleSort(column)}
+                className={cx(
+                  headerTextClass[i],
+                  'inline-flex w-full items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                  column.align === 'right' && 'justify-end',
+                  info !== null && 'pr-0'
+                )}
+              >
+                {column.header}
+                <SortGlyph
+                  aria-hidden="true"
+                  size={Icon.ICON_SIZE.sm}
+                  className={cx('shrink-0', active ? 'text-accent' : 'text-text-faint')}
+                />
+              </button>
+            );
             return (
               <th
                 key={column.id}
@@ -209,22 +254,14 @@ export function DataTable<T>({
                 className={headerClass[i]}
                 aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
               >
-                <button
-                  type="button"
-                  onClick={() => toggleSort(column)}
-                  className={cx(
-                    headerTextClass[i],
-                    'inline-flex w-full items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-                    column.align === 'right' && 'justify-end'
-                  )}
-                >
-                  {column.header}
-                  <SortGlyph
-                    aria-hidden="true"
-                    size={Icon.ICON_SIZE.sm}
-                    className={cx('shrink-0', active ? 'text-accent' : 'text-text-faint')}
-                  />
-                </button>
+                {info ? (
+                  <span className={cx('inline-flex items-center', headerPadding, 'py-0 pl-0')}>
+                    {sortButton}
+                    {info}
+                  </span>
+                ) : (
+                  sortButton
+                )}
               </th>
             );
           })}

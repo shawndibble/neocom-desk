@@ -48,8 +48,21 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
     // unmount-while-open too.
     const trigger = document.activeElement;
     if (!dialog.open) dialog.showModal();
+    // `showModal()` focuses the first focusable element, which is the
+    // header's close `IconButton` — and its Radix tooltip opens on focus,
+    // floating a stray "Close" bubble over every freshly opened dialog and
+    // swallowing the first Escape press (the tooltip dismisses, the dialog
+    // stays). Parking initial focus on the body instead keeps the dialog
+    // focused (for the focus trap and screen readers) without arming the
+    // tooltip; Tab still reaches the close button first.
+    dialog.querySelector<HTMLElement>('[data-modal-body]')?.focus({ preventScroll: true });
+    // A native dialog does not lock the page behind it: on a phone, a scroll
+    // that starts over the sheet chains straight into the page underneath.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
 
     return () => {
+      document.body.style.overflow = previousOverflow;
       if (dialog.open) dialog.close();
       if (trigger instanceof HTMLElement) trigger.focus();
     };
@@ -103,7 +116,12 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
               onClick={onClose}
             />
           </header>
-          <div ref={setPortalContainer} className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div
+            ref={setPortalContainer}
+            data-modal-body
+            tabIndex={-1}
+            className="min-h-0 flex-1 overflow-y-auto p-3 outline-none"
+          >
             <PortalContainerProvider value={portalContainer}>{children}</PortalContainerProvider>
           </div>
         </div>

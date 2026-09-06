@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, StatChip } from '@/components/ui';
+import { Button, InfoTooltip, Modal, StatChip } from '@/components/ui';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
@@ -28,9 +28,12 @@ interface RowDetailModalProps {
   onDismiss: () => void;
   onMarkPaid: () => void;
   onResolve: () => void;
+  /** Deletes the Assignment outright — "Undo" on a Dismissed row, "Unassign" on any other assigned one, so a wrong Payee or a mis-split can always be taken back to Unassigned. */
   onUndo: () => void;
   /** Opens `JoinAssignDialog` to fold another same-system entry into this one (issue #523) — offered only for Unassigned/Outstanding rows that aren't already part of a joined group. */
   onJoin?: () => void;
+  /** Opens `SplitDialog` to move part of this day's ore to a second Payee — offered for Outstanding/Paid rows that aren't part of a joined group. */
+  onSplit?: () => void;
 }
 
 /**
@@ -59,6 +62,7 @@ export function RowDetailModal({
   onResolve,
   onUndo,
   onJoin,
+  onSplit,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
@@ -79,6 +83,10 @@ export function RowDetailModal({
         <span className="flex items-center gap-1.5">
           {t('miningTax.detailTitle', { date: row.entry.date, system: systemName })}
           <SecurityValue security={systemSecurity} t={t} />
+          <InfoTooltip
+            label={t('common.aboutLabel', { label: t('miningTax.dateColumn') })}
+            content={t('miningTax.dateEveHint')}
+          />
         </span>
       }
     >
@@ -184,6 +192,16 @@ export function RowDetailModal({
                 {onJoin && (status === 'unassigned' || status === 'outstanding') && (
                   <Button size="sm" disabled={busy} onClick={onJoin}>
                     {t('miningTax.joinAction')}
+                  </Button>
+                )}
+                {onSplit && (status === 'outstanding' || status === 'paid') && (
+                  <Button size="sm" disabled={busy} onClick={onSplit}>
+                    {t('miningTax.splitAction')}
+                  </Button>
+                )}
+                {assignment && (
+                  <Button size="sm" variant="danger" disabled={busy} onClick={onUndo}>
+                    {t('miningTax.unassignAction')}
                   </Button>
                 )}
               </>

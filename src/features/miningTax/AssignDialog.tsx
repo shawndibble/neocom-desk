@@ -414,7 +414,7 @@ export function AssignDialog({
           disabled={!canAssign || saving || busy}
           onClick={() => void handleAssign()}
         >
-          {t('miningTax.assignAction')}
+          {isEditing ? t('common.save') : t('miningTax.assignAction')}
         </Button>
         {extraActions}
         <Button size="sm" onClick={onCancel}>

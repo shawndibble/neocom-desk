@@ -187,12 +187,14 @@ export function PayeeManagerDialog({
             {draft.id ? t('miningTax.editPayeeTitle') : t('miningTax.addPayeeTitle')}
           </p>
           <TextInput
+            className="w-full"
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             placeholder={t('miningTax.payeeNamePlaceholder')}
             aria-label={t('miningTax.payeeNamePlaceholder')}
           />
           <TextInput
+            className="w-full"
             type="number"
             min={0}
             max={100}
