@@ -6,6 +6,7 @@ import {
   recordFeedEntry,
   readFeed,
   dismissFeedEntry,
+  mergeFeedRecord,
   dismissFeedEntries,
   rowsWithinSyncWindow,
   FEED_SYNC_WINDOW_MAX_ROWS,
@@ -207,6 +208,46 @@ describe('recordFeedEntry / readFeed', () => {
       firedAt: 1500,
     });
     expect((await readFeed())[0].dismissedAt).toBeTypeOf('number');
+  });
+});
+
+describe('mergeFeedRecord', () => {
+  const incoming = {
+    id: 'k',
+    characterId: 1,
+    eventId: 'walletBalanceChanged',
+    title: 'Newer copy',
+    body: 'b',
+    firedAt: 5000,
+  };
+
+  it('is the incoming row when nothing is stored yet', () => {
+    expect(mergeFeedRecord(undefined, incoming)).toEqual(incoming);
+  });
+
+  it('takes the earlier firedAt and the newer copy, whichever side is older', () => {
+    const stored = { ...incoming, title: 'Older copy', firedAt: 1000 };
+    expect(mergeFeedRecord(stored, incoming)).toMatchObject({ firedAt: 1000, title: 'Newer copy' });
+    expect(mergeFeedRecord(incoming, { ...stored, title: 'Newer copy' })).toMatchObject({
+      firedAt: 1000,
+    });
+  });
+
+  it('takes the later dismissal from either side, so a re-record keeps one and a pull applies one', () => {
+    const dismissedLocally = { ...incoming, firedAt: 1000, dismissedAt: 9000 };
+    // A re-record carries no dismissal of its own; the stored one survives.
+    expect(mergeFeedRecord(dismissedLocally, incoming).dismissedAt).toBe(9000);
+    // A pull carrying a newer dismissal applies it.
+    expect(
+      mergeFeedRecord({ ...incoming, dismissedAt: 100 }, { ...incoming, dismissedAt: 9000 })
+        .dismissedAt
+    ).toBe(9000);
+  });
+
+  it('leaves dismissedAt off entirely when neither side has one', () => {
+    expect(mergeFeedRecord({ ...incoming, firedAt: 1 }, incoming)).not.toHaveProperty(
+      'dismissedAt'
+    );
   });
 });
 

@@ -39,10 +39,10 @@ import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import {
-  idsBeyondLimit,
-  NOTIFICATION_FEED_LIMIT,
+  mergeFeedRecord,
   readFeed,
   rowsWithinSyncWindow,
+  trimFeed,
 } from '@/features/notifications/feed';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { retryPendingRemotePurge } from './characterPurge';
@@ -762,28 +762,25 @@ function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record
 }
 
 /**
- * `local` is this device's own copy when it has one — a pull only ever
- * reaches an existing row to carry a dismissal over (`mergeFeed`'s
- * `pullDismiss`). The earlier `firedAt` of the two wins, the same rule
- * `features/notifications/feed.recordFeedEntry` applies to every other
- * writer: devices legitimately disagree about a row's time (a push stamps its
- * own arrival, a poll stamps the occurrence), and a pull must not be the one
- * path that re-dates a row forward.
+ * `local` is this device's own copy, present only when a pull is carrying an
+ * existing row's dismissal across (`mergeFeed`'s `pullDismiss`). The merge
+ * itself is `features/notifications/feed.mergeFeedRecord`'s — a pull must not
+ * be the one writer that re-dates a row.
  */
 function toLocalFeedRecord(
   remote: RemoteNotificationFeedDoc,
   local?: NotificationFeedRecord
 ): NotificationFeedRecord {
-  return {
+  return mergeFeedRecord(local, {
     id: remote.id,
     characterId: remote.characterId,
     eventId: remote.eventId,
     title: remote.title,
     body: remote.body,
-    firedAt: local === undefined ? remote.firedAt : Math.min(local.firedAt, remote.firedAt),
+    firedAt: remote.firedAt,
     ...(remote.eveType !== undefined ? { eveType: remote.eveType } : {}),
     ...(remote.dismissedAt !== undefined ? { dismissedAt: remote.dismissedAt } : {}),
-  };
+  });
 }
 
 async function syncFeed(ctx: SyncContext): Promise<void> {
@@ -812,14 +809,9 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
   );
   if (pulled.length > 0) {
     await db.notificationFeed.bulkPut(pulled);
-    // Same exclusion `recordFeedEntry` makes: a pulled row can be dated well
-    // back (`engine/occurrenceKey.occurrenceFiredAt`), and trimming it in the
-    // call that pulled it would make the sync a no-op that keeps re-pulling it.
-    const pulledIds = new Set(pulled.map((row) => row.id));
-    const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT).filter(
-      (id) => !pulledIds.has(id)
-    );
-    if (stale.length > 0) await db.notificationFeed.bulkDelete(stale);
+    // Excluding what this pull just wrote, or a back-dated row would be
+    // trimmed on arrival and pulled again on the next sync, forever.
+    await trimFeed(new Set(pulled.map((row) => row.id)));
     await refreshAppBadge();
   }
 }

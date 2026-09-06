@@ -15,9 +15,8 @@
  * `engine/occurrenceKey.ts`), not a minted one: a `put` with the same id
  * upserts, which is what makes a second device or the Scheduled Push backend
  * recording the same occurrence collapse into the one row instead of two.
- * What that upsert must *not* take from the later sighting is a `firedAt`
- * later than the one already stored, or a missing `dismissedAt` — see
- * `recordFeedEntry`.
+ * What that upsert must *not* take from the later sighting is the row's
+ * `firedAt` or `dismissedAt` — see `mergeFeedRecord`.
  */
 import { db, type NotificationFeedRecord } from '@/db';
 import { refreshAppBadge } from './appBadge';
@@ -72,54 +71,81 @@ export async function readFeed(): Promise<NotificationFeedEntry[]> {
 }
 
 /**
- * Upserts by Occurrence Key, but never re-dates a row forward or un-dismisses
- * one that is already here.
+ * How two sightings of one Occurrence Key combine.
  *
- * A second observer of the same occurrence — the other device, the Scheduled
- * Push backend, or this device's own poller diffing against a baseline that
- * predates the row — writes the identical id with its own `firedAt` and no
- * `dismissedAt`. A plain `put` replaces the whole record, so that write used
- * to restamp the row to the moment of the *later* sighting and drop the
- * dismissal with it: alerts the user had already cleared came back, at the top
- * of the list, dated now.
+ * The same row is written by several parties — the other device, the
+ * Scheduled Push backend, this device's poller re-diffing against a baseline
+ * that predates the row, and `sync/planSync`'s pull — and each writes the
+ * whole record. Left alone, the newest write wins every field: it restamps
+ * the row to the moment of the *later* sighting and drops the dismissal with
+ * it, so alerts the user had already cleared come back, at the top of the
+ * list, dated now.
  *
- * The earliest `firedAt` of the two wins rather than simply the stored one, so
- * the outcome does not depend on which observer arrived first. That matters
- * because the observers disagree on purpose: a push stamps its own arrival
- * (`pushHandler.ts`), while the poller stamps the occurrence itself
- * (`engine/occurrenceKey.occurrenceFiredAt`) — and the closer of the two to
- * when it really happened is the earlier one. A dismissal is the user's own
- * act, so it survives regardless. Everything else — the copy — still comes
- * from the newest write.
+ * Two fields are therefore not the newest writer's to set:
+ *
+ * - `firedAt` takes the **earlier** of the two, not simply the stored one, so
+ *   the outcome does not depend on which sighting arrived first. The parties
+ *   disagree on purpose: a push stamps its own arrival (`pushHandler.ts`)
+ *   while the poller stamps the occurrence itself
+ *   (`engine/occurrenceKey.occurrenceFiredAt`), and the earlier of the two is
+ *   the closer to when it really happened.
+ * - `dismissedAt` takes the **later**, absent counting as never — the same
+ *   last-write-wins policy `sync/merge.mergeFeed` uses to decide which side's
+ *   dismissal to carry across, so a local dismissal survives a re-record and
+ *   a remote one still applies on a pull.
+ *
+ * Everything else — the copy — comes from the newer write.
+ */
+export function mergeFeedRecord(
+  existing: NotificationFeedEntry | undefined,
+  incoming: NotificationFeedEntry
+): NotificationFeedEntry {
+  if (existing === undefined) return incoming;
+  const dismissedAt = Math.max(existing.dismissedAt ?? 0, incoming.dismissedAt ?? 0);
+  return {
+    ...incoming,
+    firedAt: Math.min(existing.firedAt, incoming.firedAt),
+    ...(dismissedAt > 0 ? { dismissedAt } : {}),
+  };
+}
+
+/**
+ * Drops whatever sits past the cap, except the rows the caller just wrote.
+ *
+ * That exclusion is why this is a function rather than two lines at each call
+ * site: a row can now be dated days back
+ * (`engine/occurrenceKey.occurrenceFiredAt`), so an incoming row really can
+ * sort past the cut line — and deleting an alert in the same breath as
+ * raising it leaves nothing to re-fire it, the poller's baseline having
+ * already advanced past it. It ages out through an ordinary later trim
+ * instead, which is the bound this cap is actually for.
+ *
+ * The `count` guard keeps the common case cheap: the feed is under the cap
+ * almost always, and `readFeed` materialises every row to sort it.
+ */
+export async function trimFeed(justWritten: ReadonlySet<string>): Promise<void> {
+  if ((await db.notificationFeed.count()) <= NOTIFICATION_FEED_LIMIT) return;
+  const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT).filter(
+    (id) => !justWritten.has(id)
+  );
+  if (stale.length > 0) await db.notificationFeed.bulkDelete(stale);
+}
+
+/**
+ * Records one occurrence, merged with whatever is already stored under its
+ * Occurrence Key (`mergeFeedRecord`).
  *
  * Read-modify-write inside one `rw` transaction: the page's poller and the
  * Service Worker's push handler (`sw.ts`) write this table from separate JS
  * contexts, and a `dismissFeedEntry` landing between a bare `get` and its
- * `put` would be written straight back out — resurrecting the dismissal this
- * function exists to protect.
+ * `put` would be written straight back out — resurrecting the dismissal the
+ * merge exists to protect.
  */
 export async function recordFeedEntry(entry: NewNotificationFeedEntry): Promise<void> {
   await db.transaction('rw', db.notificationFeed, async () => {
     const existing = await db.notificationFeed.get(entry.id);
-    await db.notificationFeed.put(
-      existing === undefined
-        ? entry
-        : {
-            ...entry,
-            firedAt: Math.min(existing.firedAt, entry.firedAt),
-            ...(existing.dismissedAt !== undefined ? { dismissedAt: existing.dismissedAt } : {}),
-          }
-    );
-    // Never the row this call just wrote, even when it sorts past the cap: a
-    // row can now be dated days back (`occurrenceFiredAt`), and deleting it in
-    // the same call that created it would drop an alert the user was just
-    // notified about, with nothing left to re-fire it — the poller's baseline
-    // has already advanced past it. It ages out through an ordinary later
-    // trim instead, which is the bound this cap is actually for.
-    const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT).filter(
-      (id) => id !== entry.id
-    );
-    if (stale.length > 0) await db.notificationFeed.bulkDelete(stale);
+    await db.notificationFeed.put(mergeFeedRecord(existing, entry));
+    await trimFeed(new Set([entry.id]));
   });
   await refreshAppBadge();
 }
