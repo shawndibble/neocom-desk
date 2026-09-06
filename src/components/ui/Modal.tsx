@@ -13,8 +13,8 @@ interface ModalProps {
   id?: string;
   /** Requested close — Escape, backdrop click, or the header close button. */
   onClose: () => void;
-  /** Visible heading and the dialog's accessible name. */
-  title: string;
+  /** Visible heading and the dialog's accessible name. Usually a string; a node is for a title that needs inline styling (e.g. a colored value), since `aria-labelledby` reads whatever text content renders. */
+  title: ReactNode;
   children: ReactNode;
   /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `wide` for multi-column content (e.g. a comparison matrix). */
   placement?: ModalPlacement;

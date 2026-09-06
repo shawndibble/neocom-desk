@@ -690,7 +690,6 @@ export function MoonMiningTax() {
           }
           systemSecurity={data.systemSecurity.get(detailTarget.row.entry.solarSystemId)}
           typeNames={data.typeNames}
-          payeeDisplayName={payeeDisplayName(detailTarget)}
           payees={data.payeesByCharacter.get(detailTarget.row.characterId) ?? []}
           unitPrices={data.unitPrices}
           busy={busy}

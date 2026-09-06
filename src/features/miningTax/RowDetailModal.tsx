@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, StatChip } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
@@ -19,7 +20,6 @@ interface RowDetailModalProps {
   /** Undefined while still resolving, null when unresolvable — `SecurityValue` renders nothing either way. */
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
-  payeeDisplayName: string;
   payees: readonly PayeeRecord[];
   unitPrices: ReadonlyMap<number, number>;
   busy: boolean;
@@ -48,7 +48,6 @@ export function RowDetailModal({
   systemName,
   systemSecurity,
   typeNames,
-  payeeDisplayName,
   payees,
   unitPrices,
   busy,
@@ -73,21 +72,16 @@ export function RowDetailModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={t('miningTax.detailTitle', { date: row.entry.date, system: systemName })}
+      title={
+        <span className="flex items-center gap-1.5">
+          {t('miningTax.detailTitle', { date: row.entry.date, system: systemName })}
+          <SecurityValue security={systemSecurity} t={t} />
+        </span>
+      }
     >
       <div className="space-y-3 text-sm">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <div>
-            <p>
-              <span className="text-text-dim">{row.characterName}</span>
-              <span className="mx-1.5 text-text-faint">·</span>
-              <span className="font-medium">{payeeDisplayName}</span>
-            </p>
-            <span className="flex items-center gap-1.5 text-xs text-text-dim">
-              {systemName}
-              <SecurityValue security={systemSecurity} t={t} />
-            </span>
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <span className="text-text-dim">{row.characterName}</span>
           <StatChip
             label={t('miningTax.statusColumn')}
             value={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)}
@@ -109,13 +103,21 @@ export function RowDetailModal({
             <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('miningTax.oreColumn')}
             </p>
-            <ul className="space-y-0.5 text-xs">
+            <ul className="divide-y divide-line text-xs">
               {oreLines.map((line) => (
-                <li key={line.typeId} className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate">
+                <li
+                  key={line.typeId}
+                  className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
+                >
+                  <Icon.Ore
+                    aria-hidden="true"
+                    size={Icon.ICON_SIZE.sm}
+                    className="shrink-0 text-text-faint"
+                  />
+                  <span className="min-w-0 max-w-[10rem] truncate">
                     {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                   </span>
-                  <span className="shrink-0 tabular-nums text-text-dim">
+                  <span className="tabular-nums text-text-dim">
                     {line.quantity.toLocaleString()}
                   </span>
                 </li>

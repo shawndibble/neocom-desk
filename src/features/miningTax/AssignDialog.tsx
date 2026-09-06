@@ -9,6 +9,7 @@ import {
   SelectValue,
   TextInput,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
@@ -239,16 +240,24 @@ export function AssignDialog({
           <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('miningTax.oreLinesLabel')}
           </p>
-          <ul className="space-y-1">
+          <ul className="divide-y divide-line">
             {oreLines.map((line) => (
-              <li key={line.typeId} className="flex items-center gap-2 text-sm">
+              <li
+                key={line.typeId}
+                className="flex items-center gap-1.5 py-1 text-sm first:pt-0 last:pb-0"
+              >
                 <input
                   type="checkbox"
                   id={`line-${line.typeId}`}
                   checked={includedTypeIds.has(line.typeId)}
                   onChange={() => toggleLine(line.typeId)}
                 />
-                <label htmlFor={`line-${line.typeId}`} className="min-w-0 flex-1 truncate">
+                <Icon.Ore
+                  aria-hidden="true"
+                  size={Icon.ICON_SIZE.sm}
+                  className="shrink-0 text-text-faint"
+                />
+                <label htmlFor={`line-${line.typeId}`} className="min-w-0 max-w-[10rem] truncate">
                   {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                 </label>
                 <span className="tabular-nums text-text-dim">{line.quantity.toLocaleString()}</span>
