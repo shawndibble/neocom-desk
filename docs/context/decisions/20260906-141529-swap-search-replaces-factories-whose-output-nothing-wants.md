@@ -34,6 +34,20 @@ _Recorded 2026-09-06._
   2,000–2,800 MW free per colony, budget is the binding constraint and leftover
   P1 does survive, so it does fire in practice.
 
+- **A P2 factory is convertible too, not just a P1 one.** `colonyOutputPerHour`
+  tracks every schematic's output, so an Advanced Industry Facility whose P2 no
+  High-Tech Production Plant consumes is as eligible as a Basic one. It can only
+  ever be replaced by a _better-paying_ product: swapping it for the same
+  product gives an identical margin either side, so the net is zero and the
+  `> 0` guard drops it.
+
+- **The exchange removes as few pins as it can.** `remove` is scanned upwards
+  and a new best needs a strictly greater net, so ties keep the smaller count.
+  Where a factory earns something, removing one more than the replacement needs
+  costs that margin and loses; where a factory earns nothing — a P2 quoted far
+  below what its inputs cost, say — removing more genuinely does pay, and the
+  card says so.
+
 - **Known bound: valued at the best standing order, not tested against
   order-book depth.** `sellVolume`/`buyVolume` exist in the market aggregate but
   die at `marketData.ts`, so nothing here knows whether the book absorbs the
