@@ -96,11 +96,14 @@ function IskField({ ariaLabel, computedDefault, override, onOverrideChange }: Is
  * keys off — resplitting a record happens through Undo + a fresh Assign, not
  * this edit.
  *
- * Estimated value and tax owed are both prefilled — from `computeAssignmentValue`
- * when creating, from the stored Assignment when editing — but independently
- * editable either way, since a Jita price or a Payee's default rate can turn
- * out wrong. Clearing a field back to empty returns it to tracking a freshly
- * computed default.
+ * Tax %, estimated value, and tax owed are prefilled — from
+ * `computeAssignmentValue` when creating, from the stored Assignment when
+ * editing — but all three stay connected (`taxOwed = estimatedValue * taxPct
+ * / 100`) as the pilot edits: changing tax % or estimated value recomputes
+ * tax owed from the other two; changing tax owed instead back-solves the
+ * estimated value, since tax % is the one figure a pilot is unlikely to be
+ * correcting *from* a known tax-owed total. Clearing a field back to empty
+ * returns both value fields to tracking their freshly computed defaults.
  *
  * "I already paid this" only shows up when creating: correcting an existing
  * record's fields never silently changes its paid/unpaid status (a dedicated
@@ -173,8 +176,13 @@ export function AssignDialog({
     estimatedValueOverride.trim() === ''
       ? computed.estimatedValue
       : (unmaskNumber(estimatedValueOverride) ?? NaN);
+  // Tracks the *current* estimated value and tax %, not the raw Jita
+  // default — so an edit to either one keeps this field's display in sync
+  // (the three fields are connected: taxOwed = estimatedValue * pct / 100).
   const taxOwed =
-    taxOwedOverride.trim() === '' ? computed.taxOwed : (unmaskNumber(taxOwedOverride) ?? NaN);
+    taxOwedOverride.trim() === ''
+      ? (estimatedValue * (Number.isFinite(pctValue) ? pctValue : 0)) / 100
+      : (unmaskNumber(taxOwedOverride) ?? NaN);
 
   function toggleLine(typeId: number) {
     setIncludedTypeIds((previous) => {
@@ -183,6 +191,41 @@ export function AssignDialog({
       else next.add(typeId);
       return next;
     });
+  }
+
+  /** Tax % changed: recompute tax owed from the *current* estimated value, leaving that value itself untouched. */
+  function handleTaxPctChange(raw: string) {
+    setTaxPct(raw);
+    const pct = Number(raw);
+    if (Number.isFinite(pct)) {
+      setTaxOwedOverride(String(round2((estimatedValue * pct) / 100)));
+    }
+  }
+
+  /** Estimated value changed: recompute tax owed from the new value and the current tax %. Clearing back to empty resumes tracking both defaults. */
+  function handleEstimatedValueChange(raw: string) {
+    setEstimatedValueOverride(raw);
+    if (raw.trim() === '') {
+      setTaxOwedOverride('');
+      return;
+    }
+    const newValue = unmaskNumber(raw);
+    if (newValue !== undefined && Number.isFinite(pctValue)) {
+      setTaxOwedOverride(String(round2((newValue * pctValue) / 100)));
+    }
+  }
+
+  /** Tax owed changed: back-solve the estimated value from the current tax %, leaving the rate itself untouched. Clearing back to empty resumes tracking both defaults. */
+  function handleTaxOwedChange(raw: string) {
+    setTaxOwedOverride(raw);
+    if (raw.trim() === '') {
+      setEstimatedValueOverride('');
+      return;
+    }
+    const newTaxOwed = unmaskNumber(raw);
+    if (newTaxOwed !== undefined && Number.isFinite(pctValue) && pctValue !== 0) {
+      setEstimatedValueOverride(String(round2(newTaxOwed / (pctValue / 100))));
+    }
   }
 
   const selectedPayee = payees.find((p) => p.id === payeeId) ?? null;
@@ -322,7 +365,7 @@ export function AssignDialog({
             max={100}
             step="0.1"
             value={taxPct}
-            onChange={(e) => setTaxPct(e.target.value)}
+            onChange={(e) => handleTaxPctChange(e.target.value)}
             aria-label={t('miningTax.taxPctLabel')}
             className="w-full"
           />
@@ -336,7 +379,7 @@ export function AssignDialog({
             ariaLabel={t('miningTax.estimatedValueLabel')}
             computedDefault={computed.estimatedValue}
             override={estimatedValueOverride}
-            onOverrideChange={setEstimatedValueOverride}
+            onOverrideChange={handleEstimatedValueChange}
           />
         </div>
 
@@ -346,9 +389,9 @@ export function AssignDialog({
           </p>
           <IskField
             ariaLabel={t('miningTax.taxOwedLabel')}
-            computedDefault={computed.taxOwed}
+            computedDefault={(estimatedValue * (Number.isFinite(pctValue) ? pctValue : 0)) / 100}
             override={taxOwedOverride}
-            onOverrideChange={setTaxOwedOverride}
+            onOverrideChange={handleTaxOwedChange}
           />
         </div>
       </div>
