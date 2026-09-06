@@ -130,7 +130,7 @@ describe('planNetwork', () => {
     expect(sources.size).toBe(2);
     expect(sources).toContain(line.hostPlanetId);
     // Exactly one input is imported; the other is made where the factories go.
-    expect(line.inputs.filter((input) => input.local)).toHaveLength(1);
+    expect(line.inputs.filter((input) => input.source === 'local')).toHaveLength(1);
   });
 
   it('will not put factories on a colony that has no budget for them', () => {
@@ -298,6 +298,40 @@ describe('planNetwork', () => {
       // Whatever it buys, it must still clear the customs office.
       expect(line.marginPerHour).toBeGreaterThan(0);
     }
+  });
+
+  it('never names a planet for more material than that planet makes', () => {
+    // Two colonies refining the same P0 into the same P1, as the reported
+    // operation does with Reactive Metals. Sizing on the pooled total while
+    // naming the larger producer would print a route for units it cannot
+    // supply — the confidently-wrong number this tab exists to avoid.
+    const split: NetworkColony[] = [
+      colony(1, BACTERIA, 200),
+      colony(2, REACTIVE_METALS, 60),
+      colony(3, REACTIVE_METALS, 100),
+    ];
+    const plan = planNetwork({ ...options, colonies: split }, pi);
+    const made = new Map([
+      [1, new Map([[BACTERIA, 200]])],
+      [2, new Map([[REACTIVE_METALS, 60]])],
+      [3, new Map([[REACTIVE_METALS, 100]])],
+    ]);
+    const drawn = new Map<string, number>();
+    for (const line of plan.opportunities) {
+      for (const input of line.inputs) {
+        if (input.fromPlanetId === null) continue;
+        const key = `${input.fromPlanetId}:${input.typeId}`;
+        drawn.set(key, (drawn.get(key) ?? 0) + input.unitsPerHour);
+      }
+    }
+    for (const [key, units] of drawn) {
+      const [planetId, typeId] = key.split(':').map(Number);
+      expect(units).toBeLessThanOrEqual((made.get(planetId)?.get(typeId) ?? 0) + 1e-6);
+    }
+    // And it really did split one draw across both, rather than passing by
+    // taking only what the largest could cover.
+    const nanites = plan.opportunities.find((entry) => entry.name === 'Nanites');
+    expect(nanites?.inputs.filter((input) => input.typeId === REACTIVE_METALS).length).toBe(2);
   });
 
   it('has nothing to say about a single colony, or none', () => {

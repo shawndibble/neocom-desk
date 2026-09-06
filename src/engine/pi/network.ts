@@ -113,8 +113,6 @@ export interface NetworkInput {
   /** The colony that makes it; null when it is bought at the hub. */
   fromPlanetId: number | null;
   source: InputSource;
-  /** True when that colony is the host, so the material crosses no customs office. */
-  local: boolean;
   /** ISK an hour this input costs — hub price either way, bought or forgone. */
   costPerHour: number;
 }
@@ -318,24 +316,59 @@ function factoryCost(colony: NetworkColony, candidate: Candidate, opts: NetworkO
 export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
   const { ok, blocked } = candidates(opts, pi);
 
-  // One running pool for the whole set: the supply a better-paying line takes
-  // is gone for the next, which is the constraint a per-candidate fit misses.
-  const supply = new Map<number, number>();
-  const supplierOf = new Map<number, number>();
+  // Supply is tracked per colony, not as one pool.
+  //
+  // The pooled total is still what bounds a candidate — material is shared —
+  // but an opportunity has to name where each unit comes from, and naming the
+  // largest producer for the whole draw is a lie whenever two colonies make
+  // the same P1: "route 80/hr of Reactive Metals from Efa IV" when Efa IV
+  // makes 60 is precisely the confidently-wrong number this tab exists to
+  // avoid. Drawing colony by colony means a line either names a real source
+  // for every unit or does not claim them.
+  const supplyByColony = new Map<number, Map<number, number>>();
   for (const colony of opts.colonies) {
-    for (const [typeId, units] of colony.outputPerHour) {
-      if (units <= 0) continue;
-      supply.set(typeId, (supply.get(typeId) ?? 0) + units);
-      // The colony that makes the most of it, so a two-source input names the
-      // one a route would realistically come from.
-      const best = supplierOf.get(typeId);
-      const bestUnits =
-        best === undefined
-          ? -1
-          : (opts.colonies.find((c) => c.planetId === best)?.outputPerHour.get(typeId) ?? 0);
-      if (units > bestUnits) supplierOf.set(typeId, colony.planetId);
-    }
+    const own = new Map<number, number>();
+    for (const [typeId, units] of colony.outputPerHour) if (units > 0) own.set(typeId, units);
+    supplyByColony.set(colony.planetId, own);
   }
+  const pooled = (typeId: number): number => {
+    let total = 0;
+    for (const own of supplyByColony.values()) total += own.get(typeId) ?? 0;
+    return total;
+  };
+
+  /**
+   * Take `units` of `typeId` out of the set, nearest source first, and say
+   * which colonies it came from.
+   *
+   * The host first — material already on the consuming planet crosses no
+   * customs office — then the largest producer, so a draw is split across as
+   * few routes as it can be.
+   */
+  const drawFrom = (
+    typeId: number,
+    units: number,
+    hostPlanetId: number
+  ): { fromPlanetId: number; unitsPerHour: number }[] => {
+    const order = [...supplyByColony.entries()].sort(
+      ([aId, aOwn], [bId, bOwn]) =>
+        Number(bId === hostPlanetId) - Number(aId === hostPlanetId) ||
+        (bOwn.get(typeId) ?? 0) - (aOwn.get(typeId) ?? 0) ||
+        aId - bId
+    );
+    const taken: { fromPlanetId: number; unitsPerHour: number }[] = [];
+    let left = units;
+    for (const [planetId, own] of order) {
+      if (left <= EPSILON) break;
+      const available = own.get(typeId) ?? 0;
+      if (available <= EPSILON) continue;
+      const drawn = Math.min(left, available);
+      own.set(typeId, available - drawn);
+      taken.push({ fromPlanetId: planetId, unitsPerHour: drawn });
+      left -= drawn;
+    }
+    return taken;
+  };
 
   // Budget is a pool too. A candidate reads the host's *remaining* CPU and
   // Powergrid, and spends it, so the next candidate cannot be given the same
@@ -353,7 +386,7 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
     // candidate whose inputs are all bought is bounded by host budget alone.
     const grown = candidate.demandPerFactory.filter((input) => !input.bought);
     const bySupply = grown.length
-      ? Math.min(...grown.map((input) => (supply.get(input.typeId) ?? 0) / input.unitsPerHour))
+      ? Math.min(...grown.map((input) => pooled(input.typeId) / input.unitsPerHour))
       : Number.POSITIVE_INFINITY;
     if (Math.floor(bySupply + EPSILON) < 1) {
       stillBlocked.push({
@@ -401,28 +434,37 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
       powergrid: left.powergrid - cost.powergrid * factories,
     });
 
-    const inputs: NetworkInput[] = candidate.demandPerFactory.map((input) => {
+    // Priced the same whether bought or grown: `chainCost` charges the hub
+    // price for a sourced line either way, because routing your own P1 forgoes
+    // selling it for exactly that.
+    const price = (typeId: number) => priceOf(typeId, opts.prices) ?? 0;
+    const inputs: NetworkInput[] = [];
+    for (const input of candidate.demandPerFactory) {
       const unitsPerHour = input.unitsPerHour * factories;
-      if (!input.bought) supply.set(input.typeId, (supply.get(input.typeId) ?? 0) - unitsPerHour);
-      const localHere = !input.bought && (host.colony.outputPerHour.get(input.typeId) ?? 0) > 0;
-      const source: InputSource = input.bought ? 'bought' : localHere ? 'local' : 'routed';
-      return {
-        typeId: input.typeId,
-        name: input.name,
-        unitsPerHour,
-        fromPlanetId: input.bought
-          ? null
-          : localHere
-            ? host.colony.planetId
-            : (supplierOf.get(input.typeId) ?? host.colony.planetId),
-        source,
-        local: localHere,
-        // Priced the same whether bought or grown: `chainCost` charges the hub
-        // price for a sourced line either way, because routing your own P1
-        // forgoes selling it for exactly that.
-        costPerHour: (priceOf(input.typeId, opts.prices) ?? 0) * unitsPerHour,
-      };
-    });
+      if (input.bought) {
+        inputs.push({
+          typeId: input.typeId,
+          name: input.name,
+          unitsPerHour,
+          fromPlanetId: null,
+          source: 'bought',
+          costPerHour: price(input.typeId) * unitsPerHour,
+        });
+        continue;
+      }
+      // One entry per contributing colony: two planets making the same P1 get
+      // two routes, each for what that planet actually supplies.
+      for (const part of drawFrom(input.typeId, unitsPerHour, host.colony.planetId)) {
+        inputs.push({
+          typeId: input.typeId,
+          name: input.name,
+          unitsPerHour: part.unitsPerHour,
+          fromPlanetId: part.fromPlanetId,
+          source: part.fromPlanetId === host.colony.planetId ? 'local' : 'routed',
+          costPerHour: price(input.typeId) * part.unitsPerHour,
+        });
+      }
+    }
 
     opportunities.push({
       typeId: candidate.typeId,
@@ -443,8 +485,13 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
     });
   }
 
-  const unallocated = [...supply.entries()]
-    .filter(([, units]) => units > EPSILON)
+  const leftover = new Map<number, number>();
+  for (const own of supplyByColony.values()) {
+    for (const [typeId, units] of own) {
+      if (units > EPSILON) leftover.set(typeId, (leftover.get(typeId) ?? 0) + units);
+    }
+  }
+  const unallocated = [...leftover.entries()]
     .map(([typeId, unitsPerHour]) => ({ typeId, name: nameOf(typeId, pi), unitsPerHour }))
     .sort((a, b) => b.unitsPerHour - a.unitsPerHour);
 

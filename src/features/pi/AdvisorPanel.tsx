@@ -90,10 +90,11 @@ import { loadPlanetInfo, loadSchematicName } from './names';
 import { plannableTypeIds } from './products';
 import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorModel';
 import { colonyStopTierAdvice } from './stopTierModel';
-import { colonyFactoryBalance, surplusLoad } from './factoryBalanceModel';
+import { colonyFactoryBalance } from './factoryBalanceModel';
 import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
 import { ColonyActions } from './ColonyActions';
+import { idleFacilityPlan } from './colonyActionModel';
 import type { NetworkOpportunity } from '@/engine/pi/network';
 import {
   colonySpaceFor,
@@ -638,24 +639,28 @@ function BuiltCard({
   // The next Command Center level, not the pilot's ceiling: levels are bought
   // one at a time, for ISK, per colony.
   const nextLevel = colonyBudget(colony.upgradeLevel + 1, pi);
-  // And what that level would hold, because the pilot is buying pins rather
-  // than megawatts — naming the CPU and Powergrid alone is half an answer.
-  const upgradedHeadroom = useMemo(
-    () =>
-      spareCapacity(colony.pinLoad.load, nextLevel.budget, pi.infrastructure, {
-        headsPerExtractor: HEADROOM_EXTRACTOR_HEADS,
-        ...(newLinkCost ? { newLinkCost } : {}),
-      }),
-    [colony.pinLoad.load, nextLevel.budget, pi.infrastructure, newLinkCost]
-  );
-  const upgradedRoom = roomSummary(upgradedHeadroom, t);
 
   // The "remove x, add y" pair. `balance` is what this colony's own extraction
   // can actually feed; `freedHeadroom` is what the budget would hold once the
   // pins nothing feeds are gone — the same `spareCapacity` call as the row
   // above, against a load reduced by exactly those pins.
   const balance = useMemo(() => colonyFactoryBalance(colony, pi), [colony, pi]);
-  const freed = useMemo(() => surplusLoad(balance, pi), [balance, pi]);
+  // The idle-facility decision — remove them, or buy the extraction that feeds
+  // them. Computed in `colonyActionModel`, so this card only renders it.
+  const idle = useMemo(
+    () =>
+      idleFacilityPlan({
+        colony,
+        balance,
+        pi,
+        spare: {
+          cpu: Math.max(0, budget.cpu - colony.pinLoad.load.cpu),
+          powergrid: Math.max(0, budget.powergrid - colony.pinLoad.load.powergrid),
+        },
+        newLinkCost,
+      }),
+    [colony, balance, pi, budget, newLinkCost]
+  );
 
   return (
     <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType}>
@@ -754,10 +759,8 @@ function BuiltCard({
             </p>
           ) : (
             <ColonyActions
-              colony={colony}
+              idle={idle}
               pi={pi}
-              balance={balance}
-              freed={freed}
               spare={{ cpu: freeCpu, powergrid: freePowergrid }}
               newLinkCost={newLinkCost}
               opportunities={opportunities}
@@ -780,14 +783,13 @@ function BuiltCard({
           */}
           {!ceiling.assumed && colony.upgradeLevel < ceiling.level && (
             <p className="text-[0.6875rem] text-accent">
-              {t(upgradedRoom ? 'piAdvisor.upgradeAvailableRoom' : 'piAdvisor.upgradeAvailable', {
+              {t('piAdvisor.upgradeAvailable', {
                 level: colony.upgradeLevel,
                 max: ceiling.level,
                 cpu: Math.round(nextLevel.budget.cpu - budget.cpu).toLocaleString(),
                 powergrid: Math.round(
                   nextLevel.budget.powergrid - budget.powergrid
                 ).toLocaleString(),
-                room: upgradedRoom,
               })}
             </p>
           )}

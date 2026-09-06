@@ -41,122 +41,16 @@ import { useTranslation } from 'react-i18next';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { PiData, PiPinKind } from '@/sde/types';
-import type { FactoryBalance } from '@/engine/pi/factoryBalance';
 import type { NetworkOpportunity } from '@/engine/pi/network';
-import { extractionUpgrade } from '@/engine/pi/extractionUpgrade';
 import type { PinLoad } from '@/engine/pi/types';
-import type { BuiltColonyAdvice } from './advisorModel';
+import type { IdleFacilityPlan } from './colonyActionModel';
 
 const round = (value: number) => Math.round(value).toLocaleString();
 
-type Measured = Extract<FactoryBalance, { status: 'measured' }>;
-
-/**
- * The input a starved schematic is shortest of, and by how much.
- *
- * The binding one, not the first listed: a schematic short of two things is
- * short of one of them worse, and sizing extraction off the wrong one would
- * buy heads that change nothing.
- */
-function shortfallOf(
-  line: Measured
-): { name: string; unitsPerHour: number; demand: number; supply: number } | null {
-  const supplyOf = (typeId: number) =>
-    line.supplyPerHour.find((entry) => entry.typeId === typeId)?.unitsPerHour ?? 0;
-  const binding = line.demandPerHour.reduce(
-    (worst, demand) =>
-      supplyOf(demand.typeId) / demand.unitsPerHour < supplyOf(worst.typeId) / worst.unitsPerHour
-        ? demand
-        : worst,
-    line.demandPerHour[0]
-  );
-  if (!binding) return null;
-  const supply = supplyOf(binding.typeId);
-  const gap = binding.unitsPerHour - supply;
-  return gap > 0
-    ? { name: binding.name, unitsPerHour: gap, demand: binding.unitsPerHour, supply }
-    : null;
-}
-
-/**
- * The idle-facility decision: remove them, or buy the extraction that feeds
- * them.
- *
- * Sized only on a colony extracting a single resource. With two, "extraction
- * over head count" is not this resource's rate per head, and a rate that is
- * quietly an average across two ores would size the purchase wrong — the kind
- * of confidently-derived number `chain.ts` refuses to produce.
- */
-function IdleFacilities({
-  colony,
-  balance,
-  freed,
-  pi,
-  spare,
-  newLinkCost,
-}: {
-  colony: BuiltColonyAdvice;
-  balance: readonly FactoryBalance[];
-  freed: PinLoad;
-  pi: PiData;
-  spare: PinLoad;
-  newLinkCost: PinLoad | null;
-}) {
+export function IdleFacilities({ plan, pi }: { plan: IdleFacilityPlan; pi: PiData }) {
   const { t } = useTranslation();
-  const starved = balance.filter(
-    (line): line is Measured => line.status === 'measured' && line.surplusPins > 0
-  );
-  if (starved.length === 0) return null;
-
-  // One line per starved schematic, not one summed line. A colony refining two
-  // P0s can be short of both, and a single line would take its facility kind
-  // and its shortfall from the first while counting idle pins from all of them
-  // — naming one input as the reason pins short of a different one must go.
-  const perLine = starved.map((line) => {
-    const spec = pi.infrastructure.pins[line.facility];
-    return {
-      line,
-      gap: shortfallOf(line),
-      freed: {
-        cpu: (spec?.cpu ?? 0) * line.surplusPins,
-        powergrid: (spec?.powergrid ?? 0) * line.surplusPins,
-      },
-    };
-  });
-
-  // Extraction is only sized against a single starved schematic, for the same
-  // reason its head rate is only read off a single extracted resource: with
-  // two, "the shortfall" is not one number and buying to close one of them
-  // would be reported as closing both.
-  const only = perLine.length === 1 ? perLine[0] : null;
-  const heads = colony.pinLoad.extractorHeads;
-  const singleResource = colony.extractedPerHour.length === 1;
-  const perHeadPerHour =
-    singleResource && heads > 0 ? colony.extractedPerHour[0].unitsPerHour / heads : null;
-
-  const upgrade = extractionUpgrade({
-    shortfallPerHour: only?.gap?.unitsPerHour ?? 0,
-    perHeadPerHour: only ? perHeadPerHour : null,
-    spare,
-    newLinkCost,
-    infrastructure: pi.infrastructure,
-    freedByRemoval: freed,
-  });
-  // A Basic Industry Facility eats a fixed rate, so extra extraction converts
-  // to facilities fed at that rate — never more than are actually idle.
-  //
-  // `demandPerHour` is the colony's whole appetite for that input, not one
-  // pin's: dividing by the pins that want it is what turns extraction back
-  // into facilities. Reading it as a per-pin rate silently reports that a
-  // purchase feeds nothing.
-  const perFacility =
-    only && only.line.pins > 0
-      ? (only.line.demandPerHour[0]?.unitsPerHour ?? 0) / only.line.pins
-      : 0;
-  const wouldFeed =
-    perFacility > 0
-      ? Math.min(only?.line.surplusPins ?? 0, Math.floor(upgrade.extraPerHour / perFacility))
-      : 0;
+  const { lines, upgrade, wouldFeed } = plan;
+  const only = lines.length === 1 ? lines[0] : null;
 
   return (
     <>
@@ -172,7 +66,7 @@ function IdleFacilities({
           })}
         </li>
       ) : null}
-      {perLine.map(({ line, gap, freed: frees }) => (
+      {lines.map(({ line, gap, freed }) => (
         <li key={line.typeId} className="text-warning">
           {t('piAdvisor.actionRemove', {
             count: line.surplusPins,
@@ -180,8 +74,8 @@ function IdleFacilities({
             demand: round(gap?.demand ?? 0),
             input: gap?.name ?? '',
             supply: round(gap?.supply ?? 0),
-            cpu: round(frees.cpu),
-            powergrid: round(frees.powergrid),
+            cpu: round(freed.cpu),
+            powergrid: round(freed.powergrid),
           })}
         </li>
       ))}
@@ -200,15 +94,24 @@ function IdleFacilities({
                 extra: round(upgrade.extraPerHour),
                 name: only?.gap?.name ?? '',
                 fed: wouldFeed,
-              })}
+              })}{' '}
+              {t('piAdvisor.actionExtractWanted', { heads: upgrade.headsWanted })}
             </span>
           )}
           {upgrade.status === 'no-room' && (
             <span className="block">
+              {/*
+                The post-removal figure, because that is the budget the verdict
+                was actually reached against: `extractionUpgrade` returns
+                `no-room` only after the freed budget failed too. Quoting the
+                smaller pre-removal number here would read as "removing would
+                fix this", which is the opposite of what it found.
+              */}
               {t('piAdvisor.actionExtractNoRoom', {
                 cpu: round(pi.infrastructure.pins.extractorControlUnit?.cpu ?? 0),
                 powergrid: round(pi.infrastructure.pins.extractorControlUnit?.powergrid ?? 0),
-                free: round(spare.powergrid),
+                count: lines.reduce((sum, entry) => sum + entry.line.surplusPins, 0),
+                free: round(plan.freeAfterRemoval.powergrid),
               })}
             </span>
           )}
@@ -284,10 +187,8 @@ function AddFactories({
 }
 
 export function ColonyActions({
-  colony,
+  idle,
   pi,
-  balance,
-  freed,
   spare,
   newLinkCost,
   opportunities,
@@ -295,11 +196,9 @@ export function ColonyActions({
   room,
   closest,
 }: {
-  colony: BuiltColonyAdvice;
+  /** The idle-facility decision, already computed; null when nothing is idle. */
+  idle: IdleFacilityPlan | null;
   pi: PiData;
-  balance: readonly FactoryBalance[];
-  /** Budget the idle facilities are holding. */
-  freed: PinLoad;
   /** CPU and Powergrid free right now. */
   spare: PinLoad;
   newLinkCost: PinLoad | null;
@@ -312,24 +211,27 @@ export function ColonyActions({
   closest: { kind: PiPinKind; cost: PinLoad } | null;
 }) {
   const { t } = useTranslation();
-  const idle = balance.some((line) => line.status === 'measured' && line.surplusPins > 0);
   const nothing = !idle && opportunities.length === 0;
 
   return (
     <div className="space-y-1 border-t border-line pt-2">
       <CardHeading label={t('piAdvisor.actionsLabel')} />
       <ul className="space-y-1 text-xs">
-        <IdleFacilities
-          colony={colony}
-          balance={balance}
-          freed={freed}
-          pi={pi}
-          spare={spare}
-          newLinkCost={newLinkCost}
-        />
+        {idle && <IdleFacilities plan={idle} pi={pi} />}
         {opportunities.map((line) => (
           <AddFactories key={line.typeId} line={line} planetNames={planetNames} />
         ))}
+        {/*
+          `networkModel` offers each host the budget its idle pins are holding,
+          so an "add" line on a colony that still has them rests on a removal
+          that has not happened. The system panel says this once for the whole
+          plan; the card has to say it too, because the card is what a pilot
+          acts on and the footnote directly below prints the *pre*-removal
+          budget.
+        */}
+        {idle && opportunities.length > 0 && (
+          <li className="text-text-dim">{t('piAdvisor.actionAssumesRemoval')}</li>
+        )}
         {nothing && (
           <li className="text-text-dim">
             {room ? t('piAdvisor.actionNothingRoom', { room }) : t('piAdvisor.actionNothing')}

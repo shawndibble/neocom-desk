@@ -455,14 +455,20 @@ describe('AdvisorPanel', () => {
     expect(within(card).getByText(/1 of 5 colony slots free/)).toBeInTheDocument();
   });
 
-  it('says what the next Command Center level would make room for', async () => {
+  it('says what the next Command Center level buys, without re-offering a menu', async () => {
     // "Need to look into how that will adjust the advisor and its
-    // suggestions": naming the CPU and Powergrid a level adds is only half an
-    // answer — the pilot is buying pins, not megawatts.
+    // suggestions." The nudge used to append "room for 6x High-Tech
+    // Production Plant · …", which is the shape the card stopped using — and
+    // it printed outside the guard, so it made a headroom claim on the one
+    // colony the card had just declined to advise at all. What a level adds is
+    // pure budget arithmetic and true everywhere; what it would then hold is
+    // advice about a purchase the pilot has not made.
     renderPanel();
     const card = (await screen.findByText('Ashab III')).closest('div')
       ?.parentElement as HTMLElement;
-    expect(within(card).getByText(/room for/)).toBeInTheDocument();
+    const nudge = within(card).getByText(/Command Center at level/);
+    expect(nudge).toHaveTextContent('MW');
+    expect(nudge).not.toHaveTextContent('room for');
   });
 
   it('says nothing about slots on an unbuilt planet while one is free', async () => {
@@ -629,18 +635,21 @@ describe('AdvisorPanel', () => {
     expect(screen.queryByText(/pins are fed/)).not.toBeInTheDocument();
   });
 
-  it('says what two colonies could make together that neither makes alone', async () => {
-    // The reported operation in miniature. Ashab III refines Microorganisms
-    // into Bacteria; Ashab IV refines Aqueous Liquids into Water. Neither
-    // planet can extract the other's P0, so both cards say "keep selling raw"
-    // — and together they make Test Cultures.
-    const WATER_SCHEMATIC = 121;
-    const BACTERIA_SCHEMATIC = 131;
-    const AQUEOUS_LIQUIDS = 2268;
-    const MICROORGANISMS = 2073;
-    const WATER = 3645;
-    const BACTERIA = 2393;
-    const TEST_CULTURES = 2319;
+  /**
+   * Two colonies that reach a P2 only together: Ashab III refines
+   * Microorganisms into Bacteria, Ashab IV refines Aqueous Liquids into Water,
+   * and neither planet can extract the other's P0. Shared because the tests
+   * below differ only in what the hub quotes.
+   */
+  const WATER_SCHEMATIC = 121;
+  const BACTERIA_SCHEMATIC = 131;
+  const AQUEOUS_LIQUIDS = 2268;
+  const MICROORGANISMS = 2073;
+  const WATER = 3645;
+  const BACTERIA = 2393;
+  const TEST_CULTURES = 2319;
+
+  function twoRefineries(prices: Record<number, number>) {
     const waterColony = { ...colony(40_000_003, 'barren'), planet_id: 40_000_003 };
     loadCharacterPlanets.mockResolvedValue({
       cached: {
@@ -705,16 +714,24 @@ describe('AdvisorPanel', () => {
       ])
     );
     loadPlanPrices.mockResolvedValue({
-      prices: {
-        [MICROORGANISMS]: 12,
-        [AQUEOUS_LIQUIDS]: 12,
-        [WATER]: 513.9,
-        [BACTERIA]: 490,
-        [TEST_CULTURES]: 10_000,
-      },
+      prices,
       unpriced: [],
       failed: false,
       fetchedAt: new Date(),
+    });
+  }
+
+  it('says what two colonies could make together that neither makes alone', async () => {
+    // The reported operation in miniature. Ashab III refines Microorganisms
+    // into Bacteria; Ashab IV refines Aqueous Liquids into Water. Neither
+    // planet can extract the other's P0, so both cards say "keep selling raw"
+    // — and together they make Test Cultures.
+    twoRefineries({
+      [MICROORGANISMS]: 12,
+      [AQUEOUS_LIQUIDS]: 12,
+      [WATER]: 513.9,
+      [BACTERIA]: 490,
+      [TEST_CULTURES]: 10_000,
     });
     renderPanel();
 
@@ -725,6 +742,31 @@ describe('AdvisorPanel', () => {
     // The route is the work: an opportunity with no shipping named is not
     // actionable.
     expect(screen.getByText(/of (Water|Bacteria) — route in from Ashab/)).toBeInTheDocument();
+  });
+
+  it('separates what a factory would buy from what it merely gives up', async () => {
+    // The pilot asked to "take into account the cost of buying it on the local
+    // market hub". Superconductors need Plasmoids, which neither colony makes,
+    // so those are a purchase — while the Water feeding the same factory is
+    // material they already grow. Both cost the hub price; only one is money
+    // leaving the wallet, and one figure under one word for both is how a
+    // pilot budgets for a purchase they are not making.
+    const PLASMOIDS = 2389;
+    const SUPERCONDUCTORS = 9838;
+    twoRefineries({
+      [MICROORGANISMS]: 12,
+      [AQUEOUS_LIQUIDS]: 12,
+      [WATER]: 513.9,
+      [BACTERIA]: 490,
+      [PLASMOIDS]: 600.2,
+      [SUPERCONDUCTORS]: 11_280,
+    });
+    renderPanel();
+
+    expect(await screen.findByText(/of Plasmoids — buy at .* and haul it in/)).toBeInTheDocument();
+    // The Water is routed, not bought, so it must not appear as a purchase.
+    expect(screen.queryByText(/of Water — buy at/)).not.toBeInTheDocument();
+    expect(screen.getByText(/an hour of inputs you have to buy/)).toBeInTheDocument();
   });
 
   it('says nothing about a network when there is only one colony to work with', async () => {
