@@ -146,3 +146,26 @@ export function useColonyPlan(colony: BuiltColonyAdvice, pi: PiData): ColonyPlan
     };
   }, [colony, pi]);
 }
+
+/** How many instructions a card shows before the rest go to the modal. */
+export const CARD_DIRECTIVE_LIMIT = 2;
+
+/**
+ * Which instructions a card shows, and in what order.
+ *
+ * Removals lead because they are a fault rather than an option — a facility
+ * nothing feeds is drawing budget for nothing, and every gain below rests on
+ * the budget it would free.
+ *
+ * But leading is not the same as crowding out. A colony with two idle
+ * schematics and one opportunity would spend both slots on removals and push a
+ * five-figure-an-hour line behind "1 more in Details" — burying the number a
+ * pilot came to the tab for. So when both kinds are present the cap reserves
+ * its last slot for the best-paying gain (`planNetwork` allocates best-paying
+ * first, so that is the head of the list). The rest go to the modal, which
+ * shows every one of them.
+ */
+export function cappedRows<T>(removals: readonly T[], gains: readonly T[], limit: number): T[] {
+  if (removals.length === 0 || gains.length === 0) return [...removals, ...gains].slice(0, limit);
+  return [...removals.slice(0, Math.max(1, limit - 1)), gains[0]].slice(0, limit);
+}

@@ -35,11 +35,9 @@ import type { PinLoad } from '@/engine/pi/types';
 import type { IdleFacilityPlan } from './colonyActionModel';
 import type { ColonyStopTierAdvice } from './stopTierModel';
 import { DirectiveRow, InputChip, SectionLabel } from './DirectiveRow';
+import { CARD_DIRECTIVE_LIMIT, cappedRows } from './colonyPlan';
 
 const round = (value: number) => Math.round(value).toLocaleString();
-
-/** How many instructions a card shows before the rest go to the modal. */
-export const CARD_DIRECTIVE_LIMIT = 2;
 
 export interface ColonyActionProps {
   /** The idle-facility decision, already computed; null when nothing is idle. */
@@ -171,13 +169,7 @@ function swapRow(
   );
 }
 
-/**
- * The card's instructions: at most `CARD_DIRECTIVE_LIMIT`, worst-first.
- *
- * Removals lead because they are a fault rather than an option — a facility
- * nothing feeds is drawing budget for nothing, and every "add" line below
- * rests on the budget it would free.
- */
+/** The card's instructions: at most `CARD_DIRECTIVE_LIMIT`, faults first. */
 export function ColonyDirectives(props: ColonyActionProps & { limit?: number }) {
   const { t } = useTranslation();
   const {
@@ -189,11 +181,11 @@ export function ColonyDirectives(props: ColonyActionProps & { limit?: number }) 
     limit = CARD_DIRECTIVE_LIMIT,
   } = props;
 
-  const rows: { key: string; node: ReactNode }[] = [
-    ...(idle?.lines ?? []).map((entry) => ({
-      key: `remove-${entry.line.typeId}`,
-      node: removeRow(entry, t),
-    })),
+  const removals: { key: string; node: ReactNode }[] = (idle?.lines ?? []).map((entry) => ({
+    key: `remove-${entry.line.typeId}`,
+    node: removeRow(entry, t),
+  }));
+  const gains: { key: string; node: ReactNode }[] = [
     ...opportunities.map((line) => ({
       key: `add-${line.typeId}`,
       node: addRow(line, planetNames, owners, t),
@@ -204,12 +196,12 @@ export function ColonyDirectives(props: ColonyActionProps & { limit?: number }) 
     })),
   ];
 
-  if (rows.length === 0) {
+  if (removals.length + gains.length === 0) {
     return <p className="text-[0.6875rem] text-text-dim">{t('piAdvisor.nothingToDo')}</p>;
   }
 
-  const shown = rows.slice(0, limit);
-  const hidden = rows.length - shown.length;
+  const shown = cappedRows(removals, gains, limit);
+  const hidden = removals.length + gains.length - shown.length;
   return (
     <div className="space-y-2">
       {shown.map((row, index) => (

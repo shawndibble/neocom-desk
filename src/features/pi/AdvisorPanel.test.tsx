@@ -396,6 +396,20 @@ describe('AdvisorPanel', () => {
     expect(screen.queryByText(/x high-tech plant/)).not.toBeInTheDocument();
   });
 
+  it('keeps the detail modal open across a re-render', async () => {
+    // `openColony` is looked up by planetId from the freshly derived advice
+    // rather than stored, so a refresh that reshapes the snapshot cannot
+    // strand a stale colony behind an open dialog — or close it out from
+    // under a reader.
+    const { rerender } = renderPanel();
+    const dialog = await openDetails();
+    expect(within(dialog).getByText('Running now')).toBeInTheDocument();
+
+    rerender(<AdvisorPanel characterId={1} systemId={null} onSystemIdChange={vi.fn()} />);
+    expect(screen.getByRole('dialog')).toHaveAttribute('open');
+    expect(within(screen.getByRole('dialog')).getByText('Running now')).toBeInTheDocument();
+  });
+
   it('charges a new pin for the link it will need, not just for the pin', async () => {
     // Efa V in miniature: 448 MW free and a 400 MW High-Tech plant offered,
     // which could not be placed because the link it needed was 54 MW. Here
@@ -1268,6 +1282,22 @@ describe('resource picking (#425)', () => {
 
     expect(await screen.findByText('Est.')).toBeInTheDocument();
     expect(screen.getByText(/average extraction rate/)).toBeInTheDocument();
+  });
+
+  it('refuses a build plan off an assumed Command Center ceiling', async () => {
+    // Untrained is one level, and fitting against it would tell a pilot at
+    // Command Center Upgrades V that nothing fits here. Same rule the slot
+    // count and the header chip follow: an assumed figure may be shown, never
+    // acted on.
+    loadCommandCenterUpgrades.mockResolvedValue(null);
+    linkedColony();
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Base Metals' }));
+
+    expect(
+      await screen.findByText(/an assumed budget is never fitted against/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Est.')).not.toBeInTheDocument();
   });
 
   it('refuses a build plan when no colony of the pilot’s can price a link', async () => {
