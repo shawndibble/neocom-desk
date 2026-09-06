@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -16,7 +16,6 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { formatIsk } from '@/lib/isk';
 import { createAssignment } from './assignments';
 import { updatePayee } from './payees';
-import { loadJitaUnitPrices } from './pricing';
 import type { MoonMiningTaxRow } from './snapshot';
 
 interface AssignDialogProps {
@@ -26,6 +25,8 @@ interface AssignDialogProps {
   payees: readonly PayeeRecord[];
   systemName: string;
   typeNames: ReadonlyMap<number, string>;
+  /** Jita unit prices, already fetched by the parent route's snapshot load for every ore line across every row — a strict superset of what this dialog needs, so it reads this instead of re-fetching. */
+  unitPrices: ReadonlyMap<number, number>;
   onAssigned: () => void;
 }
 
@@ -52,6 +53,7 @@ export function AssignDialog({
   payees,
   systemName,
   typeNames,
+  unitPrices,
   onAssigned,
 }: AssignDialogProps) {
   const { t } = useTranslation();
@@ -68,24 +70,12 @@ export function AssignDialog({
   );
   const [markPaid, setMarkPaid] = useState(true);
   const [rememberSystem, setRememberSystem] = useState(false);
-  const [prices, setPrices] = useState<Map<number, number>>(new Map());
   const [saving, setSaving] = useState(false);
 
   // No reset-on-reopen effect: the route only ever renders one `AssignDialog`
   // at a time, keyed off `assignTarget` going from `null` to a row, so this
   // component remounts fresh (new `useState` initializers) every time it
   // opens for a (possibly different) row rather than being reused in place.
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    void loadJitaUnitPrices(row.unassignedOreLines.map((line) => line.typeId)).then((result) => {
-      if (!cancelled) setPrices(result);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, row]);
 
   const selectedLines: OreLine[] = useMemo(
     () => row.unassignedOreLines.filter((line) => includedTypeIds.has(line.typeId)),
@@ -94,7 +84,7 @@ export function AssignDialog({
   const pctValue = Number(taxPct);
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     selectedLines,
-    prices,
+    unitPrices,
     Number.isFinite(pctValue) ? pctValue : 0
   );
 

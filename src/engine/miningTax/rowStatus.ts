@@ -46,25 +46,3 @@ export function linesClaimedBy(
     assignedLines.some((covered) => covered.typeId === line.typeId)
   );
 }
-
-/**
- * Every status present on one row (one Mining Ledger Entry): `unassigned`
- * when any of its ore is not yet covered by an Assignment, plus each distinct
- * status among the Assignments that do cover it. A split entry can carry more
- * than one — the ledger's Status filter (Unassigned/Needs Review/Outstanding/
- * Paid multi-select) matches a row if *any* of its statuses is selected,
- * since "outstanding" and "still has an unassigned line" are both true at
- * once for that row.
- */
-export function statusesForRow(
-  entryLines: readonly OreLine[],
-  covering: readonly { status: MiningTaxRowStatus; oreLines: readonly OreLine[] }[]
-): Set<MiningTaxRowStatus> {
-  const statuses = new Set<MiningTaxRowStatus>(covering.map((c) => c.status));
-  const residual = unassignedOreLines(
-    entryLines,
-    covering.map((c) => c.oreLines)
-  );
-  if (residual.length > 0) statuses.add('unassigned');
-  return statuses;
-}

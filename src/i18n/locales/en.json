@@ -780,7 +780,7 @@
     "statusFilterLabel": "Status ({{count}})",
     "status": {
       "unassigned": "Unassigned",
-      "needsreview": "Needs Review",
+      "needsReview": "Needs Review",
       "outstanding": "Outstanding",
       "paid": "Paid"
     },

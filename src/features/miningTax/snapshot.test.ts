@@ -43,7 +43,6 @@ describe('loadMoonMiningTaxSnapshot', () => {
 
     expect(snapshot.rows).toHaveLength(1);
     const [row] = snapshot.rows;
-    expect(row.statuses).toEqual(new Set(['unassigned']));
     expect(row.unassignedOreLines).toEqual([{ typeId: MOON_ORE, quantity: 100 }]);
     expect(row.assignments).toEqual([]);
   });
@@ -73,9 +72,9 @@ describe('loadMoonMiningTaxSnapshot', () => {
     const snapshot = await loadMoonMiningTaxSnapshot();
 
     const [row] = snapshot.rows;
-    expect(row.statuses).toEqual(new Set(['outstanding']));
     expect(row.unassignedOreLines).toEqual([]);
     expect(row.assignments.map((a) => a.id)).toEqual(['a1']);
+    expect(row.assignments[0].status).toBe('outstanding');
   });
 
   it('re-diffs a stored Assignment against a fresh (grown) ledger read before joining it', async () => {
@@ -108,7 +107,7 @@ describe('loadMoonMiningTaxSnapshot', () => {
     // never as a second, separately-assignable "unassigned" residual for the
     // same ore.
     const [row] = snapshot.rows;
-    expect(row.statuses).toEqual(new Set(['needs-review']));
+    expect(row.assignments[0].status).toBe('needs-review');
     expect(row.unassignedOreLines).toEqual([]);
     expect((await db.miningTaxAssignments.get('a1'))?.reviewDiff).toEqual([
       { typeId: MOON_ORE, before: 100, after: 150 },

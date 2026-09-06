@@ -48,6 +48,17 @@ const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
 // Everything except Paid — Paid is opt-in (decision doc).
 const DEFAULT_STATUSES = new Set<MiningTaxRowStatus>(['unassigned', 'needs-review', 'outstanding']);
 
+// Explicit map rather than munging the status string into a key (a stray
+// `.replace('-', '')` silently mis-keys the moment a second hyphenated
+// status is ever added) — the i18n keys read naturally instead of matching a
+// derived, unnatural form.
+const STATUS_LABEL_KEY: Record<MiningTaxRowStatus, string> = {
+  unassigned: 'unassigned',
+  'needs-review': 'needsReview',
+  outstanding: 'outstanding',
+  paid: 'paid',
+};
+
 interface Snapshot {
   entries: MoonMiningTaxRow[];
   characters: TrackedCharacter[];
@@ -115,7 +126,7 @@ function flatten(rows: readonly MoonMiningTaxRow[]): DisplayRow[] {
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): string {
-  return t(`miningTax.status.${status.replace('-', '')}`);
+  return t(`miningTax.status.${STATUS_LABEL_KEY[status]}`);
 }
 
 function oreSummary(
@@ -215,19 +226,27 @@ export function MoonMiningTax() {
     refresh();
   }
 
-  const outstandingSelectable = visibleRows.filter(
-    (dr) => dr.status === 'outstanding' && dr.assignment
+  function payeeName(characterId: number, payeeId: string | undefined): string {
+    return (
+      data?.payeesByCharacter.get(characterId)?.find((p) => p.id === payeeId)?.name ??
+      t('miningTax.unknownPayee')
+    );
+  }
+
+  const bulkPayRows = useMemo(
+    () =>
+      visibleRows
+        .filter(
+          (dr) => dr.status === 'outstanding' && dr.assignment && bulkPaySelection.has(dr.key)
+        )
+        .map((dr) => ({
+          assignment: dr.assignment as MiningTaxAssignmentRecord,
+          characterName: dr.row.characterName,
+          payeeName: payeeName(dr.row.characterId, dr.assignment?.payeeId),
+        })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleRows, bulkPaySelection, data]
   );
-  const bulkPayRows = outstandingSelectable
-    .filter((dr) => bulkPaySelection.has(dr.key))
-    .map((dr) => ({
-      assignment: dr.assignment as MiningTaxAssignmentRecord,
-      characterName: dr.row.characterName,
-      payeeName:
-        data?.payeesByCharacter
-          .get(dr.row.characterId)
-          ?.find((p) => p.id === dr.assignment?.payeeId)?.name ?? t('miningTax.unknownPayee'),
-    }));
 
   const columns: DataTableColumn<DisplayRow>[] = [
     {
@@ -281,13 +300,7 @@ export function MoonMiningTax() {
     {
       id: 'payee',
       header: t('miningTax.payeeColumn'),
-      render: (dr) => {
-        if (!dr.assignment) return '—';
-        const payee = data?.payeesByCharacter
-          .get(dr.row.characterId)
-          ?.find((p) => p.id === dr.assignment?.payeeId);
-        return payee?.name ?? t('miningTax.unknownPayee');
-      },
+      render: (dr) => (dr.assignment ? payeeName(dr.row.characterId, dr.assignment.payeeId) : '—'),
     },
     {
       id: 'value',
@@ -539,6 +552,7 @@ export function MoonMiningTax() {
             `#${assignTarget.entry.solarSystemId}`
           }
           typeNames={data.typeNames}
+          unitPrices={data.unitPrices}
           onAssigned={refresh}
         />
       )}
@@ -548,6 +562,7 @@ export function MoonMiningTax() {
           open={payeeManagerCharacterId !== null}
           onClose={() => setPayeeManagerCharacterId(null)}
           characters={characters}
+          payeesByCharacter={data?.payeesByCharacter ?? new Map()}
           initialCharacterId={payeeManagerCharacterId}
           onChanged={refresh}
         />

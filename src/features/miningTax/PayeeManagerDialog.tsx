@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -14,16 +14,14 @@ import {
 import * as Icon from '@/components/ui/icons';
 import type { PayeeRecord } from '@/db';
 import { createPayee, deletePayee, loadPayees, updatePayee } from './payees';
-
-export interface PayeeManagerCharacter {
-  characterId: number;
-  characterName: string;
-}
+import type { TrackedCharacter } from './snapshot';
 
 interface PayeeManagerDialogProps {
   open: boolean;
   onClose: () => void;
-  characters: readonly PayeeManagerCharacter[];
+  characters: readonly TrackedCharacter[];
+  /** Every tracked character's current Payees, already loaded by the parent route's snapshot — the initial list here is seeded from this rather than a fresh Dexie read. */
+  payeesByCharacter: ReadonlyMap<number, PayeeRecord[]>;
   /** Preselected on open — usually whichever character the "Manage Payees" action was pressed from. */
   initialCharacterId: number;
   onChanged: () => void;
@@ -49,6 +47,7 @@ export function PayeeManagerDialog({
   open,
   onClose,
   characters,
+  payeesByCharacter,
   initialCharacterId,
   onChanged,
 }: PayeeManagerDialogProps) {
@@ -58,20 +57,25 @@ export function PayeeManagerDialog({
   // `useState` initializers) every time it opens — `characterId` only moves
   // afterward, via the in-dialog character switcher below.
   const [characterId, setCharacterId] = useState(initialCharacterId);
-  const [payees, setPayees] = useState<PayeeRecord[]>([]);
+  const [payees, setPayees] = useState<PayeeRecord[]>(
+    () => payeesByCharacter.get(initialCharacterId) ?? []
+  );
   const [draft, setDraft] = useState<DraftPayee>(EMPTY_DRAFT);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void loadPayees(characterId).then((result) => {
-      if (!cancelled) setPayees(result);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
+  // Render-time adjustment (not an effect) for the in-dialog character
+  // switcher: the parent route's snapshot already loaded every character's
+  // Payees, so switching here re-reads that map instead of firing a fresh
+  // Dexie query the data already answers.
+  const [payeesLoadedFor, setPayeesLoadedFor] = useState(characterId);
+  if (payeesLoadedFor !== characterId) {
+    setPayeesLoadedFor(characterId);
+    setPayees(payeesByCharacter.get(characterId) ?? []);
+  }
 
+  // A genuinely fresh read after a mutation, since the parent's snapshot map
+  // is a point-in-time seed and won't reflect this dialog's own edit until
+  // its next full refresh.
   async function refresh() {
     setPayees(await loadPayees(characterId));
   }

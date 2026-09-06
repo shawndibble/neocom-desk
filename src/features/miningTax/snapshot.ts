@@ -8,11 +8,7 @@ import { loadAllCharacterLedgers } from './ledger';
 import { loadPayees } from './payees';
 import { loadAssignments } from './assignments';
 import { reconcileAssignments } from './reconcile';
-import {
-  statusesForRow,
-  unassignedOreLines,
-  type MiningTaxRowStatus,
-} from '@/engine/miningTax/rowStatus';
+import { unassignedOreLines } from '@/engine/miningTax/rowStatus';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 
 export interface MoonMiningTaxRow {
@@ -23,8 +19,6 @@ export interface MoonMiningTaxRow {
   assignments: MiningTaxAssignmentRecord[];
   /** Ore this entry's assignments don't yet cover. */
   unassignedOreLines: MiningLedgerEntry['oreLines'];
-  /** Every status present on this row — see `engine/miningTax/rowStatus.ts`. */
-  statuses: Set<MiningTaxRowStatus>;
 }
 
 export interface UnclassifiedOre {
@@ -125,10 +119,6 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
         unassignedOreLines: unassignedOreLines(
           entry.oreLines,
           covering.map((a) => a.oreLines)
-        ),
-        statuses: statusesForRow(
-          entry.oreLines,
-          covering.map((a) => ({ status: a.status, oreLines: a.oreLines }))
         ),
       });
     }
