@@ -35,6 +35,7 @@ import type { RegionCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
+import { OrderRowSummaryText } from './OrderRowSummaryText';
 
 export interface OrderDetailModalProps {
   open: boolean;
@@ -61,6 +62,8 @@ export interface OrderDetailModalProps {
   stationsLoaded: boolean;
   /** Undefined while not yet requested/resolved. */
   regionJumps: JumpsAwayResult | undefined;
+  /** Resolves a rival's location to a name, so the three scopes can be told apart when they quote the same seller. Returns null for a player structure. */
+  stationNameFor: (locationId: number) => string | null;
   onCheckDeeper: () => void;
   onClose: () => void;
 }
@@ -127,40 +130,79 @@ function deepScopeState(
   return { kind: 'clear' };
 }
 
+/**
+ * One scope's line in the "who is cheaper, and where" table.
+ *
+ * Five columns, because the three scopes routinely carry the SAME rival —
+ * one seller at your own station is, by construction, also the cheapest in
+ * your system and can be the cheapest in the region too. Three identical
+ * ISK figures on three bare rows read as a bug; the same three beside the
+ * station they sit in, the ISK gap, and the distance read as what they are.
+ *
+ * A state that isn't a rival (not checked, clear, structure) has nothing to
+ * put in those four columns, so it spans them rather than printing dashes.
+ */
 function ScopeRow({
   label,
   state,
+  stationName,
+  distance,
   jumps,
 }: {
   label: string;
   state: ScopeState;
+  /** Where the rival sits, when this app resolved that location. */
+  stationName?: string | null;
+  /** Fixed distance wording for a scope whose answer is structural (station, system). */
+  distance?: string;
   jumps?: JumpsAwayResult;
 }) {
   const { t } = useTranslation();
+  const scopeLabel = (
+    <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
+  );
+
+  if (state.kind !== 'rival') {
+    return (
+      <div className="grid grid-cols-[6rem_1fr] gap-x-3 border-t border-line py-1.5 text-xs">
+        {scopeLabel}
+        <span className={state.kind === 'clear' ? 'text-success' : 'text-text-dim'}>
+          {state.kind === 'unavailable' && t('market.orders.structureMarketUnavailable')}
+          {state.kind === 'notChecked' && t('market.orders.scopeNotChecked')}
+          {state.kind === 'clear' && t('market.orders.scopeClear')}
+        </span>
+      </div>
+    );
+  }
+
+  const { rival } = state;
+  // The station tier is a Fuzzwork aggregate: a price, never an order count.
+  // `stationScopeState` fills those fields with 0, so they are only ever read
+  // when the deep book actually supplied them.
+  const countsKnown = rival.ordersBeatingMe > 0;
+
   return (
-    <div className="flex items-center justify-between gap-3 py-1 text-sm">
-      <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
-      <span className="tabular-nums">
-        {state.kind === 'unavailable' && (
-          <span className="text-text-dim">{t('market.orders.structureMarketUnavailable')}</span>
-        )}
-        {state.kind === 'notChecked' && (
-          <span className="text-text-dim">{t('market.orders.scopeNotChecked')}</span>
-        )}
-        {state.kind === 'clear' && (
-          <span className="text-success">{t('market.orders.scopeClear')}</span>
-        )}
-        {state.kind === 'rival' && (
-          <span className="text-danger">
-            {formatIsk(state.rival.price, 2)} ISK (-{state.rival.gapPct.toFixed(1)}%)
-            {jumps && (
-              <>
-                {' · '}
-                <JumpsAwayText result={jumps} t={t} />
-              </>
-            )}
-          </span>
-        )}
+    <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 gap-y-0.5 border-t border-line py-1.5 text-xs md:grid-cols-[6rem_1fr_auto_auto_auto]">
+      {scopeLabel}
+      <span className="flex flex-col gap-0.5">
+        <span>{stationName ?? t('market.unknownStructure')}</span>
+        <span className="text-[0.6875rem] text-text-dim">
+          {countsKnown
+            ? [
+                t('market.orders.rowSummary.sellersUnderMe', { count: rival.ordersBeatingMe }),
+                t('market.orders.scopeUnitsUnder', {
+                  units: rival.unitsBeatingMe.toLocaleString(),
+                }),
+              ].join(' · ')
+            : t('market.orders.scopeAggregateOnly')}
+        </span>
+      </span>
+      <span className="tabular-nums">{formatIsk(rival.price, 2)}</span>
+      <span className="text-danger tabular-nums">
+        {formatIsk(rival.gapIsk, 2)} · {rival.gapPct.toFixed(1)}%
+      </span>
+      <span className="text-text-dim tabular-nums">
+        {jumps ? <JumpsAwayText result={jumps} t={t} /> : (distance ?? '')}
       </span>
     </div>
   );
@@ -229,6 +271,7 @@ export function OrderDetailModal({
   stationChecked,
   stationsLoaded,
   regionJumps,
+  stationNameFor,
   onCheckDeeper,
   onClose,
 }: OrderDetailModalProps) {
@@ -273,10 +316,17 @@ export function OrderDetailModal({
           </h3>
           {badge ? (
             <>
-              <p className="text-sm text-text">{t(`market.orders.badge.${badge.kind}Help`)}</p>
-              <p className="text-xs text-text-dim">
+              {/*
+                The call first, at a size the eye lands on — the reason
+                someone opened this modal is "what do I do about it", not
+                "what does the badge mean". The explanation and the concrete
+                numbers follow it.
+              */}
+              <p className="text-base font-semibold text-text">
                 {t(`market.orders.badge.${badge.kind}Action`)}
               </p>
+              <p className="text-sm text-text-dim">{t(`market.orders.badge.${badge.kind}Help`)}</p>
+              <OrderRowSummaryText row={row} />
             </>
           ) : (
             <p className="text-sm text-text-dim">{t('market.orders.scopeNotChecked')}</p>
@@ -315,13 +365,45 @@ export function OrderDetailModal({
           <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
             {t('market.orders.whoIsCheaper')}
           </h3>
-          <ScopeRow label={t('market.orders.badge.undercutStation')} state={station} />
-          <ScopeRow label={t('market.orders.badge.undercutSystem')} state={system} />
+          <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:grid-cols-[6rem_1fr_auto_auto_auto]">
+            <span />
+            <span />
+            <span>{t('market.orders.scopeTheirPrice')}</span>
+            <span className="hidden md:inline">{t('market.orders.scopeOverBy')}</span>
+            <span className="hidden md:inline">{t('market.orders.scopeDistance')}</span>
+          </div>
+          <ScopeRow
+            label={t('market.orders.badge.undercutStation')}
+            state={station}
+            stationName={row.stationName}
+            distance={t('market.orders.scopeSameStation')}
+          />
+          <ScopeRow
+            label={t('market.orders.badge.undercutSystem')}
+            state={system}
+            stationName={
+              system.kind === 'rival' ? stationNameFor(system.rival.locationId) : undefined
+            }
+            distance={t('market.orders.scopeSameSystem')}
+          />
           <ScopeRow
             label={t('market.orders.badge.undercutRegion')}
             state={region}
+            stationName={
+              region.kind === 'rival' ? stationNameFor(region.rival.locationId) : undefined
+            }
             jumps={regionJumps}
           />
+          {/* My own order last, as the line every row above is measured against. */}
+          <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 border-t border-line bg-panel-2 py-1.5 text-xs md:grid-cols-[6rem_1fr_auto_auto_auto]">
+            <span className="font-semibold tracking-widest text-accent uppercase">
+              {t('market.orders.scopeMyOrder')}
+            </span>
+            <span>{row.stationName ?? t('market.unknownStructure')}</span>
+            <span className="tabular-nums">{formatIsk(row.price, 2)}</span>
+            <span className="hidden md:inline" />
+            <span className="hidden md:inline" />
+          </div>
           {allClean && <p className="text-xs text-success">{t('market.orders.onlySeller')}</p>}
           {deep?.truncated && (
             // A truncated fetch isn't the pre-fetch state (the button above

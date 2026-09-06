@@ -7,6 +7,7 @@ import {
   openOrderProblemCounts,
   type BuildRowsInput,
   type OpenOrderRow,
+  summariseOrderGroup,
 } from './openOrdersModel';
 import type { OpenOrdersSnapshot, CharacterOpenOrders } from './openOrdersData';
 import type { OrderCostBasis } from './orderCostBasis';
@@ -585,5 +586,91 @@ describe('sorting, grouping, counting', () => {
     ]);
     const rows = buildOpenOrderRows(baseInput({ snapshot }));
     expect(needsAttentionCount(rows)).toBe(1);
+  });
+});
+
+const SUMMARY_BASE_ROW: OpenOrderRow = {
+  orderId: 1,
+  characterId: 10,
+  characterName: 'Alpha',
+  typeId: 34,
+  typeName: 'Tritanium',
+  isBuyOrder: false,
+  price: 100,
+  volumeRemain: 5,
+  volumeTotal: 5,
+  locationId: 60003760,
+  regionId: 10000002,
+  stationName: 'Jita IV - Moon 4',
+  issued: new Date().toISOString(),
+  durationDays: 90,
+  expiry: null,
+  floor: null,
+  costBasis: null,
+  station: { bestPrice: null, beatsMe: false, gapIsk: 0, gapPct: 0 },
+  deepUndercut: null,
+  worstScope: null,
+  problem: 'undercutStation',
+  problems: ['undercutStation'],
+  iskTiedUp: 500,
+  belowFloor: false,
+};
+
+describe('summariseOrderGroup', () => {
+  it('totals the ISK, takes the worst gap, and splits the group by character', () => {
+    const summary = summariseOrderGroup([
+      { ...SUMMARY_BASE_ROW, station: { bestPrice: 95, beatsMe: true, gapIsk: 5, gapPct: 5 } },
+      {
+        ...SUMMARY_BASE_ROW,
+        orderId: 2,
+        iskTiedUp: 1500,
+        station: { bestPrice: 88, beatsMe: true, gapIsk: 12, gapPct: 12 },
+      },
+      {
+        ...SUMMARY_BASE_ROW,
+        orderId: 3,
+        characterId: 20,
+        characterName: 'Beta',
+        iskTiedUp: 1000,
+        station: { bestPrice: 97, beatsMe: true, gapIsk: 3, gapPct: 3 },
+      },
+    ]);
+    expect(summary.iskTiedUp).toBe(3000);
+    expect(summary.worstGapPct).toBe(12);
+    expect(summary.byCharacter).toEqual([
+      { characterId: 10, characterName: 'Alpha', count: 2 },
+      { characterId: 20, characterName: 'Beta', count: 1 },
+    ]);
+  });
+
+  it('leaves the worst gap null when nothing in the group is undercut', () => {
+    const summary = summariseOrderGroup([
+      { ...SUMMARY_BASE_ROW, problem: 'expiringOrStale', problems: ['expiringOrStale'] },
+    ]);
+    expect(summary.worstGapPct).toBeNull();
+  });
+
+  it('reads the gap off the deep rival once the region book has been fetched', () => {
+    const summary = summariseOrderGroup([
+      {
+        ...SUMMARY_BASE_ROW,
+        station: { bestPrice: 95, beatsMe: true, gapIsk: 5, gapPct: 5 },
+        deepUndercut: {
+          worst: {
+            scope: 'region',
+            price: 80,
+            gapIsk: 20,
+            gapPct: 20,
+            volumeRemain: 3,
+            locationId: 60003761,
+            systemId: 30000142,
+            ordersBeatingMe: 1,
+            unitsBeatingMe: 3,
+          },
+          byScope: {},
+        },
+      },
+    ]);
+    expect(summary.worstGapPct).toBe(20);
   });
 });

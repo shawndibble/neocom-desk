@@ -62,6 +62,9 @@ function renderModal(overrides: Partial<Parameters<typeof OrderDetailModal>[0]> 
         stationChecked={false}
         stationsLoaded
         regionJumps={undefined}
+        stationNameFor={(locationId) =>
+          locationId === 60003760 ? 'Jita IV - Moon 4' : `Station ${locationId}`
+        }
         onCheckDeeper={onCheckDeeper}
         onClose={onClose}
         {...overrides}
@@ -122,6 +125,7 @@ describe('OrderDetailModal', () => {
           stationChecked
           stationsLoaded
           regionJumps={undefined}
+          stationNameFor={() => 'Jita IV - Moon 4'}
           onCheckDeeper={vi.fn()}
           onClose={vi.fn()}
         />
@@ -141,6 +145,7 @@ describe('OrderDetailModal', () => {
           stationChecked
           stationsLoaded
           regionJumps={undefined}
+          stationNameFor={() => 'Jita IV - Moon 4'}
           onCheckDeeper={vi.fn()}
           onClose={vi.fn()}
         />
@@ -228,8 +233,9 @@ describe('OrderDetailModal', () => {
 
     const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
     const regionRow = within(whoSection).getByText('Region').closest('div');
-    expect(regionRow).toHaveTextContent('450.00 ISK');
-    expect(regionRow).toHaveTextContent('-10.0%');
+    // The "their price" / "I am over by" / "distance" columns of that row.
+    expect(regionRow).toHaveTextContent('450.00');
+    expect(regionRow).toHaveTextContent('10.0%');
     expect(regionRow).toHaveTextContent('4 jumps');
   });
 
@@ -410,7 +416,7 @@ describe('OrderDetailModal', () => {
 
       const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
       const regionRow = within(whoSection).getByText('Region').closest('div');
-      expect(regionRow).toHaveTextContent('450.00 ISK');
+      expect(regionRow).toHaveTextContent('450.00');
     });
 
     it('explains the "not checked" reads with an incomplete-data line, so a truncated fetch does not look identical to never having checked at all', () => {
