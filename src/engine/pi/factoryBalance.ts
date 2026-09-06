@@ -50,7 +50,7 @@
  * clock, no Dexie.
  */
 
-import type { PiData } from '@/sde/types';
+import type { PiData, PiPinKind } from '@/sde/types';
 
 const SECONDS_PER_HOUR = 3_600;
 
@@ -78,6 +78,12 @@ export interface BalanceLineBase {
   typeId: number;
   name: string;
   pins: number;
+  /**
+   * The facility that runs this schematic, from the payload's own
+   * schematic-to-pin map — so a caller pricing what a surplus pin frees does
+   * not have to assume a tier-to-facility table.
+   */
+  facility: PiPinKind;
 }
 
 export interface MeasuredBalance extends BalanceLineBase {
@@ -148,7 +154,12 @@ export function factoryBalance(input: FactoryBalanceInput, pi: PiData): FactoryB
 
   return known.map((line): FactoryBalance => {
     const schematic = pi.schematics[String(line.typeId)];
-    const base = { typeId: line.typeId, name: schematic.name, pins: line.pins };
+    const base = {
+      typeId: line.typeId,
+      name: schematic.name,
+      pins: line.pins,
+      facility: schematic.facility,
+    };
 
     const missing = schematic.inputs
       .filter((inputLine) => !supply.has(inputLine.typeID))

@@ -25,8 +25,14 @@ const ASHAB = 30_002_187;
 const ECU = 3068;
 const BASIC = 2481;
 const LAUNCHPAD = 2256;
-/** Reactive Metals — a P1 the Basic Industry Facility runs. */
-const REACTIVE_METALS_SCHEMATIC = 133;
+/**
+ * Reactive Metals — a P1 the Basic Industry Facility runs, and the one whose
+ * input is the Base Metals this fixture's extractor pulls. Schematic 133 sat
+ * here for a long time under this name; it is Proteins, which eats Complex
+ * Organisms, so anything measuring supply against demand read the colony as
+ * importing its input.
+ */
+const REACTIVE_METALS_SCHEMATIC = 126;
 /** Base Metals, the P0 it eats. */
 const BASE_METALS = 2267;
 const NOBLE_METALS = 2270;
@@ -497,6 +503,56 @@ describe('AdvisorPanel', () => {
     expect(line).toHaveTextContent('high-tech plant');
     expect(screen.queryByText(/Each count pays/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Any one of those/)).not.toBeInTheDocument();
+  });
+
+  it('names the factories nothing on this colony feeds, and what removing them gives back', async () => {
+    // The default fixture is one 4-head extractor and one Basic factory. A
+    // Basic factory eats 6,000 Base Metals an hour and this program sustains
+    // 5,580, so four of five pins are fed and one is not.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [],
+                routes: [],
+                pins: [
+                  extractorPin(1),
+                  ...Array.from({ length: 5 }, (_, i) => ({
+                    pin_id: i + 2,
+                    type_id: BASIC,
+                    latitude: 0,
+                    longitude: 0,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  })),
+                  { pin_id: 9, type_id: LAUNCHPAD, latitude: 0, longitude: 0 },
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+    // 5,580/hr against five pins wanting 30,000/hr keeps one fed, so four
+    // draw budget and make nothing.
+    const line = await screen.findByText(/1 of 5 basic factory pins are fed/);
+    expect(line).toHaveTextContent('30,000/hr of Base Metals');
+    expect(line).toHaveTextContent('5,580/hr');
+    // Four Basic factories at 200 tf / 800 MW.
+    expect(screen.getByText(/frees 800 tf and 3,200 MW/)).toBeInTheDocument();
+  });
+
+  it('says nothing about unfed factories on a colony that is in balance', async () => {
+    // The default fixture's single factory is fed, so there is no line — a
+    // reassurance on every card would bury the ones with something to act on.
+    renderPanel();
+    await screen.findByText('Ashab III');
+    expect(screen.queryByText(/pins are fed/)).not.toBeInTheDocument();
   });
 
   it('does not tell a pilot whose skills never loaded to abandon a colony', async () => {

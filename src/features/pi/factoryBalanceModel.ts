@@ -1,0 +1,70 @@
+/**
+ * A built colony's factory balance, in the terms the Advisor card renders.
+ *
+ * `engine/pi/factoryBalance.ts` is pure and keyed by *product* typeID.
+ * `BuiltColonyAdvice` reports what ESI reports: factory pins grouped by
+ * *schematic* id, and extraction as a list rather than a map. This is the
+ * translation, and the one place it happens — the same role
+ * `stopTierModel.ts` plays for the stop-tier engine.
+ */
+
+import type { PiData } from '@/sde/types';
+import { factoryBalance, type FactoryBalance } from '@/engine/pi/factoryBalance';
+import { pinsLoad } from '@/engine/pi/pinBudget';
+import type { PinLoad } from '@/engine/pi/types';
+import type { BuiltColonyAdvice } from './advisorModel';
+
+/**
+ * This colony's factories measured against what it can put into them.
+ *
+ * A factory pin whose schematic could not be resolved is dropped rather than
+ * grouped under an unknown: `groupFactoryPins` keys those under `undefined`,
+ * and folding them into a real schematic's count would inflate that
+ * schematic's demand and manufacture a surplus out of a lookup failure.
+ */
+export function colonyFactoryBalance(colony: BuiltColonyAdvice, pi: PiData): FactoryBalance[] {
+  const productBySchematic = new Map(
+    Object.entries(pi.schematics).map(([typeId, schematic]) => [
+      schematic.schematicId,
+      Number(typeId),
+    ])
+  );
+
+  const running: { typeId: number; pins: number }[] = [];
+  for (const group of colony.production) {
+    if (group.schematicId === undefined) continue;
+    const typeId = productBySchematic.get(group.schematicId);
+    if (typeId === undefined) continue;
+    running.push({ typeId, pins: group.count });
+  }
+
+  return factoryBalance(
+    {
+      running,
+      extractedPerHour: new Map(
+        colony.extractedPerHour.map((line) => [line.typeId, line.unitsPerHour])
+      ),
+    },
+    pi
+  );
+}
+
+/**
+ * What the pins nothing feeds are holding.
+ *
+ * The whole reason the count is worth printing: on a colony whose Powergrid is
+ * the stated reason nothing else fits, four unfed Basic Industry Facilities
+ * are 3,200 MW that a pilot can have back for the price of deleting them.
+ *
+ * Links are not counted, though a deleted pin frees its link too. That is the
+ * conservative direction — the figure understates what comes back — and the
+ * link a given pin owns is a placement question this app does not answer.
+ */
+export function surplusLoad(balance: readonly FactoryBalance[], pi: PiData): PinLoad {
+  const counts: Record<string, number> = {};
+  for (const line of balance) {
+    if (line.status !== 'measured' || line.surplusPins <= 0) continue;
+    counts[line.facility] = (counts[line.facility] ?? 0) + line.surplusPins;
+  }
+  return pinsLoad(counts, pi.infrastructure, { extractorHeads: 0 });
+}

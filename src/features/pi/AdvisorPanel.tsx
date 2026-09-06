@@ -90,6 +90,8 @@ import { loadPlanetInfo, loadSchematicName } from './names';
 import { plannableTypeIds } from './products';
 import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorModel';
 import { colonyStopTierAdvice } from './stopTierModel';
+import { colonyFactoryBalance, surplusLoad } from './factoryBalanceModel';
+import type { FactoryBalance } from '@/engine/pi/factoryBalance';
 import {
   colonySpaceFor,
   customsRatePercent,
@@ -156,6 +158,93 @@ function nearestPin(
     if (!best || fraction > best.fraction) best = { kind, cost, fraction };
   }
   return best ? { kind: best.kind, cost: best.cost } : null;
+}
+
+/**
+ * The factories on this colony that nothing feeds, and what deleting them
+ * would give back.
+ *
+ * This is the "remove x" half of the advice, and it is a measurement rather
+ * than a projection: a Basic Industry Facility eats 6,000 P0 an hour and the
+ * colony's own extractor sustains what it sustains. Rendered only when there
+ * is a surplus — a balanced colony has nothing to act on, and a line saying so
+ * on every card would bury the ones that do.
+ */
+function UnfedFactories({
+  balance,
+  freed,
+  headroom,
+}: {
+  balance: readonly FactoryBalance[];
+  freed: PinLoad;
+  /** What the freed budget would then hold, per kind — the "add y" half. */
+  headroom: Record<PiPinKind, number>;
+}) {
+  const { t } = useTranslation();
+  const starved = balance.filter(
+    (line): line is Extract<FactoryBalance, { status: 'measured' }> =>
+      line.status === 'measured' && line.surplusPins > 0
+  );
+  if (starved.length === 0) return null;
+
+  // What the room would be spent on, largest count first — the pins a planner
+  // reaches for, not every kind that technically fits.
+  const room = HEADROOM_KINDS.filter((kind) => (headroom[kind] ?? 0) > 0)
+    .slice(0, 2)
+    .map((kind) =>
+      t('piAdvisor.roomForItem', { count: headroom[kind], pin: t(`piAdvisor.pinKind.${kind}`) })
+    )
+    .join(' · ');
+
+  return (
+    <div className="space-y-1 border-t border-line pt-2">
+      <CardLine label={t('piAdvisor.balanceLabel')}>
+        <ul className="space-y-0.5 text-warning">
+          {starved.map((line) => {
+            // The input that actually binds, not the first one listed: a
+            // schematic short of two things is short of one of them worse.
+            const binding = line.demandPerHour.reduce((worst, demand) => {
+              const supplyOf = (id: number) =>
+                line.supplyPerHour.find((entry) => entry.typeId === id)?.unitsPerHour ?? 0;
+              return supplyOf(demand.typeId) / demand.unitsPerHour <
+                supplyOf(worst.typeId) / worst.unitsPerHour
+                ? demand
+                : worst;
+            }, line.demandPerHour[0]);
+            const supply =
+              line.supplyPerHour.find((entry) => entry.typeId === binding.typeId)?.unitsPerHour ??
+              0;
+            return (
+              <li key={line.typeId}>
+                {t('piAdvisor.balanceStarved', {
+                  name: line.name,
+                  fed: line.fedPins,
+                  built: line.pins,
+                  pin: t(`piAdvisor.pinKind.${line.facility}`),
+                  surplus: line.surplusPins,
+                  demand: Math.round(binding.unitsPerHour).toLocaleString(),
+                  input: binding.name,
+                  supply: Math.round(supply).toLocaleString(),
+                })}
+              </li>
+            );
+          })}
+        </ul>
+      </CardLine>
+      <p className="text-[0.6875rem] text-text-dim">
+        {room
+          ? t('piAdvisor.balanceFrees', {
+              cpu: Math.round(freed.cpu).toLocaleString(),
+              powergrid: Math.round(freed.powergrid).toLocaleString(),
+              room,
+            })
+          : t('piAdvisor.balanceFreesPlain', {
+              cpu: Math.round(freed.cpu).toLocaleString(),
+              powergrid: Math.round(freed.powergrid).toLocaleString(),
+            })}
+      </p>
+    </div>
+  );
 }
 
 /** Stable identities, so an unranked planet's card does not remount every render. */
@@ -603,6 +692,29 @@ function BuiltCard({
   // one at a time, for ISK, per colony.
   const nextLevel = colonyBudget(colony.upgradeLevel + 1, pi);
 
+  // The "remove x, add y" pair. `balance` is what this colony's own extraction
+  // can actually feed; `freedHeadroom` is what the budget would hold once the
+  // pins nothing feeds are gone — the same `spareCapacity` call as the row
+  // above, against a load reduced by exactly those pins.
+  const balance = useMemo(() => colonyFactoryBalance(colony, pi), [colony, pi]);
+  const freed = useMemo(() => surplusLoad(balance, pi), [balance, pi]);
+  const freedHeadroom = useMemo(
+    () =>
+      spareCapacity(
+        {
+          cpu: colony.pinLoad.load.cpu - freed.cpu,
+          powergrid: colony.pinLoad.load.powergrid - freed.powergrid,
+        },
+        budget,
+        pi.infrastructure,
+        {
+          headsPerExtractor: HEADROOM_EXTRACTOR_HEADS,
+          ...(newLinkCost ? { newLinkCost } : {}),
+        }
+      ),
+    [colony.pinLoad.load, freed, budget, pi.infrastructure, newLinkCost]
+  );
+
   return (
     <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType}>
       <>
@@ -792,6 +904,8 @@ function BuiltCard({
             </p>
           )}
         </div>
+
+        <UnfedFactories balance={balance} freed={freed} headroom={freedHeadroom} />
 
         <StopTierLine advice={advice} pi={pi} prices={prices} taxRate={taxRate} />
       </>
