@@ -90,6 +90,30 @@ service cloud.firestore {
         allow update: if isOwner() && hashMatches() && incomingHashMatches();
         allow delete: if isOwner();
       }
+
+      match /productionRuns/{runId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
+      match /productionSaleLinks/{linkId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
+      match /productionOrderWatches/{watchId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
     }
 
     // Device registrations (issue #356, ADR 0010): written only by the
