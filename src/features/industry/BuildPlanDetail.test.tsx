@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -226,10 +226,16 @@ const meInput = () => screen.getByLabelText('ME %');
 const teInput = () => screen.getByLabelText('TE %');
 const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 
+/** Inputs live behind "Edit setup" now — open it before touching any of them. */
+async function openSetup(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Edit setup' }));
+}
+
 describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
   it('reflects exactly what is typed mid-edit, including an intermediate out-of-range value', async () => {
     const user = userEvent.setup();
     render(<Harness plan={{ runs: 10 }} />);
+    await openSetup(user);
 
     await user.clear(runsInput());
     await user.type(runsInput(), '25000');
@@ -242,6 +248,7 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
   it('keeps the field empty mid-edit when cleared, rather than snapping to 1', async () => {
     const user = userEvent.setup();
     render(<Harness plan={{ runs: 10 }} />);
+    await openSetup(user);
 
     await user.clear(runsInput());
 
@@ -252,6 +259,7 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
 
     await user.clear(runsInput());
     await user.type(runsInput(), '250');
@@ -265,6 +273,7 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
 
     await user.clear(runsInput());
     await user.tab();
@@ -277,6 +286,7 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness plan={{ runs: 10, me: 5, te: 8 }} onUpdate={onUpdate} />);
+    await openSetup(user);
 
     // Runs, then ME, then TE, then out — none of them touched.
     await user.tab();
@@ -291,6 +301,7 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness plan={{ me: 0 }} onUpdate={onUpdate} />);
+    await openSetup(user);
 
     await user.clear(meInput());
     await user.type(meInput(), '15');
@@ -306,6 +317,7 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness plan={{ te: 0 }} onUpdate={onUpdate} />);
+    await openSetup(user);
 
     await user.clear(teInput());
     await user.type(teInput(), '25');
@@ -321,6 +333,7 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness plan={{ me: 5 }} onUpdate={onUpdate} />);
+    await openSetup(user);
 
     await user.clear(meInput());
     expect(valueOf(meInput())).toBe('');
@@ -334,6 +347,7 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness plan={{ te: 8 }} onUpdate={onUpdate} />);
+    await openSetup(user);
 
     await user.clear(teInput());
     expect(valueOf(teInput())).toBe('');
@@ -346,6 +360,7 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
   it('clicking the ME label focuses its input, proving the htmlFor/id pairing (not just aria-label) works', async () => {
     const user = userEvent.setup();
     render(<Harness />);
+    await openSetup(user);
 
     await user.click(screen.getByText('ME %'));
 
@@ -523,6 +538,7 @@ describe('BuildPlanDetail build system', () => {
    * below reads or edits one of them, so each opens it first.
    */
   async function openOverride(user: ReturnType<typeof userEvent.setup>) {
+    await openSetup(user);
     await user.click(screen.getByRole('button', { name: /Override/ }));
   }
 
@@ -594,17 +610,26 @@ describe('BuildPlanDetail build system', () => {
         }}
       />
     );
+    // A synchronous click, not `openSetup`'s userEvent one: this plan's stored
+    // band disagrees with Badivefi's real one, so `useDerivedSecurityBand`
+    // corrects it moments after mount. `userEvent.click` awaits enough of the
+    // event loop for that correction to land first, which would flip the text
+    // this asserts before the assertion even runs.
+    fireEvent.click(screen.getByRole('button', { name: 'Edit setup' }));
 
     expect(await screen.findByText(/Azbel · Badivefi · Lowsec/)).toBeInTheDocument();
   });
 
   it("names the plan's own picked location in the search box", async () => {
+    const user = userEvent.setup();
     render(<Harness plan={{ buildLocationId: 1035, buildLocationName: 'K2-18 R&D' }} />);
+    await openSetup(user);
 
     expect(valueOf(await screen.findByLabelText('Build location'))).toBe('K2-18 R&D');
   });
 
   it('composes a stand-in name for a picked structure ESI would not name', async () => {
+    const user = userEvent.setup();
     render(
       <Harness
         plan={{
@@ -615,6 +640,7 @@ describe('BuildPlanDetail build system', () => {
         }}
       />
     );
+    await openSetup(user);
 
     expect(valueOf(await screen.findByLabelText('Build location'))).toBe('Azbel in Badivefi');
   });
@@ -722,7 +748,9 @@ describe('BuildPlanDetail build system', () => {
   });
 
   it('labels the cost index with the build system', async () => {
+    const user = userEvent.setup();
     render(<Harness plan={{ buildSystemId: 30003888, buildSystemName: 'Badivefi' }} />);
+    await user.click(await screen.findByRole('button', { name: 'Show details' }));
 
     expect(await screen.findByText('Cost index (Badivefi)')).toBeInTheDocument();
   });
@@ -767,7 +795,9 @@ describe('BuildPlanDetail build system', () => {
     // A half-pair is what a partial sync or a hand-edited record can leave
     // behind. Charging the fee at one system while labelling it another is
     // worse than not having a build system at all.
+    const user = userEvent.setup();
     render(<Harness plan={{ buildSystemId: 30003888 }} />);
+    await user.click(await screen.findByRole('button', { name: 'Show details' }));
 
     expect(await screen.findByText('Cost index (Jita)')).toBeInTheDocument();
     expect(loadMarketSnapshot).toHaveBeenCalledWith(
@@ -792,6 +822,7 @@ describe('BuildPlanDetail build system', () => {
 
 describe('BuildPlanDetail reaction plans (issue #460)', () => {
   async function openOverride(user: ReturnType<typeof userEvent.setup>) {
+    await openSetup(user);
     await user.click(screen.getByRole('button', { name: /Override/ }));
   }
 
@@ -804,8 +835,11 @@ describe('BuildPlanDetail reaction plans (issue #460)', () => {
     };
   }
 
-  it('has no ME/TE fields — reaction formulas carry no research activity', () => {
+  it('has no ME/TE fields — reaction formulas carry no research activity', async () => {
+    const user = userEvent.setup();
     render(<Harness plan={reactionPlan()} catalog={REACTION_CATALOG} />);
+    await openSetup(user);
+
     expect(screen.queryByLabelText('ME %')).toBeNull();
     expect(screen.queryByLabelText('TE %')).toBeNull();
     // Runs is unaffected — only ME/TE are activity-specific.
@@ -829,10 +863,12 @@ describe('BuildPlanDetail reaction plans (issue #460)', () => {
   });
 
   it('produces a materials table and results for the reaction formula', async () => {
+    const user = userEvent.setup();
     render(<Harness plan={reactionPlan()} catalog={REACTION_CATALOG} />);
 
     expect(await screen.findByText('Fullerides')).toBeInTheDocument();
-    expect(screen.getByText('Results')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Show details' }));
+    expect(screen.getByText('Costs & revenue')).toBeInTheDocument();
   });
 });
 
@@ -854,6 +890,7 @@ describe('BuildPlanDetail material price basis', () => {
     const user = userEvent.setup();
     pricedSnapshot();
     render(<Harness />);
+    await openSetup(user);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(basisSelect()).toHaveTextContent('Sell orders');
@@ -871,6 +908,7 @@ describe('BuildPlanDetail material price basis', () => {
     const onUpdate = vi.fn();
     pricedSnapshot();
     render(<Harness onUpdate={onUpdate} />);
+    await openSetup(user);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     await user.click(basisSelect());
@@ -883,6 +921,7 @@ describe('BuildPlanDetail material price basis', () => {
     const user = userEvent.setup();
     pricedSnapshot();
     render(<Harness />);
+    await openSetup(user);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(tritaniumPrice().value).toBe('5');
@@ -897,8 +936,10 @@ describe('BuildPlanDetail material price basis', () => {
   });
 
   it('prices a stored buy-basis plan off the buy side on first render', async () => {
+    const user = userEvent.setup();
     pricedSnapshot();
     render(<Harness plan={{ materialPriceBasis: 'buy' }} />);
+    await openSetup(user);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(tritaniumPrice().value).toBe('4');

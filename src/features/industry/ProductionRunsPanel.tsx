@@ -8,12 +8,23 @@ import {
   removeProductionSaleLink,
   scheduleSync,
 } from '@/sync';
-import { Button, DataTable, EmptyState, IconButton, Modal, Panel } from '@/components/ui';
+import {
+  Button,
+  CollapsiblePanel,
+  DataTable,
+  EmptyState,
+  IconButton,
+  Modal,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { SkillLevels } from '@/engine/industry/types';
 import { SourcingInput } from './MaterialsTable';
-import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
+import {
+  rollupProductionRuns,
+  summarizeProductionRun,
+  type ProductionRunSummary,
+} from './productionRunSummary';
 import {
   loggedAtColumn,
   quantityColumn,
@@ -36,6 +47,13 @@ interface ProductionRunsPanelProps {
   productTypeID: number | null;
   productName: string;
   skills: SkillLevels;
+  /**
+   * Bumped by the parent each time something outside this panel asks to log
+   * a run — the hero's own "Log Production" button. A counter rather than a
+   * boolean so two requests in a row both open the form, and so the panel
+   * never has to tell the parent to reset anything.
+   */
+  logRequest?: number;
 }
 
 interface RunForm {
@@ -69,12 +87,24 @@ export function ProductionRunsPanel({
   productTypeID,
   productName,
   skills,
+  logRequest = 0,
 }: ProductionRunsPanelProps) {
   const { t } = useTranslation();
   const [loggingOpen, setLoggingOpen] = useState(false);
-  const [form, setForm] = useState<RunForm>(EMPTY_FORM);
+  // Closed until asked: the table is the record, and on a plan being priced
+  // the header's one-line rollup is the read that matters. Its rows are
+  // still one click away, whatever the viewport.
+  const [expanded, setExpanded] = useState(false);
   const [editingRunId, setEditingRunId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<RunForm>(EMPTY_FORM);
+  /**
+   * The last outside request this panel has answered. The form is open while
+   * a newer one is outstanding — derived, so an outside request needs no
+   * effect and no render-time state adjustment — and closing it settles the
+   * counter. The form's `key` below is what makes each open start fresh.
+   */
+  const [dismissedLogRequest, setDismissedLogRequest] = useState(logRequest);
+  const requestedOpen = logRequest > dismissedLogRequest && productTypeID !== null;
+  const loggingModalOpen = loggingOpen || requestedOpen;
 
   const runs =
     useLiveQuery(
@@ -101,11 +131,22 @@ export function ProductionRunsPanel({
   const editingRow = editingRunId ? rows.find((r) => r.run.id === editingRunId) : undefined;
 
   function openLogProduction() {
-    setForm(defaults ? runForm(defaults) : EMPTY_FORM);
     setLoggingOpen(true);
   }
 
-  async function saveProductionRun() {
+  function closeLogProduction() {
+    setLoggingOpen(false);
+    setDismissedLogRequest(logRequest);
+  }
+
+  const rollup = rollupProductionRuns(rows);
+  const runsSummary = t('industry.runsSummary', {
+    count: rollup.count,
+    profit: formatIsk(rollup.realizedProfit),
+    open: rollup.openCount,
+  });
+
+  async function saveProductionRun(form: RunForm) {
     if (productTypeID === null) return;
     const quantity = unmaskNumber(form.quantity) ?? 0;
     const materialCost = unmaskNumber(form.materialCost) ?? 0;
@@ -124,15 +165,14 @@ export function ProductionRunsPanel({
       updatedAt: now,
     });
     scheduleSync(characterId);
-    setLoggingOpen(false);
+    closeLogProduction();
   }
 
   function openEdit(run: ProductionRunRecord) {
-    setEditForm(runForm(run));
     setEditingRunId(run.id);
   }
 
-  async function saveEdit() {
+  async function saveEdit(editForm: RunForm) {
     if (!editingRow) return;
     const quantity = unmaskNumber(editForm.quantity) ?? editingRow.run.quantity;
     const materialCost = unmaskNumber(editForm.materialCost) ?? editingRow.run.materialCost;
@@ -181,39 +221,52 @@ export function ProductionRunsPanel({
   ];
 
   return (
-    <Panel
-      title={t('industry.productionRuns')}
-      actions={
-        <Button size="sm" onClick={openLogProduction} disabled={productTypeID === null}>
-          <Icon.AddToPlan /> {t('industry.logProduction')}
-        </Button>
-      }
-    >
-      {runs.length === 0 ? (
-        <EmptyState title={t('industry.productionRunsEmptyTitle')} className="py-4" />
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.run.id}
-          label={t('industry.productionRuns')}
-          density="compact"
-          onRowClick={(r) => openEdit(r.run)}
-        />
-      )}
+    <>
+      <CollapsiblePanel
+        title={t('industry.productionRuns')}
+        meta={
+          rollup.count > 0 && (
+            <span className="text-xs tabular-nums text-text-dim">{runsSummary}</span>
+          )
+        }
+        expanded={expanded}
+        collapsible={runs.length > 0}
+        onToggle={() => setExpanded((open) => !open)}
+        labels={{ show: t('industry.runsShow'), hide: t('industry.runsHide') }}
+        actions={
+          <Button size="sm" onClick={openLogProduction} disabled={productTypeID === null}>
+            <Icon.AddToPlan /> {t('industry.logProduction')}
+          </Button>
+        }
+      >
+        {runs.length === 0 ? (
+          <EmptyState title={t('industry.productionRunsEmptyTitle')} className="py-4" />
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.run.id}
+            label={t('industry.productionRuns')}
+            density="compact"
+            onRowClick={(r) => openEdit(r.run)}
+          />
+        )}
+      </CollapsiblePanel>
 
       <Modal
-        open={loggingOpen}
-        onClose={() => setLoggingOpen(false)}
+        open={loggingModalOpen}
+        onClose={closeLogProduction}
         title={t('industry.logProduction')}
       >
-        <ProductionRunForm
-          hint={t('industry.logProductionHint', { name: productName })}
-          form={form}
-          onChange={setForm}
-          onSubmit={() => void saveProductionRun()}
-          submitLabel={t('industry.saveProductionRun')}
-        />
+        {loggingModalOpen && (
+          <ProductionRunForm
+            key={logRequest}
+            hint={t('industry.logProductionHint', { name: productName })}
+            initial={defaults}
+            onSubmit={(form) => void saveProductionRun(form)}
+            submitLabel={t('industry.saveProductionRun')}
+          />
+        )}
       </Modal>
 
       <Modal
@@ -224,9 +277,9 @@ export function ProductionRunsPanel({
         {editingRow && (
           <div className="space-y-4">
             <ProductionRunForm
-              form={editForm}
-              onChange={setEditForm}
-              onSubmit={() => void saveEdit()}
+              key={editingRow.run.id}
+              initial={editingRow.run}
+              onSubmit={(form) => void saveEdit(form)}
               submitLabel={t('industry.saveProductionRun')}
             />
             {(editingRow.saleLinks.length > 0 || editingRow.orderWatches.length > 0) && (
@@ -295,26 +348,25 @@ export function ProductionRunsPanel({
       </Modal>
 
       <SaleLinkingModals sale={sale} />
-    </Panel>
+    </>
   );
 }
 
 interface ProductionRunFormProps {
   hint?: string;
-  form: RunForm;
-  onChange: (form: RunForm) => void;
-  onSubmit: () => void;
+  /**
+   * Seeds the fields once, on mount — the caller re-keys the form to start it
+   * over. The raw record rather than a prepared `RunForm`: formatting it here,
+   * inside the state initializer, keeps that work out of the panel's render.
+   */
+  initial: Pick<ProductionRunRecord, 'quantity' | 'materialCost' | 'jobFee'> | null;
+  onSubmit: (form: RunForm) => void;
   submitLabel: string;
 }
 
 /** Shared body for the "Log Production" and edit-run modals: the three cost/quantity fields plus a live total. */
-function ProductionRunForm({
-  hint,
-  form,
-  onChange,
-  onSubmit,
-  submitLabel,
-}: ProductionRunFormProps) {
+function ProductionRunForm({ hint, initial, onSubmit, submitLabel }: ProductionRunFormProps) {
+  const [form, onChange] = useState<RunForm>(() => (initial ? runForm(initial) : EMPTY_FORM));
   const { t } = useTranslation();
   const materialCost = unmaskNumber(form.materialCost) ?? 0;
   const jobFee = unmaskNumber(form.jobFee) ?? 0;
@@ -371,7 +423,7 @@ function ProductionRunForm({
           {formatIsk(materialCost + jobFee)}
         </span>
       </div>
-      <Button variant="primary" onClick={onSubmit} className="w-full justify-center">
+      <Button variant="primary" onClick={() => onSubmit(form)} className="w-full justify-center">
         {submitLabel}
       </Button>
     </div>

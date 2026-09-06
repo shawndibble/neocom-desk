@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { summarizeProductionRun } from './productionRunSummary';
+import { rollupProductionRuns, summarizeProductionRun } from './productionRunSummary';
 import type {
   ProductionOrderWatchRecord,
   ProductionRunRecord,
@@ -122,5 +122,26 @@ describe('summarizeProductionRun', () => {
       {}
     );
     expect(summary.quantitySold).toBe(4);
+  });
+});
+
+describe('rollupProductionRuns', () => {
+  const base = { saleLinks: [], orderWatches: [], quantitySold: 0, remaining: 0 };
+  const row = (status: 'new' | 'open' | 'closed', profit: number) =>
+    ({
+      ...base,
+      run: { id: status + profit } as never,
+      profit: { profit } as never,
+      status,
+      openInventoryValue: 0,
+    }) as never;
+
+  it('totals realized profit and counts runs still selling', () => {
+    const rollup = rollupProductionRuns([row('closed', 100), row('open', 20), row('new', 0)]);
+    expect(rollup).toEqual({ count: 3, realizedProfit: 120, openCount: 2 });
+  });
+
+  it('is zero for no runs', () => {
+    expect(rollupProductionRuns([])).toEqual({ count: 0, realizedProfit: 0, openCount: 0 });
   });
 });

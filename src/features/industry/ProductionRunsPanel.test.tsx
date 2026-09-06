@@ -95,6 +95,11 @@ async function chooseSoldMenuItem(user: ReturnType<typeof userEvent.setup>, item
   await user.click(await screen.findByRole('menuitem', { name: itemName }));
 }
 
+/** Unfolds the runs table, once its caret has arrived (rows load via useLiveQuery). */
+async function expandRuns(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Show production runs' }));
+}
+
 describe('ProductionRunsPanel', () => {
   it('shows the empty state with no logged runs', () => {
     renderPanel(null);
@@ -125,7 +130,9 @@ describe('ProductionRunsPanel', () => {
 
   it('renders a logged run as a table row with its snapshotted total cost', async () => {
     await addRun();
+    const user = userEvent.setup();
     renderPanel(null);
+    await expandRuns(user);
 
     const row = (await screen.findByRole('cell', { name: /^320,000$/ })).closest('tr');
     expect(row).not.toBeNull();
@@ -135,6 +142,7 @@ describe('ProductionRunsPanel', () => {
     await addRun();
     const user = userEvent.setup();
     renderPanel(null);
+    await expandRuns(user);
 
     await user.click(await screen.findByRole('cell', { name: /^320,000$/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit production run' });
@@ -166,6 +174,7 @@ describe('ProductionRunsPanel', () => {
     });
     const user = userEvent.setup();
     renderPanel(null);
+    await expandRuns(user);
 
     await user.click(await screen.findByRole('cell', { name: /^320,000$/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit production run' });
@@ -188,6 +197,7 @@ describe('ProductionRunsPanel', () => {
 
     const user = userEvent.setup();
     renderPanel(null);
+    await expandRuns(user);
 
     await user.click(await screen.findByRole('button', { name: 'Sold' }));
     await waitFor(() => screen.getByRole('button', { name: 'Link' }));
@@ -233,6 +243,7 @@ describe('ProductionRunsPanel', () => {
 
     const user = userEvent.setup();
     renderPanel(null);
+    await expandRuns(user);
 
     await user.click(await screen.findByRole('button', { name: 'Sold' }));
 
@@ -253,6 +264,7 @@ describe('ProductionRunsPanel', () => {
 
     const user = userEvent.setup();
     renderPanel(null);
+    await expandRuns(user);
     await screen.findByRole('button', { name: 'Sold' });
 
     await chooseSoldMenuItem(user, 'Watch Open Order');
@@ -294,6 +306,7 @@ describe('ProductionRunsPanel', () => {
     await addRun();
     const user = userEvent.setup();
     renderPanel(null);
+    await expandRuns(user);
     await screen.findByRole('button', { name: 'Sold' });
 
     await chooseSoldMenuItem(user, 'Manual / Private Sale');
@@ -309,5 +322,33 @@ describe('ProductionRunsPanel', () => {
     const link = (await db.productionSaleLinks.toArray())[0];
     expect(link.transactionId).toBeUndefined();
     expect(link).toMatchObject({ runId: 'run-1', quantity: 3, unitPrice: 80_000 });
+  });
+
+  it('opens the Log Production dialog on a bumped logRequest, without clicking', async () => {
+    const { rerender } = render(
+      <ProductionRunsPanel
+        characterId={CHARACTER_ID}
+        buildPlanId={BUILD_PLAN_ID}
+        defaults={null}
+        productTypeID={PRODUCT_TYPE_ID}
+        productName="Rifter"
+        skills={{}}
+        logRequest={0}
+      />
+    );
+
+    rerender(
+      <ProductionRunsPanel
+        characterId={CHARACTER_ID}
+        buildPlanId={BUILD_PLAN_ID}
+        defaults={null}
+        productTypeID={PRODUCT_TYPE_ID}
+        productName="Rifter"
+        skills={{}}
+        logRequest={1}
+      />
+    );
+
+    expect(await screen.findByRole('button', { name: 'Save run' })).toBeVisible();
   });
 });

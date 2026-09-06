@@ -210,6 +210,7 @@ here — they go one per file in `docs/context/decisions/`.
   the most urgent entry that depends on it — the plan's banded view and the
   optimizer's "suggest full reorder" both key off this effective value, not
   each entry's own raw setting.
+- **Plan Setup**: The folded block of a Build Plan's inputs — runs, ME/TE, build location, facility, rig, tax, trade hub, material price basis — read as a row of chips until "Edit setup" opens the controls. The same fields as before; only their default visibility changed (see docs/context/decisions, 2026-09-06 verdict-first).
 - **Production Log**: The cross-plan, cross-item realized-profit rollup
   (issue #525) — every **Production Run** the character has logged,
   regardless of which Build Plan it came from, grouped by item. Distinct
@@ -330,6 +331,7 @@ here — they go one per file in `docs/context/decisions/`.
   (which counts owned units as free) against what those units would net if
   liquidated, on a chosen **Liquidation Basis**. Only exists when something is
   owned; no verdict at all when an owned material has no price on that side.
+- **Verdict Hero**: The first panel of a Build Plan: net profit as one large figure, the margin / ISK-hour / duration / break-even line under it, and the Acquisition Verdict, Sale Profitability and Use-or-Sell Check as three labelled pills. It owns the Calculation Breakdown; the "Costs & revenue" ledger beside the materials holds the working.
 - **Liquidation Basis**: How owned materials would be turned into ISK in the
   **Use-or-Sell Check** — `instant` (fill the hub's standing buy orders: sales
   tax only, since filling an order lists nothing) or `order` (list your own

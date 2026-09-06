@@ -95,7 +95,16 @@ async function addRun(overrides: Partial<Parameters<typeof db.productionRuns.add
   });
 }
 
-function runsTable() {
+/**
+ * Unfolds "All production runs" if still folded, then returns the table.
+ * Idempotent across repeat calls in one test: once expanded the caret reads
+ * "Hide…", so a later call is a no-op rather than re-folding it.
+ */
+async function runsTable() {
+  const toggle = await screen.findByRole('button', { name: /all production runs/i });
+  if (toggle.getAttribute('aria-label')?.startsWith('Show')) {
+    await userEvent.click(toggle);
+  }
   return screen.findByRole('table', { name: 'All production runs' });
 }
 
@@ -276,6 +285,7 @@ describe('ProductionLogPanel', () => {
     render(
       <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
     );
+    await runsTable();
 
     await user.click(await screen.findByRole('button', { name: 'Sold' }));
     await waitFor(() => screen.getByRole('button', { name: 'Link' }));

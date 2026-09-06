@@ -117,3 +117,34 @@ export function activityI18nKey(activityId: number): string {
   const name = ACTIVITY_NAMES[activityId];
   return name ? `industry.activity.${name}` : 'industry.activity.unknown';
 }
+
+/** The one-line read of a job list: how many still run, how many finished, and which finishes next. */
+export interface JobsSummary<T> {
+  running: number;
+  done: number;
+  /** The unfinished job ending soonest, or null when nothing is still running. */
+  next: { job: T; seconds: number } | null;
+}
+
+/**
+ * Collapses a job list to what the panel's closed strip says. Sorts itself
+ * rather than trusting the caller's order, so `next` is right whatever
+ * order the rows arrive in.
+ */
+export function summarizeJobs<T extends Pick<IndustryJob, 'end_date'>>(
+  jobs: readonly T[],
+  nowMs: number
+): JobsSummary<T> {
+  let running = 0;
+  let done = 0;
+  let next: JobsSummary<T>['next'] = null;
+  for (const job of sortJobsBySoonest(jobs)) {
+    if (isJobDone(job, nowMs)) {
+      done += 1;
+      continue;
+    }
+    running += 1;
+    if (next === null) next = { job, seconds: secondsRemaining(job, nowMs) };
+  }
+  return { running, done, next };
+}
