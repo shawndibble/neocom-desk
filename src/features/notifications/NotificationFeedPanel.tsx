@@ -24,6 +24,7 @@ import { db } from '@/db';
 import { Button, EmptyState, IconButton, Panel, buttonClassName } from '@/components/ui';
 import { Close } from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
+import { formatTimestamp } from '@/lib/timestamp';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { readFeed, dismissFeedEntries, type NotificationFeedEntry } from './feed';
 import { refreshAppBadge } from './appBadge';
@@ -235,7 +236,7 @@ function FiredAt({ firedAt }: { firedAt: number }) {
   return (
     <time
       dateTime={date.toISOString()}
-      title={date.toLocaleString()}
+      title={formatTimestamp(date)}
       className="shrink-0 pt-0.5 text-[0.6875rem] tabular-nums text-text-dim"
     >
       {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}

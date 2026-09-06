@@ -18,6 +18,7 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
+import { formatTimestamp } from '@/lib/timestamp';
 import { downloadCsv } from '@/lib/downloadCsv';
 import {
   transactionTotal,
@@ -84,7 +85,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
         id: 'date',
         header: t('wallet.date'),
         className: 'whitespace-nowrap text-text-dim',
-        render: (txn) => new Date(txn.date).toLocaleString(),
+        render: (txn) => formatTimestamp(new Date(txn.date)),
       },
       {
         id: 'item',

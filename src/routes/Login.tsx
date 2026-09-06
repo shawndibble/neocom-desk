@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/tabStyles';
 import { formatAge, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { formatIsk } from '@/lib/isk';
+import { formatTimestamp } from '@/lib/timestamp';
 
 const FEATURES: { icon: ComponentType<IconProps>; key: string }[] = [
   { icon: Skills, key: 'skills' },
@@ -62,7 +63,7 @@ export function Login() {
   // initializers run once on mount rather than every render.
   const [previewFetchedAt] = useState(() => new Date(Date.now() - 2 * MINUTE_MS));
   const [previewFinishDate] = useState(() =>
-    new Date(Date.now() + 4 * HOUR_MS + 12 * MINUTE_MS).toLocaleString()
+    formatTimestamp(new Date(Date.now() + 4 * HOUR_MS + 12 * MINUTE_MS))
   );
 
   // Bookmark/back-button case: a Character already exists, so the marketing
@@ -278,7 +279,7 @@ function PreviewNotification({
       </div>
       <time
         dateTime={firedAt.toISOString()}
-        title={firedAt.toLocaleString()}
+        title={formatTimestamp(firedAt)}
         className="shrink-0 pt-0.5 text-[0.6875rem] tabular-nums text-text-dim"
       >
         {formatAge(ageMs, t)}

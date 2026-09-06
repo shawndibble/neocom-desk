@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatAge, HOUR_MS, DAY_MS } from '@/lib/age';
+import { formatTimestamp } from '@/lib/timestamp';
 
 interface DataAgeBadgeProps {
   /** When the data was last fetched. */
@@ -56,7 +57,7 @@ export function DataAgeBadge({ date, note, dotOnly = false, className = '' }: Da
   const age = formatAge(ms, t);
   // `dotOnly` drops the age from the visible text but must not drop it
   // altogether — it moves to the front of the tooltip instead.
-  const title = [dotOnly ? age : null, date.toLocaleString(), note].filter(Boolean).join(' — ');
+  const title = [dotOnly ? age : null, formatTimestamp(date), note].filter(Boolean).join(' — ');
 
   return (
     <time

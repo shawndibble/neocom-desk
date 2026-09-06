@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import { formatTimestamp } from '@/lib/timestamp';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -154,7 +155,7 @@ describe('Clones', () => {
       screen.getAllByText('Jita IV - Moon 4 - Caldari Navy Assembly Plant').length
     ).toBeGreaterThan(1);
     expect(
-      screen.getByText(new Date('2025-06-01T00:00:00Z').toLocaleString(), { exact: false })
+      screen.getByText(formatTimestamp(new Date('2025-06-01T00:00:00Z')), { exact: false })
     ).toBeInTheDocument();
   });
 
