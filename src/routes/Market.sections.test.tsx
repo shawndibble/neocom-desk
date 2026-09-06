@@ -143,10 +143,13 @@ describe('Market top-level tabs', () => {
     await screen.findByRole('tab', { name: 'Market' });
 
     await user.click(screen.getByRole('tab', { name: 'Open' }));
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    // The fixture order has no problems, so it lands in the Healthy group,
+    // which starts folded — reveal it to see the row.
+    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
     expect(
-      within(screen.getByRole('table', { name: 'Open' })).getByText('Sell')
+      within(screen.getByRole('table', { name: 'Healthy · 1' })).getByText('Tritanium')
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sell' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'History' }));
     expect(await screen.findByText('expired')).toBeInTheDocument();
@@ -174,6 +177,8 @@ describe('Market top-level tabs', () => {
     await screen.findByRole('tab', { name: 'Market' });
 
     await user.click(screen.getByRole('tab', { name: 'Open' }));
+    // The fixture order is healthy, so it's folded until revealed.
+    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-selected', 'true');
@@ -184,6 +189,8 @@ describe('Market top-level tabs', () => {
     const user = userEvent.setup();
     render(<App />);
 
+    // The fixture order is healthy, so it's folded until revealed.
+    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
     const itemLink = await screen.findByRole('link', { name: 'Tritanium' });
     await user.click(itemLink);
 
@@ -220,11 +227,15 @@ describe('Market top-level tabs', () => {
 describe('Market Open Orders tab', () => {
   it('shows open orders directly via a ?section= deep link, with resolved item name', async () => {
     window.history.pushState({}, '', '/market?section=orders');
+    const user = userEvent.setup();
     render(<App />);
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    // The fixture order has no problems, so it lands in the Healthy group,
+    // which starts folded — reveal it to see the resolved item name.
+    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
     expect(
-      within(screen.getByRole('table', { name: 'Open' })).getByText('Sell')
+      within(screen.getByRole('table', { name: 'Healthy · 1' })).getByText('Tritanium')
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sell' })).toBeInTheDocument();
   });
 
   it('falls back to cached orders offline', async () => {
@@ -238,8 +249,12 @@ describe('Market Open Orders tab', () => {
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () => HttpResponse.error())
     );
     window.history.pushState({}, '', '/market?section=orders');
+    const user = userEvent.setup();
     render(<App />);
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
+    expect(
+      within(screen.getByRole('table', { name: 'Healthy · 1' })).getByText('Tritanium')
+    ).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
 
@@ -260,7 +275,16 @@ describe('Market Open Orders tab', () => {
     );
     window.history.pushState({}, '', '/market?section=orders');
     render(<App />);
-    expect(await screen.findByText('Log in again to see your orders')).toBeInTheDocument();
+    // The banner is now per character, since this page covers every selling
+    // character at once — title is prefixed with the character's name.
+    expect(
+      await screen.findByText('Pilot One — Log in again to see your orders')
+    ).toBeInTheDocument();
+    // NB: this currently fails — OpenOrdersPanel.tsx renders the reauth
+    // banner and the "no open orders cached" EmptyState unconditionally
+    // side by side (the old code was an if/else: reauth XOR empty/table).
+    // See the report for the fix this needs; not something this test file
+    // can paper over.
     expect(screen.queryByText(/no open orders cached/i)).not.toBeInTheDocument();
   });
 });
