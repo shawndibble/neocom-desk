@@ -80,7 +80,7 @@ const ROUTE_ELEMENTS = {
   '/market': <Market />,
   '/wallet': <Wallet />,
   '/wallet/loyalty/:corporationId': <LoyaltyStore />,
-  '/moon-mining-tax': <MoonMiningTax />,
+  '/moon-mining': <MoonMiningTax />,
   '/clones': <Clones />,
   '/planetary-industry': <PlanetaryIndustry />,
   '/employment-history': <EmploymentHistory />,

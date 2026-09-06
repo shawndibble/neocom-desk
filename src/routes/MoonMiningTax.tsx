@@ -230,6 +230,18 @@ export function MoonMiningTax() {
     return payeeName(dr.row.characterId, dr.assignment.payeeId);
   }
 
+  function systemName(dr: DisplayRow): string {
+    return data?.systemNames.get(dr.row.entry.solarSystemId) ?? `#${dr.row.entry.solarSystemId}`;
+  }
+
+  /** Both the table's Value column and the sole Assignment-less rows: an unassigned entry has no `estimatedValue` of its own, so it's priced live from its still-unclaimed ore lines instead. */
+  function estimatedValueOf(dr: DisplayRow): number {
+    return dr.assignment
+      ? dr.assignment.estimatedValue
+      : computeAssignmentValue(dr.row.unassignedOreLines, data?.unitPrices ?? new Map(), 0)
+          .estimatedValue;
+  }
+
   async function handleAssignFromDetail() {
     if (!detailTarget) return;
     setAssignTarget(detailTarget.row);
@@ -344,6 +356,7 @@ export function MoonMiningTax() {
             id: 'character',
             header: t('miningTax.characterColumn'),
             render: (dr: DisplayRow) => dr.row.characterName,
+            sortValue: (dr: DisplayRow) => dr.row.characterName,
           } satisfies DataTableColumn<DisplayRow>,
         ]
       : []),
@@ -357,27 +370,23 @@ export function MoonMiningTax() {
     {
       id: 'system',
       header: t('miningTax.systemColumn'),
-      render: (dr) =>
-        data?.systemNames.get(dr.row.entry.solarSystemId) ?? `#${dr.row.entry.solarSystemId}`,
+      render: (dr) => systemName(dr),
+      sortValue: (dr) => systemName(dr),
     },
     {
       id: 'payee',
       header: t('miningTax.payeeColumn'),
       className: 'whitespace-nowrap',
       render: (dr) => payeeDisplayName(dr),
+      sortValue: (dr) => payeeDisplayName(dr),
     },
     {
       id: 'value',
       header: t('miningTax.estimatedValueColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (dr) => {
-        const value = dr.assignment
-          ? dr.assignment.estimatedValue
-          : computeAssignmentValue(dr.row.unassignedOreLines, data?.unitPrices ?? new Map(), 0)
-              .estimatedValue;
-        return `${formatIsk(value, 2)} ISK`;
-      },
+      render: (dr) => `${formatIsk(estimatedValueOf(dr), 2)} ISK`,
+      sortValue: (dr) => estimatedValueOf(dr),
     },
     {
       id: 'taxOwed',
@@ -385,11 +394,13 @@ export function MoonMiningTax() {
       align: 'right',
       className: 'whitespace-nowrap',
       render: (dr) => (dr.assignment ? `${formatIsk(dr.assignment.taxOwed, 2)} ISK` : '—'),
+      sortValue: (dr) => dr.assignment?.taxOwed,
     },
     {
       id: 'status',
       header: t('miningTax.statusColumn'),
       render: (dr) => statusLabel(t, dr.status),
+      sortValue: (dr) => statusLabel(t, dr.status),
     },
     {
       id: 'edit',

@@ -199,7 +199,7 @@ export const ROUTE_REQUIREMENTS = {
   // reads (system names) and postUniverseNames (ore names) are PUBLIC and
   // listed for the same reason /assets lists its own: this table says what
   // the route actually calls.
-  '/moon-mining-tax': {
+  '/moon-mining': {
     endpoints: ['getCharacterMining', 'getUniverseSystem', 'postUniverseNames'],
     strings: 'miningTax',
   },

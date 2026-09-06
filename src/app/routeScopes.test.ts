@@ -85,7 +85,7 @@ describe('gated routes', () => {
       '/contacts',
       '/contracts',
       '/mail',
-      '/moon-mining-tax',
+      '/moon-mining',
       '/planetary-industry',
       '/wallet/loyalty/:corporationId',
     ]);

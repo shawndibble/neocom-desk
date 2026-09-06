@@ -95,10 +95,10 @@ const NAV_PATHS = [
   '/overview',
   '/skills',
   '/industry',
+  '/moon-mining',
+  '/planetary-industry',
   '/market',
   '/wallet',
-  '/moon-mining-tax',
-  '/planetary-industry',
   '/assets',
   '/mail',
   '/calendar',
@@ -322,9 +322,9 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           onClick={onClose}
         />
         <NavItem
-          to="/moon-mining-tax"
+          to="/moon-mining"
           label={t('nav.miningTax')}
-          locked={locked.has('/moon-mining-tax')}
+          locked={locked.has('/moon-mining')}
           onClick={onClose}
         />
         <NavItem
@@ -430,6 +430,11 @@ export function Layout() {
           <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
           <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
           <NavItem
+            to="/moon-mining"
+            label={t('nav.miningTax')}
+            locked={locked.has('/moon-mining')}
+          />
+          <NavItem
             to="/planetary-industry"
             label={t('nav.pi')}
             locked={locked.has('/planetary-industry')}
@@ -440,11 +445,6 @@ export function Layout() {
               isn't Character-scoped. */}
           <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
           <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
-          <NavItem
-            to="/moon-mining-tax"
-            label={t('nav.miningTax')}
-            locked={locked.has('/moon-mining-tax')}
-          />
           <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
           <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
           <NavGroupLabel>{t('nav.groups.social')}</NavGroupLabel>

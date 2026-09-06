@@ -239,35 +239,27 @@ export function AssignDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="space-y-1">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              {/* Narrow and fixed: a tax rate is a percentage, realistically
+                  2 digits (rarely a decimal), so it never needs the room the
+                  two ISK fields do. */}
+              <div className="space-y-1 sm:w-16 sm:shrink-0">
                 <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('miningTax.taxPctLabel')}
                 </p>
-                <div className="relative">
-                  <TextInput
-                    type="number"
-                    min={0}
-                    max={100}
-                    step="0.1"
-                    value={taxPct}
-                    onChange={(e) => setTaxPct(e.target.value)}
-                    aria-label={t('miningTax.taxPctLabel')}
-                    className="pr-6"
-                  />
-                  {/* `5` not `0.05` — a bare number field gives no hint which
-                      scale it wants, so this pins the unit visibly rather
-                      than leaving it to the label alone. */}
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-xs text-text-dim"
-                  >
-                    %
-                  </span>
-                </div>
+                <TextInput
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  value={taxPct}
+                  onChange={(e) => setTaxPct(e.target.value)}
+                  aria-label={t('miningTax.taxPctLabel')}
+                  className="w-full"
+                />
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-0 space-y-1 sm:flex-1">
                 <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('miningTax.estimatedValueLabel')}
                 </p>
@@ -282,10 +274,11 @@ export function AssignDialog({
                   }
                   onChange={(e) => setEstimatedValueOverride(e.target.value)}
                   aria-label={t('miningTax.estimatedValueLabel')}
+                  className="w-full"
                 />
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-0 space-y-1 sm:flex-1">
                 <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('miningTax.taxOwedLabel')}
                 </p>
@@ -298,6 +291,7 @@ export function AssignDialog({
                   }
                   onChange={(e) => setTaxOwedOverride(e.target.value)}
                   aria-label={t('miningTax.taxOwedLabel')}
+                  className="w-full"
                 />
               </div>
             </div>
