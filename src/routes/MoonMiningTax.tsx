@@ -42,7 +42,6 @@ import {
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
-import { AssignDialog } from '@/features/miningTax/AssignDialog';
 import { BulkPayConfirmDialog } from '@/features/miningTax/BulkPayConfirmDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
@@ -142,7 +141,6 @@ export function MoonMiningTax() {
   const [characterFilter, setCharacterFilter] = useState<ReadonlySet<number> | 'all'>('all');
   const [statusFilter, setStatusFilter] =
     useState<ReadonlySet<MiningTaxRowStatus>>(DEFAULT_STATUSES);
-  const [assignTarget, setAssignTarget] = useState<MoonMiningTaxRow | null>(null);
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
   const [bulkPaySelection, setBulkPaySelection] = useState<ReadonlySet<string>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
@@ -268,10 +266,10 @@ export function MoonMiningTax() {
           .estimatedValue;
   }
 
-  async function handleAssignFromDetail() {
-    if (!detailTarget) return;
-    setAssignTarget(detailTarget.row);
+  /** The Assign form's create-or-edit submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
+  function handleAssignedFromDetail() {
     setDetailTarget(null);
+    refresh();
   }
 
   async function handleDismissFromDetail() {
@@ -668,22 +666,6 @@ export function MoonMiningTax() {
         </>
       )}
 
-      {assignTarget && data && (
-        <AssignDialog
-          open={assignTarget !== null}
-          onClose={() => setAssignTarget(null)}
-          row={assignTarget}
-          payees={data.payeesByCharacter.get(assignTarget.characterId) ?? []}
-          systemName={
-            data.systemNames.get(assignTarget.entry.solarSystemId) ??
-            `#${assignTarget.entry.solarSystemId}`
-          }
-          typeNames={data.typeNames}
-          unitPrices={data.unitPrices}
-          onAssigned={refresh}
-        />
-      )}
-
       {payeeManagerCharacterId !== null && (
         <PayeeManagerDialog
           open={payeeManagerCharacterId !== null}
@@ -709,9 +691,10 @@ export function MoonMiningTax() {
           systemSecurity={data.systemSecurity.get(detailTarget.row.entry.solarSystemId)}
           typeNames={data.typeNames}
           payeeDisplayName={payeeDisplayName(detailTarget)}
+          payees={data.payeesByCharacter.get(detailTarget.row.characterId) ?? []}
           unitPrices={data.unitPrices}
           busy={busy}
-          onAssign={() => void handleAssignFromDetail()}
+          onAssigned={handleAssignedFromDetail}
           onDismiss={() => void handleDismissFromDetail()}
           onMarkPaid={() => void handleMarkPaidFromDetail()}
           onResolve={() => void handleResolveFromDetail()}

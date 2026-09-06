@@ -93,6 +93,42 @@ export async function dismissEntry(input: DismissInput): Promise<MiningTaxAssign
   return record;
 }
 
+export interface UpdateAssignmentInput {
+  payeeId: string;
+  taxPct: number;
+  estimatedValue: number;
+  taxOwed: number;
+}
+
+/**
+ * Edits an existing Assignment's Payee/tax %/value/tax owed from the row
+ * detail view — the same four fields the Assign form itself collects, now
+ * correctable after the fact (a Jita price or a Payee's rate can turn out
+ * wrong after the invoice moment `createAssignment` snapshotted).
+ *
+ * Deliberately leaves two things alone: `oreLines`, since line membership is
+ * what the sole-vs-split ownership rule (`rowStatus.ts`) keys off — resplitting
+ * a record happens through Undo + a fresh Assign, not this edit — and
+ * `status`/`paidAt`, so correcting a Paid record's ISK doesn't silently
+ * un-pay it.
+ */
+export async function updateAssignment(
+  assignment: MiningTaxAssignmentRecord,
+  input: UpdateAssignmentInput
+): Promise<MiningTaxAssignmentRecord> {
+  const updated: MiningTaxAssignmentRecord = {
+    ...assignment,
+    payeeId: input.payeeId,
+    taxPct: input.taxPct,
+    estimatedValue: input.estimatedValue,
+    taxOwed: input.taxOwed,
+    updatedAt: Date.now(),
+  };
+  await db.miningTaxAssignments.put(updated);
+  scheduleSync(assignment.characterId);
+  return updated;
+}
+
 /**
  * Marks several Assignments paid at once — the itemized bulk-pay confirmation
  * commits through this. Never a single blind "mark all paid": the caller is

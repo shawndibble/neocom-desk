@@ -7,6 +7,7 @@ import {
   dismissEntry,
   markAssignmentsPaid,
   resolveNeedsReview,
+  updateAssignment,
 } from './assignments';
 
 const syncMock = vi.hoisted(() => ({
@@ -90,6 +91,40 @@ describe('createAssignment', () => {
 
     expect(assignment.status).toBe('paid');
     expect(assignment.paidAt).toBeDefined();
+  });
+});
+
+describe('updateAssignment', () => {
+  it('overwrites payeeId/taxPct/estimatedValue/taxOwed, leaving oreLines, status and paidAt untouched', async () => {
+    const assignment = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: true,
+    });
+    vi.clearAllMocks();
+
+    const updated = await updateAssignment(assignment, {
+      payeeId: 'payee-2',
+      taxPct: 15,
+      estimatedValue: 1200,
+      taxOwed: 180,
+    });
+
+    expect(updated.payeeId).toBe('payee-2');
+    expect(updated.taxPct).toBe(15);
+    expect(updated.estimatedValue).toBe(1200);
+    expect(updated.taxOwed).toBe(180);
+    expect(updated.oreLines).toEqual(assignment.oreLines);
+    expect(updated.status).toBe('paid');
+    expect(updated.paidAt).toBe(assignment.paidAt);
+    expect(await db.miningTaxAssignments.get(assignment.id)).toEqual(updated);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
   });
 });
 
