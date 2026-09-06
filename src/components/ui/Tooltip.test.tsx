@@ -102,27 +102,6 @@ describe('Tooltip touch support', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('dismisses on its own a short while after a long-press reveal', () => {
-    vi.useFakeTimers();
-    render(
-      <Tooltip content="One-line explanation.">
-        <button type="button">Trigger</button>
-      </Tooltip>
-    );
-    const trigger = screen.getByRole('button', { name: 'Trigger' });
-
-    fireEvent.touchStart(trigger);
-    act(() => {
-      vi.advanceTimersByTime(500);
-    });
-    expect(screen.getByRole('tooltip')).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(1500);
-    });
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
-  });
-
   it('dismisses when tapping outside the trigger/tooltip', () => {
     vi.useFakeTimers();
     render(
@@ -152,7 +131,7 @@ describe('Tooltip touch support', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
-  it('resets the auto-dismiss window on a second long-press, instead of closing on the first one’s stale timer', () => {
+  it('keeps a long-press-revealed tooltip up until something dismisses it, with no timeout', () => {
     vi.useFakeTimers();
     render(
       <Tooltip content="One-line explanation.">
@@ -163,27 +142,187 @@ describe('Tooltip touch support', () => {
 
     fireEvent.touchStart(trigger);
     act(() => {
-      vi.advanceTimersByTime(500); // t=500: revealed, first auto-dismiss would fire at t=2000
+      vi.advanceTimersByTime(500);
     });
     fireEvent.touchEnd(trigger);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
+    // Reading time is the reader's — only an explicit dismissal closes it.
     act(() => {
-      vi.advanceTimersByTime(500); // t=1000
+      vi.advanceTimersByTime(60_000);
     });
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+  });
+
+  it('still reveals when the finger only drifts a pixel or two during the hold', () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="One-line explanation.">
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchMove(trigger, { touches: [{ clientX: 103, clientY: 102 }] });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+  });
+
+  it('drops a pending long press when the browser cancels the touch', () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="One-line explanation.">
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
     fireEvent.touchStart(trigger);
+    fireEvent.touchCancel(trigger);
     act(() => {
-      vi.advanceTimersByTime(500); // t=1500: second reveal, resets auto-dismiss to fire at t=3000
+      vi.advanceTimersByTime(500);
     });
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('cancels the reveal once the finger really drags, so a scroll is not a long press', () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="One-line explanation.">
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchMove(trigger, { touches: [{ clientX: 100, clientY: 160 }] });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+});
+
+describe('Tooltip tap-to-open', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reveals on a plain tap, with no hold, when openOnTap is set', () => {
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
+  });
+
+  it('hides again on the next tap of the same trigger', () => {
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    vi.useFakeTimers();
+    fireEvent.pointerDown(trigger, { pointerType: 'touch' });
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
+    // The real event order on a touch device: `pointerdown` lands first, and
+    // Radix dismisses the bubble on it. The second tap still has to read as
+    // "close", not re-open.
     act(() => {
-      vi.advanceTimersByTime(500); // t=2000: first press's stale timer must not fire here
+      vi.advanceTimersByTime(0); // let DismissableLayer attach its outside listener
     });
+    fireEvent.pointerDown(trigger, { pointerType: 'touch' });
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('closes on Escape, so a timeout-free bubble is still dismissable', () => {
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('does not reveal when the browser cancels the touch, e.g. to scroll', () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger);
+    fireEvent.touchCancel(trigger);
     act(() => {
-      vi.advanceTimersByTime(1000); // t=3000: second press's own auto-dismiss fires
+      vi.advanceTimersByTime(500);
     });
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('does not reveal when the touch was a drag rather than a tap', () => {
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchMove(trigger, { touches: [{ clientX: 100, clientY: 160 }] });
+    fireEvent.touchEnd(trigger);
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+});
+
+describe('Tooltip multi-touch', () => {
+  it('ignores a second finger instead of reading it as a tap on the trigger', () => {
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchStart(trigger, {
+      touches: [
+        { clientX: 100, clientY: 100 },
+        { clientX: 200, clientY: 200 },
+      ],
+    });
+    // First finger lifts, second still down — not a completed tap.
+    fireEvent.touchEnd(trigger, { touches: [{ clientX: 200, clientY: 200 }] });
+
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 });
@@ -197,5 +336,42 @@ describe('InfoTooltip', () => {
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip).toHaveTextContent('Reduces material use.');
     expect(trigger).toHaveAttribute('aria-describedby', tooltip.id);
+  });
+
+  it('reveals its tooltip on a single tap — an explain-only icon needs no hold', () => {
+    render(<InfoTooltip label="About Material Efficiency" content="Reduces material use." />);
+    const trigger = screen.getByRole('button', { name: 'About Material Efficiency' });
+
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Reduces material use.');
+  });
+
+  it('gives the tap back to the click action when it has one, keeping long-press for the tooltip', () => {
+    vi.useFakeTimers();
+    const onClick = vi.fn();
+    render(
+      <InfoTooltip
+        label="About Material Efficiency"
+        content="Reduces material use."
+        onClick={onClick}
+        aria-haspopup="dialog"
+      />
+    );
+    const trigger = screen.getByRole('button', { name: 'About Material Efficiency' });
+
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+    fireEvent.click(trigger);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    fireEvent.touchStart(trigger);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Reduces material use.');
+    vi.useRealTimers();
   });
 });

@@ -205,7 +205,7 @@ export function Contracts() {
         render: (contract) => {
           const label = t(CONTRACT_STATUS_KEY[contract.status]);
           return isStale(contract) ? (
-            <Tooltip content={t('contracts.staleTooltip')}>
+            <Tooltip content={t('contracts.staleTooltip')} openOnTap>
               <span>{label}</span>
             </Tooltip>
           ) : (
