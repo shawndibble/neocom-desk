@@ -782,6 +782,12 @@
     "ignoreOreAction": "Ignore",
     "allCharacters": "All characters",
     "charactersSelected": "{{count}} character(s)",
+    "allPayees": "All payees",
+    "payeesSelected": "{{count}} payee(s)",
+    "payeeOptionWithCharacter": "{{payee}} ({{character}})",
+    "owedToPayeeLabel": "Owed to {{payee}}",
+    "owedToPayeesLabel": "Owed to {{count}} payees",
+    "selectOwedForBulkPay": "Select {{count}} for bulk pay",
     "statusFilterLabel": "Status ({{count}})",
     "status": {
       "unassigned": "Unassigned",

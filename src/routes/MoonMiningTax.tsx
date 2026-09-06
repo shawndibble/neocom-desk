@@ -10,7 +10,6 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   EmptyState,
-  FilterChip,
   IconButton,
   PageHeader,
   Panel,
@@ -139,6 +138,7 @@ export function MoonMiningTax() {
   );
 
   const [characterFilter, setCharacterFilter] = useState<ReadonlySet<number> | 'all'>('all');
+  const [payeeFilter, setPayeeFilter] = useState<ReadonlySet<string> | 'all'>('all');
   const [statusFilter, setStatusFilter] =
     useState<ReadonlySet<MiningTaxRowStatus>>(DEFAULT_STATUSES);
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
@@ -163,11 +163,35 @@ export function MoonMiningTax() {
     [allDisplayRows, characterFilter]
   );
 
+  // Every Payee across every tracked character, so the filter dropdown lists
+  // them all regardless of the Character filter above — "who do I owe" is a
+  // question about Payees, not about which alt mined it.
+  const allPayees = useMemo(() => {
+    const seen = new Map<string, PayeeRecord>();
+    for (const payees of data?.payeesByCharacter.values() ?? []) {
+      for (const payee of payees) seen.set(payee.id, payee);
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [data]);
+
+  // Filtering "by Payee" only makes sense for rows that already have one —
+  // an unassigned or dismissed row has no Payee to match, so it drops out as
+  // soon as a specific Payee is selected.
+  const payeeFiltered = useMemo(
+    () =>
+      payeeFilter === 'all'
+        ? characterFiltered
+        : characterFiltered.filter(
+            (dr) => dr.assignment?.payeeId !== undefined && payeeFilter.has(dr.assignment.payeeId)
+          ),
+    [characterFiltered, payeeFilter]
+  );
+
   const statusCounts = useMemo(() => {
     const counts = new Map<MiningTaxRowStatus, number>();
-    for (const dr of characterFiltered) counts.set(dr.status, (counts.get(dr.status) ?? 0) + 1);
+    for (const dr of payeeFiltered) counts.set(dr.status, (counts.get(dr.status) ?? 0) + 1);
     return counts;
-  }, [characterFiltered]);
+  }, [payeeFiltered]);
 
   // Across every status, deliberately unfiltered by the status chips below:
   // "how much have I mined and what do I owe" shouldn't change just because
@@ -175,19 +199,23 @@ export function MoonMiningTax() {
   const totals = useMemo(() => {
     let estimatedMined = 0;
     let taxOwed = 0;
+    let unpaidTaxOwed = 0;
     let unpaidCount = 0;
-    for (const dr of characterFiltered) {
+    for (const dr of payeeFiltered) {
       estimatedMined += estimatedValueOf(dr);
       if (dr.assignment) taxOwed += dr.assignment.taxOwed;
-      if (dr.status === 'outstanding') unpaidCount += 1;
+      if (dr.status === 'outstanding') {
+        unpaidCount += 1;
+        unpaidTaxOwed += dr.assignment?.taxOwed ?? 0;
+      }
     }
-    return { estimatedMined, taxOwed, unpaidCount };
+    return { estimatedMined, taxOwed, unpaidTaxOwed, unpaidCount };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [characterFiltered, data]);
+  }, [payeeFiltered, data]);
 
   const visibleRows = useMemo(
-    () => characterFiltered.filter((dr) => statusFilter.has(dr.status)),
-    [characterFiltered, statusFilter]
+    () => payeeFiltered.filter((dr) => statusFilter.has(dr.status)),
+    [payeeFiltered, statusFilter]
   );
 
   function toggleStatus(status: MiningTaxRowStatus) {
@@ -207,6 +235,23 @@ export function MoonMiningTax() {
       else base.add(characterId);
       return base.size === characters.length ? 'all' : base;
     });
+  }
+
+  function togglePayee(payeeId: string) {
+    setPayeeFilter((previous) => {
+      const base = previous === 'all' ? new Set(allPayees.map((p) => p.id)) : new Set(previous);
+      if (base.has(payeeId)) base.delete(payeeId);
+      else base.add(payeeId);
+      return base.size === allPayees.length ? 'all' : base;
+    });
+  }
+
+  /** "Pay them in one lump sum": select every currently-unpaid Assignment for the filtered Payee(s), ready for the existing bulk-pay flow. */
+  function selectOwedForBulkPay() {
+    const keys = payeeFiltered
+      .filter((dr) => dr.status === 'outstanding' && dr.assignment)
+      .map((dr) => dr.key);
+    setBulkPaySelection(new Set(keys));
   }
 
   async function handleTagAsMoonOre(typeId: number) {
@@ -325,7 +370,7 @@ export function MoonMiningTax() {
 
   const bulkPayRows = useMemo(
     () =>
-      visibleRows
+      allDisplayRows
         .filter(
           (dr) => dr.status === 'outstanding' && dr.assignment && bulkPaySelection.has(dr.key)
         )
@@ -335,7 +380,7 @@ export function MoonMiningTax() {
           payeeName: payeeName(dr.row.characterId, dr.assignment?.payeeId),
         })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [visibleRows, bulkPaySelection, data]
+    [allDisplayRows, bulkPaySelection, data]
   );
 
   // The Character column only earns its place when more than one character
@@ -610,6 +655,37 @@ export function MoonMiningTax() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {allPayees.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm">
+                    {payeeFilter === 'all'
+                      ? t('miningTax.allPayees')
+                      : t('miningTax.payeesSelected', { count: payeeFilter.size })}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {allPayees.map((p) => (
+                    <DropdownMenuCheckboxItem
+                      key={p.id}
+                      checked={payeeFilter === 'all' || payeeFilter.has(p.id)}
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={() => togglePayee(p.id)}
+                    >
+                      {characters.length > 1
+                        ? t('miningTax.payeeOptionWithCharacter', {
+                            payee: p.name,
+                            character:
+                              characters.find((c) => c.characterId === p.characterId)
+                                ?.characterName ?? '',
+                          })
+                        : p.name}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm">
@@ -624,28 +700,47 @@ export function MoonMiningTax() {
                     onSelect={(e) => e.preventDefault()}
                     onCheckedChange={() => toggleStatus(status)}
                   >
-                    {statusLabel(t, status)}
+                    {statusLabel(t, status)} ({statusCounts.get(status) ?? 0})
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {ALL_STATUSES.map((status) => (
-              <FilterChip
-                key={status}
-                label={statusLabel(t, status)}
-                count={statusCounts.get(status) ?? 0}
-                selected={statusFilter.has(status)}
-                onToggle={() => toggleStatus(status)}
-              />
-            ))}
-
-            {bulkPaySelection.size > 0 && (
+            {bulkPayRows.length > 0 && (
               <Button size="sm" variant="primary" onClick={() => setBulkPayOpen(true)}>
-                {t('miningTax.bulkPayAction', { count: bulkPaySelection.size })}
+                {t('miningTax.bulkPayAction', { count: bulkPayRows.length })}
               </Button>
             )}
           </div>
+
+          {payeeFilter !== 'all' && (
+            <Panel>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {payeeFilter.size === 1
+                      ? t('miningTax.owedToPayeeLabel', {
+                          payee: allPayees.find((p) => payeeFilter.has(p.id))?.name ?? '',
+                        })
+                      : t('miningTax.owedToPayeesLabel', { count: payeeFilter.size })}
+                  </p>
+                  <p
+                    className={cx(
+                      'text-lg font-medium tabular-nums',
+                      totals.unpaidTaxOwed > 0 && 'text-danger'
+                    )}
+                  >
+                    {formatIsk(totals.unpaidTaxOwed, 2)} ISK
+                  </p>
+                </div>
+                {totals.unpaidCount > 0 && (
+                  <Button size="sm" onClick={selectOwedForBulkPay}>
+                    {t('miningTax.selectOwedForBulkPay', { count: totals.unpaidCount })}
+                  </Button>
+                )}
+              </div>
+            </Panel>
+          )}
 
           {visibleRows.length === 0 ? (
             <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
