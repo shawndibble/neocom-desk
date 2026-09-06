@@ -23,6 +23,7 @@ import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshot } from './marketData';
+import { materialPricesFor } from './priceBasis';
 import { buildPlanTypeIds } from './recipes';
 
 export interface ComparedBuildRow {
@@ -95,6 +96,7 @@ async function computeRow(
       systemCostIndex: snapshot.systemCostIndex ?? 0,
       adjustedPrices: snapshot.adjustedPrices ?? {},
       hubPrices: snapshot.hubPrices,
+      materialPrices: materialPricesFor(snapshot, plan.materialPriceBasis),
       skills,
     });
     return { ...base, result, error };
