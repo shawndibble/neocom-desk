@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -92,12 +92,15 @@ describe('OrderDetailModal', () => {
     };
     renderModal({ row });
 
-    expect(screen.getByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
+    // The dialog is named for the character as well as the item — several
+    // characters can hold an order on the same thing.
+    expect(screen.getByRole('dialog', { name: 'Alpha · Tritanium' })).toBeInTheDocument();
     expect(screen.getByText('Quick answer')).toBeInTheDocument();
+    // With a floor in hand the quick answer is the call itself, not the
+    // badge's generic explanation.
+    expect(screen.getByText('Raise the price')).toBeInTheDocument();
     expect(
-      screen.getByText(
-        'Your price is under what this cost you plus the fees, so selling it loses ISK.'
-      )
+      screen.getByText(/sells 200.00 ISK a unit under what it cost you plus the fees/)
     ).toBeInTheDocument();
     expect(screen.getByText('-28.6%')).toBeInTheDocument();
   });
@@ -469,11 +472,9 @@ describe('OrderDetailModal', () => {
       };
       renderModal({ history });
 
-      // Scoped to the "Sells out in" chip itself — "60d" elsewhere on the
-      // modal (BASE_ROW's own expiresIn chip) is a different stat entirely.
-      const chip = screen
-        .getByText('Sells out in')
-        .closest('span[class*="inline-flex"]') as HTMLElement;
+      // Scoped to the "Sells out in" card itself — "60d" elsewhere on the
+      // modal (BASE_ROW's own expiry card) is a different stat entirely.
+      const chip = screen.getByText('Sells out in').closest('div') as HTMLElement;
       expect(within(chip).getByText('Nothing has sold in the last 30 days')).toBeInTheDocument();
       expect(within(chip).queryByText(/^\d+d$/)).not.toBeInTheDocument();
     });
@@ -525,6 +526,89 @@ describe('OrderDetailModal', () => {
       renderModal({ row, history, deep });
 
       expect(screen.getByText('7d')).toBeInTheDocument();
+    });
+  });
+
+  describe('quick answer, exits and rank', () => {
+    const UNDERCUT_ROW: OpenOrderRow = {
+      ...BASE_ROW,
+      problem: 'undercutStation',
+      problems: ['undercutStation'],
+      worstScope: 'station',
+      station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
+    };
+
+    it('falls back to the badge advice when there is no floor to judge against', () => {
+      renderModal({ row: UNDERCUT_ROW, stationChecked: true });
+
+      expect(screen.getByText('React if you can stay above your floor.')).toBeInTheDocument();
+      expect(screen.queryByText('Let this one go')).not.toBeInTheDocument();
+      // And the exits card says why it has nothing to offer.
+      expect(
+        screen.getByText('Link a build and we can price the ways out of this order.')
+      ).toBeInTheDocument();
+    });
+
+    it('calls it once a floor exists, and prices the exits', () => {
+      const row: OpenOrderRow = { ...UNDERCUT_ROW, floor: { relist: 480, fill: 470 } };
+      renderModal({ row, stationChecked: true });
+
+      expect(screen.getByText('Let this one go')).toBeInTheDocument();
+      // Holding nets price - fill; matching nets rival price - relist.
+      expect(screen.getByText('Hold at 500.00')).toBeInTheDocument();
+      expect(screen.getByText('+30.00 / unit')).toBeInTheDocument();
+      expect(screen.getByText('Match the station at 450.00')).toBeInTheDocument();
+      expect(screen.getByText('-30.00 / unit')).toBeInTheDocument();
+    });
+
+    it('names hauling and reprocessing as not built rather than estimating them', () => {
+      renderModal({ row: UNDERCUT_ROW, stationChecked: true });
+
+      expect(screen.getByText('Haul to another trade hub')).toBeInTheDocument();
+      expect(screen.getByText('Reprocess and sell the minerals')).toBeInTheDocument();
+    });
+
+    it('ranks my price at my station from a complete book, and not from a truncated one', () => {
+      const competitors = [
+        {
+          orderId: 101,
+          price: 500,
+          locationId: 60003760,
+          systemId: 30000142,
+          volumeRemain: 10,
+          isBuyOrder: false,
+        },
+        {
+          orderId: 2,
+          price: 450,
+          locationId: 60003760,
+          systemId: 30000142,
+          volumeRemain: 5,
+          isBuyOrder: false,
+        },
+        {
+          orderId: 3,
+          price: 460,
+          locationId: 60003760,
+          systemId: 30000142,
+          volumeRemain: 5,
+          isBuyOrder: false,
+        },
+      ];
+      renderModal({
+        row: UNDERCUT_ROW,
+        stationChecked: true,
+        deep: { competitors, truncated: false, fetchedAt: Date.now() },
+      });
+      expect(screen.getByText('Rank 3 of 3 at this station')).toBeInTheDocument();
+
+      cleanup();
+      renderModal({
+        row: UNDERCUT_ROW,
+        stationChecked: true,
+        deep: { competitors, truncated: true, fetchedAt: Date.now() },
+      });
+      expect(screen.queryByText(/Rank \d+ of/)).not.toBeInTheDocument();
     });
   });
 });

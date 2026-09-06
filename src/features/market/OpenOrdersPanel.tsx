@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  Caret,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -248,6 +249,10 @@ export function OpenOrdersPanel() {
   const [filter, setFilter] = useState<OpenOrdersFilter>(DEFAULT_FILTER);
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<OrderProblem>>(
+    () => new Set()
+  );
   const [deepByKey, setDeepByKey] = useState<Map<string, RegionCompetition>>(new Map());
   const [deepLoadingKeys, setDeepLoadingKeys] = useState<ReadonlySet<string>>(new Set());
   const [jumpsByPair, setJumpsByPair] = useState<Map<string, JumpsAwayResult>>(new Map());
@@ -862,68 +867,103 @@ export function OpenOrdersPanel() {
             <EmptyState title={t('orders.noResults')} className="py-8" />
           ) : (
             groups.map((group) => {
-              const folded = group.problem === 'healthy' && filter.hideHealthy;
+              // Healthy folds through `hideHealthy` rather than
+              // `collapsedGroups`: that flag is also what the "N of M orders
+              // match" count reads, so two mechanisms would let the caret and
+              // the count disagree about whether healthy orders are showing.
+              const folded =
+                group.problem === 'healthy'
+                  ? filter.hideHealthy
+                  : collapsedGroups.has(group.problem);
+              const toggle = () => {
+                if (group.problem === 'healthy') {
+                  setFilter({ ...filter, hideHealthy: !filter.hideHealthy });
+                  return;
+                }
+                setCollapsedGroups((was) => {
+                  const next = new Set(was);
+                  if (next.has(group.problem)) next.delete(group.problem);
+                  else next.add(group.problem);
+                  return next;
+                });
+              };
+              const groupTitle = t(`market.orders.group.${group.problem}`);
               return (
                 <div key={group.problem} data-testid={`order-group-${group.problem}`}>
                   <div
                     className={cx(
-                      'flex items-start justify-between gap-2 border-l-2 bg-panel-2 px-3 py-2',
+                      'flex flex-col border-l-2 bg-panel-2',
                       GROUP_ACCENT[group.problem]
                     )}
                   >
-                    <span className="flex flex-col gap-0.5">
-                      <span className="text-xs font-semibold tracking-widest text-text-dim uppercase">
-                        {t(`market.orders.group.${group.problem}`)} · {group.rows.length}
-                      </span>
+                    <div className="flex items-center justify-between gap-2 pr-3">
                       {/*
-                        What the group holds, said in the header rather than
-                        inside a "?" tooltip, so a folded or long group can be
-                        judged without opening it: what the group means, then
-                        the ISK at stake, the worst gap in it, and whose
-                        orders they are.
+                        Only the caret and the title are inside the button, so
+                        its accessible name stays the group's name. The
+                        summary line below carries character names, which
+                        would otherwise land in the button's name and collide
+                        with the character strip's own chips.
                       */}
-                      <span className="text-[0.6875rem] text-text-dim">
-                        {groupHeaderLine(group.problem, groupSummaries.get(group.problem), {
-                          showCharacters: showCharacterStrip,
-                          t,
-                        })}
+                      <button
+                        type="button"
+                        aria-expanded={!folded}
+                        onClick={toggle}
+                        className="flex flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                      >
+                        <Caret expanded={!folded} />
+                        {groupTitle} · {group.rows.length}
+                      </button>
+                      <span className="flex items-center gap-3">
+                        {group.problem === 'healthy' && (
+                          <button
+                            type="button"
+                            className="text-xs text-accent underline hover:text-text"
+                            onClick={toggle}
+                          >
+                            {t(
+                              filter.hideHealthy
+                                ? 'market.orders.showHealthy'
+                                : 'market.orders.hideHealthy'
+                            )}
+                          </button>
+                        )}
+                        {!folded && (
+                          <IconButton
+                            size="sm"
+                            variant="plain"
+                            icon={<Icon.Route />}
+                            label={t('market.orders.checkDeeper')}
+                            onClick={() => checkGroupDeeper(group.rows)}
+                          />
+                        )}
                       </span>
-                    </span>
-                    <span className="flex items-center gap-3">
-                      {group.problem === 'healthy' && (
-                        <button
-                          type="button"
-                          className="text-xs text-accent underline hover:text-text"
-                          onClick={() => setFilter({ ...filter, hideHealthy: !filter.hideHealthy })}
-                        >
-                          {t(
-                            filter.hideHealthy
-                              ? 'market.orders.showHealthy'
-                              : 'market.orders.hideHealthy'
-                          )}
-                        </button>
-                      )}
-                      {!folded && (
-                        <IconButton
-                          size="sm"
-                          variant="plain"
-                          icon={<Icon.Route />}
-                          label={t('market.orders.checkDeeper')}
-                          onClick={() => checkGroupDeeper(group.rows)}
-                        />
-                      )}
-                    </span>
+                    </div>
+                    {/*
+                      What the group holds, said in the header rather than
+                      inside a "?" tooltip, so a folded or long group can be
+                      judged without opening it: what the group means, then
+                      the ISK at stake, the worst gap in it, and whose orders
+                      they are.
+                    */}
+                    <p className="px-3 pb-2 pl-8 text-[0.6875rem] text-text-dim">
+                      {groupHeaderLine(group.problem, groupSummaries.get(group.problem), {
+                        showCharacters: showCharacterStrip,
+                        t,
+                      })}
+                    </p>
                   </div>
                   {folded ? (
-                    <p className="px-3 py-2 text-xs text-text-dim">
-                      {t('market.orders.group.healthyHint')}
-                    </p>
+                    group.problem === 'healthy' && (
+                      <p className="px-3 py-2 text-xs text-text-dim">
+                        {t('market.orders.group.healthyHint')}
+                      </p>
+                    )
                   ) : (
                     <DataTable
                       columns={columns}
                       rows={group.rows}
                       rowKey={(row) => row.orderId}
-                      label={`${t(`market.orders.group.${group.problem}`)} · ${group.rows.length}`}
+                      label={`${groupTitle} · ${group.rows.length}`}
                     />
                   )}
                 </div>
