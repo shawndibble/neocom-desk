@@ -3,7 +3,7 @@ import { expireCachedEsiRows, goExternallyOffline, loginAndSelectCharacter } fro
 import { CHARACTER_NAME } from './support/fixtureData';
 
 /**
- * NeoCom Desk has no dev-mode service worker (VitePWA's devOptions aren't
+ * Neocom Desk has no dev-mode service worker (VitePWA's devOptions aren't
  * enabled), so `context.setOffline(true)` followed by a reload can't work
  * here — it also blocks the app's own localhost dev server, leaving nothing
  * to serve index.html. Offline support in this app instead lives in

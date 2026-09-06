@@ -34,7 +34,7 @@ describe('Login', () => {
     expect(
       await screen.findByRole('heading', { name: /command deck for every character you fly/i })
     ).toBeInTheDocument();
-    expect(screen.getByText('NeoCom Desk')).toBeInTheDocument();
+    expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
     const buttons = screen.getAllByRole('button', { name: /log in with eve online/i });
     expect(buttons.length).toBeGreaterThanOrEqual(2);
   });

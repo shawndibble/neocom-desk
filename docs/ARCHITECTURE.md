@@ -1,4 +1,4 @@
-# NeoCom Desk — Architecture Map
+# Neocom Desk — Architecture Map
 
 For agents locating or adding code. Terms match `CONTEXT.md` — read that first
 for glossary (Character, Skill Plan, Build Plan, Remap Marker, etc.). Past
@@ -7,7 +7,7 @@ cite) live one per file in `docs/context/decisions/`; `grep` that directory.
 
 ## 1. System overview
 
-NeoCom Desk is a static SPA (React 19 + TS + Vite) hosted on GitHub Pages —
+Neocom Desk is a static SPA (React 19 + TS + Vite) hosted on GitHub Pages —
 no app server. Two kinds of data:
 
 - **API-derived** (skills, wallet, assets, mail, ...): pulled live from CCP's

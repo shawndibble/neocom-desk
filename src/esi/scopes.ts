@@ -1,5 +1,5 @@
 /**
- * ESI OAuth scopes for NeoCom Desk v1. Read-only by design (see CONTEXT.md).
+ * ESI OAuth scopes for Neocom Desk v1. Read-only by design (see CONTEXT.md).
  * esi-markets.structure_markets.v1 deliberately excluded: v1 trade hubs are
  * NPC stations only, which need no scope.
  *

@@ -1,4 +1,4 @@
-# NeoCom Desk — agent instructions
+# Neocom Desk — agent instructions
 
 - **All work happens in a git worktree, never in this main checkout.** The
   main repo directory (`C:/Users/shawn/OneDrive/Documents/GitHub/neocom-desk`)

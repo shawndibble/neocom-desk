@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "NeoCom Desk",
+    "name": "Neocom Desk",
     "tagline": "EVE Online character, skill planning, and industry companion"
   },
   "nav": {
@@ -664,7 +664,7 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Grants read-only access to your skills, assets, wallet, mail, calendar, contracts, market orders, industry, clones, player structure names, planetary colonies, contacts, loyalty points and notifications. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — NeoCom Desk only reads that data and never writes to it. Log in again after an update to pick up newly requested permissions.",
+    "permissionsHint": "Grants read-only access to your skills, assets, wallet, mail, calendar, contracts, market orders, industry, clones, player structure names, planetary colonies, contacts, loyalty points and notifications. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Log in again after an update to pick up newly requested permissions.",
     "eyebrow": "Read-only · Free · Open source",
     "heading": "Command deck for every character you fly.",
     "trustLine": "Refresh tokens never leave this device.",
@@ -1796,8 +1796,8 @@
   "notifications": {
     "prompt": {
       "title": "Turn on notifications?",
-      "body": "NeoCom can notify you about skill training, mail, industry jobs, and more. You choose exactly what, per character, in Settings.",
-      "installRequiredBody": "On iPhone and iPad, notifications only work once NeoCom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
+      "body": "Neocom can notify you about skill training, mail, industry jobs, and more. You choose exactly what, per character, in Settings.",
+      "installRequiredBody": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
       "enable": "Enable",
       "dismiss": "Not now"
     },
@@ -1809,7 +1809,7 @@
     },
     "fired": {
       "pushFallback": {
-        "title": "NeoCom Desk",
+        "title": "Neocom Desk",
         "body": "Something happened — open the app for details."
       },
       "newMail": {
@@ -1987,9 +1987,9 @@
     "updateReady": "A new version is available.",
     "reload": "Reload",
     "dismiss": "Dismiss",
-    "installCta": "Install NeoCom Desk for quicker access.",
+    "installCta": "Install Neocom Desk for quicker access.",
     "install": "Install",
-    "installIosCta": "Install NeoCom Desk: tap Share, then Add to Home Screen."
+    "installIosCta": "Install Neocom Desk: tap Share, then Add to Home Screen."
   },
   "whatsNew": {
     "title": "What's new in v{{version}}",
@@ -2164,7 +2164,7 @@
     "notifications": {
       "hint": "Choose how you'd like to be told, and what about, per character. App sends a browser notification; List adds it to the Overview page. Stays on this device.",
       "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
-      "installRequiredNotice": "On iPhone and iPad, notifications only work once NeoCom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
+      "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
       "enableHint": "This device hasn't granted notification permission yet.",
       "enableButton": "Turn on browser notifications",
       "masterSwitchLabel": "Enable notifications",
@@ -2384,7 +2384,7 @@
       }
     },
     "grantPromptTitle": "Corporation access",
-    "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so NeoCom Desk can show your corporation's data?",
+    "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so Neocom Desk can show your corporation's data?",
     "grantPromptUnnamedCorporation": "your corporation",
     "grantPromptGrant": "Grant access",
     "grantPromptDismiss": "Not now",

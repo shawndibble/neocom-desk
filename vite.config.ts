@@ -64,8 +64,8 @@ export default defineConfig({
       filename: 'sw.ts',
       registerType: 'prompt',
       manifest: {
-        name: 'NeoCom Desk',
-        short_name: 'NeoCom',
+        name: 'Neocom Desk',
+        short_name: 'Neocom',
         description: 'EVE Online character, skill planning, and industry companion',
         theme_color: '#0d1117',
         background_color: '#0d1117',

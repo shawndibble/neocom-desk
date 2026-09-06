@@ -48,7 +48,7 @@ const MARKET_OUT_DIR = join(OUT_DIR, 'market');
 // Mirrors src/esi/client.ts's headers — a build-time probe is still an ESI
 // client, and courtesy to CCP's API doesn't stop at the browser boundary.
 const ESI_COMPATIBILITY_DATE = '2026-08-01';
-const ESI_USER_AGENT = 'NeoCom Desk (github.com/shawndibble/neocom-desk)';
+const ESI_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
 const ESI_BASE = 'https://esi.evetech.net';
 const PROBE_CACHE_FILE = join(CACHE_DIR, 'market-regions-probe.json');
 // Delve: canary region with no NPC station that still carries busy

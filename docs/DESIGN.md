@@ -1,4 +1,4 @@
-# NeoCom Desk — Design System
+# Neocom Desk — Design System
 
 Dark-only UI inspired by EVE Online's Photon UI (CCP, 2022+) and eveonline.com:
 near-black blue-tinted backgrounds, semi-transparent layered panels, hairline 1px
