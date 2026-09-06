@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './DropdownMenu';
+import { Modal } from './Modal';
 
 function Harness({
   onRefresh,
@@ -39,6 +40,27 @@ async function openMenu(props?: { onRefresh?: () => void; onDisabledSelect?: () 
 }
 
 describe('DropdownMenu', () => {
+  /**
+   * `Modal` runs on `showModal()`, so the dialog sits in the browser's top
+   * layer with everything outside it inert. A surface portalled to
+   * `document.body` — Radix's default — would render behind it and take no
+   * clicks; see `portalContainer.ts`.
+   */
+  it('portals its menu inside a Modal, not to the body', async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal open onClose={() => {}} title="Order detail">
+        <Harness />
+      </Modal>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Actions' }));
+
+    expect(screen.getByRole('dialog', { name: 'Order detail' })).toContainElement(
+      screen.getByRole('menu')
+    );
+  });
+
   it('opens on click and lists its items', async () => {
     await openMenu();
     expect(screen.getByRole('menu')).toBeInTheDocument();

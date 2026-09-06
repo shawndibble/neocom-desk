@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
+import { Modal } from './Modal';
 
 function Harness() {
   return (
@@ -17,6 +18,27 @@ function Harness() {
 }
 
 describe('Popover', () => {
+  /**
+   * `Modal` runs on `showModal()`, so the dialog sits in the browser's top
+   * layer with everything outside it inert. A surface portalled to
+   * `document.body` — Radix's default — would render behind it and take no
+   * clicks; see `portalContainer.ts`.
+   */
+  it('portals its content inside a Modal, not to the body', async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal open onClose={() => {}} title="Order detail">
+        <Harness />
+      </Modal>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Details' }));
+
+    expect(screen.getByRole('dialog', { name: 'Order detail' })).toContainElement(
+      screen.getByRole('dialog', { name: 'Details' })
+    );
+  });
+
   it('reveals its content as a dialog, not a menu', async () => {
     const user = userEvent.setup();
     render(<Harness />);

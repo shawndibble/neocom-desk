@@ -19,15 +19,17 @@
  *   `deriveSystemId`) — which must render as "not checked" too, never as
  *   "checked, clean".
  */
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, StatChip, Button } from '@/components/ui';
+import { Modal, Button, InfoTooltip } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
 import { formatIsk } from '@/lib/isk';
 import { salesTax, brokerFee } from '@/engine/industry/fees';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
-import type { UndercutRival } from '@/engine/market/undercut';
+import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
 import { sellThrough, type SellThrough } from '@/engine/market/orderHealth';
 import { filterPriceHistoryRange } from '@/engine/market/priceHistory';
 import type { CharacterSkills, OpenOrderRow } from './openOrdersModel';
@@ -36,6 +38,8 @@ import type { PriceHistoryResult } from './priceHistory';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
+import { orderVerdict, type OrderVerdictKind } from './orderVerdict';
+import { orderExits } from './orderExits';
 
 export interface OrderDetailModalProps {
   open: boolean;
@@ -142,14 +146,33 @@ function deepScopeState(
  * A state that isn't a rival (not checked, clear, structure) has nothing to
  * put in those four columns, so it spans them rather than printing dashes.
  */
+/** Scope pill colours: the same station/system/region ladder the row badges use. */
+const SCOPE_PILL: Record<UndercutScope, string> = {
+  station: 'border-danger/50 bg-danger/15 text-danger',
+  system: 'border-warning/50 bg-warning/15 text-warning',
+  region: 'border-accent/50 bg-accent/15 text-accent',
+};
+
+/**
+ * One cell of the scope table. Every row is a FRAGMENT of these, not its own
+ * grid: three separate grids each size their `auto` columns to their own
+ * content, so the price and gap columns landed in a different place on every
+ * row. One grid owns the track sizes for the whole table, and the rows only
+ * contribute cells.
+ *
+ * That rules out a row background or a row border — a fragment has no box —
+ * so the top rule and the "my order" tint are painted per cell instead.
+ */
+const CELL = 'border-t border-line px-2 py-1.5';
+
 function ScopeRow({
-  label,
+  scope,
   state,
   stationName,
   distance,
   jumps,
 }: {
-  label: string;
+  scope: UndercutScope;
   state: ScopeState;
   /** Where the rival sits, when this app resolved that location. */
   stationName?: string | null;
@@ -159,19 +182,34 @@ function ScopeRow({
 }) {
   const { t } = useTranslation();
   const scopeLabel = (
-    <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
+    <span className={cx(CELL, 'pl-3')}>
+      <span
+        className={cx(
+          'inline-flex h-5 w-fit items-center rounded-xs border px-1.5 text-[0.625rem] font-semibold tracking-widest uppercase',
+          SCOPE_PILL[scope]
+        )}
+      >
+        {t(`market.orders.badge.undercut${scope[0].toUpperCase()}${scope.slice(1)}`)}
+      </span>
+    </span>
   );
 
   if (state.kind !== 'rival') {
     return (
-      <div className="grid grid-cols-[6rem_1fr] gap-x-3 border-t border-line py-1.5 text-xs">
+      <>
         {scopeLabel}
-        <span className={state.kind === 'clear' ? 'text-success' : 'text-text-dim'}>
+        <span
+          className={cx(
+            CELL,
+            'col-span-2 pr-3 md:col-span-4',
+            state.kind === 'clear' ? 'text-success' : 'text-text-dim'
+          )}
+        >
           {state.kind === 'unavailable' && t('market.orders.structureMarketUnavailable')}
           {state.kind === 'notChecked' && t('market.orders.scopeNotChecked')}
           {state.kind === 'clear' && t('market.orders.scopeClear')}
         </span>
-      </div>
+      </>
     );
   }
 
@@ -180,19 +218,18 @@ function ScopeRow({
   // `stationScopeState` fills those fields with 0, so they are only ever read
   // when the deep book actually supplied them.
   const countsKnown = rival.ordersBeatingMe > 0;
-
   const distanceText = jumps ? <JumpsAwayText result={jumps} t={t} /> : (distance ?? '');
   const whoText = countsKnown
     ? [
         t('market.orders.rowSummary.sellersUnderMe', { count: rival.ordersBeatingMe }),
-        t('market.orders.scopeUnitsUnder', { units: rival.unitsBeatingMe.toLocaleString() }),
+        t('market.orders.scopeUnitsUnder', { count: rival.unitsBeatingMe }),
       ].join(' · ')
     : t('market.orders.scopeAggregateOnly');
 
   return (
-    <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 gap-y-0.5 border-t border-line py-1.5 text-xs md:grid-cols-[6rem_1fr_auto_auto_auto]">
+    <>
       {scopeLabel}
-      <span className="flex flex-col gap-0.5">
+      <span className={cx(CELL, 'flex flex-col gap-0.5')}>
         <span>{stationName ?? t('market.unknownStructure')}</span>
         <span className="text-[0.6875rem] text-text-dim">{whoText}</span>
         {/*
@@ -211,12 +248,16 @@ function ScopeRow({
           </span>
         )}
       </span>
-      <span className="tabular-nums">{formatIsk(rival.price, 2)}</span>
-      <span className="hidden text-danger tabular-nums md:inline">
+      <span className={cx(CELL, 'pr-3 text-right tabular-nums md:pr-2')}>
+        {formatIsk(rival.price, 2)}
+      </span>
+      <span className={cx(CELL, 'hidden text-right text-danger tabular-nums md:block')}>
         {formatIsk(rival.gapIsk, 2)} · {rival.gapPct.toFixed(1)}%
       </span>
-      <span className="hidden text-text-dim tabular-nums md:inline">{distanceText}</span>
-    </div>
+      <span className={cx(CELL, 'hidden pr-3 text-right text-text-dim tabular-nums md:block')}>
+        {distanceText}
+      </span>
+    </>
   );
 }
 
@@ -317,205 +358,497 @@ export function OrderDetailModal({
     station.kind === 'clear' &&
     (system.kind === 'clear' || system.kind === 'unavailable' || system.kind === 'notChecked') &&
     region.kind === 'clear';
+  const verdict = orderVerdict(row);
+  const exits = orderExits({ row, competitors: deep?.competitors });
+  const rank = stationRank(row, deep);
+  const netIfSellsAsListed = row.floor ? row.price - row.floor.fill : null;
 
   return (
-    <Modal open={open} onClose={onClose} title={row.typeName} placement="wide">
-      <div className="space-y-4">
-        <section className="space-y-1">
-          <h3 className="flex items-center gap-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
-            {t('market.orders.quickAnswer')}
-            {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
-          </h3>
-          {badge ? (
-            <>
-              {/*
-                The call first, at a size the eye lands on — the reason
-                someone opened this modal is "what do I do about it", not
-                "what does the badge mean". The explanation and the concrete
-                numbers follow it.
-              */}
-              <p className="text-base font-semibold text-text">
-                {t(`market.orders.badge.${badge.kind}Action`)}
-              </p>
-              <p className="text-sm text-text-dim">{t(`market.orders.badge.${badge.kind}Help`)}</p>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`${row.characterName} · ${row.typeName}`}
+      placement="wide"
+    >
+      <div className="space-y-3">
+        {/*
+          The call and the numbers behind it, side by side on a wide screen
+          and stacked on a phone — the two things anyone opening this modal
+          came for, above every explanation.
+        */}
+        <div className="grid gap-3 md:grid-cols-[minmax(0,19rem)_1fr]">
+          <section className="rounded-xs border border-line bg-panel-2 p-3">
+            <h3 className="flex flex-wrap items-center gap-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.orders.quickAnswer')}
+              {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
+            </h3>
+            {verdict ? (
+              <>
+                {/*
+                  A real call, only ever reachable with an Order Floor. With
+                  no cost basis linked there is no way to tell "match them"
+                  from "let this one go", so the badge's generic advice is
+                  the fallback below — which is the common case, not the
+                  exception.
+                */}
+                <p className={cx('mt-1.5 text-lg font-semibold', VERDICT_TONE[verdict.kind])}>
+                  {t(`market.orders.verdict.${verdict.kind}`)}
+                </p>
+                <p className="mt-1 text-sm text-text-dim">
+                  {t(`market.orders.verdict.${verdict.kind}Detail`, {
+                    amount: verdict.amount === null ? '' : formatIsk(verdict.amount, 2),
+                  })}
+                </p>
+              </>
+            ) : badge ? (
+              <>
+                <p className="mt-1.5 text-base font-semibold text-text">
+                  {t(`market.orders.badge.${badge.kind}Action`)}
+                </p>
+                <p className="mt-1 text-sm text-text-dim">
+                  {t(`market.orders.badge.${badge.kind}Help`)}
+                </p>
+              </>
+            ) : (
+              <p className="mt-1.5 text-sm text-text-dim">{t('market.orders.scopeNotChecked')}</p>
+            )}
+            <p className="mt-2">
               <OrderRowSummaryText row={row} />
-            </>
-          ) : (
-            <p className="text-sm text-text-dim">{t('market.orders.scopeNotChecked')}</p>
-          )}
-        </section>
+            </p>
+          </section>
 
-        <div className="flex flex-wrap gap-2">
-          <StatChip label={t('orders.price')} value={formatIsk(row.price, 2)} />
-          <StatChip
-            label={t('market.orders.floorLabel')}
-            tooltip={t('market.orders.floorHelp')}
-            value={row.floor ? formatIsk(row.floor.relist, 2) : t('common.unknown')}
-            tone={row.floor && row.price < row.floor.relist ? 'danger' : 'default'}
-          />
-          <StatChip
-            label={t('orders.remaining')}
-            value={`${row.volumeRemain.toLocaleString()} / ${row.volumeTotal.toLocaleString()}`}
-          />
-          <StatChip
-            label={t('market.orders.expiresIn')}
-            value={row.expiry ? `${row.expiry.daysLeft}d` : t('common.unknown')}
-            tone={row.expiry && row.expiry.daysLeft <= 7 ? 'warning' : 'default'}
-          />
-          <StatChip
-            label={t('market.orders.sellsOutIn')}
-            tooltip={t('market.orders.sellsOutHelp')}
-            value={sellValue}
-            tone={sellPastExpiry ? 'danger' : 'default'}
-          />
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+            <StatCard
+              label={t('market.orders.statMyPrice')}
+              value={formatIsk(row.price, 2)}
+              caption={
+                rank ? t('market.orders.statRank', { rank: rank.rank, total: rank.total }) : null
+              }
+            />
+            <StatCard
+              label={t('market.orders.floorLabel')}
+              tooltip={t('market.orders.floorHelp')}
+              value={row.floor ? formatIsk(row.floor.relist, 2) : t('common.unknown')}
+              tone={row.floor && row.price < row.floor.relist ? 'danger' : 'default'}
+              caption={t(
+                row.costBasis ? 'market.orders.statFloorCaption' : 'market.orders.statFloorNoBasis'
+              )}
+            />
+            <StatCard
+              label={t('market.orders.sellsOutIn')}
+              tooltip={t('market.orders.sellsOutHelp')}
+              value={sellValue}
+              tone={sellPastExpiry ? 'danger' : 'default'}
+              caption={
+                sell.kind === 'known'
+                  ? t('market.orders.statSellsOutCaption', {
+                      count: Math.round(sell.unitsPerDay),
+                    })
+                  : null
+              }
+            />
+            <StatCard
+              label={t('market.orders.statVolumeLeft')}
+              value={`${row.volumeRemain.toLocaleString()} / ${row.volumeTotal.toLocaleString()}`}
+            >
+              {row.volumeTotal > 0 && (
+                <span className="mt-1.5 block h-1 w-full overflow-hidden rounded-xs bg-line">
+                  <span
+                    className="block h-full bg-accent"
+                    style={{
+                      width: `${Math.min(100, (row.volumeRemain / row.volumeTotal) * 100)}%`,
+                    }}
+                  />
+                </span>
+              )}
+            </StatCard>
+            <StatCard
+              label={t('market.orders.statOrderExpires')}
+              value={row.expiry ? `${row.expiry.daysLeft}d` : t('common.unknown')}
+              tone={row.expiry && row.expiry.daysLeft <= 7 ? 'warning' : 'default'}
+              caption={
+                row.expiry
+                  ? t('market.orders.statExpiresCaption', {
+                      date: new Date(row.expiry.expiresAt).toLocaleDateString(),
+                      listed: new Date(row.issued).toLocaleDateString(),
+                    })
+                  : null
+              }
+            />
+            <StatCard
+              label={t('market.orders.statIfSellsAsListed')}
+              value={
+                netIfSellsAsListed === null
+                  ? t('common.unknown')
+                  : `${netIfSellsAsListed >= 0 ? '+' : ''}${formatIsk(netIfSellsAsListed, 2)}`
+              }
+              tone={
+                netIfSellsAsListed === null
+                  ? 'default'
+                  : netIfSellsAsListed >= 0
+                    ? 'success'
+                    : 'danger'
+              }
+              caption={netIfSellsAsListed === null ? null : t('market.orders.statPerUnitAfterFees')}
+            />
+          </div>
         </div>
+
         {sellPastExpiry && (
           <p className="text-xs text-danger">{t('market.orders.sellsOutPastExpiry')}</p>
         )}
 
-        <section className="space-y-1 border-t border-line pt-3">
-          <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
-            {t('market.orders.whoIsCheaper')}
-          </h3>
-          <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:grid-cols-[6rem_1fr_auto_auto_auto]">
-            <span />
-            <span />
-            <span>{t('market.orders.scopeTheirPrice')}</span>
-            <span className="hidden md:inline">{t('market.orders.scopeOverBy')}</span>
-            <span className="hidden md:inline">{t('market.orders.scopeDistance')}</span>
+        <section className="rounded-xs border border-line">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line bg-panel-2 px-3 py-2">
+            <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.orders.whoIsCheaper')}
+            </h3>
+            <p className="text-[0.6875rem] text-text-faint">
+              {t('market.orders.scopeTightestBites')}
+            </p>
           </div>
-          <ScopeRow
-            label={t('market.orders.badge.undercutStation')}
-            state={station}
-            stationName={row.stationName}
-            distance={t('market.orders.scopeSameStation')}
-          />
-          <ScopeRow
-            label={t('market.orders.badge.undercutSystem')}
-            state={system}
-            stationName={
-              system.kind === 'rival' ? stationNameFor(system.rival.locationId) : undefined
-            }
-            distance={t('market.orders.scopeSameSystem')}
-          />
-          <ScopeRow
-            label={t('market.orders.badge.undercutRegion')}
-            state={region}
-            stationName={
-              region.kind === 'rival' ? stationNameFor(region.rival.locationId) : undefined
-            }
-            jumps={regionJumps}
-          />
-          {/* My own order last, as the line every row above is measured against. */}
-          <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 border-t border-line bg-panel-2 py-1.5 text-xs md:grid-cols-[6rem_1fr_auto_auto_auto]">
-            <span className="font-semibold tracking-widest text-accent uppercase">
+          {/*
+            ONE grid for the whole table: header, every scope row and the
+            player's own order all contribute cells to these tracks, so the
+            price, gap and distance columns line up down the table. Rows
+            cannot own a background or a border here, so the rule between
+            rows and the "my order" tint are painted per cell.
+          */}
+          <div className="grid grid-cols-[auto_1fr_auto] text-xs md:grid-cols-[auto_1fr_auto_auto_auto]">
+            <span className="px-2 pt-2 pl-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.orders.scopeColumn')}
+            </span>
+            <span className="px-2 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.orders.scopeCheapestSeller')}
+            </span>
+            <span className="px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:pr-2">
+              {t('market.orders.scopeTheirPrice')}
+            </span>
+            <span className="hidden px-2 pt-2 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
+              {t('market.orders.scopeOverBy')}
+            </span>
+            <span className="hidden px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
+              {t('market.orders.scopeDistance')}
+            </span>
+            <ScopeRow
+              scope="station"
+              state={station}
+              stationName={row.stationName}
+              distance={t('market.orders.scopeSameStation')}
+            />
+            <ScopeRow
+              scope="system"
+              state={system}
+              stationName={
+                system.kind === 'rival' ? stationNameFor(system.rival.locationId) : undefined
+              }
+              distance={t('market.orders.scopeSameSystem')}
+            />
+            <ScopeRow
+              scope="region"
+              state={region}
+              stationName={
+                region.kind === 'rival' ? stationNameFor(region.rival.locationId) : undefined
+              }
+              jumps={regionJumps}
+            />
+            {/* My own order last, as the line every row above is measured against. */}
+            <span
+              className={cx(
+                CELL,
+                'bg-panel-2 pl-3 font-semibold tracking-widest text-accent uppercase'
+              )}
+            >
               {t('market.orders.scopeMyOrder')}
             </span>
-            <span>{row.stationName ?? t('market.unknownStructure')}</span>
-            <span className="tabular-nums">{formatIsk(row.price, 2)}</span>
-            <span className="hidden md:inline" />
-            <span className="hidden md:inline" />
+            <span className={cx(CELL, 'bg-panel-2')}>
+              {row.stationName ?? t('market.unknownStructure')}
+            </span>
+            <span className={cx(CELL, 'bg-panel-2 pr-3 text-right tabular-nums md:pr-2')}>
+              {formatIsk(row.price, 2)}
+            </span>
+            <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
+            <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
           </div>
-          {allClean && <p className="text-xs text-success">{t('market.orders.onlySeller')}</p>}
-          {deep?.truncated && (
-            // A truncated fetch isn't the pre-fetch state (the button above
-            // stays hidden, same as any other resolved `deep`) — say why
-            // system/region above read "not checked" instead of leaving the
-            // user to wonder where the "check deeper" button went. Same
-            // key/shape `OrderHistoryPanel.tsx` and `VariationsTable.tsx` use
-            // for their own truncated fetches.
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.incompleteTitle')}</p>
-          )}
-          {showCheckDeeper && (
-            <Button size="sm" onClick={onCheckDeeper}>
-              {t('market.orders.checkDeeper')}
-            </Button>
-          )}
-          {loadingDeep && (
-            <p className="text-xs text-text-dim">{t('market.orders.checkingDeeper')}</p>
-          )}
+          <div className="px-3 pb-2">
+            {allClean && (
+              <p className="pt-1.5 text-xs text-success">{t('market.orders.onlySeller')}</p>
+            )}
+            {deep?.truncated && (
+              // A truncated fetch isn't the pre-fetch state (the button below
+              // stays hidden, same as any other resolved `deep`) — say why
+              // system/region above read "not checked" instead of leaving the
+              // user to wonder where the "check deeper" button went. Same
+              // key/shape `OrderHistoryPanel.tsx` and `VariationsTable.tsx` use
+              // for their own truncated fetches.
+              <p className="pt-1.5 text-[0.6875rem] text-warning uppercase">
+                {t('common.incompleteTitle')}
+              </p>
+            )}
+            {showCheckDeeper && (
+              <p className="pt-2">
+                <Button size="sm" onClick={onCheckDeeper}>
+                  {t('market.orders.checkDeeper')}
+                </Button>
+              </p>
+            )}
+            {loadingDeep && (
+              <p className="pt-1.5 text-xs text-text-dim">{t('market.orders.checkingDeeper')}</p>
+            )}
+          </div>
         </section>
 
-        <section className="space-y-1.5 border-t border-line pt-3">
-          <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
-            {t('market.orders.floorWorking')}
-          </h3>
-          {row.costBasis === null ? (
-            <div className="space-y-1">
-              <p className="text-sm text-text">{t('market.orders.noCostBasisTitle')}</p>
-              <p className="text-xs text-text-dim">{t('market.orders.noCostBasisHint')}</p>
-              <Link to="/industry" className={buttonClassName({ variant: 'ghost', size: 'sm' })}>
-                {t('market.orders.linkBuild')}
-              </Link>
-            </div>
-          ) : (
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-              <LedgerRow
-                label={t('industry.quantity')}
-                value={row.costBasis.runQuantity.toLocaleString()}
-              />
-              <LedgerRow
-                label={t('industry.materialCost')}
-                value={`${formatIsk(row.costBasis.materialCost)} ISK`}
-              />
-              <LedgerRow
-                label={t('industry.jobFee')}
-                value={`${formatIsk(row.costBasis.jobFee)} ISK`}
-              />
-              <LedgerRow
-                label={t('industry.totalCost')}
-                value={`${formatIsk(row.costBasis.materialCost + row.costBasis.jobFee)} ISK`}
-              />
-              {/*
-                Per unit, not per run — the pivot from the batch totals above
-                to the per-unit figures below. `unitCost` is exactly
-                `totalCost / runQuantity` (orderCostBasis.ts); 2 decimals to
-                match the floor rows it feeds into, not the 0-decimal batch
-                totals above it.
-              */}
-              <LedgerRow
-                label={t('market.orders.costPerUnit')}
-                value={`${formatIsk(row.costBasis.unitCost, 2)} ISK`}
-              />
-              {/*
-                Rendered as ISK off `floor.relist`, not as a bare percentage:
-                `unitCost + salesTax(relist) + brokerFee(relist) === relist`
-                by construction (`breakEvenPrice` solves for exactly that
-                revenue), including its 100 ISK minimum-broker-fee floor —
-                which a percentage-of-unitCost readout would silently miss.
-                This is what makes the ledger's lines actually sum to the
-                floor shown below, so gated on `row.floor` (not `skills`
-                alone): there is no relist price to read the fee off without it.
-              */}
-              {skills && row.floor && (
+        <div className="grid gap-3 md:grid-cols-2">
+          <section className="rounded-xs border border-line">
+            <h3 className="border-b border-line bg-panel-2 px-3 py-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.orders.floorWorking')}
+            </h3>
+            <div className="space-y-1.5 px-3 py-2">
+              {row.costBasis === null ? (
                 <>
-                  <LedgerRow
-                    label={t('industry.salesTax')}
-                    value={`${formatIsk(salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
-                  />
-                  <LedgerRow
-                    label={t('industry.brokerFee')}
-                    value={`${formatIsk(brokerFee(row.floor.relist, skills.brokerRelationsLevel), 2)} ISK`}
-                  />
+                  <p className="text-sm text-text">{t('market.orders.noCostBasisTitle')}</p>
+                  <p className="text-xs text-text-dim">{t('market.orders.noCostBasisHint')}</p>
+                  <Link
+                    to="/industry"
+                    className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+                  >
+                    {t('market.orders.linkBuild')}
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <LedgerRow
+                      label={t('industry.quantity')}
+                      value={row.costBasis.runQuantity.toLocaleString()}
+                    />
+                    <LedgerRow
+                      label={t('industry.materialCost')}
+                      value={`${formatIsk(row.costBasis.materialCost)} ISK`}
+                    />
+                    <LedgerRow
+                      label={t('industry.jobFee')}
+                      value={`${formatIsk(row.costBasis.jobFee)} ISK`}
+                    />
+                    <LedgerRow
+                      label={t('industry.totalCost')}
+                      value={`${formatIsk(row.costBasis.materialCost + row.costBasis.jobFee)} ISK`}
+                    />
+                    {/*
+                      Per unit, not per run — the pivot from the batch totals
+                      above to the per-unit figures below. `unitCost` is
+                      exactly `totalCost / runQuantity` (orderCostBasis.ts);
+                      2 decimals to match the floor rows it feeds into, not
+                      the 0-decimal batch totals above it.
+                    */}
+                    <LedgerRow
+                      label={t('market.orders.costPerUnit')}
+                      value={`${formatIsk(row.costBasis.unitCost, 2)} ISK`}
+                    />
+                    {/*
+                      Rendered as ISK off `floor.relist`, not as a bare
+                      percentage: `unitCost + salesTax(relist) +
+                      brokerFee(relist) === relist` by construction
+                      (`breakEvenPrice` solves for exactly that revenue),
+                      including its 100 ISK minimum-broker-fee floor — which a
+                      percentage-of-unitCost readout would silently miss. This
+                      is what makes the ledger's lines actually sum to the
+                      floor shown below, so gated on `row.floor` (not `skills`
+                      alone): there is no relist price to read the fee off
+                      without it.
+                    */}
+                    {skills && row.floor && (
+                      <>
+                        <LedgerRow
+                          label={t('industry.salesTax')}
+                          value={`${formatIsk(salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
+                        />
+                        <LedgerRow
+                          label={t('industry.brokerFee')}
+                          value={`${formatIsk(brokerFee(row.floor.relist, skills.brokerRelationsLevel), 2)} ISK`}
+                        />
+                      </>
+                    )}
+                    {row.floor && (
+                      // Only ONE floor is ever shown as a ledger number
+                      // (design decision): `floor.fill` — what leaving the
+                      // order alone would net once it sells — appears only in
+                      // the prose below, which is the one place the smaller
+                      // number is the answer to something.
+                      <LedgerRow
+                        label={t('market.orders.floorLabel')}
+                        value={`${formatIsk(row.floor.relist, 2)} ISK`}
+                      />
+                    )}
+                  </dl>
+                  {row.floor && (
+                    <>
+                      <p className="text-xs text-text-dim">
+                        {t('market.orders.floorBreakEvenNote')}
+                      </p>
+                      <div className="rounded-xs border border-line bg-panel-2 p-2">
+                        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                          {t('market.orders.floorWhyBroker')}
+                        </p>
+                        <p className="mt-1 text-xs text-text">
+                          {t('market.orders.floorWhyBrokerBody', {
+                            relist: formatIsk(row.floor.relist, 2),
+                          })}
+                        </p>
+                        <p className="mt-1 text-xs text-text-dim">
+                          {t('market.orders.floorWhyBrokerFill', {
+                            price: formatIsk(row.price, 2),
+                            fill: formatIsk(row.floor.fill, 2),
+                            difference: formatIsk(row.floor.relist - row.floor.fill, 2),
+                          })}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  <Link
+                    to="/industry"
+                    className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+                  >
+                    {t('market.orders.linkBuild')}
+                  </Link>
                 </>
               )}
-              {row.floor && (
-                // Only ONE floor is ever shown on screen (design decision):
-                // `floor.fill` — what leaving the order alone would net once
-                // it sells — is explained inside the `floorHelp` tooltip on
-                // the headline stat chip above, never as a second visible
-                // number here.
-                <LedgerRow
-                  label={t('market.orders.floorLabel')}
-                  value={`${formatIsk(row.floor.relist, 2)} ISK`}
-                />
+            </div>
+          </section>
+
+          <section className="rounded-xs border border-line">
+            <h3 className="border-b border-line bg-panel-2 px-3 py-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.orders.exitsTitle')}
+            </h3>
+            <div className="space-y-1.5 px-3 py-2 text-xs">
+              {exits.length === 0 ? (
+                <p className="text-text-dim">{t('market.orders.exitsNoFloor')}</p>
+              ) : (
+                exits.map((exit) => (
+                  <p key={exit.kind} className="flex items-baseline justify-between gap-3">
+                    <span className="text-text-dim">
+                      {exit.kind === 'hold' && sell.kind === 'known'
+                        ? t('market.orders.exitHoldSellsIn', {
+                            price: formatIsk(exit.price, 2),
+                            days: sell.daysToClear,
+                          })
+                        : t(
+                            `market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`,
+                            {
+                              price: formatIsk(exit.price, 2),
+                            }
+                          )}
+                    </span>
+                    <span
+                      className={cx(
+                        'shrink-0 tabular-nums',
+                        exit.netPerUnit >= 0 ? 'text-success' : 'text-danger'
+                      )}
+                    >
+                      {t('market.orders.exitPerUnit', {
+                        amount: `${exit.netPerUnit >= 0 ? '+' : ''}${formatIsk(exit.netPerUnit, 2)}`,
+                      })}
+                    </span>
+                  </p>
+                ))
               )}
-            </dl>
-          )}
-        </section>
+              {/*
+                Named, not estimated: hauling needs hub prices this page does
+                not load, and reprocessing needs the refining data (issue
+                #537). Saying they exist and are not built beats a number
+                nothing can back.
+              */}
+              {(['exitHaulNotBuilt', 'exitReprocessNotBuilt'] as const).map((key) => (
+                <p key={key} className="flex items-baseline justify-between gap-3 text-text-faint">
+                  <span>{t(`market.orders.${key}`)}</span>
+                  <span className="shrink-0">{t('market.orders.exitNotBuilt')}</span>
+                </p>
+              ))}
+              <p className="text-text-faint">{t('market.orders.orderSoFarNotBuilt')}</p>
+            </div>
+          </section>
+        </div>
       </div>
     </Modal>
   );
+}
+
+type StatCardTone = 'default' | 'success' | 'warning' | 'danger';
+
+const STAT_TONE: Record<StatCardTone, string> = {
+  default: 'text-text',
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-danger',
+};
+
+const VERDICT_TONE: Record<OrderVerdictKind, string> = {
+  letGo: 'text-danger',
+  matchThem: 'text-success',
+  raisePrice: 'text-danger',
+  leaveItAlone: 'text-success',
+};
+
+/**
+ * One captioned figure in the modal's stat grid.
+ *
+ * Not `StatChip`: that component is a fixed-height single-line pill whose
+ * own docblock rules out a second line of text, and every figure here needs
+ * the caption underneath it — "rank 4 of 22 at this station" is what turns
+ * a price into something the reader can judge.
+ */
+function StatCard({
+  label,
+  value,
+  caption,
+  tooltip,
+  tone = 'default',
+  children,
+}: {
+  label: string;
+  value: ReactNode;
+  caption?: string | null;
+  tooltip?: string;
+  tone?: StatCardTone;
+  children?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-xs border border-line bg-panel-2 px-2.5 py-2">
+      <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {label}
+        {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
+      </p>
+      <p className={cx('mt-0.5 text-sm font-semibold tabular-nums', STAT_TONE[tone])}>{value}</p>
+      {caption && <p className="mt-0.5 text-[0.6875rem] text-text-dim">{caption}</p>}
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Where my price sits among the sell orders at my own station.
+ *
+ * Only from a COMPLETE region book: a truncated fetch under-counts the
+ * orders at my station, so both the rank and the total would be a lower
+ * bound dressed up as a fact. The station tier cannot answer this at all —
+ * an aggregate carries a price and no order count.
+ */
+function stationRank(
+  row: OpenOrderRow,
+  deep: RegionCompetition | null
+): { rank: number; total: number } | null {
+  if (!deep || deep.truncated) return null;
+  const atMyStation = deep.competitors.filter(
+    (c) => c.locationId === row.locationId && c.isBuyOrder === row.isBuyOrder
+  );
+  if (atMyStation.length === 0) return null;
+  const better = atMyStation.filter((c) =>
+    row.isBuyOrder ? c.price > row.price : c.price < row.price
+  ).length;
+  // `atMyStation` already includes my own order (`loadRegionCompetition` does
+  // not filter it out), so it is the total, not the total minus me.
+  return { rank: better + 1, total: atMyStation.length };
 }
 
 function LedgerRow({ label, value }: { label: string; value: string }) {

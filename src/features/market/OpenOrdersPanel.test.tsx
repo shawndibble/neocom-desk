@@ -208,6 +208,35 @@ describe('OpenOrdersPanel', () => {
     expect(screen.getByTestId('order-group-healthy')).toHaveTextContent('No build linked');
   });
 
+  it('folds a group away from its own header, keeping the summary on screen', async () => {
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+
+    const header = await screen.findByRole('button', { name: 'Priced below cost · 1' });
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('table', { name: 'Priced below cost · 1' })).toBeInTheDocument();
+
+    await user.click(header);
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('table', { name: 'Priced below cost · 1' })).not.toBeInTheDocument();
+    // The header still answers what the group holds while it is folded.
+    expect(screen.getByTestId('order-group-belowFloor')).toHaveTextContent('ISK listed');
+  });
+
   it('summarises each group in its own header', async () => {
     mockedLoadAll.mockResolvedValue(
       snapshot([
@@ -227,7 +256,7 @@ describe('OpenOrdersPanel', () => {
 
     const group = await screen.findByTestId('order-group-belowFloor');
     // What the group means, on screen rather than inside a tooltip...
-    expect(group).toHaveTextContent('These orders lose ISK if they sell');
+    expect(group).toHaveTextContent('These lose money every time one sells');
     // ...and what it is holding: 500 x 10 units.
     expect(group).toHaveTextContent('ISK listed');
   });
@@ -396,7 +425,7 @@ describe('OpenOrdersPanel', () => {
     const row = await screen.findByRole('row', { name: /Tritanium/ });
     await user.click(within(row).getByRole('button', { name: 'Details' }));
 
-    expect(await screen.findByRole('dialog', { name: 'Tritanium' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Alpha · Tritanium' })).toBeInTheDocument();
     expect(screen.getByText('Quick answer')).toBeInTheDocument();
   });
 
@@ -432,7 +461,7 @@ describe('OpenOrdersPanel', () => {
     const row = await screen.findByRole('row', { name: /Tritanium/ });
     await user.click(within(row).getByRole('button', { name: 'Details' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Tritanium' });
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
     expect(mockedPriceHistory).toHaveBeenCalledWith(REGION, 34);
     // 300 units / 30 days = 10/day; BELOW_FLOOR_ORDER's volumeRemain is 10 ->
     // 1 day, with no deep book fetched yet so myShare defaults to 1.
@@ -467,7 +496,7 @@ describe('OpenOrdersPanel', () => {
     const row = await screen.findByRole('row', { name: /Tritanium/ });
     await user.click(within(row).getByRole('button', { name: 'Details' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Tritanium' });
+    const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
     await waitFor(() => expect(within(dialog).queryByText('Checking...')).not.toBeInTheDocument());
 
     const systemRow = within(dialog).getByText('System').closest('div');
@@ -533,10 +562,10 @@ describe('OpenOrdersPanel', () => {
       // healthy no-cost-basis order is folded out of the count.
       expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
 
-      // Anchored to the chip's own label, not a substring match on the
-      // group heading that carries the same words.
+      // Anchored to the chip's own accessible name (label + count), not the
+      // group header button, which carries the same words plus a separator.
       await openFunnel(user);
-      await user.click(screen.getByRole('button', { name: /^Priced under my floor/ }));
+      await user.click(screen.getByRole('button', { name: 'Priced below cost1' }));
       expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
     });
 
@@ -661,7 +690,7 @@ describe('OpenOrdersPanel', () => {
       renderPanel();
       const row = await screen.findByRole('row', { name: /Tritanium/ });
       await user.click(within(row).getByRole('button', { name: 'Details' }));
-      await screen.findByRole('dialog', { name: 'Tritanium' });
+      await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
       await user.click(screen.getByRole('button', { name: 'Close' }));
       expect(mockedRegionCompetition).toHaveBeenCalledTimes(1);
 

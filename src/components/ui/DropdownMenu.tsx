@@ -1,6 +1,7 @@
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
+import { usePortalContainer } from './portalContainer';
 import { menuContentClassName, menuItemClassName } from './menuStyles';
 
 /**
@@ -16,8 +17,11 @@ export function DropdownMenuContent({
   sideOffset = 4,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
+  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
+  const container = usePortalContainer();
   return (
-    <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Portal container={container}>
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
         className={cx(menuContentClassName, className)}

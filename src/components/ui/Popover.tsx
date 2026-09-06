@@ -1,6 +1,7 @@
 import { Popover as PopoverPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
+import { usePortalContainer } from './portalContainer';
 import { menuContentClassName } from './menuStyles';
 
 /**
@@ -18,8 +19,11 @@ export function PopoverContent({
   sideOffset = 4,
   ...props
 }: ComponentProps<typeof PopoverPrimitive.Content>) {
+  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
+  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
+  const container = usePortalContainer();
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container}>
       <PopoverPrimitive.Content
         sideOffset={sideOffset}
         className={cx(menuContentClassName, className)}

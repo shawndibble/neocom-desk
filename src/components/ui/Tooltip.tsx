@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { Tooltip as TooltipPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
+import { usePortalContainer } from './portalContainer';
 
 /** Matches Material UI's `enterTouchDelay` — long enough to not fire on an incidental brush, short enough to feel responsive. */
 const TOUCH_LONG_PRESS_MS = 500;
@@ -47,6 +48,12 @@ interface TooltipProps {
  * an `openOnTap` trigger.
  */
 export function Tooltip({ content, children, openOnTap = false, className = '' }: TooltipProps) {
+  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
+  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
+  // A `<dialog>` opened with `showModal()` sits in the browser's top layer,
+  // which no `z-index` can reach, so a body-portalled bubble renders behind
+  // the modal that triggered it.
+  const container = usePortalContainer();
   const [hoverOpen, setHoverOpen] = useState(false);
   const [touchOpen, setTouchOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -150,7 +157,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
         >
           {trigger}
         </TooltipPrimitive.Trigger>
-        <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Portal container={container}>
           <TooltipPrimitive.Content
             sideOffset={4}
             collisionPadding={8}

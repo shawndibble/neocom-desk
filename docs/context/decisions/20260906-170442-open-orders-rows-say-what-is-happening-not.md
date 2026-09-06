@@ -36,3 +36,45 @@ _Recorded 2026-09-06._
   they are. Deferred with it: the "is there a better exit?" comparison and the
   per-order "this order so far" ledger, which need the hub-gap work and
   per-order fill tracking respectively.
+- **Every group folds from its own header.** The caret is the one mechanism,
+  except for `healthy`, which folds through the existing `hideHealthy` flag —
+  that flag is also what the "N of M orders match" count reads, so a second
+  mechanism would let the caret and the count disagree. The header keeps its
+  title, count and summary while folded, so a closed group still answers what
+  it holds.
+- **The detail modal opens with a call, not a definition, but only when it can
+  make one.** `orderVerdict` needs an Order Floor: "match them" and "let this
+  one go" are the same situation told apart by whether the rival's price still
+  clears what the item cost. With no cost basis linked — the common case, not
+  the exception — it returns null and the badge's own generic advice stands.
+- **"Rank N of M at this station" comes only from a complete region book.** A
+  truncated fetch under-counts the orders at the station, so both numbers
+  would be a lower bound dressed as a fact. The station aggregate cannot
+  answer it at all.
+- **"Is there a better exit?" prices only exits this app can stand behind.**
+  Holding and dumping into a buy order pay sales tax alone, so they are priced
+  against `floor.fill`; matching is a price edit that charges the broker fee
+  again, so it is priced against `floor.relist`. Only buy orders at the
+  player's OWN station are offered — a buy order carries a range this app does
+  not read, so one elsewhere in the region may not reach the stock. Hauling to
+  a hub and reprocessing are named as not built rather than estimated, and
+  "this order so far" is left out entirely: none of the three has data behind
+  it yet.
+- **Advice is written as instructions, not vocabulary.** "React if you can stay
+  above your floor" told a reader nothing: it names an internal term (Order
+  Floor) and never says what to do. Every badge's advice line now names an
+  action — "Lower your price to win the sale, or leave it and wait for them to
+  run out" — and prose elsewhere says "your lowest safe price" or "what it cost
+  you plus the fees" rather than "floor". "Floor" survives only in code and in
+  this repo's own docs; on screen the number is labelled "Never sell below".
+- **The scope table is one grid, not three.** Each row used to be its own grid,
+  so `auto` columns sized to that row's own content and the price, gap and
+  distance columns landed in a different place on every line. One grid owns the
+  track sizes and each row contributes cells to it. Because a fragment has no
+  box, the rule between rows and the "my order" tint are painted per cell.
+- **Every Radix floating surface portals into the open modal.** A `<dialog>`
+  opened with `showModal()` sits in the browser's top layer, which no
+  `z-index` reaches, so a tooltip, popover or menu portalled to `document.body`
+  renders _behind_ the modal that triggered it. `Select` already read a
+  container off `portalContainer.ts`; `Tooltip`, `Popover`, `DropdownMenu` and
+  `ContextMenu` now do too.
