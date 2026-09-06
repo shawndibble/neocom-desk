@@ -68,13 +68,19 @@ export function NetworkPanel({
               <ul className="text-[0.6875rem] text-text-dim">
                 {line.inputs.map((input) => (
                   <li key={input.typeId}>
-                    {input.local
+                    {input.source === 'local'
                       ? t('piAdvisor.networkRouteLocal', { name: input.name })
-                      : t('piAdvisor.networkRouteImport', {
-                          units: Math.round(input.unitsPerHour).toLocaleString(),
-                          name: input.name,
-                          from: nameOfPlanet(input.fromPlanetId),
-                        })}
+                      : input.source === 'bought'
+                        ? t('piAdvisor.networkRouteBuy', {
+                            units: Math.round(input.unitsPerHour).toLocaleString(),
+                            name: input.name,
+                            isk: formatIsk(input.costPerHour),
+                          })
+                        : t('piAdvisor.networkRouteImport', {
+                            units: Math.round(input.unitsPerHour).toLocaleString(),
+                            name: input.name,
+                            from: nameOfPlanet(input.fromPlanetId ?? 0),
+                          })}
                   </li>
                 ))}
               </ul>

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
+import { piTier } from './chain';
 import { planNetwork, type NetworkColony } from './network';
 
 const pi = JSON.parse(
@@ -30,6 +31,24 @@ const PRICES: Record<number, number> = {
   [NANITES]: 8_500,
   [SUPERCONDUCTORS]: 11_280,
 };
+
+/**
+ * Every planetary commodity priced, which is what production does:
+ * `AdvisorPanel` asks the hub for `pi.raw` plus every plannable type in one
+ * read. The eight real Jita reads above stand; the rest get a plausible
+ * per-tier ladder, because a market-sourced candidate that is silently
+ * `needs-price` would make these tests pass for the wrong reason.
+ */
+const TIER_LADDER = [12, 450, 9_000, 90_000, 1_200_000];
+const ALL_PRICES: Record<number, number> = (() => {
+  const out: Record<number, number> = {};
+  for (const resource of pi.raw) out[resource.typeID] = TIER_LADDER[0];
+  for (const key of Object.keys(pi.schematics)) {
+    const typeId = Number(key);
+    out[typeId] = TIER_LADDER[piTier(typeId, pi)];
+  }
+  return { ...out, ...PRICES };
+})();
 
 /** Room for plenty, so a test about supply is not silently about budget. */
 const ROOMY = { cpu: 100_000, powergrid: 100_000 };
@@ -208,6 +227,77 @@ describe('planNetwork', () => {
     // Plasmoids: 264.42/hr made, 5 factories x 40 = 200 consumed.
     const left = plan.unallocated.find((line) => line.typeId === PLASMOIDS);
     expect(left?.unitsPerHour).toBeCloseTo(64.42, 4);
+  });
+
+  it('leaves a product nobody has the inputs for alone unless buying is allowed', () => {
+    // A High-Tech Production Plant eats two P2s and this pilot makes none, so
+    // with buying off there is nothing to say about one — which is why the
+    // card could only ever offer the pin and never its contents.
+    const off = planNetwork(options, pi);
+    expect(off.opportunities.every((line) => line.tier === 2)).toBe(true);
+
+    const on = planNetwork({ ...options, prices: ALL_PRICES, allowMarketSourcing: true }, pi);
+    expect(on.opportunities.some((line) => line.tier === 3)).toBe(true);
+  });
+
+  it('names a bought input as bought, and prices it at the hub', () => {
+    const plan = planNetwork({ ...options, prices: ALL_PRICES, allowMarketSourcing: true }, pi);
+    const bought = plan.opportunities
+      .flatMap((line) => line.inputs)
+      .find((input) => input.source === 'bought');
+    expect(bought).toBeDefined();
+    // No colony makes it, so there is no planet to route it from — and saying
+    // "route it from Efa V" when Efa V does not make it is the confidently
+    // wrong answer this field exists to prevent.
+    expect(bought?.fromPlanetId).toBeNull();
+    expect(bought?.costPerHour).toBeGreaterThan(0);
+  });
+
+  it('does not let a bought input pretend to be scarce', () => {
+    // Colony-made material is a pool that runs out; the hub's is not. So a
+    // bought input must not enter the supply bound — and the colonies' own P1
+    // must still never be over-drawn once it is exempt from it.
+    const plan = planNetwork({ ...options, prices: ALL_PRICES, allowMarketSourcing: true }, pi);
+    const drawn = new Map<number, number>();
+    for (const line of plan.opportunities) {
+      for (const input of line.inputs) {
+        if (input.source === 'bought') continue;
+        drawn.set(input.typeId, (drawn.get(input.typeId) ?? 0) + input.unitsPerHour);
+      }
+    }
+    expect(drawn.get(WATER) ?? 0).toBeLessThanOrEqual(226.69 + 1e-6);
+    expect(drawn.get(BACTERIA) ?? 0).toBeLessThanOrEqual(141.34 + 1e-6);
+  });
+
+  it('prefers material the pilot already makes when two products pay the same', () => {
+    // Identical ISK, one fewer thing to haul. Routing a P1 you grew and buying
+    // the same P1 cost the same by construction, so the tie-break is the only
+    // thing keeping the advice from sending them shopping needlessly.
+    //
+    // Flat within a tier, so every P2 pays the same and the comparator's
+    // second key is the only thing left to order them by. A ladder that made
+    // one product richer would be testing the ladder instead.
+    const flat: Record<number, number> = {};
+    for (const resource of pi.raw) flat[resource.typeID] = 12;
+    for (const key of Object.keys(pi.schematics)) {
+      const typeId = Number(key);
+      // P3 left unpriced: it would outrank every P2 on margin alone and the
+      // tie-break would never be reached.
+      if (piTier(typeId, pi) === 2) flat[typeId] = 9_000;
+      else if (piTier(typeId, pi) === 1) flat[typeId] = 450;
+    }
+    const plan = planNetwork({ ...options, prices: flat, allowMarketSourcing: true }, pi);
+    expect(plan.opportunities[0].inputs.some((input) => input.source !== 'bought')).toBe(true);
+  });
+
+  it('reports what a line sells for and what its shopping costs', () => {
+    const plan = planNetwork({ ...options, prices: ALL_PRICES, allowMarketSourcing: true }, pi);
+    for (const line of plan.opportunities) {
+      expect(line.revenuePerHour).toBeGreaterThan(0);
+      expect(line.buyCostPerHour).toBeGreaterThanOrEqual(0);
+      // Whatever it buys, it must still clear the customs office.
+      expect(line.marginPerHour).toBeGreaterThan(0);
+    }
   });
 
   it('has nothing to say about a single colony, or none', () => {

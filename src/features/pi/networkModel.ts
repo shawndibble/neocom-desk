@@ -86,6 +86,11 @@ export function colonyNetwork(input: NetworkModelInput): ColonyNetwork | null {
         colonies,
         infrastructure: input.pi.infrastructure,
         prices: input.prices,
+        // The pilot asked what to put in an Advanced Industry Facility and a
+        // High-Tech Production Plant. Their colonies make no P2, so with
+        // buying off the honest answer was silence — and silence is what
+        // left the card offering pins it could not fill.
+        allowMarketSourcing: true,
         taxRate: input.taxRate,
       },
       input.pi

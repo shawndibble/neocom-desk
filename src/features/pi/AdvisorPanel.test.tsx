@@ -306,28 +306,26 @@ describe('AdvisorPanel', () => {
     expect(screen.queryByText('No colonies yet')).not.toBeInTheDocument();
   });
 
-  it('says what the leftover budget still holds, for a colony with no links', async () => {
+  it('still prints the leftover budget, underneath the advice rather than as it', async () => {
+    // 16,675 tf and 10,700 MW left of the colony's own level-4 budget. The
+    // figure is worth having — a pilot checking the arithmetic needs it — but
+    // as a footnote under a decision, not as the decision.
     renderPanel();
-    // 16,675 tf and 10,700 MW left of the colony's own level-4 budget.
-    // Powergrid binds: 13 basic (800 MW), 15 advanced or storage (700), and
-    // only 1 extractor once ten heads are costed in (2,600 + 5,500 MW).
-    const room = await screen.findByText(/1x extractor/);
-    expect(room).toHaveTextContent('13x basic factory');
-    expect(room).toHaveTextContent('15x advanced factory');
+    expect(await screen.findByText(/16,675 tf and 10,700 MW free after that/)).toBeInTheDocument();
   });
 
-  it('says the headroom counts are alternatives rather than a list to build together', async () => {
-    // The reported bug. A pilot read "1x basic factory · 1x advanced factory ·
-    // 2x high-tech plant · 1x storage · 1x launchpad" as five things they
-    // could add, placed the basic factory, and found the colony full. Every
-    // count was right; the sentence was not, and the engine's own docstring
-    // has always said these are alternatives.
+  it('leads with what to do here, not with a list of what would fit', async () => {
+    // The row this replaced offered "1x basic factory · 1x advanced factory ·
+    // 2x high-tech plant · 1x storage · 1x launchpad". Every count was right
+    // and it was still the wrong answer: a pilot cannot act on a menu of pins
+    // whose contents nothing on the card names, and said so three times. The
+    // caveat that followed it ("any one of those, not all of them") was a
+    // repair to a shape that should not have been a list at all.
     renderPanel();
-    await screen.findByText(/1x extractor/);
-    expect(screen.getByText(/Any one of those, not all of them/)).toBeInTheDocument();
-    // And the remainder those counts came out of, so the arithmetic is
-    // checkable on the card instead of only in the engine.
-    expect(screen.getByText(/16,675 tf and 10,700 MW free/)).toBeInTheDocument();
+    await screen.findByText('Ashab III');
+    expect(screen.getByText('Do this')).toBeInTheDocument();
+    expect(screen.queryByText(/Any one of those/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/x high-tech plant/)).not.toBeInTheDocument();
   });
 
   it('charges a new pin for the link it will need, not just for the pin', async () => {
@@ -368,21 +366,20 @@ describe('AdvisorPanel', () => {
     );
     renderPanel();
 
-    const room = await screen.findByText(/x basic factory/);
-    expect(room).toHaveTextContent('13x basic factory');
-    expect(room).not.toHaveTextContent('14x basic factory');
+    // The charge is still made — `spareCapacity` takes it — and the footnote
+    // is where the card now says so, priced off this colony's own geometry.
     expect(
-      screen.getByText(/pays for the link a new pin needs.*30 tf \/ 21 MW/)
+      await screen.findByText(/A new pin also pays for its link here: 30 tf \/ 21 MW/)
     ).toBeInTheDocument();
   });
 
-  it('calls the counts ceilings when the colony has no link to price one from', async () => {
-    // Zero links is not "links are free here". The counts are still the best
-    // answer available, and the card owes the reader the caveat rather than a
-    // silently optimistic number.
+  it('claims no link price on a colony with no link to measure one from', async () => {
+    // Zero links is not "links are free here". With nothing to price a hop
+    // from, the footnote states the remainder and stops — quoting a link cost
+    // this colony's geometry cannot support would be the invented number.
     renderPanel();
-    await screen.findByText(/1x extractor/);
-    expect(screen.getByText(/These are ceilings/)).toBeInTheDocument();
+    await screen.findByText(/16,675 tf and 10,700 MW free after that/);
+    expect(screen.queryByText(/A new pin also pays for its link/)).not.toBeInTheDocument();
   });
 
   it('counts the colony slots the pilot’s skill actually allows', async () => {
@@ -532,10 +529,10 @@ describe('AdvisorPanel', () => {
     renderPanel();
     // 7,600 tf and 16,700 MW drawn of 21,315 / 17,000 — so 13,715 tf spare and
     // 300 MW, against a High-Tech plant's 400 MW, the closest thing to fitting.
-    const line = await screen.findByText(/Nothing fits/);
-    expect(line).toHaveTextContent('13,715 tf and 300 MW free');
-    expect(line).toHaveTextContent('high-tech plant');
-    expect(screen.queryByText(/Each count pays/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/13,715 tf and 300 MW free after that/)).toBeInTheDocument();
+    const closest = screen.getByText(/Nothing more fits as it stands/);
+    expect(closest).toHaveTextContent('High-Tech Production Plant');
+    expect(closest).toHaveTextContent('400 MW');
     expect(screen.queryByText(/Any one of those/)).not.toBeInTheDocument();
   });
 
@@ -573,12 +570,53 @@ describe('AdvisorPanel', () => {
     );
     renderPanel();
     // 5,580/hr against five pins wanting 30,000/hr keeps one fed, so four
-    // draw budget and make nothing.
-    const line = await screen.findByText(/1 of 5 basic factory pins are fed/);
+    // draw budget and make nothing. The card states that as the action —
+    // remove them — with the measurement that justifies it in the same line,
+    // rather than as a separate observation the pilot has to act on themselves.
+    const line = await screen.findByText(/Remove 4x idle Basic Industry Facility/);
     expect(line).toHaveTextContent('30,000/hr of Base Metals');
     expect(line).toHaveTextContent('5,580/hr');
-    // Four Basic factories at 200 tf / 800 MW.
-    expect(screen.getByText(/frees 800 tf and 3,200 MW/)).toBeInTheDocument();
+    // Four Basic Industry Facilities at 200 tf / 800 MW.
+    expect(line).toHaveTextContent('Frees 800 tf and 3,200 MW');
+  });
+
+  it('offers to feed the idle facilities when the Powergrid is there for it', async () => {
+    // The other half of the trade, and the half the pilot had to point out:
+    // removing capacity is the wrong answer on a colony whose own card says
+    // keep selling this P1 raw, because every unit that reaches an idle
+    // facility is another P1 sold. Whether it is available is a Powergrid
+    // question, and an Extractor Control Unit is 2,600 MW before a head.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [],
+                routes: [],
+                pins: [
+                  extractorPin(1),
+                  ...Array.from({ length: 2 }, (_, i) => ({
+                    pin_id: i + 2,
+                    type_id: BASIC,
+                    latitude: 0,
+                    longitude: 0,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  })),
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+    expect(
+      await screen.findByText(/Add 1x Extractor Control Unit and \d+ heads/)
+    ).toBeInTheDocument();
   });
 
   it('says nothing about unfed factories on a colony that is in balance', async () => {
@@ -678,10 +716,13 @@ describe('AdvisorPanel', () => {
     });
     renderPanel();
 
-    expect(await screen.findByText(/making Test Cultures/)).toBeInTheDocument();
+    // Named twice on purpose: the "Together" panel says the set can reach it,
+    // and the host planet's own card says to build it. The pilot reads the
+    // card, so the card carries the routes and the ISK.
+    expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
     // The route is the work: an opportunity with no shipping named is not
     // actionable.
-    expect(screen.getByText(/Route .* of (Water|Bacteria) from Ashab/)).toBeInTheDocument();
+    expect(screen.getByText(/of (Water|Bacteria) — route in from Ashab/)).toBeInTheDocument();
   });
 
   it('says nothing about a network when there is only one colony to work with', async () => {

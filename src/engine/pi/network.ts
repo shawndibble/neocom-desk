@@ -82,17 +82,41 @@ export interface NetworkOptions {
   prices: Readonly<Record<number, number>>;
   /** The customs rate. Never derived here — see `chain.ts`. */
   taxRate: number;
+  /**
+   * Let a candidate buy inputs no colony makes, at the hub's sell price.
+   *
+   * Off, the surface answers "what can these colonies make between them" and
+   * a pilot whose colonies make no P2 is told nothing about a High-Tech
+   * Production Plant except that one would fit. On, the same pilot is told
+   * what to put in it and what it costs to get. The margin is `chainCost`'s
+   * either way; this only widens which candidates are considered.
+   */
+  allowMarketSourcing?: boolean;
 }
+
+/**
+ * Where an input comes from, which is the difference between a route to set up
+ * and a haul to buy — and the pilot asked to be told which.
+ *
+ * `bought` costs the hub's sell price, which is exactly what `chainCost`
+ * already charges for a sourced line, so the margin is the same arithmetic for
+ * all three. What differs is the work: `local` is a link, `routed` is a link
+ * plus a customs boundary, `bought` is a shopping trip.
+ */
+export type InputSource = 'local' | 'routed' | 'bought';
 
 export interface NetworkInput {
   typeId: number;
   name: string;
   /** Units an hour this opportunity draws. */
   unitsPerHour: number;
-  /** The colony that makes it. */
-  fromPlanetId: number;
+  /** The colony that makes it; null when it is bought at the hub. */
+  fromPlanetId: number | null;
+  source: InputSource;
   /** True when that colony is the host, so the material crosses no customs office. */
   local: boolean;
+  /** ISK an hour this input costs — hub price either way, bought or forgone. */
+  costPerHour: number;
 }
 
 export interface NetworkOpportunity {
@@ -109,6 +133,10 @@ export interface NetworkOpportunity {
   unitsPerHour: number;
   marginPerUnit: number;
   marginPerHour: number;
+  /** ISK an hour of inputs that must be bought rather than routed. */
+  buyCostPerHour: number;
+  /** What the product itself sells for an hour, before inputs and tax. */
+  revenuePerHour: number;
 }
 
 export type NetworkBlocker =
@@ -150,7 +178,9 @@ interface Candidate {
   tier: PiTier;
   facility: PiPinKind;
   /** Units an hour of each input one factory draws. */
-  demandPerFactory: { typeId: number; name: string; unitsPerHour: number }[];
+  demandPerFactory: { typeId: number; name: string; unitsPerHour: number; bought: boolean }[];
+  /** True when no colony makes any of its inputs — every unit is a purchase. */
+  fullyBought: boolean;
   /** Units an hour one factory yields. */
   outputPerFactory: number;
   marginPerUnit: number;
@@ -176,17 +206,24 @@ function candidates(
   for (const [key, schematic] of Object.entries(pi.schematics)) {
     const typeId = Number(key);
     const tier = piTier(typeId, pi);
-    // P2 only in this first cut; ADR 0012 records why P3 waits.
-    if (tier !== 2) continue;
+    // P2 and P3. A High-Tech Production Plant eats two P2s, which no colony
+    // here makes — so it is reachable only with buying on, and offering the
+    // pin without ever saying what goes in it is the complaint this answers.
+    if (tier !== 2 && tier !== 3) continue;
 
-    const madeBy = schematic.inputs.map((input) =>
-      opts.colonies.filter((c) => (c.outputPerHour.get(input.typeID) ?? 0) > 0)
+    const bought = schematic.inputs.map(
+      (input) => !opts.colonies.some((c) => (c.outputPerHour.get(input.typeID) ?? 0) > 0)
     );
-    if (madeBy.some((list) => list.length === 0)) continue;
-    // Skip anything one colony could supply on its own.
-    const selfSufficient = opts.colonies.some((colony) =>
-      schematic.inputs.every((input) => (colony.outputPerHour.get(input.typeID) ?? 0) > 0)
-    );
+    if (bought.some(Boolean) && !opts.allowMarketSourcing) continue;
+    // Skip anything one colony could supply on its own *from its own ground*:
+    // that is `recommendStopTier`'s question, already answered on its card,
+    // and repeating it here would print one recommendation twice. A candidate
+    // with a bought input is not that question and is never skipped.
+    const selfSufficient =
+      !bought.some(Boolean) &&
+      opts.colonies.some((colony) =>
+        schematic.inputs.every((input) => (colony.outputPerHour.get(input.typeID) ?? 0) > 0)
+      );
     if (selfSufficient) continue;
 
     const name = schematic.name;
@@ -220,18 +257,27 @@ function candidates(
       name,
       tier,
       facility: schematic.facility,
-      demandPerFactory: schematic.inputs.map((input) => ({
+      demandPerFactory: schematic.inputs.map((input, i) => ({
         typeId: input.typeID,
         name: input.name,
         unitsPerHour: (input.quantity * SECONDS_PER_HOUR) / schematic.cycleTime,
+        bought: bought[i],
       })),
+      fullyBought: bought.every(Boolean),
       outputPerFactory: perHour,
       marginPerUnit: cost.margin,
       marginPerFactory: cost.margin * perHour,
     });
   }
 
-  ok.sort((a, b) => b.marginPerFactory - a.marginPerFactory || a.typeId - b.typeId);
+  // Margin first. Between two that pay the same, the one whose material the
+  // pilot already makes wins — identical ISK, one less thing to haul.
+  ok.sort(
+    (a, b) =>
+      b.marginPerFactory - a.marginPerFactory ||
+      Number(a.fullyBought) - Number(b.fullyBought) ||
+      a.typeId - b.typeId
+  );
   return { ok, blocked };
 }
 
@@ -302,11 +348,13 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
   const stillBlocked = [...blocked];
 
   for (const candidate of ok) {
-    const bySupply = Math.min(
-      ...candidate.demandPerFactory.map(
-        (input) => (supply.get(input.typeId) ?? 0) / input.unitsPerHour
-      )
-    );
+    // Only material the colonies make is scarce. A bought input constrains
+    // nothing but the wallet, so it does not enter the supply bound — and a
+    // candidate whose inputs are all bought is bounded by host budget alone.
+    const grown = candidate.demandPerFactory.filter((input) => !input.bought);
+    const bySupply = grown.length
+      ? Math.min(...grown.map((input) => (supply.get(input.typeId) ?? 0) / input.unitsPerHour))
+      : Number.POSITIVE_INFINITY;
     if (Math.floor(bySupply + EPSILON) < 1) {
       stillBlocked.push({
         typeId: candidate.typeId,
@@ -355,16 +403,24 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
 
     const inputs: NetworkInput[] = candidate.demandPerFactory.map((input) => {
       const unitsPerHour = input.unitsPerHour * factories;
-      supply.set(input.typeId, (supply.get(input.typeId) ?? 0) - unitsPerHour);
-      const localHere = (host.colony.outputPerHour.get(input.typeId) ?? 0) > 0;
+      if (!input.bought) supply.set(input.typeId, (supply.get(input.typeId) ?? 0) - unitsPerHour);
+      const localHere = !input.bought && (host.colony.outputPerHour.get(input.typeId) ?? 0) > 0;
+      const source: InputSource = input.bought ? 'bought' : localHere ? 'local' : 'routed';
       return {
         typeId: input.typeId,
         name: input.name,
         unitsPerHour,
-        fromPlanetId: localHere
-          ? host.colony.planetId
-          : (supplierOf.get(input.typeId) ?? host.colony.planetId),
+        fromPlanetId: input.bought
+          ? null
+          : localHere
+            ? host.colony.planetId
+            : (supplierOf.get(input.typeId) ?? host.colony.planetId),
+        source,
         local: localHere,
+        // Priced the same whether bought or grown: `chainCost` charges the hub
+        // price for a sourced line either way, because routing your own P1
+        // forgoes selling it for exactly that.
+        costPerHour: (priceOf(input.typeId, opts.prices) ?? 0) * unitsPerHour,
       };
     });
 
@@ -379,6 +435,11 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
       unitsPerHour: candidate.outputPerFactory * factories,
       marginPerUnit: candidate.marginPerUnit,
       marginPerHour: candidate.marginPerFactory * factories,
+      buyCostPerHour: inputs
+        .filter((input) => input.source === 'bought')
+        .reduce((sum, input) => sum + input.costPerHour, 0),
+      revenuePerHour:
+        (priceOf(candidate.typeId, opts.prices) ?? 0) * candidate.outputPerFactory * factories,
     });
   }
 

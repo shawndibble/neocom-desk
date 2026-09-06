@@ -93,7 +93,8 @@ import { colonyStopTierAdvice } from './stopTierModel';
 import { colonyFactoryBalance, surplusLoad } from './factoryBalanceModel';
 import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
-import type { FactoryBalance } from '@/engine/pi/factoryBalance';
+import { ColonyActions } from './ColonyActions';
+import type { NetworkOpportunity } from '@/engine/pi/network';
 import {
   colonySpaceFor,
   customsRatePercent,
@@ -178,86 +179,6 @@ function roomSummary(headroom: Record<PiPinKind, number>, t: TFunction): string 
       t('piAdvisor.roomForItem', { count: headroom[kind], pin: t(`piAdvisor.pinKind.${kind}`) })
     )
     .join(' · ');
-}
-
-/**
- * The factories on this colony that nothing feeds, and what deleting them
- * would give back.
- *
- * This is the "remove x" half of the advice, and it is a measurement rather
- * than a projection: a Basic Industry Facility eats 6,000 P0 an hour and the
- * colony's own extractor sustains what it sustains. Rendered only when there
- * is a surplus — a balanced colony has nothing to act on, and a line saying so
- * on every card would bury the ones that do.
- */
-function UnfedFactories({
-  balance,
-  freed,
-  headroom,
-}: {
-  balance: readonly FactoryBalance[];
-  freed: PinLoad;
-  /** What the freed budget would then hold, per kind — the "add y" half. */
-  headroom: Record<PiPinKind, number>;
-}) {
-  const { t } = useTranslation();
-  const starved = balance.filter(
-    (line): line is Extract<FactoryBalance, { status: 'measured' }> =>
-      line.status === 'measured' && line.surplusPins > 0
-  );
-  if (starved.length === 0) return null;
-
-  const room = roomSummary(headroom, t);
-
-  return (
-    <div className="space-y-1 border-t border-line pt-2">
-      <CardLine label={t('piAdvisor.balanceLabel')}>
-        <ul className="space-y-0.5 text-warning">
-          {starved.map((line) => {
-            // The input that actually binds, not the first one listed: a
-            // schematic short of two things is short of one of them worse.
-            const binding = line.demandPerHour.reduce((worst, demand) => {
-              const supplyOf = (id: number) =>
-                line.supplyPerHour.find((entry) => entry.typeId === id)?.unitsPerHour ?? 0;
-              return supplyOf(demand.typeId) / demand.unitsPerHour <
-                supplyOf(worst.typeId) / worst.unitsPerHour
-                ? demand
-                : worst;
-            }, line.demandPerHour[0]);
-            const supply =
-              line.supplyPerHour.find((entry) => entry.typeId === binding.typeId)?.unitsPerHour ??
-              0;
-            return (
-              <li key={line.typeId}>
-                {t('piAdvisor.balanceStarved', {
-                  name: line.name,
-                  fed: line.fedPins,
-                  built: line.pins,
-                  pin: t(`piAdvisor.pinKind.${line.facility}`),
-                  surplus: line.surplusPins,
-                  demand: Math.round(binding.unitsPerHour).toLocaleString(),
-                  input: binding.name,
-                  supply: Math.round(supply).toLocaleString(),
-                })}
-              </li>
-            );
-          })}
-        </ul>
-      </CardLine>
-      <p className="text-[0.6875rem] text-text-dim">
-        {room
-          ? t('piAdvisor.balanceFrees', {
-              cpu: Math.round(freed.cpu).toLocaleString(),
-              powergrid: Math.round(freed.powergrid).toLocaleString(),
-              room,
-            })
-          : t('piAdvisor.balanceFreesPlain', {
-              cpu: Math.round(freed.cpu).toLocaleString(),
-              powergrid: Math.round(freed.powergrid).toLocaleString(),
-            })}
-      </p>
-    </div>
-  );
 }
 
 /** Stable identities, so an unranked planet's card does not remount every render. */
@@ -576,6 +497,9 @@ function PlanetCard({
 }
 
 /** A card body's small label/value line. */
+/** One shared empty array, so a card with no opportunity keeps a stable prop. */
+const EMPTY_OPPORTUNITIES: readonly NetworkOpportunity[] = [];
+
 function CardLine({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="text-xs">
@@ -662,6 +586,8 @@ function BuiltCard({
   prices,
   taxRate,
   ceiling,
+  opportunities,
+  planetNames,
 }: {
   advice: Extract<PlanetAdvice, { kind: 'built' }>;
   pi: PiData;
@@ -671,6 +597,13 @@ function BuiltCard({
   taxRate: number;
   /** The pilot's Command Center Upgrades ceiling, for spotting a colony behind it. */
   ceiling: MaxColonyBudget;
+  /**
+   * The network plan's lines placed on *this* planet. Passed in rather than
+   * computed here because material is shared across the set: a card that
+   * planned its own would promise the same Water to five different planets.
+   */
+  opportunities: readonly NetworkOpportunity[];
+  planetNames: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
   const { colony } = advice;
@@ -723,22 +656,6 @@ function BuiltCard({
   // above, against a load reduced by exactly those pins.
   const balance = useMemo(() => colonyFactoryBalance(colony, pi), [colony, pi]);
   const freed = useMemo(() => surplusLoad(balance, pi), [balance, pi]);
-  const freedHeadroom = useMemo(
-    () =>
-      spareCapacity(
-        {
-          cpu: colony.pinLoad.load.cpu - freed.cpu,
-          powergrid: colony.pinLoad.load.powergrid - freed.powergrid,
-        },
-        budget,
-        pi.infrastructure,
-        {
-          headsPerExtractor: HEADROOM_EXTRACTOR_HEADS,
-          ...(newLinkCost ? { newLinkCost } : {}),
-        }
-      ),
-    [colony.pinLoad.load, freed, budget, pi.infrastructure, newLinkCost]
-  );
 
   return (
     <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType}>
@@ -823,10 +740,10 @@ function BuiltCard({
         <div className="mt-auto border-t border-line pt-2">
           {/*
             A colony with links has a load this app cannot fully measure, so it
-            gets no headroom figure at all — the same rule the unbuilt cards
-            follow: name what is true, print no number that isn't. Showing
-            "room for 12 factories" to a pilot whose colony is full is the one
-            failure this tab exists to avoid.
+            gets no advice at all — the same rule the unbuilt cards follow:
+            name what is true, print no number that isn't. Recommending three
+            factories to a pilot whose colony is full is the one failure this
+            tab exists to avoid.
           */}
           {colony.linkCount > 0 && colony.pinLoad.linkLoad === null ? (
             // Only when the radius itself did not resolve. Links are charged
@@ -836,73 +753,18 @@ function BuiltCard({
               {t('piAdvisor.roomUnknownRadius', { count: colony.linkCount })}
             </p>
           ) : (
-            <>
-              <CardLine label={t('piAdvisor.roomForLabel')}>
-                <span className="text-text-dim">
-                  {room.length === 0
-                    ? /*
-                        A full colony used to say only "the budget is spent",
-                        with the remainder printed underneath as a separate
-                        sentence — 62% of the CPU budget unspent beside a claim
-                        that it was gone, and a note about what "each count"
-                        pays for when there were no counts. The remainder is
-                        worth having, but only next to the thing it fails to
-                        buy: what actually stops a pilot is one axis being 100
-                        MW short of one pin.
-                      */
-                      closest
-                      ? t('piAdvisor.roomForNothing', {
-                          cpu: Math.round(freeCpu).toLocaleString(),
-                          powergrid: Math.round(freePowergrid).toLocaleString(),
-                          pin: t(`piAdvisor.pinKind.${closest.kind}`),
-                          pinCpu: Math.round(closest.cost.cpu).toLocaleString(),
-                          pinPowergrid: Math.round(closest.cost.powergrid).toLocaleString(),
-                        })
-                      : t('piAdvisor.roomForNothingUnpriced', {
-                          cpu: Math.round(freeCpu).toLocaleString(),
-                          powergrid: Math.round(freePowergrid).toLocaleString(),
-                        })
-                    : room
-                        .map((kind) =>
-                          t('piAdvisor.roomForItem', {
-                            count: headroom[kind],
-                            pin: t(`piAdvisor.pinKind.${kind}`),
-                          })
-                        )
-                        .join(' · ')}
-                </span>
-              </CardLine>
-              {/*
-                The counts above are independent per kind — what the leftover
-                budget holds if you spend it all on that one thing — and a
-                pilot who read the joined list as a shopping list placed the
-                first factory and found the colony full. The counts were
-                right; only this sentence was missing. The remainder they came
-                out of goes with it, so the arithmetic is checkable here rather
-                than only in the engine. Both are suppressed when nothing fits:
-                the sentence above already carries the remainder, and there is
-                no count for either to qualify.
-              */}
-              {room.length > 0 && (
-                <>
-                  <p className="text-[0.6875rem] text-text-dim">
-                    {room.length > 1 ? `${t('piAdvisor.roomForAnyOne')} ` : ''}
-                    {t('piAdvisor.roomForFree', {
-                      cpu: Math.round(freeCpu).toLocaleString(),
-                      powergrid: Math.round(freePowergrid).toLocaleString(),
-                    })}
-                  </p>
-                  <p className="text-[0.6875rem] text-text-dim">
-                    {newLinkCost
-                      ? t('piAdvisor.roomForLinkCharged', {
-                          cpu: Math.round(newLinkCost.cpu).toLocaleString(),
-                          powergrid: Math.round(newLinkCost.powergrid).toLocaleString(),
-                        })
-                      : t('piAdvisor.roomForLinkUnmeasured')}
-                  </p>
-                </>
-              )}
-            </>
+            <ColonyActions
+              colony={colony}
+              pi={pi}
+              balance={balance}
+              freed={freed}
+              spare={{ cpu: freeCpu, powergrid: freePowergrid }}
+              newLinkCost={newLinkCost}
+              opportunities={opportunities}
+              planetNames={planetNames}
+              room={roomSummary(headroom, t)}
+              closest={room.length === 0 ? closest : null}
+            />
           )}
 
           {/*
@@ -930,8 +792,6 @@ function BuiltCard({
             </p>
           )}
         </div>
-
-        <UnfedFactories balance={balance} freed={freed} headroom={freedHeadroom} />
 
         <StopTierLine advice={advice} pi={pi} prices={prices} taxRate={taxRate} />
       </>
@@ -1346,6 +1206,12 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 prices={snapshot.prices}
                 taxRate={activeSystem.customsRate}
                 ceiling={snapshot.ceiling}
+                opportunities={
+                  network?.plan.opportunities.filter(
+                    (line) => line.hostPlanetId === entry.planetId
+                  ) ?? EMPTY_OPPORTUNITIES
+                }
+                planetNames={planetNames}
               />
             ) : entry.kind === 'unbuilt' ? (
               <UnbuiltCard
