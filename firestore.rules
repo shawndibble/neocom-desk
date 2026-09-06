@@ -71,6 +71,24 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      // Moon Mining Tax ledger (issue #523): Payees and Assignments are
+      // per-character Editable Data, synced exactly like plans.
+      match /payees/{payeeId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
+      match /miningTaxAssignments/{assignmentId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
       match /settings/{key} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();
