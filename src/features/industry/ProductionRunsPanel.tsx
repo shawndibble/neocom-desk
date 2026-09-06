@@ -14,10 +14,17 @@ import * as Icon from '@/components/ui/icons';
 import type { SkillLevels } from '@/engine/industry/types';
 import { SourcingInput } from './MaterialsTable';
 import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
-import { ProductionRunStatusChip } from './ProductionRunStatusChip';
-import { SaleLinkingModals, SoldSplitButton } from './SaleLinkingControls';
+import {
+  loggedAtColumn,
+  quantityColumn,
+  quantitySoldColumn,
+  realizedProfitColumn,
+  soldActionsColumn,
+  statusColumn,
+  totalCostColumn,
+} from './productionRunColumns';
+import { SaleLinkingModals } from './SaleLinkingControls';
 import { useSaleLinking } from './useSaleLinking';
-import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 
@@ -156,30 +163,9 @@ export function ProductionRunsPanel({
   }
 
   const columns: DataTableColumn<ProductionRunSummary>[] = [
-    {
-      id: 'loggedAt',
-      header: t('industry.productionRunColumnLogged'),
-      primary: true,
-      className: 'whitespace-nowrap',
-      sortValue: (r) => r.run.loggedAt,
-      render: (r) => new Date(r.run.loggedAt).toLocaleDateString(),
-    },
-    {
-      id: 'quantity',
-      header: t('industry.quantity'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (r) => r.run.quantity,
-      render: (r) => r.run.quantity.toLocaleString(),
-    },
-    {
-      id: 'totalCost',
-      header: t('industry.totalCost'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (r) => r.run.totalCost,
-      render: (r) => formatIsk(r.run.totalCost),
-    },
+    loggedAtColumn(t),
+    quantityColumn(t),
+    totalCostColumn(t),
     {
       id: 'realizedRevenue',
       header: t('industry.realizedRevenue'),
@@ -188,48 +174,10 @@ export function ProductionRunsPanel({
       sortValue: (r) => r.profit.grossRevenue,
       render: (r) => formatIsk(r.profit.grossRevenue),
     },
-    {
-      id: 'realizedProfit',
-      header: t('industry.realizedProfit'),
-      align: 'right',
-      className: 'tabular-nums font-semibold',
-      cellClassName: (r) => iskToneClass(r.profit.profit),
-      sortValue: (r) => r.profit.profit,
-      render: (r) => formatIsk(r.profit.profit),
-    },
-    {
-      id: 'quantitySold',
-      header: t('industry.productionRunColumnSold'),
-      align: 'right',
-      className: 'tabular-nums text-text-dim',
-      sortValue: (r) => r.quantitySold,
-      render: (r) => `${r.quantitySold.toLocaleString()} / ${r.run.quantity.toLocaleString()}`,
-    },
-    {
-      id: 'status',
-      header: t('industry.productionRunColumnStatus'),
-      align: 'right',
-      sortValue: (r) => r.status,
-      render: (r) => <ProductionRunStatusChip status={r.status} />,
-    },
-    {
-      id: 'actions',
-      header: '',
-      align: 'right',
-      render: (r) => (
-        <SoldSplitButton
-          onSold={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'sale')}
-          onWatch={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'watch')}
-          onManual={() => sale.openManualSale(r.run.id)}
-          onRefresh={
-            r.orderWatches.some((w) => !w.closed)
-              ? () => void sale.refreshWatches(r.run.id)
-              : undefined
-          }
-          refreshing={sale.refreshingRunId === r.run.id}
-        />
-      ),
-    },
+    realizedProfitColumn(t),
+    quantitySoldColumn(t),
+    statusColumn(t),
+    soldActionsColumn(sale),
   ];
 
   return (

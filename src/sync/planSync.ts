@@ -159,6 +159,28 @@ async function recordDeletion(
   scheduleSync(characterId);
 }
 
+/**
+ * `recordDeletion` for a whole batch under one collection's tombstone key —
+ * one bulk row-delete plus one tombstone read/write, rather than a
+ * read-modify-write cycle on the same `db.settings` row per id (what a loop
+ * of `recordDeletion` calls would do, serialized against itself for no
+ * reason: the row deletes are already independent of each other). A no-op
+ * for an empty batch, so callers don't need their own length check.
+ */
+async function recordBulkDeletion(
+  characterId: number,
+  ids: string[],
+  tombstoneKey: string,
+  deleteRows: (ids: string[]) => Promise<unknown>
+): Promise<void> {
+  if (ids.length === 0) return;
+  await deleteRows(ids);
+  const now = Date.now();
+  const remaining = (await readTombstones(tombstoneKey)).filter((t) => !ids.includes(t.id));
+  await writeTombstones(tombstoneKey, [...remaining, ...ids.map((id) => ({ id, deletedAt: now }))]);
+  scheduleSync(characterId);
+}
+
 /** Delete a Skill Plan locally + tombstone, so the deletion propagates. */
 export async function markPlanDeleted(characterId: number, planId: string): Promise<void> {
   await recordDeletion(characterId, planId, planTombstonesKey(characterId), () =>
@@ -874,19 +896,18 @@ export async function markProductionRunDeleted(characterId: number, runId: strin
     db.productionSaleLinks.where('runId').equals(runId).toArray(),
     db.productionOrderWatches.where('runId').equals(runId).toArray(),
   ]);
-  for (const link of saleLinks) {
-    await recordDeletion(characterId, link.id, productionSaleLinkTombstonesKey(characterId), () =>
-      db.productionSaleLinks.delete(link.id)
-    );
-  }
-  for (const watch of orderWatches) {
-    await recordDeletion(
-      characterId,
-      watch.id,
-      productionOrderWatchTombstonesKey(characterId),
-      () => db.productionOrderWatches.delete(watch.id)
-    );
-  }
+  await recordBulkDeletion(
+    characterId,
+    saleLinks.map((l) => l.id),
+    productionSaleLinkTombstonesKey(characterId),
+    (ids) => db.productionSaleLinks.bulkDelete(ids)
+  );
+  await recordBulkDeletion(
+    characterId,
+    orderWatches.map((w) => w.id),
+    productionOrderWatchTombstonesKey(characterId),
+    (ids) => db.productionOrderWatches.bulkDelete(ids)
+  );
   await recordDeletion(characterId, runId, productionRunTombstonesKey(characterId), () =>
     db.productionRuns.delete(runId)
   );

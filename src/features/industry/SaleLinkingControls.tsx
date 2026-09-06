@@ -183,7 +183,7 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
       </Modal>
 
       <Modal
-        open={sale.manualSaleRunId !== null}
+        open={sale.manualSale !== null}
         onClose={sale.closeManualSale}
         title={t('industry.manualSale')}
       >
@@ -193,13 +193,13 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
             <label className="flex flex-col gap-1 text-xs">
               {t('industry.quantity')}
               <SourcingInput
-                value={unmaskNumber(sale.manualForm.quantity)}
+                value={unmaskNumber(sale.manualSale?.form.quantity ?? '')}
                 label={t('industry.quantity')}
                 inputMode="numeric"
                 widthClassName="w-full"
                 parse={(raw) => unmaskNumber(raw)}
                 onCommit={(value) =>
-                  sale.setManualForm((f) => ({
+                  sale.setManualSaleForm((f) => ({
                     ...f,
                     quantity: value === undefined ? '' : String(value),
                   }))
@@ -209,13 +209,13 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
             <label className="flex flex-col gap-1 text-xs">
               {t('industry.unitPrice')}
               <SourcingInput
-                value={unmaskNumber(sale.manualForm.unitPrice)}
+                value={unmaskNumber(sale.manualSale?.form.unitPrice ?? '')}
                 label={t('industry.unitPrice')}
                 inputMode="numeric"
                 widthClassName="w-full"
                 parse={(raw) => unmaskNumber(raw)}
                 onCommit={(value) =>
-                  sale.setManualForm((f) => ({
+                  sale.setManualSaleForm((f) => ({
                     ...f,
                     unitPrice: value === undefined ? '' : String(value),
                   }))

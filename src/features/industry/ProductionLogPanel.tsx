@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type BuildPlanRecord } from '@/db';
+import {
+  db,
+  type BuildPlanRecord,
+  type ProductionOrderWatchRecord,
+  type ProductionRunRecord,
+  type ProductionSaleLinkRecord,
+} from '@/db';
 import {
   DataTable,
   EmptyState,
@@ -21,8 +27,16 @@ import {
   type ProductionLogFilter,
 } from './productionLogFilter';
 import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
-import { ProductionRunStatusChip } from './ProductionRunStatusChip';
-import { SaleLinkingModals, SoldSplitButton } from './SaleLinkingControls';
+import {
+  loggedAtColumn,
+  quantityColumn,
+  quantitySoldColumn,
+  realizedProfitColumn,
+  soldActionsColumn,
+  statusColumn,
+  totalCostColumn,
+} from './productionRunColumns';
+import { SaleLinkingModals } from './SaleLinkingControls';
 import { useSaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
@@ -44,8 +58,28 @@ interface ItemRow {
   unitsProduced: number;
   unitsSold: number;
   realizedProfit: number;
+  revenue: number;
   /** Null when nothing has sold for this item yet — a percentage of zero revenue is not a number. */
   avgMarginPct: number | null;
+}
+
+// Stable empty fallbacks for `useLiveQuery(...) ?? []`: a fresh `[]` literal
+// on every render defeats `useMemo`'s dependency check below during the one
+// or two renders before the live query first resolves — these are read-only
+// and module-level, so they never change identity.
+const NO_RUNS: ProductionRunRecord[] = [];
+const NO_SALE_LINKS: ProductionSaleLinkRecord[] = [];
+const NO_ORDER_WATCHES: ProductionOrderWatchRecord[] = [];
+
+/** Every row this run's own id backs, grouped once instead of `.filter()`-ed once per run. */
+function groupByRunId<T extends { runId: string }>(rows: readonly T[]): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const row of rows) {
+    const existing = map.get(row.runId);
+    if (existing) existing.push(row);
+    else map.set(row.runId, [row]);
+  }
+  return map;
 }
 
 /** One label-over-value block, matching the design's larger dashboard stat (distinct from the compact `StatChip`). */
@@ -109,11 +143,95 @@ function ProductionLogDateRange({
   );
 }
 
-interface RunRow {
-  summary: ProductionRunSummary;
+interface RunRow extends ProductionRunSummary {
   itemName: string;
   /** Whether the run's own Build Plan still exists — a run outlives a deleted plan (locked financial record), so this gates the row-click navigation rather than a display column. */
   planExists: boolean;
+}
+
+interface Rollup {
+  summaries: ProductionRunSummary[];
+  itemRows: ItemRow[];
+  runRows: RunRow[];
+  filteredRunCount: number;
+  totalRealizedProfit: number;
+  totalCostLogged: number;
+  totalRevenueLinked: number;
+  openInventoryValue: number;
+}
+
+function buildRollup(
+  runs: readonly ProductionRunRecord[],
+  saleLinks: readonly ProductionSaleLinkRecord[],
+  orderWatches: readonly ProductionOrderWatchRecord[],
+  filter: ProductionLogFilter,
+  skills: SkillLevels,
+  catalog: BlueprintCatalog,
+  planIds: ReadonlySet<string>
+): Rollup {
+  const filteredRuns = filterProductionRunsByDate(runs, filter);
+  const saleLinksByRun = groupByRunId(saleLinks);
+  const orderWatchesByRun = groupByRunId(orderWatches);
+  const summaries = filteredRuns.map((run) =>
+    summarizeProductionRun(
+      run,
+      saleLinksByRun.get(run.id) ?? [],
+      orderWatchesByRun.get(run.id) ?? [],
+      skills
+    )
+  );
+
+  const byItem = new Map<number, ItemRow>();
+  for (const s of summaries) {
+    const typeID = s.run.productTypeID;
+    const existing = byItem.get(typeID);
+    if (existing) {
+      existing.runsLogged += 1;
+      existing.unitsProduced += s.run.quantity;
+      existing.unitsSold += s.quantitySold;
+      existing.realizedProfit += s.profit.profit;
+      existing.revenue += s.profit.grossRevenue;
+    } else {
+      byItem.set(typeID, {
+        productTypeID: typeID,
+        itemName: catalog.byProductTypeID.get(typeID)?.productName ?? `#${typeID}`,
+        runsLogged: 1,
+        unitsProduced: s.run.quantity,
+        unitsSold: s.quantitySold,
+        realizedProfit: s.profit.profit,
+        revenue: s.profit.grossRevenue,
+        avgMarginPct: null,
+      });
+    }
+  }
+  // Margin is computed per item over its combined revenue, not averaged from
+  // the per-run percentages — a weighted rollup, the same reasoning
+  // `realizedProfit`'s own marginPct uses per run.
+  const itemRows = Array.from(byItem.values()).map((row) => ({
+    ...row,
+    avgMarginPct: row.revenue > 0 ? (row.realizedProfit / row.revenue) * 100 : null,
+  }));
+
+  const runRows: RunRow[] = summaries
+    .map((summary) => ({
+      ...summary,
+      itemName:
+        catalog.byProductTypeID.get(summary.run.productTypeID)?.productName ??
+        `#${summary.run.productTypeID}`,
+      planExists: planIds.has(summary.run.buildPlanId),
+    }))
+    .sort((a, b) => b.run.loggedAt - a.run.loggedAt);
+
+  return {
+    summaries,
+    itemRows,
+    runRows,
+    filteredRunCount: filteredRuns.length,
+    totalRealizedProfit: summaries.reduce((sum, s) => sum + s.profit.profit, 0),
+    totalCostLogged: summaries.reduce((sum, s) => sum + s.run.totalCost, 0),
+    totalRevenueLinked: summaries.reduce((sum, s) => sum + s.profit.grossRevenue, 0),
+    openInventoryValue: summaries.reduce((sum, s) => sum + s.openInventoryValue, 0),
+  };
 }
 
 /**
@@ -141,19 +259,30 @@ export function ProductionLogPanel({
     useLiveQuery(
       () => db.productionRuns.where('characterId').equals(characterId).toArray(),
       [characterId]
-    ) ?? [];
+    ) ?? NO_RUNS;
   const saleLinks =
     useLiveQuery(
       () => db.productionSaleLinks.where('characterId').equals(characterId).toArray(),
       [characterId]
-    ) ?? [];
+    ) ?? NO_SALE_LINKS;
   const orderWatches =
     useLiveQuery(
       () => db.productionOrderWatches.where('characterId').equals(characterId).toArray(),
       [characterId]
-    ) ?? [];
+    ) ?? NO_ORDER_WATCHES;
 
   const sale = useSaleLinking(characterId, saleLinks, orderWatches);
+
+  const planIds = useMemo(() => new Set(plans.map((p) => p.id)), [plans]);
+
+  // The character's full history recomputes here, not on every keystroke in
+  // the date filter or unrelated parent re-render — `filter` is the only
+  // piece of this that changes often, and everything else it's paired with
+  // (`runs`/`saleLinks`/`orderWatches`) only changes on an actual Dexie write.
+  const rollup = useMemo(
+    () => buildRollup(runs, saleLinks, orderWatches, filter, skills, catalog, planIds),
+    [runs, saleLinks, orderWatches, filter, skills, catalog, planIds]
+  );
 
   if (runs.length === 0) {
     return (
@@ -167,52 +296,15 @@ export function ProductionLogPanel({
     );
   }
 
-  const planIds = new Set(plans.map((p) => p.id));
-  const filteredRuns = filterProductionRunsByDate(runs, filter);
-  const summaries = filteredRuns.map((run) =>
-    summarizeProductionRun(run, saleLinks, orderWatches, skills)
-  );
-
-  const totalRealizedProfit = summaries.reduce((sum, s) => sum + s.profit.profit, 0);
-  const totalCostLogged = summaries.reduce((sum, s) => sum + s.run.totalCost, 0);
-  const totalRevenueLinked = summaries.reduce((sum, s) => sum + s.profit.grossRevenue, 0);
-  const openInventoryValue = summaries.reduce((sum, s) => sum + s.openInventoryValue, 0);
-
-  const byItem = new Map<number, ItemRow>();
-  for (const s of summaries) {
-    const typeID = s.run.productTypeID;
-    const existing = byItem.get(typeID);
-    if (existing) {
-      existing.runsLogged += 1;
-      existing.unitsProduced += s.run.quantity;
-      existing.unitsSold += s.quantitySold;
-      existing.realizedProfit += s.profit.profit;
-    } else {
-      byItem.set(typeID, {
-        productTypeID: typeID,
-        itemName: catalog.byProductTypeID.get(typeID)?.productName ?? `#${typeID}`,
-        runsLogged: 1,
-        unitsProduced: s.run.quantity,
-        unitsSold: s.quantitySold,
-        realizedProfit: s.profit.profit,
-        avgMarginPct: null,
-      });
-    }
-  }
-  // Margin is computed per item over its combined revenue, not averaged from
-  // the per-run percentages — a weighted rollup, the same reasoning
-  // `realizedProfit`'s own marginPct uses per run.
-  const revenueByItem = new Map<number, number>();
-  for (const s of summaries) {
-    revenueByItem.set(
-      s.run.productTypeID,
-      (revenueByItem.get(s.run.productTypeID) ?? 0) + s.profit.grossRevenue
-    );
-  }
-  const itemRows = Array.from(byItem.values()).map((row) => {
-    const revenue = revenueByItem.get(row.productTypeID) ?? 0;
-    return { ...row, avgMarginPct: revenue > 0 ? (row.realizedProfit / revenue) * 100 : null };
-  });
+  const {
+    itemRows,
+    runRows,
+    filteredRunCount,
+    totalRealizedProfit,
+    totalCostLogged,
+    totalRevenueLinked,
+    openInventoryValue,
+  } = rollup;
 
   const columns: DataTableColumn<ItemRow>[] = [
     {
@@ -265,94 +357,20 @@ export function ProductionLogPanel({
     },
   ];
 
-  const itemCount = byItem.size;
-
-  const runRows: RunRow[] = summaries
-    .map((summary) => ({
-      summary,
-      itemName:
-        catalog.byProductTypeID.get(summary.run.productTypeID)?.productName ??
-        `#${summary.run.productTypeID}`,
-      planExists: planIds.has(summary.run.buildPlanId),
-    }))
-    .sort((a, b) => b.summary.run.loggedAt - a.summary.run.loggedAt);
-
   const runColumns: DataTableColumn<RunRow>[] = [
-    {
-      id: 'loggedAt',
-      header: t('industry.productionRunColumnLogged'),
-      primary: true,
-      className: 'whitespace-nowrap',
-      sortValue: (r) => r.summary.run.loggedAt,
-      render: (r) => new Date(r.summary.run.loggedAt).toLocaleDateString(),
-    },
+    loggedAtColumn(t),
     {
       id: 'item',
       header: t('industry.productionRunColumnItem'),
       sortValue: (r) => r.itemName,
       render: (r) => r.itemName,
     },
-    {
-      id: 'quantity',
-      header: t('industry.quantity'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (r) => r.summary.run.quantity,
-      render: (r) => r.summary.run.quantity.toLocaleString(),
-    },
-    {
-      id: 'totalCost',
-      header: t('industry.totalCost'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (r) => r.summary.run.totalCost,
-      render: (r) => formatIsk(r.summary.run.totalCost),
-    },
-    {
-      id: 'quantitySold',
-      header: t('industry.productionRunColumnSold'),
-      align: 'right',
-      className: 'tabular-nums text-text-dim',
-      sortValue: (r) => r.summary.quantitySold,
-      render: (r) =>
-        `${r.summary.quantitySold.toLocaleString()} / ${r.summary.run.quantity.toLocaleString()}`,
-    },
-    {
-      id: 'realizedProfit',
-      header: t('industry.realizedProfit'),
-      align: 'right',
-      className: 'tabular-nums font-semibold',
-      cellClassName: (r) => iskToneClass(r.summary.profit.profit),
-      sortValue: (r) => r.summary.profit.profit,
-      render: (r) => formatIsk(r.summary.profit.profit),
-    },
-    {
-      id: 'status',
-      header: t('industry.productionRunColumnStatus'),
-      align: 'right',
-      sortValue: (r) => r.summary.status,
-      render: (r) => <ProductionRunStatusChip status={r.summary.status} />,
-    },
-    {
-      id: 'actions',
-      header: '',
-      align: 'right',
-      render: (r) => (
-        <SoldSplitButton
-          onSold={() => void sale.openPicker(r.summary.run.id, r.summary.run.productTypeID, 'sale')}
-          onWatch={() =>
-            void sale.openPicker(r.summary.run.id, r.summary.run.productTypeID, 'watch')
-          }
-          onManual={() => sale.openManualSale(r.summary.run.id)}
-          onRefresh={
-            r.summary.orderWatches.some((w) => !w.closed)
-              ? () => void sale.refreshWatches(r.summary.run.id)
-              : undefined
-          }
-          refreshing={sale.refreshingRunId === r.summary.run.id}
-        />
-      ),
-    },
+    quantityColumn(t),
+    totalCostColumn(t),
+    quantitySoldColumn(t),
+    realizedProfitColumn(t),
+    statusColumn(t),
+    soldActionsColumn(sale),
   ];
 
   return (
@@ -371,7 +389,7 @@ export function ProductionLogPanel({
       <div className="space-y-1">
         <p className="text-[0.6875rem] text-text-dim">{t('industry.productionLogSubtitle')}</p>
         <p className="text-[0.6875rem] text-text-faint">
-          {t('industry.productionLogCaveat', { runs: filteredRuns.length, items: itemCount })}
+          {t('industry.productionLogCaveat', { runs: filteredRunCount, items: itemRows.length })}
         </p>
       </div>
 
@@ -400,7 +418,7 @@ export function ProductionLogPanel({
           <DataTable
             columns={runColumns}
             rows={runRows}
-            rowKey={(r) => r.summary.run.id}
+            rowKey={(r) => r.run.id}
             label={t('industry.allProductionRuns')}
             density="compact"
             className="mb-5"
@@ -408,9 +426,7 @@ export function ProductionLogPanel({
             // logged run is a locked financial record that outlives a
             // deleted plan (see planSync.ts's markBuildPlanDeleted), so a
             // click here has nowhere left to jump to.
-            onRowClick={
-              onOpenRun ? (r) => r.planExists && onOpenRun(r.summary.run.buildPlanId) : undefined
-            }
+            onRowClick={onOpenRun ? (r) => r.planExists && onOpenRun(r.run.buildPlanId) : undefined}
           />
 
           <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

@@ -28,6 +28,11 @@ export interface ManualSaleForm {
 
 const EMPTY_MANUAL_FORM: ManualSaleForm = { quantity: '', unitPrice: '' };
 
+interface ManualSaleState {
+  runId: string;
+  form: ManualSaleForm;
+}
+
 /**
  * The "Sold" split button's three linking mechanisms (issue #525) — Link
  * Past Sale, Watch Open Order, Manual/Private Sale — plus the manual
@@ -44,8 +49,7 @@ export function useSaleLinking(
   const [pickerLoading, setPickerLoading] = useState(false);
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[] | null>(null);
   const [openOrders, setOpenOrders] = useState<MarketOrder[] | null>(null);
-  const [manualSaleRunId, setManualSaleRunId] = useState<string | null>(null);
-  const [manualForm, setManualForm] = useState<ManualSaleForm>(EMPTY_MANUAL_FORM);
+  const [manualSale, setManualSale] = useState<ManualSaleState | null>(null);
   const [refreshingRunId, setRefreshingRunId] = useState<string | null>(null);
 
   const linkedTransactionIds = new Set(
@@ -74,31 +78,34 @@ export function useSaleLinking(
   }
 
   function openManualSale(runId: string) {
-    setManualForm(EMPTY_MANUAL_FORM);
-    setManualSaleRunId(runId);
+    setManualSale({ runId, form: EMPTY_MANUAL_FORM });
   }
 
   function closeManualSale() {
-    setManualSaleRunId(null);
+    setManualSale(null);
+  }
+
+  function setManualSaleForm(updater: (form: ManualSaleForm) => ManualSaleForm) {
+    setManualSale((state) => (state ? { ...state, form: updater(state.form) } : state));
   }
 
   async function saveManualSale() {
-    if (!manualSaleRunId) return;
-    const quantity = unmaskNumber(manualForm.quantity);
-    const unitPrice = unmaskNumber(manualForm.unitPrice);
+    if (!manualSale) return;
+    const quantity = unmaskNumber(manualSale.form.quantity);
+    const unitPrice = unmaskNumber(manualSale.form.unitPrice);
     if (!quantity || unitPrice === undefined) return;
     const now = Date.now();
     await db.productionSaleLinks.add({
       id: `${characterId}:manual:${crypto.randomUUID()}`,
       characterId,
-      runId: manualSaleRunId,
+      runId: manualSale.runId,
       quantity,
       unitPrice,
       linkedAt: now,
       updatedAt: now,
     });
     scheduleSync(characterId);
-    setManualSaleRunId(null);
+    setManualSale(null);
   }
 
   async function linkPastSale(runId: string, txn: WalletTransaction) {
@@ -154,15 +161,17 @@ export function useSaleLinking(
       const liveOrders = result.cached?.data ?? [];
       const liveById = new Map(liveOrders.map((o) => [o.order_id, o]));
       const now = Date.now();
-      for (const watch of watchesForRun) {
-        const live = liveById.get(watch.orderId);
-        await db.productionOrderWatches.put({
-          ...watch,
-          lastKnownVolumeRemain: live ? live.volume_remain : watch.lastKnownVolumeRemain,
-          closed: !live,
-          updatedAt: now,
-        });
-      }
+      await db.productionOrderWatches.bulkPut(
+        watchesForRun.map((watch) => {
+          const live = liveById.get(watch.orderId);
+          return {
+            ...watch,
+            lastKnownVolumeRemain: live ? live.volume_remain : watch.lastKnownVolumeRemain,
+            closed: !live,
+            updatedAt: now,
+          };
+        })
+      );
       scheduleSync(characterId);
     } finally {
       setRefreshingRunId(null);
@@ -193,9 +202,8 @@ export function useSaleLinking(
     pickerLoading,
     saleCandidates,
     watchCandidates,
-    manualSaleRunId,
-    manualForm,
-    setManualForm,
+    manualSale,
+    setManualSaleForm,
     refreshingRunId,
     openPicker,
     closePicker,
