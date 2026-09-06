@@ -1,5 +1,5 @@
 /**
- * Single source of truth for every ESI endpoint NeoCom Desk calls: the OAuth
+ * Single source of truth for every ESI endpoint Neocom Desk calls: the OAuth
  * scope it needs, or an explicit "public".
  *
  * Three consumers derive from it rather than restate it — `esi/scopes.ts` for

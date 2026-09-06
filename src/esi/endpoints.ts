@@ -1,5 +1,5 @@
 /**
- * Thin typed wrappers over the ESI endpoints NeoCom Desk v1 consumes.
+ * Thin typed wrappers over the ESI endpoints Neocom Desk v1 consumes.
  * Field names verified against https://esi.evetech.net/meta/openapi.json
  * (2026-08). Optional fields mirror the spec's non-required properties.
  *

@@ -63,7 +63,7 @@ Core loops work end-to-end: SSO re-auth, skill plan → computed queue → expor
 
 ## 7. Ship fitting expectations
 
-- **[lacking / med]** Persona goal "fit a ship" hits a wall: no Fitting nav item, no mention anywhere that fitting isn't a feature; the only fit-related capability (EFT import) hides inside Skills → Plans → Import from clipboard. Fix: don't build a fitter (right scope call per competitors research) — add a small "Fittings?" pointer: on the import dialog title mention "from pyfa / in-game fitting window", and add one Overview/Characters help line: "NeoCom doesn't simulate fits — paste any EFT fit into a Skill Plan to see what you need to train." That converts the gap into the app's differentiator.
+- **[lacking / med]** Persona goal "fit a ship" hits a wall: no Fitting nav item, no mention anywhere that fitting isn't a feature; the only fit-related capability (EFT import) hides inside Skills → Plans → Import from clipboard. Fix: don't build a fitter (right scope call per competitors research) — add a small "Fittings?" pointer: on the import dialog title mention "from pyfa / in-game fitting window", and add one Overview/Characters help line: "Neocom doesn't simulate fits — paste any EFT fit into a Skill Plan to see what you need to train." That converts the gap into the app's differentiator.
 
 ## 8. General
 

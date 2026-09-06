@@ -15,7 +15,7 @@ industry data, and it grants exactly two GETs
 write operations in the current ESI surface. CONTEXT.md's "Read-only" scope
 decision holds at the behaviour level, but EVE's own consent screen renders
 the scope's name as "manage your planetary installations" to a user of an app
-that otherwise advertises itself as read-only — a wording NeoCom Desk does
+that otherwise advertises itself as read-only — a wording Neocom Desk does
 not control and cannot change.
 
 Separately, the full per-planet ESI response mixes two kinds of data: fields
@@ -31,7 +31,7 @@ group would confidently display numbers that can be arbitrarily out of date.
 no-writes claim plainly at the point of login, rather than softening or
 omitting it. This already ships as `login.permissionsHint`
 (`src/i18n/locales/en.json`): "EVE's consent screen lists the planetary scope
-as 'manage your planetary installations' — NeoCom Desk only reads that data
+as 'manage your planetary installations' — Neocom Desk only reads that data
 and never writes to it." The honesty is in the disclosure, not in trying to
 make the scope name say something CCP didn't write.
 
@@ -66,7 +66,7 @@ explicit: showing factory _inputs/outputs_ would need the SDE's
   runtime re-auth banner every other single-scope gated route uses
   (`app/routeScopes.ts` `/planetary-industry` entry) — no special-cased UX.
 - The colony list's own `last_update` (when CCP last recalculated it) and
-  NeoCom's `DataAgeBadge` (when we last fetched from ESI) are two distinct
+  Neocom's `DataAgeBadge` (when we last fetched from ESI) are two distinct
   staleness signals shown side by side, per `docs/plans/feature-parity/briefs/G-newscope-views.md`'s
   investigation of this endpoint — collapsing them into one would misstate
   which staleness a user is looking at.

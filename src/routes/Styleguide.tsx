@@ -167,7 +167,7 @@ export function Styleguide() {
   return (
     <div className="min-h-screen space-y-10 bg-bg p-6 text-text">
       <div className="space-y-1">
-        <PageHeader title="NeoCom Desk Styleguide" />
+        <PageHeader title="Neocom Desk Styleguide" />
         <p className="text-sm text-text-dim">
           Design tokens and base components. Source of truth: docs/DESIGN.md.
         </p>

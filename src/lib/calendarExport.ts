@@ -48,7 +48,7 @@ export function buildIcsFile(event: CalendarExportEvent, now: Date = new Date())
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//NeoCom Desk//Calendar Export//EN',
+    'PRODID:-//Neocom Desk//Calendar Export//EN',
     'BEGIN:VEVENT',
     `UID:${event.eventId}@neocom-desk`,
     `DTSTAMP:${toUtcBasic(now)}`,

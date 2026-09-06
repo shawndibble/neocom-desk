@@ -1,5 +1,5 @@
 /**
- * Mocks every ESI / market / image endpoint NeoCom Desk touches: no real
+ * Mocks every ESI / market / image endpoint Neocom Desk touches: no real
  * request ever reaches esi.evetech.net, market.fuzzwork.co.uk or
  * images.evetech.net. Endpoints not yet consumed by the UI (markets/prices,
  * industry/systems, fuzzwork aggregates) are mocked anyway so a future

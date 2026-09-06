@@ -1,4 +1,4 @@
-# NeoCom Desk
+# Neocom Desk
 
 Installable, offline-capable PWA companion for EVE Online: multi-character
 overview, skill planning with remap optimization, industry build planning,

@@ -1,6 +1,6 @@
 # Feature parity — implementation plan
 
-Source: a competitive teardown of NeoCom Desk against a rival skill planner,
+Source: a competitive teardown of Neocom Desk against a rival skill planner,
 items 01–18 and 20 (item 19, second language, is explicitly excluded — it
 waits for a stable English UI). The rival is named only in
 `docs/research/competitors.md`; nothing downstream of this plan needs it.

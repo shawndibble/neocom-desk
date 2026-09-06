@@ -1,4 +1,4 @@
-# EVE Online third-party tool landscape (2026) — feature-gap analysis vs NeoCom Desk
+# EVE Online third-party tool landscape (2026) — feature-gap analysis vs Neocom Desk
 
 Scope check against `CONTEXT.md`/`README.md`: character views, skill plans (remap
 optimizer, ESI queue import, clipboard export), industry build plans (manufacturing

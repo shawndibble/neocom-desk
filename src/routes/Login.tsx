@@ -52,7 +52,7 @@ const PREVIEW = {
   trainingSkill: 'Gunnery',
 };
 
-/** Landing page for signed-out users: what NeoCom Desk does, and the EVE SSO login button. */
+/** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
 export function Login() {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);

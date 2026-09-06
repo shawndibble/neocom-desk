@@ -6,7 +6,7 @@ Accepted (2026-08-29)
 
 ## Context
 
-NeoCom Desk is a static SPA on GitHub Pages. EVE SSO supports the OAuth2
+Neocom Desk is a static SPA on GitHub Pages. EVE SSO supports the OAuth2
 authorization-code flow with PKCE for public clients, and both
 login.eveonline.com's token endpoint and esi.evetech.net serve
 `Access-Control-Allow-Origin: *` (verified 2026-08-29). A backend proxy for

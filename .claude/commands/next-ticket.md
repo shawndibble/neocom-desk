@@ -4,7 +4,7 @@ argument-hint: '[issue number] (optional — otherwise auto-picks the next unblo
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Skill, Agent, Task, TodoWrite, WebFetch, WebSearch
 ---
 
-You are running one iteration of the autonomous ticket loop for **NeoCom Desk**
+You are running one iteration of the autonomous ticket loop for **Neocom Desk**
 (`shawndibble/neocom-desk`). Do exactly one ticket, end to end, then stop.
 
 **This run is safe to execute concurrently with other `/next-ticket` runs on the

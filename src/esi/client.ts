@@ -11,7 +11,7 @@ import type { EsiEndpointId } from './registry';
 
 export const ESI_BASE_URL = 'https://esi.evetech.net';
 export const COMPATIBILITY_DATE = '2026-08-01';
-export const USER_AGENT = 'NeoCom Desk (github.com/shawndibble/neocom-desk)';
+export const USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
 
 /** Single retry on 429/420; never wait longer than this, whatever the server asks. */
 const MAX_RETRY_WAIT_MS = 10_000;

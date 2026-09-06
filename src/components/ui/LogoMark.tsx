@@ -3,7 +3,7 @@ interface LogoMarkProps {
 }
 
 /**
- * The NeoCom Desk hexagon mark, inline rather than an `<img>` so the corner
+ * The Neocom Desk hexagon mark, inline rather than an `<img>` so the corner
  * brackets track `--color-accent` instead of freezing whatever cyan the source
  * artwork happened to use. Simplified from `assets/brand/logo-mark.png`: the
  * bevels and the outer glow read as dirt below ~64px, which is every size this
