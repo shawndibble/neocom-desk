@@ -175,7 +175,12 @@ describe('planNetwork', () => {
     const plan = planNetwork({ ...options, colonies: full }, pi);
     expect(plan.opportunities).toEqual([]);
     expect(plan.blocked.map((line) => line.name)).toContain('Superconductors');
-    expect(plan.blocked.every((line) => line.reason === 'no-host-budget')).toBe(true);
+    // `needs-buying` is a different statement — "you make one of the two, the
+    // other is a hub run" — and with buying off the list carries both. Every
+    // candidate the colonies *can* feed was dropped for want of a host.
+    const feedable = plan.blocked.filter((line) => line.reason !== 'needs-buying');
+    expect(feedable.every((line) => line.reason === 'no-host-budget')).toBe(true);
+    expect(feedable.map((line) => line.name)).toContain('Superconductors');
   });
 
   it('leaves a type the hub does not quote unpriced rather than valuing it at zero', () => {
@@ -332,6 +337,25 @@ describe('planNetwork', () => {
     // taking only what the largest could cover.
     const nanites = plan.opportunities.find((entry) => entry.name === 'Nanites');
     expect(nanites?.inputs.filter((input) => input.typeId === REACTIVE_METALS).length).toBe(2);
+  });
+
+  it('says which products are one hub run away when buying is off', () => {
+    // Turning buying off must not go back to silence: a pilot who cannot reach
+    // a hub should still learn that they make one of the two inputs for
+    // something. Only partly-reachable candidates are named — every other
+    // schematic in the game is unreachable too, and listing those is a
+    // catalogue rather than advice.
+    const plan = planNetwork({ ...options, prices: ALL_PRICES }, pi);
+    const named = plan.blocked.filter((line) => line.reason === 'needs-buying');
+    expect(named.length).toBeGreaterThan(0);
+    for (const line of named) {
+      const schematic = pi.schematics[String(line.typeId)];
+      const made = schematic.inputs.filter((input) =>
+        EFA.some((entry) => (entry.outputPerHour.get(input.typeID) ?? 0) > 0)
+      );
+      expect(made.length).toBeGreaterThan(0);
+      expect(made.length).toBeLessThan(schematic.inputs.length);
+    }
   });
 
   it('has nothing to say about a single colony, or none', () => {

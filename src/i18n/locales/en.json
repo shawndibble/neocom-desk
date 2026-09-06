@@ -1292,8 +1292,12 @@
       "no-host-budget": "no colony here has the CPU and Powergrid for a factory",
       "needs-price": "the hub quotes no price for it",
       "unprofitable": "the customs office takes more than it earns",
-      "inputs-spoken-for": "its inputs went to a better-paying product"
+      "inputs-spoken-for": "its inputs went to a better-paying product",
+      "needs-buying": "one of its inputs would have to be bought at the hub"
     },
+    "buyInputsLabel": "Buy inputs at the hub",
+    "buyInputsHint": "Assume you can reach {{hub}} and haul planetary inputs in. Off, the Advisor only routes between your own colonies.",
+    "buyInputsOffNote": "Buying is off, so only what your own colonies make is on the table. {{names}} would also be reachable by hauling inputs from the hub.",
     "actionsLabel": "Do this",
     "actionRemove": "Remove {{count}}x idle {{pin}} \u2014 they draw {{demand}}/hr of {{input}} against the {{supply}}/hr this colony extracts. Frees {{cpu}} tf and {{powergrid}} MW.",
     "actionExtractFits": "Add {{units}}x Extractor Control Unit and {{heads}} heads \u2014 +{{extra}}/hr of {{name}}, which feeds {{fed}} of the {{idle}} idle facilities.",

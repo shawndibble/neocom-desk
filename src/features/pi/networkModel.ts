@@ -28,6 +28,11 @@ export interface NetworkModelInput {
   prices: Readonly<Record<number, number>>;
   /** What a sale fetches — highest hub buy, falling back to the ask. */
   revenuePrices?: Readonly<Record<number, number>>;
+  /**
+   * May a plan assume inputs can be bought at a hub? The caller decides, and
+   * the pilot's default is off — see `marketSourcingPref.ts`.
+   */
+  allowMarketSourcing?: boolean;
   taxRate: number;
 }
 
@@ -165,11 +170,11 @@ export function colonyNetwork(input: NetworkModelInput): ColonyNetwork | null {
         infrastructure: input.pi.infrastructure,
         prices: input.prices,
         ...(input.revenuePrices ? { revenuePrices: input.revenuePrices } : {}),
-        // The pilot asked what to put in an Advanced Industry Facility and a
-        // High-Tech Production Plant. Their colonies make no P2, so with
-        // buying off the honest answer was silence — and silence is what
-        // left the card offering pins it could not fill.
-        allowMarketSourcing: true,
+        // The pilot's own switch, off by default: buying P1 to feed a factory
+        // assumes a hub you can reach, which is not everyone's situation.
+        // Routing between the pilot's *own* colonies is never gated by it —
+        // that is the case this surface exists to find.
+        allowMarketSourcing: input.allowMarketSourcing ?? false,
         taxRate: input.taxRate,
       },
       input.pi

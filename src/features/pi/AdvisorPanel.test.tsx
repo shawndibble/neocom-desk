@@ -12,6 +12,7 @@ import type {
 } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
+import { useMarketSourcing } from './marketSourcingPref';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -161,6 +162,9 @@ function renderPanel(onSystemIdChange = vi.fn()) {
 }
 
 beforeEach(() => {
+  // A module-scoped store outlives the test that set it, and buying changes
+  // what every card says. Back to the shipped default each time.
+  useMarketSourcing.setState({ value: false, hydrated: true });
   loadPiPlanetRadius.mockResolvedValue({ '40000001': 6030, '40000002': 6030 });
   for (const mock of [
     loadCharacterPlanets,
@@ -763,6 +767,9 @@ describe('AdvisorPanel', () => {
   });
 
   it('separates what a factory would buy from what it merely gives up', async () => {
+    // Buying is off by default — it assumes a hub within reach — so this is
+    // the opted-in state, set the way the checkbox sets it.
+    useMarketSourcing.setState({ value: true, hydrated: true });
     // The pilot asked to "take into account the cost of buying it on the local
     // market hub". Superconductors need Plasmoids, which neither colony makes,
     // so those are a purchase — while the Water feeding the same factory is
@@ -785,6 +792,26 @@ describe('AdvisorPanel', () => {
     // The Water is routed, not bought, so it must not appear as a purchase.
     expect(screen.queryByText(/of Water — buy at/)).not.toBeInTheDocument();
     expect(screen.getByText(/an hour of inputs you have to buy/)).toBeInTheDocument();
+  });
+
+  it('names what buying would reach, rather than going quiet when it is off', async () => {
+    // Off is the default, because buying assumes a hub within reach. It must
+    // not mean silence: the complaint that started this work was a card that
+    // offered pins without ever saying what goes in them, and "you make one of
+    // the two inputs for this" is exactly what a pilot needs to decide whether
+    // the trip is worth it.
+    twoRefineries({
+      [MICROORGANISMS]: 12,
+      [AQUEOUS_LIQUIDS]: 12,
+      [WATER]: 513.9,
+      [BACTERIA]: 490,
+      [TEST_CULTURES]: 10_000,
+    });
+    renderPanel();
+    await screen.findByText('Ashab III');
+    expect(
+      screen.getByText(/would also be reachable by hauling inputs from the hub/)
+    ).toBeInTheDocument();
   });
 
   it('says nothing about a network when there is only one colony to work with', async () => {

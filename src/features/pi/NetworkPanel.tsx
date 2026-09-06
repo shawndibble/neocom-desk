@@ -23,19 +23,45 @@ import { customsRatePercent } from './customsRate';
  * reaches a P2. This is the answer they cannot give, and it sits above them
  * rather than on any one card because it is about the set.
  */
+/**
+ * Products the set almost reaches: it makes one of the two inputs, and the
+ * other would have to be bought.
+ *
+ * Only rendered with buying off, and it is the whole reason the off state is
+ * not silence. A pilot who turns the switch off should still learn that
+ * Superconductors is one hub run away, rather than being told nothing and
+ * concluding the tab has no opinion.
+ */
+function ReachableByBuying({ plan }: { plan: NetworkPlan }) {
+  const { t } = useTranslation();
+  const names = plan.blocked
+    .filter((line) => line.reason === 'needs-buying')
+    .map((line) => line.name);
+  if (names.length === 0) return null;
+  return (
+    <p className="text-[0.6875rem] text-text-dim">
+      {t('piAdvisor.buyInputsOffNote', { names: names.slice(0, 4).join(', ') })}
+    </p>
+  );
+}
+
 export function NetworkPanel({
   plan,
+  buyInputs,
   assumesRemoval,
   planetNames,
   taxRate,
 }: {
   plan: NetworkPlan;
+  /** Whether the plan was allowed to buy inputs, which decides what to explain. */
+  buyInputs: boolean;
   /** The host budgets counted room the unfed factories still hold, so say so. */
   assumesRemoval: boolean;
   planetNames: ReadonlyMap<number, string>;
   taxRate: number;
 }) {
   const { t } = useTranslation();
+  const blockers = plan.blocked.filter((line) => line.reason !== 'needs-buying');
   const nameOfPlanet = (planetId: number) =>
     planetNames.get(planetId) ?? t('piAdvisor.planetLabel', { id: planetId });
   const total = plan.opportunities.reduce((sum, line) => sum + line.marginPerHour, 0);
@@ -121,11 +147,16 @@ export function NetworkPanel({
         </p>
       )}
 
+      {!buyInputs && <ReachableByBuying plan={plan} />}
+
       {/* Never silently dropped: "you need more powergrid for this" is the
-          actionable half, and silence reads as "there is nothing here". */}
-      {plan.blocked.length > 0 && (
+          actionable half, and silence reads as "there is nothing here".
+          `needs-buying` is left out: with buying off it can name a dozen
+          products at once, and `ReachableByBuying` above says the same thing
+          in one sentence rather than a catalogue. */}
+      {blockers.length > 0 && (
         <ul className="mt-1 text-[0.6875rem] text-text-dim">
-          {plan.blocked.map((line) => (
+          {blockers.map((line) => (
             <li key={line.typeId}>
               {t('piAdvisor.networkBlocked', {
                 name: line.name,

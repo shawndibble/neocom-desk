@@ -173,7 +173,15 @@ describe('conversions', () => {
    * Cultures and change what the suite above is about.
    */
   const WITH_PLASMOIDS = { ...PRICES, [PLASMOIDS]: 600.2, [SUPERCONDUCTORS]: 11_280 };
-  const input = { advice: PAIR, pi, prices: WITH_PLASMOIDS, taxRate: 0 };
+  const input = {
+    advice: PAIR,
+    pi,
+    prices: WITH_PLASMOIDS,
+    taxRate: 0,
+    // The replacement is a market-fed factory, so these are about the
+    // opt-in state; the default-off behaviour is covered in the engine.
+    allowMarketSourcing: true,
+  };
 
   /**
    * Both colonies nearly full, which is what makes the question interesting:

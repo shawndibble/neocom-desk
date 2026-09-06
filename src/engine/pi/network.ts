@@ -173,7 +173,17 @@ export type NetworkBlocker =
   /** It earns nothing above the customs office at this rate. */
   | 'unprofitable'
   /** Every unit of an input it needs went to a better-paying candidate. */
-  | 'inputs-spoken-for';
+  | 'inputs-spoken-for'
+  /**
+   * No colony makes one of its inputs, and buying is off.
+   *
+   * Reported rather than skipped, because "you make one of the two things this
+   * needs" is the most useful thing the Advisor can say to a pilot deciding
+   * whether a hub run is worth it. Only candidates the set *partly* reaches are
+   * listed: every other schematic in the game is also unreachable, and saying
+   * so would be a catalogue rather than advice.
+   */
+  | 'needs-buying';
 
 /**
  * "Remove these, build that instead" — an exchange, priced as one decision.
@@ -267,7 +277,14 @@ function candidates(
     const bought = schematic.inputs.map(
       (input) => !opts.colonies.some((c) => (c.outputPerHour.get(input.typeID) ?? 0) > 0)
     );
-    if (bought.some(Boolean) && !opts.allowMarketSourcing) continue;
+    if (bought.some(Boolean) && !opts.allowMarketSourcing) {
+      // Partly reachable only: the set makes at least one of its inputs. A
+      // candidate it makes none of is not news.
+      if (!bought.every(Boolean)) {
+        blocked.push({ typeId, name: schematic.name, reason: 'needs-buying' });
+      }
+      continue;
+    }
     // Skip anything one colony could supply on its own *from its own ground*:
     // that is `recommendStopTier`'s question, already answered on its card,
     // and repeating it here would print one recommendation twice. A candidate

@@ -95,6 +95,7 @@ import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
 import { ColonyActions } from './ColonyActions';
 import { idleFacilityPlan } from './colonyActionModel';
+import { useMarketSourcing } from './marketSourcingPref';
 import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
 import {
   colonySpaceFor,
@@ -1001,6 +1002,14 @@ export interface AdvisorPanelProps {
 export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: AdvisorPanelProps) {
   const { t } = useTranslation();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  // Off by default: buying planetary inputs assumes a hub within reach, which
+  // is a fact about the pilot rather than about any colony.
+  const buyInputs = useMarketSourcing((state) => state.value);
+  const hydrateBuyInputs = useMarketSourcing((state) => state.hydrate);
+  const setBuyInputs = useMarketSourcing((state) => state.setValue);
+  useEffect(() => {
+    void hydrateBuyInputs();
+  }, [hydrateBuyInputs]);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -1122,6 +1131,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     pi: snapshot.pi,
     prices: snapshot.prices,
     revenuePrices: snapshot.revenuePrices,
+    allowMarketSourcing: buyInputs,
     taxRate: activeSystem.customsRate,
   });
   // Grouped once rather than filtered per card: the plan is one pass over a
@@ -1247,12 +1257,34 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               }
             />
           </div>
+          {/*
+            A fact about the pilot, not about a planet — so one switch for the
+            tab rather than a control on every card. Off by default: buying P1
+            to feed a factory is a good strategy that assumes a hub within
+            reach, and the Advisor should not price a standing freight run
+            nobody agreed to.
+          */}
+          <label className="mt-3 flex items-start gap-2 text-xs text-text">
+            <input
+              type="checkbox"
+              checked={buyInputs}
+              onChange={() => void setBuyInputs(!buyInputs)}
+              className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
+            />
+            <span>
+              <span className="font-medium">{t('piAdvisor.buyInputsLabel')}</span>
+              <span className="block text-[0.6875rem] text-text-dim">
+                {t('piAdvisor.buyInputsHint', { hub: DEFAULT_TRADE_HUB.systemName })}
+              </span>
+            </span>
+          </label>
         </div>
       </Panel>
 
       {network && (
         <NetworkPanel
           plan={network.plan}
+          buyInputs={buyInputs}
           assumesRemoval={network.assumesRemoval}
           planetNames={planetNames}
           taxRate={activeSystem.customsRate}
