@@ -39,10 +39,10 @@ import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import {
-  idsBeyondLimit,
-  NOTIFICATION_FEED_LIMIT,
+  mergeFeedRecord,
   readFeed,
   rowsWithinSyncWindow,
+  trimFeed,
 } from '@/features/notifications/feed';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { retryPendingRemotePurge } from './characterPurge';
@@ -761,8 +761,17 @@ function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record
   };
 }
 
-function toLocalFeedRecord(remote: RemoteNotificationFeedDoc): NotificationFeedRecord {
-  return {
+/**
+ * `local` is this device's own copy, present only when a pull is carrying an
+ * existing row's dismissal across (`mergeFeed`'s `pullDismiss`). The merge
+ * itself is `features/notifications/feed.mergeFeedRecord`'s — a pull must not
+ * be the one writer that re-dates a row.
+ */
+function toLocalFeedRecord(
+  remote: RemoteNotificationFeedDoc,
+  local?: NotificationFeedRecord
+): NotificationFeedRecord {
+  return mergeFeedRecord(local, {
     id: remote.id,
     characterId: remote.characterId,
     eventId: remote.eventId,
@@ -771,7 +780,7 @@ function toLocalFeedRecord(remote: RemoteNotificationFeedDoc): NotificationFeedR
     firedAt: remote.firedAt,
     ...(remote.eveType !== undefined ? { eveType: remote.eveType } : {}),
     ...(remote.dismissedAt !== undefined ? { dismissedAt: remote.dismissedAt } : {}),
-  };
+  });
 }
 
 async function syncFeed(ctx: SyncContext): Promise<void> {
@@ -794,11 +803,15 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
     )
   );
 
-  const pulled = [...plan.pullCreate, ...plan.pullDismiss].map(toLocalFeedRecord);
+  const localById = new Map(local.map((row) => [row.id, row]));
+  const pulled = [...plan.pullCreate, ...plan.pullDismiss].map((row) =>
+    toLocalFeedRecord(row, localById.get(row.id))
+  );
   if (pulled.length > 0) {
     await db.notificationFeed.bulkPut(pulled);
-    const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT);
-    if (stale.length > 0) await db.notificationFeed.bulkDelete(stale);
+    // Excluding what this pull just wrote, or a back-dated row would be
+    // trimmed on arrival and pulled again on the next sync, forever.
+    await trimFeed(new Set(pulled.map((row) => row.id)));
     await refreshAppBadge();
   }
 }

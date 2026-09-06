@@ -13,7 +13,7 @@
  * drives all live in `pollDomains.ts`; this file names none of them (#273).
  */
 import { db } from '@/db';
-import { occurrenceKey } from '@/engine/occurrenceKey';
+import { occurrenceKey, occurrenceFiredAt } from '@/engine/occurrenceKey';
 import type { ProjectionRow } from '@/engine/projection';
 import { loadUniverseType } from '@/features/skills/data';
 import { loadPlanetName } from '@/features/pi/names';
@@ -636,9 +636,14 @@ async function recordFeedNotification(
 ): Promise<void> {
   try {
     const { title, body } = await notificationText(fire, character);
-    const firedAt = Date.now();
+    const now = Date.now();
+    // Dated by the occurrence, not by this poll, wherever the fire knows when
+    // it happened (`occurrenceFiredAt`): a device opened after days away
+    // reports everything it missed in one poll, and stamping all of it `now`
+    // would pile days of history onto one minute at the top of the feed.
+    const firedAt = occurrenceFiredAt(fire, now);
     await recordFeedEntry({
-      id: occurrenceKey(fire, firedAt),
+      id: occurrenceKey(fire, now),
       characterId: character.characterId,
       eventId: fire.eventId,
       eveType: fire.eventId === 'eveNotification' ? fire.type : undefined,

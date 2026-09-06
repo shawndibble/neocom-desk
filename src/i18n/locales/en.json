@@ -660,7 +660,8 @@
     "notificationsDismissAll": "Dismiss all",
     "notificationsDismiss": "Dismiss {{title}}",
     "notificationsSettings": "Settings",
-    "notificationsOtherCharacters": "Other characters"
+    "notificationsOtherCharacters": "Other characters",
+    "notificationsSpan": "{{count}} alerts from {{oldest}} to {{newest}}"
   },
   "common": {
     "close": "Close",

@@ -25,7 +25,7 @@ import { Button, EmptyState, IconButton, Panel, buttonClassName } from '@/compon
 import { Close } from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { readFeed, dismissFeedEntries } from './feed';
+import { readFeed, dismissFeedEntries, type NotificationFeedEntry } from './feed';
 import { refreshAppBadge } from './appBadge';
 import { NotificationContextMenu } from './NotificationContextMenu';
 import { notificationUrlFor } from './notificationOptions';
@@ -150,6 +150,7 @@ export function NotificationFeedPanel() {
                   >
                     <p className="text-sm font-medium hover:underline">{title}</p>
                     <p className="text-xs text-text-dim">{entry.body}</p>
+                    <FiredSpan fires={group.fires} />
                   </Link>
                   {/* The newest member's age: `readFeed` hands the rows over
                       newest-first, and the grouper keeps the first one it saw
@@ -191,6 +192,35 @@ export function NotificationFeedPanel() {
         </div>
       )}
     </Panel>
+  );
+}
+
+/**
+ * How far back a collapsed row actually reaches, shown only when its rows do
+ * not all read the same age.
+ *
+ * A group carries one timestamp — its newest member's (`FiredAt` above) — so
+ * without this a pile of alerts a device only *noticed* in one poll reads as
+ * a pile that *happened* in one moment. That is exactly what a device opened
+ * after days away produces: it reports everything it missed at once, and for
+ * the events that know when they really happened
+ * (`engine/occurrenceKey.occurrenceFiredAt`) the rows behind the count can be
+ * days apart. Silent when the ages render identically, so an ordinary burst
+ * inside one poll gains no chrome.
+ */
+function FiredSpan({ fires }: { fires: readonly NotificationFeedEntry[] }) {
+  const { t } = useTranslation();
+  if (fires.length < 2) return null;
+  const firedAts = fires.map((fire) => fire.firedAt);
+  // eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label
+  const now = Date.now();
+  const newest = formatAge(Math.max(0, now - Math.max(...firedAts)), t);
+  const oldest = formatAge(Math.max(0, now - Math.min(...firedAts)), t);
+  if (newest === oldest) return null;
+  return (
+    <p className="text-[0.6875rem] text-text-dim">
+      {t('overview.notificationsSpan', { count: fires.length, oldest, newest })}
+    </p>
   );
 }
 

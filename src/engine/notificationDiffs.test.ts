@@ -33,6 +33,7 @@ import {
   type ContractEntrySnapshot,
   type ContractSnapshot,
   type WalletJournalEntrySnapshot,
+  type WalletNotificationFire,
   type WalletSnapshot,
   type MarketOrderEntrySnapshot,
   type MarketOrderSnapshot,
@@ -832,9 +833,15 @@ describe('diffContractAccepted', () => {
 function walletEntry(
   id: number,
   amount: number | null = 100,
-  thresholdIsk = 0
+  thresholdIsk = 0,
+  dateMs = T0 + id
 ): WalletJournalEntrySnapshot {
-  return { id, amount, thresholdIsk };
+  return { id, amount, thresholdIsk, dateMs };
+}
+
+/** The fire `walletEntry(id, amount)` produces, so the two stay in step. */
+function walletFire(id: number, amount: number, dateMs = T0 + id): WalletNotificationFire {
+  return { eventId: 'walletBalanceChanged', characterId: 7, amount, journalEntryId: id, dateMs };
 }
 
 function walletSnapshot(
@@ -853,9 +860,7 @@ describe('diffWalletBalanceChanged', () => {
   it('fires when a journal entry id above the previous high-water mark appears', () => {
     const prev = walletSnapshot([walletEntry(5), walletEntry(3)], T0);
     const next = walletSnapshot([walletEntry(6, 250), walletEntry(5), walletEntry(3)], T0 + 2000);
-    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
-      { eventId: 'walletBalanceChanged', characterId: 7, amount: 250 },
-    ]);
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([walletFire(6, 250)]);
   });
 
   it('does not fire for an id already seen', () => {
@@ -874,8 +879,8 @@ describe('diffWalletBalanceChanged', () => {
     const prev = walletSnapshot([walletEntry(5)], T0);
     const next = walletSnapshot([walletEntry(7), walletEntry(6), walletEntry(5)], T0 + 2000);
     expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
-      { eventId: 'walletBalanceChanged', characterId: 7, amount: 100 },
-      { eventId: 'walletBalanceChanged', characterId: 7, amount: 100 },
+      walletFire(6, 100),
+      walletFire(7, 100),
     ]);
   });
 
@@ -888,8 +893,8 @@ describe('diffWalletBalanceChanged', () => {
       T0 + 2000
     );
     expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
-      { eventId: 'walletBalanceChanged', characterId: 7, amount: 600 },
-      { eventId: 'walletBalanceChanged', characterId: 7, amount: 700 },
+      walletFire(6, 600),
+      walletFire(7, 700),
     ]);
   });
 
@@ -908,9 +913,7 @@ describe('diffWalletBalanceChanged', () => {
       [walletEntry(6, 1_000_000, 1_000_000), walletEntry(5, 100, 1_000_000)],
       T0 + 2000
     );
-    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
-      { eventId: 'walletBalanceChanged', characterId: 7, amount: 1_000_000 },
-    ]);
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([walletFire(6, 1_000_000)]);
   });
 
   it('fires for a large negative (ISK spent) entry once its magnitude crosses the threshold', () => {
@@ -919,9 +922,7 @@ describe('diffWalletBalanceChanged', () => {
       [walletEntry(6, -2_000_000, 1_000_000), walletEntry(5, 100, 1_000_000)],
       T0 + 2000
     );
-    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([
-      { eventId: 'walletBalanceChanged', characterId: 7, amount: -2_000_000 },
-    ]);
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([walletFire(6, -2_000_000)]);
   });
 
   it('does not fire for a new entry with a null amount, since it cannot be compared to the threshold', () => {
@@ -932,8 +933,13 @@ describe('diffWalletBalanceChanged', () => {
     );
     expect(diffWalletBalanceChanged(7, prev, next)).toEqual([]);
   });
+  it("carries the journal entry's own id and date, so the Occurrence Key and the feed row's time come from the payment rather than the poll", () => {
+    const paidAt = T0 - 3 * 86_400_000;
+    const prev = walletSnapshot([walletEntry(5)], T0);
+    const next = walletSnapshot([walletEntry(6, 250, 0, paidAt), walletEntry(5)], T0 + 2000);
+    expect(diffWalletBalanceChanged(7, prev, next)).toEqual([walletFire(6, 250, paidAt)]);
+  });
 });
-
 function orderEntry(
   orderId: number,
   filled: boolean,

@@ -61,7 +61,7 @@ const CONTRACT_SNAPSHOT: ContractSnapshot = {
 };
 
 const WALLET_SNAPSHOT: WalletSnapshot = {
-  entries: [{ id: 5, amount: 100, thresholdIsk: 0 }],
+  entries: [{ id: 5, amount: 100, thresholdIsk: 0, dateMs: 999 }],
   nowMs: 999,
 };
 
@@ -337,6 +337,26 @@ describe('walletDomain.store', () => {
 
   it('falls back to the default when the stored value has the wrong shape', async () => {
     await db.settings.put({ key: walletDomain.stateKey, value: { 7: { entries: 'nope' } } });
+    await walletDomain.store.getState().hydrate();
+    expect(walletDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+  });
+
+  it('drops a baseline written before entries carried dateMs, so the upgrade costs one quiet poll instead of replaying the journal', async () => {
+    await db.settings.put({
+      key: walletDomain.stateKey,
+      value: { 7: { entries: [{ id: 5, amount: 100, thresholdIsk: 0 }], nowMs: 999 } },
+    });
+    await walletDomain.store.getState().hydrate();
+    // No baseline means `diffWalletBalanceChanged` fires nothing this poll and
+    // the next save writes a complete snapshot.
+    expect(walletDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
+  });
+
+  it('rejects an entry whose dateMs is NaN, which would sort the feed row nowhere', async () => {
+    await db.settings.put({
+      key: walletDomain.stateKey,
+      value: { 7: { entries: [{ id: 5, amount: 100, thresholdIsk: 0, dateMs: NaN }], nowMs: 999 } },
+    });
     await walletDomain.store.getState().hydrate();
     expect(walletDomain.store.getState().value).toEqual(EMPTY_POLLER_STATE);
   });
