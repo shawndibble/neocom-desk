@@ -190,6 +190,29 @@ describe('NotificationFeedPanel', () => {
     expect(items[0]).toHaveTextContent('Market order filled x6');
   });
 
+  it('says how far back a collapsed row reaches, so a catch-up pile cannot read as one recent burst', async () => {
+    const now = Date.now();
+    await seed('Market order filled', 'Your order was filled.', now - 3 * 86_400_000);
+    await seed('Market order filled', 'Your order was filled.', now - 30_000);
+
+    renderPanel();
+
+    const items = await screen.findAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent('from 3d ago to just now');
+  });
+
+  it('leaves the span off a collapsed row whose rows all read the same age', async () => {
+    const now = Date.now();
+    await seed('Market order filled', 'Your order was filled.', now - 30_000);
+    await seed('Market order filled', 'Your order was filled.', now - 29_000);
+
+    renderPanel();
+
+    const items = await screen.findAllByRole('listitem');
+    expect(items[0]).not.toHaveTextContent('from');
+  });
+
   it('leaves a lone notification’s title alone — no "x1"', async () => {
     await seed('Market order filled', 'Your order was filled.', 1000);
 

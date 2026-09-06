@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { occurrenceKey } from './occurrenceKey';
+import { occurrenceKey, occurrenceFiredAt } from './occurrenceKey';
 import type {
   NotificationFire,
   IndustryJobNotificationFire,
@@ -226,14 +226,20 @@ describe('occurrenceKey', () => {
     expect(occurrenceKey(joined, T0)).not.toEqual(occurrenceKey(left, T0));
   });
 
-  it('buckets walletBalanceChanged by day', () => {
+  it('keys walletBalanceChanged on the journal entry id the diff already high-water-marks by', () => {
     const fire: WalletNotificationFire = {
       eventId: 'walletBalanceChanged',
       characterId: 7,
       amount: 1000,
+      journalEntryId: 4242,
+      dateMs: T0,
     };
-    expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey(fire, T0 + 60_000));
-    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey(fire, T0 + 86_400_000));
+    // The same entry seen on two polls a day apart is one occurrence, not two.
+    expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey(fire, T0 + 86_400_000));
+    // Two entries that happen to move the same amount are two occurrences.
+    expect(occurrenceKey(fire, T0)).not.toEqual(
+      occurrenceKey({ ...fire, journalEntryId: 4243 }, T0)
+    );
   });
 
   it('buckets corpWalletThreshold balanceBelow by day and division, a genuine threshold crossing', () => {
@@ -283,5 +289,32 @@ describe('occurrenceKey', () => {
   it('namespaces every key by characterId, so two characters never collide', () => {
     const fire: MailNotificationFire = { eventId: 'newMail', characterId: 7, mailId: 789 };
     expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, characterId: 8 }, T0));
+  });
+});
+
+describe('occurrenceFiredAt', () => {
+  it('dates a walletBalanceChanged row by the journal entry, not by the poll that noticed it', () => {
+    const paidAt = T0 - 2 * 86_400_000;
+    const fire: WalletNotificationFire = {
+      eventId: 'walletBalanceChanged',
+      characterId: 7,
+      amount: 1000,
+      journalEntryId: 4242,
+      dateMs: paidAt,
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(paidAt);
+  });
+
+  it('falls back to the poll time for a fire that carries no time of its own', () => {
+    // A market order fill: ESI order history records no fill time, so when
+    // the poller noticed it is the only time there is.
+    const fire: MarketOrderNotificationFire = {
+      eventId: 'marketOrderFilled',
+      characterId: 7,
+      orderId: 99,
+      typeId: 34,
+      quantity: 1,
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(T0);
   });
 });

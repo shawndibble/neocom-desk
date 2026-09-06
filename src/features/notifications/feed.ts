@@ -15,6 +15,8 @@
  * `engine/occurrenceKey.ts`), not a minted one: a `put` with the same id
  * upserts, which is what makes a second device or the Scheduled Push backend
  * recording the same occurrence collapse into the one row instead of two.
+ * What that upsert must *not* carry over from the later sighting is the row's
+ * `firedAt` and `dismissedAt` — see `recordFeedEntry`.
  */
 import { db, type NotificationFeedRecord } from '@/db';
 import { refreshAppBadge } from './appBadge';
@@ -68,8 +70,31 @@ export async function readFeed(): Promise<NotificationFeedEntry[]> {
   return db.notificationFeed.orderBy('firedAt').reverse().toArray();
 }
 
+/**
+ * Upserts by Occurrence Key, but never re-dates or un-dismisses a row that is
+ * already here.
+ *
+ * A second observer of the same occurrence — the other device, the Scheduled
+ * Push backend, or this device's own poller diffing against a baseline that
+ * predates the row — writes the identical id with its own `firedAt` and no
+ * `dismissedAt`. A plain `put` replaces the whole record, so that write used
+ * to restamp the row to the moment of the *later* sighting and drop the
+ * dismissal with it: alerts the user had already cleared came back, at the top
+ * of the list, dated now. The first sighting is the one that happened, and a
+ * dismissal is the user's own act — neither is a later observer's to revise.
+ * Everything else (the copy) still comes from the newest write.
+ */
 export async function recordFeedEntry(entry: NewNotificationFeedEntry): Promise<void> {
-  await db.notificationFeed.put(entry);
+  const existing = await db.notificationFeed.get(entry.id);
+  await db.notificationFeed.put(
+    existing === undefined
+      ? entry
+      : {
+          ...entry,
+          firedAt: existing.firedAt,
+          ...(existing.dismissedAt !== undefined ? { dismissedAt: existing.dismissedAt } : {}),
+        }
+  );
   const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT);
   if (stale.length > 0) await db.notificationFeed.bulkDelete(stale);
   await refreshAppBadge();

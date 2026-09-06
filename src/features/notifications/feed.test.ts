@@ -129,6 +129,47 @@ describe('recordFeedEntry / readFeed', () => {
     expect(feed).toHaveLength(1);
     expect(feed[0].title).toBe('Second observer');
   });
+
+  it("keeps the first observer's firedAt, so a second observer cannot re-date the row to its own poll", async () => {
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'First observer',
+      body: 'b',
+      firedAt: 1000,
+    });
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'Second observer',
+      body: 'b',
+      firedAt: 1500,
+    });
+    expect((await readFeed())[0].firedAt).toBe(1000);
+  });
+
+  it('keeps a dismissal, so a second observer re-recording the occurrence cannot resurface it', async () => {
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'First observer',
+      body: 'b',
+      firedAt: 1000,
+    });
+    await dismissFeedEntry('same-occurrence');
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'Second observer',
+      body: 'b',
+      firedAt: 1500,
+    });
+    expect((await readFeed())[0].dismissedAt).toBeTypeOf('number');
+  });
 });
 
 describe('legacy rows', () => {

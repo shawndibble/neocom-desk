@@ -616,13 +616,23 @@ export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractN
 /* Wallet                                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Strict about `dateMs` for `isMarketOrderEntrySnapshot`'s reason: a baseline
+ * written before the field existed fails validation, so `pollerState.ts`
+ * reads it as `null`, `diffWalletBalanceChanged` fires nothing without a
+ * baseline, and the upgrade costs one quiet poll rather than replaying the
+ * journal. `Number.isFinite` rather than `typeof === 'number'` because an
+ * unparseable ESI date yields `NaN`, which is a number and would sort the row
+ * nowhere and never trim.
+ */
 function isWalletJournalEntrySnapshot(raw: unknown): raw is WalletJournalEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
   return (
     typeof r.id === 'number' &&
     (r.amount === null || typeof r.amount === 'number') &&
-    typeof r.thresholdIsk === 'number'
+    typeof r.thresholdIsk === 'number' &&
+    Number.isFinite(r.dateMs)
   );
 }
 
@@ -651,11 +661,17 @@ export const walletDomain = defineDomain<
     // sees them again (same reasoning as the contracts truncation guard above).
     if (result.cached.truncated) return null;
     const thresholds = await currentThresholds(characterId);
-    return result.cached.data.map((entry) => ({
-      id: entry.id,
-      amount: entry.amount ?? null,
-      thresholdIsk: thresholds.walletBalanceChangedThresholdIsk,
-    }));
+    return result.cached.data.map((entry) => {
+      // An entry ESI dates unparseably falls back to the poll clock rather
+      // than poisoning the feed's ordering with NaN.
+      const dateMs = Date.parse(entry.date);
+      return {
+        id: entry.id,
+        amount: entry.amount ?? null,
+        thresholdIsk: thresholds.walletBalanceChangedThresholdIsk,
+        dateMs: Number.isFinite(dateMs) ? dateMs : Date.now(),
+      };
+    });
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   diffs: [gatedOn('walletBalanceChanged', diffWalletBalanceChanged)],

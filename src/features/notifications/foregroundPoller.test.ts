@@ -116,7 +116,7 @@ function calendarEvent(overrides: Partial<CalendarEventSummary> = {}): CalendarE
 function walletJournalEntry(
   overrides: Partial<WalletJournalEntrySnapshot> = {}
 ): WalletJournalEntrySnapshot {
-  return { id: 1, amount: 100, thresholdIsk: 0, ...overrides };
+  return { id: 1, amount: 100, thresholdIsk: 0, dateMs: 1_000_000, ...overrides };
 }
 
 function eveNotification(overrides: Partial<CharacterNotification> = {}): CharacterNotification {
@@ -856,7 +856,10 @@ describe('runForegroundPoll', () => {
 
   it('leaves the wallet high-water mark untouched and fires nothing when the load is truncated', async () => {
     const initial: WalletPollerState = {
-      [CHAR.characterId]: { entries: [{ id: 5, amount: 100, thresholdIsk: 0 }], nowMs: 500 },
+      [CHAR.characterId]: {
+        entries: [{ id: 5, amount: 100, thresholdIsk: 0, dateMs: 1_000_000 }],
+        nowMs: 500,
+      },
     };
     const saveWalletState = vi.fn(async () => {});
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
@@ -886,13 +889,16 @@ describe('runForegroundPoll', () => {
     expect(deps.notify).not.toHaveBeenCalled();
     expect(savedWallet).not.toBeNull();
     expect(savedWallet![CHAR.characterId].entries).toEqual([
-      { id: 5, amount: 100, thresholdIsk: 0 },
+      { id: 5, amount: 100, thresholdIsk: 0, dateMs: 1_000_000 },
     ]);
   });
 
   it('records walletBalanceChanged to the feed but does not raise a browser notification by default (feed-only, CONTEXT.md round 45)', async () => {
     const savedWallet: WalletPollerState = {
-      [CHAR.characterId]: { entries: [{ id: 5, amount: 100, thresholdIsk: 0 }], nowMs: 1000 },
+      [CHAR.characterId]: {
+        entries: [{ id: 5, amount: 100, thresholdIsk: 0, dateMs: 1_000_000 }],
+        nowMs: 1000,
+      },
     };
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
@@ -914,7 +920,10 @@ describe('runForegroundPoll', () => {
 
   it('fires walletBalanceChanged when a journal entry id above the previous high-water mark appears', async () => {
     let savedWallet: WalletPollerState = {
-      [CHAR.characterId]: { entries: [{ id: 5, amount: 100, thresholdIsk: 0 }], nowMs: 1000 },
+      [CHAR.characterId]: {
+        entries: [{ id: 5, amount: 100, thresholdIsk: 0, dateMs: 1_000_000 }],
+        nowMs: 1000,
+      },
     };
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
     const deps = baseDeps({
@@ -937,6 +946,8 @@ describe('runForegroundPoll', () => {
       eventId: 'walletBalanceChanged',
       characterId: CHAR.characterId,
       amount: 250,
+      journalEntryId: 6,
+      dateMs: 1_000_000,
     });
     expect(character).toEqual(CHAR);
   });

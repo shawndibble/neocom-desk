@@ -11,12 +11,19 @@
  * observers to agree.
  *
  * Some cases carry no natural id of their own: `characterNotTraining` is the
- * *absence* of training, `walletBalanceChanged` and `corpWalletThreshold`'s
- * `balanceBelow` case are threshold crossings, not entities with an id.
- * Those bucket on `nowMs` at day granularity instead, so two devices polling
- * minutes apart still agree. `corpWalletThreshold`'s `transactionAbove` case
- * is the exception: the diff itself high-water-marks it by the journal
- * entry's own id, so that id is the key, not a bucket.
+ * *absence* of training, and `corpWalletThreshold`'s `balanceBelow` case is a
+ * threshold crossing, not an entity with an id. Those bucket on `nowMs` at
+ * day granularity instead, so two devices polling minutes apart still agree.
+ *
+ * A day bucket is a last resort, not a default. It collapses every occurrence
+ * of its event within one UTC day onto a single row, so a second occurrence
+ * that day overwrites the first — and the same occurrence seen on two
+ * different days becomes two rows. `walletBalanceChanged` was bucketed that
+ * way originally and should not have been: `diffWalletBalanceChanged`
+ * high-water-marks on the journal entry's `id` and emits one fire per entry,
+ * so the entry id was always available. It is now the key, matching what
+ * `corpWalletThreshold`'s `transactionAbove` case has always done. See the
+ * superseding decision file.
  *
  * The `switch` below is exhaustive over every `NotificationEventId`
  * (`default`'s `never` assignment): adding a Notification Event without
@@ -111,7 +118,7 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     case 'corpMemberLeft':
       return [characterId, fire.eventId, fire.memberCharacterId].join(':');
     case 'walletBalanceChanged':
-      return [characterId, fire.eventId, dayBucket(nowMs)].join(':');
+      return [characterId, fire.eventId, fire.journalEntryId].join(':');
     case 'corpWalletThreshold':
       // `transactionAbove` has a real natural id (the journal entry the diff
       // itself high-water-marks by); only `balanceBelow` is a genuine
@@ -124,4 +131,24 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
       throw new Error(`occurrenceKey: unhandled Notification Event ${JSON.stringify(exhaustive)}`);
     }
   }
+}
+
+/**
+ * When the occurrence actually happened, for the feed row's `firedAt` — the
+ * poll time only when the fire has nothing better.
+ *
+ * Opt-in per event rather than exhaustive: most fires genuinely have no
+ * occurrence time to offer. A market order fill is the clearest case — ESI's
+ * order history records when an order was *issued*, never when it filled, so
+ * the poll that noticed it is the only time there is. Events whose only
+ * timestamp lies in the future (a fuel expiry, an extractor's expiry) are
+ * deadlines, not occurrence times, and stay on the poll clock too.
+ *
+ * This matters because a device polls only while the app is open: one opened
+ * after days away reports everything it missed in a single poll. Dating those
+ * rows by that poll stacks days of history onto one minute — the feed shows
+ * them as having just happened, and they sort above genuinely newer rows.
+ */
+export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
+  return fire.eventId === 'walletBalanceChanged' ? fire.dateMs : nowMs;
 }
