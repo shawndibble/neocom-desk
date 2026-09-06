@@ -48,6 +48,12 @@ vi.mock('@/features/character/systemSecurity', () => ({
   loadSystemName: vi.fn(async () => null),
 }));
 
+// The build location search only renders once the scope is known to be
+// granted; without this the box under test is the re-auth offer instead.
+vi.mock('@/app/useGrantedScopes', () => ({
+  useGrantedScopes: () => ['esi-search.search_structures.v1'],
+}));
+
 const BLUEPRINT: BlueprintType = {
   name: 'Rifter Blueprint',
   time: 1200,
@@ -590,6 +596,75 @@ describe('BuildPlanDetail build system', () => {
     );
 
     expect(await screen.findByText(/Azbel · Badivefi · Lowsec/)).toBeInTheDocument();
+  });
+
+  it("names the plan's own picked location in the search box", async () => {
+    render(<Harness plan={{ buildLocationId: 1035, buildLocationName: 'K2-18 R&D' }} />);
+
+    expect(valueOf(await screen.findByLabelText('Build location'))).toBe('K2-18 R&D');
+  });
+
+  it('composes a stand-in name for a picked structure ESI would not name', async () => {
+    render(
+      <Harness
+        plan={{
+          facility: 'azbel',
+          buildLocationId: 1035,
+          buildSystemId: 30003888,
+          buildSystemName: 'Badivefi',
+        }}
+      />
+    );
+
+    expect(valueOf(await screen.findByLabelText('Build location'))).toBe('Azbel in Badivefi');
+  });
+
+  it('forgets the picked location when the facility is changed by hand', async () => {
+    // The stored name is a label, never a number — but a label naming a
+    // Raitaru over a plan that now says NPC station is a label that lies.
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <Harness
+        plan={{ facility: 'raitaru', buildLocationId: 1035, buildLocationName: 'K2-18 R&D' }}
+        onUpdate={onUpdate}
+      />
+    );
+    await openOverride(user);
+
+    await user.click(screen.getByLabelText('Facility'));
+    await user.click(await screen.findByRole('option', { name: 'Azbel' }));
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        facility: 'azbel',
+        buildLocationId: undefined,
+        buildLocationName: undefined,
+      })
+    );
+  });
+
+  it('forgets the picked location when the build system is typed by hand', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <Harness
+        plan={{ buildLocationId: 1035, buildLocationName: 'K2-18 R&D' }}
+        onUpdate={onUpdate}
+      />
+    );
+    await openOverride(user);
+
+    await user.type(systemInput(), 'badivefi');
+    await user.tab();
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        buildSystemId: 30003888,
+        buildLocationId: undefined,
+        buildLocationName: undefined,
+      })
+    );
   });
 
   it('takes the band from the system it just resolved', async () => {

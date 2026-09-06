@@ -11,9 +11,9 @@ import type { BuildLocationOption } from './buildLocations';
 
 type BuildLocationPatch = Pick<
   BuildPlanRecord,
-  'facility' | 'security' | 'buildSystemId' | 'buildSystemName'
+  'facility' | 'security' | 'buildSystemId' | 'buildSystemName' | 'buildLocationId'
 > &
-  Partial<Pick<BuildPlanRecord, 'rigLevel' | 'facilityTaxPct'>>;
+  Partial<Pick<BuildPlanRecord, 'rigLevel' | 'facilityTaxPct' | 'buildLocationName'>>;
 
 export function buildLocationPatch(option: BuildLocationOption): BuildLocationPatch {
   return {
@@ -21,6 +21,10 @@ export function buildLocationPatch(option: BuildLocationOption): BuildLocationPa
     security: option.security,
     buildSystemId: option.systemId,
     buildSystemName: option.systemName,
+    // Dropped rather than replaced when ESI withheld the name: the stand-in
+    // label belongs to i18next, so only the id is data here.
+    buildLocationId: option.structureId,
+    buildLocationName: option.name ?? undefined,
     // An NPC station has no rig slots, and a tax CCP fixes at 0.25% — which
     // `jobFee` already applies from `FACILITY_PRESETS.npcStation.defaultTaxPct`
     // the moment the facility is one. Clearing both here is what stops a rig

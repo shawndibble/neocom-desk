@@ -208,6 +208,26 @@ export interface BuildPlanRecord {
    * build system at all.
    */
   buildSystemName?: string;
+  /**
+   * The station or structure the pilot picked in the build location search,
+   * kept so the search box can still name it after a reload instead of going
+   * blank the moment the pick fills the fields below it.
+   *
+   * Held for the label only — every calculation still reads `facility`,
+   * `security` and `buildSystemId`, which the pick wrote. That makes a stale
+   * pair a wrong *label*, never a wrong number, and the two manual controls
+   * that could make it stale (the Facility select, the Build system field)
+   * clear both fields as they edit.
+   *
+   * Unlike `buildSystemId`/`buildSystemName` these two are independently
+   * optional: ESI withholds a structure's name from a Character whose role
+   * cannot see it, and the id is still worth keeping — the label that stands
+   * in for the missing name is UI copy (`buildLocationLabel.ts`), not data.
+   * Additive and unindexed, so no schema version bump.
+   */
+  buildLocationId?: number;
+  /** @see buildLocationId */
+  buildLocationName?: string;
   /** Facility tax, percent of EIV. Structures only — NPC station tax is fixed. */
   facilityTaxPct?: number;
   /**
