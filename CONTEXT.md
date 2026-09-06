@@ -291,6 +291,17 @@ here — they go one per file in `docs/context/decisions/`.
   while `/skillqueue` carries `training_start_sp`, `level_end_sp` and the
   window the level trains across — enough to interpolate the true figure,
   which is what the in-game queue itself displays.
+- **Use-or-Sell Check**: A Build Plan's third read, alongside the
+  **Acquisition Verdict** and **Sale Profitability**: is the stock the player
+  already owns worth more sold than consumed? Compares the plan's profit
+  (which counts owned units as free) against what those units would net if
+  liquidated, on a chosen **Liquidation Basis**. Only exists when something is
+  owned; no verdict at all when an owned material has no price on that side.
+- **Liquidation Basis**: How owned materials would be turned into ISK in the
+  **Use-or-Sell Check** — `instant` (fill the hub's standing buy orders: sales
+  tax only, since filling an order lists nothing) or `order` (list your own
+  stack at the hub's sell price: sales tax plus broker fee, 100 ISK minimum per
+  stack). Independent of a plan's material price basis, which is about buying.
 - **Variations**: The selected item's Tech I/II/Faction/Storyline/Officer
   variation group, shown as a sortable table (Name, Tier, Sell, Buy) beside
   it for price comparison; falls back to its Market Group siblings when it

@@ -14,6 +14,11 @@ import {
 import * as Icon from '@/components/ui/icons';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
+import {
+  compareUseOrSell,
+  type LiquidationBasis,
+  type OwnedStockSale,
+} from '@/engine/industry/ownedStockSale';
 import { marketItemUrl } from '@/engine/market/urlState';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -29,6 +34,8 @@ interface CostRowProps {
   /** `'negative'`/`'positive'` render the value in the `isk-neg`/`isk-pos` tone, e.g. for
    * deductions like Sales Tax/Broker Fee, or a Profit row that can go either way. */
   tone?: 'negative' | 'positive';
+  /** Makes the row's tooltip trigger open the calculation breakdown on click. */
+  onTooltipClick?: () => void;
 }
 
 /** One row of the Costs stack: label (+ optional tooltip) left, value right. */
@@ -39,6 +46,7 @@ function CostRow({
   emphasized = false,
   indented = false,
   tone,
+  onTooltipClick,
 }: CostRowProps) {
   const { t } = useTranslation();
   const toneClass =
@@ -55,7 +63,14 @@ function CostRow({
     >
       <span className="flex items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
         {label}
-        {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
+        {tooltip && (
+          <InfoTooltip
+            label={t('common.aboutLabel', { label })}
+            content={tooltip}
+            onClick={onTooltipClick}
+            {...(onTooltipClick ? { 'aria-haspopup': 'dialog' as const } : {})}
+          />
+        )}
       </span>
       <span className={`font-medium tabular-nums ${emphasized ? 'text-sm' : ''} ${toneClass}`}>
         {value}
@@ -94,6 +109,12 @@ interface ResultsSummaryProps {
   costIndexSystemName: string;
   /** The inputs behind the numbers, quoted back by the calculation breakdown modal. */
   breakdown: BreakdownContext;
+  /**
+   * What the materials the player already owns would fetch if sold instead of
+   * consumed, quoted on both liquidation bases. Null when the plan owns none —
+   * the whole comparison only exists for a player who is holding stock.
+   */
+  ownedSale: { instant: OwnedStockSale; order: OwnedStockSale } | null;
 }
 
 /**
@@ -114,6 +135,7 @@ export function ResultsSummary({
   productQuantity,
   costIndexSystemName,
   breakdown,
+  ownedSale,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -121,6 +143,7 @@ export function ResultsSummary({
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
   const [profitView, setProfitView] = useState<'net' | 'gross'>('net');
   const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [saleBasis, setSaleBasis] = useState<LiquidationBasis>('instant');
 
   const revenueColumns = useMemo<DataTableColumn<RevenueRow>[]>(
     () => [
@@ -382,6 +405,7 @@ export function ResultsSummary({
               label={t('industry.breakEvenPrice')}
               value={formatIsk(result.breakEvenPrice)}
               tooltip={t('industry.breakEvenPriceTooltip')}
+              onTooltipClick={() => setBreakdownOpen(true)}
             />
             {productUnitPrice !== null && (
               <CostRow
@@ -392,6 +416,67 @@ export function ResultsSummary({
           </div>
         )}
       </div>
+
+      {ownedSale && ownedSale[saleBasis].ownedUnits > 0 && (
+        <div className="space-y-1">
+          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('industry.useOrSell.label')}
+          </p>
+          <p className="text-xs text-text-dim">{t('industry.useOrSell.intro')}</p>
+          <div
+            role="group"
+            aria-label={t('industry.useOrSell.basisLabel')}
+            className="flex gap-1.5"
+          >
+            <FilterChip
+              label={t('industry.useOrSell.basisInstant')}
+              selected={saleBasis === 'instant'}
+              onToggle={() => setSaleBasis('instant')}
+            />
+            <FilterChip
+              label={t('industry.useOrSell.basisOrder')}
+              selected={saleBasis === 'order'}
+              onToggle={() => setSaleBasis('order')}
+            />
+          </div>
+          <div className="divide-y divide-line rounded-xs border border-line">
+            <CostRow
+              label={t('industry.useOrSell.sellNet')}
+              value={formatIsk(ownedSale[saleBasis].net)}
+              tooltip={t('industry.useOrSell.sellNetTooltip')}
+              onTooltipClick={() => setBreakdownOpen(true)}
+            />
+            {result.profit !== null && (
+              <CostRow
+                label={t('industry.useOrSell.buildProfit')}
+                value={formatIsk(result.profit)}
+                tone={result.profit >= 0 ? 'positive' : 'negative'}
+              />
+            )}
+          </div>
+          {(() => {
+            const verdict = compareUseOrSell(result.profit, ownedSale[saleBasis]);
+            if (verdict === null) {
+              return <p className="text-xs text-text-dim">{t('industry.useOrSell.unknown')}</p>;
+            }
+            return (
+              <p
+                className={`text-sm font-semibold ${
+                  verdict.verdict === 'build' ? 'text-success' : 'text-warning'
+                }`}
+              >
+                {verdict.verdict === 'build'
+                  ? t('industry.useOrSell.verdictBuild', {
+                      amount: formatIsk(verdict.advantage),
+                    })
+                  : t('industry.useOrSell.verdictSell', {
+                      amount: formatIsk(Math.abs(verdict.advantage)),
+                    })}
+              </p>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }

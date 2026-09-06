@@ -17,6 +17,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { FACILITY_PRESETS, SKILL_IDS, industryActivityOf } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
   MaterialPriceBasis,
@@ -326,6 +327,21 @@ export function BuildPlanDetail({
       skills,
     });
   }, [plan, blueprint, snapshot, materialPrices, skills, t]);
+
+  /**
+   * Both liquidation bases at once, so the Use-or-sell toggle switches between
+   * two numbers already in hand rather than re-deriving one per click. Sell-now
+   * reads the buy side of the book (what a standing order pays today), sell-order
+   * the sell side (what listing your own stack asks) — deliberately independent
+   * of the plan's *material* price basis, which is about buying, not selling.
+   */
+  const ownedSale = useMemo(() => {
+    if (!result || !snapshot) return null;
+    return {
+      instant: ownedStockSale(result.materials, snapshot.hubBuyPrices, 'instant', skills),
+      order: ownedStockSale(result.materials, snapshot.hubPrices, 'order', skills),
+    };
+  }, [result, snapshot, skills]);
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
@@ -1001,6 +1017,7 @@ export function BuildPlanDetail({
               blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null
             }
             costIndexSystemName={buildSystem?.name ?? hub.systemName}
+            ownedSale={ownedSale}
             breakdown={{
               hubName: hub.systemName,
               materialPriceBasis: materialPriceBasisOf(plan.materialPriceBasis),

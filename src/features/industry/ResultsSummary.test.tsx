@@ -6,6 +6,27 @@ import '@/i18n';
 import type { BuildResult } from '@/engine/industry/types';
 import { ResultsSummary } from './ResultsSummary';
 import type { BreakdownContext } from './CalculationBreakdown';
+import { ownedStockSale } from '@/engine/industry/ownedStockSale';
+import type { MaterialCostLine } from '@/engine/industry/types';
+
+/** One material the plan needs 100 of and the player already holds all 100 of. */
+const OWNED_MATERIALS: MaterialCostLine[] = [
+  {
+    typeID: 34,
+    baseQuantity: 100,
+    quantity: 100,
+    ownedQuantity: 100,
+    remainingQuantity: 0,
+    unitPrice: 1_000,
+    lineCost: 0,
+    unpriced: false,
+  },
+];
+
+const OWNED_SALE = {
+  instant: ownedStockSale(OWNED_MATERIALS, { 34: 1_000 }, 'instant', {}),
+  order: ownedStockSale(OWNED_MATERIALS, { 34: 1_200 }, 'order', {}),
+};
 
 const BREAKDOWN: BreakdownContext = {
   hubName: 'Jita',
@@ -62,6 +83,7 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
               productQuantity={10}
               costIndexSystemName="Jita"
               breakdown={BREAKDOWN}
+              ownedSale={null}
               {...overrides}
             />
           }
@@ -453,5 +475,45 @@ describe('ResultsSummary: calculation breakdown (issue #531)', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/no material efficiency/i)).toBeTruthy();
     expect(within(dialog).queryByText(/after ME 10/i)).toBeNull();
+  });
+});
+
+describe('ResultsSummary: use or sell the owned materials (issue #531)', () => {
+  it('stays hidden when the player owns none of the materials', () => {
+    renderSummary();
+    expect(screen.queryByText(/use or sell your materials/i)).toBeNull();
+  });
+
+  it('compares selling the owned stock against building with it, and switches basis', async () => {
+    renderSummary({ ownedSale: OWNED_SALE });
+
+    expect(screen.getByText(/use or sell your materials/i)).toBeTruthy();
+    // Sell now: 100 x 1,000 gross, less 7.5% sales tax, no broker fee.
+    expect(screen.getByText('92,500')).toBeTruthy();
+    // The stock is worth far more than the 435 ISK the build nets.
+    expect(screen.getByText(/SELL — selling your materials beats building/i)).toBeTruthy();
+
+    await userEvent.click(screen.getByRole('button', { name: /sell order/i }));
+    // Sell order: 100 x 1,200 gross, less 7.5% sales tax and 3% broker fee.
+    expect(screen.getByText('107,400')).toBeTruthy();
+  });
+
+  it('calls it for building when the build out-earns the stock', () => {
+    renderSummary({
+      ownedSale: OWNED_SALE,
+      result: { ...RESULT, profit: 500_000 },
+    });
+
+    expect(screen.getByText(/BUILD — using your materials beats selling them/i)).toBeTruthy();
+  });
+
+  it('gives no verdict when an owned material has no price on the chosen side', () => {
+    const unpriced = {
+      instant: ownedStockSale(OWNED_MATERIALS, {}, 'instant', {}),
+      order: ownedStockSale(OWNED_MATERIALS, {}, 'order', {}),
+    };
+    renderSummary({ ownedSale: unpriced });
+
+    expect(screen.getByText(/not enough price data to compare/i)).toBeTruthy();
   });
 });

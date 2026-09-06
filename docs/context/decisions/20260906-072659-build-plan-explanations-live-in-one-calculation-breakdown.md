@@ -20,3 +20,15 @@ _Recorded 2026-09-06._
   use; owned units cost 0 ISK, so self-mined ore is free and no opportunity
   cost is charged for it. Refining is not modelled anywhere — a plan that
   consumes minerals prices minerals, never the ore behind them.
+- **The break-even "?" is the door to the breakdown.** Its tooltip stays a
+  one-liner and says "Click for the full breakdown", so the shallow answer and
+  the deep one share one affordance instead of competing for the same row.
+- **Owned stock gets a use-or-sell comparison, not just a zero.** Pricing owned
+  units at zero answers "what does this job cost today" and is silent on the
+  question a miner actually asks. The Use-or-Sell Check answers it by comparing
+  the plan's profit against the Liquidation Basis proceeds; it is deliberately a
+  read on the plan's own owned units, not a general "should I mine" tool.
+- **Selling is quoted on both bases, buying is not.** Sell now and Sell order
+  are computed together from the snapshot already in hand, so the toggle
+  re-renders rather than refetches — the same rule the material price basis
+  follows.
