@@ -1,6 +1,7 @@
 import { ContextMenu as ContextMenuPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
+import { usePortalContainer } from './portalContainer';
 import { menuContentClassName, menuItemClassName } from './menuStyles';
 
 /**
@@ -16,8 +17,11 @@ export function ContextMenuContent({
   className,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.Content>) {
+  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
+  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
+  const container = usePortalContainer();
   return (
-    <ContextMenuPrimitive.Portal>
+    <ContextMenuPrimitive.Portal container={container}>
       <ContextMenuPrimitive.Content className={cx(menuContentClassName, className)} {...props} />
     </ContextMenuPrimitive.Portal>
   );
@@ -61,8 +65,11 @@ export function ContextMenuSubContent({
   className,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.SubContent>) {
+  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
+  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
+  const container = usePortalContainer();
   return (
-    <ContextMenuPrimitive.Portal>
+    <ContextMenuPrimitive.Portal container={container}>
       <ContextMenuPrimitive.SubContent className={cx(menuContentClassName, className)} {...props} />
     </ContextMenuPrimitive.Portal>
   );

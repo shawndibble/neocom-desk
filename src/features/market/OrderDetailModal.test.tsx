@@ -98,9 +98,9 @@ describe('OrderDetailModal', () => {
     expect(screen.getByText('Quick answer')).toBeInTheDocument();
     // With a floor in hand the quick answer is the call itself, not the
     // badge's generic explanation.
-    expect(screen.getByText('Raise the price')).toBeInTheDocument();
+    expect(screen.getByText('Put the price up')).toBeInTheDocument();
     expect(
-      screen.getByText(/sells 200.00 ISK a unit under what it cost you plus the fees/)
+      screen.getByText(/Every unit sells for 200.00 ISK less than it cost you to make/)
     ).toBeInTheDocument();
     expect(screen.getByText('-28.6%')).toBeInTheDocument();
   });
@@ -263,7 +263,7 @@ describe('OrderDetailModal', () => {
   it('keeps the cost-basis card visible with no cost basis, and never shows a zero floor', () => {
     renderModal({ row: { ...BASE_ROW, costBasis: null, floor: null } });
 
-    expect(screen.getByText('Where that number comes from')).toBeInTheDocument();
+    expect(screen.getByText('Where that price comes from')).toBeInTheDocument();
     expect(screen.getByText("We don't know what this cost you")).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Link a build' })).toBeInTheDocument();
     expect(screen.queryByText(/^0(\.00)? ISK$/)).not.toBeInTheDocument();
@@ -320,7 +320,7 @@ describe('OrderDetailModal', () => {
     };
     renderModal({ row, skills });
 
-    const ledger = screen.getByText('Where that number comes from').closest('section')!;
+    const ledger = screen.getByText('Where that price comes from').closest('section')!;
     const rowValue = (label: string) => {
       const text = within(ledger).getByText(label).nextElementSibling?.textContent ?? '';
       return Number(text.replace(/[^0-9.-]/g, ''));
@@ -541,11 +541,15 @@ describe('OrderDetailModal', () => {
     it('falls back to the badge advice when there is no floor to judge against', () => {
       renderModal({ row: UNDERCUT_ROW, stationChecked: true });
 
-      expect(screen.getByText('React if you can stay above your floor.')).toBeInTheDocument();
-      expect(screen.queryByText('Let this one go')).not.toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Lower your price to win the sale, or leave it and wait for them to run out.'
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Do not chase this one')).not.toBeInTheDocument();
       // And the exits card says why it has nothing to offer.
       expect(
-        screen.getByText('Link a build and we can price the ways out of this order.')
+        screen.getByText('Link a build and we can work out what each way out is worth.')
       ).toBeInTheDocument();
     });
 
@@ -553,7 +557,7 @@ describe('OrderDetailModal', () => {
       const row: OpenOrderRow = { ...UNDERCUT_ROW, floor: { relist: 480, fill: 470 } };
       renderModal({ row, stationChecked: true });
 
-      expect(screen.getByText('Let this one go')).toBeInTheDocument();
+      expect(screen.getByText('Do not chase this one')).toBeInTheDocument();
       // Holding nets price - fill; matching nets rival price - relist.
       expect(screen.getByText('Hold at 500.00')).toBeInTheDocument();
       expect(screen.getByText('+30.00 / unit')).toBeInTheDocument();

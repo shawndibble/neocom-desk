@@ -153,6 +153,18 @@ const SCOPE_PILL: Record<UndercutScope, string> = {
   region: 'border-accent/50 bg-accent/15 text-accent',
 };
 
+/**
+ * One cell of the scope table. Every row is a FRAGMENT of these, not its own
+ * grid: three separate grids each size their `auto` columns to their own
+ * content, so the price and gap columns landed in a different place on every
+ * row. One grid owns the track sizes for the whole table, and the rows only
+ * contribute cells.
+ *
+ * That rules out a row background or a row border — a fragment has no box —
+ * so the top rule and the "my order" tint are painted per cell instead.
+ */
+const CELL = 'border-t border-line px-2 py-1.5';
+
 function ScopeRow({
   scope,
   state,
@@ -170,26 +182,34 @@ function ScopeRow({
 }) {
   const { t } = useTranslation();
   const scopeLabel = (
-    <span
-      className={cx(
-        'inline-flex h-5 w-fit items-center rounded-xs border px-1.5 text-[0.625rem] font-semibold tracking-widest uppercase',
-        SCOPE_PILL[scope]
-      )}
-    >
-      {t(`market.orders.badge.undercut${scope[0].toUpperCase()}${scope.slice(1)}`)}
+    <span className={cx(CELL, 'pl-3')}>
+      <span
+        className={cx(
+          'inline-flex h-5 w-fit items-center rounded-xs border px-1.5 text-[0.625rem] font-semibold tracking-widest uppercase',
+          SCOPE_PILL[scope]
+        )}
+      >
+        {t(`market.orders.badge.undercut${scope[0].toUpperCase()}${scope.slice(1)}`)}
+      </span>
     </span>
   );
 
   if (state.kind !== 'rival') {
     return (
-      <div className="grid grid-cols-[6rem_1fr] gap-x-3 border-t border-line py-1.5 text-xs">
+      <>
         {scopeLabel}
-        <span className={state.kind === 'clear' ? 'text-success' : 'text-text-dim'}>
+        <span
+          className={cx(
+            CELL,
+            'col-span-2 pr-3 md:col-span-4',
+            state.kind === 'clear' ? 'text-success' : 'text-text-dim'
+          )}
+        >
           {state.kind === 'unavailable' && t('market.orders.structureMarketUnavailable')}
           {state.kind === 'notChecked' && t('market.orders.scopeNotChecked')}
           {state.kind === 'clear' && t('market.orders.scopeClear')}
         </span>
-      </div>
+      </>
     );
   }
 
@@ -198,19 +218,18 @@ function ScopeRow({
   // `stationScopeState` fills those fields with 0, so they are only ever read
   // when the deep book actually supplied them.
   const countsKnown = rival.ordersBeatingMe > 0;
-
   const distanceText = jumps ? <JumpsAwayText result={jumps} t={t} /> : (distance ?? '');
   const whoText = countsKnown
     ? [
         t('market.orders.rowSummary.sellersUnderMe', { count: rival.ordersBeatingMe }),
-        t('market.orders.scopeUnitsUnder', { units: rival.unitsBeatingMe.toLocaleString() }),
+        t('market.orders.scopeUnitsUnder', { count: rival.unitsBeatingMe }),
       ].join(' · ')
     : t('market.orders.scopeAggregateOnly');
 
   return (
-    <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 gap-y-0.5 border-t border-line py-1.5 text-xs md:grid-cols-[6rem_1fr_auto_auto_auto]">
+    <>
       {scopeLabel}
-      <span className="flex flex-col gap-0.5">
+      <span className={cx(CELL, 'flex flex-col gap-0.5')}>
         <span>{stationName ?? t('market.unknownStructure')}</span>
         <span className="text-[0.6875rem] text-text-dim">{whoText}</span>
         {/*
@@ -229,12 +248,16 @@ function ScopeRow({
           </span>
         )}
       </span>
-      <span className="tabular-nums">{formatIsk(rival.price, 2)}</span>
-      <span className="hidden text-danger tabular-nums md:inline">
+      <span className={cx(CELL, 'pr-3 text-right tabular-nums md:pr-2')}>
+        {formatIsk(rival.price, 2)}
+      </span>
+      <span className={cx(CELL, 'hidden text-right text-danger tabular-nums md:block')}>
         {formatIsk(rival.gapIsk, 2)} · {rival.gapPct.toFixed(1)}%
       </span>
-      <span className="hidden text-text-dim tabular-nums md:inline">{distanceText}</span>
-    </div>
+      <span className={cx(CELL, 'hidden pr-3 text-right text-text-dim tabular-nums md:block')}>
+        {distanceText}
+      </span>
+    </>
   );
 }
 
@@ -484,16 +507,29 @@ export function OrderDetailModal({
               {t('market.orders.scopeTightestBites')}
             </p>
           </div>
-          <div className="px-3 pb-2">
-            <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 pt-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:grid-cols-[6rem_1fr_auto_auto_auto]">
-              <span>{t('market.orders.scopeColumn')}</span>
-              <span>{t('market.orders.scopeCheapestSeller')}</span>
-              <span className="text-right">{t('market.orders.scopeTheirPrice')}</span>
-              <span className="hidden text-right md:inline">{t('market.orders.scopeOverBy')}</span>
-              <span className="hidden text-right md:inline">
-                {t('market.orders.scopeDistance')}
-              </span>
-            </div>
+          {/*
+            ONE grid for the whole table: header, every scope row and the
+            player's own order all contribute cells to these tracks, so the
+            price, gap and distance columns line up down the table. Rows
+            cannot own a background or a border here, so the rule between
+            rows and the "my order" tint are painted per cell.
+          */}
+          <div className="grid grid-cols-[auto_1fr_auto] text-xs md:grid-cols-[auto_1fr_auto_auto_auto]">
+            <span className="px-2 pt-2 pl-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.orders.scopeColumn')}
+            </span>
+            <span className="px-2 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.orders.scopeCheapestSeller')}
+            </span>
+            <span className="px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:pr-2">
+              {t('market.orders.scopeTheirPrice')}
+            </span>
+            <span className="hidden px-2 pt-2 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
+              {t('market.orders.scopeOverBy')}
+            </span>
+            <span className="hidden px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
+              {t('market.orders.scopeDistance')}
+            </span>
             <ScopeRow
               scope="station"
               state={station}
@@ -517,15 +553,24 @@ export function OrderDetailModal({
               jumps={regionJumps}
             />
             {/* My own order last, as the line every row above is measured against. */}
-            <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 border-t border-line bg-panel-2 py-1.5 text-xs md:grid-cols-[6rem_1fr_auto_auto_auto]">
-              <span className="font-semibold tracking-widest text-accent uppercase">
-                {t('market.orders.scopeMyOrder')}
-              </span>
-              <span>{row.stationName ?? t('market.unknownStructure')}</span>
-              <span className="text-right tabular-nums">{formatIsk(row.price, 2)}</span>
-              <span className="hidden md:inline" />
-              <span className="hidden md:inline" />
-            </div>
+            <span
+              className={cx(
+                CELL,
+                'bg-panel-2 pl-3 font-semibold tracking-widest text-accent uppercase'
+              )}
+            >
+              {t('market.orders.scopeMyOrder')}
+            </span>
+            <span className={cx(CELL, 'bg-panel-2')}>
+              {row.stationName ?? t('market.unknownStructure')}
+            </span>
+            <span className={cx(CELL, 'bg-panel-2 pr-3 text-right tabular-nums md:pr-2')}>
+              {formatIsk(row.price, 2)}
+            </span>
+            <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
+            <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
+          </div>
+          <div className="px-3 pb-2">
             {allClean && (
               <p className="pt-1.5 text-xs text-success">{t('market.orders.onlySeller')}</p>
             )}

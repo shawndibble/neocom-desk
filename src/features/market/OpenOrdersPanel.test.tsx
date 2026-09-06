@@ -226,15 +226,13 @@ describe('OpenOrdersPanel', () => {
 
     renderPanel();
 
-    const header = await screen.findByRole('button', { name: 'Priced under my floor · 1' });
+    const header = await screen.findByRole('button', { name: 'Priced below cost · 1' });
     expect(header).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('table', { name: 'Priced under my floor · 1' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Priced below cost · 1' })).toBeInTheDocument();
 
     await user.click(header);
     expect(header).toHaveAttribute('aria-expanded', 'false');
-    expect(
-      screen.queryByRole('table', { name: 'Priced under my floor · 1' })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Priced below cost · 1' })).not.toBeInTheDocument();
     // The header still answers what the group holds while it is folded.
     expect(screen.getByTestId('order-group-belowFloor')).toHaveTextContent('ISK listed');
   });
@@ -258,7 +256,7 @@ describe('OpenOrdersPanel', () => {
 
     const group = await screen.findByTestId('order-group-belowFloor');
     // What the group means, on screen rather than inside a tooltip...
-    expect(group).toHaveTextContent('These orders lose ISK if they sell');
+    expect(group).toHaveTextContent('These lose money every time one sells');
     // ...and what it is holding: 500 x 10 units.
     expect(group).toHaveTextContent('ISK listed');
   });
@@ -567,7 +565,7 @@ describe('OpenOrdersPanel', () => {
       // Anchored to the chip's own accessible name (label + count), not the
       // group header button, which carries the same words plus a separator.
       await openFunnel(user);
-      await user.click(screen.getByRole('button', { name: 'Priced under my floor1' }));
+      await user.click(screen.getByRole('button', { name: 'Priced below cost1' }));
       expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
     });
 

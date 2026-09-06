@@ -60,3 +60,21 @@ _Recorded 2026-09-06._
   a hub and reprocessing are named as not built rather than estimated, and
   "this order so far" is left out entirely: none of the three has data behind
   it yet.
+- **Advice is written as instructions, not vocabulary.** "React if you can stay
+  above your floor" told a reader nothing: it names an internal term (Order
+  Floor) and never says what to do. Every badge's advice line now names an
+  action — "Lower your price to win the sale, or leave it and wait for them to
+  run out" — and prose elsewhere says "your lowest safe price" or "what it cost
+  you plus the fees" rather than "floor". "Floor" survives only in code and in
+  this repo's own docs; on screen the number is labelled "Never sell below".
+- **The scope table is one grid, not three.** Each row used to be its own grid,
+  so `auto` columns sized to that row's own content and the price, gap and
+  distance columns landed in a different place on every line. One grid owns the
+  track sizes and each row contributes cells to it. Because a fragment has no
+  box, the rule between rows and the "my order" tint are painted per cell.
+- **Every Radix floating surface portals into the open modal.** A `<dialog>`
+  opened with `showModal()` sits in the browser's top layer, which no
+  `z-index` reaches, so a tooltip, popover or menu portalled to `document.body`
+  renders _behind_ the modal that triggered it. `Select` already read a
+  container off `portalContainer.ts`; `Tooltip`, `Popover`, `DropdownMenu` and
+  `ContextMenu` now do too.

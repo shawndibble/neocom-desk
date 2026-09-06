@@ -1,8 +1,30 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Tooltip, InfoTooltip } from './Tooltip';
+import { Modal } from './Modal';
 
 describe('Tooltip', () => {
+  /**
+   * `Modal` runs on `showModal()`, so the dialog sits in the browser's top
+   * layer, which no `z-index` can reach. A bubble portalled to `document.body`
+   * — Radix's default — renders *behind* the modal that triggered it, which is
+   * why `Tooltip` reads a container off `portalContainer.ts`.
+   */
+  it('portals its bubble inside a Modal, not to the body', async () => {
+    render(
+      <Modal open onClose={() => {}} title="Order detail">
+        <Tooltip content="One-line explanation.">
+          <button type="button">Trigger</button>
+        </Tooltip>
+      </Modal>
+    );
+
+    fireEvent.pointerMove(screen.getByRole('button', { name: 'Trigger' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Order detail' });
+    expect(dialog).toContainElement(await screen.findByRole('tooltip'));
+  });
+
   it('reveals a role="tooltip" bubble on hover, wired to its trigger via aria-describedby', async () => {
     render(
       <Tooltip content="One-line explanation.">
