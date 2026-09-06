@@ -549,9 +549,10 @@ describe('triggerSync: ownerHash-scoped reads', () => {
   it('queries every collection filtered by the character ownerHash', async () => {
     await triggerSync(1);
     // plans + buildPlans + quickbars + stationPins + planetRichness +
-    // productionRuns + productionSaleLinks + productionOrderWatches +
-    // notificationFeed + settings, each read through a where clause.
-    expect(vi.mocked(where)).toHaveBeenCalledTimes(10);
+    // productionRuns + productionSaleLinks + productionOrderWatches + payees +
+    // miningTaxAssignments + notificationFeed + settings, each read through a
+    // where clause.
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(12);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
       expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
@@ -1546,7 +1547,7 @@ describe('sync orchestration', () => {
     await Promise.all([p1, p2]);
     // One getDocs per synced collection (see the collection-count comment in
     // the "debounces scheduleSync" test above).
-    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(10);
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(12);
   });
 
   it('a queued sync still runs after the previous one fails', async () => {
@@ -1563,10 +1564,11 @@ describe('sync orchestration', () => {
     scheduleSync(1, 20);
     // One sync = one getDocs per collection (plans + buildPlans + quickbars +
     // stationPins + planetRichness + productionRuns + productionSaleLinks +
-    // productionOrderWatches + notificationFeed + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(10));
+    // productionOrderWatches + payees + miningTaxAssignments +
+    // notificationFeed + settings).
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(12));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(10);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(12);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
   });
 });

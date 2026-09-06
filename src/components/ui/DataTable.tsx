@@ -1,6 +1,8 @@
 import { Fragment, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import * as Icon from './icons';
+import { InfoTooltip } from './Tooltip';
 
 export interface DataTableSort {
   columnId: string;
@@ -23,6 +25,13 @@ export interface DataTableColumn<T> {
    * `text-text-dim` has no business on the header.
    */
   headerClassName?: string;
+  /**
+   * One-line plain-language note on what the column's values *are*, shown as
+   * a small info control beside the header text — e.g. that a ledger date is
+   * an EVE/UTC calendar day, not a local one. Only for a genuine ambiguity a
+   * reader could get wrong; most columns explain themselves.
+   */
+  headerTooltip?: string;
   render: (row: T) => ReactNode;
   /**
    * Declares the column sortable and extracts its comparable value.
@@ -40,6 +49,13 @@ export interface DataTableColumn<T> {
    * At most one column per table; later ones are ignored.
    */
   primary?: boolean;
+  /**
+   * Pins this cell to the stacked card's top-right corner instead of its own
+   * labelled row — for a purely decorative, non-tabular cell (an affordance
+   * icon) that reads as a stray unlabelled line when stacked normally. At
+   * most one column per table; later ones are ignored.
+   */
+  cardCorner?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -127,6 +143,7 @@ export function DataTable<T>({
   onRowClick,
   responsive = 'stack',
 }: DataTableProps<T>) {
+  const { t } = useTranslation();
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
 
   const headerPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-2';
@@ -134,6 +151,9 @@ export function DataTable<T>({
 
   // Per-column classes are invariant across rows, so they are built once
   // rather than per cell — a 1,000-row journal is 5,000 cells.
+  // A plain header carries these on the `<th>`; a sortable one moves them
+  // onto its button (the `<th>` goes padding-free) so the whole cell is the
+  // click target.
   const headerTextClass = columns.map((column) =>
     cx(
       headerPadding,
@@ -142,7 +162,6 @@ export function DataTable<T>({
       column.headerClassName
     )
   );
-  const headerClass = columns.map((column, i) => cx(column.sortValue ? 'p-0' : headerTextClass[i]));
   // Which cell titles the card once the rows stack. Marked on every row's
   // cell rather than positionally, so `.dt-stack` can hoist it out of column
   // order without the markup differing by width.
@@ -150,6 +169,7 @@ export function DataTable<T>({
     0,
     columns.findIndex((column) => column.primary)
   );
+  const cardCornerIndex = columns.findIndex((column) => column.cardCorner);
   // A right-aligned sortable header's own sort glyph (`gap-1` + an icon) sits
   // between the label and the header's right inset, pushing the label ~1rem
   // further left than a plain right-aligned cell below it — same horizontal
@@ -189,14 +209,8 @@ export function DataTable<T>({
       <thead role="rowgroup">
         <tr role="row" className="border-b border-line text-left text-text-dim">
           {columns.map((column, i) => {
-            if (!column.sortValue) {
-              return (
-                <th key={column.id} role="columnheader" scope="col" className={headerClass[i]}>
-                  {column.header}
-                </th>
-              );
-            }
-            const active = sort?.columnId === column.id;
+            const sortable = column.sortValue !== undefined;
+            const active = sortable && sort?.columnId === column.id;
             const direction = active ? sort.direction : undefined;
             // Unsorted columns get the neutral up/down glyph, so a sortable
             // column advertises itself before anyone clicks it.
@@ -205,30 +219,57 @@ export function DataTable<T>({
               : direction === 'asc'
                 ? Icon.Ascending
                 : Icon.Descending;
+            // Its own `<button>`, beside the sort button rather than inside
+            // it (nested buttons are invalid HTML).
+            const info = column.headerTooltip && (
+              <InfoTooltip
+                label={t('common.aboutLabel', { label: column.header })}
+                content={column.headerTooltip}
+                className={cx('normal-case', sortable && (density === 'compact' ? 'mr-2' : 'mr-3'))}
+              />
+            );
             return (
               <th
                 key={column.id}
                 role="columnheader"
                 scope="col"
-                className={headerClass[i]}
-                aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                className={sortable ? 'p-0' : headerTextClass[i]}
+                aria-sort={
+                  sortable
+                    ? active
+                      ? direction === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                    : undefined
+                }
               >
-                <button
-                  type="button"
-                  onClick={() => toggleSort(column)}
-                  className={cx(
-                    headerTextClass[i],
-                    'inline-flex w-full items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-                    column.align === 'right' && 'justify-end'
-                  )}
-                >
-                  {column.header}
-                  <SortGlyph
-                    aria-hidden="true"
-                    size={Icon.ICON_SIZE.sm}
-                    className={cx('shrink-0', active ? 'text-accent' : 'text-text-faint')}
-                  />
-                </button>
+                {sortable ? (
+                  <span className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(column)}
+                      className={cx(
+                        headerTextClass[i],
+                        'inline-flex flex-1 items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                        column.align === 'right' && 'justify-end'
+                      )}
+                    >
+                      {column.header}
+                      <SortGlyph
+                        aria-hidden="true"
+                        size={Icon.ICON_SIZE.sm}
+                        className={cx('shrink-0', active ? 'text-accent' : 'text-text-faint')}
+                      />
+                    </button>
+                    {info}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    {column.header}
+                    {info}
+                  </span>
+                )}
               </th>
             );
           })}
@@ -270,6 +311,7 @@ export function DataTable<T>({
                   className={cx(
                     cellClass[i],
                     i === primaryIndex && 'dt-primary',
+                    i === cardCornerIndex && 'dt-corner',
                     column.cellClassName?.(row)
                   )}
                 >

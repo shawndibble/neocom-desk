@@ -36,6 +36,7 @@ describe('SCOPES', () => {
         'esi-characters.read_notifications.v1',
         'esi-characters.read_corporation_roles.v1',
         'esi-search.search_structures.v1',
+        'esi-industry.read_character_mining.v1',
       ].sort()
     );
   });

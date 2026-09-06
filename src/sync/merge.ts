@@ -21,6 +21,8 @@ import type {
   QuickbarRecord,
   SkillPlanRecord,
   StationPinRecord,
+  PayeeRecord,
+  MiningTaxAssignmentRecord,
   WhatIfImplantSelection,
 } from '@/db';
 import type { Attributes } from '@/engine/types';
@@ -64,6 +66,12 @@ export type RemoteStationPinDoc = StationPinRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/planetRichness/{id} (issue #425). */
 export type RemotePlanetRichnessDoc = PlanetRichnessRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/payees/{id} (issue #523). */
+export type RemotePayeeDoc = PayeeRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/miningTaxAssignments/{id} (issue #523). */
+export type RemoteMiningTaxAssignmentDoc = MiningTaxAssignmentRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/productionRuns/{id} (issue #525). */
 export type RemoteProductionRunDoc = ProductionRunRecord & RemoteDoc;

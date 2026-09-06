@@ -95,9 +95,10 @@ const NAV_PATHS = [
   '/overview',
   '/skills',
   '/industry',
+  '/moon-mining',
+  '/planetary-industry',
   '/market',
   '/wallet',
-  '/planetary-industry',
   '/assets',
   '/mail',
   '/calendar',
@@ -321,6 +322,12 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           onClick={onClose}
         />
         <NavItem
+          to="/moon-mining"
+          label={t('nav.miningTax')}
+          locked={locked.has('/moon-mining')}
+          onClick={onClose}
+        />
+        <NavItem
           to="/assets"
           label={t('nav.assets')}
           locked={locked.has('/assets')}
@@ -422,6 +429,11 @@ export function Layout() {
           <NavGroupLabel>{t('nav.groups.progression')}</NavGroupLabel>
           <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
           <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
+          <NavItem
+            to="/moon-mining"
+            label={t('nav.miningTax')}
+            locked={locked.has('/moon-mining')}
+          />
           <NavItem
             to="/planetary-industry"
             label={t('nav.pi')}

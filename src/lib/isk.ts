@@ -36,6 +36,19 @@ export function formatIsk(value: number, decimals = 0): string {
   return formatterFor(decimals).format(clampIskZero(value, decimals));
 }
 
+/**
+ * Grouped digits for an editable ISK field at rest — commas, and up to 2
+ * decimal places only if the value actually has them (`1,234` vs `1,234.56`,
+ * never a padded `1,234.00`). Distinct from `numberMask.ts`'s `maskNumber`,
+ * which keeps up to 20 fraction digits for a generic quantity/price field;
+ * ISK here is always cents-precision.
+ */
+const iskMasker = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
+
+export function maskIsk(value: number): string {
+  return iskMasker.format(value);
+}
+
 /** Abbreviated ISK (`"5.2M"`) for tight spaces — the character card, not Wallet's own precise figures. */
 export function formatIskCompact(value: number): string {
   return formatCompactNumber(clampIskZero(value, 0));

@@ -91,6 +91,7 @@
      * desktop while the card is titled by what the row actually is.
      */
     .dt-stack tr {
+      position: relative;
       display: flex;
       flex-direction: column;
       padding: 0.5rem 0.75rem;
@@ -130,6 +131,20 @@
     }
 
     .dt-stack td.dt-primary::before {
+      content: none;
+    }
+
+    /* A decorative corner cell (e.g. an edit-affordance icon): pinned out of
+       the card's label/value flow entirely, rather than rendering as its own
+       row with a blank label. */
+    .dt-stack td.dt-corner {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.75rem;
+      padding: 0;
+    }
+
+    .dt-stack td.dt-corner::before {
       content: none;
     }
 
@@ -185,6 +200,14 @@
 }
 
 @layer base {
+  /* A native <dialog> leaves the page behind it scrollable (only inert), so
+     on a phone a scroll that starts over an open Modal chains into the page.
+     One selector locks it for every dialog in the app, with nothing to
+     restore when the last one closes. */
+  body:has(dialog[open]) {
+    overflow: hidden;
+  }
+
   :root {
     color-scheme: dark;
     /* A viewport-bounded scroller (useViewportBoundedHeight) shrinking can

@@ -371,6 +371,132 @@ export interface NotificationFeedRecord {
 }
 
 /**
+ * A Payee (CONTEXT.md, issue #523): who the Moon Mining Tax ledger owes —
+ * user-managed, per-character (like `BuildPlanRecord`). The moon/system tag
+ * is what lets a future entry auto-suggest this Payee and its rate — "pick
+ * the moon, the corp, or the person, whichever is memorable" — and is
+ * deliberately left unmatched for the two-corps-one-system-one-day case,
+ * which the Assignment's own split-line support handles instead.
+ */
+export interface PayeeRecord {
+  id: string;
+  characterId: number;
+  name: string;
+  /** Percent, 0-100. What a new Assignment against this Payee prefills. */
+  defaultTaxPct: number;
+  /** Solar system id this Payee collects on, for auto-match. Optional — a Payee need not be tied to one system. */
+  systemId?: number;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
+/** One ore line an Assignment covers — a whole Mining Ledger Entry, or a split slice of one (two Payees, one system, one day). */
+export interface MiningTaxOreLine {
+  typeId: number;
+  quantity: number;
+}
+
+/** Before/after quantity for one ore type, recorded when a `needs-review` flip occurs (CONTEXT.md, issue #523). */
+export interface MiningTaxQuantityDiff {
+  typeId: number;
+  before: number;
+  after: number;
+}
+
+export type MiningTaxAssignmentStatus = 'outstanding' | 'paid' | 'needs-review' | 'dismissed';
+
+/**
+ * An Assignment (CONTEXT.md, issue #523): links a Mining Ledger Entry (or a
+ * split slice of its ore lines) to a Payee, snapshotting the tax percent and
+ * ISK value **at assignment time** — invoice semantics, so neither a later
+ * Jita price move nor an edited Payee default retroactively changes what an
+ * already-assigned obligation shows as owed. Both the value and the tax
+ * percent are prefilled from the computed default but pilot-editable at
+ * assignment time, since Jita price and a Payee's default rate are both
+ * estimates that can be wrong for a specific haul.
+ *
+ * A `dismissed` Assignment ("I don't pay tax on this entry") carries no
+ * `payeeId` — there is no Payee to owe, so `taxPct`/`taxOwed` are always 0.
+ * It still snapshots `oreLines` and still participates in re-diffing (a
+ * dismissed entry that grows still surfaces for reconsideration, the same as
+ * a paid one).
+ *
+ * Re-diffed on every ledger refresh: if ESI reports *more* ore for the same
+ * (characterId, date, solarSystemId) after assignment, `status` flips to
+ * `needs-review` and `reviewDiff` records the before/after — never silently
+ * absorbed into `oreLines`.
+ */
+export interface MiningTaxAssignmentRecord {
+  id: string;
+  /** The character who mined this — the Mining Ledger Entry's own owner. */
+  characterId: number;
+  /** EVE/UTC calendar date, e.g. "2026-09-04". */
+  date: string;
+  solarSystemId: number;
+  /** Absent only when `status` is `dismissed` — every other status owes a real Payee. */
+  payeeId?: string;
+  /** The ore lines this Assignment covers, snapshotted at assignment time. */
+  oreLines: MiningTaxOreLine[];
+  /** Percent, 0-100, snapshotted from the Payee's default (or overridden) at assignment time. Always 0 for `dismissed`. */
+  taxPct: number;
+  /** ISK value of `oreLines` at Jita price, snapshotted at assignment time — pilot-editable at assignment. */
+  estimatedValue: number;
+  /** Snapshotted at assignment time — defaults to `estimatedValue * taxPct / 100` but is pilot-editable. Always 0 for `dismissed`. */
+  taxOwed: number;
+  status: MiningTaxAssignmentStatus;
+  /** Set only while `status` is `needs-review`. */
+  reviewDiff?: MiningTaxQuantityDiff[];
+  /** Epoch ms the assignment was marked paid, absent while outstanding or needs-review. */
+  paidAt?: number;
+  /**
+   * Shared by every Assignment joined into one combined ledger row (issue
+   * #523's "join entries" feature — a moon-mining session that spans
+   * midnight UTC, so ESI reports it as two Mining Ledger Entries the corp's
+   * own billing treats as one). Every member always shares `characterId` and
+   * `solarSystemId` (a Payee is scoped to one character, and a join is
+   * same-system-only) — never assume a group can span either. A `groupId`
+   * shared by only one surviving record (the other member deleted, or a sync
+   * race delivering one member before the other) renders as an ordinary
+   * ungrouped row rather than a broken group of one.
+   */
+  groupId?: string;
+  /**
+   * Which Assignment on a split entry (2+ covering one character/day/system)
+   * receives any ore ESI reports for that day *after* the split — one EVE/UTC
+   * day can hold two local-time sessions at two corps' moons in one system,
+   * so the later one's ore has to have exactly one owner
+   * (`engine/miningTax/ownership.ts`). Meaningless, and never set, on a sole
+   * Assignment: it always collects.
+   */
+  collectsGrowth?: boolean;
+  /**
+   * How this Assignment was settled, when it was marked paid through the
+   * Settle-up flow rather than a bare "mark paid". Every Assignment covered
+   * by one lump-sum payment shares a `paymentId`, so a per-Payee payment
+   * history is a group-by away without a separate synced table.
+   */
+  payment?: MiningTaxPaymentInfo;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
+export type MiningTaxPaymentMethod = 'donation' | 'contract' | 'other';
+
+export interface MiningTaxPaymentInfo {
+  /** Shared by every Assignment settled in the same lump sum. */
+  paymentId: string;
+  /** Local calendar date the pilot says they paid, `YYYY-MM-DD` — a real-world date, not an EVE ledger date. */
+  paidOn: string;
+  method: MiningTaxPaymentMethod;
+  /** The whole lump sum, in ISK — the same figure on every Assignment it covered. */
+  amount: number;
+  /** Wallet journal entry id (`WalletJournalEntry.id`) the pilot linked this payment to, if any. */
+  journalRefId?: number;
+  /** Contract id the pilot typed or linked, if any. */
+  contractId?: number;
+}
+
+/**
  * A manually logged Production Run (issue #525, CONTEXT.md): a snapshot of
  * one production batch off a Build Plan — materials cost, job fee, and
  * quantity as they stood at logging time, user-overridable and never
@@ -492,6 +618,8 @@ export const db = new Dexie('neocom') as Dexie & {
   productionRuns: EntityTable<ProductionRunRecord, 'id'>;
   productionSaleLinks: EntityTable<ProductionSaleLinkRecord, 'id'>;
   productionOrderWatches: EntityTable<ProductionOrderWatchRecord, 'id'>;
+  payees: EntityTable<PayeeRecord, 'id'>;
+  miningTaxAssignments: EntityTable<MiningTaxAssignmentRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -608,4 +736,26 @@ db.version(9).stores({
   productionRuns: 'id, characterId, buildPlanId',
   productionSaleLinks: 'id, characterId, runId',
   productionOrderWatches: 'id, characterId, runId',
+});
+
+// Additive: v9 stores unchanged, plus Payees and Mining Tax Assignments
+// (issue #523). `miningTaxAssignments` also indexes the compound
+// `[characterId+date+solarSystemId]` key — the Mining Ledger Entry identity —
+// since every assignment/re-diff read is scoped to one entry at a time.
+db.version(10).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
 });

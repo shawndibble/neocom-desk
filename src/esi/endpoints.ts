@@ -1011,6 +1011,34 @@ export function getCharacterIndustryJobs(
   });
 }
 
+/**
+ * One pre-aggregated row of a character's personal mining ledger: CCP
+ * collapses everything mined in one (date, solar system, type) to a single
+ * row before it ever reaches the app — no intra-day timestamp, no moon
+ * identity (docs/context/decisions/20260905-170644-moon-mining-tax-ledger.md).
+ * 90-day retention on ESI's side.
+ */
+export interface MiningLedgerRow {
+  /** EVE/UTC calendar date, e.g. "2026-09-04". */
+  date: string;
+  quantity: number;
+  solar_system_id: number;
+  type_id: number;
+}
+
+// --- GET /characters/{character_id}/mining/ (esi-industry.read_character_mining.v1) ---
+
+export function getCharacterMining(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<MiningLedgerRow>> {
+  return fetchAllPagesStatus<MiningLedgerRow>(`/characters/${characterId}/mining/`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterMining',
+  });
+}
+
 // --- GET /characters/{character_id}/corporationhistory (public) ---
 
 export interface CorporationHistoryEntry {

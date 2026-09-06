@@ -29,6 +29,10 @@ export const productionSaleLinkTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}productionSaleLinkTombstones.${characterId}`;
 export const productionOrderWatchTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}productionOrderWatchTombstones.${characterId}`;
+export const payeeTombstonesKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}payeeTombstones.${characterId}`;
+export const miningTaxAssignmentTombstonesKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}miningTaxAssignmentTombstones.${characterId}`;
 
 /**
  * One Character's tombstone list for a collection, by its bookkeeping key.
@@ -59,5 +63,7 @@ export async function clearCharacterSyncBookkeeping(characterId: number): Promis
     productionRunTombstonesKey(characterId),
     productionSaleLinkTombstonesKey(characterId),
     productionOrderWatchTombstonesKey(characterId),
+    payeeTombstonesKey(characterId),
+    miningTaxAssignmentTombstonesKey(characterId),
   ]);
 }

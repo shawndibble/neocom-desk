@@ -162,6 +162,19 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/industry/jobs',
     scope: 'esi-industry.read_character_jobs.v1',
   },
+  /**
+   * Base grant, like every other single-route D3 view (mail, calendar,
+   * contracts, clones, contacts, loyalty) — `ScopeGate`'s re-auth banner calls
+   * `beginEveLogin()` with no scope group, so a route gated on a grouped scope
+   * would offer a re-login that never actually requests it (issue #523). The
+   * `corp` group's own grant flow (`CorpGrantPrompt`) exists because a corp
+   * role is discoverable and this isn't — nothing here can tell a renter needs
+   * this scope before they visit the page and ask for it themselves.
+   */
+  getCharacterMining: {
+    route: '/characters/{character_id}/mining/',
+    scope: 'esi-industry.read_character_mining.v1',
+  },
 
   getCharacterPublicInfo: {
     route: '/characters/{character_id}',

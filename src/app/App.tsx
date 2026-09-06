@@ -23,6 +23,7 @@ import { CorpMembers } from '@/routes/CorpMembers';
 import { CorpAssets } from '@/routes/CorpAssets';
 import { Market } from '@/routes/Market';
 import { Wallet } from '@/routes/Wallet';
+import { MoonMiningTax } from '@/routes/MoonMiningTax';
 import { LoyaltyStore } from '@/routes/LoyaltyStore';
 import { Clones } from '@/routes/Clones';
 import { PlanetaryIndustry } from '@/routes/PlanetaryIndustry';
@@ -79,6 +80,7 @@ const ROUTE_ELEMENTS = {
   '/market': <Market />,
   '/wallet': <Wallet />,
   '/wallet/loyalty/:corporationId': <LoyaltyStore />,
+  '/moon-mining': <MoonMiningTax />,
   '/clones': <Clones />,
   '/planetary-industry': <PlanetaryIndustry />,
   '/employment-history': <EmploymentHistory />,

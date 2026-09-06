@@ -194,6 +194,15 @@ export const ROUTE_REQUIREMENTS = {
     endpoints: ['getCharacterContacts', 'postUniverseNames'],
     strings: 'contacts',
   },
+  // The Moon Mining Tax ledger (issue #523) is built entirely on the personal
+  // mining ledger — without the scope there is nothing to show. The universe
+  // reads (system names) and postUniverseNames (ore names) are PUBLIC and
+  // listed for the same reason /assets lists its own: this table says what
+  // the route actually calls.
+  '/moon-mining': {
+    endpoints: ['getCharacterMining', 'getUniverseSystem', 'postUniverseNames'],
+    strings: 'miningTax',
+  },
 } as const satisfies Record<string, RouteRequirement>;
 
 export type AppRoutePath = keyof typeof ROUTE_REQUIREMENTS;
