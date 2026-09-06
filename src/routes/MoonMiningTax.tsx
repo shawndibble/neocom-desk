@@ -121,6 +121,11 @@ export function MoonMiningTax() {
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
   const [joinTarget, setJoinTarget] = useState<DisplayRow | null>(null);
+  // Set only by the table's "Join selected" shortcut below — pins
+  // `JoinAssignDialog`'s candidate list to exactly the one row picked via
+  // checkbox, instead of the full same-system candidate list `RowDetailModal`'s
+  // "Join with another entry" button offers.
+  const [joinCandidateOverride, setJoinCandidateOverride] = useState<DisplayRow | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Every tracked character, not just those with a Mining Ledger Entry this
@@ -335,6 +340,8 @@ export function MoonMiningTax() {
 
   function handleJoined() {
     setJoinTarget(null);
+    setJoinCandidateOverride(null);
+    setBulkPaySelection(new Set());
     refresh();
   }
 
@@ -432,14 +439,56 @@ export function MoonMiningTax() {
     [allDisplayRows, bulkPaySelection, data]
   );
 
+  // The same checkbox column doubles as "pick two rows to join" — only the
+  // Unassigned/Outstanding, not-already-grouped rows among the selection
+  // count (an ordinary bulk-pay selection of 2+ Outstanding rows just isn't
+  // a join candidate list), and exactly two of them, same character and
+  // system, and (when both already have an Assignment) the same Payee and
+  // tax % — the decision doc's merge rule.
+  const joinEligibleSelected = useMemo(
+    () =>
+      allDisplayRows.filter(
+        (dr) =>
+          bulkPaySelection.has(dr.key) &&
+          !dr.groupMembers &&
+          (dr.status === 'unassigned' || dr.status === 'outstanding')
+      ),
+    [allDisplayRows, bulkPaySelection]
+  );
+  const joinPair = useMemo(() => {
+    if (joinEligibleSelected.length !== 2) return null;
+    const [a, b] = joinEligibleSelected;
+    if (a.row.characterId !== b.row.characterId) return null;
+    if (a.row.entry.solarSystemId !== b.row.entry.solarSystemId) return null;
+    if (
+      a.assignment &&
+      b.assignment &&
+      (a.assignment.payeeId !== b.assignment.payeeId || a.assignment.taxPct !== b.assignment.taxPct)
+    ) {
+      return null;
+    }
+    return [a, b] as const;
+  }, [joinEligibleSelected]);
+
+  function handleJoinSelected() {
+    if (!joinPair) return;
+    setJoinTarget(joinPair[0]);
+    setJoinCandidateOverride(joinPair[1]);
+  }
+
   // The Character column only earns its place when more than one character
   // is actually in view — with a single tracked character (or a filter
   // narrowed to one) it says the same thing on every row.
   const showCharacterColumn = characters.length > 1;
-  // Same reasoning for the bulk-pay select column: with no Outstanding row on
-  // screen there's nothing to select, and an always-blank leading column just
-  // reads as unexplained whitespace before Date.
-  const showSelectColumn = visibleRows.some((dr) => dr.status === 'outstanding' && dr.assignment);
+  // Same reasoning for the select column: with nothing selectable on screen
+  // (nothing Outstanding to bulk-pay, nothing Unassigned to join) an
+  // always-blank leading column just reads as unexplained whitespace before
+  // Date. A row qualifies if either action could apply to it — bulk-pay
+  // (Outstanding, already assigned) or join (Unassigned) — the two share one
+  // checkbox column rather than each getting its own.
+  const isSelectableRow = (dr: DisplayRow) =>
+    (dr.status === 'outstanding' && dr.assignment !== null) || dr.status === 'unassigned';
+  const showSelectColumn = visibleRows.some(isSelectableRow);
 
   const columns: DataTableColumn<DisplayRow>[] = [
     ...(showSelectColumn
@@ -449,10 +498,10 @@ export function MoonMiningTax() {
             header: '',
             className: 'w-8 px-2',
             render: (dr: DisplayRow) =>
-              dr.status === 'outstanding' && dr.assignment ? (
+              isSelectableRow(dr) ? (
                 <input
                   type="checkbox"
-                  aria-label={t('miningTax.selectForBulkPay')}
+                  aria-label={t('miningTax.selectForBulkAction')}
                   checked={bulkPaySelection.has(dr.key)}
                   onClick={(e) => e.stopPropagation()}
                   onChange={() =>
@@ -760,6 +809,15 @@ export function MoonMiningTax() {
                 {t('miningTax.bulkPayAction', { count: bulkPayRows.length })}
               </Button>
             )}
+
+            {joinPair && (
+              <Button size="sm" variant="primary" onClick={handleJoinSelected}>
+                {t('miningTax.joinSelectedAction')}
+              </Button>
+            )}
+            {joinEligibleSelected.length === 2 && !joinPair && (
+              <p className="text-xs text-text-dim">{t('miningTax.joinIncompatibleHint')}</p>
+            )}
           </div>
 
           {payeeFilter !== 'all' && (
@@ -877,9 +935,16 @@ export function MoonMiningTax() {
       {joinTarget && data && (
         <JoinAssignDialog
           open={joinTarget !== null}
-          onClose={() => setJoinTarget(null)}
+          onClose={() => {
+            setJoinTarget(null);
+            setJoinCandidateOverride(null);
+          }}
           primary={{ row: joinTarget.row, assignment: joinTarget.assignment }}
-          candidates={joinCandidatesFor(joinTarget)}
+          candidates={
+            joinCandidateOverride
+              ? [{ row: joinCandidateOverride.row, assignment: joinCandidateOverride.assignment }]
+              : joinCandidatesFor(joinTarget)
+          }
           payees={data.payeesByCharacter.get(joinTarget.row.characterId) ?? []}
           typeNames={data.typeNames}
           unitPrices={data.unitPrices}
