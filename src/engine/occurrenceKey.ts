@@ -22,8 +22,8 @@
  * way originally and should not have been: `diffWalletBalanceChanged`
  * high-water-marks on the journal entry's `id` and emits one fire per entry,
  * so the entry id was always available. It is now the key, matching what
- * `corpWalletThreshold`'s `transactionAbove` case has always done. See the
- * superseding decision file.
+ * `corpWalletThreshold`'s `transactionAbove` case has always done. See
+ * `docs/context/decisions/20260905-195857-wallet-alerts-key-on-the-journal-entry-not.md`.
  *
  * The `switch` below is exhaustive over every `NotificationEventId`
  * (`default`'s `never` assignment): adding a Notification Event without
@@ -135,20 +135,56 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
 
 /**
  * When the occurrence actually happened, for the feed row's `firedAt` — the
- * poll time only when the fire has nothing better.
- *
- * Opt-in per event rather than exhaustive: most fires genuinely have no
- * occurrence time to offer. A market order fill is the clearest case — ESI's
- * order history records when an order was *issued*, never when it filled, so
- * the poll that noticed it is the only time there is. Events whose only
- * timestamp lies in the future (a fuel expiry, an extractor's expiry) are
- * deadlines, not occurrence times, and stay on the poll clock too.
+ * poll clock only for the fires that have no time of their own.
  *
  * This matters because a device polls only while the app is open: one opened
  * after days away reports everything it missed in a single poll. Dating those
  * rows by that poll stacks days of history onto one minute — the feed shows
  * them as having just happened, and they sort above genuinely newer rows.
+ *
+ * Exhaustive over every `NotificationEventId` for `occurrenceKey`'s reason: a
+ * new Notification Event has to state which clock dates it, rather than
+ * defaulting to the poll's and being wrong quietly. `nowMs` is the honest
+ * answer for most of them — a market order fill has none of its own (ESI's
+ * order history records when an order was *issued*, never when it filled),
+ * and the times the rest carry are deadlines in the future (a fuel expiry, an
+ * extractor's expiry, a calendar event's start), not the moment the thing
+ * happened.
  */
 export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
-  return fire.eventId === 'walletBalanceChanged' ? fire.dateMs : nowMs;
+  switch (fire.eventId) {
+    case 'walletBalanceChanged':
+      return fire.dateMs;
+    // The completed entry's `finish_date`, already in the past by the time
+    // the diff fires (`isCompleted`). Null when the queue carried no date.
+    case 'skillLevelComplete':
+      return fire.finishMs ?? nowMs;
+    // ESI's own `timestamp` for the notification, as an ISO string.
+    case 'eveNotification': {
+      const sentAt = Date.parse(fire.timestamp);
+      return Number.isFinite(sentAt) ? sentAt : nowMs;
+    }
+    case 'characterNotTraining':
+    case 'industryJobComplete':
+    case 'corpIndustryJobReady':
+    case 'planetaryExtractionDone':
+    case 'planetaryExtractorExpiring':
+    case 'newCalendarEvent':
+    case 'calendarEventStarting':
+    case 'contractAccepted':
+    case 'marketOrderFilled':
+    case 'newMail':
+    case 'structureReinforcementExit':
+    case 'structureFuelLow':
+    case 'corpMemberJoined':
+    case 'corpMemberLeft':
+    case 'corpWalletThreshold':
+      return nowMs;
+    default: {
+      const exhaustive: never = fire;
+      throw new Error(
+        `occurrenceFiredAt: unhandled Notification Event ${JSON.stringify(exhaustive)}`
+      );
+    }
+  }
 }

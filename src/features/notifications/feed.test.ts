@@ -150,6 +150,44 @@ describe('recordFeedEntry / readFeed', () => {
     expect((await readFeed())[0].firedAt).toBe(1000);
   });
 
+  it("takes the earlier firedAt whichever observer arrives first, so a push stamping its own arrival cannot beat the poller's real occurrence time", async () => {
+    const entry = {
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'walletBalanceChanged',
+      title: 't',
+      body: 'b',
+    };
+    // The push lands first, stamping its own arrival; the poller follows with
+    // the journal entry's real date.
+    await recordFeedEntry({ ...entry, firedAt: 5000 });
+    await recordFeedEntry({ ...entry, firedAt: 1000 });
+    expect((await readFeed())[0].firedAt).toBe(1000);
+  });
+
+  it('keeps a back-dated row it just wrote, rather than trimming it away in the same call', async () => {
+    for (let i = 0; i < NOTIFICATION_FEED_LIMIT; i++) {
+      await recordFeedEntry({
+        id: `newer-${i}`,
+        characterId: 1,
+        eventId: 'newMail',
+        title: 't',
+        body: 'b',
+        firedAt: 10_000 + i,
+      });
+    }
+    // Older than every row already stored — the trim's own cut line.
+    await recordFeedEntry({
+      id: 'back-dated',
+      characterId: 1,
+      eventId: 'walletBalanceChanged',
+      title: 'Wallet balance changed',
+      body: 'b',
+      firedAt: 1,
+    });
+    expect(await db.notificationFeed.get('back-dated')).toBeDefined();
+  });
+
   it('keeps a dismissal, so a second observer re-recording the occurrence cannot resurface it', async () => {
     await recordFeedEntry({
       id: 'same-occurrence',

@@ -196,11 +196,6 @@ export function NotificationFeedPanel() {
 }
 
 /**
- * Same age ladder as `DataAgeBadge` (`lib/age.ts`) without its staleness
- * tone: an old notification is old, not stale — nothing about it needs
- * refreshing, so colouring it like out-of-date data would misreport it.
- */
-/**
  * How far back a collapsed row actually reaches, shown only when its rows do
  * not all read the same age.
  *
@@ -229,6 +224,11 @@ function FiredSpan({ fires }: { fires: readonly NotificationFeedEntry[] }) {
   );
 }
 
+/**
+ * Same age ladder as `DataAgeBadge` (`lib/age.ts`) without its staleness
+ * tone: an old notification is old, not stale — nothing about it needs
+ * refreshing, so colouring it like out-of-date data would misreport it.
+ */
 function FiredAt({ firedAt }: { firedAt: number }) {
   const { t } = useTranslation();
   const date = new Date(firedAt);

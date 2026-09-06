@@ -305,6 +305,34 @@ describe('occurrenceFiredAt', () => {
     expect(occurrenceFiredAt(fire, T0)).toBe(paidAt);
   });
 
+  it("dates skillLevelComplete by the level's finish, and falls back when the queue carried no date", () => {
+    const finishMs = T0 - 6 * 3_600_000;
+    const fire: NotificationFire = {
+      eventId: 'skillLevelComplete',
+      characterId: 7,
+      skillId: 3300,
+      level: 4,
+      finishMs,
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(finishMs);
+    expect(occurrenceFiredAt({ ...fire, finishMs: null }, T0)).toBe(T0);
+  });
+
+  it("dates an eveNotification by ESI's own timestamp, and falls back when it cannot be parsed", () => {
+    const fire: EveNotificationFire = {
+      eventId: 'eveNotification',
+      characterId: 7,
+      notificationId: 11,
+      type: 'StructureUnderAttack',
+      senderId: 1000132,
+      senderType: 'corporation',
+      text: '',
+      timestamp: '2026-09-01T12:00:00Z',
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(Date.parse('2026-09-01T12:00:00Z'));
+    expect(occurrenceFiredAt({ ...fire, timestamp: 'not a date' }, T0)).toBe(T0);
+  });
+
   it('falls back to the poll time for a fire that carries no time of its own', () => {
     // A market order fill: ESI order history records no fill time, so when
     // the poller noticed it is the only time there is.

@@ -210,6 +210,8 @@ describe('NotificationFeedPanel', () => {
     renderPanel();
 
     const items = await screen.findAllByRole('listitem');
+    // The collapsed row itself is there — only the span is withheld.
+    expect(items[0]).toHaveTextContent('Market order filled x2');
     expect(items[0]).not.toHaveTextContent('from');
   });
 

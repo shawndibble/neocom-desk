@@ -761,14 +761,26 @@ function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record
   };
 }
 
-function toLocalFeedRecord(remote: RemoteNotificationFeedDoc): NotificationFeedRecord {
+/**
+ * `local` is this device's own copy when it has one — a pull only ever
+ * reaches an existing row to carry a dismissal over (`mergeFeed`'s
+ * `pullDismiss`). The earlier `firedAt` of the two wins, the same rule
+ * `features/notifications/feed.recordFeedEntry` applies to every other
+ * writer: devices legitimately disagree about a row's time (a push stamps its
+ * own arrival, a poll stamps the occurrence), and a pull must not be the one
+ * path that re-dates a row forward.
+ */
+function toLocalFeedRecord(
+  remote: RemoteNotificationFeedDoc,
+  local?: NotificationFeedRecord
+): NotificationFeedRecord {
   return {
     id: remote.id,
     characterId: remote.characterId,
     eventId: remote.eventId,
     title: remote.title,
     body: remote.body,
-    firedAt: remote.firedAt,
+    firedAt: local === undefined ? remote.firedAt : Math.min(local.firedAt, remote.firedAt),
     ...(remote.eveType !== undefined ? { eveType: remote.eveType } : {}),
     ...(remote.dismissedAt !== undefined ? { dismissedAt: remote.dismissedAt } : {}),
   };
@@ -794,10 +806,19 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
     )
   );
 
-  const pulled = [...plan.pullCreate, ...plan.pullDismiss].map(toLocalFeedRecord);
+  const localById = new Map(local.map((row) => [row.id, row]));
+  const pulled = [...plan.pullCreate, ...plan.pullDismiss].map((row) =>
+    toLocalFeedRecord(row, localById.get(row.id))
+  );
   if (pulled.length > 0) {
     await db.notificationFeed.bulkPut(pulled);
-    const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT);
+    // Same exclusion `recordFeedEntry` makes: a pulled row can be dated well
+    // back (`engine/occurrenceKey.occurrenceFiredAt`), and trimming it in the
+    // call that pulled it would make the sync a no-op that keeps re-pulling it.
+    const pulledIds = new Set(pulled.map((row) => row.id));
+    const stale = idsBeyondLimit(await readFeed(), NOTIFICATION_FEED_LIMIT).filter(
+      (id) => !pulledIds.has(id)
+    );
     if (stale.length > 0) await db.notificationFeed.bulkDelete(stale);
     await refreshAppBadge();
   }
