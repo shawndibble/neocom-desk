@@ -316,12 +316,24 @@ function costerFor(opts: NetworkOptions, pi: PiData) {
     const chain = singleFactoryChain(typeId, pi);
     let value: { marginPerUnit: number; marginPerFactory: number } | null = null;
     if (chain !== null) {
+      // A candidate can source one P1 from a colony's own ground and buy the
+      // other, so the chain's `sourcedBasis` — one basis for the whole chain
+      // — cannot say both. `ownSourcedIds` charges each P1 the same way
+      // `place()` prices the input line it becomes: at the bid for material a
+      // colony in the set already makes, at the ask for what has to be bought.
+      const ownSourcedIds = new Set(
+        chain.nodes
+          .filter((node) => node.tier === 1)
+          .filter((node) => opts.colonies.some((c) => (c.outputPerHour.get(node.typeId) ?? 0) > 0))
+          .map((node) => node.typeId)
+      );
       const cost = chainCost(chain, {
         prices: opts.prices,
         ...(opts.revenuePrices ? { revenuePrices: opts.revenuePrices } : {}),
         sourcingFloor: 'P1',
         layout: 'single-planet',
         taxRate,
+        ownSourcedIds,
       });
       if (cost.status === 'costed' && cost.margin > 0) {
         value = {

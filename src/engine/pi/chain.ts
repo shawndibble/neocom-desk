@@ -276,6 +276,7 @@ export function chainCost(chain: PiChain, opts: ChainCostOptions): ChainCostResu
     revenuePrices = prices,
     sourcingFloor,
     sourcedBasis = 'buy',
+    ownSourcedIds,
     layout,
     taxRate = DEFAULT_CUSTOMS_TAX_RATE,
     extractionRate = null,
@@ -349,11 +350,16 @@ export function chainCost(chain: PiChain, opts: ChainCostOptions): ChainCostResu
   };
   // What you pay for a sourced line, and what you receive for the target: the
   // ask and the bid respectively, unless the caller left both at one book.
-  const sourcedBook = sourcedBasis === 'own' ? revenuePrices : prices;
+  // `ownSourcedIds` overrides this per line, for a chain that sources some
+  // floor material from the market and some from ground already held.
+  const bookFor = (id: number) => {
+    const own = ownSourcedIds ? ownSourcedIds.has(id) : sourcedBasis === 'own';
+    return own ? revenuePrices : prices;
+  };
 
   const sourced: SourcedLine[] = sourcedIds.map((id) => {
     const node = nodeAt(id);
-    const unitPrice = priceIn(sourcedBook, id, node.name);
+    const unitPrice = priceIn(bookFor(id), id, node.name);
     const units = perTargetUnit(demand.get(id) as number);
     return {
       typeId: id,

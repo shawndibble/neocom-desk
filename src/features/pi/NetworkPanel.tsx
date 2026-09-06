@@ -12,7 +12,7 @@ import { Panel } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { NetworkPlan } from '@/engine/pi/network';
-import { customsRatePercent } from './customsRate';
+import { customsRatePercent, hostRateFor } from './customsRate';
 
 /**
  * What this system's colonies could make between them (ADR 0012).
@@ -68,7 +68,7 @@ export function NetworkPanel({
   const nameOfPlanet = (planetId: number) =>
     planetNames.get(planetId) ?? t('piAdvisor.planetLabel', { id: planetId });
   const total = plan.opportunities.reduce((sum, line) => sum + line.marginPerHour, 0);
-  const hostRate = (planetId: number) => taxRateByPlanet?.get(planetId) ?? taxRate;
+  const hostRate = (planetId: number) => hostRateFor(planetId, taxRateByPlanet, taxRate);
   // The footer states one customs rate only when every host in the plan
   // actually shares it — a cross-system plan is priced at each host's own
   // office (decision 20260906-144358), and naming one rate for all of them

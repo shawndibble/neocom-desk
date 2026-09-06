@@ -564,3 +564,34 @@ describe('planNetwork across systems', () => {
     expect(plan.blocked.every((line) => line.reason !== 'no-host-budget')).toBe(true);
   });
 });
+
+describe('planNetwork — sourced material pricing', () => {
+  it('prices a self-supplied input at the bid, never the ask, even split across colonies', () => {
+    // The candidate `place()` already gets right on the displayed input line
+    // (`routedPrice`, the bid): consuming a colony's own Water costs the sale
+    // forgone, not a purchase nobody makes. The candidate's own ranking figure
+    // has to agree, or the number that decides whether this is worth building
+    // disagrees with the numbers printed under it.
+    const twoColonies: NetworkColony[] = [colony(1, PLASMOIDS, 1_000), colony(2, WATER, 1_000)];
+    const prices = { ...PRICES };
+    // Water's ask is far above its bid; if the engine charged the ask for
+    // material a colony already makes, this test would see the ask's number.
+    const revenuePrices: Record<number, number> = { ...PRICES, [WATER]: 100 };
+    const plan = planNetwork(
+      {
+        colonies: twoColonies,
+        infrastructure: pi.infrastructure,
+        prices,
+        revenuePrices,
+        taxRate: 0,
+      },
+      pi
+    );
+    const superconductors = plan.opportunities.find((line) => line.name === 'Superconductors');
+    expect(superconductors).toBeDefined();
+    // 40 Plasmoids + 40 Water make 5 Superconductors an hour: 8 of each per unit.
+    const expectedMarginPerUnit =
+      revenuePrices[SUPERCONDUCTORS] - 8 * revenuePrices[PLASMOIDS] - 8 * revenuePrices[WATER];
+    expect(superconductors?.marginPerUnit).toBeCloseTo(expectedMarginPerUnit, 6);
+  });
+});

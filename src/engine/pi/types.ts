@@ -217,6 +217,15 @@ export interface ChainCostOptions {
    * Defaults to `'buy'`.
    */
   sourcedBasis?: 'buy' | 'own';
+  /**
+   * Per-line override of `sourcedBasis`, for a chain that sources some floor
+   * material from the market and some from ground the caller already holds —
+   * `network.ts`'s candidates, which can draw a P1 from a colony's own
+   * production and buy the rest of it in the same chain. A typeId in this set
+   * is charged at `revenuePrices` regardless of `sourcedBasis`; every other
+   * sourced line still follows `sourcedBasis`.
+   */
+  ownSourcedIds?: ReadonlySet<number>;
   layout: ChainLayout;
   /** Defaults to the highsec NPC base rate. Never derived here. */
   taxRate?: number;

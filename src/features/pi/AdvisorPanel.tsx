@@ -288,6 +288,10 @@ interface Snapshot {
 
 async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   const nowMs = Date.now();
+  // Started here rather than awaited where it's used: it needs only
+  // `characterId`, so it runs alongside everything else below instead of
+  // after it — one fewer serialized round trip before first paint.
+  const rosterPromise = loadPiRosterSnapshot(characterId);
   const [pi, planetRadiusRaw, { cached, needsReauth }, ccLevel, customsSkill, consolidation] =
     await Promise.all([
       loadPi(),
@@ -422,7 +426,7 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   // Other Characters' colonies. Cache-only and therefore cheap: page open
   // costs no extra ESI here, and a Character whose colonies have never been
   // read contributes nothing rather than an empty-looking one.
-  const roster = await loadPiRosterSnapshot(characterId);
+  const roster = await rosterPromise;
   const altAdvice: PlanetAdvice[] = [];
   const altTaxRates = new Map<number, number>();
   const altOwners = new Map<number, string>();
@@ -778,13 +782,10 @@ function BuiltCard({
         colony,
         balance,
         pi,
-        spare: {
-          cpu: Math.max(0, budget.cpu - colony.pinLoad.load.cpu),
-          powergrid: Math.max(0, budget.powergrid - colony.pinLoad.load.powergrid),
-        },
+        spare: { cpu: freeCpu, powergrid: freePowergrid },
         newLinkCost,
       }),
-    [colony, balance, pi, budget, newLinkCost]
+    [colony, balance, pi, freeCpu, freePowergrid, newLinkCost]
   );
 
   return (

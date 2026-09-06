@@ -16,6 +16,7 @@ import {
 } from '@/engine/pi/network';
 import { CUSTOMS_TAXABLE_VALUE, piTier } from '@/engine/pi/chain';
 import type { FactoryBalance } from '@/engine/pi/factoryBalance';
+import { hostRateFor } from './customsRate';
 import type { PlanetAdvice } from './advisorModel';
 
 /** Schematic cycle times are in seconds. */
@@ -112,13 +113,22 @@ function convertibleFacilities(
   return out;
 }
 
-export function networkColonies(input: NetworkModelInput): NetworkColony[] {
+/**
+ * `networkColonies` and its `assumesRemoval` flag, built in one pass over the
+ * advice: both need each colony's own `factoryBalance`/`surplusLoad`, and a
+ * second pass just to re-derive the flag would rebuild the same balance for
+ * every colony a second time.
+ */
+function buildNetworkColonies(input: NetworkModelInput): {
+  colonies: NetworkColony[];
+  assumesRemoval: boolean;
+} {
   const colonies: NetworkColony[] = [];
+  let assumesRemoval = false;
   for (const entry of input.advice) {
     if (entry.kind !== 'built') continue;
     const { colony } = entry;
     if (!colony.detailLoaded) continue;
-    if (colony.linkCount > 0 && colony.pinLoad.linkLoad === null) continue;
 
     const balance = colonyFactoryBalance(colony, input.pi);
     // The budget offered to a host includes what its *unfed* factories are
@@ -130,7 +140,10 @@ export function networkColonies(input: NetworkModelInput): NetworkColony[] {
     // so — a promise resting on an unstated precondition is the failure this
     // tab exists to avoid.
     const freed = surplusLoad(balance, input.pi);
-    const hostTaxRate = input.taxRateByPlanet?.get(entry.planetId) ?? input.taxRate;
+    if (freed.cpu > 0 || freed.powergrid > 0) assumesRemoval = true;
+    if (colony.linkCount > 0 && colony.pinLoad.linkLoad === null) continue;
+
+    const hostTaxRate = hostRateFor(entry.planetId, input.taxRateByPlanet, input.taxRate);
     colonies.push({
       planetId: entry.planetId,
       outputPerHour: colonyOutputPerHour(balance, input.pi),
@@ -154,7 +167,11 @@ export function networkColonies(input: NetworkModelInput): NetworkColony[] {
       ),
     });
   }
-  return colonies;
+  return { colonies, assumesRemoval };
+}
+
+export function networkColonies(input: NetworkModelInput): NetworkColony[] {
+  return buildNetworkColonies(input).colonies;
 }
 
 /**
@@ -175,7 +192,7 @@ export interface ColonyNetwork {
 }
 
 export function colonyNetwork(input: NetworkModelInput): ColonyNetwork | null {
-  const colonies = networkColonies(input);
+  const { colonies, assumesRemoval } = buildNetworkColonies(input);
   if (colonies.length < 2) return null;
   return {
     plan: planNetwork(
@@ -193,20 +210,6 @@ export function colonyNetwork(input: NetworkModelInput): ColonyNetwork | null {
       },
       input.pi
     ),
-    assumesRemoval: assumesRemovalFor(input),
+    assumesRemoval,
   };
-}
-
-/**
- * Whether any colony in this set is holding budget in factories nothing feeds.
- *
- * Recomputed rather than threaded out of `networkColonies`, which returns the
- * engine's own shape and should not grow a field the engine has no use for.
- */
-function assumesRemovalFor(input: NetworkModelInput): boolean {
-  return input.advice.some((entry) => {
-    if (entry.kind !== 'built' || !entry.colony.detailLoaded) return false;
-    const freed = surplusLoad(colonyFactoryBalance(entry.colony, input.pi), input.pi);
-    return freed.cpu > 0 || freed.powergrid > 0;
-  });
 }

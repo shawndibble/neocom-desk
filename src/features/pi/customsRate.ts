@@ -97,6 +97,15 @@ export function customsRatePercent(rate: number): number {
   return Math.round(rate * 10_000) / 100;
 }
 
+/** A colony's own rate from a per-planet map, falling back to a set-wide default. */
+export function hostRateFor(
+  planetId: number,
+  taxRateByPlanet: ReadonlyMap<number, number> | undefined,
+  taxRate: number
+): number {
+  return taxRateByPlanet?.get(planetId) ?? taxRate;
+}
+
 /**
  * The character's trained Customs Code Expertise, or `null` when the app has
  * no skill data for them at all.
