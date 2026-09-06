@@ -594,6 +594,7 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
       ...(p.buildLocationId !== undefined ? { buildLocationId: p.buildLocationId } : {}),
       ...(p.buildLocationName !== undefined ? { buildLocationName: p.buildLocationName } : {}),
       ...(p.facilityTaxPct !== undefined ? { facilityTaxPct: p.facilityTaxPct } : {}),
+      ...(p.materialPriceBasis !== undefined ? { materialPriceBasis: p.materialPriceBasis } : {}),
       ...(materialSourcing !== undefined ? { materialSourcing } : {}),
       ...(p.ownedStockScope !== undefined ? { ownedStockScope: p.ownedStockScope } : {}),
       // An empty selection is omitted rather than pushed as [], so a plan that
@@ -623,6 +624,7 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     ...(r.buildLocationId !== undefined ? { buildLocationId: r.buildLocationId } : {}),
     ...(r.buildLocationName !== undefined ? { buildLocationName: r.buildLocationName } : {}),
     ...(r.facilityTaxPct !== undefined ? { facilityTaxPct: r.facilityTaxPct } : {}),
+    ...(r.materialPriceBasis !== undefined ? { materialPriceBasis: r.materialPriceBasis } : {}),
     ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
     ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),
     ...(r.buildHere !== undefined ? { buildHere: r.buildHere } : {}),

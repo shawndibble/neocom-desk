@@ -19,6 +19,7 @@ import { FACILITY_PRESETS, industryActivityOf } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type {
   FacilityKind,
+  MaterialPriceBasis,
   MaterialSourcing,
   RigLevel,
   SkillLevels,
@@ -33,6 +34,7 @@ import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
 import { buildPlanTypeIds, materialRecipe } from './recipes';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
+import { MATERIAL_PRICE_BASES, materialPriceBasisOf, materialPricesFor } from './priceBasis';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -73,6 +75,7 @@ export type PlanPatch = Partial<
     | 'buildLocationId'
     | 'buildLocationName'
     | 'facilityTaxPct'
+    | 'materialPriceBasis'
     | 'ownedStockScope'
     | 'buildHere'
   >
@@ -299,6 +302,18 @@ export function BuildPlanDetail({
     [detectedStock, scopedStock, characterNames, locationNames, incompleteCharacters, t]
   );
 
+  /**
+   * The one map every "what does this material cost to buy" on the plan reads
+   * — its own cost lines, its sub-build inputs and its make-or-buy verdicts,
+   * so a single plan never mixes the two sides of the book. Both sides come
+   * from the snapshot already in hand, which is why the basis is deliberately
+   * absent from `snapshotKey` above: toggling it must re-compute, not refetch.
+   */
+  const materialPrices = useMemo(
+    () => materialPricesFor(snapshot, plan.materialPriceBasis),
+    [snapshot, plan.materialPriceBasis]
+  );
+
   const { result, error } = useMemo(() => {
     if (!blueprint) return { result: null, error: t('industry.blueprintMissing') };
     return computeBuildPlan({
@@ -307,9 +322,10 @@ export function BuildPlanDetail({
       systemCostIndex: snapshot?.systemCostIndex ?? 0,
       adjustedPrices: snapshot?.adjustedPrices ?? {},
       hubPrices: snapshot?.hubPrices ?? {},
+      materialPrices,
       skills,
     });
-  }, [plan, blueprint, snapshot, skills, t]);
+  }, [plan, blueprint, snapshot, materialPrices, skills, t]);
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
@@ -353,7 +369,7 @@ export function BuildPlanDetail({
     [recipeFor]
   );
 
-  // "Use all detected" fills only rows with nothing typed in them: a
+  // "Use all" fills only rows with nothing typed in them: a
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
   // action. The per-row action is the one that overwrites — clicking it on that
   // row means it.
@@ -399,10 +415,12 @@ export function BuildPlanDetail({
       ...facilityContext,
       systemCostIndex: snapshot.systemCostIndex,
       adjustedPrices: snapshot.adjustedPrices,
-      hubPrices: snapshot.hubPrices,
+      // The verdict's "buy it instead" side is a material purchase like any
+      // other on this plan, so it is quoted at the plan's basis.
+      hubPrices: materialPrices,
       skills,
     };
-  }, [facilityContext, snapshot, skills]);
+  }, [facilityContext, snapshot, materialPrices, skills]);
 
   /**
    * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
@@ -429,7 +447,7 @@ export function BuildPlanDetail({
         materials: result?.materials ?? [],
         buildHere: plan.buildHere ?? [],
         recipeFor,
-        hubPrices: snapshot?.hubPrices ?? {},
+        hubPrices: materialPrices,
         sourcing: plan.materialSourcing,
         ctx: {
           ...facilityContext,
@@ -438,7 +456,16 @@ export function BuildPlanDetail({
           skills,
         },
       }),
-    [result, plan.buildHere, plan.materialSourcing, facilityContext, recipeFor, snapshot, skills]
+    [
+      result,
+      plan.buildHere,
+      plan.materialSourcing,
+      facilityContext,
+      recipeFor,
+      snapshot,
+      materialPrices,
+      skills,
+    ]
   );
 
   const visibleMaterials = useMemo(
@@ -800,6 +827,42 @@ export function BuildPlanDetail({
                     </SelectContent>
                   </Select>
                 </label>
+
+                {/* Sits under Trade hub because it names a side of that hub's
+                    order book, not a separate place. Materials only — the
+                    product stays on lowest sell, which is what buying it
+                    outright costs (CONTEXT.md, Acquisition Verdict). */}
+                <div className="flex flex-col gap-1 text-xs">
+                  <span className="flex items-center gap-1">
+                    <label htmlFor="build-plan-material-price-basis">
+                      {t('industry.materialPriceBasis')}
+                    </label>
+                    <InfoTooltip
+                      label={t('industry.materialPriceBasisTooltipLabel')}
+                      content={t('industry.materialPriceBasisTooltip')}
+                    />
+                  </span>
+                  <Select
+                    value={materialPriceBasisOf(plan.materialPriceBasis)}
+                    onValueChange={(value) =>
+                      update({ materialPriceBasis: value as MaterialPriceBasis })
+                    }
+                  >
+                    <SelectTrigger
+                      id="build-plan-material-price-basis"
+                      aria-label={t('industry.materialPriceBasis')}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MATERIAL_PRICE_BASES.map((basis) => (
+                        <SelectItem key={basis} value={basis}>
+                          {t(`industry.materialPriceBasis_${basis}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </div>
@@ -817,11 +880,6 @@ export function BuildPlanDetail({
           // fixed) header beats clipping.
           <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-text-dim">
             {fetchedAt && <DataAgeBadge date={fetchedAt} />}
-            {bulkDetectedPatches.length > 0 && (
-              <Button size="sm" onClick={() => onSourcingChangeMany(bulkDetectedPatches)}>
-                {t('industry.useAllDetected')}
-              </Button>
-            )}
             {/*
               Gated on there being a remainder to order, not on the table
               having rows: a plan whose every material is already owned still
@@ -884,6 +942,13 @@ export function BuildPlanDetail({
                 detectedStock={detectedStock}
                 detection={detection}
                 onChange={(ownedStockScope) => update({ ownedStockScope })}
+                action={
+                  bulkDetectedPatches.length > 0 && (
+                    <Button size="sm" onClick={() => onSourcingChangeMany(bulkDetectedPatches)}>
+                      {t('industry.useAllOwned')}
+                    </Button>
+                  )
+                }
               />
             </div>
             <MaterialsTable

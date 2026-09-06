@@ -557,6 +557,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     buildLocationId: 1035466617946,
     buildLocationName: 'K2-18 R&D',
     facilityTaxPct: 1.5,
+    materialPriceBasis: 'buy',
     materialSourcing: { 34: { ownedQuantity: 500, overridePrice: 6.5 } },
     ownedStockScope: {
       mode: 'selected',
@@ -594,6 +595,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       'facilityTaxPct',
       'hubId',
       'id',
+      'materialPriceBasis',
       'materialSourcing',
       'me',
       'name',

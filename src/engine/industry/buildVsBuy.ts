@@ -2,8 +2,13 @@
  * Build-vs-buy comparison: total build cost (materials at their sourced prices
  * + job fee) against buying the product outright at the hub's lowest sell.
  * Material prices come from src/engine/industry/sourcing — owned units are
- * free, the rest is priced at an override or the hub. Missing prices flag the
+ * free, the rest is priced at an override or at `materialPrices` (the hub's
+ * sell side unless the caller passes another map). Missing prices flag the
  * result as unpriceable instead of throwing.
+ *
+ * The product is always priced from `hubPrices`, never `materialPrices`: an
+ * Acquisition Verdict asks what buying the product outright costs, and buying
+ * outright pays the hub's lowest sell whatever the materials were sourced at.
  */
 
 import type { BuildResult, FacilityContext, IndustryInputs } from '@/engine/industry/types';
@@ -24,7 +29,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
 
   const materials = materialCostLines(
     effectiveMaterials(blueprint, runs, me, ctx),
-    hubPrices,
+    inputs.materialPrices ?? hubPrices,
     inputs.materialSourcing
   );
   const seconds = jobDurationSeconds(blueprint.time, runs, te, skills, ctx);

@@ -431,7 +431,7 @@ export function Industry() {
   }
 
   /**
-   * "Use all detected" (issue #181), applied one row at a time through the very
+   * "Use all" (issue #181), applied one row at a time through the very
    * same write path a typed value takes. Awaited in sequence, not fired in
    * parallel: each `saveSourcingEdit` merges into the record it reads inside
    * its own transaction, so overlapping writes would drop all but the last.

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FilterChip,
@@ -25,6 +25,14 @@ interface OwnedStockScopeControlProps {
   detection: OwnedStockDetection;
   /** `undefined` clears the field back to the "everywhere" default rather than storing it explicitly. */
   onChange: (scope: OwnedStockScope | undefined) => void;
+  /**
+   * Rendered inline at the end of the label-and-select line. The "use all"
+   * bulk fill lives here rather than in the Materials panel's own toolbar: it
+   * spends exactly the stock this control scopes, and two rows apart the two
+   * did not read as one thing. A slot rather than a prop pair, so this
+   * component still knows nothing about sourcing patches.
+   */
+  action?: ReactNode;
 }
 
 /**
@@ -44,6 +52,7 @@ export function OwnedStockScopeControl({
   detectedStock,
   detection,
   onChange,
+  action,
 }: OwnedStockScopeControlProps) {
   const { t } = useTranslation();
   const locations = useMemo(() => collectStockLocations(detectedStock), [detectedStock]);
@@ -100,6 +109,7 @@ export function OwnedStockScopeControl({
             <SelectItem value="selected">{t('industry.ownedStockScopeSelected')}</SelectItem>
           </SelectContent>
         </Select>
+        {action}
       </div>
       {mode === 'selected' &&
         (locations.length === 0 ? (
