@@ -180,6 +180,11 @@ function useViewport(matches: boolean) {
 }
 const useNarrowViewport = () => useViewport(false);
 
+/** The plan's inputs fold behind "Edit setup"; tests that read them open it first. */
+async function openSetup(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole('button', { name: 'Edit setup' }));
+}
+
 afterEach(() => {
   server.resetHandlers();
   clearMarketPriceCache();
@@ -445,6 +450,7 @@ describe('Industry: owned-blueprint prefill', () => {
     await user.click(await screen.findByRole('button', { name: /Rifter/ }));
 
     await screen.findByRole('button', { name: 'Rifter' });
+    await openSetup(user);
     // Text fields now (issue #455's commit-on-blur fix), not `type="number"`
     // spinbuttons — `toHaveValue` compares against the DOM string value.
     expect(screen.getByLabelText('ME %')).toHaveValue('8');
@@ -478,6 +484,7 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
+    await openSetup(user);
     // Labels stay exact ("ME %"/"TE %") — the tooltip trigger lives outside the <label>.
     expect(screen.getByLabelText('ME %')).toBeInTheDocument();
     expect(screen.getByLabelText('TE %')).toBeInTheDocument();
@@ -496,10 +503,12 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
 
 describe('Industry: build plan settings grouping (#120)', () => {
   it('groups Runs/ME/TE under Blueprint and the rest under Location & market', async () => {
+    const user = userEvent.setup();
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
+    await openSetup(user);
     expect(screen.getByText('Blueprint')).toBeInTheDocument();
     expect(screen.getByText('Location & market')).toBeInTheDocument();
 

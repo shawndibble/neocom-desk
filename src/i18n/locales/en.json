@@ -658,8 +658,8 @@
     "runsHide": "Hide production runs",
     "productionLogShowRuns": "Show all production runs",
     "productionLogHideRuns": "Hide all production runs",
-    "heroTitle_one": "{{name}} · 1 run · profit after fees",
-    "heroTitle_other": "{{name}} · {{count}} runs · profit after fees"
+    "heroTitle_one": "1 run · profit after fees",
+    "heroTitle_other": "{{count}} runs · profit after fees"
   },
   "login": {
     "button": "Log in with EVE Online",

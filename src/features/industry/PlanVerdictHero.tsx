@@ -104,8 +104,10 @@ export function PlanVerdictHero({
     <Panel className="border-line-bright">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 space-y-1 md:min-w-64 md:flex-1">
-          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('industry.heroTitle', { name: productName, count: runs })}
+          <p className="flex flex-wrap items-baseline gap-x-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {/* A real heading, not decoration: it is what names the open plan to a screen reader. */}
+            <h2 className="text-text">{productName}</h2>
+            <span>· {t('industry.heroTitle', { count: runs })}</span>
           </p>
           {pricesLoading ? (
             <div className="py-2">
@@ -123,15 +125,13 @@ export function PlanVerdictHero({
           <p className="text-xs tabular-nums text-text-dim">
             {pricesLoading
               ? ''
-              : !pricesReady
-                ? t('industry.pricesUnavailableTitle')
-                : profit === null
-                  ? t('industry.heroNoPrices')
-                  : qualifiers.join(' · ')}
+              : !pricesReady || profit === null
+                ? t('industry.heroNoPrices')
+                : qualifiers.join(' · ')}
           </p>
         </div>
 
-        {!pricesLoading && (
+        {!pricesLoading && pricesReady && (
           <div className="flex flex-col items-start gap-2 md:max-w-sm">
             {result.recommendation === 'build' ? (
               <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="success">
