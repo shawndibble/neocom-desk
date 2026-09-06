@@ -100,16 +100,18 @@ describe('PlanVerdictHero: verdict labels and prose', () => {
     expect(screen.getByText('Sale Profitability')).toBeInTheDocument();
   });
 
-  it('states Sale Profitability from the net profit, distinct from the Acquisition Verdict', () => {
+  it('states Sale Profitability as the one large figure, distinct from the Acquisition Verdict', () => {
     renderHero();
     expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
-    expect(screen.getByText('Selling profits 435 ISK')).toBeInTheDocument();
+    // The figure is the statement; no pill restates it.
+    expect(screen.getByText('Sale Profitability').parentElement).toHaveTextContent('435 ISK');
+    expect(screen.queryByText(/Selling profits/)).not.toBeInTheDocument();
   });
 
-  it('flips Sale Profitability to a loss statement when profit is negative, independent of the Acquisition Verdict', () => {
+  it('keeps the figure signed when profit is negative, independent of the Acquisition Verdict', () => {
     renderHero({ result: { ...RESULT, profit: -50, grossProfit: 460 } });
     expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
-    expect(screen.getByText('Selling loses 50 ISK')).toBeInTheDocument();
+    expect(screen.getByText('Sale Profitability').parentElement).toHaveTextContent('-50 ISK');
   });
 
   it('shows Sale Profitability and Acquisition Verdict unknown states independently when unpriced', () => {
@@ -137,9 +139,9 @@ describe('PlanVerdictHero: verdict labels and prose', () => {
     expect(
       screen.getByText('Not enough price data for a build-vs-buy verdict.')
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('Not enough price data to judge sale profitability.')
-    ).toBeInTheDocument();
+    // The figure has nothing to state, so the qualifier line says so instead.
+    expect(screen.getByText('No price data yet')).toBeInTheDocument();
+    expect(screen.queryByText(/sale profitability\./)).not.toBeInTheDocument();
   });
 });
 
@@ -177,7 +179,7 @@ describe('PlanVerdictHero: Log Production', () => {
 describe('PlanVerdictHero: calculation breakdown', () => {
   it('opens a modal from the results and explains where material and product prices come from', async () => {
     renderHero();
-    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/lowest sell order/i)).toBeTruthy();
@@ -188,7 +190,7 @@ describe('PlanVerdictHero: calculation breakdown', () => {
 
   it("names the buy-order basis when that is the plan's basis", async () => {
     renderHero({ breakdown: { ...BREAKDOWN, materialPriceBasis: 'buy' } });
-    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/highest buy order/i)).toBeTruthy();
@@ -198,7 +200,7 @@ describe('PlanVerdictHero: calculation breakdown', () => {
 
   it("quotes the plan's own figures rather than a generic formula", async () => {
     renderHero();
-    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
 
     const dialog = screen.getByRole('dialog');
     // Total cost = materials 500 + job fee 65.
@@ -213,7 +215,7 @@ describe('PlanVerdictHero: calculation breakdown', () => {
 
   it('explains the use-or-sell comparison and its two selling bases', async () => {
     renderHero();
-    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/Sell now fills the standing buy orders/i)).toBeTruthy();
@@ -222,7 +224,7 @@ describe('PlanVerdictHero: calculation breakdown', () => {
 
   it('drops the material-efficiency wording for a reaction, which has none', async () => {
     renderHero({ breakdown: { ...BREAKDOWN, isReaction: true } });
-    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/no material efficiency/i)).toBeTruthy();

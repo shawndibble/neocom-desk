@@ -676,9 +676,12 @@ export function BuildPlanDetail({
           chip(t('industry.setupChipTe'), `${plan.te}%`),
         ]
       : []),
+    // The place the pilot picked, by the name they picked it under; the
+    // facility · system · band triple only when no place was picked.
     chip(
-      t('industry.facility'),
-      `${facilityPreset.name} · ${buildSystem?.name ?? hub.systemName} · ${t(`industry.${plan.security}`)}`
+      t('industry.buildLocation'),
+      buildLocationName ??
+        `${facilityPreset.name} · ${buildSystem?.name ?? hub.systemName} · ${t(`industry.${plan.security}`)}`
     ),
     ...(facilityPreset.structure
       ? [

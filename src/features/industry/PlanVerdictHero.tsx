@@ -102,91 +102,87 @@ export function PlanVerdictHero({
 
   return (
     <Panel className="border-line-bright">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0 space-y-1 md:min-w-64 md:flex-1">
-          <p className="flex flex-wrap items-baseline gap-x-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {/* A real heading, not decoration: it is what names the open plan to a screen reader. */}
-            <h2 className="text-text">{productName}</h2>
-            <span>· {t('industry.heroTitle', { count: runs })}</span>
-          </p>
-          {pricesLoading ? (
-            <div className="py-2">
-              <Spinner size="sm" label={t('industry.pricesLoading')} />
-            </div>
-          ) : (
-            <p
-              className={`text-3xl leading-tight font-semibold tabular-nums ${
-                profit === null ? 'text-text-dim' : iskToneClass(profit)
-              }`}
-            >
-              {profit === null ? t('common.unknown') : `${formatIsk(profit)} ISK`}
+      {/*
+        Figure and pills share a row from `md`; the buttons join it only from
+        `xl`. Below that they wrap under, so the panel can never be wider than
+        its column — three fixed-width blocks side by side used to force the
+        whole page to scroll sideways at ordinary desktop widths.
+      */}
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 md:flex-row md:items-start md:gap-6">
+          <div className="min-w-0 space-y-1 md:flex-1">
+            <p className="flex flex-wrap items-baseline gap-x-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {/* A real heading, not decoration: it is what names the open plan to a screen reader. */}
+              <h2 className="text-text">{productName}</h2>
+              <span>· {t('industry.heroTitle', { count: runs })}</span>
             </p>
-          )}
-          <p className="text-xs tabular-nums text-text-dim">
-            {pricesLoading
-              ? ''
-              : !pricesReady || profit === null
-                ? t('industry.heroNoPrices')
-                : qualifiers.join(' · ')}
-          </p>
-        </div>
-
-        {!pricesLoading && pricesReady && (
-          <div className="flex flex-col items-start gap-2 md:max-w-sm">
-            {result.recommendation === 'build' ? (
-              <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="success">
-                {t('industry.verdictBuild', {
-                  amount: formatIsk((result.buyCost ?? 0) - result.totalCost),
-                })}
-              </VerdictPill>
-            ) : result.recommendation === 'buy' ? (
-              <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="warning">
-                {t('industry.verdictBuy', {
-                  amount: formatIsk(result.totalCost - (result.buyCost ?? 0)),
-                })}
-              </VerdictPill>
+            {pricesLoading ? (
+              <div className="py-2">
+                <Spinner size="sm" label={t('industry.pricesLoading')} />
+              </div>
             ) : (
-              <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="muted">
-                {t('industry.verdictUnknown')}
-              </VerdictPill>
+              <p
+                className={`text-3xl leading-tight font-semibold tabular-nums ${
+                  profit === null ? 'text-text-dim' : iskToneClass(profit)
+                }`}
+              >
+                {/* The figure is the Sale Profitability statement (ADR 0006) — labelled, not restated as a pill. */}
+                <span className="sr-only">{t('industry.saleProfitabilityLabel')} </span>
+                {profit === null ? t('common.unknown') : `${formatIsk(profit)} ISK`}
+              </p>
             )}
+            <p className="text-xs tabular-nums text-text-dim">
+              {pricesLoading
+                ? ''
+                : !pricesReady || profit === null
+                  ? t('industry.heroNoPrices')
+                  : qualifiers.join(' · ')}
+            </p>
+          </div>
 
-            {profit === null ? (
-              <VerdictPill label={t('industry.saleProfitabilityLabel')} tone="muted">
-                {t('industry.saleProfitabilityUnknown')}
-              </VerdictPill>
-            ) : profit >= 0 ? (
-              <VerdictPill label={t('industry.saleProfitabilityLabel')} tone="success">
-                {t('industry.saleProfitabilityProfit', { amount: formatIsk(profit) })}
-              </VerdictPill>
-            ) : (
-              <VerdictPill label={t('industry.saleProfitabilityLabel')} tone="warning">
-                {t('industry.saleProfitabilityLoss', { amount: formatIsk(Math.abs(profit)) })}
-              </VerdictPill>
-            )}
-
-            {useOrSell &&
-              (useOrSell.verdict === null ? (
-                <VerdictPill label={t('industry.useOrSell.label')} tone="muted">
-                  {t('industry.useOrSell.unknown')}
+          {!pricesLoading && pricesReady && (
+            <div className="flex min-w-0 flex-col items-start gap-2 md:flex-1">
+              {result.recommendation === 'build' ? (
+                <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="success">
+                  {t('industry.verdictBuild', {
+                    amount: formatIsk((result.buyCost ?? 0) - result.totalCost),
+                  })}
                 </VerdictPill>
-              ) : useOrSell.verdict.verdict === 'build' ? (
-                <VerdictPill label={t('industry.useOrSell.label')} tone="success">
-                  {t('industry.useOrSell.verdictBuild', {
-                    amount: formatIsk(useOrSell.verdict.advantage),
+              ) : result.recommendation === 'buy' ? (
+                <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="warning">
+                  {t('industry.verdictBuy', {
+                    amount: formatIsk(result.totalCost - (result.buyCost ?? 0)),
                   })}
                 </VerdictPill>
               ) : (
-                <VerdictPill label={t('industry.useOrSell.label')} tone="warning">
-                  {t('industry.useOrSell.verdictSell', {
-                    amount: formatIsk(Math.abs(useOrSell.verdict.advantage)),
-                  })}
+                <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="muted">
+                  {t('industry.verdictUnknown')}
                 </VerdictPill>
-              ))}
-          </div>
-        )}
+              )}
 
-        <div className="flex shrink-0 flex-wrap gap-2 md:flex-col md:items-end">
+              {useOrSell &&
+                (useOrSell.verdict === null ? (
+                  <VerdictPill label={t('industry.useOrSell.label')} tone="muted">
+                    {t('industry.useOrSell.unknown')}
+                  </VerdictPill>
+                ) : useOrSell.verdict.verdict === 'build' ? (
+                  <VerdictPill label={t('industry.useOrSell.label')} tone="success">
+                    {t('industry.useOrSell.verdictBuild', {
+                      amount: formatIsk(useOrSell.verdict.advantage),
+                    })}
+                  </VerdictPill>
+                ) : (
+                  <VerdictPill label={t('industry.useOrSell.label')} tone="warning">
+                    {t('industry.useOrSell.verdictSell', {
+                      amount: formatIsk(Math.abs(useOrSell.verdict.advantage)),
+                    })}
+                  </VerdictPill>
+                ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex shrink-0 flex-wrap gap-2 xl:flex-col xl:items-end">
           <Button
             size="sm"
             onClick={() => onBreakdownOpenChange(true)}

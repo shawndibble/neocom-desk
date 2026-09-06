@@ -575,7 +575,7 @@
     "override": "Override",
     "buildLocationGrantHint": "Sign in again to search your stations and structures and fill these in for you.",
     "buildLocationGrant": "Sign in again",
-    "breakdownTrigger": "How is this calculated?",
+    "breakdownTrigger": "Calculations?",
     "breakdown": {
       "title": "How this Build Plan is calculated",
       "intro": "Every figure in the results comes from the plan's own inputs and live market prices at {{hub}}. The numbers below are the ones this plan is using right now.",

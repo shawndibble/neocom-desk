@@ -505,7 +505,7 @@ export function Industry() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-7xl space-y-4">
       <PageHeader title={t('nav.industry')} />
       <ActiveJobsPanel
         characterId={activeCharacterId}
