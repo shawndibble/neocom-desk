@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
@@ -38,6 +38,20 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
   // State, not a ref: a Radix portal needs to re-render once the node exists,
   // and a ref assignment alone would not schedule that render.
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
+  // `showModal()` focuses the first focusable element — the header's close
+  // `IconButton` — and its Radix tooltip arms on focus: a stray "Close"
+  // bubble floated over every freshly opened dialog, and the first Escape
+  // press dismissed the bubble instead of the dialog. Moving focus away
+  // *after* `showModal()` is too late (the tooltip opens on a zero-delay
+  // timer, after the blur it would have needed), so the body carries the
+  // `autofocus` attribute instead: the dialog focusing steps then land on
+  // it directly and the close button never receives focus on open. Set as a
+  // DOM attribute because React's `autoFocus` prop is a mount-time
+  // `.focus()` call, which does nothing inside a not-yet-shown dialog.
+  const bodyRef = useCallback((element: HTMLDivElement | null) => {
+    setPortalContainer(element);
+    element?.setAttribute('autofocus', '');
+  }, []);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -48,14 +62,6 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
     // unmount-while-open too.
     const trigger = document.activeElement;
     if (!dialog.open) dialog.showModal();
-    // `showModal()` focuses the first focusable element, which is the
-    // header's close `IconButton` — and its Radix tooltip opens on focus,
-    // floating a stray "Close" bubble over every freshly opened dialog and
-    // swallowing the first Escape press (the tooltip dismisses, the dialog
-    // stays). Parking initial focus on the body instead keeps the dialog
-    // focused (for the focus trap and screen readers) without arming the
-    // tooltip; Tab still reaches the close button first.
-    dialog.querySelector<HTMLElement>('[data-modal-body]')?.focus({ preventScroll: true });
     // A native dialog does not lock the page behind it: on a phone, a scroll
     // that starts over the sheet chains straight into the page underneath.
     const previousOverflow = document.body.style.overflow;
@@ -117,8 +123,7 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
             />
           </header>
           <div
-            ref={setPortalContainer}
-            data-modal-body
+            ref={bodyRef}
             tabIndex={-1}
             className="min-h-0 flex-1 overflow-y-auto p-3 outline-none"
           >

@@ -660,6 +660,7 @@
   },
   "common": {
     "close": "Close",
+    "save": "Save",
     "loading": "Loading",
     "loadingEllipsis": "Loading…",
     "unknown": "—",
