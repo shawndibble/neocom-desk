@@ -56,6 +56,13 @@ import {
 } from '@/features/miningTax/selection';
 import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
+import { loadMadePayments } from '@/features/miningTax/madePayments';
+import {
+  suggestLinks,
+  unlinkedPayments,
+  type MadePayment,
+} from '@/features/miningTax/paymentLinks';
+import { LinkPaymentDialog } from '@/features/miningTax/LinkPaymentDialog';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
@@ -85,6 +92,13 @@ interface Snapshot {
   systemSecurity: Map<number, number>;
   typeNames: Map<number, string>;
   unitPrices: Map<number, number>;
+  /**
+   * Payments the pilot already made (issue #540) — a secondary enhancement, so
+   * a missing wallet/contracts grant or an offline read just leaves this empty
+   * rather than gating the page (`routeScopes.ts` deliberately doesn't list
+   * either endpoint for `/moon-mining`).
+   */
+  madePayments: MadePayment[];
 }
 
 async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
@@ -97,6 +111,7 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
       systemSecurity: new Map(),
       typeNames: new Map(),
       unitPrices: new Map(),
+      madePayments: [],
     };
   }
   const unclassifiedTypeIds = result.unclassified.flatMap((u) => u.typeIds);
@@ -104,13 +119,23 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
     { systemNames, systemSecurity, typeNames: rowTypeNames },
     unitPrices,
     unclassifiedTypeNames,
+    madePayments,
   ] = await Promise.all([
     resolveRowNames(result.rows),
     loadJitaUnitPrices(result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))),
     loadTypeNames(unclassifiedTypeIds),
+    loadMadePayments(result.characters.map((c) => c.characterId)),
   ]);
   const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);
-  return { ...result, entries: result.rows, systemNames, systemSecurity, typeNames, unitPrices };
+  return {
+    ...result,
+    entries: result.rows,
+    systemNames,
+    systemSecurity,
+    typeNames,
+    unitPrices,
+    madePayments,
+  };
 }
 
 /**
@@ -153,6 +178,7 @@ export function MoonMiningTax() {
   // actions (settle up / combine / dismiss), never just bulk-pay.
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
   const [bulkDismissOpen, setBulkDismissOpen] = useState(false);
+  const [linkPaymentOpen, setLinkPaymentOpen] = useState(false);
   // What the Settle-up dialog is settling: a balance card's whole balance, or
   // the table's checkbox selection. `null` keeps it closed.
   const [settleUpRows, setSettleUpRows] = useState<SettleUpRow[] | null>(null);
@@ -229,6 +255,15 @@ export function MoonMiningTax() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [characterFiltered, data]
   );
+
+  // Payments already made that nothing accounts for, each with the Payee and
+  // entries it most likely settled (issue #540). Only payments with a
+  // plausible target survive `suggestLinks`, which is what lets the card stay
+  // a quiet offer rather than a standing alert.
+  const linkSuggestions = useMemo(() => {
+    const everyAssignment = allDisplayRows.flatMap((dr) => allMembers(dr).map((m) => m.assignment));
+    return suggestLinks(unlinkedPayments(data?.madePayments ?? [], everyAssignment), balances);
+  }, [allDisplayRows, data, balances]);
 
   const visibleRows = useMemo(
     () => payeeFiltered.filter((dr) => statusFilter.has(dr.status)),
@@ -757,7 +792,9 @@ export function MoonMiningTax() {
                 </label>
               )}
             </div>
-            {(visibleBalances.length > 0 || unassigned.entryCount > 0) && (
+            {(visibleBalances.length > 0 ||
+              unassigned.entryCount > 0 ||
+              linkSuggestions.length > 0) && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {visibleBalances.map((balance) => (
                   <Panel key={balance.payee.id}>
@@ -830,6 +867,30 @@ export function MoonMiningTax() {
                     <div className="mt-2">
                       <Button size="sm" className="w-full" onClick={assignNext}>
                         {t('miningTax.assignNextAction')}
+                      </Button>
+                    </div>
+                  </Panel>
+                )}
+                {/* Paying backwards (issue #540): ISK that left the wallet and
+                    isn't accounted for. A card beside Unassigned, never an
+                    alert — it is an observation about balances, and only
+                    payments with a plausible target reach here at all. */}
+                {linkSuggestions.length > 0 && (
+                  <Panel className="border-dashed">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold">
+                        {t('miningTax.unlinkedPaymentsCardTitle')}
+                      </span>
+                      <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                        {t('miningTax.unlinkedPaymentsCount', { count: linkSuggestions.length })}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-[0.6875rem] text-text-dim">
+                      {t('miningTax.unlinkedPaymentsHint')}
+                    </p>
+                    <div className="mt-2">
+                      <Button size="sm" className="w-full" onClick={() => setLinkPaymentOpen(true)}>
+                        {t('miningTax.linkPaymentAction')}
                       </Button>
                     </div>
                   </Panel>
@@ -1067,6 +1128,17 @@ export function MoonMiningTax() {
             setSelection(new Set());
             refresh();
           }}
+        />
+      )}
+
+      {linkPaymentOpen && data && linkSuggestions.length > 0 && (
+        <LinkPaymentDialog
+          open
+          onClose={() => setLinkPaymentOpen(false)}
+          suggestions={linkSuggestions}
+          systemNames={data.systemNames}
+          showCharacter={showCharacterColumn}
+          onLinked={refresh}
         />
       )}
 

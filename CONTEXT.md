@@ -162,6 +162,16 @@ here — they go one per file in `docs/context/decisions/`.
 - **Market Order Filled**: Fires when any of a Character's market orders
   completes — a sell order being bought out, or a buy order being delivered.
   Both directions count as one event type, not two.
+- **Made Payment**: ISK (or ore) the pilot has already sent, gathered so the
+  Moon Mining Tax ledger can run its settle-up backwards — "I already paid
+  this; what did it cover?" (issue #540). Two sources only: an outgoing
+  wallet-journal entry of a hand-sent kind (which already covers paying a
+  landlord's ISK contract), and an `item_exchange` contract the pilot **issued**
+  at no price — payment in kind, whose cargo is deliberately never priced, so
+  it carries no amount and the pilot confirms one. A Made Payment is offered
+  only when it has a plausible target (recipient identity, or an amount that
+  agrees, inside the date window); one that matches nothing is never shown, which
+  is what keeps the offer from becoming a nag without an ignore-list.
 - **Market Region**: A region that can actually hold orders. Not every region
   qualifies — wormhole, Abyssal and the unreachable dev regions never do — and
   the test is not whether the region has an NPC station: 31 nullsec regions have
@@ -218,7 +228,12 @@ here — they go one per file in `docs/context/decisions/`.
 default tax %, optional moon/system tag}`. The moon/system tag lets the UI
   auto-suggest (and pre-fill) the Payee and rate for a future Mining Ledger
   Entry from that system: "pick the moon, the corp, or the person, whichever
-  is memorable" (issue #523).
+  is memorable" (issue #523). Optionally also carries `entityId`, the EVE
+  character or corporation the ISK actually goes to — never asked for, since a
+  Payee is a free-text label, but **learned** the first time a Made Payment to
+  that recipient is confirmed as settling this Payee's entries, after which
+  recipient identity (not amount or date) is the primary match signal
+  (issue #540).
 - **Pin Budget**: The CPU and Powergrid a Command Center supplies to one
   colony, and the fixed amount each pin draws from it. **This is the pin cap
   — the game defines no pin-count limit** — so "how many P1 pins, or fewer
