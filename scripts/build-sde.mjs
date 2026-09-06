@@ -1081,6 +1081,30 @@ async function main() {
     .map((t) => t.typeId)
     .sort((a, b) => a - b);
 
+  // --- compressedOreTypeIds.json: raw ore/ice typeId -> its "Compressed "
+  // counterpart's typeId (issue #523 corp-tax-parity decision). A character's
+  // personal mining ledger only ever reports raw ore/ice typeIds (compression
+  // is a separate industry job, not something ESI's mining endpoint can
+  // report), but a corp valuing what got mined prices the *compressed*
+  // item's market data instead of the raw one's — a different, generally
+  // more liquid order book. Matched by name against the full invTypes set
+  // (not just `marketTypes`) so a published-but-oddly-grouped compressed
+  // variant is still found, rather than by market group id, which the
+  // "Moon Ores" tree happens to nest both forms under but nothing guarantees
+  // for every ore/ice category.
+  const COMPRESSED_NAME_PREFIX = 'Compressed ';
+  const typeIdByName = new Map();
+  for (const [typeID, t] of types) {
+    if (t.published) typeIdByName.set(t.name, typeID);
+  }
+  const compressedOreTypeIds = {};
+  for (const rawTypeId of oreAndIceTypeIds) {
+    const rawName = types.get(rawTypeId)?.name;
+    if (!rawName) continue;
+    const compressedTypeId = typeIdByName.get(`${COMPRESSED_NAME_PREFIX}${rawName}`);
+    if (compressedTypeId !== undefined) compressedOreTypeIds[rawTypeId] = compressedTypeId;
+  }
+
   // --- market/variations.json: invMetaTypes + invMetaGroups -> Tech/Meta/
   // Faction variation relation (the EVE client's "Variations" tab). Every
   // classified type has an invMetaTypes row; a group's root has an empty
@@ -1257,6 +1281,7 @@ async function main() {
     ['pi-planet-radius.json', piPlanetRadiusKm],
     ['moonOreTypes.json', moonOreTypeIds],
     ['oreAndIceTypeIds.json', oreAndIceTypeIds],
+    ['compressedOreTypeIds.json', compressedOreTypeIds],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {
@@ -1317,6 +1342,15 @@ async function main() {
   if (oreAndIceTypeIds.length < moonOreTypeIds.length + 100) {
     console.error(
       '  FAIL: ore/ice type ids came out implausibly small — the ore/ice market group structure may have changed'
+    );
+    process.exitCode = 1;
+  }
+  console.log(
+    `  compressed-ore type id pairs: ${Object.keys(compressedOreTypeIds).length} of ${oreAndIceTypeIds.length} ore/ice types`
+  );
+  if (Object.keys(compressedOreTypeIds).length < moonOreTypeIds.length) {
+    console.error(
+      '  FAIL: fewer compressed-ore pairs than moon ore types alone — the "Compressed " naming convention may have changed'
     );
     process.exitCode = 1;
   }

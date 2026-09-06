@@ -8,8 +8,9 @@ export interface AssignmentValue {
 }
 
 /**
- * Values a set of ore lines at the given per-unit prices (Jita sell, per the
- * decision doc) and applies a tax percent — computed once, at assignment
+ * Values a set of ore lines at the given per-unit prices (Jita buy, of each
+ * line's Compressed counterpart where one exists — `pricing.ts`) and applies
+ * a tax percent — computed once, at assignment
  * time, and stored on the Assignment record rather than recomputed on render
  * (invoice semantics: a later price move or a Payee's default-rate edit must
  * not retroactively change what an already-assigned obligation shows as

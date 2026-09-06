@@ -9,10 +9,12 @@ import {
   SelectValue,
   TextInput,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
+import { typeIconUrl } from '@/lib/eveImages';
+import { maskIsk } from '@/lib/isk';
+import { unmaskNumber } from '@/lib/numberMask';
 import { createAssignment, updateAssignment } from './assignments';
 import { updatePayee } from './payees';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -37,6 +39,45 @@ interface AssignDialogProps {
 /** Rounds to the cent — what the editable ISK fields below prefill and display, since a raw float in a number input reads as noise. */
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+interface IskFieldProps {
+  ariaLabel: string;
+  computedDefault: number;
+  /** Empty means "track `computedDefault`"; anything else is the pilot's own text, commas and all. */
+  override: string;
+  onOverrideChange: (raw: string) => void;
+}
+
+/**
+ * The estimated-value/tax-owed fields: grouped digits at rest (`maskIsk`,
+ * up to 2 decimals, none padded on) and the plain figure to type into, same
+ * split `numberMask.ts`'s `SourcingInput` uses — reformatting on every
+ * keystroke would fight the caret. `unmaskNumber` accepts what's typed or
+ * pasted with or without its own commas.
+ */
+function IskField({ ariaLabel, computedDefault, override, onOverrideChange }: IskFieldProps) {
+  const [editing, setEditing] = useState(false);
+  const effectiveValue =
+    override.trim() === '' ? computedDefault : (unmaskNumber(override) ?? computedDefault);
+  return (
+    <TextInput
+      type="text"
+      inputMode="decimal"
+      aria-label={ariaLabel}
+      className="w-full"
+      value={
+        editing
+          ? override === ''
+            ? String(round2(computedDefault))
+            : override
+          : maskIsk(round2(effectiveValue))
+      }
+      onFocus={() => setEditing(true)}
+      onChange={(e) => onOverrideChange(e.target.value)}
+      onBlur={() => setEditing(false)}
+    />
+  );
 }
 
 /**
@@ -129,8 +170,11 @@ export function AssignDialog({
     Number.isFinite(pctValue) ? pctValue : 0
   );
   const estimatedValue =
-    estimatedValueOverride.trim() === '' ? computed.estimatedValue : Number(estimatedValueOverride);
-  const taxOwed = taxOwedOverride.trim() === '' ? computed.taxOwed : Number(taxOwedOverride);
+    estimatedValueOverride.trim() === ''
+      ? computed.estimatedValue
+      : (unmaskNumber(estimatedValueOverride) ?? NaN);
+  const taxOwed =
+    taxOwedOverride.trim() === '' ? computed.taxOwed : (unmaskNumber(taxOwedOverride) ?? NaN);
 
   function toggleLine(typeId: number) {
     setIncludedTypeIds((previous) => {
@@ -252,12 +296,8 @@ export function AssignDialog({
                   checked={includedTypeIds.has(line.typeId)}
                   onChange={() => toggleLine(line.typeId)}
                 />
-                <Icon.Ore
-                  aria-hidden="true"
-                  size={Icon.ICON_SIZE.sm}
-                  className="shrink-0 text-text-faint"
-                />
-                <label htmlFor={`line-${line.typeId}`} className="min-w-0 max-w-[10rem] truncate">
+                <img src={typeIconUrl(line.typeId, 32)} alt="" className="h-4 w-4 shrink-0" />
+                <label htmlFor={`line-${line.typeId}`} className="w-40 shrink-0 truncate">
                   {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                 </label>
                 <span className="tabular-nums text-text-dim">{line.quantity.toLocaleString()}</span>
@@ -292,18 +332,11 @@ export function AssignDialog({
           <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('miningTax.estimatedValueLabel')}
           </p>
-          <TextInput
-            type="number"
-            min={0}
-            step="0.01"
-            value={
-              estimatedValueOverride === ''
-                ? String(round2(computed.estimatedValue))
-                : estimatedValueOverride
-            }
-            onChange={(e) => setEstimatedValueOverride(e.target.value)}
-            aria-label={t('miningTax.estimatedValueLabel')}
-            className="w-full"
+          <IskField
+            ariaLabel={t('miningTax.estimatedValueLabel')}
+            computedDefault={computed.estimatedValue}
+            override={estimatedValueOverride}
+            onOverrideChange={setEstimatedValueOverride}
           />
         </div>
 
@@ -311,14 +344,11 @@ export function AssignDialog({
           <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('miningTax.taxOwedLabel')}
           </p>
-          <TextInput
-            type="number"
-            min={0}
-            step="0.01"
-            value={taxOwedOverride === '' ? String(round2(computed.taxOwed)) : taxOwedOverride}
-            onChange={(e) => setTaxOwedOverride(e.target.value)}
-            aria-label={t('miningTax.taxOwedLabel')}
-            className="w-full"
+          <IskField
+            ariaLabel={t('miningTax.taxOwedLabel')}
+            computedDefault={computed.taxOwed}
+            override={taxOwedOverride}
+            onOverrideChange={setTaxOwedOverride}
           />
         </div>
       </div>

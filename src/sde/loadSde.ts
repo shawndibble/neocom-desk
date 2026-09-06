@@ -47,3 +47,14 @@ export const loadMoonOreTypeIds = cached<number[]>('moonOreTypes.json');
  * allowlist-gap case the "unclassified ore" banner exists to catch.
  */
 export const loadOreAndIceTypeIds = cached<number[]>('oreAndIceTypeIds.json');
+/**
+ * Raw ore/ice typeId -> its "Compressed " counterpart's typeId, for every
+ * pair the SDE's naming convention resolves (issue #523's corp-tax-parity
+ * decision). Matched by name at build time (`scripts/build-sde.mjs`), not
+ * market group id: the ledger only ever reports raw typeIds, but a corp
+ * valuing what got mined prices the (generally more liquid) compressed
+ * item's market data instead — this is how the pricing layer finds that
+ * item. A raw type with no entry here has no compressed counterpart at all
+ * (rare, but real) and prices as itself.
+ */
+export const loadCompressedOreTypeIds = cached<Record<string, number>>('compressedOreTypeIds.json');

@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, StatChip } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
+import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
 import { AssignDialog } from './AssignDialog';
 import { STATUS_TONE } from './statusTone';
@@ -109,12 +109,8 @@ export function RowDetailModal({
                   key={line.typeId}
                   className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
                 >
-                  <Icon.Ore
-                    aria-hidden="true"
-                    size={Icon.ICON_SIZE.sm}
-                    className="shrink-0 text-text-faint"
-                  />
-                  <span className="min-w-0 max-w-[10rem] truncate">
+                  <img src={typeIconUrl(line.typeId, 32)} alt="" className="h-4 w-4 shrink-0" />
+                  <span className="w-40 shrink-0 truncate">
                     {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                   </span>
                   <span className="tabular-nums text-text-dim">

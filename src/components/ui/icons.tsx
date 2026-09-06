@@ -34,7 +34,6 @@ import {
   CheckCircle,
   Clipboard,
   Copy,
-  Cube,
   DotsThreeVertical,
   DownloadSimple,
   EnvelopeSimple,
@@ -206,4 +205,3 @@ export const Social = withWeight(EnvelopeSimple);
 export const Clones = withWeight(Stack);
 /** Contracts — courier, item exchange, auction. */
 export const Contracts = withWeight(FileText);
-export const Ore = withWeight(Cube);
