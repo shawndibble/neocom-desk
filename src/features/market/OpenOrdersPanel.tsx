@@ -31,7 +31,9 @@ import { loadNpcStations } from '@/sde/loadMarketSde';
 import type { NpcStationEntry } from '@/sde/marketTypes';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { TRADE_HUBS } from '@/market/hubs';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { ordersCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrder } from '@/esi/endpoints';
@@ -53,6 +55,8 @@ import {
   groupOpenOrders,
   needsAttentionCount,
   openOrderProblemCounts,
+  summariseOrderGroup,
+  type OpenOrderGroupSummary,
   type CharacterSkills,
   type OpenOrderRow,
 } from './openOrdersModel';
@@ -69,6 +73,7 @@ import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { stationPriceKey } from './stationPriceKey';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
+import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { OrderDetailModal } from './OrderDetailModal';
 
 /** Healthy orders start collapsed (CONTEXT.md redesign) — the `showHealthy` toggle is the way back, not the funnel filter. */
@@ -86,6 +91,26 @@ const SORTS: readonly OpenOrdersSort[] = [
 const PROBLEM_FILTER_OPTIONS: readonly OrderProblem[] = ORDER_PROBLEMS.filter(
   (problem) => problem !== 'healthy'
 );
+
+/** The five NPC trade hub stations — an order anywhere else sees far fewer buyers, which the row says out loud. */
+const HUB_STATION_IDS = new Set(TRADE_HUBS.map((hub) => hub.stationId));
+
+/**
+ * The left edge stripe on a group header, by how bad the group is. Same
+ * severity ladder the badges use (`OrderProblemBadge`'s `KIND_TONE`), so a
+ * group and the badges inside it can never disagree about how alarming they
+ * look. Colour is never the only signal here — the header always carries its
+ * own words and count (DESIGN.md §7).
+ */
+const GROUP_ACCENT: Record<OrderProblem, string> = {
+  belowFloor: 'border-l-danger',
+  undercutStation: 'border-l-danger',
+  undercutSystem: 'border-l-warning',
+  undercutRegion: 'border-l-accent',
+  expiringOrStale: 'border-l-line',
+  outbid: 'border-l-line',
+  healthy: 'border-l-success',
+};
 
 const EXPIRING_WITHIN_DAY_OPTIONS = [3, 7, 14, 30] as const;
 const MIN_ISK_TIED_UP_OPTIONS = [10_000_000, 100_000_000, 1_000_000_000] as const;
@@ -341,6 +366,12 @@ export function OpenOrdersPanel() {
     [allRows, filter]
   );
   const groups = useMemo(() => groupOpenOrders(groupingRows), [groupingRows]);
+  const groupSummaries = useMemo(
+    () => new Map(groups.map((group) => [group.problem, summariseOrderGroup(group.rows)])),
+    [groups]
+  );
+
+  const attentionCount = useMemo(() => needsAttentionCount(allRows), [allRows]);
 
   const attentionByCharacter = useMemo(() => {
     const m = new Map<number, number>();
@@ -468,9 +499,27 @@ export function OpenOrdersPanel() {
       primary: true,
       sortValue: (row) => row.typeName,
       render: (row) => (
-        <span className="flex flex-wrap items-center gap-1">
-          <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
-          {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
+        <span className="flex flex-col gap-0.5">
+          <span className="flex flex-wrap items-center gap-1">
+            <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
+            {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
+          </span>
+          {/*
+            What the floor column is reading from, said on the row that owns
+            it. Without this an order with no linked build shows an em-dash
+            under "Never sell below" and nothing anywhere explains why — the
+            single most confusing thing on the page for a player who has not
+            linked any builds yet.
+          */}
+          {!row.isBuyOrder && (
+            <span className="text-[0.6875rem] text-text-dim">
+              {/*
+                Not the run's id: `ProductionRunRecord.id` is an opaque
+                storage key, and there is no user-facing run number to show.
+              */}
+              {row.costBasis ? t('market.orders.buildLinked') : t('market.orders.noBuildLinked')}
+            </span>
+          )}
         </span>
       ),
     },
@@ -478,7 +527,24 @@ export function OpenOrdersPanel() {
       id: 'where',
       header: t('market.location'),
       className: 'text-text-dim',
-      render: (row) => row.stationName ?? t('market.unknownStructure'),
+      render: (row) => (
+        <span className="flex flex-col gap-0.5">
+          <span>{row.stationName ?? t('market.unknownStructure')}</span>
+          {/*
+            Only ever claimed for a location this app actually resolved: an
+            unresolved player structure is "not checked", not "off hub".
+          */}
+          {row.stationName !== null && !HUB_STATION_IDS.has(row.locationId) && (
+            <span className="flex items-center gap-1 text-[0.6875rem] text-warning">
+              {t('market.orders.offHub')}
+              <InfoTooltip
+                label={t('common.aboutLabel', { label: t('market.orders.offHub') })}
+                content={t('market.orders.offHubHelp')}
+              />
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       id: 'price',
@@ -493,7 +559,12 @@ export function OpenOrdersPanel() {
       header: t('market.orders.filter.problem'),
       render: (row) => {
         const badge = orderBadgeFor(row);
-        return badge ? <OrderProblemBadge kind={badge.kind} detail={badge.detail} /> : null;
+        return (
+          <span className="flex flex-col items-start gap-1">
+            {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
+            <OrderRowSummaryText row={row} />
+          </span>
+        );
       },
     },
     {
@@ -554,6 +625,19 @@ export function OpenOrdersPanel() {
       }
     >
       <div className="space-y-2 px-3 pt-2">
+        {allRows.length > 0 && (
+          <p className="text-xs text-text-dim">
+            {[
+              showCharacterStrip
+                ? t('market.orders.headerCharacters', { count: entriesWithOrders.length })
+                : null,
+              t('market.orders.headerSummary', { count: allRows.length }),
+              t('market.orders.headerAttention', { count: attentionCount }),
+            ]
+              .filter((part): part is string => part !== null)
+              .join(' \u00b7 ')}
+          </p>
+        )}
         {reauthEntries.map((entry) => (
           <ReauthBanner
             key={entry.characterId}
@@ -582,6 +666,11 @@ export function OpenOrdersPanel() {
             <FilterBar
               value={filter}
               onChange={setFilter}
+              // A chip per problem plus three selects is two full rows above
+              // the worklist they exist to narrow, so the whole box lives
+              // behind the funnel at every width here. The active chips stay
+              // outside it, where they can be seen and dropped.
+              collapsible
               activeCount={visibleChips.length}
               search={
                 <SearchInput
@@ -776,17 +865,29 @@ export function OpenOrdersPanel() {
               const folded = group.problem === 'healthy' && filter.hideHealthy;
               return (
                 <div key={group.problem} data-testid={`order-group-${group.problem}`}>
-                  <div className="flex items-center justify-between gap-2 bg-panel-2 px-3 py-2">
-                    <span className="flex items-center gap-1.5">
+                  <div
+                    className={cx(
+                      'flex items-start justify-between gap-2 border-l-2 bg-panel-2 px-3 py-2',
+                      GROUP_ACCENT[group.problem]
+                    )}
+                  >
+                    <span className="flex flex-col gap-0.5">
                       <span className="text-xs font-semibold tracking-widest text-text-dim uppercase">
                         {t(`market.orders.group.${group.problem}`)} · {group.rows.length}
                       </span>
-                      <InfoTooltip
-                        label={t('common.aboutLabel', {
-                          label: t(`market.orders.group.${group.problem}`),
+                      {/*
+                        What the group holds, said in the header rather than
+                        inside a "?" tooltip, so a folded or long group can be
+                        judged without opening it: what the group means, then
+                        the ISK at stake, the worst gap in it, and whose
+                        orders they are.
+                      */}
+                      <span className="text-[0.6875rem] text-text-dim">
+                        {groupHeaderLine(group.problem, groupSummaries.get(group.problem), {
+                          showCharacters: showCharacterStrip,
+                          t,
                         })}
-                        content={t(`market.orders.group.${group.problem}Hint`)}
-                      />
+                      </span>
                     </span>
                     <span className="flex items-center gap-3">
                       {group.problem === 'healthy' && (
@@ -860,6 +961,7 @@ export function OpenOrdersPanel() {
             if (!rival || mySystemId === undefined) return undefined;
             return jumpsByPair.get(`${mySystemId}:${rival.systemId}`);
           })()}
+          stationNameFor={(locationId) => snapshot.npcStations.get(locationId)?.name ?? null}
           onCheckDeeper={() => ensureDeepChecked(detailRow.regionId, detailRow.typeId)}
           onClose={() => setDetailOrderId(null)}
         />
@@ -888,4 +990,34 @@ function chipLabel(
   }
   if (chip.value !== undefined) return `${label}: ${chip.value}`;
   return label;
+}
+
+/**
+ * The group header's one-line description: what the group means, how much
+ * ISK it holds, the worst gap any row in it carries, and — only when more
+ * than one character has orders — who those rows belong to.
+ *
+ * A missing summary (a group whose rows were filtered out from under it)
+ * drops the numbers rather than printing zeroes, and a group with nothing
+ * undercut in it drops the gap clause rather than claiming "worst -0.0%".
+ */
+function groupHeaderLine(
+  problem: OrderProblem,
+  summary: OpenOrderGroupSummary | undefined,
+  {
+    showCharacters,
+    t,
+  }: { showCharacters: boolean; t: (key: string, options?: Record<string, unknown>) => string }
+): string {
+  const parts: string[] = [t(`market.orders.group.${problem}Hint`)];
+  if (summary) {
+    parts.push(t('market.orders.groupSummaryIsk', { isk: formatIskCompact(summary.iskTiedUp) }));
+    if (summary.worstGapPct !== null) {
+      parts.push(t('market.orders.groupSummaryWorst', { pct: summary.worstGapPct.toFixed(1) }));
+    }
+    if (showCharacters && summary.byCharacter.length > 0) {
+      parts.push(summary.byCharacter.map((s) => `${s.characterName} ${s.count}`).join(', '));
+    }
+  }
+  return parts.join(' \u00b7 ');
 }

@@ -344,3 +344,58 @@ export function openOrderProblemCounts(
 export function needsAttentionCount(rows: readonly OpenOrderRow[]): number {
   return rows.filter((row) => row.problem !== 'healthy').length;
 }
+
+/** One character's share of a group, for the group header's split line. */
+export interface GroupCharacterShare {
+  characterId: number;
+  characterName: string;
+  count: number;
+}
+
+/**
+ * What a group header states in its own right, so the reader can judge a
+ * folded group without opening it: how much ISK it holds, how badly the
+ * worst row in it is beaten, and which characters it belongs to.
+ *
+ * `worstGapPct` is read off the same tier the row's own badge reads — the
+ * deep rival when the region book has been fetched for that row, the
+ * station aggregate otherwise — so the header can never quote a percentage
+ * no row on screen shows. Null when no row in the group is undercut at all
+ * (an `expiringOrStale` or `healthy` group), never 0, which would read as
+ * "beaten by nothing".
+ */
+export interface OpenOrderGroupSummary {
+  iskTiedUp: number;
+  worstGapPct: number | null;
+  /** Descending by count, then by name, so the header's order is stable across refreshes. */
+  byCharacter: GroupCharacterShare[];
+}
+
+function rowGapPct(row: OpenOrderRow): number | null {
+  const deep = row.deepUndercut?.worst;
+  if (deep) return deep.gapPct;
+  return row.station.beatsMe ? row.station.gapPct : null;
+}
+
+export function summariseOrderGroup(rows: readonly OpenOrderRow[]): OpenOrderGroupSummary {
+  let iskTiedUp = 0;
+  let worstGapPct: number | null = null;
+  const shares = new Map<number, GroupCharacterShare>();
+  for (const row of rows) {
+    iskTiedUp += row.iskTiedUp;
+    const gap = rowGapPct(row);
+    if (gap !== null && (worstGapPct === null || gap > worstGapPct)) worstGapPct = gap;
+    const share = shares.get(row.characterId);
+    if (share) share.count++;
+    else
+      shares.set(row.characterId, {
+        characterId: row.characterId,
+        characterName: row.characterName,
+        count: 1,
+      });
+  }
+  const byCharacter = [...shares.values()].sort(
+    (a, b) => b.count - a.count || a.characterName.localeCompare(b.characterName)
+  );
+  return { iskTiedUp, worstGapPct, byCharacter };
+}

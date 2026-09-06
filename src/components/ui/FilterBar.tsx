@@ -81,6 +81,21 @@ interface FilterBarProps<T> {
    * sheet they are local state committed on Apply.
    */
   children: (draft: T, setDraft: (next: T) => void) => ReactNode;
+  /**
+   * Collapse the controls behind the funnel button on a POINTER-width screen
+   * too, instead of laying them out inline beside the search box.
+   *
+   * Off by default: most routes carry a handful of controls that read fine in
+   * the row, and hiding them behind a click would cost more than it saves.
+   * Opt in where the set is long enough that the row wraps and becomes the
+   * page — Market > Open Orders has a chip per problem plus three selects,
+   * which is two full rows above the worklist they exist to narrow.
+   *
+   * Unlike the narrow sheet there is no draft here: the row's controls are
+   * still bound straight to `value`/`onChange`, so opening the box and
+   * editing behaves exactly as it did inline. Only its visibility is new.
+   */
+  collapsible?: boolean;
   /** Wrapper class for the row. */
   className?: string;
 }
@@ -110,16 +125,29 @@ export function FilterBar<T>({
   activeCount = 0,
   title,
   children,
+  collapsible = false,
   className = '',
 }: FilterBarProps<T>) {
   const isNarrow = useIsNarrow();
 
   if (!isNarrow) {
+    if (!collapsible) {
+      return (
+        <div className={cx('flex flex-wrap items-center gap-2', className)}>
+          {search}
+          {children(value, onChange)}
+        </div>
+      );
+    }
     return (
-      <div className={cx('flex flex-wrap items-center gap-2', className)}>
-        {search}
+      <CollapsibleFilterRow
+        search={search}
+        activeCount={activeCount}
+        title={title}
+        className={className}
+      >
         {children(value, onChange)}
-      </div>
+      </CollapsibleFilterRow>
     );
   }
 
@@ -134,6 +162,98 @@ export function FilterBar<T>({
     >
       {children}
     </FilterSheet>
+  );
+}
+
+/**
+ * The funnel button, shared by both surfaces that hide controls behind one.
+ *
+ * The count rides on it as a number, not as an accent tint: "some filter is
+ * on" has to survive a viewer who can't tell the two border colours apart
+ * (DESIGN.md §7). It repeats inside the accessible name, so it is announced
+ * rather than only drawn.
+ */
+function FilterTrigger({
+  activeCount,
+  expanded,
+  haspopup,
+  onClick,
+}: {
+  activeCount: number;
+  expanded: boolean;
+  haspopup: 'dialog' | 'true';
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <span className="relative inline-flex shrink-0">
+      <IconButton
+        icon={<Icon.Filter />}
+        label={
+          activeCount > 0 ? t('filters.openWithCount', { count: activeCount }) : t('filters.open')
+        }
+        aria-haspopup={haspopup}
+        aria-expanded={expanded}
+        onClick={onClick}
+      />
+      {activeCount > 0 && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-1 -right-1 min-w-4 rounded-full border border-accent-dim bg-accent px-1 text-center text-[0.625rem] leading-4 font-semibold text-accent-contrast tabular-nums"
+        >
+          {activeCount}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * The `collapsible` pointer-width half of `FilterBar`: search box and funnel
+ * button on one line, the controls themselves on a line below that the
+ * funnel shows and hides.
+ *
+ * Unmounting the controls rather than hiding them with a class is deliberate
+ * — a `SelectTrigger` inside a `display:none` subtree is still in the tab
+ * order in some browsers, and a closed filter box the keyboard can walk into
+ * is worse than no collapse at all.
+ */
+function CollapsibleFilterRow({
+  search,
+  activeCount,
+  title,
+  children,
+  className = '',
+}: {
+  search?: ReactNode;
+  activeCount: number;
+  title?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={cx('flex flex-col gap-2', className)}>
+      <div className="flex flex-wrap items-center gap-2">
+        {search}
+        <FilterTrigger
+          activeCount={activeCount}
+          expanded={open}
+          haspopup="true"
+          onClick={() => setOpen((was) => !was)}
+        />
+      </div>
+      {open && (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 p-2"
+          aria-label={title ?? t('filters.title')}
+          role="group"
+        >
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -167,34 +287,19 @@ function FilterSheet<T>({
           border colours apart (DESIGN.md §7). It repeats inside `label`, so
           it is announced rather than only drawn.
         */}
-        <span className="relative inline-flex shrink-0">
-          <IconButton
-            icon={<Icon.Filter />}
-            label={
-              activeCount > 0
-                ? t('filters.openWithCount', { count: activeCount })
-                : t('filters.open')
-            }
-            aria-haspopup="dialog"
-            aria-expanded={open}
-            onClick={() => {
-              // Seeded here rather than in an effect on `value`: a filter whose
-              // options arrive from a fetch would otherwise re-seed mid-edit and
-              // discard what the user had already picked. Seeding on every open
-              // is also what stops a cancelled draft resurrecting itself.
-              setDraft(value);
-              setOpen(true);
-            }}
-          />
-          {activeCount > 0 && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -top-1 -right-1 min-w-4 rounded-full border border-accent-dim bg-accent px-1 text-center text-[0.625rem] leading-4 font-semibold text-accent-contrast tabular-nums"
-            >
-              {activeCount}
-            </span>
-          )}
-        </span>
+        <FilterTrigger
+          activeCount={activeCount}
+          expanded={open}
+          haspopup="dialog"
+          onClick={() => {
+            // Seeded here rather than in an effect on `value`: a filter whose
+            // options arrive from a fetch would otherwise re-seed mid-edit and
+            // discard what the user had already picked. Seeding on every open
+            // is also what stops a cancelled draft resurrecting itself.
+            setDraft(value);
+            setOpen(true);
+          }}
+        />
       </div>
       <Modal
         open={open}

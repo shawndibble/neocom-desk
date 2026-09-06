@@ -179,6 +179,85 @@ describe('OpenOrdersPanel', () => {
     expect(screen.queryByTestId('order-group-healthy')).not.toBeInTheDocument();
   });
 
+  it('states what is happening on the row, not just the badge', async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER, NO_COST_BASIS_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+
+    // The below-floor row says the loss in ISK a unit, not only "-x%".
+    const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
+    expect(belowFloorGroup).toHaveTextContent(/Selling at this price loses .* a unit/);
+    // And its item cell says the floor has a build behind it.
+    expect(belowFloorGroup).toHaveTextContent('Linked to a build');
+
+    // The order with nothing linked says so where the empty floor column is.
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Show healthy orders' }));
+    expect(screen.getByTestId('order-group-healthy')).toHaveTextContent('No build linked');
+  });
+
+  it('summarises each group in its own header', async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+
+    const group = await screen.findByTestId('order-group-belowFloor');
+    // What the group means, on screen rather than inside a tooltip...
+    expect(group).toHaveTextContent('These orders lose ISK if they sell');
+    // ...and what it is holding: 500 x 10 units.
+    expect(group).toHaveTextContent('ISK listed');
+  });
+
+  it('marks an order that is not at a trade hub', async () => {
+    // Not one of the five NPC trade hub stations in `@/market/hubs`.
+    const OFF_HUB_STATION = 60011867;
+    mockedNpcStations.mockResolvedValue([
+      { id: STATION_A, name: 'Jita IV - Moon 4', systemId: 30000142 },
+      { id: OFF_HUB_STATION, name: 'Osmon II - Moon 1', systemId: 30000049 },
+    ]);
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [{ ...BELOW_FLOOR_ORDER, location_id: OFF_HUB_STATION }],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+
+    expect(await screen.findByTestId('order-group-belowFloor')).toHaveTextContent('Off hub');
+  });
+
   it('has no character strip and no per-row character marker with one character', async () => {
     mockedLoadAll.mockResolvedValue(
       snapshot([
@@ -421,6 +500,15 @@ describe('OpenOrdersPanel', () => {
   });
 
   describe('funnel filter controls', () => {
+    /**
+     * The controls live behind the funnel at every width on this page (the
+     * chip-per-problem set is two full rows inline), so every filter test
+     * has to open the box first.
+     */
+    async function openFunnel(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(await screen.findByRole('button', { name: /^Filters/ }));
+    }
+
     function renderMixedFixture() {
       mockedLoadAll.mockResolvedValue(
         snapshot([
@@ -445,15 +533,28 @@ describe('OpenOrdersPanel', () => {
       // healthy no-cost-basis order is folded out of the count.
       expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
 
-      // Anchored so it doesn't also match the group heading's "About Priced
-      // under my floor" InfoTooltip trigger.
+      // Anchored to the chip's own label, not a substring match on the
+      // group heading that carries the same words.
+      await openFunnel(user);
       await user.click(screen.getByRole('button', { name: /^Priced under my floor/ }));
       expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
     });
 
-    it('still renders a zero-count problem chip, dimmed', async () => {
+    it('keeps the whole control set behind the funnel until it is opened', async () => {
+      const user = userEvent.setup();
       renderMixedFixture();
       await screen.findByText('2 of 3 orders match');
+
+      expect(screen.queryByRole('combobox', { name: 'Expires within' })).not.toBeInTheDocument();
+      await openFunnel(user);
+      expect(screen.getByRole('combobox', { name: 'Expires within' })).toBeInTheDocument();
+    });
+
+    it('still renders a zero-count problem chip, dimmed', async () => {
+      const user = userEvent.setup();
+      renderMixedFixture();
+      await screen.findByText('2 of 3 orders match');
+      await openFunnel(user);
 
       // Nothing in this fixture is undercut at the station tier.
       const chip = screen.getByRole('button', { name: /^Undercut at my station/ });
@@ -467,6 +568,7 @@ describe('OpenOrdersPanel', () => {
       await screen.findByText('2 of 3 orders match');
 
       // Only the expiring order (visible by default) has no cost basis linked.
+      await openFunnel(user);
       await user.click(screen.getByRole('button', { name: 'No cost basis' }));
       expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
     });
@@ -478,6 +580,7 @@ describe('OpenOrdersPanel', () => {
 
       // The below-floor order expires in 60 days; only the expiring order (5
       // days left) is inside a 7-day window.
+      await openFunnel(user);
       await user.click(screen.getByRole('combobox', { name: 'Expires within' }));
       await user.click(screen.getByRole('option', { name: '7 days' }));
       expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
@@ -489,6 +592,7 @@ describe('OpenOrdersPanel', () => {
       await screen.findByText('2 of 3 orders match');
 
       // Both visible orders tie up well under 10M ISK.
+      await openFunnel(user);
       await user.click(screen.getByRole('combobox', { name: 'ISK tied up over' }));
       await user.click(screen.getByRole('option', { name: '10M ISK' }));
       expect(await screen.findByText('0 of 3 orders match')).toBeInTheDocument();

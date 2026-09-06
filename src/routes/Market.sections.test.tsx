@@ -149,6 +149,8 @@ describe('Market top-level tabs', () => {
     expect(
       within(screen.getByRole('table', { name: 'Healthy · 1' })).getByText('Tritanium')
     ).toBeInTheDocument();
+    // The filter controls sit behind the funnel button on this tab.
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
     expect(screen.getByRole('button', { name: 'Sell' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'History' }));
@@ -235,6 +237,8 @@ describe('Market Open Orders tab', () => {
     expect(
       within(screen.getByRole('table', { name: 'Healthy · 1' })).getByText('Tritanium')
     ).toBeInTheDocument();
+    // The filter controls sit behind the funnel button on this tab.
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
     expect(screen.getByRole('button', { name: 'Sell' })).toBeInTheDocument();
   });
 
