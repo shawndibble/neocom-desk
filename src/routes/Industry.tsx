@@ -59,9 +59,9 @@ function fallbackFacility(activity: IndustryActivity): FacilityKind {
   return activity === 'reaction' ? 'athanor' : 'npcStation';
 }
 
-// Facility/rig/security/hub/tax default from the character's own most
-// recently updated plan (issue #456), so a second plan doesn't force
-// re-picking settings the pilot already set once. `defaultsFrom` is that
+// Facility/rig/security/hub/tax, build system and build location all default
+// from the character's own most recently updated plan (issue #456), so a
+// second plan doesn't force re-picking settings the pilot already set once. `defaultsFrom` is that
 // plan, or null/undefined for a character with no plans yet, in which case
 // the historical hardcoded defaults apply. Only carried when it hosts the
 // same activity as the new plan (issue #460) — otherwise it names a
@@ -98,6 +98,19 @@ function newBuildPlan(
       : {}),
     ...(defaultsFrom?.facilityTaxPct !== undefined
       ? { facilityTaxPct: defaultsFrom.facilityTaxPct }
+      : {}),
+    // The picked place itself (#527), carried under the same activity check as
+    // `facility` rather than merely when the source plan has one: where the
+    // activity differs the new plan's facility is the hardcoded fallback, not
+    // the picked place's, so its name would label a job whose numbers came
+    // from somewhere else. The id and the name are independently optional —
+    // ESI withholds some structure names, and the id alone still drives the
+    // picker's stand-in label.
+    ...(defaultsMatchActivity && defaultsFrom.buildLocationId !== undefined
+      ? { buildLocationId: defaultsFrom.buildLocationId }
+      : {}),
+    ...(defaultsMatchActivity && defaultsFrom.buildLocationName !== undefined
+      ? { buildLocationName: defaultsFrom.buildLocationName }
       : {}),
     updatedAt: Date.now(),
   };
