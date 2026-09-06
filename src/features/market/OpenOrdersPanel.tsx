@@ -513,9 +513,11 @@ export function OpenOrdersPanel() {
           */}
           {!row.isBuyOrder && (
             <span className="text-[0.6875rem] text-text-dim">
-              {row.costBasis
-                ? t('market.orders.buildRun', { id: row.costBasis.runId })
-                : t('market.orders.noBuildLinked')}
+              {/*
+                Not the run's id: `ProductionRunRecord.id` is an opaque
+                storage key, and there is no user-facing run number to show.
+              */}
+              {row.costBasis ? t('market.orders.buildLinked') : t('market.orders.noBuildLinked')}
             </span>
           )}
         </span>

@@ -2194,7 +2194,7 @@
       "offHub": "Off hub",
       "offHubHelp": "This order is not at one of the five NPC trade hubs, so fewer buyers pass it.",
       "noBuildLinked": "No build linked",
-      "buildRun": "Run {{id}}",
+      "buildLinked": "Linked to a build",
       "legendColourRule": "Colour marks distance only — station, system, region. Everything else is grey. Every badge also carries its own words.",
       "group": {
         "belowFloor": "Priced under my floor",

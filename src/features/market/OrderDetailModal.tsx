@@ -181,29 +181,41 @@ function ScopeRow({
   // when the deep book actually supplied them.
   const countsKnown = rival.ordersBeatingMe > 0;
 
+  const distanceText = jumps ? <JumpsAwayText result={jumps} t={t} /> : (distance ?? '');
+  const whoText = countsKnown
+    ? [
+        t('market.orders.rowSummary.sellersUnderMe', { count: rival.ordersBeatingMe }),
+        t('market.orders.scopeUnitsUnder', { units: rival.unitsBeatingMe.toLocaleString() }),
+      ].join(' · ')
+    : t('market.orders.scopeAggregateOnly');
+
   return (
     <div className="grid grid-cols-[6rem_1fr_auto] gap-x-3 gap-y-0.5 border-t border-line py-1.5 text-xs md:grid-cols-[6rem_1fr_auto_auto_auto]">
       {scopeLabel}
       <span className="flex flex-col gap-0.5">
         <span>{stationName ?? t('market.unknownStructure')}</span>
-        <span className="text-[0.6875rem] text-text-dim">
-          {countsKnown
-            ? [
-                t('market.orders.rowSummary.sellersUnderMe', { count: rival.ordersBeatingMe }),
-                t('market.orders.scopeUnitsUnder', {
-                  units: rival.unitsBeatingMe.toLocaleString(),
-                }),
-              ].join(' · ')
-            : t('market.orders.scopeAggregateOnly')}
+        <span className="text-[0.6875rem] text-text-dim">{whoText}</span>
+        {/*
+          The gap and distance columns are dropped below `md`, where their
+          headers would be too — a bare red number under no label says
+          nothing. They come back here as labelled words instead, since a
+          phone is the read-only surface for this page.
+        */}
+        <span className="text-[0.6875rem] text-text-dim md:hidden">
+          {t('market.orders.scopeOverBy')}: {formatIsk(rival.gapIsk, 2)} · {rival.gapPct.toFixed(1)}
+          %
         </span>
+        {distanceText !== '' && (
+          <span className="text-[0.6875rem] text-text-dim md:hidden">
+            {t('market.orders.scopeDistance')}: {distanceText}
+          </span>
+        )}
       </span>
       <span className="tabular-nums">{formatIsk(rival.price, 2)}</span>
-      <span className="text-danger tabular-nums">
+      <span className="hidden text-danger tabular-nums md:inline">
         {formatIsk(rival.gapIsk, 2)} · {rival.gapPct.toFixed(1)}%
       </span>
-      <span className="text-text-dim tabular-nums">
-        {jumps ? <JumpsAwayText result={jumps} t={t} /> : (distance ?? '')}
-      </span>
+      <span className="hidden text-text-dim tabular-nums md:inline">{distanceText}</span>
     </div>
   );
 }

@@ -199,8 +199,8 @@ describe('OpenOrdersPanel', () => {
     // The below-floor row says the loss in ISK a unit, not only "-x%".
     const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
     expect(belowFloorGroup).toHaveTextContent(/Selling at this price loses .* a unit/);
-    // And its item cell names the run the floor came from.
-    expect(belowFloorGroup).toHaveTextContent('Run run-1');
+    // And its item cell says the floor has a build behind it.
+    expect(belowFloorGroup).toHaveTextContent('Linked to a build');
 
     // The order with nothing linked says so where the empty floor column is.
     const user = userEvent.setup();
@@ -533,8 +533,8 @@ describe('OpenOrdersPanel', () => {
       // healthy no-cost-basis order is folded out of the count.
       expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
 
-      // Anchored so it doesn't also match the group heading's "About Priced
-      // under my floor" InfoTooltip trigger.
+      // Anchored to the chip's own label, not a substring match on the
+      // group heading that carries the same words.
       await openFunnel(user);
       await user.click(screen.getByRole('button', { name: /^Priced under my floor/ }));
       expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
