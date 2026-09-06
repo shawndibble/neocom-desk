@@ -136,6 +136,7 @@ here — they go one per file in `docs/context/decisions/`.
   at which profit is exactly zero — is always a Net figure, since it answers
   "at what price do I stop losing ISK," which only holds net of the fees an
   actual sale pays.
+- **High-Tech Production Plant**: The planetary pin that makes a P3 from two P2s. The tier above an **Advanced Industry Facility**, and the reason the Advisor will not offer one to a pilot whose colonies make no P2: it has nothing to put in it unless the P2s are bought at a hub and hauled in.
 - **Industry Activity**: Which job a **Build Plan** runs — `'manufacturing'` or `'reaction'` (issue #460). Never a field on `BuildPlanRecord`; always derived from the picked blueprint/reaction formula's own `activity`, tagged onto it from the SDE (`industryActivity.csv`'s activity ID 1 vs 11) at build time. Determines which **Facility Preset**s and reactor/engineering rig security multipliers apply — a facility hosts one activity, never both.
 - **Install Prompt**: A one-time, in-app call-to-action to install NeoCom
   Desk as a home-screen/desktop app, layered on top of the browser's own

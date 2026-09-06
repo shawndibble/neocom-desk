@@ -15,12 +15,14 @@
  * therefore still holds for unbuilt cards, and this is the built-only half
  * round 51 left open.
  *
- * The residual is stated rather than hidden: a bigger layout would need more
- * links than the colony has today, and reserving today's link load
- * under-reserves for that. It is the same residual the shipped "room for"
- * line already carries — `spareCapacity` prices an extra factory without the
- * link it would need — and it is bounded by a measurement rather than by an
- * assumption.
+ * A bigger layout also needs more links than the colony has today, and
+ * reserving only today's link load would under-reserve for exactly that. So
+ * every pin of a fitted layout is charged a link of its own, at this colony's
+ * own longest measured hop (`colonyPinLoad`'s `newLinkLoad`) — the same charge
+ * the "Room for" line directly above this one on the card makes. The two
+ * numbers sit two lines apart and must not disagree about whether links exist:
+ * this line used to be the optimistic one, and would recommend building up to
+ * a tier whose pins the row above said would not fit.
  *
  * ## Every input here is read off the colony, not assumed
  *
@@ -37,6 +39,7 @@ import type { PiData } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX } from '@/engine/pi/pinBudget';
 import { recommendStopTier, type StopTierAdvice } from '@/engine/pi/stopTier';
 import { localResourcesFor, type BuiltColonyAdvice } from './advisorModel';
+import { productBySchematicId } from './products';
 
 /**
  * How long a colony is left to fill before someone hauls. The throughput
@@ -74,6 +77,8 @@ export interface ColonyStopTierInput {
   pi: PiData;
   /** Hub prices by typeID. A type the hub does not quote is absent, never zero. */
   prices: Readonly<Record<number, number>>;
+  /** What a sale fetches — highest hub buy, falling back to the ask. */
+  revenuePrices?: Readonly<Record<number, number>>;
   taxRate: number;
 }
 
@@ -116,12 +121,7 @@ export function meanHeadsPerExtractor(colony: BuiltColonyAdvice): number {
  * schematic id, so it is the one place that mapping exists.
  */
 export function currentProductTypeIds(colony: BuiltColonyAdvice, pi: PiData): number[] {
-  const productBySchematic = new Map(
-    Object.entries(pi.schematics).map(([typeId, schematic]) => [
-      schematic.schematicId,
-      Number(typeId),
-    ])
-  );
+  const productBySchematic = productBySchematicId(pi);
   return colony.production
     .map((group) =>
       group.schematicId === undefined ? undefined : productBySchematic.get(group.schematicId)
@@ -130,7 +130,7 @@ export function currentProductTypeIds(colony: BuiltColonyAdvice, pi: PiData): nu
 }
 
 export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTierAdvice {
-  const { colony, planetType, pi, prices, taxRate } = input;
+  const { colony, planetType, pi, prices, revenuePrices, taxRate } = input;
 
   // Links first: without their cost the budget below is a fiction, and a
   // recommendation built on it would promise room this colony does not have.
@@ -158,8 +158,12 @@ export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTier
         storageFacilities: colony.pinLoad.counts.storage ?? 0,
       },
       headsPerExtractor: meanHeadsPerExtractor(colony),
+      // Charged per pin of whatever layout is fitted, so this line and the
+      // "Room for" row above it price a new pin the same way.
+      ...(colony.pinLoad.newLinkLoad ? { newLinkCost: colony.pinLoad.newLinkLoad } : {}),
       extractionRatePerHour: rate,
       prices,
+      ...(revenuePrices ? { revenuePrices } : {}),
       taxRate,
       // Never guessed. A basic link moves 1,250 m3/hr and each upgrade level
       // doubles it, but whether that axis is the same skill as the budget

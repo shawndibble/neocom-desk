@@ -12,6 +12,8 @@ import type {
 } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
+import { useMarketSourcing } from './marketSourcingPref';
+import { useAltColonies } from './altColoniesPref';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -25,8 +27,14 @@ const ASHAB = 30_002_187;
 const ECU = 3068;
 const BASIC = 2481;
 const LAUNCHPAD = 2256;
-/** Reactive Metals — a P1 the Basic Industry Facility runs. */
-const REACTIVE_METALS_SCHEMATIC = 133;
+/**
+ * Reactive Metals — a P1 the Basic Industry Facility runs, and the one whose
+ * input is the Base Metals this fixture's extractor pulls. Schematic 133 sat
+ * here for a long time under this name; it is Proteins, which eats Complex
+ * Organisms, so anything measuring supply against demand read the colony as
+ * importing its input.
+ */
+const REACTIVE_METALS_SCHEMATIC = 126;
 /** Base Metals, the P0 it eats. */
 const BASE_METALS = 2267;
 const NOBLE_METALS = 2270;
@@ -40,7 +48,9 @@ const loadPlanetInfo = vi.fn();
 const loadSchematicName = vi.fn();
 const loadTypeNames = vi.fn();
 const loadSystemSecurity = vi.fn();
+const readCachedSystemSecurity = vi.fn();
 const loadCustomsCodeExpertise = vi.fn();
+const loadInterplanetaryConsolidation = vi.fn();
 
 const loadPiPlanetRadius = vi.fn<() => Promise<Record<string, number>>>();
 vi.mock('@/sde/loadSde', () => ({
@@ -57,6 +67,8 @@ vi.mock('@/sync', () => ({
 }));
 const loadPlanPrices = vi.fn<() => Promise<import('./planPrices').PlanPrices>>();
 vi.mock('./planPrices', () => ({ loadPlanPrices: () => loadPlanPrices() }));
+const loadPiRosterSnapshot = vi.fn();
+vi.mock('./roster', () => ({ loadPiRosterSnapshot: () => loadPiRosterSnapshot() }));
 
 vi.mock('./data', () => ({
   loadCharacterPlanets: (...args: unknown[]) => loadCharacterPlanets(...args),
@@ -68,10 +80,16 @@ vi.mock('./colonyBudget', async (importOriginal) => ({
   loadCommandCenterUpgrades: (...args: unknown[]) => loadCommandCenterUpgrades(...args),
 }));
 
+vi.mock('./planetSlots', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./planetSlots')>()),
+  loadInterplanetaryConsolidation: (...args: unknown[]) => loadInterplanetaryConsolidation(...args),
+}));
+
 vi.mock('@/features/character/systemSecurity', () => ({
   loadSystemPlanetIds: (...args: unknown[]) => loadSystemPlanetIds(...args),
   loadSystemName: (...args: unknown[]) => loadSystemName(...args),
   loadSystemSecurity: (...args: unknown[]) => loadSystemSecurity(...args),
+  readCachedSystemSecurity: (...args: unknown[]) => readCachedSystemSecurity(...args),
 }));
 
 vi.mock('./customsRate', async (importOriginal) => ({
@@ -120,6 +138,37 @@ function extractorPin(pinId: number): PlanetPin {
   };
 }
 
+/** A refining colony's pin detail: one extractor feeding `factories` Basic pins. */
+function refineryDetail(
+  schematicId: number,
+  productTypeId: number,
+  factories = 3,
+  qtyPerCycle = 20_000
+): CharacterPlanetDetail {
+  return {
+    links: [],
+    routes: [],
+    pins: [
+      {
+        ...extractorPin(1),
+        extractor_details: {
+          ...(extractorPin(1).extractor_details as NonNullable<PlanetPin['extractor_details']>),
+          qty_per_cycle: qtyPerCycle,
+          product_type_id: productTypeId,
+        },
+      },
+      ...Array.from({ length: factories }, (_, i) => ({
+        pin_id: i + 2,
+        type_id: BASIC,
+        latitude: 0,
+        longitude: 0,
+        factory_details: { schematic_id: schematicId },
+      })),
+      { pin_id: 9, type_id: LAUNCHPAD, latitude: 0, longitude: 0 },
+    ],
+  };
+}
+
 const detail: CharacterPlanetDetail = {
   links: [],
   routes: [],
@@ -149,6 +198,16 @@ function renderPanel(onSystemIdChange = vi.fn()) {
 }
 
 beforeEach(() => {
+  // A module-scoped store outlives the test that set it, and buying changes
+  // what every card says. Back to the shipped default each time.
+  useMarketSourcing.setState({ value: false, hydrated: true });
+  useAltColonies.setState({ value: false, hydrated: true });
+  loadPiRosterSnapshot.mockResolvedValue({
+    colonies: [],
+    skipped: [],
+    notLoaded: [],
+    noColonies: [],
+  });
   loadPiPlanetRadius.mockResolvedValue({ '40000001': 6030, '40000002': 6030 });
   for (const mock of [
     loadCharacterPlanets,
@@ -160,13 +219,19 @@ beforeEach(() => {
     loadSchematicName,
     loadTypeNames,
     loadSystemSecurity,
+    readCachedSystemSecurity,
     loadCustomsCodeExpertise,
+    loadInterplanetaryConsolidation,
     loadPlanPrices,
   ]) {
     mock.mockReset();
   }
+  // Level IV — five colonies — so the default fixture has slots to spare and
+  // only the tests that care about the cap have to say so.
+  loadInterplanetaryConsolidation.mockResolvedValue(4);
   loadPlanPrices.mockResolvedValue({
     prices: { [BASE_METALS]: 12 },
+    buyPrices: {},
     unpriced: [],
     failed: false,
     fetchedAt: new Date(),
@@ -174,6 +239,7 @@ beforeEach(() => {
   // Ashab is highsec, and the character has Customs Code Expertise IV — so
   // every chain below is costed at the 6% these two imply.
   loadSystemSecurity.mockResolvedValue(0.5);
+  readCachedSystemSecurity.mockResolvedValue(0.5);
   loadCustomsCodeExpertise.mockResolvedValue(4);
   loadCharacterPlanets.mockResolvedValue({
     cached: { data: [colony(40_000_001, 'temperate')], fetchedAt: new Date(), fromCache: false },
@@ -290,14 +356,639 @@ describe('AdvisorPanel', () => {
     expect(screen.queryByText('No colonies yet')).not.toBeInTheDocument();
   });
 
-  it('says what the leftover budget still holds, for a colony with no links', async () => {
+  it('still prints the leftover budget, underneath the advice rather than as it', async () => {
+    // 16,675 tf and 10,700 MW left of the colony's own level-4 budget. The
+    // figure is worth having — a pilot checking the arithmetic needs it — but
+    // as a footnote under a decision, not as the decision.
     renderPanel();
-    // 16,675 tf and 10,700 MW left of the colony's own level-4 budget.
-    // Powergrid binds: 13 basic (800 MW), 15 advanced or storage (700), and
-    // only 1 extractor once ten heads are costed in (2,600 + 5,500 MW).
-    const room = await screen.findByText(/1x extractor/);
-    expect(room).toHaveTextContent('13x basic factory');
-    expect(room).toHaveTextContent('15x advanced factory');
+    expect(
+      await screen.findByText(/16,675 tf and 10,700 MW free as it stands/)
+    ).toBeInTheDocument();
+  });
+
+  it('leads with what to do here, not with a list of what would fit', async () => {
+    // The row this replaced offered "1x basic factory · 1x advanced factory ·
+    // 2x high-tech plant · 1x storage · 1x launchpad". Every count was right
+    // and it was still the wrong answer: a pilot cannot act on a menu of pins
+    // whose contents nothing on the card names, and said so three times. The
+    // caveat that followed it ("any one of those, not all of them") was a
+    // repair to a shape that should not have been a list at all.
+    renderPanel();
+    await screen.findByText('Ashab III');
+    expect(screen.getByText('Do this')).toBeInTheDocument();
+    expect(screen.queryByText(/Any one of those/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/x high-tech plant/)).not.toBeInTheDocument();
+  });
+
+  it('charges a new pin for the link it will need, not just for the pin', async () => {
+    // Efa V in miniature: 448 MW free and a 400 MW High-Tech plant offered,
+    // which could not be placed because the link it needed was 54 MW. Here
+    // the same omission is worth one basic factory — 14 unlinked, 13 once the
+    // 20.9 MW link this colony's own geometry prices is charged with it.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [{ source_pin_id: 1, destination_pin_id: 2, link_level: 0 }],
+                routes: [],
+                pins: [
+                  {
+                    ...extractorPin(1),
+                    latitude: 1.5826666355133057,
+                    longitude: 5.977088451385498,
+                  },
+                  {
+                    pin_id: 2,
+                    type_id: BASIC,
+                    latitude: 1.5946428775787354,
+                    longitude: 5.978272914886475,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  },
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+
+    // The charge is still made — `spareCapacity` takes it — and the footnote
+    // is where the card now says so, priced off this colony's own geometry.
+    expect(
+      await screen.findByText(/A new pin also pays for its link here: 30 tf \/ 21 MW/)
+    ).toBeInTheDocument();
+  });
+
+  it('claims no link price on a colony with no link to measure one from', async () => {
+    // Zero links is not "links are free here". With nothing to price a hop
+    // from, the footnote states the remainder and stops — quoting a link cost
+    // this colony's geometry cannot support would be the invented number.
+    renderPanel();
+    await screen.findByText(/16,675 tf and 10,700 MW free as it stands/);
+    expect(screen.queryByText(/A new pin also pays for its link/)).not.toBeInTheDocument();
+  });
+
+  it('counts the colony slots the pilot’s skill actually allows', async () => {
+    // The header's "1 / 2 planets" is about this system. The pilot's own cap
+    // is Interplanetary Consolidation, and it was nowhere on this tab — a
+    // pilot at level IV read the system figure as their allowance.
+    loadInterplanetaryConsolidation.mockResolvedValue(4);
+    renderPanel();
+    expect(await screen.findByText('1 / 5 used')).toBeInTheDocument();
+  });
+
+  it('counts colonies in every system against the cap, not just the one on screen', async () => {
+    // The cap is per character. A pilot showing one system while running
+    // colonies in three has one slot free, not four.
+    loadInterplanetaryConsolidation.mockResolvedValue(4);
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [
+          colony(40_000_001, 'temperate'),
+          { ...colony(40_000_003, 'barren'), solar_system_id: 30_002_188 },
+          { ...colony(40_000_004, 'barren'), solar_system_id: 30_002_189 },
+          { ...colony(40_000_005, 'barren'), solar_system_id: 30_002_190 },
+        ],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    renderPanel();
+    expect(await screen.findByText('4 / 5 used')).toBeInTheDocument();
+  });
+
+  it('does not present an assumed colony cap as a fact', async () => {
+    // Same rule the Command Center ceiling follows: a pilot whose /skills
+    // never loaded is not a pilot with one colony.
+    loadInterplanetaryConsolidation.mockResolvedValue(null);
+    renderPanel();
+    expect(await screen.findByText(/1 \/ 1 used \(assumed\)/)).toBeInTheDocument();
+  });
+
+  it('tells an unbuilt planet it has no slot to be built in', async () => {
+    // Naming resources for a planet the pilot cannot colonise is advice they
+    // cannot take. Ashab II is the unbuilt card in this fixture.
+    loadInterplanetaryConsolidation.mockResolvedValue(0);
+    renderPanel();
+    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
+    expect(within(card).getByText(/No colony slot free/)).toBeInTheDocument();
+  });
+
+  it('tells every unbuilt planet how many colony slots are left', async () => {
+    // The reported case, and the one the "no slot free" warning missed
+    // entirely: six planets in the system, four colonies, five slots. Both
+    // unbuilt cards are options, but only one of them can be taken, and
+    // nothing on the tab said which of those two facts applied.
+    loadInterplanetaryConsolidation.mockResolvedValue(4);
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [
+          colony(40_000_001, 'temperate'),
+          { ...colony(40_000_003, 'barren'), solar_system_id: 30_002_188 },
+          { ...colony(40_000_004, 'barren'), solar_system_id: 30_002_189 },
+          { ...colony(40_000_005, 'barren'), solar_system_id: 30_002_190 },
+        ],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    renderPanel();
+    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
+    expect(within(card).getByText(/1 of 5 colony slots free/)).toBeInTheDocument();
+  });
+
+  it('says what the next Command Center level buys, without re-offering a menu', async () => {
+    // "Need to look into how that will adjust the advisor and its
+    // suggestions." The nudge used to append "room for 6x High-Tech
+    // Production Plant · …", which is the shape the card stopped using — and
+    // it printed outside the guard, so it made a headroom claim on the one
+    // colony the card had just declined to advise at all. What a level adds is
+    // pure budget arithmetic and true everywhere; what it would then hold is
+    // advice about a purchase the pilot has not made.
+    renderPanel();
+    const card = (await screen.findByText('Ashab III')).closest('div')
+      ?.parentElement as HTMLElement;
+    const nudge = within(card).getByText(/Command Center at level/);
+    expect(nudge).toHaveTextContent('MW');
+    expect(nudge).not.toHaveTextContent('room for');
+  });
+
+  it('says nothing about slots on an unbuilt planet while one is free', async () => {
+    loadInterplanetaryConsolidation.mockResolvedValue(4);
+    renderPanel();
+    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
+    expect(within(card).queryByText(/No colony slot free/)).not.toBeInTheDocument();
+  });
+
+  it('points out a Command Center the pilot’s skill could already upgrade', async () => {
+    // The colony is at upgrade_level 4 and the pilot's Command Center
+    // Upgrades is V. Powergrid is what binds every one of these colonies, and
+    // 2,000 MW of it is sitting behind an ISK purchase the tab never mentioned.
+    renderPanel();
+    const card = (await screen.findByText('Ashab III')).closest('div')
+      ?.parentElement as HTMLElement;
+    expect(within(card).getByText(/level 4.*allows 5/)).toBeInTheDocument();
+    expect(within(card).getByText(/4,100 tf and 2,000 MW/)).toBeInTheDocument();
+  });
+
+  it('does not push an upgrade off a skill level it had to assume', async () => {
+    // Structurally this is also guaranteed — `maxColonyBudget` reports level 0
+    // when it had to assume, and no colony's `upgrade_level` is below zero —
+    // so this asserts the behaviour rather than the branch. The explicit
+    // `!ceiling.assumed` guard beside it states the intent for the next reader
+    // and survives a change to either of those two facts.
+    loadCommandCenterUpgrades.mockResolvedValue(null);
+    renderPanel();
+    const card = (await screen.findByText('Ashab III')).closest('div')
+      ?.parentElement as HTMLElement;
+    expect(within(card).queryByText(/allows/)).not.toBeInTheDocument();
+  });
+
+  it('explains why nothing fits instead of printing a remainder beside “budget is spent”', async () => {
+    // A full colony used to read "Nothing — the budget is spent." with
+    // "13,226 tf and 448 MW free." directly beneath it, and a sentence about
+    // what "each count" pays for when there were no counts. The remainder is
+    // worth printing, but only attached to the thing it fails to buy.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [],
+                routes: [],
+                pins: [
+                  { pin_id: 1, type_id: LAUNCHPAD, latitude: 0, longitude: 0 },
+                  ...Array.from({ length: 20 }, (_, i) => ({
+                    pin_id: i + 2,
+                    type_id: BASIC,
+                    latitude: 0,
+                    longitude: 0,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  })),
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+    // 7,600 tf and 16,700 MW drawn of 21,315 / 17,000 — so 13,715 tf spare and
+    // 300 MW, against a High-Tech plant's 400 MW, the closest thing to fitting.
+    expect(await screen.findByText(/13,715 tf and 300 MW free as it stands/)).toBeInTheDocument();
+    const closest = screen.getByText(/Nothing more fits as it stands/);
+    expect(closest).toHaveTextContent('High-Tech Production Plant');
+    expect(closest).toHaveTextContent('400 MW');
+    expect(screen.queryByText(/Any one of those/)).not.toBeInTheDocument();
+  });
+
+  it('names the factories nothing on this colony feeds, and what removing them gives back', async () => {
+    // The default fixture is one 4-head extractor and one Basic factory. A
+    // Basic factory eats 6,000 Base Metals an hour and this program sustains
+    // 5,580, so four of five pins are fed and one is not.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [],
+                routes: [],
+                pins: [
+                  extractorPin(1),
+                  ...Array.from({ length: 5 }, (_, i) => ({
+                    pin_id: i + 2,
+                    type_id: BASIC,
+                    latitude: 0,
+                    longitude: 0,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  })),
+                  { pin_id: 9, type_id: LAUNCHPAD, latitude: 0, longitude: 0 },
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+    // 5,580/hr against five pins wanting 30,000/hr keeps one fed, so four
+    // draw budget and make nothing. The card states that as the action —
+    // remove them — with the measurement that justifies it in the same line,
+    // rather than as a separate observation the pilot has to act on themselves.
+    const line = await screen.findByText(/Remove 4x idle Basic Industry Facility/);
+    expect(line).toHaveTextContent('30,000/hr of Base Metals');
+    expect(line).toHaveTextContent('5,580/hr');
+    // Four Basic Industry Facilities at 200 tf / 800 MW.
+    expect(line).toHaveTextContent('Frees 800 tf and 3,200 MW');
+  });
+
+  it('offers to feed the idle facilities when the Powergrid is there for it', async () => {
+    // The other half of the trade, and the half the pilot had to point out:
+    // removing capacity is the wrong answer on a colony whose own card says
+    // keep selling this P1 raw, because every unit that reaches an idle
+    // facility is another P1 sold. Whether it is available is a Powergrid
+    // question, and an Extractor Control Unit is 2,600 MW before a head.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [],
+                routes: [],
+                pins: [
+                  extractorPin(1),
+                  ...Array.from({ length: 2 }, (_, i) => ({
+                    pin_id: i + 2,
+                    type_id: BASIC,
+                    latitude: 0,
+                    longitude: 0,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  })),
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+    expect(
+      await screen.findByText(/Add 1x Extractor Control Unit and \d+ heads/)
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing about unfed factories on a colony that is in balance', async () => {
+    // The default fixture's single factory is fed, so there is no line — a
+    // reassurance on every card would bury the ones with something to act on.
+    renderPanel();
+    await screen.findByText('Ashab III');
+    expect(screen.queryByText(/pins are fed/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Two colonies that reach a P2 only together: Ashab III refines
+   * Microorganisms into Bacteria, Ashab IV refines Aqueous Liquids into Water,
+   * and neither planet can extract the other's P0. Shared because the tests
+   * below differ only in what the hub quotes.
+   */
+  const WATER_SCHEMATIC = 121;
+  const BACTERIA_SCHEMATIC = 131;
+  const AQUEOUS_LIQUIDS = 2268;
+  const MICROORGANISMS = 2073;
+  const WATER = 3645;
+  const BACTERIA = 2393;
+  const TEST_CULTURES = 2319;
+
+  function twoRefineries(
+    prices: Record<number, number>,
+    pins: [number, number] = [3, 3],
+    qty: [number, number] = [20_000, 20_000],
+    pads: [number, number] = [1, 1]
+  ) {
+    const waterColony = { ...colony(40_000_003, 'barren'), planet_id: 40_000_003 };
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [colony(40_000_001, 'temperate'), waterColony],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    loadSystemPlanetIds.mockResolvedValue([40_000_001, 40_000_003]);
+    loadPlanetInfo.mockImplementation(async (planetId: number) =>
+      planetId === 40_000_003 ? { name: 'Ashab IV', typeId: 2016 } : (PLANET_INFO[planetId] ?? null)
+    );
+    // Both colonies sized to feed a real factory: a 20,000-a-cycle program
+    // sustains 16,026 P0/hr off the decay curve, which keeps 2.67 of three
+    // Basic pins fed and so makes 107 P1/hr — enough for two Advanced
+    // factories at 40 + 40.
+    const refinery = (
+      schematicId: number,
+      productTypeId: number,
+      factories: number,
+      qtyPerCycle: number,
+      launchpads: number
+    ) => ({
+      links: [],
+      routes: [],
+      pins: [
+        {
+          ...extractorPin(1),
+          extractor_details: {
+            ...(extractorPin(1).extractor_details as NonNullable<PlanetPin['extractor_details']>),
+            qty_per_cycle: qtyPerCycle,
+            product_type_id: productTypeId,
+          },
+        },
+        ...Array.from({ length: factories }, (_, i) => ({
+          pin_id: i + 2,
+          type_id: BASIC,
+          latitude: 0,
+          longitude: 0,
+          factory_details: { schematic_id: schematicId },
+        })),
+        ...Array.from({ length: launchpads }, (_, i) => ({
+          pin_id: 100 + i,
+          type_id: LAUNCHPAD,
+          latitude: 0,
+          longitude: 0,
+        })),
+      ],
+    });
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: refinery(BACTERIA_SCHEMATIC, MICROORGANISMS, pins[0], qty[0], pads[0]),
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+        [
+          40_000_003,
+          {
+            cached: {
+              data: refinery(WATER_SCHEMATIC, AQUEOUS_LIQUIDS, pins[1], qty[1], pads[1]),
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    loadPlanPrices.mockResolvedValue({
+      prices,
+      buyPrices: {},
+      unpriced: [],
+      failed: false,
+      fetchedAt: new Date(),
+    });
+  }
+
+  it('says what two colonies could make together that neither makes alone', async () => {
+    // The reported operation in miniature. Ashab III refines Microorganisms
+    // into Bacteria; Ashab IV refines Aqueous Liquids into Water. Neither
+    // planet can extract the other's P0, so both cards say "keep selling raw"
+    // — and together they make Test Cultures.
+    twoRefineries({
+      [MICROORGANISMS]: 12,
+      [AQUEOUS_LIQUIDS]: 12,
+      [WATER]: 513.9,
+      [BACTERIA]: 490,
+      [TEST_CULTURES]: 10_000,
+    });
+    renderPanel();
+
+    // Named twice on purpose: the "Together" panel says the set can reach it,
+    // and the host planet's own card says to build it. The pilot reads the
+    // card, so the card carries the routes and the ISK.
+    expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
+    // The route is the work: an opportunity with no shipping named is not
+    // actionable.
+    expect(screen.getByText(/of (Water|Bacteria) — route in from Ashab/)).toBeInTheDocument();
+  });
+
+  it('separates what a factory would buy from what it merely gives up', async () => {
+    // Buying is off by default — it assumes a hub within reach — so this is
+    // the opted-in state, set the way the checkbox sets it.
+    useMarketSourcing.setState({ value: true, hydrated: true });
+    // The pilot asked to "take into account the cost of buying it on the local
+    // market hub". Superconductors need Plasmoids, which neither colony makes,
+    // so those are a purchase — while the Water feeding the same factory is
+    // material they already grow. Both cost the hub price; only one is money
+    // leaving the wallet, and one figure under one word for both is how a
+    // pilot budgets for a purchase they are not making.
+    const PLASMOIDS = 2389;
+    const SUPERCONDUCTORS = 9838;
+    twoRefineries({
+      [MICROORGANISMS]: 12,
+      [AQUEOUS_LIQUIDS]: 12,
+      [WATER]: 513.9,
+      [BACTERIA]: 490,
+      [PLASMOIDS]: 600.2,
+      [SUPERCONDUCTORS]: 11_280,
+    });
+    renderPanel();
+
+    expect(await screen.findByText(/of Plasmoids — buy at .* and haul it in/)).toBeInTheDocument();
+    // The Water is routed, not bought, so it must not appear as a purchase.
+    expect(screen.queryByText(/of Water — buy at/)).not.toBeInTheDocument();
+    expect(screen.getByText(/an hour of inputs you have to buy/)).toBeInTheDocument();
+  });
+
+  it('names what buying would reach, rather than going quiet when it is off', async () => {
+    // Off is the default, because buying assumes a hub within reach. It must
+    // not mean silence: the complaint that started this work was a card that
+    // offered pins without ever saying what goes in them, and "you make one of
+    // the two inputs for this" is exactly what a pilot needs to decide whether
+    // the trip is worth it.
+    twoRefineries({
+      [MICROORGANISMS]: 12,
+      [AQUEOUS_LIQUIDS]: 12,
+      [WATER]: 513.9,
+      [BACTERIA]: 490,
+      [TEST_CULTURES]: 10_000,
+    });
+    renderPanel();
+    await screen.findByText('Ashab III');
+    expect(
+      screen.getByText(/would also be reachable by hauling inputs from the hub/)
+    ).toBeInTheDocument();
+  });
+
+  it('combines colonies that are not in the same system', async () => {
+    // "If a player has a bunch of alts, they may have like 20 colonies." The
+    // plan used to run one system at a time, so a pilot whose two refineries
+    // sat in different systems was told each planet could only sell raw — the
+    // exact blindness this surface exists to remove. Only the *host's* customs
+    // office enters a chain's cost, so spanning systems needs the rate per
+    // planet, not a second tax model.
+    const OTHER = 30_002_188;
+    twoRefineries({
+      [MICROORGANISMS]: 12,
+      [AQUEOUS_LIQUIDS]: 12,
+      [WATER]: 513.9,
+      [BACTERIA]: 490,
+      [TEST_CULTURES]: 10_000,
+    });
+    // Move the Water colony one system over, and give that system its own
+    // planet list so its card still resolves.
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [
+          colony(40_000_001, 'temperate'),
+          { ...colony(40_000_003, 'barren'), planet_id: 40_000_003, solar_system_id: OTHER },
+        ],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    loadSystemPlanetIds.mockImplementation(async (systemId: number) =>
+      systemId === OTHER ? [40_000_003] : [40_000_001]
+    );
+    renderPanel();
+
+    // Named in the "Together" panel even though the two planets are in
+    // different systems and only one of them has a card on screen.
+    expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
+  });
+
+  it('plans with another character’s colonies once asked to', async () => {
+    // "If a player has a bunch of alts, they may have like 20 colonies." The
+    // alt supplies the second P1, so the pair reaches a P2 that neither
+    // character reaches alone — and the route names whose planet it is, because
+    // "route in from Ashab IV" is not actionable if you have to log in as
+    // somebody else to do it.
+    useAltColonies.setState({ value: true, hydrated: true });
+    loadPiRosterSnapshot.mockResolvedValue({
+      colonies: [
+        {
+          characterId: 99,
+          characterName: 'Alt Pilot',
+          planet: {
+            ...colony(40_000_003, 'barren'),
+            planet_id: 40_000_003,
+            solar_system_id: ASHAB,
+          },
+          detail: refineryDetail(121, 2268),
+        },
+      ],
+      skipped: [],
+      notLoaded: [],
+      noColonies: [],
+    });
+    loadPlanPrices.mockResolvedValue({
+      prices: {
+        [2073]: 12,
+        [2268]: 12,
+        [3645]: 513.9,
+        [2393]: 490,
+        [2319]: 10_000,
+      },
+      buyPrices: {},
+      unpriced: [],
+      failed: false,
+      fetchedAt: new Date(),
+    });
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          { cached: { data: refineryDetail(131, 2073), fetchedAt: new Date(), fromCache: false } },
+        ],
+      ])
+    );
+    renderPanel();
+    await screen.findByText('Ashab III');
+    expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
+    expect(screen.getByText(/\(Alt Pilot\)/)).toBeInTheDocument();
+    // Cache-only for the alt's system: page open must not spend ESI just
+    // because an alt has a colony there, even when that system is also the
+    // active Character's own (as here) — the alt path always reads cache.
+    expect(readCachedSystemSecurity).toHaveBeenCalledWith(ASHAB);
+  });
+
+  it('says nothing about a network when there is only one colony to work with', async () => {
+    // One colony is the per-planet question, and its own card already answers
+    // it. A panel headed "Together" over a single planet is noise.
+    renderPanel();
+    await screen.findByText('Ashab III');
+    expect(screen.queryByText('Together')).not.toBeInTheDocument();
+  });
+
+  it('does not tell a pilot whose skills never loaded to abandon a colony', async () => {
+    // `planetSlots(null)` is one slot and `assumed`. Read as fact it tells a
+    // pilot at Interplanetary Consolidation V — five free slots — to abandon a
+    // colony. Same rule as the Command Center ceiling: an assumed figure may
+    // be shown, never acted on.
+    loadInterplanetaryConsolidation.mockResolvedValue(null);
+    renderPanel();
+    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
+    expect(within(card).queryByText(/No colony slot free/)).not.toBeInTheDocument();
+  });
+
+  it('prices the next Command Center level, not the whole jump to the ceiling', async () => {
+    // Each level is its own ISK purchase. A level-2 colony under a level-V
+    // pilot was told "upgrading this colony adds 13,279 tf and 7,000 MW",
+    // which is three purchases described as one.
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [{ ...colony(40_000_001, 'temperate'), upgrade_level: 2 }],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    renderPanel();
+    const card = (await screen.findByText('Ashab III')).closest('div')
+      ?.parentElement as HTMLElement;
+    // Level 2 is 12,136 / 12,000 and level 3 is 17,215 / 15,000.
+    expect(within(card).getByText(/5,079 tf and 3,000 MW/)).toBeInTheDocument();
+    expect(within(card).queryByText(/13,279/)).not.toBeInTheDocument();
   });
 
   it('charges for links, and still states headroom (#440)', async () => {
@@ -562,6 +1253,7 @@ describe('AdvisorPanel build advice', () => {
         [WATER]: 1_000,
         ...overrides,
       },
+      buyPrices: {},
       unpriced: [],
       failed: false,
       fetchedAt: new Date(),
@@ -582,7 +1274,24 @@ describe('AdvisorPanel build advice', () => {
     // eats plus the extractor capacity it costs, so the raw floor wins.
     priceEverything();
     renderPanel();
-    expect(await screen.findByText('Keep selling Microorganisms raw')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Switch to extracting Microorganisms and sell it raw')
+    ).toBeInTheDocument();
+  });
+
+  it('says “keep” only when the winning ore is the one already coming out', async () => {
+    // `stopTier` scores every P0 the planet type yields, not just the one
+    // being extracted, and this colony's extractor runs Base Metals while
+    // Microorganisms wins. "Keep selling Microorganisms raw" reads as "carry
+    // on" to a pilot who is not extracting it — a false status-quo claim, and
+    // the one that made a reader take the recommended ore's price for the
+    // extracted ore's when checking the arithmetic.
+    priceEverything();
+    renderPanel();
+    await screen.findByText('Switch to extracting Microorganisms and sell it raw');
+    expect(screen.queryByText(/^Keep selling/)).not.toBeInTheDocument();
+    // And the output figure is flagged as a rebuilt colony's, not this one's.
+    expect(screen.getByText(/what this colony would make rebuilt around it/)).toBeInTheDocument();
   });
 
   it('states the derived customs rate rather than costing at a silent default', async () => {
@@ -596,6 +1305,7 @@ describe('AdvisorPanel build advice', () => {
   it('says the hub is the gap when nothing is quoted, not that the planet is poor', async () => {
     loadPlanPrices.mockResolvedValue({
       prices: {},
+      buyPrices: {},
       unpriced: [],
       failed: false,
       fetchedAt: new Date(),

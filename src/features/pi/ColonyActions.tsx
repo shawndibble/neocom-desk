@@ -1,0 +1,375 @@
+/**
+ * What to do on this planet — the Advisor's answer, rather than its options.
+ *
+ * ## Why this replaced the "Room for" row
+ *
+ * That row listed what the leftover budget would hold, per pin kind. Every
+ * number in it was right and it still failed, three times over, on the same
+ * ground: a pilot does not want to know that six High-Tech Production Plants
+ * would fit, they want to know whether to build one — and a High-Tech
+ * Production Plant eats two P2s, which that pilot's colonies did not make. The
+ * row could name the pin and never its contents, so it read as a menu of
+ * things that all turned out to be impossible.
+ *
+ * So the card leads with actions, each of which names what goes in, what comes
+ * out and what it is worth, and the capacity figures survive only as a
+ * footnote under them. A pin nothing could feed is never offered at all.
+ *
+ * ## The two actions, and why they are one choice
+ *
+ * `factoryBalance` finds facilities the colony's own extraction cannot feed.
+ * There are two ways to fix that and the card used to give only the first:
+ *
+ * - remove them, freeing CPU and Powergrid for something that pays;
+ * - feed them, by buying extraction — which is the better answer whenever the
+ *   card also says *keep selling this P1 raw*, since every extra unit that
+ *   reaches an idle facility is another P1 sold.
+ *
+ * They compete for the same Powergrid, so `extractionUpgrade` sizes the second
+ * against the budget the first would free and the card states them as one
+ * decision rather than two suggestions.
+ *
+ * ## Where the "add" lines come from
+ *
+ * `planNetwork`, filtered to the opportunities it placed on this planet. The
+ * plan is computed once for the whole set because material is shared, so the
+ * card cannot recompute its own — it reads its slice. Inputs arrive already
+ * marked `local`, `routed` or `bought`, which is exactly the distinction the
+ * pilot asked to see: a link, a customs boundary, or a shopping trip.
+ */
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { formatIsk } from '@/lib/isk';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import type { PiData, PiPinKind } from '@/sde/types';
+import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
+import type { PinLoad } from '@/engine/pi/types';
+import type { IdleFacilityPlan } from './colonyActionModel';
+
+const round = (value: number) => Math.round(value).toLocaleString();
+
+/**
+ * How an input reads on the card: a link, a route, or a shopping trip — and
+ * whose planet it comes from when that is not the reader's own.
+ *
+ * Naming the owner matters once alts are in the plan: "route in from Ashab IV"
+ * is not an instruction the reader can act on if Ashab IV belongs to a
+ * character they would have to log in as first.
+ */
+function inputLine(
+  input: NetworkOpportunity['inputs'][number],
+  planetNames: ReadonlyMap<number, string>,
+  owners: ReadonlyMap<number, string>,
+  t: TFunction
+): string {
+  const units = round(input.unitsPerHour);
+  if (input.source === 'local') return t('piAdvisor.actionInputLocal', { units, name: input.name });
+  if (input.source === 'bought') {
+    return t('piAdvisor.actionInputBuy', {
+      units,
+      name: input.name,
+      hub: DEFAULT_TRADE_HUB.systemName,
+      isk: formatIsk(input.costPerHour),
+    });
+  }
+  const planetId = input.fromPlanetId ?? -1;
+  const from = planetNames.get(planetId) ?? String(input.fromPlanetId ?? '');
+  const owner = owners.get(planetId);
+  return owner
+    ? t('piAdvisor.altOwnerRoute', { units, name: input.name, from, owner })
+    : t('piAdvisor.actionInputRoute', { units, name: input.name, from });
+}
+
+export function IdleFacilities({ plan, pi }: { plan: IdleFacilityPlan; pi: PiData }) {
+  const { t } = useTranslation();
+  const { lines, upgrade, wouldFeed } = plan;
+  const only = lines.length === 1 ? lines[0] : null;
+
+  return (
+    <>
+      {upgrade.status === 'fits' && wouldFeed > 0 ? (
+        <li className="text-accent">
+          {t('piAdvisor.actionExtractFits', {
+            units: upgrade.units,
+            heads: upgrade.heads,
+            extra: round(upgrade.extraPerHour),
+            name: only?.gap?.name ?? '',
+            fed: wouldFeed,
+            idle: only?.line.surplusPins ?? 0,
+          })}
+        </li>
+      ) : null}
+      {lines.map(({ line, gap, freed }) => (
+        <li key={line.typeId} className="text-warning">
+          {t('piAdvisor.actionRemove', {
+            count: line.surplusPins,
+            pin: t(`piAdvisor.pinKind.${line.facility}`),
+            demand: round(gap?.demand ?? 0),
+            input: gap?.name ?? '',
+            supply: round(gap?.supply ?? 0),
+            cpu: round(freed.cpu),
+            powergrid: round(freed.powergrid),
+          })}
+        </li>
+      ))}
+      {/*
+        The alternative to removing, when there is one. Its own list item and
+        conditional on there being something to say: an empty `<li>` renders as
+        a bullet with nothing after it.
+      */}
+      {(upgrade.status === 'no-room' || (upgrade.status === 'needs-removal' && wouldFeed > 0)) && (
+        <li className="text-text-dim">
+          {upgrade.status === 'needs-removal' && wouldFeed > 0 && (
+            <span className="block">
+              {t('piAdvisor.actionExtractOrRemove', {
+                count: only?.line.surplusPins ?? 0,
+                heads: upgrade.heads,
+                extra: round(upgrade.extraPerHour),
+                name: only?.gap?.name ?? '',
+                fed: wouldFeed,
+              })}{' '}
+              {t('piAdvisor.actionExtractWanted', { heads: upgrade.headsWanted })}
+            </span>
+          )}
+          {upgrade.status === 'no-room' && (
+            <span className="block">
+              {/*
+                The post-removal figure, because that is the budget the verdict
+                was actually reached against: `extractionUpgrade` returns
+                `no-room` only after the freed budget failed too. Quoting the
+                smaller pre-removal number here would read as "removing would
+                fix this", which is the opposite of what it found.
+              */}
+              {t('piAdvisor.actionExtractNoRoom', {
+                cpu: round(pi.infrastructure.pins.extractorControlUnit?.cpu ?? 0),
+                powergrid: round(pi.infrastructure.pins.extractorControlUnit?.powergrid ?? 0),
+                count: lines.reduce((sum, entry) => sum + entry.line.surplusPins, 0),
+                free: round(plan.freeAfterRemoval.powergrid),
+              })}
+            </span>
+          )}
+        </li>
+      )}
+    </>
+  );
+}
+
+/**
+ * "Replace these with those" — an exchange, stated as one line.
+ *
+ * The pilot asked for this directly: "investigate the idea of replacing
+ * elements with others if it would increase the final value". `planNetwork`
+ * only ever offers one against output its allocation could not place, so this
+ * never proposes tearing down a factory that is feeding something.
+ *
+ * The hauling load is named because it is the part that does not show up in
+ * the ISK: a market-fed Advanced Industry Facility is 80 units an hour of
+ * shopping, every hour, and a pilot deciding whether it is worth it needs the
+ * freight as well as the margin.
+ */
+function ConvertFacilities({
+  conversions,
+  planetNames,
+  owners,
+}: {
+  conversions: readonly NetworkConversion[];
+  planetNames: ReadonlyMap<number, string>;
+  owners: ReadonlyMap<number, string>;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {conversions.map((entry) => {
+        const bought = entry.add.inputs.filter((input) => input.source === 'bought');
+        const haulIn = bought.reduce((sum, input) => sum + input.unitsPerHour, 0);
+        return (
+          <li key={`${entry.removeFacility}-${entry.removeName}`} className="text-accent">
+            {t('piAdvisor.actionConvert', {
+              count: entry.removeCount,
+              pin: t(`piAdvisor.pinKind.${entry.removeFacility}`),
+              from: entry.removeName,
+              addCount: entry.add.factories,
+              addPin: t(`piAdvisor.pinKind.${entry.add.facility}`),
+              to: entry.add.name,
+              net: formatIsk(entry.netPerHour),
+            })}
+            <ul className="text-text-dim">
+              <li>
+                {t('piAdvisor.actionConvertWhy', {
+                  from: entry.removeName,
+                  count: entry.removeCount,
+                  lost: formatIsk(entry.removeMarginPerHour),
+                  gained: formatIsk(entry.add.marginPerHour),
+                })}
+              </li>
+              {entry.add.inputs.map((input) => (
+                <li key={`${input.typeId}-${input.fromPlanetId ?? 'hub'}`}>
+                  {inputLine(input, planetNames, owners, t)}
+                </li>
+              ))}
+              {haulIn > 0 && (
+                <li>
+                  {t('piAdvisor.actionConvertHaul', {
+                    in: round(haulIn),
+                    out: round(entry.add.unitsPerHour),
+                  })}
+                </li>
+              )}
+            </ul>
+          </li>
+        );
+      })}
+    </>
+  );
+}
+
+/** One "add N factories making X" line, with what feeds it and what it earns. */
+function AddFactories({
+  line,
+  planetNames,
+  owners,
+}: {
+  line: NetworkOpportunity;
+  planetNames: ReadonlyMap<number, string>;
+  owners: ReadonlyMap<number, string>;
+}) {
+  const { t } = useTranslation();
+  return (
+    <li className="text-accent">
+      {t('piAdvisor.actionAdd', {
+        count: line.factories,
+        pin: t(`piAdvisor.pinKind.${line.facility}`),
+        name: line.name,
+      })}
+      <ul className="text-text-dim">
+        {line.inputs.map((input) => (
+          <li key={input.typeId}>{inputLine(input, planetNames, owners, t)}</li>
+        ))}
+        <li>
+          {/*
+            `buyCostPerHour`, not the total across every input. Routed material
+            costs the same number — its forgone sale — but that is not money
+            leaving the wallet, and printing one figure under one word for two
+            different things is how a pilot budgets for a purchase they are not
+            making.
+          */}
+          {line.buyCostPerHour > 0
+            ? t('piAdvisor.actionAddEconBuy', {
+                units: round(line.unitsPerHour),
+                revenue: formatIsk(line.revenuePerHour),
+                spend: formatIsk(line.buyCostPerHour),
+                margin: formatIsk(line.marginPerHour),
+              })
+            : t('piAdvisor.actionAddEcon', {
+                units: round(line.unitsPerHour),
+                revenue: formatIsk(line.revenuePerHour),
+                margin: formatIsk(line.marginPerHour),
+              })}
+        </li>
+      </ul>
+    </li>
+  );
+}
+
+export function ColonyActions({
+  idle,
+  pi,
+  spare,
+  newLinkCost,
+  opportunities,
+  conversions,
+  planetNames,
+  owners,
+  room,
+  closest,
+}: {
+  /** The idle-facility decision, already computed; null when nothing is idle. */
+  idle: IdleFacilityPlan | null;
+  pi: PiData;
+  /** CPU and Powergrid free right now. */
+  spare: PinLoad;
+  newLinkCost: PinLoad | null;
+  /** The network plan's lines placed on this planet. */
+  opportunities: readonly NetworkOpportunity[];
+  /** Exchanges worth making here: what to take down, and what goes up instead. */
+  conversions: readonly NetworkConversion[];
+  planetNames: ReadonlyMap<number, string>;
+  /** Who owns a planet, when it is not the reader's own — by planetId. */
+  owners: ReadonlyMap<number, string>;
+  /** What the leftover budget would hold, in words — the footnote's fallback. */
+  room: string;
+  /** The pin a full colony came nearest to affording; null when something fits. */
+  closest: { kind: PiPinKind; cost: PinLoad } | null;
+}) {
+  const { t } = useTranslation();
+  const nothing = !idle && opportunities.length === 0 && conversions.length === 0;
+
+  return (
+    <div className="space-y-1 border-t border-line pt-2">
+      <CardHeading label={t('piAdvisor.actionsLabel')} />
+      <ul className="space-y-1 text-xs">
+        {idle && <IdleFacilities plan={idle} pi={pi} />}
+        {opportunities.map((line) => (
+          <AddFactories key={line.typeId} line={line} planetNames={planetNames} owners={owners} />
+        ))}
+        <ConvertFacilities conversions={conversions} planetNames={planetNames} owners={owners} />
+        {/*
+          `networkModel` offers each host the budget its idle pins are holding,
+          so an "add" line on a colony that still has them rests on a removal
+          that has not happened. The system panel says this once for the whole
+          plan; the card has to say it too, because the card is what a pilot
+          acts on and the footnote directly below prints the *pre*-removal
+          budget.
+        */}
+        {idle && opportunities.length > 0 && (
+          <li className="text-text-dim">{t('piAdvisor.actionAssumesRemoval')}</li>
+        )}
+        {nothing && (
+          <li className="text-text-dim">
+            {room ? t('piAdvisor.actionNothingRoom', { room }) : t('piAdvisor.actionNothing')}
+          </li>
+        )}
+      </ul>
+      {/*
+        The capacity numbers the row used to lead with. They are still worth
+        having — a pilot checking the arithmetic needs them — but underneath
+        the decision rather than in place of it.
+      */}
+      <p className="text-[0.6875rem] text-text-faint">
+        {newLinkCost
+          ? t('piAdvisor.capacityFootnote', {
+              cpu: round(spare.cpu),
+              powergrid: round(spare.powergrid),
+              linkCpu: round(newLinkCost.cpu),
+              linkPowergrid: round(newLinkCost.powergrid),
+            })
+          : t('piAdvisor.capacityFootnoteNoLink', {
+              cpu: round(spare.cpu),
+              powergrid: round(spare.powergrid),
+            })}
+      </p>
+      {!room && closest && (
+        <p className="text-[0.6875rem] text-text-faint">
+          {t('piAdvisor.capacityClosest', {
+            pin: t(`piAdvisor.pinKind.${closest.kind}`),
+            pinCpu: round(closest.cost.cpu),
+            pinPowergrid: round(closest.cost.powergrid),
+          })}
+        </p>
+      )}
+      {opportunities.length > 0 && (
+        <p className="text-[0.6875rem] text-text-faint">
+          {t('piAdvisor.priceBasis', { hub: DEFAULT_TRADE_HUB.systemName })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CardHeading({ label }: { label: string }) {
+  return (
+    <span className="text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
+      {label}
+    </span>
+  );
+}

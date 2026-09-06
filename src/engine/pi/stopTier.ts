@@ -88,9 +88,25 @@ export interface StopTierOptions {
   extractionRatePerHour: number;
   /** ISK per unit by typeID. A type the hub does not quote is absent, never zero. */
   prices: Readonly<Record<number, number>>;
+  /**
+   * What the hub actually pays, by typeId — its highest buy. Defaults to
+   * `prices`, which credits every sale at your own ask.
+   *
+   * This is the option that decides whether "keep selling it raw" is honest.
+   * Extracted ore is the widest spread on the board and the biggest volume a
+   * colony moves, so pricing it at the ask overstates the one candidate that
+   * competes with every made tier.
+   */
+  revenuePrices?: Readonly<Record<number, number>>;
   taxRate: number;
   linkCapacityPerHour: ThroughputOptions['linkCapacityPerHour'];
   bufferHours: ThroughputOptions['bufferHours'];
+  /**
+   * What one link costs on this colony, charged per pin of every layout fitted
+   * here — see `FitColonyOptions`. Omitted means unpriced, which is the only
+   * honest answer for a planet with no colony on it to measure one from.
+   */
+  newLinkCost?: PinLoad;
 }
 
 /**
@@ -277,7 +293,7 @@ function scoreRawResource(
   const base = { typeId, name, tier: 0 as PiTier };
   if (fit.blocks <= 0) return { ...base, status: 'does-not-fit', fit };
 
-  const price = priceOf(typeId, opts.prices);
+  const price = priceOf(typeId, opts.revenuePrices ?? opts.prices);
   if (price === null) return { ...base, status: 'needs-price', missing: [typeId] };
 
   const throughput = checkThroughput(rawChain(typeId, name, opts.extractionRatePerHour), pi, {
@@ -312,6 +328,7 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
     infrastructure: opts.infrastructure,
     overhead: opts.overhead,
     headsPerExtractor: opts.headsPerExtractor,
+    ...(opts.newLinkCost ? { newLinkCost: opts.newLinkCost } : {}),
     sourcingFloor: 'P0',
     extractionRatePerHour: opts.extractionRatePerHour,
     linkCapacityPerHour: opts.linkCapacityPerHour,
@@ -331,6 +348,11 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
   if (missing.length > 0) return { ...base, status: 'needs-price', missing };
 
   const cost = chainCost(plan.chain, {
+    ...(opts.revenuePrices ? { revenuePrices: opts.revenuePrices } : {}),
+    // The P0 under a made chain is dug up here, not bought. Charging it at the
+    // ask prices material this pilot never buys, and makes every made tier
+    // look worse than the ore it came from.
+    sourcedBasis: 'own' as const,
     prices: opts.prices,
     sourcingFloor: 'P0',
     layout: LAYOUT,
@@ -423,6 +445,7 @@ export function recommendStopTier(opts: StopTierOptions, pi: PiData): StopTierAd
     overhead: opts.overhead,
     block: { extractorControlUnit: 1 },
     headsPerExtractor: opts.headsPerExtractor,
+    ...(opts.newLinkCost ? { newLinkCost: opts.newLinkCost } : {}),
   });
   const rawEntries = pi.raw
     .filter((resource) => local.has(resource.typeID))

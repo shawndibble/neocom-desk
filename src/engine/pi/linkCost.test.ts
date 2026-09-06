@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { greatCircleKm, linksLoad, type LinkGeometry } from './linkCost';
+import { greatCircleKm, linksLoad, newLinkLoad, type LinkGeometry } from './linkCost';
 import type { PiLinkSpec } from '@/sde/types';
 
 /** The shipped Link type (2280) attributes, verified against the dump. */
@@ -135,5 +135,45 @@ describe('against the reported colony', () => {
     const small = linksLoad([{ a, b, level: 0 }], 6_030, SPEC);
     const large = linksLoad([{ a, b, level: 0 }], 85_400, SPEC);
     expect(large.powergrid).toBeGreaterThan(small.powergrid * 5);
+  });
+});
+
+describe('newLinkLoad', () => {
+  // Three pins on one equator at 0.1 and 0.25 rad on a 1,000 km planet: hops
+  // of 100 km and 150 km.
+  const equator = (longitude: number) => ({ latitude: Math.PI / 2, longitude });
+  const hops: LinkGeometry[] = [
+    { a: equator(0), b: equator(0.1), level: 0 },
+    { a: equator(0.1), b: equator(0.25), level: 0 },
+  ];
+
+  it('prices a link the colony has not built at its longest existing hop', () => {
+    // The mean would quote 125 km, and a pin placed anywhere past the middle
+    // of this colony costs more than that — which is the direction
+    // `colonyBudget.ts` calls the one the Advisor must not err in. The longest
+    // hop is a measured number, and it makes the headroom count a floor.
+    const load = newLinkLoad(hops, 1_000, SPEC);
+    expect(load?.cpu).toBeCloseTo(15 + 0.2 * 150, 6);
+    expect(load?.powergrid).toBeCloseTo(10 + 0.15 * 150, 6);
+  });
+
+  it('prices it at link level 0, whatever the colony’s own links are upgraded to', () => {
+    // A link you have not built yet is a level-0 link. Carrying the level
+    // modifiers of upgraded ones into the quote would price a new link at
+    // something no new link pays — and would do it off this module's own
+    // explicitly unverified reading of those modifiers.
+    const upgraded = hops.map((hop) => ({ ...hop, level: 3 }));
+    expect(newLinkLoad(upgraded, 1_000, SPEC)).toEqual(newLinkLoad(hops, 1_000, SPEC));
+  });
+
+  it('has no answer for a colony with no link to measure', () => {
+    // Not zero: a new pin still needs a link, and there is simply nothing here
+    // to price one from. The caller has to say so.
+    expect(newLinkLoad([], 1_000, SPEC)).toBeNull();
+  });
+
+  it('has no answer without a usable radius, like the total it comes from', () => {
+    expect(newLinkLoad(hops, 0, SPEC)).toBeNull();
+    expect(newLinkLoad(hops, Number.NaN, SPEC)).toBeNull();
   });
 });

@@ -273,7 +273,10 @@ function planetOf(tier: PiTier, layout: ChainLayout): string {
 export function chainCost(chain: PiChain, opts: ChainCostOptions): ChainCostResult {
   const {
     prices,
+    revenuePrices = prices,
     sourcingFloor,
+    sourcedBasis = 'buy',
+    ownSourcedIds,
     layout,
     taxRate = DEFAULT_CUSTOMS_TAX_RATE,
     extractionRate = null,
@@ -338,17 +341,25 @@ export function chainCost(chain: PiChain, opts: ChainCostOptions): ChainCostResu
   }
 
   const perTargetUnit = (perHour: number) => perHour / chain.targetPerHour;
-  const priceOf = (id: number, label: string): number => {
-    const price = prices[id];
+  const priceIn = (book: Readonly<Record<number, number>>, id: number, label: string): number => {
+    const price = book[id];
     if (price == null || !Number.isFinite(price)) {
       throw new Error(`no price for ${label} (${id}); the chain cannot be costed`);
     }
     return price;
   };
+  // What you pay for a sourced line, and what you receive for the target: the
+  // ask and the bid respectively, unless the caller left both at one book.
+  // `ownSourcedIds` overrides this per line, for a chain that sources some
+  // floor material from the market and some from ground already held.
+  const bookFor = (id: number) => {
+    const own = ownSourcedIds ? ownSourcedIds.has(id) : sourcedBasis === 'own';
+    return own ? revenuePrices : prices;
+  };
 
   const sourced: SourcedLine[] = sourcedIds.map((id) => {
     const node = nodeAt(id);
-    const unitPrice = priceOf(id, node.name);
+    const unitPrice = priceIn(bookFor(id), id, node.name);
     const units = perTargetUnit(demand.get(id) as number);
     return {
       typeId: id,
@@ -360,7 +371,7 @@ export function chainCost(chain: PiChain, opts: ChainCostOptions): ChainCostResu
     };
   });
   const sourcedCost = sourced.reduce((sum, line) => sum + line.cost, 0);
-  const revenue = priceOf(chain.targetTypeId, target.name);
+  const revenue = priceIn(revenuePrices, chain.targetTypeId, target.name);
 
   // Customs, charged strictly per planet boundary:
   //  - every sourced unit is imported onto the planet that consumes it,

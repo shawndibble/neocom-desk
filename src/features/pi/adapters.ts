@@ -9,7 +9,7 @@ import type { PlanetPin } from '@/esi/endpoints';
 import type { ExtractorProgram, PinCounts, PinLoad } from '@/engine/pi/types';
 import type { PiData, PiPinKind } from '@/sde/types';
 import { pinsLoad } from '@/engine/pi/pinBudget';
-import { linksLoad, type LinkGeometry } from '@/engine/pi/linkCost';
+import { linksLoad, newLinkLoad, type LinkGeometry } from '@/engine/pi/linkCost';
 import type { PlanetLink } from '@/esi/endpoints';
 
 export type PinRole = 'extractor' | 'factory' | 'other';
@@ -139,6 +139,22 @@ export interface ColonyPinLoad {
    * showing headroom must say so rather than treat links as free (#440).
    */
   linkLoad: PinLoad | null;
+  /**
+   * What a link this colony has **not built yet** would cost: its own longest
+   * existing hop, priced at link level 0. See `engine/pi/linkCost.ts`'s
+   * `newLinkLoad` for why the longest rather than the average, and why level 0.
+   *
+   * A pin that does not exist has no place on the planet, so the distance term
+   * cannot be computed for it; but it will need a link all the same, and
+   * quoting it at its unlinked price promises room that is not there. A
+   * planet's links are the one cost that varies by two orders of magnitude
+   * between colonies, so a shared constant would be worse than useless.
+   *
+   * Null on a colony with no priceable link, which is not the same as a colony
+   * whose links are free: there is simply nothing to measure, and a caller
+   * must say "unpriced" rather than charge zero.
+   */
+  newLinkLoad: PinLoad | null;
   /** How many links the colony has, whether or not they could be costed. */
   linkCount: number;
   /**
@@ -212,6 +228,12 @@ export function colonyPinLoad(
       ? linksLoad(geometry, planetRadiusKm, pi.infrastructure.link)
       : null;
 
+  // Over the links that could actually be priced, never over `links.length`: a
+  // link whose far end is not in the pin list has no geometry, so it is not a
+  // hop this colony can be measured by.
+  const newLink =
+    planetRadiusKm !== null ? newLinkLoad(geometry, planetRadiusKm, pi.infrastructure.link) : null;
+
   return {
     counts,
     extractorHeads,
@@ -219,6 +241,7 @@ export function colonyPinLoad(
       ? { cpu: pinLoad.cpu + linkLoad.cpu, powergrid: pinLoad.powergrid + linkLoad.powergrid }
       : pinLoad,
     linkLoad,
+    newLinkLoad: newLink,
     linkCount: links.length,
     unknownTypeIds,
   };
