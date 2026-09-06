@@ -64,6 +64,7 @@ import { checkThroughput, fitColony, planColony } from './pinBudget';
 import type {
   ChainLayout,
   ColonyFit,
+  PinCounts,
   FitColonyOptions,
   PiChain,
   PiTier,
@@ -127,6 +128,17 @@ export interface ScoredStopTier extends CandidateBase {
   status: 'scored';
   /** Ratio blocks that fit — extractors, on a tier-0 candidate. */
   blocks: number;
+  /**
+   * The pins the fitted layout is built from, overhead included — the fit's
+   * own flattened counts.
+   *
+   * Carried because `blocks` is a ratio count and not something a pilot can go
+   * and place: a recommendation reads "2x Extractor Control Unit -> 8x Basic
+   * Industry Facility", which needs the counts rather than the ratio they came
+   * from. The rest of the `ColonyFit` is still dropped — `used` and `budget`
+   * belong to a meter this candidate is not rendered with.
+   */
+  pins: PinCounts;
   /** Which of the two ceilings stopped the fit there. */
   limitedBy: ColonyFit['limitedBy'];
   /** What the fitted colony makes an hour. */
@@ -268,6 +280,7 @@ function rejectOrScore(
     ...base,
     status: 'scored',
     blocks: fit.blocks,
+    pins: fit.pins,
     limitedBy: fit.limitedBy,
     unitsPerHour,
     marginPerUnit,

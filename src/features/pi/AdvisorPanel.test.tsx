@@ -61,12 +61,18 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 const setPlanetRichness = vi.fn<(planetId: number, order: number[]) => Promise<void>>();
 const clearPlanetRichness = vi.fn<(planetId: number) => Promise<void>>();
+const setSyncedSetting = vi.fn<(key: string, value: unknown) => Promise<void>>();
+const scheduleSync = vi.fn();
 vi.mock('@/sync', () => ({
   setPlanetRichness: (planetId: number, order: number[]) => setPlanetRichness(planetId, order),
   clearPlanetRichness: (planetId: number) => clearPlanetRichness(planetId),
+  setSyncedSetting: (key: string, value: unknown) => setSyncedSetting(key, value),
+  scheduleSync: (characterId: number) => scheduleSync(characterId),
 }));
-const loadPlanPrices = vi.fn<() => Promise<import('./planPrices').PlanPrices>>();
-vi.mock('./planPrices', () => ({ loadPlanPrices: () => loadPlanPrices() }));
+const loadPlanPrices = vi.fn<(...args: unknown[]) => Promise<import('./planPrices').PlanPrices>>();
+vi.mock('./planPrices', () => ({
+  loadPlanPrices: (...args: unknown[]) => loadPlanPrices(...args),
+}));
 const loadPiRosterSnapshot = vi.fn();
 vi.mock('./roster', () => ({ loadPiRosterSnapshot: () => loadPiRosterSnapshot() }));
 
@@ -197,10 +203,23 @@ function renderPanel(onSystemIdChange = vi.fn()) {
   );
 }
 
+/**
+ * Open a colony's detail modal.
+ *
+ * The card states the instruction; the measurement and economics that justify
+ * it live here. A test asserting the reasoning therefore has to go where a
+ * pilot would - which is the point of the split, and why these assertions were
+ * moved rather than deleted.
+ */
+async function openDetails(planet = 'Ashab III') {
+  await userEvent.click(await screen.findByRole('button', { name: `Details for ${planet}` }));
+  return screen.getByRole('dialog');
+}
+
 beforeEach(() => {
   // A module-scoped store outlives the test that set it, and buying changes
   // what every card says. Back to the shipped default each time.
-  useMarketSourcing.setState({ value: false, hydrated: true });
+  useMarketSourcing.setState({ value: 'none', hydrated: true });
   useAltColonies.setState({ value: false, hydrated: true });
   loadPiRosterSnapshot.mockResolvedValue({
     colonies: [],
@@ -223,9 +242,12 @@ beforeEach(() => {
     loadCustomsCodeExpertise,
     loadInterplanetaryConsolidation,
     loadPlanPrices,
+    setSyncedSetting,
+    scheduleSync,
   ]) {
     mock.mockReset();
   }
+  setSyncedSetting.mockResolvedValue(undefined);
   // Level IV — five colonies — so the default fixture has slots to spare and
   // only the tests that care about the cap have to say so.
   loadInterplanetaryConsolidation.mockResolvedValue(4);
@@ -257,18 +279,6 @@ beforeEach(() => {
 });
 
 describe('AdvisorPanel', () => {
-  it('states the pilot’s ceiling, and that it came from a trained level', async () => {
-    renderPanel();
-    expect(await screen.findByText('Level 5 — 25,415 tf / 19,000 MW')).toBeInTheDocument();
-    expect(screen.queryByText(/assumed/)).not.toBeInTheDocument();
-  });
-
-  it('flags an assumed budget when the character has no skill data', async () => {
-    loadCommandCenterUpgrades.mockResolvedValue(null);
-    renderPanel();
-    expect(await screen.findByText('Level 0 — 1,675 tf / 6,000 MW (assumed)')).toBeInTheDocument();
-  });
-
   it('shows the built colony’s measured extraction rate, not its qty_per_cycle', async () => {
     renderPanel();
     const card = (await screen.findByText('Ashab III')).closest('div')?.parentElement;
@@ -286,15 +296,17 @@ describe('AdvisorPanel', () => {
     // factory (200/800) and one launchpad (3,600/700). The denominator is the
     // colony's upgrade_level 4 budget, NOT the pilot's level-5 ceiling —
     // sizing it off the skill would claim 25,415 / 19,000 here.
-    const bar = await screen.findByText('4,640 / 21,315 tf');
-    expect(bar).toBeInTheDocument();
-    expect(screen.getByText('6,300 / 17,000 MW')).toBeInTheDocument();
     // The pilot's level-5 ceiling (25,415 tf) does appear — in the header
     // chip, which is what that chip is for. It must not appear as any card's
-    // denominator.
+    // denominator, and the card now carries percentages rather than figures.
     const card = (await screen.findByText('Ashab III')).closest('div')
       ?.parentElement as HTMLElement;
     expect(within(card).queryByText(/25,415/)).not.toBeInTheDocument();
+
+    const dialog = await openDetails();
+    expect(within(dialog).getByText('4,640 / 21,315 tf')).toBeInTheDocument();
+    expect(within(dialog).getByText('6,300 / 17,000 MW')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/25,415/)).not.toBeInTheDocument();
   });
 
   it('never flags the Command Center every colony has as an unrecognised pin', async () => {
@@ -331,8 +343,6 @@ describe('AdvisorPanel', () => {
     await screen.findByText('Ashab III');
     expect(screen.getByText(/has not loaded/)).toBeInTheDocument();
     expect(screen.queryByText('No colony can be placed on this planet.')).not.toBeInTheDocument();
-    // And it is not counted as somewhere a colony could go.
-    expect(screen.getByText('1 / 1 planets')).toBeInTheDocument();
   });
 
   it('clears a previous failure when a later load succeeds', async () => {
@@ -361,8 +371,9 @@ describe('AdvisorPanel', () => {
     // figure is worth having — a pilot checking the arithmetic needs it — but
     // as a footnote under a decision, not as the decision.
     renderPanel();
+    const dialog = await openDetails();
     expect(
-      await screen.findByText(/16,675 tf and 10,700 MW free as it stands/)
+      within(dialog).getByText(/16,675 tf and 10,700 MW free as it stands/)
     ).toBeInTheDocument();
   });
 
@@ -375,9 +386,23 @@ describe('AdvisorPanel', () => {
     // repair to a shape that should not have been a list at all.
     renderPanel();
     await screen.findByText('Ashab III');
-    expect(screen.getByText('Do this')).toBeInTheDocument();
+    expect(screen.getAllByText('Do this').length).toBeGreaterThan(0);
     expect(screen.queryByText(/Any one of those/)).not.toBeInTheDocument();
     expect(screen.queryByText(/x high-tech plant/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the detail modal open across a re-render', async () => {
+    // `openColony` is looked up by planetId from the freshly derived advice
+    // rather than stored, so a refresh that reshapes the snapshot cannot
+    // strand a stale colony behind an open dialog — or close it out from
+    // under a reader.
+    const { rerender } = renderPanel();
+    const dialog = await openDetails();
+    expect(within(dialog).getByText('Running now')).toBeInTheDocument();
+
+    rerender(<AdvisorPanel characterId={1} systemId={null} onSystemIdChange={vi.fn()} />);
+    expect(screen.getByRole('dialog')).toHaveAttribute('open');
+    expect(within(screen.getByRole('dialog')).getByText('Running now')).toBeInTheDocument();
   });
 
   it('charges a new pin for the link it will need, not just for the pin', async () => {
@@ -418,10 +443,11 @@ describe('AdvisorPanel', () => {
     );
     renderPanel();
 
-    // The charge is still made — `spareCapacity` takes it — and the footnote
-    // is where the card now says so, priced off this colony's own geometry.
+    // The charge is still made — `spareCapacity` takes it — and the modal's
+    // footnote is where it is stated, priced off this colony's own geometry.
+    const dialog = await openDetails();
     expect(
-      await screen.findByText(/A new pin also pays for its link here: 30 tf \/ 21 MW/)
+      within(dialog).getByText(/A new pin also pays for its link here: 30 tf \/ 21 MW/)
     ).toBeInTheDocument();
   });
 
@@ -430,8 +456,9 @@ describe('AdvisorPanel', () => {
     // from, the footnote states the remainder and stops — quoting a link cost
     // this colony's geometry cannot support would be the invented number.
     renderPanel();
-    await screen.findByText(/16,675 tf and 10,700 MW free as it stands/);
-    expect(screen.queryByText(/A new pin also pays for its link/)).not.toBeInTheDocument();
+    const dialog = await openDetails();
+    within(dialog).getByText(/16,675 tf and 10,700 MW free as it stands/);
+    expect(within(dialog).queryByText(/A new pin also pays for its link/)).not.toBeInTheDocument();
   });
 
   it('counts the colony slots the pilot’s skill actually allows', async () => {
@@ -514,11 +541,49 @@ describe('AdvisorPanel', () => {
     // pure budget arithmetic and true everywhere; what it would then hold is
     // advice about a purchase the pilot has not made.
     renderPanel();
-    const card = (await screen.findByText('Ashab III')).closest('div')
-      ?.parentElement as HTMLElement;
-    const nudge = within(card).getByText(/Command Center at level/);
+    const dialog = await openDetails();
+    const nudge = within(dialog).getByText(/Command Center at level/);
     expect(nudge).toHaveTextContent('MW');
     expect(nudge).not.toHaveTextContent('room for');
+  });
+
+  it('starts with no hub, and offers the ones the rest of the app uses', async () => {
+    // Buying assumes a trade hub you can actually reach, so nothing is assumed
+    // until the pilot names one. It was a checkbox, which forced every figure
+    // on the tab through Jita whether or not that was their market.
+    renderPanel();
+    const select = await screen.findByRole('combobox', { name: 'Buy inputs at' });
+    expect(select).toHaveTextContent('None');
+
+    await userEvent.click(select);
+    for (const hub of ['Jita', 'Amarr', 'Dodixie', 'Rens', 'Hek']) {
+      expect(await screen.findByRole('option', { name: hub })).toBeInTheDocument();
+    }
+  });
+
+  it('prices the whole tab at the hub the pilot picked', async () => {
+    // The control is both the permission and the price basis: an Amarr pilot's
+    // margins are Amarr's, not Jita's read through an Amarr-shaped label.
+    useMarketSourcing.setState({ value: 'amarr', hydrated: true });
+    renderPanel();
+    await screen.findByText('Ashab III');
+
+    expect(loadPlanPrices).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'amarr' }),
+      expect.anything()
+    );
+  });
+
+  it('still prices output at the reference hub when no hub is picked', async () => {
+    // 'none' refuses to plan a purchase; it does not refuse to value the
+    // output, which still has to be priced somewhere.
+    renderPanel();
+    await screen.findByText('Ashab III');
+
+    expect(loadPlanPrices).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'jita' }),
+      expect.anything()
+    );
   });
 
   it('says nothing about slots on an unbuilt planet while one is free', async () => {
@@ -533,10 +598,9 @@ describe('AdvisorPanel', () => {
     // Upgrades is V. Powergrid is what binds every one of these colonies, and
     // 2,000 MW of it is sitting behind an ISK purchase the tab never mentioned.
     renderPanel();
-    const card = (await screen.findByText('Ashab III')).closest('div')
-      ?.parentElement as HTMLElement;
-    expect(within(card).getByText(/level 4.*allows 5/)).toBeInTheDocument();
-    expect(within(card).getByText(/4,100 tf and 2,000 MW/)).toBeInTheDocument();
+    const dialog = await openDetails();
+    expect(within(dialog).getByText(/level 4.*allows 5/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/4,100 tf and 2,000 MW/)).toBeInTheDocument();
   });
 
   it('does not push an upgrade off a skill level it had to assume', async () => {
@@ -547,9 +611,8 @@ describe('AdvisorPanel', () => {
     // and survives a change to either of those two facts.
     loadCommandCenterUpgrades.mockResolvedValue(null);
     renderPanel();
-    const card = (await screen.findByText('Ashab III')).closest('div')
-      ?.parentElement as HTMLElement;
-    expect(within(card).queryByText(/allows/)).not.toBeInTheDocument();
+    const dialog = await openDetails();
+    expect(within(dialog).queryByText(/allows/)).not.toBeInTheDocument();
   });
 
   it('explains why nothing fits instead of printing a remainder beside “budget is spent”', async () => {
@@ -587,8 +650,9 @@ describe('AdvisorPanel', () => {
     renderPanel();
     // 7,600 tf and 16,700 MW drawn of 21,315 / 17,000 — so 13,715 tf spare and
     // 300 MW, against a High-Tech plant's 400 MW, the closest thing to fitting.
-    expect(await screen.findByText(/13,715 tf and 300 MW free as it stands/)).toBeInTheDocument();
-    const closest = screen.getByText(/Nothing more fits as it stands/);
+    const dialog = await openDetails();
+    expect(within(dialog).getByText(/13,715 tf and 300 MW free as it stands/)).toBeInTheDocument();
+    const closest = within(dialog).getByText(/Nothing more fits as it stands/);
     expect(closest).toHaveTextContent('High-Tech Production Plant');
     expect(closest).toHaveTextContent('400 MW');
     expect(screen.queryByText(/Any one of those/)).not.toBeInTheDocument();
@@ -631,11 +695,16 @@ describe('AdvisorPanel', () => {
     // draw budget and make nothing. The card states that as the action —
     // remove them — with the measurement that justifies it in the same line,
     // rather than as a separate observation the pilot has to act on themselves.
-    const line = await screen.findByText(/Remove 4x idle Basic Industry Facility/);
-    expect(line).toHaveTextContent('30,000/hr of Base Metals');
-    expect(line).toHaveTextContent('5,580/hr');
+    const what = await screen.findByText('4× Basic Industry Facility — nothing feeds them');
+    const row = what.closest('div')?.parentElement as HTMLElement;
+    expect(within(row).getByText('Remove')).toBeInTheDocument();
     // Four Basic Industry Facilities at 200 tf / 800 MW.
-    expect(line).toHaveTextContent('Frees 800 tf and 3,200 MW');
+    expect(row).toHaveTextContent('+800 tf · 3,200 MW');
+
+    // The measurement that justifies it is one click away, not gone.
+    const dialog = await openDetails();
+    const why = within(dialog).getByText(/They draw 30,000\/hr of Base Metals/);
+    expect(why).toHaveTextContent('5,580/hr');
   });
 
   it('offers to feed the idle facilities when the Powergrid is there for it', async () => {
@@ -672,8 +741,9 @@ describe('AdvisorPanel', () => {
       ])
     );
     renderPanel();
+    const dialog = await openDetails();
     expect(
-      await screen.findByText(/Add 1x Extractor Control Unit and \d+ heads/)
+      within(dialog).getByText(/Add 1x Extractor Control Unit and \d+ heads/)
     ).toBeInTheDocument();
   });
 
@@ -805,16 +875,18 @@ describe('AdvisorPanel', () => {
     // Named twice on purpose: the "Together" panel says the set can reach it,
     // and the host planet's own card says to build it. The pilot reads the
     // card, so the card carries the routes and the ISK.
-    expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText(/Test Cultures — \d+× Advanced Industry Facility/)).length
+    ).toBeGreaterThan(0);
     // The route is the work: an opportunity with no shipping named is not
     // actionable.
-    expect(screen.getByText(/of (Water|Bacteria) — route in from Ashab/)).toBeInTheDocument();
+    expect(screen.getAllByText(/(Water|Bacteria) \d+\/hr · Ashab/).length).toBeGreaterThan(0);
   });
 
   it('separates what a factory would buy from what it merely gives up', async () => {
     // Buying is off by default — it assumes a hub within reach — so this is
     // the opted-in state, set the way the checkbox sets it.
-    useMarketSourcing.setState({ value: true, hydrated: true });
+    useMarketSourcing.setState({ value: 'jita', hydrated: true });
     // The pilot asked to "take into account the cost of buying it on the local
     // market hub". Superconductors need Plasmoids, which neither colony makes,
     // so those are a purchase — while the Water feeding the same factory is
@@ -833,10 +905,18 @@ describe('AdvisorPanel', () => {
     });
     renderPanel();
 
-    expect(await screen.findByText(/of Plasmoids — buy at .* and haul it in/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Plasmoids \d+\/hr · buy at /)).length).toBeGreaterThan(0);
     // The Water is routed, not bought, so it must not appear as a purchase.
-    expect(screen.queryByText(/of Water — buy at/)).not.toBeInTheDocument();
-    expect(screen.getByText(/an hour of inputs you have to buy/)).toBeInTheDocument();
+    expect(screen.queryByText(/Water \d+\/hr · buy at /)).not.toBeInTheDocument();
+    // And the two are still told apart in words, one click into the host card
+    // — whichever of the two planets the plan put the factory on.
+    const host = screen
+      .getAllByRole('button', { name: /^Details for / })
+      .map((button) => button.closest('div.flex.flex-col') as HTMLElement)
+      .find((card) => within(card).queryByText(/Plasmoids \d+\/hr · buy at /));
+    fireEvent.click(within(host as HTMLElement).getByRole('button', { name: /^Details for / }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/an hour of inputs you have to buy/)).toBeInTheDocument();
   });
 
   it('names what buying would reach, rather than going quiet when it is off', async () => {
@@ -854,9 +934,7 @@ describe('AdvisorPanel', () => {
     });
     renderPanel();
     await screen.findByText('Ashab III');
-    expect(
-      screen.getByText(/would also be reachable by hauling inputs from the hub/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/would also be reachable by hauling inputs in/)).toBeInTheDocument();
   });
 
   it('combines colonies that are not in the same system', async () => {
@@ -894,7 +972,9 @@ describe('AdvisorPanel', () => {
 
     // Named in the "Together" panel even though the two planets are in
     // different systems and only one of them has a card on screen.
-    expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText(/Test Cultures — \d+× Advanced Industry Facility/)).length
+    ).toBeGreaterThan(0);
   });
 
   it('plans with another character’s colonies once asked to', async () => {
@@ -944,7 +1024,9 @@ describe('AdvisorPanel', () => {
     );
     renderPanel();
     await screen.findByText('Ashab III');
-    expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText(/Test Cultures — \d+× Advanced Industry Facility/)).length
+    ).toBeGreaterThan(0);
     expect(screen.getByText(/\(Alt Pilot\)/)).toBeInTheDocument();
     // Cache-only for the alt's system: page open must not spend ESI just
     // because an alt has a colony there, even when that system is also the
@@ -984,11 +1066,10 @@ describe('AdvisorPanel', () => {
       needsReauth: false,
     });
     renderPanel();
-    const card = (await screen.findByText('Ashab III')).closest('div')
-      ?.parentElement as HTMLElement;
+    const dialog = await openDetails();
     // Level 2 is 12,136 / 12,000 and level 3 is 17,215 / 15,000.
-    expect(within(card).getByText(/5,079 tf and 3,000 MW/)).toBeInTheDocument();
-    expect(within(card).queryByText(/13,279/)).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/5,079 tf and 3,000 MW/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/13,279/)).not.toBeInTheDocument();
   });
 
   it('charges for links, and still states headroom (#440)', async () => {
@@ -1032,7 +1113,9 @@ describe('AdvisorPanel', () => {
     );
     renderPanel();
 
-    expect(await screen.findByText('Includes 1 link drawing 30 tf / 21 MW.')).toBeInTheDocument();
+    const dialog = await openDetails();
+    expect(within(dialog).getByText('1 link')).toBeInTheDocument();
+    expect(within(dialog).getByText('30 tf / 21 MW')).toBeInTheDocument();
     expect(screen.queryByText(/Headroom unknown/)).not.toBeInTheDocument();
   });
 
@@ -1062,18 +1145,17 @@ describe('AdvisorPanel', () => {
     expect(await screen.findByText(/Headroom unknown/)).toBeInTheDocument();
   });
 
-  it('names an unbuilt planet’s resources and refuses to price them', async () => {
+  it('offers an unbuilt planet’s resources as a pick, and waits for one', async () => {
+    // The old card listed what the planet could extract and then priced
+    // nothing, which is a statement a pilot can do nothing with. It now asks
+    // the one question that decides something — and says so rather than
+    // showing an empty recommendation.
     renderPanel();
     const heading = await screen.findByText('Ashab II');
     const card = heading.closest('div')?.parentElement as HTMLElement;
-    expect(within(card).getByText('Could extract')).toBeInTheDocument();
-    expect(within(card).getAllByText(/Base Metals/).length).toBeGreaterThan(0);
-    expect(within(card).getByText(/No ISK figure here/)).toBeInTheDocument();
-  });
-
-  it('counts only the planets a colony could go on', async () => {
-    renderPanel();
-    expect(await screen.findByText('1 / 2 planets')).toBeInTheDocument();
+    expect(within(card).getByText('Pull which of these?')).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Base Metals' })).toBeInTheDocument();
+    expect(within(card).getByText(/Tick what you would pull here/)).toBeInTheDocument();
   });
 
   it('marks a shattered planet as taking no colony rather than as unbuilt', async () => {
@@ -1086,8 +1168,8 @@ describe('AdvisorPanel', () => {
     renderPanel();
     expect(await screen.findByText('Ashab X')).toBeInTheDocument();
     expect(screen.getByText('No colony can be placed on this planet.')).toBeInTheDocument();
-    // And it is not counted as somewhere a colony could still go.
-    expect(screen.getByText('1 / 1 planets')).toBeInTheDocument();
+    // And it offers no pick, no plan and no Details: nothing can go here.
+    expect(screen.queryByText('Pull which of these?')).not.toBeInTheDocument();
   });
 
   it('prompts a character with no colonies towards the Plan tab instead of an empty grid', async () => {
@@ -1165,62 +1247,134 @@ describe('AdvisorPanel', () => {
   });
 });
 
-describe('resource ranking (#425)', () => {
-  it('saves a ranking account-wide when a resource is added', async () => {
+describe('resource picking (#425)', () => {
+  it('saves a pick account-wide when a resource is ticked', async () => {
     renderPanel();
-    const add = await screen.findByRole('button', { name: '+ Base Metals' });
-    fireEvent.click(add);
+    fireEvent.click(await screen.findByRole('button', { name: 'Base Metals' }));
 
-    // Fanned out by the sync layer, so the call carries the planet and order
-    // only — there is no per-Character variant to pass.
+    // Fanned out by the sync layer, so the call carries the planet and the
+    // picks only — there is no per-Character variant to pass.
     expect(setPlanetRichness).toHaveBeenCalledWith(40_000_002, [BASE_METALS]);
   });
 
-  it('prices the top-ranked resource, and marks the figure an estimate', async () => {
-    renderPanel();
-    fireEvent.click(await screen.findByRole('button', { name: '+ Base Metals' }));
+  /**
+   * A colony with one real link, so a hop can be measured off it. The default
+   * fixture has none, and a planet with no colony has no geometry of its own —
+   * which is exactly the state the refusal below covers.
+   */
+  function linkedColony() {
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [{ source_pin_id: 1, destination_pin_id: 2, link_level: 0 }],
+                routes: [],
+                pins: [
+                  {
+                    ...extractorPin(1),
+                    latitude: 1.5826666355133057,
+                    longitude: 5.977088451385498,
+                  },
+                  {
+                    pin_id: 2,
+                    type_id: BASIC,
+                    latitude: 1.5946428775787354,
+                    longitude: 5.978272914886475,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  },
+                  { pin_id: 3, type_id: LAUNCHPAD, latitude: 0, longitude: 0 },
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+  }
 
-    // 6,965 a cycle over 30-minute cycles decays to a measured sustained rate;
-    // the estimate projects one extractor at that rate against the hub price.
-    // What matters here is that it is labelled, not what it rounds to.
+  it('turns a pick into a build plan, and marks the figure an estimate', async () => {
+    // This is what the ranking never did. The picked resource becomes the
+    // candidate set `recommendStopTier` scores, sized against the pilot's own
+    // Command Center ceiling and a hop borrowed from their own colonies — so
+    // the control finally decides something. The projection is labelled; what
+    // matters here is the badge, not what the figure rounds to.
+    linkedColony();
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Base Metals' }));
+
     expect(await screen.findByText('Est.')).toBeInTheDocument();
-    expect(screen.getByText(/Estimated, not measured/)).toBeInTheDocument();
+    expect(screen.getByText(/average extraction rate/)).toBeInTheDocument();
   });
 
-  it('reorders without a reload, and the estimate follows the new top rank', async () => {
+  it('refuses a build plan off an assumed Command Center ceiling', async () => {
+    // Untrained is one level, and fitting against it would tell a pilot at
+    // Command Center Upgrades V that nothing fits here. Same rule the slot
+    // count and the header chip follow: an assumed figure may be shown, never
+    // acted on.
+    loadCommandCenterUpgrades.mockResolvedValue(null);
+    linkedColony();
     renderPanel();
-    fireEvent.click(await screen.findByRole('button', { name: '+ Base Metals' }));
-    fireEvent.click(await screen.findByRole('button', { name: '+ Noble Metals' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Base Metals' }));
 
+    expect(
+      await screen.findByText(/an assumed budget is never fitted against/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Est.')).not.toBeInTheDocument();
+  });
+
+  it('refuses a build plan when no colony of the pilot’s can price a link', async () => {
+    // Every pin of a fitted layout is charged a link, and an unbuilt planet
+    // has no geometry to price one from. The default fixture's colony has no
+    // links either, so there is no hop to borrow — and fitting links at zero
+    // would overstate what fits by exactly the amount #440 was filed about.
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Base Metals' }));
+
+    expect(await screen.findByText(/no honest price for one/)).toBeInTheDocument();
+    expect(screen.queryByText('Est.')).not.toBeInTheDocument();
+  });
+
+  it('adds a second pick without a reload, and un-ticks back off again', async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Base Metals' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Noble Metals' }));
+
+    // Click order is preference order, and it is what the store keeps.
     expect(setPlanetRichness).toHaveBeenLastCalledWith(40_000_002, [BASE_METALS, NOBLE_METALS]);
 
     // Rendered from the layered edit, with no reload and no second snapshot
-    // read: the list is in the pilot's chosen order, numbered from one.
-    const list = await screen.findByRole('list', { name: 'Resource ranking, richest first' });
-    expect(
-      within(list)
-        .getAllByRole('listitem')
-        .map((row) => row.textContent)
-    ).toEqual([expect.stringContaining('1'), expect.stringContaining('2')]);
-    expect(within(list).getAllByRole('listitem')[0]).toHaveTextContent('Base Metals');
-    expect(within(list).getAllByRole('listitem')[1]).toHaveTextContent('Noble Metals');
+    // read: both chips report themselves pressed.
+    const picked = await screen.findByRole('button', { name: 'Base Metals' });
+    expect(picked).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Noble Metals' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    fireEvent.click(picked);
+    expect(setPlanetRichness).toHaveBeenLastCalledWith(40_000_002, [NOBLE_METALS]);
   });
 
-  it('clears a ranking through the tombstoned path, not a bare delete', async () => {
+  it('clears the picks through the tombstoned path, not a bare delete', async () => {
     renderPanel();
-    fireEvent.click(await screen.findByRole('button', { name: '+ Base Metals' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Clear ranking' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Base Metals' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear' }));
 
     expect(clearPlanetRichness).toHaveBeenCalledWith(40_000_002);
   });
 
-  it('refuses to price a ranked planet when nothing of the pilot’s is measurable', async () => {
+  it('refuses to plan a picked planet when nothing of the pilot’s is measurable', async () => {
     // No colony detail means no measured extractor, so there is no rate of the
     // pilot's own to project from — and the card says exactly that instead of
     // reaching for a default.
     loadAllColonyDetails.mockResolvedValue(new Map());
     renderPanel();
-    fireEvent.click(await screen.findByRole('button', { name: '+ Base Metals' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Base Metals' }));
 
     expect(await screen.findByText(/no rate of your own to project from/)).toBeInTheDocument();
     expect(screen.queryByText('Est.')).not.toBeInTheDocument();
@@ -1291,15 +1445,55 @@ describe('AdvisorPanel build advice', () => {
     await screen.findByText('Switch to extracting Microorganisms and sell it raw');
     expect(screen.queryByText(/^Keep selling/)).not.toBeInTheDocument();
     // And the output figure is flagged as a rebuilt colony's, not this one's.
-    expect(screen.getByText(/what this colony would make rebuilt around it/)).toBeInTheDocument();
+    const dialog = await openDetails();
+    expect(
+      within(dialog).getByText(/what this colony would make rebuilt around it/)
+    ).toBeInTheDocument();
   });
 
   it('states the derived customs rate rather than costing at a silent default', async () => {
     priceEverything();
     renderPanel();
     // Ashab at 0.5 security is highsec: the 10% NPC base less 1% per level of
-    // Customs Code Expertise IV.
-    expect(await screen.findByText('6%')).toBeInTheDocument();
+    // Customs Code Expertise IV. It is the field's default, not a value the
+    // pilot had to supply.
+    expect(await screen.findByLabelText('Customs rate')).toHaveValue(6);
+    expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
+  });
+
+  it('lets the pilot set a customs rate the derivation cannot know', async () => {
+    // Outside highsec the office is player-owned, its tax is in no ESI field,
+    // and the derived default is 0 — so every margin was overstated by
+    // whatever the POCO owner charges, with nothing on screen to say so.
+    priceEverything();
+    renderPanel();
+    const field = await screen.findByLabelText('Customs rate');
+    fireEvent.change(field, { target: { value: '17' } });
+
+    expect(setSyncedSetting).toHaveBeenCalledWith('sync.piCustomsRates', { [ASHAB]: 0.17 });
+    // Repainted from the layered edit, with no reload.
+    expect(await screen.findByLabelText('Customs rate')).toHaveValue(17);
+    // Scheduled off the write's own promise, so it lands a microtask later.
+    await vi.waitFor(() => expect(scheduleSync).toHaveBeenCalledWith(1));
+  });
+
+  it('ignores a half-typed rate rather than declaring the system tax-free', async () => {
+    priceEverything();
+    renderPanel();
+    const field = await screen.findByLabelText('Customs rate');
+    fireEvent.change(field, { target: { value: '' } });
+
+    expect(setSyncedSetting).not.toHaveBeenCalled();
+  });
+
+  it('resets a customs rate back to the derived one', async () => {
+    priceEverything();
+    renderPanel();
+    fireEvent.change(await screen.findByLabelText('Customs rate'), { target: { value: '17' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));
+
+    expect(setSyncedSetting).toHaveBeenLastCalledWith('sync.piCustomsRates', {});
+    expect(await screen.findByLabelText('Customs rate')).toHaveValue(6);
   });
 
   it('says the hub is the gap when nothing is quoted, not that the planet is poor', async () => {

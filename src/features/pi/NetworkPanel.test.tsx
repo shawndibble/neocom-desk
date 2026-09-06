@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import type { NetworkPlan, NetworkOpportunity } from '@/engine/pi/network';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { NetworkPanel } from './NetworkPanel';
 
 function opportunity(overrides: Partial<NetworkOpportunity>): NetworkOpportunity {
@@ -35,6 +36,7 @@ describe('NetworkPanel', () => {
   it('names the shared rate when every host in the plan pays the same one', () => {
     render(
       <NetworkPanel
+        hub={DEFAULT_TRADE_HUB}
         plan={plan([
           opportunity({ hostPlanetId: 1, marginPerHour: 500 }),
           opportunity({ typeId: 2, name: 'Water-Cooled CPU', hostPlanetId: 1, marginPerHour: 300 }),
@@ -55,6 +57,7 @@ describe('NetworkPanel', () => {
     // has no single rate to name honestly.
     render(
       <NetworkPanel
+        hub={DEFAULT_TRADE_HUB}
         plan={plan([
           opportunity({ typeId: 1, hostPlanetId: 1, marginPerHour: 500 }),
           opportunity({ typeId: 2, name: 'Water-Cooled CPU', hostPlanetId: 2, marginPerHour: 300 }),
@@ -78,6 +81,7 @@ describe('NetworkPanel', () => {
   it('falls back to the single taxRate when no per-planet map is given', () => {
     render(
       <NetworkPanel
+        hub={DEFAULT_TRADE_HUB}
         plan={plan([opportunity({ hostPlanetId: 1, marginPerHour: 500 })])}
         buyInputs={false}
         assumesRemoval={false}

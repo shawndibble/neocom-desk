@@ -20,7 +20,19 @@
 // long as the account has any Character — the same "never deleted, only
 // emptied" shape the Quickbar's local row already carries. So the tombstone
 // edge above doesn't bite this key.
-export const SYNCED_SETTING_KEYS: readonly string[] = ['sync.notificationFeedPrefs'];
+// sync.piCustomsRates: the PI Advisor's per-system customs rate overrides.
+// One key holding a systemId -> rate map, for the same reason the key above
+// holds every Character: mergeSettings is whole-value LWW per key and this
+// list is exact-match, not a prefix match. See
+// src/features/pi/customsOverride.ts.
+//
+// Never deleted via deleteSyncedSetting either: clearing one system's override
+// empties an entry and leaves the blob valid, so the tombstone-expiry edge
+// above does not bite this key.
+export const SYNCED_SETTING_KEYS: readonly string[] = [
+  'sync.notificationFeedPrefs',
+  'sync.piCustomsRates',
+];
 
 const allowed = new Set(SYNCED_SETTING_KEYS);
 

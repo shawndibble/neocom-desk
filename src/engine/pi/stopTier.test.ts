@@ -171,6 +171,26 @@ describe('recommendStopTier', () => {
     expect(Math.max(...margins)).toBeCloseTo(advice.best.marginPerHour, 6);
   });
 
+  it('reports the pins a scored layout would actually be built from', () => {
+    // `blocks` alone is a ratio count, which is not something a pilot can go
+    // and place. The Advisor states a build as the pins it takes — "2x
+    // Extractor Control Unit -> 8x Basic Industry Facility" — so the fit's own
+    // flattened counts have to survive scoring rather than being discarded
+    // with the rest of the `ColonyFit`.
+    const advice = recommendStopTier(options(), pi);
+    expect(advice.kind).toBe('recommended');
+    if (advice.kind !== 'recommended') return;
+
+    const { pins } = advice.best;
+    // Every layout exports, so the overhead's Launchpad is always in there.
+    expect(pins.launchpad).toBeGreaterThan(0);
+    // Test Cultures is a P2, so it runs both Basic and Advanced facilities off
+    // this planet's own extraction.
+    expect(pins.extractorControlUnit).toBeGreaterThan(0);
+    expect(pins.basic).toBeGreaterThan(0);
+    expect(pins.advanced).toBeGreaterThan(0);
+  });
+
   it('refuses a candidate the hub does not quote rather than dropping the whole run', () => {
     const withoutCultures = { ...PRICES };
     delete withoutCultures[TEST_CULTURES];
