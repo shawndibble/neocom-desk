@@ -38,6 +38,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
   EmptyState,
+  InfoTooltip,
   Panel,
   ReauthBanner,
   Modal,
@@ -53,7 +54,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { formatIsk } from '@/lib/isk';
 import { loadPi, loadPiPlanetRadius } from '@/sde/loadSde';
 import { db } from '@/db';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadPlanPrices } from './planPrices';
 import { clearPlanetRichness, setPlanetRichness } from '@/sync';
 import { ResourcePicker } from './ResourcePicker';
@@ -90,7 +91,7 @@ import { ColonyDetail } from './ColonyDetailModal';
 import { useColonyPlan } from './colonyPlan';
 import { DirectiveRow, EstimateBadge, LoadMeter, SectionLabel } from './DirectiveRow';
 import { medianNewLinkLoad, unbuiltPlanAdvice, type UnbuiltPlanAdvice } from './unbuiltPlanModel';
-import { useMarketSourcing } from './marketSourcingPref';
+import { useMarketSourcing, type MarketSourcing } from './marketSourcingPref';
 import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
 import {
   colonySpaceFor,
@@ -201,7 +202,7 @@ interface Snapshot {
   altOwners: Map<number, string>;
 }
 
-async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
+async function loadAdvisorSnapshot(characterId: number, priceHub: TradeHub): Promise<Snapshot> {
   const nowMs = Date.now();
   // Started here rather than awaited where it's used: it needs only
   // `characterId`, so it runs alongside everything else below instead of
@@ -238,7 +239,7 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   // per-planet lookups instead of after them. It is the widest read on this
   // tab — every planetary commodity there is — and nothing between here and
   // the await depends on it.
-  const pricesPromise = loadPlanPrices(DEFAULT_TRADE_HUB, [
+  const pricesPromise = loadPlanPrices(priceHub, [
     ...new Set([...pi.raw.map((resource) => resource.typeID), ...plannableTypeIds(pi)]),
   ])
     // Failure is not fatal: an unpriced candidate refuses with `needs-price`
@@ -533,6 +534,8 @@ function useStopTier(
 interface ColonyCardProps {
   advice: Extract<PlanetAdvice, { kind: 'built' }>;
   pi: PiData;
+  /** The hub every price on this card came from. */
+  hub: TradeHub;
   schematicNames: ReadonlyMap<number, string>;
   typeNames: ReadonlyMap<number, string>;
   prices: Readonly<Record<number, number>>;
@@ -653,6 +656,7 @@ function BuiltCard({ onOpenDetails, ...props }: ColonyCardProps & { onOpenDetail
             </p>
           ) : (
             <ColonyDirectives
+              hub={props.hub}
               idle={plan.idle}
               pi={pi}
               opportunities={opportunities}
@@ -892,6 +896,7 @@ function UncolonisableCard({
 function ColonyDetailBody({
   advice,
   pi,
+  hub,
   schematicNames,
   typeNames,
   prices,
@@ -910,6 +915,7 @@ function ColonyDetailBody({
       advice={advice}
       plan={plan}
       pi={pi}
+      hub={hub}
       schematicNames={schematicNames}
       typeNames={typeNames}
       stopTier={stopTier}
@@ -934,9 +940,17 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   // Off by default: buying planetary inputs assumes a hub within reach, which
   // is a fact about the pilot rather than about any colony.
-  const buyInputs = useMarketSourcing((state) => state.value);
+  // Which hub the pilot can reach, or 'none'. It is both the permission to
+  // plan a purchase and the market every figure on the tab is priced at.
+  const sourcing = useMarketSourcing((state) => state.value);
   const hydrateBuyInputs = useMarketSourcing((state) => state.hydrate);
-  const setBuyInputs = useMarketSourcing((state) => state.setValue);
+  const setSourcing = useMarketSourcing((state) => state.setValue);
+  // 'none' is a refusal to plan a purchase, not a refusal to price anything:
+  // the output still has to be valued somewhere, so the reference hub stands
+  // in and nothing is offered as a buy.
+  const buyHub = getTradeHub(sourcing === 'none' ? DEFAULT_TRADE_HUB.id : sourcing);
+  const priceHub = buyHub ?? DEFAULT_TRADE_HUB;
+  const buyInputs = sourcing !== 'none';
   const withAlts = useAltColonies((state) => state.value);
   const hydrateAlts = useAltColonies((state) => state.hydrate);
   const setWithAlts = useAltColonies((state) => state.setValue);
@@ -952,7 +966,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     let cancelled = false;
     void (async () => {
       try {
-        const next = await loadAdvisorSnapshot(characterId);
+        const next = await loadAdvisorSnapshot(characterId, priceHub);
         if (cancelled) return;
         // Both reset on every run, not just on success: without this one
         // failure pins the error state forever, so a later character that
@@ -968,7 +982,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
+  }, [characterId, priceHub]);
 
   const systems = snapshot?.systems ?? [];
   const activeSystem = systems.find((system) => system.systemId === systemId) ?? systems[0] ?? null;
@@ -1109,7 +1123,6 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   const planColonies = withAlts ? [...networkAdvice, ...altsInPlan] : networkAdvice;
   const altsPlanned = altsInPlan.filter((entry) => entry.kind === 'built').length;
 
-  const builtCount = advice.filter((entry) => entry.kind === 'built').length;
   // What these colonies could do together — the answer no single card can
   // give, because each one is about its own planet.
   //
@@ -1153,24 +1166,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
       (entry): entry is Extract<PlanetAdvice, { kind: 'built' }> =>
         entry.kind === 'built' && entry.planetId === openPlanetId
     ) ?? null;
-  const colonisable = advice.filter(
-    (entry) => entry.kind === 'built' || entry.kind === 'unbuilt'
-  ).length;
-
-  // The header chip states the pilot's *ceiling*, not any colony's budget —
-  // each built card reads its own Command Center's upgrade level. It reads
-  // two ways, a trained level or an assumed untrained one, and must never
-  // present the second as the first.
-  const ceilingNumbers = t('piAdvisor.ccUpgradesValue', {
-    level: snapshot.ceiling.level,
-    cpu: snapshot.ceiling.budget.cpu.toLocaleString(),
-    powergrid: snapshot.ceiling.budget.powergrid.toLocaleString(),
-  });
-  const ceilingChipValue = snapshot.ceiling.assumed
-    ? t('piAdvisor.ccUpgradesAssumed', { numbers: ceilingNumbers })
-    : ceilingNumbers;
-
-  // Same two readings as the ceiling above: a trained level is a fact, an
+  // Same two readings the ceiling has: a trained level is a fact, an
   // untrained assumption is not, and only the first may be shown bare.
   const slotsNumbers = t('piAdvisor.slotsValue', {
     used: snapshot.colonyCount,
@@ -1204,29 +1200,17 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               </SelectContent>
             </Select>
           </label>
+          {/*
+            Two chips used to lead this row: the pilot's Command Center ceiling
+            and a "N / M planets" count of the system on screen. Both were
+            dropped — the ceiling is a fact about a skill that changes nothing a
+            pilot does on this tab and is stated where it bites (a colony behind
+            it says so in its own detail modal), and the planet count was read
+            as the colony allowance often enough that the allowance chip beside
+            it existed only to correct it. Removing the misread beats
+            annotating it.
+          */}
           <div className="flex flex-wrap gap-2">
-            <StatChip
-              label={t('piAdvisor.ccUpgrades')}
-              value={ceilingChipValue}
-              tooltip={
-                snapshot.ceiling.assumed
-                  ? t('piAdvisor.ccUpgradesAssumedTooltip')
-                  : t('piAdvisor.ccUpgradesTooltip')
-              }
-              tone={snapshot.ceiling.assumed ? 'warning' : 'accent'}
-            />
-            <StatChip
-              label={t('piAdvisor.colonised')}
-              value={t('piAdvisor.colonisedValue', { built: builtCount, total: colonisable })}
-              tooltip={t('piAdvisor.colonisedTooltip')}
-            />
-            {/*
-              The chip above counts planets in *this system*; this one counts
-              the character's colony allowance, which is what the one above
-              was being read as. They are next to each other on purpose —
-              seeing "1 / 2 planets" beside "4 / 5 used" is what makes the
-              difference obvious.
-            */}
             <StatChip
               label={t('piAdvisor.slots')}
               value={slotsChipValue}
@@ -1262,19 +1246,30 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             reach, and the Advisor should not price a standing freight run
             nobody agreed to.
           */}
-          <label className="mt-3 flex items-start gap-2 text-xs text-text">
-            <input
-              type="checkbox"
-              checked={buyInputs}
-              onChange={() => void setBuyInputs(!buyInputs)}
-              className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
-            />
-            <span>
-              <span className="font-medium">{t('piAdvisor.buyInputsLabel')}</span>
-              <span className="block text-[0.6875rem] text-text-dim">
-                {t('piAdvisor.buyInputsHint', { hub: DEFAULT_TRADE_HUB.systemName })}
-              </span>
+          <label className="space-y-1">
+            <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('piAdvisor.buyInputsLabel')}
+              <InfoTooltip
+                label={t('common.aboutLabel', { label: t('piAdvisor.buyInputsLabel') })}
+                content={t('piAdvisor.buyInputsHint')}
+              />
             </span>
+            <Select
+              value={sourcing}
+              onValueChange={(value) => void setSourcing(value as MarketSourcing)}
+            >
+              <SelectTrigger aria-label={t('piAdvisor.buyInputsLabel')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t('piAdvisor.buyInputsNone')}</SelectItem>
+                {TRADE_HUBS.map((hub) => (
+                  <SelectItem key={hub.id} value={hub.id}>
+                    {hub.systemName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           {/*
             Its own switch rather than the Colonies panel's: that one is
@@ -1306,6 +1301,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
 
       {network && (
         <NetworkPanel
+          hub={priceHub}
           plan={network.plan}
           buyInputs={buyInputs}
           assumesRemoval={network.assumesRemoval}
@@ -1326,6 +1322,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 onOpenDetails={() => setOpenPlanetId(entry.planetId)}
                 advice={entry}
                 pi={snapshot.pi}
+                hub={priceHub}
                 schematicNames={snapshot.schematicNames}
                 typeNames={snapshot.typeNames}
                 prices={snapshot.prices}
@@ -1385,6 +1382,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
           <ColonyDetailBody
             advice={openColony}
             pi={snapshot.pi}
+            hub={priceHub}
             schematicNames={snapshot.schematicNames}
             typeNames={snapshot.typeNames}
             prices={snapshot.prices}

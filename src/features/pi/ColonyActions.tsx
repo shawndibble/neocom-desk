@@ -28,7 +28,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { formatIsk } from '@/lib/isk';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import type { TradeHub } from '@/market/hubs';
 import type { PiData, PiPinKind } from '@/sde/types';
 import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
 import type { PinLoad } from '@/engine/pi/types';
@@ -40,6 +40,8 @@ import { CARD_DIRECTIVE_LIMIT, cappedRows } from './colonyPlan';
 const round = (value: number) => Math.round(value).toLocaleString();
 
 export interface ColonyActionProps {
+  /** The hub every price here came from, and the one a purchase would be made at. */
+  hub: TradeHub;
   /** The idle-facility decision, already computed; null when nothing is idle. */
   idle: IdleFacilityPlan | null;
   pi: PiData;
@@ -64,6 +66,7 @@ function inputChip(
   input: NetworkOpportunity['inputs'][number],
   planetNames: ReadonlyMap<number, string>,
   owners: ReadonlyMap<number, string>,
+  hub: TradeHub,
   t: TFunction
 ): ReactNode {
   const units = round(input.unitsPerHour);
@@ -78,7 +81,7 @@ function inputChip(
   if (input.source === 'bought') {
     return (
       <InputChip key={key} source="bought">
-        {t('piAdvisor.chipBuy', { units, name: input.name, hub: DEFAULT_TRADE_HUB.systemName })}
+        {t('piAdvisor.chipBuy', { units, name: input.name, hub: hub.systemName })}
       </InputChip>
     );
   }
@@ -99,9 +102,10 @@ function inputChips(
   line: NetworkOpportunity,
   planetNames: ReadonlyMap<number, string>,
   owners: ReadonlyMap<number, string>,
+  hub: TradeHub,
   t: TFunction
 ): ReactNode {
-  return line.inputs.map((input) => inputChip(input, planetNames, owners, t));
+  return line.inputs.map((input) => inputChip(input, planetNames, owners, hub, t));
 }
 
 function removeRow(entry: IdleFacilityPlan['lines'][number], t: TFunction) {
@@ -126,6 +130,7 @@ function addRow(
   line: NetworkOpportunity,
   planetNames: ReadonlyMap<number, string>,
   owners: ReadonlyMap<number, string>,
+  hub: TradeHub,
   t: TFunction,
   withChips = true
 ) {
@@ -134,7 +139,7 @@ function addRow(
       verb="add"
       value={t('piAdvisor.gainValue', { isk: formatIsk(line.marginPerHour) })}
       unit={t('piAdvisor.perHourUnit')}
-      {...(withChips ? { chips: inputChips(line, planetNames, owners, t) } : {})}
+      {...(withChips ? { chips: inputChips(line, planetNames, owners, hub, t) } : {})}
     >
       {t('piAdvisor.directiveAdd', {
         count: line.factories,
@@ -149,6 +154,7 @@ function swapRow(
   entry: NetworkConversion,
   planetNames: ReadonlyMap<number, string>,
   owners: ReadonlyMap<number, string>,
+  hub: TradeHub,
   t: TFunction,
   withChips = true
 ) {
@@ -157,7 +163,7 @@ function swapRow(
       verb="swap"
       value={t('piAdvisor.gainValue', { isk: formatIsk(entry.netPerHour) })}
       unit={t('piAdvisor.perHourUnit')}
-      {...(withChips ? { chips: inputChips(entry.add, planetNames, owners, t) } : {})}
+      {...(withChips ? { chips: inputChips(entry.add, planetNames, owners, hub, t) } : {})}
     >
       {t('piAdvisor.directiveSwap', {
         count: entry.removeCount,
@@ -178,6 +184,7 @@ export function ColonyDirectives(props: ColonyActionProps & { limit?: number }) 
     conversions,
     planetNames,
     owners,
+    hub,
     limit = CARD_DIRECTIVE_LIMIT,
   } = props;
 
@@ -188,11 +195,11 @@ export function ColonyDirectives(props: ColonyActionProps & { limit?: number }) 
   const gains: { key: string; node: ReactNode }[] = [
     ...opportunities.map((line) => ({
       key: `add-${line.typeId}`,
-      node: addRow(line, planetNames, owners, t),
+      node: addRow(line, planetNames, owners, hub, t),
     })),
     ...conversions.map((entry) => ({
       key: `swap-${entry.removeFacility}-${entry.removeName}`,
-      node: swapRow(entry, planetNames, owners, t),
+      node: swapRow(entry, planetNames, owners, hub, t),
     })),
   ];
 
@@ -234,7 +241,7 @@ function Why({ label, children }: { label: string; children: ReactNode }) {
  */
 export function ColonyReasoning(props: ColonyActionProps) {
   const { t } = useTranslation();
-  const { idle, pi, opportunities, conversions, planetNames, owners } = props;
+  const { idle, pi, opportunities, conversions, planetNames, owners, hub } = props;
   const only = idle && idle.lines.length === 1 ? idle.lines[0] : null;
 
   const blocks: { key: string; node: ReactNode }[] = [];
@@ -328,10 +335,12 @@ export function ColonyReasoning(props: ColonyActionProps) {
       key: `add-${line.typeId}`,
       node: (
         <div className="space-y-2">
-          {addRow(line, planetNames, owners, t, false)}
+          {addRow(line, planetNames, owners, hub, t, false)}
           <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1.5">
             <Why label={t('piAdvisor.inputsLabel')}>
-              <div className="flex flex-wrap gap-1">{inputChips(line, planetNames, owners, t)}</div>
+              <div className="flex flex-wrap gap-1">
+                {inputChips(line, planetNames, owners, hub, t)}
+              </div>
             </Why>
             <Why label={t('piAdvisor.earnsLabel')}>
               {/*
@@ -375,7 +384,7 @@ export function ColonyReasoning(props: ColonyActionProps) {
       key: `swap-${entry.removeFacility}-${entry.removeName}`,
       node: (
         <div className="space-y-2">
-          {swapRow(entry, planetNames, owners, t, false)}
+          {swapRow(entry, planetNames, owners, hub, t, false)}
           <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1.5">
             <Why label={t('piAdvisor.whyLabel')}>
               {t('piAdvisor.actionConvertWhy', {
@@ -387,7 +396,7 @@ export function ColonyReasoning(props: ColonyActionProps) {
             </Why>
             <Why label={t('piAdvisor.inputsLabel')}>
               <div className="flex flex-wrap gap-1">
-                {inputChips(entry.add, planetNames, owners, t)}
+                {inputChips(entry.add, planetNames, owners, hub, t)}
               </div>
             </Why>
             {haulIn > 0 && (
@@ -417,7 +426,7 @@ export function ColonyReasoning(props: ColonyActionProps) {
       ))}
       {opportunities.length > 0 && (
         <p className="text-[0.6875rem] text-text-faint">
-          {t('piAdvisor.priceBasis', { hub: DEFAULT_TRADE_HUB.systemName })}
+          {t('piAdvisor.priceBasis', { hub: hub.systemName })}
         </p>
       )}
     </div>

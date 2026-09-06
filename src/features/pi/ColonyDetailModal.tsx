@@ -18,6 +18,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import type { PiData } from '@/sde/types';
+import type { TradeHub } from '@/market/hubs';
 import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
 import type { PlanetAdvice } from './advisorModel';
 import type { MaxColonyBudget } from './colonyBudget';
@@ -86,6 +87,8 @@ export interface ColonyDetailProps {
   advice: Extract<PlanetAdvice, { kind: 'built' }>;
   plan: ColonyPlan;
   pi: PiData;
+  /** The hub every price here came from. */
+  hub: TradeHub;
   schematicNames: ReadonlyMap<number, string>;
   typeNames: ReadonlyMap<number, string>;
   stopTier: ColonyStopTierAdvice;
@@ -101,6 +104,7 @@ export function ColonyDetail({
   advice,
   plan,
   pi,
+  hub,
   schematicNames,
   typeNames,
   stopTier,
@@ -232,6 +236,7 @@ export function ColonyDetail({
           </p>
         ) : (
           <ColonyReasoning
+            hub={hub}
             idle={plan.idle}
             pi={pi}
             opportunities={opportunities}

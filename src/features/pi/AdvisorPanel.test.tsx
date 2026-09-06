@@ -65,8 +65,10 @@ vi.mock('@/sync', () => ({
   setPlanetRichness: (planetId: number, order: number[]) => setPlanetRichness(planetId, order),
   clearPlanetRichness: (planetId: number) => clearPlanetRichness(planetId),
 }));
-const loadPlanPrices = vi.fn<() => Promise<import('./planPrices').PlanPrices>>();
-vi.mock('./planPrices', () => ({ loadPlanPrices: () => loadPlanPrices() }));
+const loadPlanPrices = vi.fn<(...args: unknown[]) => Promise<import('./planPrices').PlanPrices>>();
+vi.mock('./planPrices', () => ({
+  loadPlanPrices: (...args: unknown[]) => loadPlanPrices(...args),
+}));
 const loadPiRosterSnapshot = vi.fn();
 vi.mock('./roster', () => ({ loadPiRosterSnapshot: () => loadPiRosterSnapshot() }));
 
@@ -213,7 +215,7 @@ async function openDetails(planet = 'Ashab III') {
 beforeEach(() => {
   // A module-scoped store outlives the test that set it, and buying changes
   // what every card says. Back to the shipped default each time.
-  useMarketSourcing.setState({ value: false, hydrated: true });
+  useMarketSourcing.setState({ value: 'none', hydrated: true });
   useAltColonies.setState({ value: false, hydrated: true });
   loadPiRosterSnapshot.mockResolvedValue({
     colonies: [],
@@ -270,18 +272,6 @@ beforeEach(() => {
 });
 
 describe('AdvisorPanel', () => {
-  it('states the pilot’s ceiling, and that it came from a trained level', async () => {
-    renderPanel();
-    expect(await screen.findByText('Level 5 — 25,415 tf / 19,000 MW')).toBeInTheDocument();
-    expect(screen.queryByText(/assumed/)).not.toBeInTheDocument();
-  });
-
-  it('flags an assumed budget when the character has no skill data', async () => {
-    loadCommandCenterUpgrades.mockResolvedValue(null);
-    renderPanel();
-    expect(await screen.findByText('Level 0 — 1,675 tf / 6,000 MW (assumed)')).toBeInTheDocument();
-  });
-
   it('shows the built colony’s measured extraction rate, not its qty_per_cycle', async () => {
     renderPanel();
     const card = (await screen.findByText('Ashab III')).closest('div')?.parentElement;
@@ -346,8 +336,6 @@ describe('AdvisorPanel', () => {
     await screen.findByText('Ashab III');
     expect(screen.getByText(/has not loaded/)).toBeInTheDocument();
     expect(screen.queryByText('No colony can be placed on this planet.')).not.toBeInTheDocument();
-    // And it is not counted as somewhere a colony could go.
-    expect(screen.getByText('1 / 1 planets')).toBeInTheDocument();
   });
 
   it('clears a previous failure when a later load succeeds', async () => {
@@ -550,6 +538,45 @@ describe('AdvisorPanel', () => {
     const nudge = within(dialog).getByText(/Command Center at level/);
     expect(nudge).toHaveTextContent('MW');
     expect(nudge).not.toHaveTextContent('room for');
+  });
+
+  it('starts with no hub, and offers the ones the rest of the app uses', async () => {
+    // Buying assumes a trade hub you can actually reach, so nothing is assumed
+    // until the pilot names one. It was a checkbox, which forced every figure
+    // on the tab through Jita whether or not that was their market.
+    renderPanel();
+    const select = await screen.findByRole('combobox', { name: 'Buy inputs at' });
+    expect(select).toHaveTextContent('None');
+
+    await userEvent.click(select);
+    for (const hub of ['Jita', 'Amarr', 'Dodixie', 'Rens', 'Hek']) {
+      expect(await screen.findByRole('option', { name: hub })).toBeInTheDocument();
+    }
+  });
+
+  it('prices the whole tab at the hub the pilot picked', async () => {
+    // The control is both the permission and the price basis: an Amarr pilot's
+    // margins are Amarr's, not Jita's read through an Amarr-shaped label.
+    useMarketSourcing.setState({ value: 'amarr', hydrated: true });
+    renderPanel();
+    await screen.findByText('Ashab III');
+
+    expect(loadPlanPrices).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'amarr' }),
+      expect.anything()
+    );
+  });
+
+  it('still prices output at the reference hub when no hub is picked', async () => {
+    // 'none' refuses to plan a purchase; it does not refuse to value the
+    // output, which still has to be priced somewhere.
+    renderPanel();
+    await screen.findByText('Ashab III');
+
+    expect(loadPlanPrices).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'jita' }),
+      expect.anything()
+    );
   });
 
   it('says nothing about slots on an unbuilt planet while one is free', async () => {
@@ -852,7 +879,7 @@ describe('AdvisorPanel', () => {
   it('separates what a factory would buy from what it merely gives up', async () => {
     // Buying is off by default — it assumes a hub within reach — so this is
     // the opted-in state, set the way the checkbox sets it.
-    useMarketSourcing.setState({ value: true, hydrated: true });
+    useMarketSourcing.setState({ value: 'jita', hydrated: true });
     // The pilot asked to "take into account the cost of buying it on the local
     // market hub". Superconductors need Plasmoids, which neither colony makes,
     // so those are a purchase — while the Water feeding the same factory is
@@ -900,9 +927,7 @@ describe('AdvisorPanel', () => {
     });
     renderPanel();
     await screen.findByText('Ashab III');
-    expect(
-      screen.getByText(/would also be reachable by hauling inputs from the hub/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/would also be reachable by hauling inputs in/)).toBeInTheDocument();
   });
 
   it('combines colonies that are not in the same system', async () => {
@@ -1126,11 +1151,6 @@ describe('AdvisorPanel', () => {
     expect(within(card).getByText(/Tick what you would pull here/)).toBeInTheDocument();
   });
 
-  it('counts only the planets a colony could go on', async () => {
-    renderPanel();
-    expect(await screen.findByText('1 / 2 planets')).toBeInTheDocument();
-  });
-
   it('marks a shattered planet as taking no colony rather than as unbuilt', async () => {
     loadSystemPlanetIds.mockResolvedValue([40_000_001, 40_000_009]);
     loadPlanetInfo.mockImplementation(async (planetId: number) =>
@@ -1141,8 +1161,8 @@ describe('AdvisorPanel', () => {
     renderPanel();
     expect(await screen.findByText('Ashab X')).toBeInTheDocument();
     expect(screen.getByText('No colony can be placed on this planet.')).toBeInTheDocument();
-    // And it is not counted as somewhere a colony could still go.
-    expect(screen.getByText('1 / 1 planets')).toBeInTheDocument();
+    // And it offers no pick, no plan and no Details: nothing can go here.
+    expect(screen.queryByText('Pull which of these?')).not.toBeInTheDocument();
   });
 
   it('prompts a character with no colonies towards the Plan tab instead of an empty grid', async () => {

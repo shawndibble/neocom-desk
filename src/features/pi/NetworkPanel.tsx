@@ -23,7 +23,7 @@
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip, Panel } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import type { TradeHub } from '@/market/hubs';
 import type { NetworkPlan } from '@/engine/pi/network';
 import { customsRatePercent, hostRateFor } from './customsRate';
 import { DirectiveRow, InputChip } from './DirectiveRow';
@@ -51,6 +51,7 @@ function ReachableByBuying({ plan }: { plan: NetworkPlan }) {
 }
 
 export function NetworkPanel({
+  hub,
   plan,
   buyInputs,
   assumesRemoval,
@@ -58,6 +59,8 @@ export function NetworkPanel({
   taxRate,
   taxRateByPlanet,
 }: {
+  /** The hub every price here came from. */
+  hub: TradeHub;
   plan: NetworkPlan;
   /** Whether the plan was allowed to buy inputs, which decides what to explain. */
   buyInputs: boolean;
@@ -137,7 +140,7 @@ export function NetworkPanel({
                           ? t('piAdvisor.chipBuy', {
                               units: Math.round(input.unitsPerHour).toLocaleString(),
                               name: input.name,
-                              hub: DEFAULT_TRADE_HUB.systemName,
+                              hub: hub.systemName,
                             })
                           : t('piAdvisor.chipRoute', {
                               units: Math.round(input.unitsPerHour).toLocaleString(),
@@ -173,12 +176,12 @@ export function NetworkPanel({
               {oneRate
                 ? t('piAdvisor.networkTotal', {
                     isk: formatIsk(total),
-                    hub: DEFAULT_TRADE_HUB.systemName,
+                    hub: hub.systemName,
                     percent: customsRatePercent(hostRate(plan.opportunities[0].hostPlanetId)),
                   })
                 : t('piAdvisor.networkTotalMixedRates', {
                     isk: formatIsk(total),
-                    hub: DEFAULT_TRADE_HUB.systemName,
+                    hub: hub.systemName,
                   })}{' '}
               {plan.opportunities.length > 1 ? t('piAdvisor.networkGreedy') : ''}
             </p>
