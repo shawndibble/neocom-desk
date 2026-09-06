@@ -266,7 +266,7 @@ describe('Industry: Build Plan CRUD', () => {
     expect(remaining[0].name).toBe('Rifter run (copy)');
   });
 
-  it('defaults facility/rig/security/hub/tax on a new plan from the most-recently-updated existing plan (#456)', async () => {
+  it('defaults facility/rig/security/hub/tax/build system/build location on a new plan from the most-recently-updated existing plan (#456)', async () => {
     // Older plan first: its (wrong) settings must lose to the newer one below,
     // proving the defaulting picks the most-recently-updated plan, not just
     // "some" existing plan.
@@ -280,6 +280,10 @@ describe('Industry: Build Plan CRUD', () => {
         security: 'nullsec',
         hubId: 'rens',
         facilityTaxPct: 0.1,
+        buildSystemId: 30002510,
+        buildSystemName: 'Rens',
+        buildLocationId: 60004588,
+        buildLocationName: 'Rens VI - Moon 8 - Brutor Tribe Treasury',
         updatedAt: 3,
       })
     );
@@ -297,6 +301,8 @@ describe('Industry: Build Plan CRUD', () => {
         buildSystemName: 'Tama',
         hubId: 'amarr',
         facilityTaxPct: 0.25,
+        buildLocationId: 1035466617946,
+        buildLocationName: 'Tama - Sosala Raitaru',
         updatedAt: 5,
       })
     );
@@ -319,6 +325,13 @@ describe('Industry: Build Plan CRUD', () => {
     expect(created?.security).toBe('lowsec');
     expect(created?.hubId).toBe('amarr');
     expect(created?.facilityTaxPct).toBe(0.25);
+    expect(created?.buildSystemId).toBe(30002813);
+    expect(created?.buildSystemName).toBe('Tama');
+    // The place the pilot actually named comes along with the fields it filled
+    // (#527): a new plan whose facility/system/band all came from the Raitaru
+    // in Tama must not show an empty location box.
+    expect(created?.buildLocationId).toBe(1035466617946);
+    expect(created?.buildLocationName).toBe('Tama - Sosala Raitaru');
   });
 });
 
