@@ -60,6 +60,7 @@ import type { ColonyAttention, ColonyStatus, ExtractorYieldProgram } from '@/eng
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { formatTimestamp } from '@/lib/timestamp';
 import { formatDuration } from '@/lib/duration';
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -647,7 +648,7 @@ function ColonyRow({
             )}
             <StatChip
               label={t('pi.lastUpdate')}
-              value={new Date(planet.last_update).toLocaleString()}
+              value={formatTimestamp(new Date(planet.last_update))}
               tooltip={t('pi.lastUpdateTooltip')}
               className="ml-auto"
             />

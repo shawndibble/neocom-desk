@@ -1,7 +1,7 @@
 /**
  * Pure date-grid math for the Calendar's Month/Week views. Local time
- * throughout (matches the app's existing `toLocaleString()` display of ESI's
- * UTC event timestamps) — no fetch/DOM/Dexie imports.
+ * throughout, matching `lib/timestamp.ts`'s display of ESI's UTC event
+ * timestamps — no fetch/DOM/Dexie imports.
  */
 
 export interface GridDay {

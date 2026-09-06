@@ -22,6 +22,7 @@ import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { maxMarketOrders } from '@/engine/market/orderSlots';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
+import { formatTimestamp } from '@/lib/timestamp';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { NotificationFeedPanel } from '@/features/notifications/NotificationFeedPanel';
@@ -343,7 +344,7 @@ export function Overview() {
                   {activeEntry?.finish_date && (
                     <span className="ml-2 text-xs text-text-dim">
                       {t('overview.finishes', {
-                        date: new Date(activeEntry.finish_date).toLocaleString(),
+                        date: formatTimestamp(new Date(activeEntry.finish_date)),
                       })}{' '}
                       ·{' '}
                       {t('overview.timeLeft', {

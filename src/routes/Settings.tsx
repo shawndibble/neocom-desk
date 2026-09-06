@@ -14,6 +14,7 @@ import {
 } from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { formatAge } from '@/lib/age';
+import { formatTimestamp } from '@/lib/timestamp';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
 import { CorpAccessPanel } from '@/features/corp/CorpAccessPanel';
@@ -104,7 +105,7 @@ function ActivityLogPanel() {
         className: 'whitespace-nowrap text-text-dim',
         // Full date, not just time-of-day: a session that crosses midnight
         // otherwise makes two entries on different days read as minutes apart.
-        render: (entry) => new Date(entry.timestamp).toLocaleString(),
+        render: (entry) => formatTimestamp(new Date(entry.timestamp)),
       },
       {
         id: 'outcome',
@@ -189,7 +190,7 @@ function DataAgePanel() {
         header: t('dataAge.columnUpdated'),
         className: 'whitespace-nowrap text-text-dim',
         render: (entry) => (
-          <span title={new Date(entry.timestamp).toLocaleString()}>
+          <span title={formatTimestamp(new Date(entry.timestamp))}>
             {formatAge(Date.now() - entry.timestamp, t)}
           </span>
         ),

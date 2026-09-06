@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
 import { EventContextMenu } from './EventContextMenu';
+import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
 export interface CalendarAgendaViewProps {
@@ -35,7 +36,7 @@ export function CalendarAgendaView({
                 className="grid w-full grid-cols-[9rem_1fr_auto] items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors hover:bg-panel-2"
               >
                 <span className="truncate text-text-faint">
-                  {new Date(event.event_date).toLocaleString()}
+                  {formatCalendarTimestamp(new Date(event.event_date))}
                 </span>
                 <span className="truncate font-semibold">{event.title}</span>
                 <span className={`shrink-0 ${RESPONSE_TEXT_TONE[event.event_response]}`}>
