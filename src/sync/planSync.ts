@@ -168,18 +168,19 @@ export async function markPlanDeleted(characterId: number, planId: string): Prom
 
 /** Build Plan analogue of markPlanDeleted — same tombstone semantics. */
 /**
- * Deleting a Build Plan cascades to every Production Run logged against it
- * (and, via `markProductionRunDeleted`, each of those runs' own sale links
- * and order watches) — the same reasoning one level up: a run left pointing
- * at a Build Plan that no longer exists would render with a raw id instead
- * of a name in `ProductionLogPanel`, and clicking it would silently land on
- * whichever Build Plan the "first plan" fallback in `Industry.tsx` picks.
+ * Deliberately does *not* cascade to a Build Plan's own Production Runs
+ * (reversed after initially cascading — see the decisions folder). A logged
+ * run is a locked financial snapshot, not a live view of the plan: its
+ * materialCost/jobFee/totalCost/quantity are fixed at logging time and never
+ * re-derived, precisely so reusing or deleting the plan later (a blueprint's
+ * market prices drift, ME/TE changes) cannot alter a profit figure already
+ * booked. Deleting the plan the run happened to be logged under must not
+ * delete the accounting record itself. `ProductionLogPanel` never renders
+ * which plan a run came from (issue #525 follow-up), so an orphaned run has
+ * nothing broken to display — it just can no longer be jumped to from a
+ * Records row click.
  */
 export async function markBuildPlanDeleted(characterId: number, planId: string): Promise<void> {
-  const runs = await db.productionRuns.where('buildPlanId').equals(planId).toArray();
-  for (const run of runs) {
-    await markProductionRunDeleted(characterId, run.id);
-  }
   await recordDeletion(characterId, planId, buildPlanTombstonesKey(characterId), () =>
     db.buildPlans.delete(planId)
   );

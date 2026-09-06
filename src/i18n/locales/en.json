@@ -484,7 +484,6 @@
     "buildPlansTab": "Build Plans",
     "recordsTab": "Records",
     "productionRunColumnItem": "Item",
-    "productionRunColumnPlan": "Plan",
     "allProductionRuns": "All production runs",
     "productionLogFilteredEmptyTitle": "No production runs in this period",
     "productionLogFilteredEmptyHint": "Try widening the date range.",

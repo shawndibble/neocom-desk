@@ -103,17 +103,35 @@ _Recorded 2026-09-05 · issue #525._
   `ProductionRunsPanel` and `ProductionLogPanel` share one pure summary
   function, `productionRunSummary.ts`'s `summarizeProductionRun`, so the two
   views can never disagree about a run's realized profit or sale status. The
-  Records tab also adds a per-run table (date, item, Build Plan, quantity,
-  cost, sold/total, realized profit, status — the same "N / total" pairing
+  Records tab also adds a per-run table (date, item, quantity, cost,
+  sold/total, realized profit, status — the same "N / total" pairing
   `ProductionRunsPanel`'s own per-plan table already uses, rather than
   showing remaining as a separate number) above the existing "By Item"
   rollup — the rollup alone could not show which individual runs still
   needed a sale linked — and a `From`/`To` date-range filter
   (`productionLogFilter.ts`, mirroring `walletJournalFilter.ts`'s inclusive
   `YYYY-MM-DD` string-range pattern and `Wallet.tsx`'s `JournalDateRange`
-  layout) that narrows both the totals and both tables together. Clicking a
-  run row switches back to the Build Plans tab and selects that run's own
-  plan (`Industry.tsx`'s `openRunFromRecords`).
+  layout) that narrows both the totals and both tables together. **No Build
+  Plan column** — explicitly cut after review: a run is a locked snapshot
+  independent of its plan (see the deletion bullet below), so naming the
+  plan added a second identity column next to Item for no benefit once the
+  plan can no longer be reached from a deleted-plan row anyway. Clicking a
+  run row still switches back to the Build Plans tab and selects that run's
+  own plan (`Industry.tsx`'s `openRunFromRecords`) when that plan still
+  exists; it silently does nothing when it doesn't (`RunRow.planExists` in
+  `ProductionLogPanel.tsx`) rather than routing to the wrong plan. The
+  Records table also carries the same "Sold" split button
+  (`SoldSplitButton`/`SaleLinkingModals` in the new
+  `SaleLinkingControls.tsx`, backed by the new `useSaleLinking` hook) that
+  `ProductionRunsPanel` uses, so a pilot can link a sale, watch an order, or
+  record a manual sale for any run without leaving Records to find its
+  plan — added because every run's own `productTypeID` is enough to drive
+  the picker; nothing about it needed a live plan either. Extracting this
+  hook out of `ProductionRunsPanel.tsx` (previously ~250 lines of inline
+  picker/manual-sale state and JSX) is what let `ProductionLogPanel.tsx`
+  gain the same feature without duplicating it — both panels now call
+  `useSaleLinking(characterId, saleLinks, orderWatches)` and render the same
+  two shared components.
 - **Every Production Run carries a sale-status badge — New (nothing sold),
   Open (partially sold), Closed (fully sold) — matching the mockup's own
   three-state chip.** `ProductionRunStatusChip` is the one place that renders
@@ -124,18 +142,26 @@ _Recorded 2026-09-05 · issue #525._
   which is honest but not the mockup's full intent. Flagged as a follow-up,
   not solved.
 - **Deleting a Production Run cascades to every sale link and order watch
-  naming it.** `markProductionRunDeleted` (`src/sync/planSync.ts`) tombstones
-  the run's own row plus every `ProductionSaleLinkRecord`/
+  naming it — but deleting a Build Plan does _not_ cascade to its
+  Production Runs.** `markProductionRunDeleted` (`src/sync/planSync.ts`)
+  tombstones the run's own row plus every `ProductionSaleLinkRecord`/
   `ProductionOrderWatchRecord` whose `runId` matches, before tombstoning the
-  run itself. An allocation left pointing at a run that no longer exists
-  would be worse than a slightly noisier tombstone list — and would
-  permanently corrupt "already linked" checks, since the deterministic id
-  would still exist there was nothing to clean it up. `markBuildPlanDeleted`
-  cascades the same way one level up (added after the Records tab review
-  caught the gap): deleting a Build Plan now tombstones every Production Run
-  logged against it via `markProductionRunDeleted`, so a deleted plan never
-  leaves an orphaned run rendering a raw `buildPlanId` in `ProductionLogPanel`
-  or sending a Records-tab row click to the wrong plan.
+  run itself — an allocation left pointing at a run that no longer exists
+  would permanently corrupt "already linked" checks, since the deterministic
+  id would still exist with nothing to clean it up. One level up is
+  different on purpose: `markBuildPlanDeleted` briefly cascaded the same way
+  (added when the first Records-tab review flagged an orphaned run rendering
+  a raw `buildPlanId` and routing a row click to the wrong plan), then was
+  **reverted** once asked directly — a logged run is a locked financial
+  snapshot (materialCost/jobFee/totalCost/quantity fixed at logging time,
+  never re-derived from the plan), specifically so reusing or deleting the
+  plan later cannot alter a profit figure already booked. Deleting the plan
+  a run happened to be logged under must not delete the accounting record
+  itself. The orphaned-row display problem that motivated the original
+  cascade is solved differently now: Records never shows which plan a run
+  came from at all (see above), and a row whose plan is gone just can't be
+  clicked through anymore (`RunRow.planExists`) — nothing renders wrong, and
+  nothing routes to the wrong plan.
 - **A third linking mechanism, "Manual / Private Sale," was added after initial
   review feedback.** Not every disposal has an ESI record at all — a gift, a
   private out-of-market deal, an item reprocessed and sold as something else.

@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db, type BuildPlanRecord } from '@/db';
+import type { WalletTransaction } from '@/esi/endpoints';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { ProductionLogPanel } from './ProductionLogPanel';
+
+const loadWalletTransactions = vi.hoisted(() => vi.fn());
+vi.mock('@/features/character/wallet', () => ({ loadWalletTransactions }));
+
+const loadOrders = vi.hoisted(() => vi.fn());
+vi.mock('@/features/character/orders', () => ({ loadOrders }));
 
 const CHARACTER_ID = 1;
 const RIFTER_TYPE_ID = 587;
@@ -55,6 +62,22 @@ const PLANS: BuildPlanRecord[] = [
   plan({ id: 'plan-3', name: 'Raven Line' }),
 ];
 
+function txn(overrides: Partial<WalletTransaction> = {}): WalletTransaction {
+  return {
+    transaction_id: 9001,
+    date: '2026-09-01T00:00:00Z',
+    location_id: 60003760,
+    type_id: RIFTER_TYPE_ID,
+    unit_price: 100_000,
+    quantity: 5,
+    client_id: 1,
+    is_buy: false,
+    is_personal: true,
+    journal_ref_id: 1,
+    ...overrides,
+  };
+}
+
 async function addRun(overrides: Partial<Parameters<typeof db.productionRuns.add>[0]> = {}) {
   const now = Date.now();
   await db.productionRuns.add({
@@ -72,10 +95,16 @@ async function addRun(overrides: Partial<Parameters<typeof db.productionRuns.add
   });
 }
 
+function runsTable() {
+  return screen.findByRole('table', { name: 'All production runs' });
+}
+
 beforeEach(async () => {
   await db.productionRuns.clear();
   await db.productionSaleLinks.clear();
   await db.productionOrderWatches.clear();
+  loadWalletTransactions.mockReset().mockResolvedValue(null);
+  loadOrders.mockReset().mockResolvedValue({ cached: null, needsReauth: false });
 });
 
 describe('ProductionLogPanel', () => {
@@ -143,7 +172,7 @@ describe('ProductionLogPanel', () => {
     expect(within(byItemTable).getByText('#999999')).toBeInTheDocument();
   });
 
-  it('lists every run individually, tagged with its own Build Plan name', async () => {
+  it('lists every run in the runs table without naming which Build Plan it came from', async () => {
     await addRun({ id: 'run-1', buildPlanId: 'plan-1' });
     await addRun({ id: 'run-2', buildPlanId: 'plan-3', productTypeID: RAVEN_TYPE_ID });
 
@@ -151,27 +180,34 @@ describe('ProductionLogPanel', () => {
       <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
     );
 
-    expect(await screen.findByText('Rifter Line')).toBeInTheDocument();
-    expect(await screen.findByText('Raven Line')).toBeInTheDocument();
+    const table = await runsTable();
+    // Header + 2 data rows.
+    expect(within(table).getAllByRole('row')).toHaveLength(3);
+    expect(within(table).getByText('Rifter')).toBeInTheDocument();
+    expect(within(table).getByText('Raven')).toBeInTheDocument();
+    expect(within(table).queryByText('Rifter Line')).not.toBeInTheDocument();
+    expect(within(table).queryByText('Raven Line')).not.toBeInTheDocument();
   });
 
   it('excludes runs outside the selected date range, keeping runs inside it', async () => {
     const old = Date.parse('2026-01-01T00:00:00Z');
     const recent = Date.parse('2026-08-15T00:00:00Z');
-    await addRun({ id: 'run-old', loggedAt: old, updatedAt: old });
-    await addRun({ id: 'run-recent', loggedAt: recent, updatedAt: recent, buildPlanId: 'plan-2' });
+    await addRun({ id: 'run-old', loggedAt: old, updatedAt: old, quantity: 7 });
+    await addRun({ id: 'run-recent', loggedAt: recent, updatedAt: recent, quantity: 42 });
 
     render(
       <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
     );
     // Both present before filtering.
-    expect(await screen.findAllByText('Rifter Line')).toHaveLength(1);
+    const table = await runsTable();
+    expect(within(table).getByText('7')).toBeInTheDocument();
+    expect(within(table).getByText('42')).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText('From'), '2026-08-01');
 
-    expect(screen.queryByText('Rifter Line')).not.toBeInTheDocument();
-    expect(screen.getByText('Rifter Line 2')).toBeInTheDocument();
+    expect(within(await runsTable()).queryByText('7')).not.toBeInTheDocument();
+    expect(within(await runsTable()).getByText('42')).toBeInTheDocument();
   });
 
   it('reports a filtered-empty state distinct from the "nothing logged ever" state', async () => {
@@ -201,9 +237,54 @@ describe('ProductionLogPanel', () => {
       />
     );
 
-    const row = (await screen.findByText('Rifter Line 2')).closest('tr');
-    expect(row).not.toBeNull();
-    await userEvent.click(row!);
+    const table = await runsTable();
+    const row = within(table).getAllByRole('row')[1];
+    await userEvent.click(row);
     expect(onOpenRun).toHaveBeenCalledWith('plan-2');
+  });
+
+  it("does not navigate when the run's own Build Plan no longer exists — a locked record with nowhere left to jump to", async () => {
+    await addRun({ id: 'run-1', buildPlanId: 'plan-deleted' });
+    const onOpenRun = vi.fn();
+
+    render(
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        onOpenRun={onOpenRun}
+      />
+    );
+
+    const table = await runsTable();
+    const row = within(table).getAllByRole('row')[1];
+    await userEvent.click(row);
+    expect(onOpenRun).not.toHaveBeenCalled();
+  });
+
+  it("links a past sale directly from the runs table's Sold button", async () => {
+    await addRun({ id: 'run-1' });
+    loadWalletTransactions.mockResolvedValue({
+      data: [txn()],
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Sold' }));
+    await waitFor(() => screen.getByRole('button', { name: 'Link' }));
+    await user.click(screen.getByRole('button', { name: 'Link' }));
+
+    await waitFor(async () => {
+      expect(await db.productionSaleLinks.count()).toBe(1);
+    });
+    const link = (await db.productionSaleLinks.toArray())[0];
+    expect(link).toMatchObject({ runId: 'run-1', transactionId: 9001, quantity: 5 });
   });
 });

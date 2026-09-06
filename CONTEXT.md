@@ -206,19 +206,27 @@ here — they go one per file in `docs/context/decisions/`.
   rollup) so a pilot can see which individual runs still need a sale linked,
   and a From/To date-range filter. Lives on `/industry`'s "Records" tab (a
   peer of the "Build Plans" tab, not a separate route or an always-visible
-  panel); clicking a run jumps back to its own Build Plan.
+  panel). The per-run table names no Build Plan — a run outlives its plan
+  (below) — so clicking a row jumps back to that run's own plan only when it
+  still exists, and does nothing otherwise. It carries the same "Sold" split
+  button (Link Past Sale / Watch Open Order / Manual Sale) the per-plan panel
+  does, so a run can be linked to a sale without leaving Records.
 - **Production Run**: A manual, pilot-entered snapshot of one production
   batch off a **Build Plan** — materials cost, job fee, and quantity as they
   stood at logging time, overridable at creation and never re-derived
   afterward (issue #525). Distinct from a Build Plan's own live `BuildResult`,
   which is a forward _estimate_ that moves with the market on every render; a
   Production Run holds still so realized profit can be measured against what
-  was actually paid. Deliberately correct-by-construction rather than
-  reconstructed from ESI wallet history (see the decisions folder for why
-  automated FIFO matching was rejected) — the pilot links what actually sold
-  via "Link Past Sale" (a picker over cached wallet transactions), "Watch
-  Open Order" (tracks one of the pilot's own open sell orders'
-  `volume_remain` directly), or a "Manual / Private Sale" entry for a
+  was actually paid. This locking is also why deleting the Build Plan a run
+  was logged under does not delete the run: the accounting record must
+  outlive the plan, exactly so reusing or deleting that plan later (a
+  blueprint's market price drifts, ME/TE changes) can never retroactively
+  change a profit figure already booked. Deliberately correct-by-construction
+  rather than reconstructed from ESI wallet history (see the decisions folder
+  for why automated FIFO matching was rejected) — the pilot links what
+  actually sold via "Link Past Sale" (a picker over cached wallet
+  transactions), "Watch Open Order" (tracks one of the pilot's own open sell
+  orders' `volume_remain` directly), or a "Manual / Private Sale" entry for a
   disposal ESI has no record of at all. Each linked sale or watched order is
   its own synced record, never a field on the run itself, so two devices
   linking different sales to the same run can never collide.

@@ -22,6 +22,8 @@ import {
 } from './productionLogFilter';
 import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
 import { ProductionRunStatusChip } from './ProductionRunStatusChip';
+import { SaleLinkingModals, SoldSplitButton } from './SaleLinkingControls';
+import { useSaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { formatPercent } from './format';
@@ -110,7 +112,8 @@ function ProductionLogDateRange({
 interface RunRow {
   summary: ProductionRunSummary;
   itemName: string;
-  planName: string;
+  /** Whether the run's own Build Plan still exists — a run outlives a deleted plan (locked financial record), so this gates the row-click navigation rather than a display column. */
+  planExists: boolean;
 }
 
 /**
@@ -150,6 +153,8 @@ export function ProductionLogPanel({
       [characterId]
     ) ?? [];
 
+  const sale = useSaleLinking(characterId, saleLinks, orderWatches);
+
   if (runs.length === 0) {
     return (
       <Panel title={t('industry.productionLog')}>
@@ -162,7 +167,7 @@ export function ProductionLogPanel({
     );
   }
 
-  const planNameById = new Map(plans.map((p) => [p.id, p.name]));
+  const planIds = new Set(plans.map((p) => p.id));
   const filteredRuns = filterProductionRunsByDate(runs, filter);
   const summaries = filteredRuns.map((run) =>
     summarizeProductionRun(run, saleLinks, orderWatches, skills)
@@ -268,7 +273,7 @@ export function ProductionLogPanel({
       itemName:
         catalog.byProductTypeID.get(summary.run.productTypeID)?.productName ??
         `#${summary.run.productTypeID}`,
-      planName: planNameById.get(summary.run.buildPlanId) ?? summary.run.buildPlanId,
+      planExists: planIds.has(summary.run.buildPlanId),
     }))
     .sort((a, b) => b.summary.run.loggedAt - a.summary.run.loggedAt);
 
@@ -286,13 +291,6 @@ export function ProductionLogPanel({
       header: t('industry.productionRunColumnItem'),
       sortValue: (r) => r.itemName,
       render: (r) => r.itemName,
-    },
-    {
-      id: 'plan',
-      header: t('industry.productionRunColumnPlan'),
-      className: 'text-text-dim',
-      sortValue: (r) => r.planName,
-      render: (r) => r.planName,
     },
     {
       id: 'quantity',
@@ -334,6 +332,26 @@ export function ProductionLogPanel({
       align: 'right',
       sortValue: (r) => r.summary.status,
       render: (r) => <ProductionRunStatusChip status={r.summary.status} />,
+    },
+    {
+      id: 'actions',
+      header: '',
+      align: 'right',
+      render: (r) => (
+        <SoldSplitButton
+          onSold={() => void sale.openPicker(r.summary.run.id, r.summary.run.productTypeID, 'sale')}
+          onWatch={() =>
+            void sale.openPicker(r.summary.run.id, r.summary.run.productTypeID, 'watch')
+          }
+          onManual={() => sale.openManualSale(r.summary.run.id)}
+          onRefresh={
+            r.summary.orderWatches.some((w) => !w.closed)
+              ? () => void sale.refreshWatches(r.summary.run.id)
+              : undefined
+          }
+          refreshing={sale.refreshingRunId === r.summary.run.id}
+        />
+      ),
     },
   ];
 
@@ -386,7 +404,13 @@ export function ProductionLogPanel({
             label={t('industry.allProductionRuns')}
             density="compact"
             className="mb-5"
-            onRowClick={onOpenRun ? (r) => onOpenRun(r.summary.run.buildPlanId) : undefined}
+            // Only navigates when the run's own Build Plan still exists — a
+            // logged run is a locked financial record that outlives a
+            // deleted plan (see planSync.ts's markBuildPlanDeleted), so a
+            // click here has nowhere left to jump to.
+            onRowClick={
+              onOpenRun ? (r) => r.planExists && onOpenRun(r.summary.run.buildPlanId) : undefined
+            }
           />
 
           <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -401,6 +425,8 @@ export function ProductionLogPanel({
           />
         </>
       )}
+
+      <SaleLinkingModals sale={sale} />
     </Panel>
   );
 }

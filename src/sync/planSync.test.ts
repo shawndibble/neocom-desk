@@ -874,15 +874,16 @@ describe('triggerSync: build plans', () => {
     expect(tombstones?.value).toEqual([]);
   });
 
-  it('markBuildPlanDeleted cascades to every Production Run logged against the plan, and their own sale links', async () => {
+  it("markBuildPlanDeleted leaves the plan's logged Production Runs and sale links alone — a locked financial record outlives the plan", async () => {
     await db.buildPlans.put(buildPlan());
     await db.productionRuns.put(productionRun());
     await db.productionSaleLinks.put(productionSaleLink());
 
     await markBuildPlanDeleted(1, 'b1');
 
-    expect(await db.productionRuns.get('run-1')).toBeUndefined();
-    expect(await db.productionSaleLinks.get('1:txn:1001')).toBeUndefined();
+    expect(await db.buildPlans.get('b1')).toBeUndefined();
+    expect(await db.productionRuns.get('run-1')).toBeDefined();
+    expect(await db.productionSaleLinks.get('1:txn:1001')).toBeDefined();
   });
 
   it('a remote tombstone deletes the local build plan', async () => {
