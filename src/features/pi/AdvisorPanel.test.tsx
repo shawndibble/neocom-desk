@@ -445,11 +445,89 @@ describe('AdvisorPanel', () => {
   });
 
   it('does not push an upgrade off a skill level it had to assume', async () => {
+    // Structurally this is also guaranteed — `maxColonyBudget` reports level 0
+    // when it had to assume, and no colony's `upgrade_level` is below zero —
+    // so this asserts the behaviour rather than the branch. The explicit
+    // `!ceiling.assumed` guard beside it states the intent for the next reader
+    // and survives a change to either of those two facts.
     loadCommandCenterUpgrades.mockResolvedValue(null);
     renderPanel();
     const card = (await screen.findByText('Ashab III')).closest('div')
       ?.parentElement as HTMLElement;
     expect(within(card).queryByText(/allows/)).not.toBeInTheDocument();
+  });
+
+  it('explains why nothing fits instead of printing a remainder beside “budget is spent”', async () => {
+    // A full colony used to read "Nothing — the budget is spent." with
+    // "13,226 tf and 448 MW free." directly beneath it, and a sentence about
+    // what "each count" pays for when there were no counts. The remainder is
+    // worth printing, but only attached to the thing it fails to buy.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [],
+                routes: [],
+                pins: [
+                  { pin_id: 1, type_id: LAUNCHPAD, latitude: 0, longitude: 0 },
+                  ...Array.from({ length: 20 }, (_, i) => ({
+                    pin_id: i + 2,
+                    type_id: BASIC,
+                    latitude: 0,
+                    longitude: 0,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  })),
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+    // 7,600 tf and 16,700 MW drawn of 21,315 / 17,000 — so 13,715 tf spare and
+    // 300 MW, against a High-Tech plant's 400 MW, the closest thing to fitting.
+    const line = await screen.findByText(/Nothing fits/);
+    expect(line).toHaveTextContent('13,715 tf and 300 MW free');
+    expect(line).toHaveTextContent('high-tech plant');
+    expect(screen.queryByText(/Each count pays/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Any one of those/)).not.toBeInTheDocument();
+  });
+
+  it('does not tell a pilot whose skills never loaded to abandon a colony', async () => {
+    // `planetSlots(null)` is one slot and `assumed`. Read as fact it tells a
+    // pilot at Interplanetary Consolidation V — five free slots — to abandon a
+    // colony. Same rule as the Command Center ceiling: an assumed figure may
+    // be shown, never acted on.
+    loadInterplanetaryConsolidation.mockResolvedValue(null);
+    renderPanel();
+    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
+    expect(within(card).queryByText(/No colony slot free/)).not.toBeInTheDocument();
+  });
+
+  it('prices the next Command Center level, not the whole jump to the ceiling', async () => {
+    // Each level is its own ISK purchase. A level-2 colony under a level-V
+    // pilot was told "upgrading this colony adds 13,279 tf and 7,000 MW",
+    // which is three purchases described as one.
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [{ ...colony(40_000_001, 'temperate'), upgrade_level: 2 }],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    renderPanel();
+    const card = (await screen.findByText('Ashab III')).closest('div')
+      ?.parentElement as HTMLElement;
+    // Level 2 is 12,136 / 12,000 and level 3 is 17,215 / 15,000.
+    expect(within(card).getByText(/5,079 tf and 3,000 MW/)).toBeInTheDocument();
+    expect(within(card).queryByText(/13,279/)).not.toBeInTheDocument();
   });
 
   it('charges for links, and still states headroom (#440)', async () => {

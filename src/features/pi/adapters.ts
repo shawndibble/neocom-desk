@@ -9,7 +9,7 @@ import type { PlanetPin } from '@/esi/endpoints';
 import type { ExtractorProgram, PinCounts, PinLoad } from '@/engine/pi/types';
 import type { PiData, PiPinKind } from '@/sde/types';
 import { pinsLoad } from '@/engine/pi/pinBudget';
-import { linksLoad, type LinkGeometry } from '@/engine/pi/linkCost';
+import { linksLoad, newLinkLoad, type LinkGeometry } from '@/engine/pi/linkCost';
 import type { PlanetLink } from '@/esi/endpoints';
 
 export type PinRole = 'extractor' | 'factory' | 'other';
@@ -140,22 +140,21 @@ export interface ColonyPinLoad {
    */
   linkLoad: PinLoad | null;
   /**
-   * What *one* of this colony's links costs, averaged over the ones that could
-   * be priced — the price of a link the colony has not built yet.
+   * What a link this colony has **not built yet** would cost: its own longest
+   * existing hop, priced at link level 0. See `engine/pi/linkCost.ts`'s
+   * `newLinkLoad` for why the longest rather than the average, and why level 0.
    *
    * A pin that does not exist has no place on the planet, so the distance term
-   * `linkCost.ts` needs cannot be computed for it; but it will need a link all
-   * the same, and quoting it at its unlinked price promises room that is not
-   * there. This colony's own links are the only measurement of what a link
-   * *here* costs, and a planet's links are the one cost that varies by two
-   * orders of magnitude between colonies, so a shared constant would be worse
-   * than useless.
+   * cannot be computed for it; but it will need a link all the same, and
+   * quoting it at its unlinked price promises room that is not there. A
+   * planet's links are the one cost that varies by two orders of magnitude
+   * between colonies, so a shared constant would be worse than useless.
    *
    * Null on a colony with no priceable link, which is not the same as a colony
-   * whose links are free: there is simply nothing to average, and a caller
+   * whose links are free: there is simply nothing to measure, and a caller
    * must say "unpriced" rather than charge zero.
    */
-  meanLinkLoad: PinLoad | null;
+  newLinkLoad: PinLoad | null;
   /** How many links the colony has, whether or not they could be costed. */
   linkCount: number;
   /**
@@ -229,14 +228,11 @@ export function colonyPinLoad(
       ? linksLoad(geometry, planetRadiusKm, pi.infrastructure.link)
       : null;
 
-  // Divided by the links that were actually priced, never by `links.length`:
-  // a link whose far end is not in the pin list contributes nothing to the
-  // total above, and counting it in the divisor would quote a mean cheaper
-  // than any link on the planet.
-  const meanLinkLoad =
-    linkLoad !== null && geometry.length > 0
-      ? { cpu: linkLoad.cpu / geometry.length, powergrid: linkLoad.powergrid / geometry.length }
-      : null;
+  // Over the links that could actually be priced, never over `links.length`: a
+  // link whose far end is not in the pin list has no geometry, so it is not a
+  // hop this colony can be measured by.
+  const newLink =
+    planetRadiusKm !== null ? newLinkLoad(geometry, planetRadiusKm, pi.infrastructure.link) : null;
 
   return {
     counts,
@@ -245,7 +241,7 @@ export function colonyPinLoad(
       ? { cpu: pinLoad.cpu + linkLoad.cpu, powergrid: pinLoad.powergrid + linkLoad.powergrid }
       : pinLoad,
     linkLoad,
-    meanLinkLoad,
+    newLinkLoad: newLink,
     linkCount: links.length,
     unknownTypeIds,
   };

@@ -74,7 +74,12 @@ import {
 } from '@/features/character/systemSecurity';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterPlanets, loadAllColonyDetails } from './data';
-import { loadCommandCenterUpgrades, maxColonyBudget, type MaxColonyBudget } from './colonyBudget';
+import {
+  colonyBudget,
+  loadCommandCenterUpgrades,
+  maxColonyBudget,
+  type MaxColonyBudget,
+} from './colonyBudget';
 import {
   loadInterplanetaryConsolidation,
   planetSlots,
@@ -111,6 +116,47 @@ const HEADROOM_KINDS: readonly PiPinKind[] = [
  * would actually build.
  */
 const HEADROOM_EXTRACTOR_HEADS = EXTRACTOR_HEADS_MAX;
+
+/**
+ * The pin this colony came nearest to affording, and what it would have cost
+ * with the link it needs.
+ *
+ * "The budget is spent" is true and unhelpful: a colony with 13,715 tf and
+ * 300 MW free has not spent its budget, it is 100 MW short of one High-Tech
+ * plant. Nearness is measured as the fraction of the pin the remainder covers
+ * on its tighter axis, so the answer is the pin a pilot is closest to being
+ * able to place rather than merely the cheapest one.
+ *
+ * Null when no kind can be measured that way — a payload with no pin costs at
+ * all — rather than naming an arbitrary one.
+ */
+function nearestPin(
+  freeCpu: number,
+  freePowergrid: number,
+  pi: PiData,
+  newLinkCost: PinLoad | null
+): { kind: PiPinKind; cost: PinLoad } | null {
+  let best: { kind: PiPinKind; cost: PinLoad; fraction: number } | null = null;
+  for (const kind of HEADROOM_KINDS) {
+    const spec = pi.infrastructure.pins[kind];
+    if (!spec) continue;
+    const heads = kind === 'extractorControlUnit' ? HEADROOM_EXTRACTOR_HEADS : 0;
+    const cost = {
+      cpu: spec.cpu + pi.infrastructure.extractorHead.cpu * heads + (newLinkCost?.cpu ?? 0),
+      powergrid:
+        spec.powergrid +
+        pi.infrastructure.extractorHead.powergrid * heads +
+        (newLinkCost?.powergrid ?? 0),
+    };
+    if (cost.cpu <= 0 && cost.powergrid <= 0) continue;
+    const fraction = Math.min(
+      cost.cpu > 0 ? freeCpu / cost.cpu : Infinity,
+      cost.powergrid > 0 ? freePowergrid / cost.powergrid : Infinity
+    );
+    if (!best || fraction > best.fraction) best = { kind, cost, fraction };
+  }
+  return best ? { kind: best.kind, cost: best.cost } : null;
+}
 
 /** Stable identities, so an unranked planet's card does not remount every render. */
 const EMPTY_ORDER: readonly number[] = [];
@@ -534,7 +580,7 @@ function BuiltCard({
   // distance-based — so the only honest price for one the colony has not built
   // is what its own links cost on average. Null when there is none to average,
   // which the card says rather than charging zero.
-  const newLinkCost = colony.pinLoad.meanLinkLoad;
+  const newLinkCost = colony.pinLoad.newLinkLoad;
   const headroom = useMemo(
     () =>
       spareCapacity(colony.pinLoad.load, budget, pi.infrastructure, {
@@ -546,6 +592,16 @@ function BuiltCard({
   const room = HEADROOM_KINDS.filter((kind) => (headroom[kind] ?? 0) > 0);
   const freeCpu = Math.max(0, budget.cpu - colony.pinLoad.load.cpu);
   const freePowergrid = Math.max(0, budget.powergrid - colony.pinLoad.load.powergrid);
+  // What a colony with no room came nearest to affording, link included — the
+  // actionable half of "nothing fits", since the answer is nearly always one
+  // axis a few hundred MW short of one specific pin.
+  const closest = useMemo(
+    () => nearestPin(freeCpu, freePowergrid, pi, newLinkCost),
+    [freeCpu, freePowergrid, pi, newLinkCost]
+  );
+  // The next Command Center level, not the pilot's ceiling: levels are bought
+  // one at a time, for ISK, per colony.
+  const nextLevel = colonyBudget(colony.upgradeLevel + 1, pi);
 
   return (
     <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType}>
@@ -645,20 +701,39 @@ function BuiltCard({
           ) : (
             <>
               <CardLine label={t('piAdvisor.roomForLabel')}>
-                {room.length === 0 ? (
-                  <span className="text-text-dim">{t('piAdvisor.roomForNothing')}</span>
-                ) : (
-                  <span className="text-text-dim">
-                    {room
-                      .map((kind) =>
-                        t('piAdvisor.roomForItem', {
-                          count: headroom[kind],
-                          pin: t(`piAdvisor.pinKind.${kind}`),
+                <span className="text-text-dim">
+                  {room.length === 0
+                    ? /*
+                        A full colony used to say only "the budget is spent",
+                        with the remainder printed underneath as a separate
+                        sentence — 62% of the CPU budget unspent beside a claim
+                        that it was gone, and a note about what "each count"
+                        pays for when there were no counts. The remainder is
+                        worth having, but only next to the thing it fails to
+                        buy: what actually stops a pilot is one axis being 100
+                        MW short of one pin.
+                      */
+                      closest
+                      ? t('piAdvisor.roomForNothing', {
+                          cpu: Math.round(freeCpu).toLocaleString(),
+                          powergrid: Math.round(freePowergrid).toLocaleString(),
+                          pin: t(`piAdvisor.pinKind.${closest.kind}`),
+                          pinCpu: Math.round(closest.cost.cpu).toLocaleString(),
+                          pinPowergrid: Math.round(closest.cost.powergrid).toLocaleString(),
                         })
-                      )
-                      .join(' · ')}
-                  </span>
-                )}
+                      : t('piAdvisor.roomForNothingUnpriced', {
+                          cpu: Math.round(freeCpu).toLocaleString(),
+                          powergrid: Math.round(freePowergrid).toLocaleString(),
+                        })
+                    : room
+                        .map((kind) =>
+                          t('piAdvisor.roomForItem', {
+                            count: headroom[kind],
+                            pin: t(`piAdvisor.pinKind.${kind}`),
+                          })
+                        )
+                        .join(' · ')}
+                </span>
               </CardLine>
               {/*
                 The counts above are independent per kind — what the leftover
@@ -667,40 +742,52 @@ function BuiltCard({
                 first factory and found the colony full. The counts were
                 right; only this sentence was missing. The remainder they came
                 out of goes with it, so the arithmetic is checkable here rather
-                than only in the engine.
+                than only in the engine. Both are suppressed when nothing fits:
+                the sentence above already carries the remainder, and there is
+                no count for either to qualify.
               */}
-              <p className="text-[0.6875rem] text-text-dim">
-                {room.length > 1 ? `${t('piAdvisor.roomForAnyOne')} ` : ''}
-                {t('piAdvisor.roomForFree', {
-                  cpu: Math.round(freeCpu).toLocaleString(),
-                  powergrid: Math.round(freePowergrid).toLocaleString(),
-                })}
-              </p>
-              <p className="text-[0.6875rem] text-text-dim">
-                {newLinkCost
-                  ? t('piAdvisor.roomForLinkCharged', {
-                      cpu: Math.round(newLinkCost.cpu).toLocaleString(),
-                      powergrid: Math.round(newLinkCost.powergrid).toLocaleString(),
-                    })
-                  : t('piAdvisor.roomForLinkUnmeasured')}
-              </p>
+              {room.length > 0 && (
+                <>
+                  <p className="text-[0.6875rem] text-text-dim">
+                    {room.length > 1 ? `${t('piAdvisor.roomForAnyOne')} ` : ''}
+                    {t('piAdvisor.roomForFree', {
+                      cpu: Math.round(freeCpu).toLocaleString(),
+                      powergrid: Math.round(freePowergrid).toLocaleString(),
+                    })}
+                  </p>
+                  <p className="text-[0.6875rem] text-text-dim">
+                    {newLinkCost
+                      ? t('piAdvisor.roomForLinkCharged', {
+                          cpu: Math.round(newLinkCost.cpu).toLocaleString(),
+                          powergrid: Math.round(newLinkCost.powergrid).toLocaleString(),
+                        })
+                      : t('piAdvisor.roomForLinkUnmeasured')}
+                  </p>
+                </>
+              )}
             </>
           )}
 
           {/*
             Powergrid is what binds nearly every colony, and on a pilot whose
-            skill has outrun their Command Centers there is a whole level of it
-            sitting behind an ISK purchase. Only ever said off a *trained*
-            ceiling: pushing an upgrade at a pilot on an assumed level 0 would
-            be advice derived from missing data.
+            skill has outrun their Command Centers there is a level of it
+            sitting behind an ISK purchase. The *next* level, not the jump to
+            the ceiling: each level is bought separately, so quoting the whole
+            distance would describe three purchases as one.
+
+            Only ever said off a trained ceiling. That guard is also structural
+            — `maxColonyBudget` reports level 0 when it had to assume — but it
+            is written out because the reason is not visible from here.
           */}
           {!ceiling.assumed && colony.upgradeLevel < ceiling.level && (
             <p className="text-[0.6875rem] text-accent">
               {t('piAdvisor.upgradeAvailable', {
                 level: colony.upgradeLevel,
                 max: ceiling.level,
-                cpu: Math.round(ceiling.budget.cpu - budget.cpu).toLocaleString(),
-                powergrid: Math.round(ceiling.budget.powergrid - budget.powergrid).toLocaleString(),
+                cpu: Math.round(nextLevel.budget.cpu - budget.cpu).toLocaleString(),
+                powergrid: Math.round(
+                  nextLevel.budget.powergrid - budget.powergrid
+                ).toLocaleString(),
               })}
             </p>
           )}
@@ -734,7 +821,11 @@ function UnbuiltCard({
   // still takes input, and the pilot may be deciding which colony to move.
   // But a card that says "could extract" to someone with nowhere to put a
   // Command Center is advice they cannot act on until they say so.
-  const noSlotFree = colonyCount >= slots.slots;
+  // Never off an assumed cap. `planetSlots(null)` is one slot, and read as
+  // fact it tells a pilot at Interplanetary Consolidation V — five free slots
+  // — to abandon a colony. Same rule the Command Center ceiling follows: an
+  // assumed figure may be shown, never acted on.
+  const noSlotFree = !slots.assumed && colonyCount >= slots.slots;
   const localResources = advice.localResources.map((resource) => resource.typeID);
   const nameByType = new Map(advice.localResources.map((r) => [r.typeID, r.name]));
 

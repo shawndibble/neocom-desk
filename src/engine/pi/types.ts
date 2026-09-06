@@ -247,6 +247,16 @@ export interface FitColonyOptions {
    * default, because guessing it silently mis-sizes every planet.
    */
   headsPerExtractor: number;
+  /**
+   * What one link costs on this colony, charged once for **every pin in a
+   * block**. Nothing on a planet is reachable without a link, so a layout
+   * fitted without them is a layout that cannot be built.
+   *
+   * Omitted means *unpriced*, not free: a caller with no colony to measure a
+   * link on — an unbuilt planet — has no honest figure and owes its reader the
+   * caveat instead. Derive it with `engine/pi/linkCost.ts`'s `newLinkLoad`.
+   */
+  newLinkCost?: PinLoad;
 }
 
 export interface ColonyFit {

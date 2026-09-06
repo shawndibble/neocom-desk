@@ -295,9 +295,20 @@ function axisFit(
   if (cost.cpu <= 0 && cost.powergrid <= 0) {
     throw new Error(`${what} draws no CPU and no Powergrid, so nothing bounds how many fit`);
   }
-  if (!Number.isFinite(plus.cpu) || !Number.isFinite(plus.powergrid)) {
+  // A surcharge is something charged *on top*, so a negative one is caller
+  // error rather than a discount — and it is the shape that reaches the one
+  // answer this function may never give. A cost of 200 tf / 800 MW under a
+  // surcharge of minus the same zeroes both divisors, and `Infinity` repeats
+  // scale the pin counts to `NaN`. Rejected on `plus` rather than only on the
+  // sum, so the message names the input that is wrong.
+  if (
+    !Number.isFinite(plus.cpu) ||
+    !Number.isFinite(plus.powergrid) ||
+    plus.cpu < 0 ||
+    plus.powergrid < 0
+  ) {
     throw new Error(
-      `the surcharge on ${what} must be a finite CPU and Powergrid figure, got ${plus.cpu} tf / ${plus.powergrid} MW`
+      `the surcharge on ${what} must be a finite, non-negative CPU and Powergrid figure, got ${plus.cpu} tf / ${plus.powergrid} MW`
     );
   }
 
@@ -339,7 +350,7 @@ function merge(...sets: PinCounts[]): PinCounts {
  * and the fix is a Command Center Upgrades level, not fewer factories.
  */
 export function fitColony(opts: FitColonyOptions): ColonyFit {
-  const { budget, infrastructure, overhead, block, headsPerExtractor } = opts;
+  const { budget, infrastructure, overhead, block, headsPerExtractor, newLinkCost } = opts;
   if (
     !Number.isInteger(headsPerExtractor) ||
     headsPerExtractor < 0 ||
@@ -394,6 +405,14 @@ export function fitColony(opts: FitColonyOptions): ColonyFit {
   const blockLoad = pinsLoad(block, infrastructure, {
     extractorHeads: (block.extractorControlUnit ?? 0) * headsPerExtractor,
   });
+  // Every pin in the block needs its own link, so the surcharge scales with
+  // the block's pin count rather than being charged once per block. The
+  // overhead is not charged: those pins are the colony's existing Launchpad
+  // and Storage, whose links are already in the load a caller subtracted from
+  // the budget it passed.
+  const blockLinkCost = newLinkCost
+    ? { cpu: newLinkCost.cpu * blockPinCount, powergrid: newLinkCost.powergrid * blockPinCount }
+    : { cpu: 0, powergrid: 0 };
   // `axisFit` owns what an unbounded or unusable axis means, so a block priced
   // at nothing and a pin kind priced at nothing get the same answer here and
   // in `spareCapacity`. A non-finite overhead cost lands here too, since a
@@ -401,16 +420,24 @@ export function fitColony(opts: FitColonyOptions): ColonyFit {
   const { blocks, limitedBy } = axisFit(
     { cpu: cpuLeft, powergrid: powergridLeft },
     blockLoad,
-    'this ratio block'
+    'this ratio block',
+    blockLinkCost
   );
 
   const pins = merge(overheadPins, scale(block, blocks));
+  const pinLoad = pinsLoad(pins, infrastructure, {
+    extractorHeads: (pins.extractorControlUnit ?? 0) * headsPerExtractor,
+  });
   return {
     blocks,
     pins,
-    used: pinsLoad(pins, infrastructure, {
-      extractorHeads: (pins.extractorControlUnit ?? 0) * headsPerExtractor,
-    }),
+    // The links this layout adds are part of what it draws, or `used` would
+    // read as fitting inside a budget the fit itself just refused to put
+    // another block in.
+    used: {
+      cpu: pinLoad.cpu + blockLinkCost.cpu * blocks,
+      powergrid: pinLoad.powergrid + blockLinkCost.powergrid * blocks,
+    },
     budget,
     limitedBy,
   };
@@ -574,6 +601,8 @@ export interface PlanColonyOptions extends ChainBlockOptions, ThroughputOptions 
   infrastructure: PiInfrastructure;
   overhead: FitColonyOptions['overhead'];
   headsPerExtractor: number;
+  /** Passed straight to `fitColony`; see `FitColonyOptions`. */
+  newLinkCost?: PinLoad;
 }
 
 export type PlanColonyResult =
@@ -628,6 +657,7 @@ export function planColony(typeId: number, pi: PiData, opts: PlanColonyOptions):
     overhead: opts.overhead,
     block: sized.pins,
     headsPerExtractor: opts.headsPerExtractor,
+    ...(opts.newLinkCost ? { newLinkCost: opts.newLinkCost } : {}),
   });
   if (fit.blocks <= 0) return { status: 'does-not-fit', chain, block: sized.pins, fit };
 

@@ -91,6 +91,12 @@ export interface StopTierOptions {
   taxRate: number;
   linkCapacityPerHour: ThroughputOptions['linkCapacityPerHour'];
   bufferHours: ThroughputOptions['bufferHours'];
+  /**
+   * What one link costs on this colony, charged per pin of every layout fitted
+   * here — see `FitColonyOptions`. Omitted means unpriced, which is the only
+   * honest answer for a planet with no colony on it to measure one from.
+   */
+  newLinkCost?: PinLoad;
 }
 
 /**
@@ -312,6 +318,7 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
     infrastructure: opts.infrastructure,
     overhead: opts.overhead,
     headsPerExtractor: opts.headsPerExtractor,
+    ...(opts.newLinkCost ? { newLinkCost: opts.newLinkCost } : {}),
     sourcingFloor: 'P0',
     extractionRatePerHour: opts.extractionRatePerHour,
     linkCapacityPerHour: opts.linkCapacityPerHour,
@@ -423,6 +430,7 @@ export function recommendStopTier(opts: StopTierOptions, pi: PiData): StopTierAd
     overhead: opts.overhead,
     block: { extractorControlUnit: 1 },
     headsPerExtractor: opts.headsPerExtractor,
+    ...(opts.newLinkCost ? { newLinkCost: opts.newLinkCost } : {}),
   });
   const rawEntries = pi.raw
     .filter((resource) => local.has(resource.typeID))

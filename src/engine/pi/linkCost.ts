@@ -102,3 +102,44 @@ export function linksLoad(
   }
   return { cpu, powergrid };
 }
+
+/**
+ * What a link this colony has **not built yet** would cost — the price of
+ * reaching a pin that does not exist.
+ *
+ * Two decisions, both of which the obvious implementation gets wrong:
+ *
+ * **The longest hop, not the average.** Where a new pin would go is the
+ * pilot's choice and unknowable here, so the statistic is a policy rather than
+ * a measurement, and `colonyBudget.ts` states which way that policy has to
+ * fall: overstating headroom is "the one direction the Advisor must not err
+ * in". A mean is under the true cost for roughly half of all placements; the
+ * colony's own longest existing hop is a measured number that makes a headroom
+ * count a floor — what will fit — instead of a coin flip.
+ *
+ * **Level 0, whatever the colony's own links are.** A link you have not built
+ * is un-upgraded, so the level modifiers are not applied here even though
+ * `linksLoad` applies them to the links that exist. Carrying them in would
+ * quote a price no new link pays, and would do it through the one term in this
+ * module flagged above as unverified.
+ *
+ * Null rather than zero when there is nothing to measure or no usable radius:
+ * a new pin still needs a link, and a caller without a price for one owes the
+ * reader that, exactly as `colonyPinLoad` does for the links already standing.
+ */
+export function newLinkLoad(
+  links: readonly LinkGeometry[],
+  radiusKm: number,
+  spec: PiLinkSpec
+): PinLoad | null {
+  if (!Number.isFinite(radiusKm) || radiusKm <= 0 || links.length === 0) return null;
+
+  let longestKm = 0;
+  for (const link of links) {
+    longestKm = Math.max(longestKm, greatCircleKm(link.a, link.b, radiusKm));
+  }
+  return {
+    cpu: spec.cpu + spec.cpuPerKm * longestKm,
+    powergrid: spec.powergrid + spec.powergridPerKm * longestKm,
+  };
+}

@@ -278,6 +278,41 @@ describe('fitColony', () => {
     expect(fit.budget).toEqual(LEVEL_4);
   });
 
+  it('charges every pin in a block for the link it will need', () => {
+    // The same omission `spareCapacity` was fixed for, one line up the card:
+    // "Build up to" fitted a layout whose pins reach nothing, while "Room for"
+    // directly above it charged each new pin a link. Two adjacent numbers on
+    // one card must not disagree about whether links exist.
+    //
+    // The ratio block is five pins — 1 advanced, 2 basic, 2 ECU — drawing
+    // 14,100 MW against the 16,300 left once the overhead launchpad is paid.
+    // One block fits. Charge each of those five pins a 500 MW link and the
+    // block is 16,600 MW, which does not: the charge has to scale with the
+    // pins in a block, not be levied once per block.
+    const bare = fitColony(options);
+    const linked = fitColony({ ...options, newLinkCost: { cpu: 0, powergrid: 500 } });
+    expect(bare.blocks).toBe(1);
+    expect(linked.blocks).toBe(0);
+
+    // And the links a layout adds are part of what it draws, or `used` would
+    // report a layout as fitting inside a budget the fit just refused it.
+    const roomy = fitColony({
+      ...options,
+      block: { launchpad: 1 },
+      overhead: { launchpads: 0, storageFacilities: 0 },
+      newLinkCost: { cpu: 0, powergrid: 100 },
+    });
+    // CPU binds at 21,315 / 3,600 = 5 launchpads; each carries a 100 MW link.
+    expect(roomy.blocks).toBe(5);
+    expect(roomy.used.powergrid).toBe(5 * 700 + 5 * 100);
+  });
+
+  it('leaves the fit unchanged when no link cost is supplied', () => {
+    // Omitted means unpriced, not free — the same reading `spareCapacity`
+    // takes — so an existing caller's answer must not move.
+    expect(fitColony({ ...options, newLinkCost: undefined })).toEqual(fitColony(options));
+  });
+
   it('is CPU-limited when the block is launchpad-heavy rather than extractor-heavy', () => {
     const fit = fitColony({
       ...options,
@@ -715,13 +750,37 @@ describe('spareCapacity', () => {
         newLinkCost: { cpu: 100, powergrid: 300 },
       }
     );
-    // 2,200 MW left. A basic factory and its link is 1,100 MW, so two fit
-    // (2,200) where two unlinked ones left 600 MW spare.
-    expect(spare.basic).toBe(2);
-    // An advanced factory is 700 + 300 = 1,000 MW: two, down from three.
+    // 2,200 MW left, and only the counts that separate all three readings —
+    // unlinked, one link for the whole batch, one link per pin — are worth
+    // asserting. A Basic factory is not one of them: 2,200/800 = 2 unlinked,
+    // 1,900/800 = 2 shared and 2,200/1,100 = 2 per pin all agree, so it is
+    // deliberately left out rather than looking like evidence.
+    // Advanced 700 MW: 3 unlinked, 2 shared, 2 per pin.
     expect(spare.advanced).toBe(2);
-    // A High-Tech plant is 400 + 300 = 700 MW: three, down from five.
+    // High-Tech 400 MW: 5 unlinked, 4 shared, 3 per pin — the one count that
+    // tells a per-pin charge from a shared one.
     expect(spare.highTech).toBe(3);
+  });
+
+  it('refuses a surcharge that cancels a pin’s own cost out', () => {
+    // `axisFit` may not answer "unbounded": `Infinity` repeats scale the pin
+    // counts to `NaN`. The payload cannot express a negative link cost, but
+    // `newLinkCost` is public API on an exported engine function, and a
+    // surcharge of minus one Basic factory zeroes the divisor and reaches
+    // exactly that.
+    expect(() =>
+      spareCapacity({ cpu: 0, powergrid: 0 }, LEVEL_4, FIXTURE_INFRASTRUCTURE, {
+        newLinkCost: { cpu: -200, powergrid: -800 },
+      })
+    ).toThrowError(/surcharge/);
+  });
+
+  it('refuses a non-finite surcharge, for the same reason', () => {
+    expect(() =>
+      spareCapacity({ cpu: 0, powergrid: 0 }, LEVEL_4, FIXTURE_INFRASTRUCTURE, {
+        newLinkCost: { cpu: Number.POSITIVE_INFINITY, powergrid: 10 },
+      })
+    ).toThrowError(/surcharge/);
   });
 
   it('charges no link when the caller has no measured one to charge', () => {
