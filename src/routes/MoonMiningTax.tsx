@@ -32,6 +32,7 @@ import {
 import {
   allMembers,
   flatten,
+  formatDateRange,
   type DisplayRow,
   type GroupMember,
 } from '@/features/miningTax/groupRows';
@@ -103,6 +104,23 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
   ]);
   const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);
   return { ...result, entries: result.rows, systemNames, systemSecurity, typeNames, unitPrices };
+}
+
+/**
+ * Flips one member of a multi-select filter. Every member selected, or none,
+ * both read as "don't filter" — with a single Payee (or character) the only
+ * possible toggle otherwise left an empty set, an empty table, and "0
+ * payee(s)".
+ */
+function toggleFilterMember<T>(
+  previous: ReadonlySet<T> | 'all',
+  member: T,
+  universe: readonly T[]
+): ReadonlySet<T> | 'all' {
+  const next = previous === 'all' ? new Set(universe) : new Set(previous);
+  if (next.has(member)) next.delete(member);
+  else next.add(member);
+  return next.size === universe.length || next.size === 0 ? 'all' : next;
 }
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
@@ -196,7 +214,6 @@ export function MoonMiningTax() {
   const visibleBalances = showSettled ? balances : owedBalances;
   const settledCount = balances.length - owedBalances.length;
   const owedTotal = owedBalances.reduce((sum, b) => sum + b.owed, 0);
-  const owedPayeeCount = owedBalances.length;
   const unassigned = useMemo(
     () => summarizeUnassigned(characterFiltered, estimatedValueOf),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -218,34 +235,31 @@ export function MoonMiningTax() {
   }
 
   function toggleCharacter(characterId: number) {
-    setCharacterFilter((previous) => {
-      const base =
-        previous === 'all' ? new Set(characters.map((c) => c.characterId)) : new Set(previous);
-      if (base.has(characterId)) base.delete(characterId);
-      else base.add(characterId);
-      return base.size === characters.length ? 'all' : base;
-    });
+    setCharacterFilter((previous) =>
+      toggleFilterMember(
+        previous,
+        characterId,
+        characters.map((c) => c.characterId)
+      )
+    );
   }
 
   function togglePayee(payeeId: string) {
-    setPayeeFilter((previous) => {
-      const base = previous === 'all' ? new Set(allPayees.map((p) => p.id)) : new Set(previous);
-      if (base.has(payeeId)) base.delete(payeeId);
-      else base.add(payeeId);
-      // Every Payee, or none: both mean "don't filter". With a single Payee
-      // the only possible toggle used to leave an empty set, which showed an
-      // empty table and "Owed to 0 payees".
-      return base.size === allPayees.length || base.size === 0 ? 'all' : base;
-    });
+    setPayeeFilter((previous) =>
+      toggleFilterMember(
+        previous,
+        payeeId,
+        allPayees.map((p) => p.id)
+      )
+    );
   }
+
+  const isSolePayeeFilter = (payeeId: string) =>
+    payeeFilter !== 'all' && payeeFilter.size === 1 && payeeFilter.has(payeeId);
 
   /** A balance card's name doubles as "show me just this Payee's entries" — the filter the card's own figure came from. */
   function filterToPayee(payeeId: string) {
-    setPayeeFilter((previous) =>
-      previous !== 'all' && previous.size === 1 && previous.has(payeeId)
-        ? 'all'
-        : new Set([payeeId])
-    );
+    setPayeeFilter(isSolePayeeFilter(payeeId) ? 'all' : new Set([payeeId]));
   }
 
   /** "Pay them in one lump sum": every Outstanding Assignment behind one balance card, straight into Settle up. */
@@ -335,8 +349,7 @@ export function MoonMiningTax() {
   }
 
   function dateLabel(dr: DisplayRow): string {
-    const dates = dateRangeOf(dr);
-    return dates.length > 1 ? `${dates[0]} – ${dates[dates.length - 1]}` : dates[0];
+    return formatDateRange(dateRangeOf(dr));
   }
 
   /**
@@ -735,10 +748,10 @@ export function MoonMiningTax() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('miningTax.balancesLabel')} ·{' '}
-                {owedPayeeCount > 0
+                {owedBalances.length > 0
                   ? t('miningTax.balancesAcross', {
                       amount: formatIsk(owedTotal, 2),
-                      count: owedPayeeCount,
+                      count: owedBalances.length,
                     })
                   : t('miningTax.balancesNothing')}
               </p>
@@ -762,11 +775,7 @@ export function MoonMiningTax() {
                         type="button"
                         onClick={() => filterToPayee(balance.payee.id)}
                         aria-label={t('miningTax.filterToPayee', { payee: balance.payee.name })}
-                        aria-pressed={
-                          payeeFilter !== 'all' &&
-                          payeeFilter.size === 1 &&
-                          payeeFilter.has(balance.payee.id)
-                        }
+                        aria-pressed={isSolePayeeFilter(balance.payee.id)}
                         className="min-w-0 truncate text-left text-sm font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent aria-pressed:text-accent"
                       >
                         {balance.payee.name}
@@ -1021,7 +1030,7 @@ export function MoonMiningTax() {
 
       {splitTarget && splitTarget.assignment && data && (
         <SplitDialog
-          open={splitTarget !== null}
+          open
           onClose={() => setSplitTarget(null)}
           assignment={splitTarget.assignment}
           row={splitTarget.row}
@@ -1060,7 +1069,7 @@ export function MoonMiningTax() {
 
       {settleUpRows && data && (
         <SettleUpDialog
-          open={settleUpRows !== null}
+          open
           onClose={() => setSettleUpRows(null)}
           rows={settleUpRows}
           systemNames={data.systemNames}

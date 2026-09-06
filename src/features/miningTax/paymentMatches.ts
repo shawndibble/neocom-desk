@@ -6,6 +6,7 @@
  * already caches for the paying character(s).
  */
 import type { WalletJournalEntry } from '@/esi/endpoints';
+import { DAY_MS } from '@/lib/age';
 
 /** ESI `ref_type`s that move ISK from the pilot to another party by hand: a direct donation, or paying a contract. */
 export const PAYMENT_REF_TYPES: ReadonlySet<string> = new Set([
@@ -15,14 +16,10 @@ export const PAYMENT_REF_TYPES: ReadonlySet<string> = new Set([
   'contract_deposit',
 ]);
 
-const DAY_MS = 24 * 60 * 60_000;
-
-export interface PaymentCandidateOptions {
-  now: Date;
-  /** How far back to look. */
-  days?: number;
-  limit?: number;
-}
+/** How far back a payment is worth offering — a settle-up is recorded within days of paying, not months. */
+const LOOKBACK_DAYS = 30;
+/** Enough to find the right entry without the list becoming a second wallet journal. */
+const MAX_CANDIDATES = 8;
 
 /** True when `entry` is within half a percent (or one ISK, whichever is larger) of `amount`. */
 export function amountMatches(entry: WalletJournalEntry, amount: number): boolean {
@@ -33,9 +30,9 @@ export function amountMatches(entry: WalletJournalEntry, amount: number): boolea
 export function findPaymentCandidates(
   entries: readonly WalletJournalEntry[],
   amount: number,
-  { now, days = 30, limit = 8 }: PaymentCandidateOptions
+  now: Date
 ): WalletJournalEntry[] {
-  const cutoff = now.getTime() - days * DAY_MS;
+  const cutoff = now.getTime() - LOOKBACK_DAYS * DAY_MS;
   return entries
     .filter(
       (entry) =>
@@ -49,5 +46,5 @@ export function findPaymentCandidates(
       const matchB = amountMatches(b, amount) ? 0 : 1;
       return matchA - matchB || b.date.localeCompare(a.date);
     })
-    .slice(0, limit);
+    .slice(0, MAX_CANDIDATES);
 }

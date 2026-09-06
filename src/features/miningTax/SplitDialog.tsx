@@ -78,12 +78,9 @@ export function SplitDialog({
     [...moves].map(([typeId, quantity]) => ({ typeId, quantity }))
   );
   const pctValue = Number(taxPct);
+  const safePct = Number.isFinite(pctValue) ? pctValue : 0;
   const keptValue = computeAssignmentValue(keptLines, unitPrices, assignment.taxPct);
-  const newValue = computeAssignmentValue(
-    movedLines,
-    unitPrices,
-    Number.isFinite(pctValue) ? pctValue : 0
-  );
+  const newValue = computeAssignmentValue(movedLines, unitPrices, safePct);
   const movedUnits = movedLines.reduce((sum, line) => sum + line.quantity, 0);
 
   const canSplit =
@@ -135,7 +132,7 @@ export function SplitDialog({
       title={t('miningTax.splitTitle', { date: row.entry.date, system: systemName })}
     >
       <div className="space-y-3 text-sm">
-        <p className="text-xs text-text-dim">{t('miningTax.splitHint')}</p>
+        <p className="text-xs text-text-dim">{t('miningTax.splitDialogHint')}</p>
 
         {otherPayees.length === 0 ? (
           <p className="text-xs text-text-dim">{t('miningTax.splitNoOtherPayeeHint')}</p>
@@ -285,7 +282,7 @@ export function SplitDialog({
             <p className="tabular-nums">
               {formatIsk(newValue.estimatedValue, 2)} ISK ·{' '}
               <span className="text-isk-neg">{formatIsk(newValue.taxOwed, 2)} ISK</span>{' '}
-              {t('miningTax.splitAtPct', { pct: Number.isFinite(pctValue) ? pctValue : 0 })}
+              {t('miningTax.splitAtPct', { pct: safePct })}
             </p>
           </div>
         </div>

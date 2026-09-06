@@ -8,7 +8,7 @@ import {
   db,
   type MiningTaxAssignmentRecord,
   type MiningTaxOreLine,
-  type MiningTaxPaymentMethod,
+  type MiningTaxPaymentInfo,
 } from '@/db';
 import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
@@ -194,15 +194,8 @@ export async function joinAssignments(
   return records;
 }
 
-export interface PaymentInput {
-  /** Local calendar date the pilot paid, `YYYY-MM-DD`. */
-  paidOn: string;
-  method: MiningTaxPaymentMethod;
-  /** The lump sum actually sent in game — whole ISK, since the transfer field takes no fractions — so it matches the journal entry it may be linked to. */
-  amount: number;
-  journalRefId?: number;
-  contractId?: number;
-}
+/** Everything about a settle-up but the shared id, which `markAssignmentsPaid` mints. `amount` is the whole-ISK figure actually sent in game, so it matches the journal entry it may be linked to. */
+export type PaymentInput = Omit<MiningTaxPaymentInfo, 'paymentId'>;
 
 /**
  * Marks several Assignments paid at once — the itemized Settle-up dialog
@@ -221,16 +214,10 @@ export async function markAssignmentsPaid(
 ): Promise<void> {
   if (assignments.length === 0) return;
   const now = Date.now();
-  const paymentInfo = payment
-    ? {
-        paymentId: crypto.randomUUID(),
-        paidOn: payment.paidOn,
-        method: payment.method,
-        amount: payment.amount,
-        ...(payment.journalRefId !== undefined ? { journalRefId: payment.journalRefId } : {}),
-        ...(payment.contractId !== undefined ? { contractId: payment.contractId } : {}),
-      }
-    : undefined;
+  const paymentInfo: MiningTaxPaymentInfo | undefined = payment && {
+    paymentId: crypto.randomUUID(),
+    ...payment,
+  };
   const updated = assignments.map((a): MiningTaxAssignmentRecord => ({
     ...a,
     status: 'paid',
@@ -328,8 +315,8 @@ export async function deleteAssignment(assignment: MiningTaxAssignmentRecord): P
  * Payee who genuinely already covered part of the new total is a one-click
  * "mark paid" away from being square again.
  *
- * `siblings` (every Assignment covering this entry, this one included)
- * decides how much of the fresh entry it re-snapshots to: a sole Assignment
+ * `siblings` (every Assignment covering this entry — this one included, or
+ * it re-snapshots to nothing) decides how much of the fresh entry it re-snapshots to: a sole Assignment
  * claims the whole entry, including any brand-new ore type; on a split entry
  * only the growth collector grows (`engine/miningTax/ownership.ts`).
  */
@@ -338,11 +325,7 @@ export async function resolveNeedsReview(
   freshEntry: MiningLedgerEntry,
   siblings: readonly MiningTaxAssignmentRecord[]
 ): Promise<void> {
-  const relevantFresh = linesOwnedBy(
-    freshEntry.oreLines,
-    siblings.some((s) => s.id === assignment.id) ? siblings : [...siblings, assignment],
-    assignment.id
-  );
+  const relevantFresh = linesOwnedBy(freshEntry.oreLines, siblings, assignment.id);
   const prices = await loadJitaUnitPrices(relevantFresh.map((line) => line.typeId));
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,

@@ -62,13 +62,8 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
     // unmount-while-open too.
     const trigger = document.activeElement;
     if (!dialog.open) dialog.showModal();
-    // A native dialog does not lock the page behind it: on a phone, a scroll
-    // that starts over the sheet chains straight into the page underneath.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
 
     return () => {
-      document.body.style.overflow = previousOverflow;
       if (dialog.open) dialog.close();
       if (trigger instanceof HTMLElement) trigger.focus();
     };
@@ -122,10 +117,14 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
               onClick={onClose}
             />
           </header>
+          {/* `overscroll-contain` plus the `body:has(dialog[open])` rule in
+              index.css: a native dialog does not lock the page behind it, so
+              on a phone a scroll that starts over the sheet would otherwise
+              chain straight into the page underneath. */}
           <div
             ref={bodyRef}
             tabIndex={-1}
-            className="min-h-0 flex-1 overflow-y-auto p-3 outline-none"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none"
           >
             <PortalContainerProvider value={portalContainer}>{children}</PortalContainerProvider>
           </div>

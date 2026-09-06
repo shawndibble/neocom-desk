@@ -777,7 +777,7 @@
     "unassignAction": "Unassign",
     "splitAction": "Split",
     "splitTitle": "Split — {{date}} — {{system}}",
-    "splitHint": "One EVE day can hold two of your local sessions at different moons. Move part of this day's ore to a second Payee, then choose which side collects any ore ESI reports for this day later.",
+    "splitDialogHint": "One EVE day can hold two of your local sessions at different moons. Move part of this day's ore to a second Payee, then choose which side collects any ore ESI reports for this day later.",
     "splitNoOtherPayeeHint": "Add a second Payee first, from Manage Payees, before splitting this entry.",
     "splitMoveToLabel": "Move part of this day to",
     "splitMovesColumn": "Moves",

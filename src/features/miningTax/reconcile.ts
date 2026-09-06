@@ -19,7 +19,7 @@
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { diffAssignedOreLines } from '@/engine/miningTax/needsReview';
-import { linesOwnedBy } from '@/engine/miningTax/ownership';
+import { computeOwnership, type Ownership } from '@/engine/miningTax/ownership';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
 
 function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityDiff[]): boolean {
@@ -48,23 +48,27 @@ export async function reconcileAssignments(
   const siblingsByKey = new Map<string, MiningTaxAssignmentRecord[]>();
   for (const a of assignments) {
     const key = `${a.date}:${a.solarSystemId}`;
-    siblingsByKey.set(key, [...(siblingsByKey.get(key) ?? []), a]);
+    let siblings = siblingsByKey.get(key);
+    if (!siblings) siblingsByKey.set(key, (siblings = []));
+    siblings.push(a);
+  }
+  // Ownership is a property of the entry, so it is worked out once per
+  // entry and read per Assignment, not recomputed for each sibling.
+  const ownershipByKey = new Map<string, Ownership>();
+  for (const [key, siblings] of siblingsByKey) {
+    const entry = freshByKey.get(key);
+    if (entry) ownershipByKey.set(key, computeOwnership(entry.oreLines, siblings));
   }
   const now = Date.now();
   const updates: MiningTaxAssignmentRecord[] = [];
 
   for (const assignment of assignments) {
     const key = `${assignment.date}:${assignment.solarSystemId}`;
-    const entry = freshByKey.get(key);
     // Absent from the fresh read means it aged out of ESI's 90-day retention
     // (or a character's grant lapsed this refresh) — leave the assignment as
     // it stands rather than treat "no fresh data" as "nothing was mined".
-    if (!entry) continue;
-    const relevantFresh = linesOwnedBy(
-      entry.oreLines,
-      siblingsByKey.get(key) ?? [assignment],
-      assignment.id
-    );
+    const relevantFresh = ownershipByKey.get(key)?.ownedLines.get(assignment.id);
+    if (!relevantFresh) continue;
     const diffs = diffAssignedOreLines(assignment.oreLines, relevantFresh);
     if (diffs.length === 0) continue;
     if (assignment.status === 'needs-review' && sameDiffs(assignment.reviewDiff, diffs)) continue;

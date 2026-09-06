@@ -29,11 +29,9 @@ export function linesOwnedBy(
   covering: readonly CoveringAssignment[],
   assignmentId: string
 ): OreLine[] {
-  const own = covering.find((c) => c.id === assignmentId);
-  return (
-    computeOwnership(entryLines, covering).ownedLines.get(assignmentId) ??
-    (own ? [...own.oreLines] : [])
-  );
+  // Every covering id is seeded into `ownedLines`, so a miss means the id
+  // simply isn't among `covering`.
+  return computeOwnership(entryLines, covering).ownedLines.get(assignmentId) ?? [];
 }
 
 /**
@@ -79,7 +77,7 @@ export function computeOwnership(
 
   const unassigned: OreLine[] = [];
   for (const line of entryLines) {
-    const claimants = covering.filter((c) => c.oreLines.some((l) => l.typeId === line.typeId));
+    const claimants = covering.filter((c) => ownedByType.get(c.id)!.has(line.typeId));
     const covered = claimants.reduce(
       (sum, c) => sum + (ownedByType.get(c.id)?.get(line.typeId) ?? 0),
       0

@@ -9,7 +9,9 @@ import { humanizeRefType } from '@/features/character/format';
 import { writeToClipboard } from '@/lib/clipboard';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
+import { formatLocalDate } from '@/lib/localDate';
 import { markAssignmentsPaid } from './assignments';
+import { formatDateRange } from './groupRows';
 import { amountMatches, findPaymentCandidates } from './paymentMatches';
 
 export interface SettleUpRow {
@@ -32,14 +34,6 @@ type Step = 1 | 2 | 3;
 type CopyTarget = 'amount' | 'recipient' | 'reason';
 const METHODS: readonly MiningTaxPaymentMethod[] = ['donation', 'contract', 'other'];
 
-/** Today as a local `YYYY-MM-DD` — the date the pilot paid, in their own calendar, not EVE's. */
-function localIsoDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 /**
  * Settle up (issue #523's lump-sum payment flow, replacing the one-click
  * bulk-pay confirmation): (1) the itemized entries with tick/untick and a
@@ -54,7 +48,8 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>(1);
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
-  const [paidOn, setPaidOn] = useState(() => localIsoDate(new Date()));
+  // The date the pilot paid, in their own calendar — a local date, not an EVE one.
+  const [paidOn, setPaidOn] = useState(() => formatLocalDate(new Date()));
   const [method, setMethod] = useState<MiningTaxPaymentMethod>('donation');
   const [contractId, setContractId] = useState('');
   const [journalRefId, setJournalRefId] = useState<number | null>(null);
@@ -74,13 +69,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
     payeeNames.length === 1
       ? payeeNames[0]
       : t('miningTax.settleUpSeveralPayees', { count: payeeNames.length });
-  const dates = included.map((r) => r.assignment.date).sort();
-  const dateRange =
-    dates.length === 0
-      ? ''
-      : dates[0] === dates[dates.length - 1]
-        ? dates[0]
-        : `${dates[0]} → ${dates[dates.length - 1]}`;
+  const dateRange = formatDateRange(included.map((r) => r.assignment.date).sort());
   const systemName = (solarSystemId: number) =>
     systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
   const systems = [...new Set(included.map((r) => systemName(r.assignment.solarSystemId)))];
@@ -98,7 +87,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
     void Promise.all(characterIds.map((id) => loadWalletJournal(id))).then((results) => {
       if (cancelled) return;
       const entries = results.flatMap((result) => result?.data ?? []);
-      setCandidates(findPaymentCandidates(entries, amountToSend, { now: new Date() }));
+      setCandidates(findPaymentCandidates(entries, amountToSend, new Date()));
     });
     return () => {
       cancelled = true;
