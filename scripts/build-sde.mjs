@@ -25,6 +25,7 @@ const FILES = [
   'dgmAttributeTypes.csv',
   'dgmAttributeCategories.csv',
   'eveUnits.csv',
+  'invTypeMaterials.csv',
   'industryActivity.csv',
   'industryActivityMaterials.csv',
   'industryActivityProducts.csv',
@@ -437,6 +438,10 @@ async function main() {
         description: r[h.description] ?? '',
         groupID: Number(r[h.groupID]),
         volume: num(r[h.volume]) ?? 0,
+        // Units that must be reprocessed together. `invTypeMaterials`
+        // quantities are per portion, not per unit, so nothing can price a
+        // refine without this (issue #537).
+        portionSize: num(r[h.portionSize]) ?? 1,
         // What the type holds, not what it takes up: a Launchpad's 10,000 m3
         // and a Storage Facility's 12,000 are the colony's whole buffer.
         capacity: num(r[h.capacity]) ?? 0,
@@ -598,11 +603,50 @@ async function main() {
     };
   }
 
+  // --- reprocessing.json: typeID -> what refining it returns (issue #537) ---
+  //
+  // Restricted to PUBLISHED types that carry a market group: the one caller is
+  // the "reprocess and sell the materials" comparison on an open market order,
+  // and every type such an order can name is in that set. `invTypeMaterials`
+  // covers most of the item universe, so baking it whole would multiply this
+  // payload for rows nothing can reach.
+  //
+  // `quantity` is per `portionSize` units, NOT per unit — the field rides
+  // along in each entry so a consumer cannot read the quantities without it.
+  const reprocessing = {};
+  {
+    const rows = raw['invTypeMaterials.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const typeID = Number(r[h.typeID]);
+      const t = types.get(typeID);
+      if (!t || !t.published || t.marketGroupID === null) continue;
+      const quantity = Number(r[h.quantity]);
+      if (!(quantity > 0)) continue;
+      let entry = reprocessing[typeID];
+      if (!entry) {
+        entry = { portionSize: t.portionSize, materials: [] };
+        reprocessing[typeID] = entry;
+      }
+      entry.materials.push({ typeID: Number(r[h.materialTypeID]), quantity });
+    }
+    for (const entry of Object.values(reprocessing)) {
+      entry.materials.sort((a, b) => a.typeID - b.typeID);
+    }
+  }
+
   // --- types.json: every referenced typeID -> {name, groupID, volume} ---
   const referenced = new Set();
   for (const s of skills) {
     referenced.add(s.typeID);
     for (const p of s.prereqs) referenced.add(p.skillTypeID);
+  }
+  // Material names and volumes for the refine comparison; the items
+  // themselves are already referenced by whatever blueprint makes them, and
+  // a market row carries its own name.
+  for (const entry of Object.values(reprocessing)) {
+    for (const m of entry.materials) referenced.add(m.typeID);
   }
   for (const [typeID, bp] of Object.entries(blueprints)) {
     referenced.add(Number(typeID));
@@ -1274,6 +1318,7 @@ async function main() {
   const outputs = [
     ['skills.json', skills],
     ['blueprints.json', blueprints],
+    ['reprocessing.json', reprocessing],
     ['types.json', typeMap],
     ['pi.json', pi],
     // Its own file, not folded into pi.json: it is one entry per planet in New

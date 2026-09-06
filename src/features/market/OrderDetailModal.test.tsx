@@ -18,7 +18,13 @@ function historyPoint(daysAgo: number, volume: number) {
   };
 }
 
-const SKILLS: CharacterSkills = { accountingLevel: 5, brokerRelationsLevel: 5 };
+const SKILLS: CharacterSkills = {
+  accountingLevel: 5,
+  brokerRelationsLevel: 5,
+  reprocessingLevel: 0,
+  reprocessingEfficiencyLevel: 0,
+  scrapmetalProcessingLevel: 0,
+};
 
 const BASE_ROW: OpenOrderRow = {
   orderId: 101,
@@ -304,7 +310,11 @@ describe('OrderDetailModal', () => {
     // fixture above), so the sum is actually checked rather than eyeballed —
     // unitCost + salesTax(relist) + brokerFee(relist) === relist by
     // construction (breakEvenPrice solves for exactly that revenue).
-    const skills: CharacterSkills = { accountingLevel: 3, brokerRelationsLevel: 2 };
+    const skills: CharacterSkills = {
+      ...SKILLS,
+      accountingLevel: 3,
+      brokerRelationsLevel: 2,
+    };
     const unitCost = 437.5;
     const floor = orderFloor({
       unitCost,
@@ -613,6 +623,61 @@ describe('OrderDetailModal', () => {
         deep: { competitors, truncated: true, fetchedAt: Date.now() },
       });
       expect(screen.queryByText(/Rank \d+ of/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('reprocess and sell the materials', () => {
+    /** 10 units refine into 1,000 Tritanium at 100%; the assumed 50% station halves it. */
+    const REPROCESSING = {
+      entry: { portionSize: 10, materials: [{ typeID: 34, quantity: 1000 }] },
+      skills: {
+        reprocessingLevel: 0,
+        reprocessingEfficiencyLevel: 0,
+        specialisationLevel: 0,
+      },
+      materialPrices: { 34: 2 },
+    };
+    const FLOORED_ROW: OpenOrderRow = { ...BASE_ROW, floor: { relist: 400, fill: 380 } };
+
+    it('stays greyed as not built until the refining data has loaded', () => {
+      renderModal({ row: FLOORED_ROW });
+
+      const row = screen.getByText('Reprocess and sell the minerals').closest('p')!;
+      expect(row).toHaveTextContent('not built yet');
+    });
+
+    it('prices the refine and names the assumptions behind it', () => {
+      renderModal({ row: FLOORED_ROW, reprocessing: REPROCESSING });
+
+      // 10 units -> 500 Tritanium at 2 ISK = 1,000 over 10 units = 100 a unit.
+      expect(
+        screen.getByText('Reprocess and sell the materials, 100.00 a unit')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Assumes a 50% station and no station tax, valued against the buy orders here.'
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Reprocess and sell the minerals')).not.toBeInTheDocument();
+    });
+
+    it('says how much stock is short of a whole refining batch', () => {
+      renderModal({ row: { ...FLOORED_ROW, volumeRemain: 23 }, reprocessing: REPROCESSING });
+
+      expect(
+        screen.getByText('3 units are short of a full refining batch and return nothing.')
+      ).toBeInTheDocument();
+    });
+
+    it('warns that the total is a floor when a material has no buy order here', () => {
+      renderModal({
+        row: FLOORED_ROW,
+        reprocessing: { ...REPROCESSING, materialPrices: {} },
+      });
+
+      expect(
+        screen.getByText('At least one material has no buy order here, so this total is a floor.')
+      ).toBeInTheDocument();
     });
   });
 });

@@ -56,6 +56,32 @@ export interface TypeInfo {
   volume: number;
 }
 
+/** One material a type reprocesses into, per `portionSize` units of it. */
+export interface ReprocessingMaterial {
+  typeID: number;
+  quantity: number;
+}
+
+export interface ReprocessingType {
+  /**
+   * Units that reprocess together. The quantities below are per PORTION, not
+   * per unit, so a part portion refines into nothing at all — which is why
+   * this rides inside the entry rather than sitting in `types.json`, where it
+   * could be read apart from the quantities it governs (issue #537).
+   */
+  portionSize: number;
+  materials: ReprocessingMaterial[];
+}
+
+/**
+ * public/data/reprocessing.json: typeID -> what refining it returns.
+ *
+ * Only published types carrying a market group are baked — the one caller is
+ * the "reprocess and sell the materials" comparison on an open market order,
+ * and every type such an order can name is in that set.
+ */
+export type ReprocessingMap = Record<string, ReprocessingType>;
+
 /** public/data/types.json: typeID -> TypeInfo */
 export type TypeMap = Record<string, TypeInfo>;
 
