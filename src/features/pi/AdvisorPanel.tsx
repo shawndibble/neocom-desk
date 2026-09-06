@@ -51,6 +51,8 @@ import {
   StatChip,
   TextInput,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { buttonClassName } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { formatIsk } from '@/lib/isk';
 import { loadPi, loadPiPlanetRadius } from '@/sde/loadSde';
@@ -60,9 +62,9 @@ import { loadPlanPrices } from './planPrices';
 import { clearPlanetRichness, scheduleSync, setPlanetRichness, setSyncedSetting } from '@/sync';
 import { ResourcePicker } from './ResourcePicker';
 import { assumedExtractionRate, type AssumedRate } from './richnessEstimate';
-import type { PiData } from '@/sde/types';
+import type { PiData, PiPinKind } from '@/sde/types';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetType } from '@/esi/endpoints';
-import type { PinLoad } from '@/engine/pi/types';
+import type { PinCounts, PinLoad } from '@/engine/pi/types';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import {
   loadSystemName,
@@ -187,8 +189,8 @@ interface Snapshot {
    * schematic output. One call for the whole payload, not one per card: the
    * set is fixed at about eighty types whatever the character owns, so this is
    * a constant, not a fan-out that grows with the system. A type the hub does
-   * not quote is absent, never zero — both `estimateUnbuiltPlanet` and
-   * `recommendStopTier` refuse rather than pricing at nothing.
+   * not quote is absent, never zero — `recommendStopTier` refuses rather than
+   * pricing at nothing.
    */
   prices: Record<number, number>;
   /**
@@ -512,22 +514,14 @@ function DetailsButton({ name, onClick }: { name: string; onClick: () => void })
       onClick={onClick}
       aria-label={t('piAdvisor.detailsLabel', { name })}
       aria-haspopup="dialog"
-      className="inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 rounded-xs border border-line-bright px-2 text-[0.6875rem] font-semibold tracking-wide text-accent uppercase hover:border-accent-dim hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent"
+      // The shared control scale, not a hand-written height: this sits in a
+      // card footer beside nothing, but it is still a tap target and
+      // `controlHeightClassName` is what gives it the 44px touch tier
+      // (DESIGN.md §3).
+      className={buttonClassName({ size: 'sm', variant: 'ghost' })}
     >
       {t('piAdvisor.detailsAction')}
-      <svg
-        aria-hidden="true"
-        width="13"
-        height="13"
-        viewBox="0 0 16 16"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M6 3.5 10.5 8 6 12.5" />
-      </svg>
+      <Icon.Descend aria-hidden="true" size={Icon.ICON_SIZE.sm} />
     </button>
   );
 }
@@ -843,6 +837,29 @@ function UnbuiltCard({
  * caveat beside it — the rule the whole tab follows. A caveat is easy to miss;
  * an absent number is not.
  */
+/**
+ * The pins a fitted layout is built from, in build order.
+ *
+ * Production pins only. The Launchpad and any Storage Facility are overhead
+ * every colony carries whatever it makes, so naming them here would pad the
+ * one line on the card that has to stay scannable — `buildPlanBasis` carries
+ * the rest.
+ */
+const LAYOUT_KINDS: readonly PiPinKind[] = [
+  'extractorControlUnit',
+  'basic',
+  'advanced',
+  'highTech',
+];
+
+function layoutLabel(pins: PinCounts, t: TFunction): string {
+  return LAYOUT_KINDS.filter((kind) => (pins[kind] ?? 0) > 0)
+    .map((kind) =>
+      t('piAdvisor.layoutPin', { count: pins[kind], pin: t(`piAdvisor.pinKind.${kind}`) })
+    )
+    .join(' → ');
+}
+
 function UnbuiltPlanLines({ plan }: { plan: UnbuiltPlanAdvice }) {
   const { t } = useTranslation();
   if (plan.status !== 'advised') {
@@ -868,9 +885,11 @@ function UnbuiltPlanLines({ plan }: { plan: UnbuiltPlanAdvice }) {
         value={t('piAdvisor.aboutValue', { isk: formatIsk(best.marginPerHour) })}
         unit={t('piAdvisor.perHourUnit')}
       >
-        {best.tier === 0
-          ? t('piAdvisor.directiveBuildRaw', { name: best.name })
-          : t('piAdvisor.directiveBuildMake', { name: best.name, tier: best.tier })}
+        {t(best.tier === 0 ? 'piAdvisor.directiveBuildRaw' : 'piAdvisor.directiveBuildMake', {
+          layout: layoutLabel(best.pins, t),
+          name: best.name,
+          tier: best.tier,
+        })}
       </DirectiveRow>
       <p className="text-[0.6875rem] text-text-faint">
         {t('piAdvisor.buildPlanBasis', {
@@ -1036,6 +1055,15 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   // repaint the whole tab's margins immediately, and a `setState` in an effect
   // keyed on the snapshot would drop one made while a reload was in flight.
   const [customsEdits, setCustomsEdits] = useState<CustomsOverrides | null>(null);
+  // What is actually in the box, while it is being typed.
+  //
+  // Rendering `customsRatePercent(rate)` straight into `value` made decimals
+  // unreachable: after "12", typing "." parses back to 12, the prop never
+  // changes, and React restores "12" — so `step={0.5}` invited a precision the
+  // control silently refused. Held per system, so switching systems shows that
+  // system's own figure rather than the last one typed. `PlanPanel` holds its
+  // rate the same way.
+  const [customsText, setCustomsText] = useState<{ systemId: number; text: string } | null>(null);
   const customsOverrides = customsEdits ?? snapshot?.customsOverrides ?? EMPTY_CUSTOMS;
 
   const writeCustoms = useCallback(
@@ -1320,14 +1348,20 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 inputMode="decimal"
                 aria-label={t('piAdvisor.customsRate')}
                 className="w-20"
-                value={String(customsRatePercent(activeRate))}
+                value={
+                  customsText?.systemId === activeSystem.systemId
+                    ? customsText.text
+                    : String(customsRatePercent(activeRate))
+                }
                 onChange={(event) => {
-                  const percent = Number(event.target.value);
-                  // An empty or half-typed field is not an edit yet — writing
+                  const { value } = event.target;
+                  setCustomsText({ systemId: activeSystem.systemId, text: value });
+                  const percent = Number(value);
+                  // An empty or half-typed field is shown but not stored — a
                   // NaN would declare the system tax-free until the pilot
-                  // noticed. `withCustomsOverride` refuses it; this keeps the
-                  // control from looking like it accepted one.
-                  if (event.target.value === '' || !Number.isFinite(percent)) return;
+                  // noticed. `withCustomsOverride` refuses it too; this stops
+                  // the control from looking like it accepted one.
+                  if (value === '' || !Number.isFinite(percent)) return;
                   writeCustoms(
                     withCustomsOverride(customsOverrides, activeSystem.systemId, percent / 100)
                   );
@@ -1337,10 +1371,13 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               {customsEdited && (
                 <button
                   type="button"
-                  onClick={() =>
-                    writeCustoms(withoutCustomsOverride(customsOverrides, activeSystem.systemId))
-                  }
-                  className="h-6 cursor-pointer px-1.5 text-[0.6875rem] text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+                  onClick={() => {
+                    // The typed text has to go too, or the box would keep
+                    // showing the override the pilot just cleared.
+                    setCustomsText(null);
+                    writeCustoms(withoutCustomsOverride(customsOverrides, activeSystem.systemId));
+                  }}
+                  className={buttonClassName({ size: 'sm', variant: 'ghost' })}
                 >
                   {t('piAdvisor.customsRateReset')}
                 </button>

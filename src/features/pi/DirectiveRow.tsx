@@ -32,6 +32,7 @@
  */
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import * as Icon from '@/components/ui/icons';
 
 /** What an instruction does. The set is closed; the colour carries the meaning. */
 export type DirectiveVerb = 'add' | 'remove' | 'swap' | 'rebuild' | 'asIs' | 'build';
@@ -41,17 +42,23 @@ const VERB_CLASS: Record<DirectiveVerb, string> = {
   build: 'border-accent/45 bg-accent/10 text-accent',
   swap: 'border-accent/45 bg-accent/10 text-accent',
   remove: 'border-warning/45 bg-warning/10 text-warning',
-  rebuild: 'border-line-bright text-text-faint',
-  asIs: 'border-line-bright text-text-faint',
+  // Outlined: a course of action the pilot could take, and a real one.
+  rebuild: 'border-line-bright text-text-dim',
+  // Flat and borderless, because it is not an action at all. It shared
+  // `rebuild`'s outline once, which left the two rows differing only in their
+  // wording — the exact collapse this verb exists to prevent.
+  asIs: 'border-transparent bg-panel-2 text-text-faint',
 };
 
 /** How the right-hand number reads: ISK earned, budget freed, or a quiet projection. */
-export type DirectiveTone = 'gain' | 'freed' | 'quiet';
+export type DirectiveTone = 'gain' | 'freed' | 'quiet' | 'muted';
 
 const TONE_CLASS: Record<DirectiveTone, string> = {
   gain: 'text-isk-pos',
   freed: 'text-warning',
   quiet: 'text-text-dim',
+  /** For a row that asks for nothing: the figure is a comparison, not a prize. */
+  muted: 'text-text-faint',
 };
 
 export function VerbTag({ verb }: { verb: DirectiveVerb }) {
@@ -113,14 +120,16 @@ export function DirectiveRow({
 /** Where an input comes from — a link, a customs boundary, or a shopping trip. */
 export type InputSource = 'local' | 'routed' | 'bought';
 
-const CHECK = 'M3 8.5l3.2 3.2L13 5';
-const ARROW = 'M2.5 8h7M6.8 5.2 9.6 8l-2.8 2.8M13 3v10';
-const BAG = 'M3.6 5.6h8.8l-.75 7.9H4.35zM6.1 5.6V4.2a1.9 1.9 0 0 1 3.8 0v1.4';
-
-const SOURCE_ICON: Record<InputSource, string> = {
-  local: CHECK,
-  routed: ARROW,
-  bought: BAG,
+/**
+ * One glyph per source, from the shared set — never hand-rolled paths.
+ * `icons.tsx` is what pins the weight and the rem-based sizing (DESIGN.md §5),
+ * and three inline SVGs at three different stroke widths is exactly the drift
+ * that rule exists to stop.
+ */
+const SOURCE_ICON: Record<InputSource, typeof Icon.Done> = {
+  local: Icon.Done,
+  routed: Icon.Route,
+  bought: Icon.Buy,
 };
 
 const SOURCE_ICON_CLASS: Record<InputSource, string> = {
@@ -137,22 +146,14 @@ const SOURCE_ICON_CLASS: Record<InputSource, string> = {
  * in a way "already made here, just link it" at the end of a sentence does not.
  */
 export function InputChip({ source, children }: { source: InputSource; children: ReactNode }) {
+  const Glyph = SOURCE_ICON[source];
   return (
     <span className="inline-flex h-5 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-1.5 text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
-      <svg
+      <Glyph
         aria-hidden="true"
-        width="12"
-        height="12"
-        viewBox="0 0 16 16"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        size={Icon.ICON_SIZE.sm}
         className={`shrink-0 ${SOURCE_ICON_CLASS[source]}`}
-      >
-        <path d={SOURCE_ICON[source]} />
-      </svg>
+      />
       {children}
     </span>
   );

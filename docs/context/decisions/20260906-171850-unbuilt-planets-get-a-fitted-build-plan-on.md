@@ -13,8 +13,9 @@ _Recorded 2026-09-06._
   no control.
 
 - **The link cost is borrowed from the pilot's own colonies, never invented.**
-  `unbuiltPlanModel.medianNewLinkLoad` takes the median hop across their built
-  colonies — the middle entry by CPU, whole, since both axes scale with the
+  `unbuiltPlanModel.medianNewLinkLoad` takes the median across their built
+  colonies of each colony's own _longest_ hop (`newLinkLoad`, which is what a
+  colony charges for a pin it has not placed yet) — the middle entry by CPU, whole, since both axes scale with the
   same distance and a per-axis median would describe a hop none of their
   colonies has. Every pin of a fitted layout is charged that hop. With no
   colony to measure, `unbuiltPlanAdvice` returns `needs-link-cost` and the card

@@ -82,7 +82,7 @@ export interface UnbuiltPlanInput {
   /** Hub price per unit by typeID. A missing entry is unpriced, never zero. */
   prices: Readonly<Record<number, number>>;
   /** What a sale fetches — highest hub buy, falling back to the ask. */
-  revenuePrices?: Readonly<Record<number, number>>;
+  revenuePrices: Readonly<Record<number, number>>;
   taxRate: number;
 }
 
@@ -137,7 +137,7 @@ export function unbuiltPlanAdvice(input: UnbuiltPlanInput): UnbuiltPlanAdvice {
       newLinkCost: assumedLinkCost,
       extractionRatePerHour: rate.unitsPerHour,
       prices,
-      ...(input.revenuePrices ? { revenuePrices: input.revenuePrices } : {}),
+      revenuePrices: input.revenuePrices,
       taxRate,
       // Never guessed, same as the built colonies' line — the engine answers
       // `link-capacity-unknown` rather than picking a level.

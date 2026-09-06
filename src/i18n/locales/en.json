@@ -1477,10 +1477,8 @@
     "powergridUnit": "MW",
     "budgetBarLabel": "{{axis}} used",
     "budgetBarValue": "{{used}} / {{budget}} {{unit}}",
-    "extractingLabel": "Extracting",
     "unitsPerHour": "{{units}}/hr",
     "noMeasuredExtraction": "No extractor here reports a complete program, so this colony has no measured rate.",
-    "makingLabel": "Making",
     "facilityCount_one": "{{count}} facility",
     "facilityCount_other": "{{count}} facilities",
     "roomForItem": "{{count}}x {{pin}}",
@@ -1579,8 +1577,8 @@
     "directiveRebuildRaw": "Switch to extracting {{name}} and sell it raw",
     "directiveRebuildMake": "{{name}} (P{{tier}})",
     "directiveAsIs": "Already best — keep selling {{name}} raw",
-    "directiveBuildRaw": "Extract {{name}} and sell it raw",
-    "directiveBuildMake": "Build up to {{name}} (P{{tier}})",
+    "directiveBuildRaw": "{{layout}} → extract {{name}}, sell it raw",
+    "directiveBuildMake": "{{layout}} → {{name}} (P{{tier}})",
     "gainValue": "+{{isk}}",
     "aboutValue": "~{{isk}}",
     "perHourUnit": "/hr",
@@ -1621,13 +1619,14 @@
       "needs-link-cost": "No build plan: every pin needs a link, and with no colony of yours to measure a hop from there is no honest price for one.",
       "needs-skill": "No build plan: no skill data for this character yet, so their Command Center ceiling is assumed — and an assumed budget is never fitted against."
     },
-    "buildPlanBasis": "About {{units}} an hour of output, at your own colonies’ average extraction rate. This planet’s richness is not in ESI, so the figure moves with it.",
+    "buildPlanBasis": "About {{units}} an hour of output, plus a launchpad, at your own colonies’ average extraction rate. This planet’s richness is not in ESI, so the figure moves with it.",
     "networkCount_one": "{{count}} combination",
     "networkCount_other": "{{count}} combinations",
     "chipLocalOn": "{{name}} · made on {{host}}",
     "buyInputsNone": "None",
     "customsRateReset": "Reset",
-    "customsRateEdited": "Your own figure for this system, kept across your devices. Reset drops it back to the rate derived from the system’s security band and your Customs Code Expertise."
+    "customsRateEdited": "Your own figure for this system, kept across your devices. Reset drops it back to the rate derived from the system’s security band and your Customs Code Expertise.",
+    "layoutPin": "{{count}}× {{pin}}"
   },
   "employmentHistory": {
     "title": "Employment",

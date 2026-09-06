@@ -34,7 +34,8 @@ import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network'
 import type { PinLoad } from '@/engine/pi/types';
 import type { IdleFacilityPlan } from './colonyActionModel';
 import type { ColonyStopTierAdvice } from './stopTierModel';
-import { DirectiveRow, InputChip, SectionLabel } from './DirectiveRow';
+import { DirectiveRow, SectionLabel } from './DirectiveRow';
+import { inputChips } from './inputChips';
 import { CARD_DIRECTIVE_LIMIT, cappedRows } from './colonyPlan';
 
 const round = (value: number) => Math.round(value).toLocaleString();
@@ -52,60 +53,6 @@ export interface ColonyActionProps {
   planetNames: ReadonlyMap<number, string>;
   /** Who owns a planet, when it is not the reader's own — by planetId. */
   owners: ReadonlyMap<number, string>;
-}
-
-/**
- * One input as a chip. The icon carries the source, so the text can be just
- * the material and where it comes from.
- *
- * Naming the owner matters once alts are in the plan: "route in from Ashab IV"
- * is not an instruction the reader can act on if Ashab IV belongs to a
- * character they would have to log in as first.
- */
-function inputChip(
-  input: NetworkOpportunity['inputs'][number],
-  planetNames: ReadonlyMap<number, string>,
-  owners: ReadonlyMap<number, string>,
-  hub: TradeHub,
-  t: TFunction
-): ReactNode {
-  const units = round(input.unitsPerHour);
-  const key = `${input.typeId}-${input.fromPlanetId ?? 'hub'}`;
-  if (input.source === 'local') {
-    return (
-      <InputChip key={key} source="local">
-        {t('piAdvisor.chipLocal', { name: input.name })}
-      </InputChip>
-    );
-  }
-  if (input.source === 'bought') {
-    return (
-      <InputChip key={key} source="bought">
-        {t('piAdvisor.chipBuy', { units, name: input.name, hub: hub.systemName })}
-      </InputChip>
-    );
-  }
-  const planetId = input.fromPlanetId ?? -1;
-  const from = planetNames.get(planetId) ?? String(input.fromPlanetId ?? '');
-  const owner = owners.get(planetId);
-  return (
-    <InputChip key={key} source="routed">
-      {owner
-        ? t('piAdvisor.chipRouteAlt', { units, name: input.name, from, owner })
-        : t('piAdvisor.chipRoute', { units, name: input.name, from })}
-    </InputChip>
-  );
-}
-
-/** The chips for one opportunity, in the order its inputs are listed. */
-function inputChips(
-  line: NetworkOpportunity,
-  planetNames: ReadonlyMap<number, string>,
-  owners: ReadonlyMap<number, string>,
-  hub: TradeHub,
-  t: TFunction
-): ReactNode {
-  return line.inputs.map((input) => inputChip(input, planetNames, owners, hub, t));
 }
 
 function removeRow(entry: IdleFacilityPlan['lines'][number], t: TFunction) {
@@ -139,7 +86,7 @@ function addRow(
       verb="add"
       value={t('piAdvisor.gainValue', { isk: formatIsk(line.marginPerHour) })}
       unit={t('piAdvisor.perHourUnit')}
-      {...(withChips ? { chips: inputChips(line, planetNames, owners, hub, t) } : {})}
+      {...(withChips ? { chips: inputChips(line, { planetNames, owners, hub, t }) } : {})}
     >
       {t('piAdvisor.directiveAdd', {
         count: line.factories,
@@ -163,7 +110,7 @@ function swapRow(
       verb="swap"
       value={t('piAdvisor.gainValue', { isk: formatIsk(entry.netPerHour) })}
       unit={t('piAdvisor.perHourUnit')}
-      {...(withChips ? { chips: inputChips(entry.add, planetNames, owners, hub, t) } : {})}
+      {...(withChips ? { chips: inputChips(entry.add, { planetNames, owners, hub, t }) } : {})}
     >
       {t('piAdvisor.directiveSwap', {
         count: entry.removeCount,
@@ -176,38 +123,37 @@ function swapRow(
 }
 
 /** The card's instructions: at most `CARD_DIRECTIVE_LIMIT`, faults first. */
-export function ColonyDirectives(props: ColonyActionProps & { limit?: number }) {
+export function ColonyDirectives(props: ColonyActionProps) {
   const { t } = useTranslation();
-  const {
-    idle,
-    opportunities,
-    conversions,
-    planetNames,
-    owners,
-    hub,
-    limit = CARD_DIRECTIVE_LIMIT,
-  } = props;
+  const { idle, opportunities, conversions, planetNames, owners, hub } = props;
 
   const removals: { key: string; node: ReactNode }[] = (idle?.lines ?? []).map((entry) => ({
     key: `remove-${entry.line.typeId}`,
     node: removeRow(entry, t),
   }));
-  const gains: { key: string; node: ReactNode }[] = [
+  // Sorted across both kinds, not concatenated. `planNetwork` orders its
+  // opportunities and its conversions best-first but in two separate streams,
+  // so taking the head of a concatenation would hand the card an "add" worth
+  // less than a "swap" sitting right behind it — and the cap would then bury
+  // the better line under "1 more in Details".
+  const gains: { key: string; node: ReactNode; worth: number }[] = [
     ...opportunities.map((line) => ({
       key: `add-${line.typeId}`,
       node: addRow(line, planetNames, owners, hub, t),
+      worth: line.marginPerHour,
     })),
     ...conversions.map((entry) => ({
       key: `swap-${entry.removeFacility}-${entry.removeName}`,
       node: swapRow(entry, planetNames, owners, hub, t),
+      worth: entry.netPerHour,
     })),
-  ];
+  ].sort((a, b) => b.worth - a.worth);
 
   if (removals.length + gains.length === 0) {
     return <p className="text-[0.6875rem] text-text-dim">{t('piAdvisor.nothingToDo')}</p>;
   }
 
-  const shown = cappedRows(removals, gains, limit);
+  const shown = cappedRows(removals, gains, CARD_DIRECTIVE_LIMIT);
   const hidden = removals.length + gains.length - shown.length;
   return (
     <div className="space-y-2">
@@ -274,7 +220,7 @@ export function ColonyReasoning(props: ColonyActionProps) {
       key,
       node: (
         <p
-          className={`border-l-2 bg-panel-2 px-3 py-2 text-xs text-text-dim ${
+          className={`border-l bg-panel-2 px-3 py-2 text-xs text-text-dim ${
             accent ? 'border-accent-dim' : 'border-line-bright'
           }`}
         >
@@ -339,7 +285,7 @@ export function ColonyReasoning(props: ColonyActionProps) {
           <div className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1.5">
             <Why label={t('piAdvisor.inputsLabel')}>
               <div className="flex flex-wrap gap-1">
-                {inputChips(line, planetNames, owners, hub, t)}
+                {inputChips(line, { planetNames, owners, hub, t })}
               </div>
             </Why>
             <Why label={t('piAdvisor.earnsLabel')}>
@@ -396,7 +342,7 @@ export function ColonyReasoning(props: ColonyActionProps) {
             </Why>
             <Why label={t('piAdvisor.inputsLabel')}>
               <div className="flex flex-wrap gap-1">
-                {inputChips(entry.add, planetNames, owners, hub, t)}
+                {inputChips(entry.add, { planetNames, owners, hub, t })}
               </div>
             </Why>
             {haulIn > 0 && (
@@ -447,6 +393,27 @@ export function ColonyReasoning(props: ColonyActionProps) {
  *   figure below is what it *would* make, not what it makes.
  * - a made tier wins, which is also a rebuild.
  */
+/**
+ * Whether the colony is already doing what was recommended — extracting the
+ * winning ore and refining nothing.
+ *
+ * Derived once and shared by the row and its note: they used to compute it
+ * separately, which is two places for the `asIs`/`rebuild` distinction to
+ * drift apart, and that distinction is the whole point of the fourth verb.
+ */
+function isAlreadyBest(
+  result: ColonyStopTierAdvice,
+  extractedPerHour: readonly { typeId: number; unitsPerHour: number }[]
+): boolean {
+  if (result.status !== 'advised' || result.advice.kind !== 'recommended') return false;
+  const { best } = result.advice;
+  return (
+    best.tier === 0 &&
+    extractedPerHour.some((entry) => entry.typeId === best.typeId) &&
+    result.alreadyRunning
+  );
+}
+
 export function StopTierRow({
   result,
   extractedPerHour,
@@ -474,16 +441,14 @@ export function StopTierRow({
   }
 
   const { best } = result.advice;
-  const extractsBest =
-    best.tier === 0 && extractedPerHour.some((entry) => entry.typeId === best.typeId);
-  const alreadyBest = extractsBest && result.alreadyRunning;
+  const alreadyBest = isAlreadyBest(result, extractedPerHour);
 
   return (
     <DirectiveRow
       verb={alreadyBest ? 'asIs' : 'rebuild'}
       value={formatIsk(best.marginPerHour)}
       unit={t('piAdvisor.perHourUnit')}
-      valueTone="quiet"
+      valueTone={alreadyBest ? 'muted' : 'quiet'}
     >
       {best.tier === 0
         ? t(alreadyBest ? 'piAdvisor.directiveAsIs' : 'piAdvisor.directiveRebuildRaw', {
@@ -505,9 +470,7 @@ export function StopTierNote({
   const { t } = useTranslation();
   if (result.status !== 'advised' || result.advice.kind !== 'recommended') return null;
   const { best } = result.advice;
-  const extractsBest =
-    best.tier === 0 && extractedPerHour.some((entry) => entry.typeId === best.typeId);
-  const alreadyBest = extractsBest && result.alreadyRunning;
+  const alreadyBest = isAlreadyBest(result, extractedPerHour);
   return (
     <p className="text-xs text-text-dim">
       {t(alreadyBest ? 'piAdvisor.stopTierValue' : 'piAdvisor.stopTierValueSwitch', {

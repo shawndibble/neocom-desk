@@ -42,6 +42,7 @@ function input(overrides: Partial<UnbuiltPlanInput> = {}): UnbuiltPlanInput {
     rate: RATE,
     assumedLinkCost: { cpu: 180, powergrid: 130 },
     prices: PRICES,
+    revenuePrices: PRICES,
     taxRate: 0.1,
     ...overrides,
   };

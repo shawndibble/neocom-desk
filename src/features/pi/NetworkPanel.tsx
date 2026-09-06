@@ -26,7 +26,8 @@ import { formatIsk } from '@/lib/isk';
 import type { TradeHub } from '@/market/hubs';
 import type { NetworkPlan } from '@/engine/pi/network';
 import { customsRatePercent, hostRateFor } from './customsRate';
-import { DirectiveRow, InputChip } from './DirectiveRow';
+import { DirectiveRow } from './DirectiveRow';
+import { inputChips } from './inputChips';
 
 /**
  * Products the set almost reaches: it makes one of the two inputs, and the
@@ -49,6 +50,9 @@ function ReachableByBuying({ plan }: { plan: NetworkPlan }) {
     </p>
   );
 }
+
+/** The plan panel names no owners: it lists the set, not one pilot's card. */
+const EMPTY_OWNERS: ReadonlyMap<number, string> = new Map();
 
 export function NetworkPanel({
   hub,
@@ -120,35 +124,13 @@ export function NetworkPanel({
                 chips={
                   // The routes are the work: an opportunity a pilot cannot see
                   // the shipping for is not actionable.
-                  line.inputs.map((input) => (
-                    <InputChip
-                      key={input.typeId}
-                      source={
-                        input.source === 'local'
-                          ? 'local'
-                          : input.source === 'bought'
-                            ? 'bought'
-                            : 'routed'
-                      }
-                    >
-                      {input.source === 'local'
-                        ? t('piAdvisor.chipLocalOn', {
-                            name: input.name,
-                            host: nameOfPlanet(line.hostPlanetId),
-                          })
-                        : input.source === 'bought'
-                          ? t('piAdvisor.chipBuy', {
-                              units: Math.round(input.unitsPerHour).toLocaleString(),
-                              name: input.name,
-                              hub: hub.systemName,
-                            })
-                          : t('piAdvisor.chipRoute', {
-                              units: Math.round(input.unitsPerHour).toLocaleString(),
-                              name: input.name,
-                              from: nameOfPlanet(input.fromPlanetId ?? 0),
-                            })}
-                    </InputChip>
-                  ))
+                  inputChips(line, {
+                    planetNames,
+                    owners: EMPTY_OWNERS,
+                    hub,
+                    hostPlanetId: line.hostPlanetId,
+                    t,
+                  })
                 }
               >
                 {t('piAdvisor.networkOpportunity', {
