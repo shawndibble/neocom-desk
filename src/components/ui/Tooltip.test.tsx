@@ -147,7 +147,7 @@ describe('Tooltip touch support', () => {
     fireEvent.touchEnd(trigger);
     expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
-    // Long past any old auto-dismiss window: reading time is the reader's.
+    // Reading time is the reader's — only an explicit dismissal closes it.
     act(() => {
       vi.advanceTimersByTime(60_000);
     });

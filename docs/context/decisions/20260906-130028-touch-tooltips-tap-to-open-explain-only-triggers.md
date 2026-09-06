@@ -20,7 +20,11 @@ _Recorded 2026-09-06._
   dismisses it — a tap outside, a scroll, Escape, another tooltip, or another
   tap on an `openOnTap` trigger. Rules out reading time being a fixed number
   the component picks.
-- **The "?" icon keeps its 16px look and gets a 32px touch target.** An
-  invisible inset pseudo-element extends the hit area past the 24px floor of
+- **The "?" icon keeps its 16px look and gets a 24px touch target.** An
+  invisible inset pseudo-element extends the hit area to the floor of
   `docs/DESIGN.md` §3 without changing layout, because tap is now the
-  sanctioned way to use it. Rules out growing the glyph itself.
+  sanctioned way to use it. It stops exactly at the floor rather than going
+  wider: the "?" sits a `gap-1` from a `Select` in `HistoryViewSelect`, and a
+  wider box would start stealing that control's taps. Rules out growing the
+  glyph itself, and rules out the `size-11 md:size-9` control tier — this is
+  an inline glyph inside a line of text, not a control on its own row.

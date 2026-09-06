@@ -52,8 +52,8 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const touchOrigin = useRef<{ x: number; y: number } | null>(null);
   const touchDragged = useRef(false);
-  const openAtTouchStart = useRef(false);
-  const captured = useRef(false);
+  /** `undefined` between touch sequences, so the first handler of a sequence wins the capture. */
+  const openAtTouchStart = useRef<boolean | undefined>(undefined);
 
   function cancelLongPress() {
     clearTimeout(longPressTimer.current);
@@ -65,14 +65,13 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
    * two arrives first, before any dismissal can rewrite it.
    */
   function captureOpenState() {
-    if (captured.current) return;
-    captured.current = true;
+    if (openAtTouchStart.current !== undefined) return;
     openAtTouchStart.current = touchOpen;
   }
 
   function endTouchSequence() {
     cancelLongPress();
-    captured.current = false;
+    openAtTouchStart.current = undefined;
   }
 
   function handlePointerDown(event: PointerEvent) {
@@ -120,10 +119,9 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
   }
 
   /**
-   * Radix drives every dismissal it knows about — Escape, scroll, a tap
-   * outside, another tooltip opening, a mouse leaving on a hybrid device —
-   * through here. Clearing the touch reveal too is what keeps a timeout-free
-   * bubble from getting stuck open.
+   * Every dismissal Radix knows about — Escape, scroll, a tap outside, another
+   * tooltip, a hybrid device's mouse leaving — arrives here. Clearing the
+   * touch reveal too keeps a timeout-free bubble from getting stuck open.
    */
   function handleOpenChange(open: boolean) {
     setHoverOpen(open);
@@ -199,7 +197,7 @@ export function InfoTooltip({
         aria-label={label}
         onClick={onClick}
         aria-haspopup={ariaHasPopup}
-        className={`relative inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line before:absolute before:-inset-2 before:content-[''] text-[0.625rem] leading-none text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${className}`}
+        className={`relative inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line before:absolute before:-inset-1 before:content-[''] text-[0.625rem] leading-none text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${className}`}
       >
         ?
       </button>
