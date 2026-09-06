@@ -48,6 +48,7 @@ import {
   Gauge,
   GraduationCap,
   Hammer,
+  Info as InfoGlyph,
   MagnifyingGlass,
   Package,
   PencilSimple,
@@ -127,6 +128,8 @@ export const Container = withWeight(Package);
 export const Route = withWeight(ArrowsLeftRight);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */
 export const Warn = withWeight(Warning);
+/** Opens a longer explanation of the numbers on screen, e.g. a Build Plan's calculation breakdown. */
+export const Info = withWeight(InfoGlyph);
 /**
  * The Corp ops board's severity ladder, shaped as well as coloured (issue
  * #419) — `SEVERITY_TONE`'s four colours alone are not a signal for a

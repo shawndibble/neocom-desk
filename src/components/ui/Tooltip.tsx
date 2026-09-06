@@ -108,16 +108,33 @@ interface InfoTooltipProps {
   label: string;
   /** One-line plain-language tooltip content. */
   content: string;
+  /**
+   * Makes the trigger do something as well as explain: the tooltip stays the
+   * one-line answer on hover/focus, the click opens the longer one. Say so in
+   * `content` when this is set — a control that acts on click has to look
+   * like one.
+   */
+  onClick?: () => void;
+  /** Set when the click opens a dialog, so the trigger announces what it opens. */
+  'aria-haspopup'?: 'dialog';
   className?: string;
 }
 
 /** Small "?" icon button + Tooltip, for labeling jargon next to a heading/label that isn't itself focusable. */
-export function InfoTooltip({ label, content, className = '' }: InfoTooltipProps) {
+export function InfoTooltip({
+  label,
+  content,
+  onClick,
+  className = '',
+  'aria-haspopup': ariaHasPopup,
+}: InfoTooltipProps) {
   return (
     <Tooltip content={content}>
       <button
         type="button"
         aria-label={label}
+        onClick={onClick}
+        aria-haspopup={ariaHasPopup}
         className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line text-[0.625rem] leading-none text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${className}`}
       >
         ?

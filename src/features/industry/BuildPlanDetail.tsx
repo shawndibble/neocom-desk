@@ -15,8 +15,9 @@ import {
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { FACILITY_PRESETS, industryActivityOf } from '@/engine/industry/types';
+import { FACILITY_PRESETS, SKILL_IDS, industryActivityOf } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
   MaterialPriceBasis,
@@ -327,6 +328,21 @@ export function BuildPlanDetail({
       skills,
     });
   }, [plan, blueprint, snapshot, materialPrices, skills, t]);
+
+  /**
+   * Both liquidation bases at once, so the Use-or-sell toggle switches between
+   * two numbers already in hand rather than re-deriving one per click. Sell-now
+   * reads the buy side of the book (what a standing order pays today), sell-order
+   * the sell side (what listing your own stack asks) — deliberately independent
+   * of the plan's *material* price basis, which is about buying, not selling.
+   */
+  const ownedSale = useMemo(() => {
+    if (!result || !snapshot) return null;
+    return {
+      instant: ownedStockSale(result.materials, snapshot.hubBuyPrices, 'instant', skills),
+      order: ownedStockSale(result.materials, snapshot.hubPrices, 'order', skills),
+    };
+  }, [result, snapshot, skills]);
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
@@ -1005,6 +1021,26 @@ export function BuildPlanDetail({
             }
             productQuantity={productQuantity}
             costIndexSystemName={buildSystem?.name ?? hub.systemName}
+            ownedSale={ownedSale}
+            nameFor={(typeID) => nameForType(catalog, typeID)}
+            breakdown={{
+              hubName: hub.systemName,
+              materialPriceBasis: materialPriceBasisOf(plan.materialPriceBasis),
+              me: plan.me,
+              isReaction: activity === 'reaction',
+              accountingLevel: skills[SKILL_IDS.accounting] ?? 0,
+              brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
+              systemCostIndex: snapshot?.systemCostIndex ?? null,
+              costIndexSystemName: buildSystem?.name ?? hub.systemName,
+              productName: entry.productName,
+              productQuantity: blueprint.products[0]
+                ? blueprint.products[0].quantity * plan.runs
+                : null,
+              productUnitPrice:
+                entry.productTypeID !== null
+                  ? (snapshot?.hubPrices[entry.productTypeID] ?? null)
+                  : null,
+            }}
           />
         </Panel>
       )}

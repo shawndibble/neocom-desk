@@ -25,6 +25,12 @@ here — they go one per file in `docs/context/decisions/`.
 - **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit, and the plan remembers which place it was so the box can still name it after a reload. That name is a label only — every number reads the plan's own values, and any edit that moves the job elsewhere drops it. "Override" unfolds the fields behind the box.
 - **Build Plan**: An industry plan for one blueprint or reaction formula: materials needed, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). Covers manufacturing and reactions (issue #460); invention and research/copying are still out of scope (`.out-of-scope/`). Which activity a plan runs is derived from the picked blueprint/formula's own `activity`, never a separate field on the record.
 - **Build System**: The solar system a Build Plan's job runs in, named on the plan. Sets the **Cost Index** the job fee is charged at _and_ the security band the rig bonus reads — both follow from the system, so neither is a separate field. Materials are still priced at the plan's trade hub. Empty means "the hub's own system", which is how every plan behaved before the field existed.
+- **Calculation Breakdown**: The modal behind a Build Plan's results that
+  restates every figure on screen as a rule plus that rule with the plan's own
+  live values substituted in — price bases, Material cost, Job Fee, revenue,
+  fees, profit, break-even, and why an **Acquisition Verdict** and a **Sale
+  Profitability** read differ off one hub price. The deep layer under the
+  per-row tooltips, which stay one-liners.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
 - **Character Not Training**: Fires when a Character's skill queue shows no
   active training (the head entry has no live `finish_date`) — whether from
@@ -318,6 +324,17 @@ here — they go one per file in `docs/context/decisions/`.
   while `/skillqueue` carries `training_start_sp`, `level_end_sp` and the
   window the level trains across — enough to interpolate the true figure,
   which is what the in-game queue itself displays.
+- **Use-or-Sell Check**: A Build Plan's third read, alongside the
+  **Acquisition Verdict** and **Sale Profitability**: is the stock the player
+  already owns worth more sold than consumed? Compares the plan's profit
+  (which counts owned units as free) against what those units would net if
+  liquidated, on a chosen **Liquidation Basis**. Only exists when something is
+  owned; no verdict at all when an owned material has no price on that side.
+- **Liquidation Basis**: How owned materials would be turned into ISK in the
+  **Use-or-Sell Check** — `instant` (fill the hub's standing buy orders: sales
+  tax only, since filling an order lists nothing) or `order` (list your own
+  stack at the hub's sell price: sales tax plus broker fee, 100 ISK minimum per
+  stack). Independent of a plan's material price basis, which is about buying.
 - **Variations**: The selected item's Tech I/II/Faction/Storyline/Officer
   variation group, shown as a sortable table (Name, Tier, Sell, Buy) beside
   it for price comparison; falls back to its Market Group siblings when it
