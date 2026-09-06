@@ -73,6 +73,26 @@ export interface NetworkColony {
   spare: PinLoad;
   /** What a link this colony has not built would cost; null when unmeasurable. */
   newLinkCost: PinLoad | null;
+  /**
+   * Factories running here that are *fed* — candidates for conversion, with
+   * what each one earns an hour so the exchange can be priced.
+   *
+   * Only fed ones belong here. A starved factory is `factoryBalance`'s
+   * question and the card already answers it; offering to convert a pin that
+   * makes nothing would double-count the same removal.
+   */
+  convertible?: readonly ConvertibleFacility[];
+}
+
+export interface ConvertibleFacility {
+  facility: PiPinKind;
+  /** How many of them are fed. */
+  count: number;
+  /** ISK an hour one of them nets: what it makes, less what it consumes. */
+  marginPerHour: number;
+  /** What one of them puts out, so removing it can be taken off the supply pool. */
+  outputTypeId: number;
+  outputPerHour: number;
 }
 
 export interface NetworkOptions {
@@ -155,9 +175,36 @@ export type NetworkBlocker =
   /** Every unit of an input it needs went to a better-paying candidate. */
   | 'inputs-spoken-for';
 
+/**
+ * "Remove these, build that instead" — an exchange, priced as one decision.
+ *
+ * Only ever offered against output the plan could not place. A factory whose
+ * P1 is feeding an allocated opportunity is load-bearing, and tearing it down
+ * would starve the very thing it feeds; a factory whose P1 nobody wanted is
+ * simply worth less than what its budget could hold instead.
+ */
+export interface NetworkConversion {
+  planetId: number;
+  /** The fed factories to take out. */
+  removeFacility: PiPinKind;
+  removeCount: number;
+  /** What they were making, and what they earned doing it. */
+  removeName: string;
+  removeMarginPerHour: number;
+  /** What goes in their place, already costed and sourced. */
+  add: NetworkOpportunity;
+  /** The exchange's own worth: what is added, less what is given up. */
+  netPerHour: number;
+}
+
 export interface NetworkPlan {
   /** Ranked, and allocated: the supply one line draws is gone for the next. */
   opportunities: NetworkOpportunity[];
+  /**
+   * Exchanges worth making on top of the allocation above: fed factories whose
+   * output nothing wanted, and what their budget is worth instead.
+   */
+  conversions: NetworkConversion[];
   /** Output no opportunity claimed, still worth selling as it is. */
   unallocated: { typeId: number; name: string; unitsPerHour: number }[];
   /** Candidates that could not be recommended, and why — never silently dropped. */
@@ -390,6 +437,82 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
   const opportunities: NetworkOpportunity[] = [];
   const stillBlocked = [...blocked];
 
+  // Bought at the ask, routed at the bid: a purchase costs what the seller asks,
+  // while consuming your own P1 costs the sale you give up, which is what a buy
+  // order would have paid you. `chainCost` already charges both inside the
+  // margin; these are the figures shown next to it.
+  const boughtPrice = (typeId: number) => priceOf(typeId, opts.prices) ?? 0;
+  const routedPrice = (typeId: number) => priceOf(typeId, opts.revenuePrices ?? opts.prices) ?? 0;
+
+  /**
+   * Put `factories` of `candidate` on `colony`: spend the budget, draw the
+   * material, and describe what it costs and earns.
+   *
+   * A function rather than a block inside the allocation loop, because the
+   * conversion pass below places factories the same way — and two copies of
+   * this would be two places to forget to decrement a pool.
+   */
+  const place = (
+    candidate: Candidate,
+    colony: NetworkColony,
+    factories: number
+  ): NetworkOpportunity => {
+    const cost = factoryCost(colony, candidate, opts);
+    const left = remaining.get(colony.planetId) ?? colony.spare;
+    remaining.set(colony.planetId, {
+      cpu: left.cpu - cost.cpu * factories,
+      powergrid: left.powergrid - cost.powergrid * factories,
+    });
+
+    const inputs: NetworkInput[] = [];
+    for (const input of candidate.demandPerFactory) {
+      const unitsPerHour = input.unitsPerHour * factories;
+      if (input.bought) {
+        inputs.push({
+          typeId: input.typeId,
+          name: input.name,
+          unitsPerHour,
+          fromPlanetId: null,
+          source: 'bought',
+          costPerHour: boughtPrice(input.typeId) * unitsPerHour,
+        });
+        continue;
+      }
+      // One entry per contributing colony: two planets making the same P1 get
+      // two routes, each for what that planet actually supplies.
+      for (const part of drawFrom(input.typeId, unitsPerHour, colony.planetId)) {
+        inputs.push({
+          typeId: input.typeId,
+          name: input.name,
+          unitsPerHour: part.unitsPerHour,
+          fromPlanetId: part.fromPlanetId,
+          source: part.fromPlanetId === colony.planetId ? 'local' : 'routed',
+          costPerHour: routedPrice(input.typeId) * part.unitsPerHour,
+        });
+      }
+    }
+
+    return {
+      typeId: candidate.typeId,
+      name: candidate.name,
+      tier: candidate.tier,
+      hostPlanetId: colony.planetId,
+      factories,
+      facility: candidate.facility,
+      inputs,
+      unitsPerHour: candidate.outputPerFactory * factories,
+      marginPerUnit: candidate.marginPerUnit,
+      marginPerHour: candidate.marginPerFactory * factories,
+      buyCostPerHour: inputs
+        .filter((input) => input.source === 'bought')
+        .reduce((sum, input) => sum + input.costPerHour, 0),
+      revenuePerHour:
+        (priceOf(candidate.typeId, opts.revenuePrices ?? opts.prices) ?? 0) *
+        candidate.outputPerFactory *
+        factories,
+    };
+  };
+
   for (const candidate of ok) {
     // Only material the colonies make is scarce. A bought input constrains
     // nothing but the wallet, so it does not enter the supply bound — and a
@@ -436,70 +559,92 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
     }
 
     const factories = Math.min(host.capacity, Math.floor(bySupply + EPSILON));
-
-    const cost = factoryCost(host.colony, candidate, opts);
-    const left = remaining.get(host.colony.planetId) ?? host.colony.spare;
-    remaining.set(host.colony.planetId, {
-      cpu: left.cpu - cost.cpu * factories,
-      powergrid: left.powergrid - cost.powergrid * factories,
-    });
-
-    // Priced the same whether bought or grown: `chainCost` charges the hub
-    // price for a sourced line either way, because routing your own P1 forgoes
-    // selling it for exactly that.
-    // Bought at the ask, routed at the bid: a purchase costs what the seller
-    // asks, while consuming your own P1 costs the sale you give up, which is
-    // what a buy order would have paid you.
-    const boughtPrice = (typeId: number) => priceOf(typeId, opts.prices) ?? 0;
-    const routedPrice = (typeId: number) => priceOf(typeId, opts.revenuePrices ?? opts.prices) ?? 0;
-    const inputs: NetworkInput[] = [];
-    for (const input of candidate.demandPerFactory) {
-      const unitsPerHour = input.unitsPerHour * factories;
-      if (input.bought) {
-        inputs.push({
-          typeId: input.typeId,
-          name: input.name,
-          unitsPerHour,
-          fromPlanetId: null,
-          source: 'bought',
-          costPerHour: boughtPrice(input.typeId) * unitsPerHour,
-        });
-        continue;
-      }
-      // One entry per contributing colony: two planets making the same P1 get
-      // two routes, each for what that planet actually supplies.
-      for (const part of drawFrom(input.typeId, unitsPerHour, host.colony.planetId)) {
-        inputs.push({
-          typeId: input.typeId,
-          name: input.name,
-          unitsPerHour: part.unitsPerHour,
-          fromPlanetId: part.fromPlanetId,
-          source: part.fromPlanetId === host.colony.planetId ? 'local' : 'routed',
-          costPerHour: routedPrice(input.typeId) * part.unitsPerHour,
-        });
-      }
-    }
-
-    opportunities.push({
-      typeId: candidate.typeId,
-      name: candidate.name,
-      tier: candidate.tier,
-      hostPlanetId: host.colony.planetId,
-      factories,
-      facility: candidate.facility,
-      inputs,
-      unitsPerHour: candidate.outputPerFactory * factories,
-      marginPerUnit: candidate.marginPerUnit,
-      marginPerHour: candidate.marginPerFactory * factories,
-      buyCostPerHour: inputs
-        .filter((input) => input.source === 'bought')
-        .reduce((sum, input) => sum + input.costPerHour, 0),
-      revenuePerHour:
-        (priceOf(candidate.typeId, opts.revenuePrices ?? opts.prices) ?? 0) *
-        candidate.outputPerFactory *
-        factories,
-    });
+    opportunities.push(place(candidate, host.colony, factories));
   }
+
+  // --- What to take down, and what to put up instead -----------------------
+  //
+  // The allocation above spent every scrap of material it could use. Whatever
+  // is still sitting in `supplyByColony` is P1 that nothing wanted — and the
+  // factory making it is holding CPU and Powergrid that something else could
+  // pay more for.
+  //
+  // Only unwanted output is convertible, and that restriction is what makes
+  // the exchange safe: a factory whose P1 feeds an allocated opportunity is
+  // load-bearing, and removing it would starve the very line it feeds. Reading
+  // the pools *after* allocation is what tells the two apart, so this pass
+  // cannot run before that one.
+  const conversions: NetworkConversion[] = [];
+  for (const colony of opts.colonies) {
+    const own = supplyByColony.get(colony.planetId);
+    if (!own) continue;
+    for (const group of colony.convertible ?? []) {
+      if (group.count <= 0 || group.outputPerHour <= 0) continue;
+      const unwanted = own.get(group.outputTypeId) ?? 0;
+      // Whole factories only: half a factory's worth of unsold P1 is not a
+      // factory you can take down.
+      const spare = Math.min(group.count, Math.floor(unwanted / group.outputPerHour + EPSILON));
+      if (spare < 1) continue;
+
+      const spec = opts.infrastructure.pins[group.facility];
+      if (!spec) continue;
+
+      // Best exchange over how many come out and what goes up in their place.
+      // Both matter: removing two frees enough for a pin that one does not.
+      let best: { remove: number; candidate: Candidate; factories: number; net: number } | null =
+        null;
+      const left = remaining.get(colony.planetId) ?? colony.spare;
+      for (let remove = 1; remove <= spare; remove += 1) {
+        const budget = {
+          cpu: left.cpu + spec.cpu * remove,
+          powergrid: left.powergrid + spec.powergrid * remove,
+        };
+        for (const candidate of ok) {
+          const byBudget = hostCapacity(budget, colony, candidate, opts);
+          if (byBudget < 1) continue;
+          // The removed factories' own output goes with them, so a candidate
+          // that eats it can only count what survives the removal.
+          const grown = candidate.demandPerFactory.filter((input) => !input.bought);
+          const bySupply = grown.length
+            ? Math.min(
+                ...grown.map((input) => {
+                  const pool =
+                    pooled(input.typeId) -
+                    (input.typeId === group.outputTypeId ? group.outputPerHour * remove : 0);
+                  return pool / input.unitsPerHour;
+                })
+              )
+            : Number.POSITIVE_INFINITY;
+          const factories = Math.min(byBudget, Math.floor(bySupply + EPSILON));
+          if (factories < 1) continue;
+          const net = factories * candidate.marginPerFactory - remove * group.marginPerHour;
+          if (!best || net > best.net) best = { remove, candidate, factories, net };
+        }
+      }
+      if (!best || best.net <= 0) continue;
+
+      // Apply it. The freed budget is credited before `place` spends it, and
+      // the removed factories' output leaves the pool with them — otherwise a
+      // later line could be routed P1 that no longer exists.
+      const freed = {
+        cpu: left.cpu + spec.cpu * best.remove,
+        powergrid: left.powergrid + spec.powergrid * best.remove,
+      };
+      remaining.set(colony.planetId, freed);
+      own.set(group.outputTypeId, unwanted - group.outputPerHour * best.remove);
+
+      conversions.push({
+        planetId: colony.planetId,
+        removeFacility: group.facility,
+        removeCount: best.remove,
+        removeName: nameOf(group.outputTypeId, pi),
+        removeMarginPerHour: group.marginPerHour * best.remove,
+        add: place(best.candidate, colony, best.factories),
+        netPerHour: best.net,
+      });
+    }
+  }
+  conversions.sort((a, b) => b.netPerHour - a.netPerHour);
 
   const leftover = new Map<number, number>();
   for (const own of supplyByColony.values()) {
@@ -511,5 +656,5 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
     .map(([typeId, unitsPerHour]) => ({ typeId, name: nameOf(typeId, pi), unitsPerHour }))
     .sort((a, b) => b.unitsPerHour - a.unitsPerHour);
 
-  return { opportunities, unallocated, blocked: stillBlocked };
+  return { opportunities, conversions, unallocated, blocked: stillBlocked };
 }

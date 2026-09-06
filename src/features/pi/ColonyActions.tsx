@@ -41,7 +41,7 @@ import { useTranslation } from 'react-i18next';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { PiData, PiPinKind } from '@/sde/types';
-import type { NetworkOpportunity } from '@/engine/pi/network';
+import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
 import type { PinLoad } from '@/engine/pi/types';
 import type { IdleFacilityPlan } from './colonyActionModel';
 
@@ -121,6 +121,91 @@ export function IdleFacilities({ plan, pi }: { plan: IdleFacilityPlan; pi: PiDat
   );
 }
 
+/**
+ * "Replace these with those" — an exchange, stated as one line.
+ *
+ * The pilot asked for this directly: "investigate the idea of replacing
+ * elements with others if it would increase the final value". `planNetwork`
+ * only ever offers one against output its allocation could not place, so this
+ * never proposes tearing down a factory that is feeding something.
+ *
+ * The hauling load is named because it is the part that does not show up in
+ * the ISK: a market-fed Advanced Industry Facility is 80 units an hour of
+ * shopping, every hour, and a pilot deciding whether it is worth it needs the
+ * freight as well as the margin.
+ */
+function ConvertFacilities({
+  conversions,
+  planetNames,
+}: {
+  conversions: readonly NetworkConversion[];
+  planetNames: ReadonlyMap<number, string>;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {conversions.map((entry) => {
+        const bought = entry.add.inputs.filter((input) => input.source === 'bought');
+        const haulIn = bought.reduce((sum, input) => sum + input.unitsPerHour, 0);
+        return (
+          <li key={`${entry.removeFacility}-${entry.removeName}`} className="text-accent">
+            {t('piAdvisor.actionConvert', {
+              count: entry.removeCount,
+              pin: t(`piAdvisor.pinKind.${entry.removeFacility}`),
+              from: entry.removeName,
+              addCount: entry.add.factories,
+              addPin: t(`piAdvisor.pinKind.${entry.add.facility}`),
+              to: entry.add.name,
+              net: formatIsk(entry.netPerHour),
+            })}
+            <ul className="text-text-dim">
+              <li>
+                {t('piAdvisor.actionConvertWhy', {
+                  from: entry.removeName,
+                  count: entry.removeCount,
+                  lost: formatIsk(entry.removeMarginPerHour),
+                  gained: formatIsk(entry.add.marginPerHour),
+                })}
+              </li>
+              {entry.add.inputs.map((input) => (
+                <li key={`${input.typeId}-${input.fromPlanetId ?? 'hub'}`}>
+                  {input.source === 'local'
+                    ? t('piAdvisor.actionInputLocal', {
+                        units: round(input.unitsPerHour),
+                        name: input.name,
+                      })
+                    : input.source === 'bought'
+                      ? t('piAdvisor.actionInputBuy', {
+                          units: round(input.unitsPerHour),
+                          name: input.name,
+                          hub: DEFAULT_TRADE_HUB.systemName,
+                          isk: formatIsk(input.costPerHour),
+                        })
+                      : t('piAdvisor.actionInputRoute', {
+                          units: round(input.unitsPerHour),
+                          name: input.name,
+                          from:
+                            planetNames.get(input.fromPlanetId ?? -1) ??
+                            String(input.fromPlanetId ?? ''),
+                        })}
+                </li>
+              ))}
+              {haulIn > 0 && (
+                <li>
+                  {t('piAdvisor.actionConvertHaul', {
+                    in: round(haulIn),
+                    out: round(entry.add.unitsPerHour),
+                  })}
+                </li>
+              )}
+            </ul>
+          </li>
+        );
+      })}
+    </>
+  );
+}
+
 /** One "add N factories making X" line, with what feeds it and what it earns. */
 function AddFactories({
   line,
@@ -192,6 +277,7 @@ export function ColonyActions({
   spare,
   newLinkCost,
   opportunities,
+  conversions,
   planetNames,
   room,
   closest,
@@ -204,6 +290,8 @@ export function ColonyActions({
   newLinkCost: PinLoad | null;
   /** The network plan's lines placed on this planet. */
   opportunities: readonly NetworkOpportunity[];
+  /** Exchanges worth making here: what to take down, and what goes up instead. */
+  conversions: readonly NetworkConversion[];
   planetNames: ReadonlyMap<number, string>;
   /** What the leftover budget would hold, in words — the footnote's fallback. */
   room: string;
@@ -211,7 +299,7 @@ export function ColonyActions({
   closest: { kind: PiPinKind; cost: PinLoad } | null;
 }) {
   const { t } = useTranslation();
-  const nothing = !idle && opportunities.length === 0;
+  const nothing = !idle && opportunities.length === 0 && conversions.length === 0;
 
   return (
     <div className="space-y-1 border-t border-line pt-2">
@@ -221,6 +309,7 @@ export function ColonyActions({
         {opportunities.map((line) => (
           <AddFactories key={line.typeId} line={line} planetNames={planetNames} />
         ))}
+        <ConvertFacilities conversions={conversions} planetNames={planetNames} />
         {/*
           `networkModel` offers each host the budget its idle pins are holding,
           so an "add" line on a colony that still has them rests on a removal

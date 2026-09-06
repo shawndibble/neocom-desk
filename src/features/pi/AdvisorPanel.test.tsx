@@ -650,7 +650,12 @@ describe('AdvisorPanel', () => {
   const BACTERIA = 2393;
   const TEST_CULTURES = 2319;
 
-  function twoRefineries(prices: Record<number, number>) {
+  function twoRefineries(
+    prices: Record<number, number>,
+    pins: [number, number] = [3, 3],
+    qty: [number, number] = [20_000, 20_000],
+    pads: [number, number] = [1, 1]
+  ) {
     const waterColony = { ...colony(40_000_003, 'barren'), planet_id: 40_000_003 };
     loadCharacterPlanets.mockResolvedValue({
       cached: {
@@ -668,7 +673,13 @@ describe('AdvisorPanel', () => {
     // sustains 16,026 P0/hr off the decay curve, which keeps 2.67 of three
     // Basic pins fed and so makes 107 P1/hr — enough for two Advanced
     // factories at 40 + 40.
-    const refinery = (schematicId: number, productTypeId: number) => ({
+    const refinery = (
+      schematicId: number,
+      productTypeId: number,
+      factories: number,
+      qtyPerCycle: number,
+      launchpads: number
+    ) => ({
       links: [],
       routes: [],
       pins: [
@@ -676,18 +687,23 @@ describe('AdvisorPanel', () => {
           ...extractorPin(1),
           extractor_details: {
             ...(extractorPin(1).extractor_details as NonNullable<PlanetPin['extractor_details']>),
-            qty_per_cycle: 20_000,
+            qty_per_cycle: qtyPerCycle,
             product_type_id: productTypeId,
           },
         },
-        ...Array.from({ length: 3 }, (_, i) => ({
+        ...Array.from({ length: factories }, (_, i) => ({
           pin_id: i + 2,
           type_id: BASIC,
           latitude: 0,
           longitude: 0,
           factory_details: { schematic_id: schematicId },
         })),
-        { pin_id: 9, type_id: LAUNCHPAD, latitude: 0, longitude: 0 },
+        ...Array.from({ length: launchpads }, (_, i) => ({
+          pin_id: 100 + i,
+          type_id: LAUNCHPAD,
+          latitude: 0,
+          longitude: 0,
+        })),
       ],
     });
     loadAllColonyDetails.mockResolvedValue(
@@ -696,7 +712,7 @@ describe('AdvisorPanel', () => {
           40_000_001,
           {
             cached: {
-              data: refinery(BACTERIA_SCHEMATIC, MICROORGANISMS),
+              data: refinery(BACTERIA_SCHEMATIC, MICROORGANISMS, pins[0], qty[0], pads[0]),
               fetchedAt: new Date(),
               fromCache: false,
             },
@@ -706,7 +722,7 @@ describe('AdvisorPanel', () => {
           40_000_003,
           {
             cached: {
-              data: refinery(WATER_SCHEMATIC, AQUEOUS_LIQUIDS),
+              data: refinery(WATER_SCHEMATIC, AQUEOUS_LIQUIDS, pins[1], qty[1], pads[1]),
               fetchedAt: new Date(),
               fromCache: false,
             },

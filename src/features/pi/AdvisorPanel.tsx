@@ -95,7 +95,7 @@ import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
 import { ColonyActions } from './ColonyActions';
 import { idleFacilityPlan } from './colonyActionModel';
-import type { NetworkOpportunity } from '@/engine/pi/network';
+import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
 import {
   colonySpaceFor,
   customsRatePercent,
@@ -514,6 +514,7 @@ function PlanetCard({
 /** A card body's small label/value line. */
 /** One shared empty array, so a card with no opportunity keeps a stable prop. */
 const EMPTY_OPPORTUNITIES: readonly NetworkOpportunity[] = [];
+const EMPTY_CONVERSIONS: readonly NetworkConversion[] = [];
 
 function CardLine({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -623,6 +624,7 @@ function BuiltCard({
   taxRate,
   ceiling,
   opportunities,
+  conversions,
   planetNames,
 }: {
   advice: Extract<PlanetAdvice, { kind: 'built' }>;
@@ -641,6 +643,8 @@ function BuiltCard({
    * planned its own would promise the same Water to five different planets.
    */
   opportunities: readonly NetworkOpportunity[];
+  /** Exchanges the plan found on this planet: what to take down for what. */
+  conversions: readonly NetworkConversion[];
   planetNames: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
@@ -801,6 +805,7 @@ function BuiltCard({
               spare={{ cpu: freeCpu, powergrid: freePowergrid }}
               newLinkCost={newLinkCost}
               opportunities={opportunities}
+              conversions={conversions}
               planetNames={planetNames}
               room={roomSummary(headroom, t)}
               closest={room.length === 0 ? closest : null}
@@ -1129,6 +1134,12 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     if (forHost) forHost.push(line);
     else opportunitiesByHost.set(line.hostPlanetId, [line]);
   }
+  const conversionsByHost = new Map<number, NetworkConversion[]>();
+  for (const entry of network?.plan.conversions ?? []) {
+    const here = conversionsByHost.get(entry.planetId);
+    if (here) here.push(entry);
+    else conversionsByHost.set(entry.planetId, [entry]);
+  }
   const planetNames = new Map(
     advice
       .filter((entry) => entry.name !== null)
@@ -1265,6 +1276,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 taxRate={activeSystem.customsRate}
                 ceiling={snapshot.ceiling}
                 opportunities={opportunitiesByHost.get(entry.planetId) ?? EMPTY_OPPORTUNITIES}
+                conversions={conversionsByHost.get(entry.planetId) ?? EMPTY_CONVERSIONS}
                 planetNames={planetNames}
               />
             ) : entry.kind === 'unbuilt' ? (

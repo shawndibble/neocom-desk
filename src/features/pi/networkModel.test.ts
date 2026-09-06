@@ -16,6 +16,8 @@ const WATER = 3645;
 const TEST_CULTURES = 2319;
 const BACTERIA_SCHEMATIC = 131;
 const WATER_SCHEMATIC = 121;
+const PLASMOIDS = 2389;
+const SUPERCONDUCTORS = 9838;
 
 const PRICES: Record<number, number> = {
   [MICROORGANISMS]: 12,
@@ -160,5 +162,85 @@ describe('colonyNetwork', () => {
     // One colony is the per-planet question, already answered on its own card.
     expect(colonyNetwork({ ...input, advice: [PAIR[0]] })).toBeNull();
     expect(colonyNetwork({ ...input, advice: [] })).toBeNull();
+  });
+});
+
+describe('conversions', () => {
+  /**
+   * Plasmoids priced so a market-fed Superconductors factory is reachable —
+   * the replacement has to come from somewhere, and nothing in this pair makes
+   * a second P1. Kept local: adding it to the shared map would outrank Test
+   * Cultures and change what the suite above is about.
+   */
+  const WITH_PLASMOIDS = { ...PRICES, [PLASMOIDS]: 600.2, [SUPERCONDUCTORS]: 11_280 };
+  const input = { advice: PAIR, pi, prices: WITH_PLASMOIDS, taxRate: 0 };
+
+  /**
+   * Both colonies nearly full, which is what makes the question interesting:
+   * with room to spare the allocation simply builds on the free budget and
+   * nothing needs replacing. Here the set can host one Advanced pin apiece
+   * against 320 Water an hour, so most of that Water has nowhere to go and the
+   * eight fed pins making it are holding budget worth more to something else.
+   */
+  const cramped: PlanetAdvice[] = [
+    built(1, BACTERIA_SCHEMATIC, MICROORGANISMS, 6_000, 1, {
+      load: { cpu: 20_400, powergrid: 16_200 },
+    }),
+    built(2, WATER_SCHEMATIC, AQUEOUS_LIQUIDS, 48_000, 8, {
+      load: { cpu: 20_500, powergrid: 14_500 },
+    }),
+  ];
+  const crampedInput = { ...input, advice: cramped };
+
+  it('prices what a fed factory earns, so taking one down has a cost', () => {
+    // Not a count of pins: the exchange is only honest if what is given up is
+    // valued the same way as what replaces it.
+    const colonies = networkColonies(crampedInput);
+    const water = colonies.find((colony) => colony.planetId === 2);
+    expect(water?.convertible).toHaveLength(1);
+    expect(water?.convertible?.[0].count).toBe(8);
+    expect(water?.convertible?.[0].outputTypeId).toBe(WATER);
+    // 40 Water an hour out at 513.9, 6,000 Aqueous Liquids an hour in at 12.
+    expect(water?.convertible?.[0].marginPerHour).toBeCloseTo(40 * 513.9 - 6_000 * 12, 6);
+  });
+
+  it('offers an exchange against output the allocation could not place', () => {
+    const network = colonyNetwork(crampedInput);
+    const conversion = network?.plan.conversions.find((entry) => entry.planetId === 2);
+    expect(conversion).toBeDefined();
+    expect(conversion?.removeName).toBe('Water');
+    expect(conversion?.add.name).toBe('Superconductors');
+    // Both halves priced as one decision.
+    expect(conversion?.netPerHour).toBeCloseTo(
+      (conversion?.add.marginPerHour ?? 0) - (conversion?.removeMarginPerHour ?? 0),
+      6
+    );
+  });
+
+  it('counts only fed pins as convertible, never starved ones', () => {
+    // A starved pin makes nothing, so it has no margin to give up — and
+    // `idleFacilityPlan` already offers it for removal. Counting it here would
+    // offer the same pin twice under two different reasons.
+    const starved: PlanetAdvice[] = [
+      cramped[0],
+      built(2, WATER_SCHEMATIC, AQUEOUS_LIQUIDS, 12_000, 8, {
+        load: { cpu: 20_500, powergrid: 14_500 },
+      }),
+    ];
+    const colonies = networkColonies({ ...input, advice: starved });
+    const water = colonies.find((colony) => colony.planetId === 2);
+    // 12,000/hr feeds two of the eight.
+    expect(water?.convertible?.[0].count).toBe(2);
+  });
+
+  it('says nothing about a colony with room to spare', () => {
+    // The allocation builds on free budget there, so no pin needs replacing —
+    // and an exchange offered where an addition would do is a demolition
+    // nobody asked for.
+    const roomy: PlanetAdvice[] = [
+      built(1, BACTERIA_SCHEMATIC, MICROORGANISMS, 6_000, 1),
+      built(2, WATER_SCHEMATIC, AQUEOUS_LIQUIDS, 48_000, 8),
+    ];
+    expect(colonyNetwork({ ...input, advice: roomy })?.plan.conversions).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
 import { piTier } from './chain';
-import { planNetwork, type NetworkColony } from './network';
+import { planNetwork, type NetworkColony, type ConvertibleFacility } from './network';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -337,5 +337,141 @@ describe('planNetwork', () => {
   it('has nothing to say about a single colony, or none', () => {
     expect(planNetwork({ ...options, colonies: [] }, pi).opportunities).toEqual([]);
     expect(planNetwork({ ...options, colonies: [EFA[0]] }, pi).opportunities).toEqual([]);
+  });
+});
+
+describe('planNetwork conversions', () => {
+  /**
+   * P1 and P2 priced, P3 left out.
+   *
+   * The tier ladder in `ALL_PRICES` makes a P3 pay ten times a P2, so a
+   * fully-bought P3 wins every host and no colony-made P1 is ever drawn — which
+   * would make every factory look unwanted and these tests pass for the wrong
+   * reason. Flat within a tier keeps the allocation reaching for the material
+   * the colonies actually make.
+   */
+  const P2_ONLY: Record<number, number> = (() => {
+    const out: Record<number, number> = {};
+    for (const resource of pi.raw) out[resource.typeID] = 12;
+    for (const key of Object.keys(pi.schematics)) {
+      const typeId = Number(key);
+      if (piTier(typeId, pi) === 1) out[typeId] = 450;
+      else if (piTier(typeId, pi) === 2) out[typeId] = 9_000;
+    }
+    return out;
+  })();
+
+  /**
+   * A colony making far more of a P1 than anything in the set can eat. Eight
+   * fed Basic Industry Facilities at 40/hr is 320/hr of Reactive Metals, and
+   * the only candidate that wants it is Nanites, bounded by Bacteria.
+   */
+  const convertible = (
+    typeId: number,
+    facilities: number,
+    marginPerHour: number
+  ): ConvertibleFacility => ({
+    facility: 'basic',
+    count: facilities,
+    marginPerHour,
+    outputTypeId: typeId,
+    outputPerHour: 40,
+  });
+
+  /** Efa I: eight fed Basics on Reactive Metals, and room to rebuild. */
+  const overSupplied: NetworkColony[] = [
+    { ...colony(1, BACTERIA, 141.34), spare: { cpu: 20_000, powergrid: 3_000 } },
+    {
+      ...colony(2, REACTIVE_METALS, 320),
+      spare: { cpu: 20_000, powergrid: 3_000 },
+      convertible: [convertible(REACTIVE_METALS, 8, 2_620)],
+    },
+  ];
+
+  it('offers to convert only the factories whose output nothing wanted', () => {
+    // Nanites takes 40 Reactive Metals a factory and Bacteria caps it at
+    // three, so three of the eight Basics are load-bearing and five are not.
+    // Converting a load-bearing one would starve the very line it feeds.
+    const plan = planNetwork(
+      { ...options, colonies: overSupplied, prices: P2_ONLY, allowMarketSourcing: true },
+      pi
+    );
+    const conversion = plan.conversions.find((entry) => entry.planetId === 2);
+    expect(conversion).toBeDefined();
+    expect(conversion?.removeCount).toBeGreaterThan(0);
+    expect(conversion?.removeCount).toBeLessThanOrEqual(5);
+  });
+
+  it('prices the exchange as one decision, not two', () => {
+    const plan = planNetwork(
+      { ...options, colonies: overSupplied, prices: P2_ONLY, allowMarketSourcing: true },
+      pi
+    );
+    for (const entry of plan.conversions) {
+      // What goes up, less what comes down — and never offered at a loss.
+      expect(entry.netPerHour).toBeCloseTo(entry.add.marginPerHour - entry.removeMarginPerHour, 6);
+      expect(entry.netPerHour).toBeGreaterThan(0);
+    }
+  });
+
+  it('says nothing when the existing factories earn more than anything else would', () => {
+    // A Basic Industry Facility clearing 10m an hour is not one to tear down,
+    // however well the replacement pays. Silence is the right answer, and an
+    // exchange offered at a loss is the failure this guard exists to prevent.
+    const precious = overSupplied.map((entry, i) =>
+      i === 1 ? { ...entry, convertible: [convertible(REACTIVE_METALS, 8, 10_000_000)] } : entry
+    );
+    const plan = planNetwork(
+      { ...options, colonies: precious, prices: P2_ONLY, allowMarketSourcing: true },
+      pi
+    );
+    expect(plan.conversions).toEqual([]);
+  });
+
+  it('has nothing to convert on a colony that never declared any', () => {
+    const plan = planNetwork({ ...options, prices: P2_ONLY, allowMarketSourcing: true }, pi);
+    expect(plan.conversions).toEqual([]);
+  });
+
+  it('does not spend the freed budget twice', () => {
+    // The conversion credits the removed pins' CPU and Powergrid back before
+    // placing what replaces them, and `place` spends it out of the same pool
+    // the allocation above used. A second conversion on the same colony must
+    // see what the first left.
+    const plan = planNetwork(
+      { ...options, colonies: overSupplied, prices: P2_ONLY, allowMarketSourcing: true },
+      pi
+    );
+    const host = overSupplied[1];
+    const spent = plan.conversions
+      .filter((entry) => entry.planetId === host.planetId)
+      .reduce((sum, entry) => sum + entry.add.factories, 0);
+    const freed = plan.conversions
+      .filter((entry) => entry.planetId === host.planetId)
+      .reduce((sum, entry) => sum + entry.removeCount, 0);
+    const advanced = pi.infrastructure.pins.advanced;
+    const basic = pi.infrastructure.pins.basic;
+    const budget = host.spare.powergrid + (basic?.powergrid ?? 0) * freed;
+    expect(spent * (advanced?.powergrid ?? 0)).toBeLessThanOrEqual(budget);
+  });
+
+  it('takes the removed factories’ own output off the pool with them', () => {
+    // The P1 those pins were making stops existing when they do. A line routed
+    // material from a factory that has just been torn down is the same class
+    // of promise as routing more than a planet makes.
+    const plan = planNetwork(
+      { ...options, colonies: overSupplied, prices: P2_ONLY, allowMarketSourcing: true },
+      pi
+    );
+    const removed = plan.conversions
+      .filter((entry) => entry.removeName === 'Reactive Metals')
+      .reduce((sum, entry) => sum + entry.removeCount * 40, 0);
+    const routed = [...plan.opportunities, ...plan.conversions.map((entry) => entry.add)]
+      .flatMap((line) => line.inputs)
+      .filter((input) => input.typeId === REACTIVE_METALS && input.source !== 'bought')
+      .reduce((sum, input) => sum + input.unitsPerHour, 0);
+    const stillListed =
+      plan.unallocated.find((line) => line.typeId === REACTIVE_METALS)?.unitsPerHour ?? 0;
+    expect(routed + stillListed + removed).toBeLessThanOrEqual(320 + 1e-6);
   });
 });
