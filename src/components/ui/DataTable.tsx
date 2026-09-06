@@ -150,8 +150,20 @@ export function DataTable<T>({
     0,
     columns.findIndex((column) => column.primary)
   );
+  // A right-aligned sortable header's own sort glyph (`gap-1` + an icon) sits
+  // between the label and the header's right inset, pushing the label ~1rem
+  // further left than a plain right-aligned cell below it — same horizontal
+  // padding otherwise, on both header and cell. Nudging just these cells'
+  // right padding by that same amount brings the numbers back under the
+  // label a reader's eye actually lands on, not under the icon.
+  const sortIconGutter = density === 'compact' ? 'pr-6' : 'pr-7';
   const cellClass = columns.map((column) =>
-    cx(cellPadding, column.align === 'right' && 'text-right', column.className)
+    cx(
+      cellPadding,
+      column.align === 'right' && 'text-right',
+      column.align === 'right' && column.sortValue && sortIconGutter,
+      column.className
+    )
   );
 
   const sortColumn = sort ? columns.find((column) => column.id === sort.columnId) : undefined;

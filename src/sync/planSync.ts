@@ -1,7 +1,9 @@
-// Two-way sync of Skill Plans, Build Plans, the Quickbar, Station Pins +
-// synced settings for one character. Public API and UI wiring live in index.ts.
+// Two-way sync of Skill Plans, Build Plans, the Quickbar, Station Pins,
+// Production Runs + their two linking-record collections, + synced settings
+// for one character. Public API and UI wiring live in index.ts.
 //
-// Remote layout: /characters/char:{id}/{plans,buildPlans,quickbars,stationPins,settings}.
+// Remote layout: /characters/char:{id}/{plans,buildPlans,quickbars,stationPins,
+// productionRuns,productionSaleLinks,productionOrderWatches,settings}.
 // Merge policy is pure and lives in merge.ts: last-write-wins per record id,
 // tombstones for deletes kept 30 days.
 //
@@ -30,10 +32,13 @@ import {
   type BuildPlanRecord,
   type CharacterRecord,
   type NotificationFeedRecord,
+  type PlanetRichnessRecord,
+  type ProductionOrderWatchRecord,
+  type ProductionRunRecord,
+  type ProductionSaleLinkRecord,
   type QuickbarRecord,
   type SkillPlanRecord,
   type StationPinRecord,
-  type PlanetRichnessRecord,
 } from '@/db';
 import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
@@ -55,6 +60,9 @@ import {
   quickbarTombstonesKey,
   stationPinTombstonesKey,
   planetRichnessTombstonesKey,
+  productionOrderWatchTombstonesKey,
+  productionRunTombstonesKey,
+  productionSaleLinkTombstonesKey,
   readTombstones,
 } from './localBookkeeping';
 import { setStatus } from './status';
@@ -71,6 +79,9 @@ import {
   type RemoteQuickbarDoc,
   type RemoteStationPinDoc,
   type RemotePlanetRichnessDoc,
+  type RemoteProductionOrderWatchDoc,
+  type RemoteProductionRunDoc,
+  type RemoteProductionSaleLinkDoc,
   type RemoteSyncedSetting,
   type SyncedSettingTombstone,
   type SyncedSettingValue,
@@ -148,6 +159,28 @@ async function recordDeletion(
   scheduleSync(characterId);
 }
 
+/**
+ * `recordDeletion` for a whole batch under one collection's tombstone key —
+ * one bulk row-delete plus one tombstone read/write, rather than a
+ * read-modify-write cycle on the same `db.settings` row per id (what a loop
+ * of `recordDeletion` calls would do, serialized against itself for no
+ * reason: the row deletes are already independent of each other). A no-op
+ * for an empty batch, so callers don't need their own length check.
+ */
+async function recordBulkDeletion(
+  characterId: number,
+  ids: string[],
+  tombstoneKey: string,
+  deleteRows: (ids: string[]) => Promise<unknown>
+): Promise<void> {
+  if (ids.length === 0) return;
+  await deleteRows(ids);
+  const now = Date.now();
+  const remaining = (await readTombstones(tombstoneKey)).filter((t) => !ids.includes(t.id));
+  await writeTombstones(tombstoneKey, [...remaining, ...ids.map((id) => ({ id, deletedAt: now }))]);
+  scheduleSync(characterId);
+}
+
 /** Delete a Skill Plan locally + tombstone, so the deletion propagates. */
 export async function markPlanDeleted(characterId: number, planId: string): Promise<void> {
   await recordDeletion(characterId, planId, planTombstonesKey(characterId), () =>
@@ -156,6 +189,19 @@ export async function markPlanDeleted(characterId: number, planId: string): Prom
 }
 
 /** Build Plan analogue of markPlanDeleted — same tombstone semantics. */
+/**
+ * Deliberately does *not* cascade to a Build Plan's own Production Runs
+ * (reversed after initially cascading — see the decisions folder). A logged
+ * run is a locked financial snapshot, not a live view of the plan: its
+ * materialCost/jobFee/totalCost/quantity are fixed at logging time and never
+ * re-derived, precisely so reusing or deleting the plan later (a blueprint's
+ * market prices drift, ME/TE changes) cannot alter a profit figure already
+ * booked. Deleting the plan the run happened to be logged under must not
+ * delete the accounting record itself. `ProductionLogPanel` never renders
+ * which plan a run came from (issue #525 follow-up), so an orphaned run has
+ * nothing broken to display — it just can no longer be jumped to from a
+ * Records row click.
+ */
 export async function markBuildPlanDeleted(characterId: number, planId: string): Promise<void> {
   await recordDeletion(characterId, planId, buildPlanTombstonesKey(characterId), () =>
     db.buildPlans.delete(planId)
@@ -389,11 +435,17 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     await db.quickbars.where('characterId').equals(character.characterId).delete();
     await db.stationPins.where('characterId').equals(character.characterId).delete();
     await db.planetRichness.where('characterId').equals(character.characterId).delete();
+    await db.productionRuns.where('characterId').equals(character.characterId).delete();
+    await db.productionSaleLinks.where('characterId').equals(character.characterId).delete();
+    await db.productionOrderWatches.where('characterId').equals(character.characterId).delete();
     await writeTombstones(planTombstonesKey(character.characterId), []);
     await writeTombstones(buildPlanTombstonesKey(character.characterId), []);
     await writeTombstones(quickbarTombstonesKey(character.characterId), []);
     await writeTombstones(stationPinTombstonesKey(character.characterId), []);
     await writeTombstones(planetRichnessTombstonesKey(character.characterId), []);
+    await writeTombstones(productionRunTombstonesKey(character.characterId), []);
+    await writeTombstones(productionSaleLinkTombstonesKey(character.characterId), []);
+    await writeTombstones(productionOrderWatchTombstonesKey(character.characterId), []);
     // Cached wallet/mail/assets belong to the previous owner just as much as
     // the plans do. `auth/session` purges on the same signal at login; this
     // covers a transfer noticed between logins. Degrades rather than throws
@@ -719,6 +771,172 @@ const planetRichnessSpec: CollectionSpec<PlanetRichnessRecord, RemotePlanetRichn
 };
 
 // ---------------------------------------------------------------------------
+// Production Log sync (issue #525): one CollectionSpec for the run itself,
+// plus one each for its two linking-record collections. Each linking record
+// is its own document (see ProductionSaleLinkRecord/ProductionOrderWatchRecord
+// doc comments in @/db for why), so this is three plain CollectionSpecs, not
+// one with a nested array — ordinary mergeRecords LWW-per-document already
+// gives each allocation its own independent merge, no special-casing needed.
+// ---------------------------------------------------------------------------
+
+const productionRunSpec: CollectionSpec<ProductionRunRecord, RemoteProductionRunDoc> = {
+  name: 'productionRuns',
+  tombstoneKey: productionRunTombstonesKey,
+  loadLocal: (characterId) => db.productionRuns.where('characterId').equals(characterId).toArray(),
+  toRemoteDoc: (r, ownerHash) => ({
+    id: r.id,
+    characterId: r.characterId,
+    buildPlanId: r.buildPlanId,
+    productTypeID: r.productTypeID,
+    quantity: r.quantity,
+    materialCost: r.materialCost,
+    jobFee: r.jobFee,
+    totalCost: r.totalCost,
+    loggedAt: r.loggedAt,
+    updatedAt: r.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    buildPlanId: r.buildPlanId,
+    productTypeID: r.productTypeID,
+    quantity: r.quantity,
+    materialCost: r.materialCost,
+    jobFee: r.jobFee,
+    totalCost: r.totalCost,
+    loggedAt: r.loggedAt,
+    updatedAt: r.updatedAt,
+  }),
+  bulkPutLocal: (records) => db.productionRuns.bulkPut(records),
+  bulkDeleteLocal: (ids) => db.productionRuns.bulkDelete(ids),
+};
+
+const productionSaleLinkSpec: CollectionSpec<
+  ProductionSaleLinkRecord,
+  RemoteProductionSaleLinkDoc
+> = {
+  name: 'productionSaleLinks',
+  tombstoneKey: productionSaleLinkTombstonesKey,
+  loadLocal: (characterId) =>
+    db.productionSaleLinks.where('characterId').equals(characterId).toArray(),
+  toRemoteDoc: (r, ownerHash) => ({
+    id: r.id,
+    characterId: r.characterId,
+    runId: r.runId,
+    // Firestore rejects undefined values, so a manual entry's absent
+    // transactionId is omitted rather than sent as null.
+    ...(r.transactionId !== undefined ? { transactionId: r.transactionId } : {}),
+    quantity: r.quantity,
+    unitPrice: r.unitPrice,
+    linkedAt: r.linkedAt,
+    updatedAt: r.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    runId: r.runId,
+    ...(r.transactionId !== undefined ? { transactionId: r.transactionId } : {}),
+    quantity: r.quantity,
+    unitPrice: r.unitPrice,
+    linkedAt: r.linkedAt,
+    updatedAt: r.updatedAt,
+  }),
+  bulkPutLocal: (records) => db.productionSaleLinks.bulkPut(records),
+  bulkDeleteLocal: (ids) => db.productionSaleLinks.bulkDelete(ids),
+};
+
+const productionOrderWatchSpec: CollectionSpec<
+  ProductionOrderWatchRecord,
+  RemoteProductionOrderWatchDoc
+> = {
+  name: 'productionOrderWatches',
+  tombstoneKey: productionOrderWatchTombstonesKey,
+  loadLocal: (characterId) =>
+    db.productionOrderWatches.where('characterId').equals(characterId).toArray(),
+  toRemoteDoc: (r, ownerHash) => ({
+    id: r.id,
+    characterId: r.characterId,
+    runId: r.runId,
+    orderId: r.orderId,
+    unitPrice: r.unitPrice,
+    initialVolumeRemain: r.initialVolumeRemain,
+    lastKnownVolumeRemain: r.lastKnownVolumeRemain,
+    closed: r.closed,
+    watchedAt: r.watchedAt,
+    updatedAt: r.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    runId: r.runId,
+    orderId: r.orderId,
+    unitPrice: r.unitPrice,
+    initialVolumeRemain: r.initialVolumeRemain,
+    lastKnownVolumeRemain: r.lastKnownVolumeRemain,
+    closed: r.closed,
+    watchedAt: r.watchedAt,
+    updatedAt: r.updatedAt,
+  }),
+  bulkPutLocal: (records) => db.productionOrderWatches.bulkPut(records),
+  bulkDeleteLocal: (ids) => db.productionOrderWatches.bulkDelete(ids),
+};
+
+/**
+ * Delete a Production Run locally + tombstone, cascading to every sale link
+ * and order watch that names it (issue #525) — an allocation left pointing at
+ * a run that no longer exists is worse than a slightly noisier tombstone
+ * list, and would otherwise linger forever in "already linked" checks.
+ */
+export async function markProductionRunDeleted(characterId: number, runId: string): Promise<void> {
+  const [saleLinks, orderWatches] = await Promise.all([
+    db.productionSaleLinks.where('runId').equals(runId).toArray(),
+    db.productionOrderWatches.where('runId').equals(runId).toArray(),
+  ]);
+  await recordBulkDeletion(
+    characterId,
+    saleLinks.map((l) => l.id),
+    productionSaleLinkTombstonesKey(characterId),
+    (ids) => db.productionSaleLinks.bulkDelete(ids)
+  );
+  await recordBulkDeletion(
+    characterId,
+    orderWatches.map((w) => w.id),
+    productionOrderWatchTombstonesKey(characterId),
+    (ids) => db.productionOrderWatches.bulkDelete(ids)
+  );
+  await recordDeletion(characterId, runId, productionRunTombstonesKey(characterId), () =>
+    db.productionRuns.delete(runId)
+  );
+}
+
+/**
+ * Unlink a past sale from a Production Run. Tombstoned like every other
+ * deletion here, so it doesn't resurrect from a device that hasn't synced
+ * the removal yet and silently re-attribute the sale.
+ */
+export async function removeProductionSaleLink(characterId: number, linkId: string): Promise<void> {
+  await recordDeletion(characterId, linkId, productionSaleLinkTombstonesKey(characterId), () =>
+    db.productionSaleLinks.delete(linkId)
+  );
+}
+
+/** Stop watching an open sell order for a Production Run — same tombstone reasoning as removeProductionSaleLink. */
+export async function removeProductionOrderWatch(
+  characterId: number,
+  watchId: string
+): Promise<void> {
+  await recordDeletion(characterId, watchId, productionOrderWatchTombstonesKey(characterId), () =>
+    db.productionOrderWatches.delete(watchId)
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Notification Feed sync (issue #362)
 //
 // Deliberate departure from CollectionSpec: this collection has no
@@ -838,6 +1056,9 @@ async function syncCharacter(characterId: number): Promise<void> {
   await syncEditableCollection(quickbarSpec, ctx);
   await syncEditableCollection(stationPinSpec, ctx);
   await syncEditableCollection(planetRichnessSpec, ctx);
+  await syncEditableCollection(productionRunSpec, ctx);
+  await syncEditableCollection(productionSaleLinkSpec, ctx);
+  await syncEditableCollection(productionOrderWatchSpec, ctx);
   await syncFeed(ctx);
 
   // ---- Synced settings ----

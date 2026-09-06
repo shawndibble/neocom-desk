@@ -4,7 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
 import { markBuildPlanDeleted, scheduleSync } from '@/sync';
-import { Button, EmptyState, PageHeader, Panel, ReauthBanner, Spinner } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  PageHeader,
+  Panel,
+  ReauthBanner,
+  Spinner,
+  Tabs,
+} from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -37,6 +45,7 @@ import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
+import { ProductionLogPanel } from '@/features/industry/ProductionLogPanel';
 import {
   BuildPlanDetail,
   type PlanPatch,
@@ -133,6 +142,7 @@ export function Industry() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState<'plans' | 'records'>('plans');
 
   // Stamped with the Character it was read for, because `useLiveQuery` holds
   // its previous result in a ref across a deps change: for one render after
@@ -482,6 +492,18 @@ export function Industry() {
     setCompareSelectedIds(new Set());
   }
 
+  /**
+   * Records tab row click: jump to the run's own Build Plan on the Build
+   * Plans tab. Exits Compare first — otherwise the detail pane's own
+   * `comparing` branch (checked before `selectedPlan`) would keep showing
+   * the compare table instead of the run's plan if Compare was left open.
+   */
+  function openRunFromRecords(buildPlanId: string) {
+    exitCompare();
+    setSelectedId(buildPlanId);
+    setTab('plans');
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title={t('nav.industry')} />
@@ -508,98 +530,123 @@ export function Industry() {
           <Spinner label={t('common.loading')} />
         </div>
       ) : (
-        // `lg:items-start`: grid items stretch to the row's height by
-        // default, so without this the list column (often just a couple of
-        // short rows) gets pulled up to match the detail column's full
-        // height, rendering as a tall, mostly-empty box.
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
-          <Panel className={isDesktop || !detailVisible ? '' : 'hidden'}>
-            <BuildPlanList
-              plans={plans}
-              catalog={catalog}
-              // Only mark a row selected when its detail is actually on
-              // screen: the first-plan fallback would otherwise leave a row
-              // highlighted on a narrow screen with nothing open.
-              selectedId={detailVisible ? effectiveSelectedId : null}
-              onSelect={setSelectedId}
-              onCreate={(entry) =>
-                void createPlan(entry).then((id) => {
-                  if (id) setSelectedId(id);
-                })
-              }
-              onDuplicate={(id) => void handleDuplicate(id)}
-              onDelete={(id) => void handleDelete(id)}
-              onRename={(id, name) => void handleRename(id, name)}
-              compareMode={compareMode}
-              compareSelectedIds={compareSelectedIds}
-              onToggleCompareMode={toggleCompareMode}
-              onToggleCompareSelected={toggleCompareSelected}
-              onOpenCompare={() => setComparing(true)}
-            />
-          </Panel>
+        <>
+          <Tabs
+            label={t('nav.industry')}
+            value={tab}
+            onChange={(id) => setTab(id as typeof tab)}
+            tabs={[
+              { id: 'plans', label: t('industry.buildPlansTab') },
+              { id: 'records', label: t('industry.recordsTab') },
+            ]}
+          />
 
-          <article className={`space-y-2 ${detailVisible ? '' : 'hidden'}`}>
-            {showBackControl && (
-              <Button size="sm" onClick={() => (comparing ? exitCompare() : setSelectedId(null))}>
-                {t('industry.backToList')}
-              </Button>
-            )}
-            <div
-              ref={scrollerRef}
-              className="space-y-4 lg:overflow-y-auto"
-              style={
-                isDesktop && scrollerMaxHeight !== null
-                  ? { maxHeight: scrollerMaxHeight }
-                  : undefined
-              }
-            >
-              {!detailVisible ? null : comparing ? (
-                comparePlans.length >= 2 ? (
-                  <BuildPlanCompare
-                    plans={comparePlans}
-                    catalog={catalog}
-                    pi={pi}
-                    skills={skills}
-                    onDone={exitCompare}
-                  />
-                ) : (
-                  <EmptyState
-                    title={t('industry.compareNeedMore')}
-                    hint={t('industry.compareNeedMoreHint')}
-                    action={
-                      <Button size="sm" onClick={exitCompare}>
-                        {t('industry.compareDone')}
-                      </Button>
-                    }
-                  />
-                )
-              ) : selectedPlan ? (
-                <BuildPlanDetail
-                  key={selectedPlan.id}
-                  plan={selectedPlan}
+          {tab === 'records' ? (
+            <ProductionLogPanel
+              characterId={activeCharacterId}
+              catalog={catalog}
+              skills={skills}
+              plans={plans}
+              onOpenRun={openRunFromRecords}
+            />
+          ) : (
+            // `lg:items-start`: grid items stretch to the row's height by
+            // default, so without this the list column (often just a couple
+            // of short rows) gets pulled up to match the detail column's
+            // full height, rendering as a tall, mostly-empty box.
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
+              <Panel className={isDesktop || !detailVisible ? '' : 'hidden'}>
+                <BuildPlanList
+                  plans={plans}
                   catalog={catalog}
-                  pi={pi}
-                  ownedBlueprints={ownedBlueprints}
-                  skills={skills}
-                  ownedStockSnapshot={ownedStockSnapshot}
-                  onUpdate={(patch) => void handleUpdate(patch)}
-                  onDerivedFix={(patch) => void handleDerivedFix(patch)}
-                  onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
-                  onSourcingChangeMany={(patches) => void handleSourcingChangeMany(patches)}
-                  onAddToQuickbar={quickbar.add}
-                  quickbarAvailable={quickbar.available}
-                  onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
+                  // Only mark a row selected when its detail is actually on
+                  // screen: the first-plan fallback would otherwise leave a row
+                  // highlighted on a narrow screen with nothing open.
+                  selectedId={detailVisible ? effectiveSelectedId : null}
+                  onSelect={setSelectedId}
+                  onCreate={(entry) =>
+                    void createPlan(entry).then((id) => {
+                      if (id) setSelectedId(id);
+                    })
+                  }
+                  onDuplicate={(id) => void handleDuplicate(id)}
+                  onDelete={(id) => void handleDelete(id)}
+                  onRename={(id, name) => void handleRename(id, name)}
+                  compareMode={compareMode}
+                  compareSelectedIds={compareSelectedIds}
+                  onToggleCompareMode={toggleCompareMode}
+                  onToggleCompareSelected={toggleCompareSelected}
+                  onOpenCompare={() => setComparing(true)}
                 />
-              ) : plans.length > 0 ? (
-                <div className="flex justify-center py-8">
-                  <Spinner label={t('common.loading')} />
+              </Panel>
+
+              <article className={`space-y-2 ${detailVisible ? '' : 'hidden'}`}>
+                {showBackControl && (
+                  <Button
+                    size="sm"
+                    onClick={() => (comparing ? exitCompare() : setSelectedId(null))}
+                  >
+                    {t('industry.backToList')}
+                  </Button>
+                )}
+                <div
+                  ref={scrollerRef}
+                  className="space-y-4 lg:overflow-y-auto"
+                  style={
+                    isDesktop && scrollerMaxHeight !== null
+                      ? { maxHeight: scrollerMaxHeight }
+                      : undefined
+                  }
+                >
+                  {!detailVisible ? null : comparing ? (
+                    comparePlans.length >= 2 ? (
+                      <BuildPlanCompare
+                        plans={comparePlans}
+                        catalog={catalog}
+                        pi={pi}
+                        skills={skills}
+                        onDone={exitCompare}
+                      />
+                    ) : (
+                      <EmptyState
+                        title={t('industry.compareNeedMore')}
+                        hint={t('industry.compareNeedMoreHint')}
+                        action={
+                          <Button size="sm" onClick={exitCompare}>
+                            {t('industry.compareDone')}
+                          </Button>
+                        }
+                      />
+                    )
+                  ) : selectedPlan ? (
+                    <BuildPlanDetail
+                      key={selectedPlan.id}
+                      plan={selectedPlan}
+                      catalog={catalog}
+                      pi={pi}
+                      ownedBlueprints={ownedBlueprints}
+                      skills={skills}
+                      ownedStockSnapshot={ownedStockSnapshot}
+                      onUpdate={(patch) => void handleUpdate(patch)}
+                      onDerivedFix={(patch) => void handleDerivedFix(patch)}
+                      onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
+                      onSourcingChangeMany={(patches) => void handleSourcingChangeMany(patches)}
+                      onAddToQuickbar={quickbar.add}
+                      quickbarAvailable={quickbar.available}
+                      onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
+                    />
+                  ) : plans.length > 0 ? (
+                    <div className="flex justify-center py-8">
+                      <Spinner label={t('common.loading')} />
+                    </div>
+                  ) : (
+                    <EmptyState title={t('industry.selectHint')} />
+                  )}
                 </div>
-              ) : (
-                <EmptyState title={t('industry.selectHint')} />
-              )}
+              </article>
             </div>
-          </article>
-        </div>
+          )}
+        </>
       )}
 
       {infoModalItem && (

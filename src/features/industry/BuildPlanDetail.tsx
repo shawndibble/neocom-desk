@@ -53,6 +53,7 @@ import {
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { ResultsSummary } from './ResultsSummary';
+import { ProductionRunsPanel } from './ProductionRunsPanel';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationLabel } from './buildLocationLabel';
@@ -521,6 +522,11 @@ export function BuildPlanDetail({
   if (!entry || !blueprint) {
     return <EmptyState title={t('industry.blueprintMissing')} className="py-8" />;
   }
+
+  // Units produced by the job (per-run product quantity x runs); null when
+  // the blueprint has no product. Shared by the Results panel and the
+  // Production Runs panel's "Log Production" default below.
+  const productQuantity = blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null;
 
   function update(patch: PlanPatch) {
     onUpdate(patch);
@@ -997,13 +1003,28 @@ export function BuildPlanDetail({
                 ? (snapshot?.hubPrices[entry.productTypeID] ?? null)
                 : null
             }
-            productQuantity={
-              blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null
-            }
+            productQuantity={productQuantity}
             costIndexSystemName={buildSystem?.name ?? hub.systemName}
           />
         </Panel>
       )}
+
+      <ProductionRunsPanel
+        characterId={plan.characterId}
+        buildPlanId={plan.id}
+        defaults={
+          result
+            ? {
+                quantity: productQuantity ?? 0,
+                materialCost: result.materialCost,
+                jobFee: result.jobFee.total,
+              }
+            : null
+        }
+        productTypeID={entry.productTypeID}
+        productName={entry.productName}
+        skills={skills}
+      />
     </div>
   );
 }
