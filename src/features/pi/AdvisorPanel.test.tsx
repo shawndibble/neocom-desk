@@ -432,6 +432,40 @@ describe('AdvisorPanel', () => {
     expect(within(card).getByText(/No colony slot free/)).toBeInTheDocument();
   });
 
+  it('tells every unbuilt planet how many colony slots are left', async () => {
+    // The reported case, and the one the "no slot free" warning missed
+    // entirely: six planets in the system, four colonies, five slots. Both
+    // unbuilt cards are options, but only one of them can be taken, and
+    // nothing on the tab said which of those two facts applied.
+    loadInterplanetaryConsolidation.mockResolvedValue(4);
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [
+          colony(40_000_001, 'temperate'),
+          { ...colony(40_000_003, 'barren'), solar_system_id: 30_002_188 },
+          { ...colony(40_000_004, 'barren'), solar_system_id: 30_002_189 },
+          { ...colony(40_000_005, 'barren'), solar_system_id: 30_002_190 },
+        ],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    renderPanel();
+    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
+    expect(within(card).getByText(/1 of 5 colony slots free/)).toBeInTheDocument();
+  });
+
+  it('says what the next Command Center level would make room for', async () => {
+    // "Need to look into how that will adjust the advisor and its
+    // suggestions": naming the CPU and Powergrid a level adds is only half an
+    // answer — the pilot is buying pins, not megawatts.
+    renderPanel();
+    const card = (await screen.findByText('Ashab III')).closest('div')
+      ?.parentElement as HTMLElement;
+    expect(within(card).getByText(/room for/)).toBeInTheDocument();
+  });
+
   it('says nothing about slots on an unbuilt planet while one is free', async () => {
     loadInterplanetaryConsolidation.mockResolvedValue(4);
     renderPanel();

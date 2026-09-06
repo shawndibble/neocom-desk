@@ -9,10 +9,13 @@
  */
 
 import type { PiData } from '@/sde/types';
+
+const SECONDS_PER_HOUR = 3_600;
 import { factoryBalance, type FactoryBalance } from '@/engine/pi/factoryBalance';
 import { pinsLoad } from '@/engine/pi/pinBudget';
 import type { PinLoad } from '@/engine/pi/types';
 import type { BuiltColonyAdvice } from './advisorModel';
+import { productBySchematicId } from './products';
 
 /**
  * This colony's factories measured against what it can put into them.
@@ -23,12 +26,7 @@ import type { BuiltColonyAdvice } from './advisorModel';
  * schematic's demand and manufacture a surplus out of a lookup failure.
  */
 export function colonyFactoryBalance(colony: BuiltColonyAdvice, pi: PiData): FactoryBalance[] {
-  const productBySchematic = new Map(
-    Object.entries(pi.schematics).map(([typeId, schematic]) => [
-      schematic.schematicId,
-      Number(typeId),
-    ])
-  );
+  const productBySchematic = productBySchematicId(pi);
 
   const running: { typeId: number; pins: number }[] = [];
   for (const group of colony.production) {
@@ -91,7 +89,7 @@ export function colonyOutputPerHour(
   for (const line of balance) {
     const schematic = pi.schematics[String(line.typeId)];
     if (!schematic || schematic.cycleTime <= 0) continue;
-    const perPin = (schematic.quantity * 3_600) / schematic.cycleTime;
+    const perPin = (schematic.quantity * SECONDS_PER_HOUR) / schematic.cycleTime;
     const pins = line.status === 'measured' ? Math.min(line.pins, line.feedablePins) : line.pins;
     if (pins <= 0) continue;
     out.set(line.typeId, (out.get(line.typeId) ?? 0) + perPin * pins);

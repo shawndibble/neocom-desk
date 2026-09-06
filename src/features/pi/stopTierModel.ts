@@ -39,6 +39,7 @@ import type { PiData } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX } from '@/engine/pi/pinBudget';
 import { recommendStopTier, type StopTierAdvice } from '@/engine/pi/stopTier';
 import { localResourcesFor, type BuiltColonyAdvice } from './advisorModel';
+import { productBySchematicId } from './products';
 
 /**
  * How long a colony is left to fill before someone hauls. The throughput
@@ -118,12 +119,7 @@ export function meanHeadsPerExtractor(colony: BuiltColonyAdvice): number {
  * schematic id, so it is the one place that mapping exists.
  */
 export function currentProductTypeIds(colony: BuiltColonyAdvice, pi: PiData): number[] {
-  const productBySchematic = new Map(
-    Object.entries(pi.schematics).map(([typeId, schematic]) => [
-      schematic.schematicId,
-      Number(typeId),
-    ])
-  );
+  const productBySchematic = productBySchematicId(pi);
   return colony.production
     .map((group) =>
       group.schematicId === undefined ? undefined : productBySchematic.get(group.schematicId)

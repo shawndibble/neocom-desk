@@ -92,8 +92,8 @@ import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorMod
 import { colonyStopTierAdvice } from './stopTierModel';
 import { colonyFactoryBalance, surplusLoad } from './factoryBalanceModel';
 import { colonyNetwork } from './networkModel';
+import { NetworkPanel } from './NetworkPanel';
 import type { FactoryBalance } from '@/engine/pi/factoryBalance';
-import type { NetworkPlan } from '@/engine/pi/network';
 import {
   colonySpaceFor,
   customsRatePercent,
@@ -163,6 +163,24 @@ function nearestPin(
 }
 
 /**
+ * The two pins a leftover budget goes furthest on, in words.
+ *
+ * Most-of-it-first rather than declaration order: a planner offered "1
+ * extractor" and "6 high-tech plants" wants to hear about the six. Two, because
+ * the sentence this lands in is a caveat on another number, not a list.
+ */
+function roomSummary(headroom: Record<PiPinKind, number>, t: TFunction): string {
+  return [...HEADROOM_KINDS]
+    .filter((kind) => (headroom[kind] ?? 0) > 0)
+    .sort((a, b) => (headroom[b] ?? 0) - (headroom[a] ?? 0))
+    .slice(0, 2)
+    .map((kind) =>
+      t('piAdvisor.roomForItem', { count: headroom[kind], pin: t(`piAdvisor.pinKind.${kind}`) })
+    )
+    .join(' · ');
+}
+
+/**
  * The factories on this colony that nothing feeds, and what deleting them
  * would give back.
  *
@@ -189,14 +207,7 @@ function UnfedFactories({
   );
   if (starved.length === 0) return null;
 
-  // What the room would be spent on, largest count first — the pins a planner
-  // reaches for, not every kind that technically fits.
-  const room = HEADROOM_KINDS.filter((kind) => (headroom[kind] ?? 0) > 0)
-    .slice(0, 2)
-    .map((kind) =>
-      t('piAdvisor.roomForItem', { count: headroom[kind], pin: t(`piAdvisor.pinKind.${kind}`) })
-    )
-    .join(' · ');
+  const room = roomSummary(headroom, t);
 
   return (
     <div className="space-y-1 border-t border-line pt-2">
@@ -246,116 +257,6 @@ function UnfedFactories({
             })}
       </p>
     </div>
-  );
-}
-
-/**
- * What this system's colonies could make between them (ADR 0012).
- *
- * The per-planet cards each answer for one planet, which is why a four-colony
- * operation making four different P1s reads "keep selling raw" four times:
- * `localChainTargets` gates on one planet's own P0 closure and no one of them
- * reaches a P2. This is the answer they cannot give, and it sits above them
- * rather than on any one card because it is about the set.
- */
-function NetworkPanel({
-  plan,
-  planetNames,
-  taxRate,
-}: {
-  plan: NetworkPlan;
-  planetNames: ReadonlyMap<number, string>;
-  taxRate: number;
-}) {
-  const { t } = useTranslation();
-  const nameOfPlanet = (planetId: number) =>
-    planetNames.get(planetId) ?? t('piAdvisor.systemLabel', { id: planetId });
-  const total = plan.opportunities.reduce((sum, line) => sum + line.marginPerHour, 0);
-
-  return (
-    <Panel title={t('piAdvisor.networkTitle')}>
-      <p className="text-xs text-text-dim">{t('piAdvisor.networkHint')}</p>
-
-      {plan.opportunities.length === 0 ? (
-        <p className="mt-2 text-xs text-text-dim">{t('piAdvisor.networkNothing')}</p>
-      ) : (
-        <ul className="mt-2 space-y-2">
-          {plan.opportunities.map((line) => (
-            <li key={line.typeId} className="space-y-0.5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span>
-                  {t('piAdvisor.networkOpportunity', {
-                    factories: line.factories,
-                    facility: t(`piAdvisor.pinKind.${line.facility}`),
-                    host: nameOfPlanet(line.hostPlanetId),
-                    name: line.name,
-                  })}
-                </span>
-                <span className="tabular-nums text-accent">
-                  {t('piAdvisor.networkValue', { isk: formatIsk(line.marginPerHour) })}
-                </span>
-              </div>
-              {/* The routes are the work: an opportunity a pilot cannot see the
-                  shipping for is not actionable. */}
-              <ul className="text-[0.6875rem] text-text-dim">
-                {line.inputs.map((input) => (
-                  <li key={input.typeId}>
-                    {input.local
-                      ? t('piAdvisor.networkRouteLocal', { name: input.name })
-                      : t('piAdvisor.networkRouteImport', {
-                          units: Math.round(input.unitsPerHour).toLocaleString(),
-                          name: input.name,
-                          from: nameOfPlanet(input.fromPlanetId),
-                        })}
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {plan.opportunities.length > 0 && (
-        <p className="mt-2 border-t border-line pt-2 text-xs text-text-dim">
-          {t('piAdvisor.networkTotal', {
-            isk: formatIsk(total),
-            hub: DEFAULT_TRADE_HUB.systemName,
-            percent: customsRatePercent(taxRate),
-          })}{' '}
-          {plan.opportunities.length > 1 ? t('piAdvisor.networkGreedy') : ''}
-        </p>
-      )}
-
-      {plan.unallocated.length > 0 && (
-        <p className="text-[0.6875rem] text-text-dim">
-          {t('piAdvisor.networkLeftover', {
-            list: plan.unallocated
-              .map((line) =>
-                t('piAdvisor.networkLeftoverItem', {
-                  units: Math.round(line.unitsPerHour).toLocaleString(),
-                  name: line.name,
-                })
-              )
-              .join(', '),
-          })}
-        </p>
-      )}
-
-      {/* Never silently dropped: "you need more powergrid for this" is the
-          actionable half, and silence reads as "there is nothing here". */}
-      {plan.blocked.length > 0 && (
-        <ul className="mt-1 text-[0.6875rem] text-text-dim">
-          {plan.blocked.map((line) => (
-            <li key={line.typeId}>
-              {t('piAdvisor.networkBlocked', {
-                name: line.name,
-                reason: t(`piAdvisor.networkBlockedReason.${line.reason}`),
-              })}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Panel>
   );
 }
 
@@ -779,8 +680,9 @@ function BuiltCard({
   const budget: PinLoad = colony.budget;
   // A new pin is not reachable without a new link, and a link's cost is
   // distance-based — so the only honest price for one the colony has not built
-  // is what its own links cost on average. Null when there is none to average,
-  // which the card says rather than charging zero.
+  // comes from its own links: the longest hop it already has, at level 0. Null
+  // when there is none to measure, which the card says rather than charging
+  // zero.
   const newLinkCost = colony.pinLoad.newLinkLoad;
   const headroom = useMemo(
     () =>
@@ -803,6 +705,17 @@ function BuiltCard({
   // The next Command Center level, not the pilot's ceiling: levels are bought
   // one at a time, for ISK, per colony.
   const nextLevel = colonyBudget(colony.upgradeLevel + 1, pi);
+  // And what that level would hold, because the pilot is buying pins rather
+  // than megawatts — naming the CPU and Powergrid alone is half an answer.
+  const upgradedHeadroom = useMemo(
+    () =>
+      spareCapacity(colony.pinLoad.load, nextLevel.budget, pi.infrastructure, {
+        headsPerExtractor: HEADROOM_EXTRACTOR_HEADS,
+        ...(newLinkCost ? { newLinkCost } : {}),
+      }),
+    [colony.pinLoad.load, nextLevel.budget, pi.infrastructure, newLinkCost]
+  );
+  const upgradedRoom = roomSummary(upgradedHeadroom, t);
 
   // The "remove x, add y" pair. `balance` is what this colony's own extraction
   // can actually feed; `freedHeadroom` is what the budget would hold once the
@@ -1005,13 +918,14 @@ function BuiltCard({
           */}
           {!ceiling.assumed && colony.upgradeLevel < ceiling.level && (
             <p className="text-[0.6875rem] text-accent">
-              {t('piAdvisor.upgradeAvailable', {
+              {t(upgradedRoom ? 'piAdvisor.upgradeAvailableRoom' : 'piAdvisor.upgradeAvailable', {
                 level: colony.upgradeLevel,
                 max: ceiling.level,
                 cpu: Math.round(nextLevel.budget.cpu - budget.cpu).toLocaleString(),
                 powergrid: Math.round(
                   nextLevel.budget.powergrid - budget.powergrid
                 ).toLocaleString(),
+                room: upgradedRoom,
               })}
             </p>
           )}
@@ -1064,7 +978,7 @@ function UnbuiltCard({
   return (
     <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType} dashed>
       <>
-        {noSlotFree && (
+        {noSlotFree ? (
           <p className="text-xs text-warning">
             {slots.slots >= PLANET_SLOTS_MAX
               ? t('piAdvisor.noSlotFreeMax', { total: slots.slots })
@@ -1073,6 +987,18 @@ function UnbuiltCard({
                   total: slots.slots,
                   level: slots.slots,
                 })}
+          </p>
+        ) : slots.assumed ? null : (
+          // Stated on every unbuilt card, not only when the allowance runs
+          // out. Six planets in a system against five colonies is not "you
+          // cannot build" — it is "you can build one of these, not both", and
+          // that is the fact the pilot was reading the system's own planet
+          // count as.
+          <p className="text-xs text-text-dim">
+            {t('piAdvisor.slotsFree', {
+              count: Math.max(0, slots.slots - colonyCount),
+              total: slots.slots,
+            })}
           </p>
         )}
 
@@ -1274,6 +1200,12 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   const builtCount = advice.filter((entry) => entry.kind === 'built').length;
   // What these colonies could do together — the answer no single card can
   // give, because each one is about its own planet.
+  //
+  // Not memoised, deliberately: this sits below the reauth and empty-state
+  // returns above, so a `useMemo` here is a conditionally-called hook. The
+  // fix is to lift the early returns into a wrapper, which is a bigger change
+  // than this walk is worth — it is one pass over the payload's schematics
+  // against a handful of colonies.
   const network = colonyNetwork({
     advice,
     pi: snapshot.pi,
@@ -1391,7 +1323,12 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
       </Panel>
 
       {network && (
-        <NetworkPanel plan={network} planetNames={planetNames} taxRate={activeSystem.customsRate} />
+        <NetworkPanel
+          plan={network.plan}
+          assumesRemoval={network.assumesRemoval}
+          planetNames={planetNames}
+          taxRate={activeSystem.customsRate}
+        />
       )}
 
       {advice.length === 0 ? (

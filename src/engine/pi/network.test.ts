@@ -125,6 +125,30 @@ describe('planNetwork', () => {
     for (const line of plan.opportunities) expect(line.hostPlanetId).toBe(40_246_354);
   });
 
+  it('never spends the same colony’s budget twice', () => {
+    // Two opportunities can want the same host, and the second must fit in
+    // what the first left. One colony with room for exactly four Advanced
+    // factories — 4 x (500 tf / 700 MW) plus a link each — and the material
+    // for more than four across two candidates.
+    const oneRoomyHost = EFA.map((entry, i) =>
+      i === 0
+        ? {
+            ...entry,
+            spare: { cpu: 4 * 530, powergrid: 4 * 721 },
+            newLinkCost: { cpu: 30, powergrid: 21 },
+          }
+        : { ...entry, spare: { cpu: 0, powergrid: 0 } }
+    );
+    const plan = planNetwork({ ...options, colonies: oneRoomyHost }, pi);
+    const onHost = plan.opportunities
+      .filter((line) => line.hostPlanetId === 40_246_311)
+      .reduce((sum, line) => sum + line.factories, 0);
+    expect(onHost).toBeLessThanOrEqual(4);
+    // And it really did place some: a test that passes on an empty plan is
+    // not testing the budget.
+    expect(onHost).toBeGreaterThan(0);
+  });
+
   it('reports a candidate nothing can host rather than dropping it', () => {
     // "You need more powergrid for this" is the actionable half, and silence
     // reads as "there is nothing here".

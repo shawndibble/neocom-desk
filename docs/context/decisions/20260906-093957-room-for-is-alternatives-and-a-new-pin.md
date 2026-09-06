@@ -21,12 +21,19 @@ _Recorded 2026-09-06._
   unlinked price promises room that is not there — on one reported colony,
   448 MW free against a 400 MW High-Tech plant whose link cost 54 MW. The
   engine takes the figure as a parameter (`spareCapacity`'s `newLinkCost`)
-  and the feature layer supplies it as the mean of that colony's _own_
-  measured links (`colonyPinLoad`'s `meanLinkLoad`), because a link's cost is
-  distance-based and varies by two orders of magnitude between planets. Where
-  a pin would go is not knowable, so the colony's own average is the only
-  honest price; a shared constant is ruled out for the same reason #440 ruled
-  one out for the links a colony already has.
+  and the feature layer supplies it from that colony's _own_ measured links
+  (`colonyPinLoad`'s `newLinkLoad`), because a link's cost is distance-based
+  and varies by two orders of magnitude between planets — a shared constant is
+  ruled out for the same reason #440 ruled one out for the links a colony
+  already has. **The colony's longest existing hop, priced at link level 0.**
+  Where a pin would go is the pilot's choice and unknowable here, so the
+  statistic is a policy rather than a measurement, and `colonyBudget.ts` states
+  which way that policy has to fall: a mean is under the true cost for roughly
+  half of all placements, and the longest hop makes the headroom count a floor
+  — what will fit — instead of a coin flip. Level 0 because a link you have not
+  built is un-upgraded; carrying in the level modifiers of existing links would
+  quote a price no new link pays, through the one term `linkCost.ts` flags as
+  unverified.
 
 - **A colony with no link to average gets a stated ceiling, not a free one.**
   Omitting `newLinkCost` means _unpriced_, never zero: the card says "These

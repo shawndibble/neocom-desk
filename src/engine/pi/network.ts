@@ -53,6 +53,8 @@ import { chainCost, piTier } from './chain';
 import { singleFactoryChain, spareCapacity } from './pinBudget';
 import type { PinLoad, PiTier } from './types';
 
+const SECONDS_PER_HOUR = 3_600;
+
 /** Absorbs float drift so 5.0000000001 factories does not become 5 and a spare. */
 const EPSILON = 1e-9;
 
@@ -221,7 +223,7 @@ function candidates(
       demandPerFactory: schematic.inputs.map((input) => ({
         typeId: input.typeID,
         name: input.name,
-        unitsPerHour: (input.quantity * 3_600) / schematic.cycleTime,
+        unitsPerHour: (input.quantity * SECONDS_PER_HOUR) / schematic.cycleTime,
       })),
       outputPerFactory: perHour,
       marginPerUnit: cost.margin,
@@ -234,18 +236,37 @@ function candidates(
 }
 
 /**
- * How many factories of one candidate a colony's leftover budget holds, with
- * the link each new pin needs.
+ * How many factories of one candidate a colony's *remaining* budget holds,
+ * with the link each new pin needs.
  *
  * `spareCapacity` is the same call the "Room for" row makes, so a host is
  * chosen by exactly the rule the card states — one number cannot promise a
  * factory the other says will not fit.
+ *
+ * `remaining` rather than the colony's own `spare`, because two opportunities
+ * can want the same host: budget is a pool like material is, and reading each
+ * candidate against the untouched figure would put eight factories on a planet
+ * that fits four.
  */
-function hostCapacity(colony: NetworkColony, candidate: Candidate, opts: NetworkOptions): number {
-  const room = spareCapacity({ cpu: 0, powergrid: 0 }, colony.spare, opts.infrastructure, {
+function hostCapacity(
+  remaining: PinLoad,
+  colony: NetworkColony,
+  candidate: Candidate,
+  opts: NetworkOptions
+): number {
+  const room = spareCapacity({ cpu: 0, powergrid: 0 }, remaining, opts.infrastructure, {
     ...(colony.newLinkCost ? { newLinkCost: colony.newLinkCost } : {}),
   });
   return room[candidate.facility] ?? 0;
+}
+
+/** What one factory of this candidate costs on this colony, link included. */
+function factoryCost(colony: NetworkColony, candidate: Candidate, opts: NetworkOptions): PinLoad {
+  const spec = opts.infrastructure.pins[candidate.facility];
+  return {
+    cpu: (spec?.cpu ?? 0) + (colony.newLinkCost?.cpu ?? 0),
+    powergrid: (spec?.powergrid ?? 0) + (colony.newLinkCost?.powergrid ?? 0),
+  };
 }
 
 export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
@@ -270,6 +291,13 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
     }
   }
 
+  // Budget is a pool too. A candidate reads the host's *remaining* CPU and
+  // Powergrid, and spends it, so the next candidate cannot be given the same
+  // room over again.
+  const remaining = new Map<number, PinLoad>(
+    opts.colonies.map((colony) => [colony.planetId, { ...colony.spare }])
+  );
+
   const opportunities: NetworkOpportunity[] = [];
   const stillBlocked = [...blocked];
 
@@ -293,7 +321,8 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
     // boundary and one fewer route to set up.
     let host: { colony: NetworkColony; capacity: number; localInputs: number } | null = null;
     for (const colony of opts.colonies) {
-      const capacity = hostCapacity(colony, candidate, opts);
+      const left = remaining.get(colony.planetId) ?? colony.spare;
+      const capacity = hostCapacity(left, colony, candidate, opts);
       if (capacity <= 0) continue;
       const localInputs = candidate.demandPerFactory.filter(
         (input) => (colony.outputPerHour.get(input.typeId) ?? 0) > 0
@@ -316,6 +345,14 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
     }
 
     const factories = Math.min(host.capacity, Math.floor(bySupply + EPSILON));
+
+    const cost = factoryCost(host.colony, candidate, opts);
+    const left = remaining.get(host.colony.planetId) ?? host.colony.spare;
+    remaining.set(host.colony.planetId, {
+      cpu: left.cpu - cost.cpu * factories,
+      powergrid: left.powergrid - cost.powergrid * factories,
+    });
+
     const inputs: NetworkInput[] = candidate.demandPerFactory.map((input) => {
       const unitsPerHour = input.unitsPerHour * factories;
       supply.set(input.typeId, (supply.get(input.typeId) ?? 0) - unitsPerHour);
