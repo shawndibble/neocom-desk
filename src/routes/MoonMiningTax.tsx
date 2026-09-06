@@ -49,6 +49,13 @@ import {
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
 import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
+import {
+  combineEligibility,
+  dismissableRows,
+  settleUpMembers,
+} from '@/features/miningTax/selection';
+import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
+import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
@@ -142,7 +149,10 @@ export function MoonMiningTax() {
   const [statusFilter, setStatusFilter] =
     useState<ReadonlySet<MiningTaxRowStatus>>(DEFAULT_STATUSES);
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
-  const [bulkPaySelection, setBulkPaySelection] = useState<ReadonlySet<string>>(new Set());
+  // Row keys checked in the table's select column. Feeds all three bulk
+  // actions (settle up / combine / dismiss), never just bulk-pay.
+  const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
+  const [bulkDismissOpen, setBulkDismissOpen] = useState(false);
   // What the Settle-up dialog is settling: a balance card's whole balance, or
   // the table's checkbox selection. `null` keeps it closed.
   const [settleUpRows, setSettleUpRows] = useState<SettleUpRow[] | null>(null);
@@ -150,11 +160,11 @@ export function MoonMiningTax() {
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
   const [joinTarget, setJoinTarget] = useState<DisplayRow | null>(null);
   const [splitTarget, setSplitTarget] = useState<DisplayRow | null>(null);
-  // Set only by the table's "Join selected" shortcut below — pins
-  // `JoinAssignDialog`'s candidate list to exactly the one row picked via
-  // checkbox, instead of the full same-system candidate list `RowDetailModal`'s
+  // Set only by the selection toolbar's Combine — pins `JoinAssignDialog`'s
+  // candidate list to exactly the rows picked via checkbox (and pre-ticks
+  // them), instead of the full same-system candidate list `RowDetailModal`'s
   // "Join with another entry" button offers.
-  const [joinCandidateOverride, setJoinCandidateOverride] = useState<DisplayRow | null>(null);
+  const [joinCandidateOverride, setJoinCandidateOverride] = useState<DisplayRow[] | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Every tracked character, not just those with a Mining Ledger Entry this
@@ -353,9 +363,12 @@ export function MoonMiningTax() {
   }
 
   /**
-   * Other rows `joinTarget` may fold in (issue #523's "join entries"):
-   * same character, same solar system, not already part of a group (v1 is
-   * two-member joins only), and either Unassigned or Outstanding. When
+   * Other rows `joinTarget` may fold in (issue #523's "join entries") when the
+   * dialog is opened from a row's detail view: same character, same solar
+   * system, not already part of a group, and either Unassigned or Outstanding.
+   * Adding to an *existing* group goes through the selection toolbar's Combine
+   * instead (issue #539), which checks the same rules plus the
+   * at-most-one-`groupId` constraint in `selection.ts`. When
    * `joinTarget` already has an Assignment, a candidate Assignment must
    * share its Payee and tax % (the decision doc's merge rule) — a candidate
    * still unassigned always qualifies, since it simply adopts whichever
@@ -378,10 +391,14 @@ export function MoonMiningTax() {
       .map((dr) => ({ row: dr.row, assignment: dr.assignment }));
   }
 
+  // Every bulk action clears the selection: row keys are an Assignment id or a
+  // `character:date:system:unassigned` residual key, and both change the
+  // moment the action lands — a surviving selection would point at rows that
+  // no longer exist.
   function handleJoined() {
     setJoinTarget(null);
     setJoinCandidateOverride(null);
-    setBulkPaySelection(new Set());
+    setSelection(new Set());
     refresh();
   }
 
@@ -458,62 +475,42 @@ export function MoonMiningTax() {
     }
   }
 
-  const bulkPayRows: SettleUpRow[] = useMemo(
+  // Every bulk action reads the selection narrowed to what is *on screen*:
+  // selection state survives a filter change, so acting on the full set would
+  // let Dismiss reach entries the pilot cannot see.
+  const selectedRows = useMemo(
+    () => visibleRows.filter((dr) => selection.has(dr.key)),
+    [visibleRows, selection]
+  );
+
+  const selectedSettleUpRows: SettleUpRow[] = useMemo(
     () =>
-      allDisplayRows
-        .filter((dr) => bulkPaySelection.has(dr.key))
-        // A selected joined row expands to every *actually*-outstanding
-        // member — a mixed-status group's already-paid member must not be
-        // billed a second time just because the group itself reads as
-        // Outstanding (worst-status-wins).
-        .flatMap((dr) =>
-          allMembers(dr)
-            .filter((m) => m.assignment.status === 'outstanding')
-            .map((m) => ({
-              assignment: m.assignment,
-              characterName: m.row.characterName,
-              payeeName: payeeName(m.row.characterId, m.assignment.payeeId),
-            }))
-        ),
+      settleUpMembers(selectedRows).map((m) => ({
+        assignment: m.assignment,
+        characterName: m.row.characterName,
+        payeeName: payeeName(m.row.characterId, m.assignment.payeeId),
+      })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allDisplayRows, bulkPaySelection, data]
+    [selectedRows, data]
   );
 
-  // The same checkbox column doubles as "pick two rows to join" — only the
-  // Unassigned/Outstanding, not-already-grouped rows among the selection
-  // count (an ordinary bulk-pay selection of 2+ Outstanding rows just isn't
-  // a join candidate list), and exactly two of them, same character and
-  // system, and (when both already have an Assignment) the same Payee and
-  // tax % — the decision doc's merge rule.
-  const joinEligibleSelected = useMemo(
-    () =>
-      allDisplayRows.filter(
-        (dr) =>
-          bulkPaySelection.has(dr.key) &&
-          !dr.groupMembers &&
-          (dr.status === 'unassigned' || dr.status === 'outstanding')
-      ),
-    [allDisplayRows, bulkPaySelection]
-  );
-  const joinPair = useMemo(() => {
-    if (joinEligibleSelected.length !== 2) return null;
-    const [a, b] = joinEligibleSelected;
-    if (a.row.characterId !== b.row.characterId) return null;
-    if (a.row.entry.solarSystemId !== b.row.entry.solarSystemId) return null;
-    if (
-      a.assignment &&
-      b.assignment &&
-      (a.assignment.payeeId !== b.assignment.payeeId || a.assignment.taxPct !== b.assignment.taxPct)
-    ) {
-      return null;
-    }
-    return [a, b] as const;
-  }, [joinEligibleSelected]);
+  const combine = useMemo(() => combineEligibility(selectedRows), [selectedRows]);
+  const dismissTargets = useMemo(() => dismissableRows(selectedRows), [selectedRows]);
 
-  function handleJoinSelected() {
-    if (!joinPair) return;
-    setJoinTarget(joinPair[0]);
-    setJoinCandidateOverride(joinPair[1]);
+  function handleCombineSelected() {
+    if (!combine.ok) return;
+    const [primary, ...rest] = combine.rows;
+    setJoinTarget(primary);
+    setJoinCandidateOverride(rest);
+  }
+
+  function toggleRowSelected(key: string) {
+    setSelection((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   // The Character column only earns its place when more than one character
@@ -528,7 +525,8 @@ export function MoonMiningTax() {
   // checkbox column rather than each getting its own.
   const isSelectableRow = (dr: DisplayRow) =>
     (dr.status === 'outstanding' && dr.assignment !== null) || dr.status === 'unassigned';
-  const showSelectColumn = visibleRows.some(isSelectableRow);
+  const selectableVisible = visibleRows.filter(isSelectableRow);
+  const showSelectColumn = selectableVisible.length > 0;
 
   const columns: DataTableColumn<DisplayRow>[] = [
     ...(showSelectColumn
@@ -542,16 +540,9 @@ export function MoonMiningTax() {
                 <input
                   type="checkbox"
                   aria-label={t('miningTax.selectForBulkAction')}
-                  checked={bulkPaySelection.has(dr.key)}
+                  checked={selection.has(dr.key)}
                   onClick={(e) => e.stopPropagation()}
-                  onChange={() =>
-                    setBulkPaySelection((previous) => {
-                      const next = new Set(previous);
-                      if (next.has(dr.key)) next.delete(dr.key);
-                      else next.add(dr.key);
-                      return next;
-                    })
-                  }
+                  onChange={() => toggleRowSelected(dr.key)}
                 />
               ) : null,
           } satisfies DataTableColumn<DisplayRow>,
@@ -920,22 +911,20 @@ export function MoonMiningTax() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {bulkPayRows.length > 0 && (
-              <Button size="sm" variant="primary" onClick={() => setSettleUpRows(bulkPayRows)}>
-                {t('miningTax.settleUpSelectedAction', { count: bulkPayRows.length })}
-              </Button>
-            )}
-
-            {joinPair && (
-              <Button size="sm" variant="primary" onClick={handleJoinSelected}>
-                {t('miningTax.joinSelectedAction')}
-              </Button>
-            )}
-            {joinEligibleSelected.length === 2 && !joinPair && (
-              <p className="text-xs text-text-dim">{t('miningTax.joinIncompatibleHint')}</p>
-            )}
           </div>
+
+          <SelectionToolbar
+            selectedCount={selectedRows.length}
+            canSelectAll={selectableVisible.some((dr) => !selection.has(dr.key))}
+            onSelectAll={() => setSelection(new Set(selectableVisible.map((dr) => dr.key)))}
+            onClear={() => setSelection(new Set())}
+            settleUpCount={selectedSettleUpRows.length}
+            onSettleUp={() => setSettleUpRows(selectedSettleUpRows)}
+            combine={combine}
+            onCombine={handleCombineSelected}
+            dismissCount={dismissTargets.length}
+            onDismiss={() => setBulkDismissOpen(true)}
+          />
 
           {visibleRows.length === 0 ? (
             <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
@@ -1056,9 +1045,10 @@ export function MoonMiningTax() {
           primary={{ row: joinTarget.row, assignment: joinTarget.assignment }}
           candidates={
             joinCandidateOverride
-              ? [{ row: joinCandidateOverride.row, assignment: joinCandidateOverride.assignment }]
+              ? joinCandidateOverride.map((dr) => ({ row: dr.row, assignment: dr.assignment }))
               : joinCandidatesFor(joinTarget)
           }
+          initialSelection={joinCandidateOverride ? 'all' : 'none'}
           payees={data.payeesByCharacter.get(joinTarget.row.characterId) ?? []}
           typeNames={data.typeNames}
           unitPrices={data.unitPrices}
@@ -1074,7 +1064,22 @@ export function MoonMiningTax() {
           rows={settleUpRows}
           systemNames={data.systemNames}
           onPaid={() => {
-            setBulkPaySelection(new Set());
+            setSelection(new Set());
+            refresh();
+          }}
+        />
+      )}
+
+      {bulkDismissOpen && data && (
+        <BulkDismissDialog
+          open
+          onClose={() => setBulkDismissOpen(false)}
+          rows={dismissTargets}
+          systemNames={data.systemNames}
+          estimatedValueOf={estimatedValueOf}
+          showCharacter={showCharacterColumn}
+          onDismissed={() => {
+            setSelection(new Set());
             refresh();
           }}
         />

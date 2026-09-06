@@ -81,8 +81,23 @@ export interface DismissInput {
  * into a standing "never taxed" verdict.
  */
 export async function dismissEntry(input: DismissInput): Promise<MiningTaxAssignmentRecord> {
+  const [record] = await dismissEntries([input]);
+  return record;
+}
+
+/**
+ * Dismisses several entries in one write — the ledger's bulk Dismiss (issue
+ * #539). Deliberately one `bulkPut` and one `scheduleSync` *per character*
+ * rather than a loop over `dismissEntry`: dismissing a week of entries would
+ * otherwise fire a week's worth of syncs for what is a single user action.
+ * Same shape as `markAssignmentsPaid`.
+ */
+export async function dismissEntries(
+  inputs: readonly DismissInput[]
+): Promise<MiningTaxAssignmentRecord[]> {
+  if (inputs.length === 0) return [];
   const now = Date.now();
-  const record: MiningTaxAssignmentRecord = {
+  const records = inputs.map((input): MiningTaxAssignmentRecord => ({
     id: crypto.randomUUID(),
     characterId: input.characterId,
     date: input.date,
@@ -93,10 +108,10 @@ export async function dismissEntry(input: DismissInput): Promise<MiningTaxAssign
     taxOwed: 0,
     status: 'dismissed',
     updatedAt: now,
-  };
-  await db.miningTaxAssignments.put(record);
-  scheduleSync(input.characterId);
-  return record;
+  }));
+  await db.miningTaxAssignments.bulkPut(records);
+  for (const characterId of new Set(inputs.map((i) => i.characterId))) scheduleSync(characterId);
+  return records;
 }
 
 export interface UpdateAssignmentInput {
