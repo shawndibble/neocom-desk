@@ -38,6 +38,7 @@
  * pilot asked to see: a link, a customs boundary, or a shopping trip.
  */
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { formatIsk } from '@/lib/isk';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { PiData, PiPinKind } from '@/sde/types';
@@ -46,6 +47,38 @@ import type { PinLoad } from '@/engine/pi/types';
 import type { IdleFacilityPlan } from './colonyActionModel';
 
 const round = (value: number) => Math.round(value).toLocaleString();
+
+/**
+ * How an input reads on the card: a link, a route, or a shopping trip — and
+ * whose planet it comes from when that is not the reader's own.
+ *
+ * Naming the owner matters once alts are in the plan: "route in from Ashab IV"
+ * is not an instruction the reader can act on if Ashab IV belongs to a
+ * character they would have to log in as first.
+ */
+function inputLine(
+  input: NetworkOpportunity['inputs'][number],
+  planetNames: ReadonlyMap<number, string>,
+  owners: ReadonlyMap<number, string>,
+  t: TFunction
+): string {
+  const units = round(input.unitsPerHour);
+  if (input.source === 'local') return t('piAdvisor.actionInputLocal', { units, name: input.name });
+  if (input.source === 'bought') {
+    return t('piAdvisor.actionInputBuy', {
+      units,
+      name: input.name,
+      hub: DEFAULT_TRADE_HUB.systemName,
+      isk: formatIsk(input.costPerHour),
+    });
+  }
+  const planetId = input.fromPlanetId ?? -1;
+  const from = planetNames.get(planetId) ?? String(input.fromPlanetId ?? '');
+  const owner = owners.get(planetId);
+  return owner
+    ? t('piAdvisor.altOwnerRoute', { units, name: input.name, from, owner })
+    : t('piAdvisor.actionInputRoute', { units, name: input.name, from });
+}
 
 export function IdleFacilities({ plan, pi }: { plan: IdleFacilityPlan; pi: PiData }) {
   const { t } = useTranslation();
@@ -137,9 +170,11 @@ export function IdleFacilities({ plan, pi }: { plan: IdleFacilityPlan; pi: PiDat
 function ConvertFacilities({
   conversions,
   planetNames,
+  owners,
 }: {
   conversions: readonly NetworkConversion[];
   planetNames: ReadonlyMap<number, string>;
+  owners: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
   return (
@@ -169,25 +204,7 @@ function ConvertFacilities({
               </li>
               {entry.add.inputs.map((input) => (
                 <li key={`${input.typeId}-${input.fromPlanetId ?? 'hub'}`}>
-                  {input.source === 'local'
-                    ? t('piAdvisor.actionInputLocal', {
-                        units: round(input.unitsPerHour),
-                        name: input.name,
-                      })
-                    : input.source === 'bought'
-                      ? t('piAdvisor.actionInputBuy', {
-                          units: round(input.unitsPerHour),
-                          name: input.name,
-                          hub: DEFAULT_TRADE_HUB.systemName,
-                          isk: formatIsk(input.costPerHour),
-                        })
-                      : t('piAdvisor.actionInputRoute', {
-                          units: round(input.unitsPerHour),
-                          name: input.name,
-                          from:
-                            planetNames.get(input.fromPlanetId ?? -1) ??
-                            String(input.fromPlanetId ?? ''),
-                        })}
+                  {inputLine(input, planetNames, owners, t)}
                 </li>
               ))}
               {haulIn > 0 && (
@@ -210,9 +227,11 @@ function ConvertFacilities({
 function AddFactories({
   line,
   planetNames,
+  owners,
 }: {
   line: NetworkOpportunity;
   planetNames: ReadonlyMap<number, string>;
+  owners: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
   return (
@@ -224,26 +243,7 @@ function AddFactories({
       })}
       <ul className="text-text-dim">
         {line.inputs.map((input) => (
-          <li key={input.typeId}>
-            {input.source === 'local'
-              ? t('piAdvisor.actionInputLocal', {
-                  units: round(input.unitsPerHour),
-                  name: input.name,
-                })
-              : input.source === 'bought'
-                ? t('piAdvisor.actionInputBuy', {
-                    units: round(input.unitsPerHour),
-                    name: input.name,
-                    hub: DEFAULT_TRADE_HUB.systemName,
-                    isk: formatIsk(input.costPerHour),
-                  })
-                : t('piAdvisor.actionInputRoute', {
-                    units: round(input.unitsPerHour),
-                    name: input.name,
-                    from:
-                      planetNames.get(input.fromPlanetId ?? -1) ?? String(input.fromPlanetId ?? ''),
-                  })}
-          </li>
+          <li key={input.typeId}>{inputLine(input, planetNames, owners, t)}</li>
         ))}
         <li>
           {/*
@@ -279,6 +279,7 @@ export function ColonyActions({
   opportunities,
   conversions,
   planetNames,
+  owners,
   room,
   closest,
 }: {
@@ -293,6 +294,8 @@ export function ColonyActions({
   /** Exchanges worth making here: what to take down, and what goes up instead. */
   conversions: readonly NetworkConversion[];
   planetNames: ReadonlyMap<number, string>;
+  /** Who owns a planet, when it is not the reader's own — by planetId. */
+  owners: ReadonlyMap<number, string>;
   /** What the leftover budget would hold, in words — the footnote's fallback. */
   room: string;
   /** The pin a full colony came nearest to affording; null when something fits. */
@@ -307,9 +310,9 @@ export function ColonyActions({
       <ul className="space-y-1 text-xs">
         {idle && <IdleFacilities plan={idle} pi={pi} />}
         {opportunities.map((line) => (
-          <AddFactories key={line.typeId} line={line} planetNames={planetNames} />
+          <AddFactories key={line.typeId} line={line} planetNames={planetNames} owners={owners} />
         ))}
-        <ConvertFacilities conversions={conversions} planetNames={planetNames} />
+        <ConvertFacilities conversions={conversions} planetNames={planetNames} owners={owners} />
         {/*
           `networkModel` offers each host the budget its idle pins are holding,
           so an "add" line on a colony that still has them rests on a removal

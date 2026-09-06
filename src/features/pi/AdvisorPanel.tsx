@@ -89,6 +89,8 @@ import {
 import { loadPlanetInfo, loadSchematicName } from './names';
 import { plannableTypeIds } from './products';
 import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorModel';
+import { loadPiRosterSnapshot } from './roster';
+import { useAltColonies } from './altColoniesPref';
 import { colonyStopTierAdvice } from './stopTierModel';
 import { colonyFactoryBalance } from './factoryBalanceModel';
 import { colonyNetwork } from './networkModel';
@@ -266,6 +268,21 @@ interface Snapshot {
    * every candidate that touches a thin market.
    */
   revenuePrices: Record<number, number>;
+  /**
+   * Every *other* authenticated Character's colonies, already turned into
+   * advice — the material for a plan that spans alts.
+   *
+   * Cache-only (`roster.ts`), so a Character whose colonies were never loaded
+   * simply is not here. Kept out of `systems` and off the cards deliberately:
+   * these planets are not the active Character's to rebuild, and a card
+   * offering to remove a pin on somebody else's colony would be advice aimed
+   * at the wrong pilot. They exist to be *routed from*.
+   */
+  altAdvice: PlanetAdvice[];
+  /** Each alt colony's customs rate, by planetId. */
+  altTaxRates: Map<number, number>;
+  /** Who owns each alt colony, by planetId — for naming a route's other end. */
+  altOwners: Map<number, string>;
 }
 
 async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
@@ -397,8 +414,68 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     if (name) schematicNames.set(id, name);
   });
 
+  const planetRadiusKm = new Map(
+    Object.entries(planetRadiusRaw).map(([planetId, km]) => [Number(planetId), km])
+  );
+
+  // Other Characters' colonies. Cache-only and therefore cheap: page open
+  // costs no extra ESI here, and a Character whose colonies have never been
+  // read contributes nothing rather than an empty-looking one.
+  const roster = await loadPiRosterSnapshot(characterId);
+  const altAdvice: PlanetAdvice[] = [];
+  const altTaxRates = new Map<number, number>();
+  const altOwners = new Map<number, string>();
+  if (roster.colonies.length > 0) {
+    const altBySystem = new Map<number, typeof roster.colonies>();
+    for (const entry of roster.colonies) {
+      const list = altBySystem.get(entry.planet.solar_system_id) ?? [];
+      list.push(entry);
+      altBySystem.set(entry.planet.solar_system_id, list);
+      altOwners.set(entry.planet.planet_id, entry.characterName);
+    }
+    const altSystemIds = [...altBySystem.keys()];
+    const altSecurities = await Promise.all(
+      altSystemIds.map((systemId) => loadSystemSecurity(systemId).catch(() => null))
+    );
+    const altDetails = new Map<number, CharacterPlanetDetail>();
+    for (const entry of roster.colonies) {
+      if (entry.detail) altDetails.set(entry.planet.planet_id, entry.detail);
+    }
+    altSystemIds.forEach((systemId, i) => {
+      const entries = altBySystem.get(systemId) ?? [];
+      // Only the alt's own colonies, not the whole system: this is material to
+      // route from, not a system the active Character is being advised about.
+      const planets: SystemPlanet[] = entries.map((entry) => ({
+        planetId: entry.planet.planet_id,
+        name: planetInfo.get(entry.planet.planet_id)?.name ?? null,
+        typeId: planetInfo.get(entry.planet.planet_id)?.typeId ?? null,
+      }));
+      const space = colonySpaceFor(altSecurities[i]);
+      // `null` skill, not the active Character's: Customs Code Expertise is
+      // trained per Character and the roster never reads an alt's skills. The
+      // un-reduced rate understates the margin, which is the safe direction,
+      // and `customsRateSource` already has a name for not knowing.
+      const rate = defaultCustomsRate(space, null);
+      for (const entry of entries) altTaxRates.set(entry.planet.planet_id, rate);
+      altAdvice.push(
+        ...systemAdvice(
+          {
+            planets,
+            colonies: entries.map((entry) => entry.planet),
+            details: altDetails,
+            planetRadiusKm,
+          },
+          pi
+        )
+      );
+    });
+  }
+
   return {
     pi,
+    altAdvice,
+    altTaxRates,
+    altOwners,
     systems: systemIds.map((systemId, i) => {
       const space = colonySpaceFor(securities[i]);
       return {
@@ -422,9 +499,7 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     richness,
     prices: prices.prices,
     revenuePrices: prices.revenuePrices,
-    planetRadiusKm: new Map(
-      Object.entries(planetRadiusRaw).map(([planetId, km]) => [Number(planetId), km])
-    ),
+    planetRadiusKm,
   };
 }
 
@@ -516,6 +591,7 @@ function PlanetCard({
 /** One shared empty array, so a card with no opportunity keeps a stable prop. */
 const EMPTY_OPPORTUNITIES: readonly NetworkOpportunity[] = [];
 const EMPTY_CONVERSIONS: readonly NetworkConversion[] = [];
+const EMPTY_ADVICE: PlanetAdvice[] = [];
 
 function CardLine({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -627,6 +703,7 @@ function BuiltCard({
   opportunities,
   conversions,
   planetNames,
+  owners,
 }: {
   advice: Extract<PlanetAdvice, { kind: 'built' }>;
   pi: PiData;
@@ -647,6 +724,8 @@ function BuiltCard({
   /** Exchanges the plan found on this planet: what to take down for what. */
   conversions: readonly NetworkConversion[];
   planetNames: ReadonlyMap<number, string>;
+  /** Who owns a planet, when it is not this Character's — by planetId. */
+  owners: ReadonlyMap<number, string>;
 }) {
   const { t } = useTranslation();
   const { colony } = advice;
@@ -808,6 +887,7 @@ function BuiltCard({
               opportunities={opportunities}
               conversions={conversions}
               planetNames={planetNames}
+              owners={owners}
               room={roomSummary(headroom, t)}
               closest={room.length === 0 ? closest : null}
             />
@@ -1007,6 +1087,12 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   const buyInputs = useMarketSourcing((state) => state.value);
   const hydrateBuyInputs = useMarketSourcing((state) => state.hydrate);
   const setBuyInputs = useMarketSourcing((state) => state.setValue);
+  const withAlts = useAltColonies((state) => state.value);
+  const hydrateAlts = useAltColonies((state) => state.hydrate);
+  const setWithAlts = useAltColonies((state) => state.setValue);
+  useEffect(() => {
+    void hydrateAlts();
+  }, [hydrateAlts]);
   useEffect(() => {
     void hydrateBuyInputs();
   }, [hydrateBuyInputs]);
@@ -1139,6 +1225,13 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
       taxRateByPlanet.set(colony.planet_id, system.customsRate);
     }
   }
+  // The alts join the *plan*, never the cards: those planets are not this
+  // Character's to rebuild, and a card offering to pull a pin off somebody
+  // else's colony would be advice aimed at the wrong pilot.
+  const altsInPlan = withAlts ? snapshot.altAdvice : EMPTY_ADVICE;
+  for (const [planetId, rate] of snapshot.altTaxRates) taxRateByPlanet.set(planetId, rate);
+  const planColonies = withAlts ? [...networkAdvice, ...altsInPlan] : networkAdvice;
+  const altsPlanned = altsInPlan.filter((entry) => entry.kind === 'built').length;
 
   const builtCount = advice.filter((entry) => entry.kind === 'built').length;
   // What these colonies could do together — the answer no single card can
@@ -1150,7 +1243,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   // than this walk is worth — it is one pass over the payload's schematics
   // against a handful of colonies.
   const network = colonyNetwork({
-    advice: networkAdvice,
+    advice: planColonies,
     pi: snapshot.pi,
     prices: snapshot.prices,
     revenuePrices: snapshot.revenuePrices,
@@ -1175,7 +1268,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     else conversionsByHost.set(entry.planetId, [entry]);
   }
   const planetNames = new Map(
-    networkAdvice
+    [...networkAdvice, ...snapshot.altAdvice]
       .filter((entry) => entry.name !== null)
       .map((entry) => [entry.planetId, entry.name as string])
   );
@@ -1302,6 +1395,31 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               </span>
             </span>
           </label>
+          {/*
+            Its own switch rather than the Colonies panel's: that one is
+            ephemeral `useState` on another tab and answers "show me", where
+            this answers "plan with". Only offered when there is something to
+            plan with — a pilot with one Character should not be handed a
+            control that can do nothing.
+          */}
+          {snapshot.altAdvice.length > 0 && (
+            <label className="mt-2 flex items-start gap-2 text-xs text-text">
+              <input
+                type="checkbox"
+                checked={withAlts}
+                onChange={() => void setWithAlts(!withAlts)}
+                className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
+              />
+              <span>
+                <span className="font-medium">{t('piAdvisor.altColoniesLabel')}</span>
+                <span className="block text-[0.6875rem] text-text-dim">
+                  {withAlts && altsPlanned > 0
+                    ? t('piAdvisor.altColoniesCount', { count: altsPlanned })
+                    : t('piAdvisor.altColoniesHint')}
+                </span>
+              </span>
+            </label>
+          )}
         </div>
       </Panel>
 
@@ -1334,6 +1452,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 opportunities={opportunitiesByHost.get(entry.planetId) ?? EMPTY_OPPORTUNITIES}
                 conversions={conversionsByHost.get(entry.planetId) ?? EMPTY_CONVERSIONS}
                 planetNames={planetNames}
+                owners={snapshot.altOwners}
               />
             ) : entry.kind === 'unbuilt' ? (
               <UnbuiltCard

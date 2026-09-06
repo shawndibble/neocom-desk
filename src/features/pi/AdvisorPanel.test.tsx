@@ -13,6 +13,7 @@ import type {
 import type { PiData } from '@/sde/types';
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import { useMarketSourcing } from './marketSourcingPref';
+import { useAltColonies } from './altColoniesPref';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -65,6 +66,8 @@ vi.mock('@/sync', () => ({
 }));
 const loadPlanPrices = vi.fn<() => Promise<import('./planPrices').PlanPrices>>();
 vi.mock('./planPrices', () => ({ loadPlanPrices: () => loadPlanPrices() }));
+const loadPiRosterSnapshot = vi.fn();
+vi.mock('./roster', () => ({ loadPiRosterSnapshot: () => loadPiRosterSnapshot() }));
 
 vi.mock('./data', () => ({
   loadCharacterPlanets: (...args: unknown[]) => loadCharacterPlanets(...args),
@@ -133,6 +136,37 @@ function extractorPin(pinId: number): PlanetPin {
   };
 }
 
+/** A refining colony's pin detail: one extractor feeding `factories` Basic pins. */
+function refineryDetail(
+  schematicId: number,
+  productTypeId: number,
+  factories = 3,
+  qtyPerCycle = 20_000
+): CharacterPlanetDetail {
+  return {
+    links: [],
+    routes: [],
+    pins: [
+      {
+        ...extractorPin(1),
+        extractor_details: {
+          ...(extractorPin(1).extractor_details as NonNullable<PlanetPin['extractor_details']>),
+          qty_per_cycle: qtyPerCycle,
+          product_type_id: productTypeId,
+        },
+      },
+      ...Array.from({ length: factories }, (_, i) => ({
+        pin_id: i + 2,
+        type_id: BASIC,
+        latitude: 0,
+        longitude: 0,
+        factory_details: { schematic_id: schematicId },
+      })),
+      { pin_id: 9, type_id: LAUNCHPAD, latitude: 0, longitude: 0 },
+    ],
+  };
+}
+
 const detail: CharacterPlanetDetail = {
   links: [],
   routes: [],
@@ -165,6 +199,13 @@ beforeEach(() => {
   // A module-scoped store outlives the test that set it, and buying changes
   // what every card says. Back to the shipped default each time.
   useMarketSourcing.setState({ value: false, hydrated: true });
+  useAltColonies.setState({ value: false, hydrated: true });
+  loadPiRosterSnapshot.mockResolvedValue({
+    colonies: [],
+    skipped: [],
+    notLoaded: [],
+    noColonies: [],
+  });
   loadPiPlanetRadius.mockResolvedValue({ '40000001': 6030, '40000002': 6030 });
   for (const mock of [
     loadCharacterPlanets,
@@ -850,6 +891,57 @@ describe('AdvisorPanel', () => {
     // Named in the "Together" panel even though the two planets are in
     // different systems and only one of them has a card on screen.
     expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
+  });
+
+  it('plans with another character’s colonies once asked to', async () => {
+    // "If a player has a bunch of alts, they may have like 20 colonies." The
+    // alt supplies the second P1, so the pair reaches a P2 that neither
+    // character reaches alone — and the route names whose planet it is, because
+    // "route in from Ashab IV" is not actionable if you have to log in as
+    // somebody else to do it.
+    useAltColonies.setState({ value: true, hydrated: true });
+    loadPiRosterSnapshot.mockResolvedValue({
+      colonies: [
+        {
+          characterId: 99,
+          characterName: 'Alt Pilot',
+          planet: {
+            ...colony(40_000_003, 'barren'),
+            planet_id: 40_000_003,
+            solar_system_id: ASHAB,
+          },
+          detail: refineryDetail(121, 2268),
+        },
+      ],
+      skipped: [],
+      notLoaded: [],
+      noColonies: [],
+    });
+    loadPlanPrices.mockResolvedValue({
+      prices: {
+        [2073]: 12,
+        [2268]: 12,
+        [3645]: 513.9,
+        [2393]: 490,
+        [2319]: 10_000,
+      },
+      buyPrices: {},
+      unpriced: [],
+      failed: false,
+      fetchedAt: new Date(),
+    });
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          { cached: { data: refineryDetail(131, 2073), fetchedAt: new Date(), fromCache: false } },
+        ],
+      ])
+    );
+    renderPanel();
+    await screen.findByText('Ashab III');
+    expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
+    expect(screen.getByText(/\(Alt Pilot\)/)).toBeInTheDocument();
   });
 
   it('says nothing about a network when there is only one colony to work with', async () => {

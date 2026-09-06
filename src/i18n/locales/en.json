@@ -1295,6 +1295,11 @@
       "inputs-spoken-for": "its inputs went to a better-paying product",
       "needs-buying": "one of its inputs would have to be bought at the hub"
     },
+    "altColoniesLabel": "Plan with my other characters' colonies",
+    "altColoniesHint": "Route between every character you have logged in, not just this one. Reads what is already cached, so a character whose colonies you have never opened will not appear.",
+    "altColoniesCount_one": "{{count}} colony from your other characters is in the plan.",
+    "altColoniesCount_other": "{{count}} colonies from your other characters are in the plan.",
+    "altOwnerRoute": "{{units}}/hr of {{name}} \u2014 route in from {{from}} ({{owner}})",
     "buyInputsLabel": "Buy inputs at the hub",
     "buyInputsHint": "Assume you can reach {{hub}} and haul planetary inputs in. Off, the Advisor only routes between your own colonies.",
     "buyInputsOffNote": "Buying is off, so only what your own colonies make is on the table. {{names}} would also be reachable by hauling inputs from the hub.",
