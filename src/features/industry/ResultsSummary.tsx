@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
+  Button,
   DataTable,
   Disclosure,
   EmptyState,
@@ -10,12 +11,14 @@ import {
   InfoTooltip,
   Spinner,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
 import { marketItemUrl } from '@/engine/market/urlState';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent } from './format';
+import { CalculationBreakdown, type BreakdownContext } from './CalculationBreakdown';
 
 interface CostRowProps {
   label: string;
@@ -89,6 +92,8 @@ interface ResultsSummaryProps {
   productQuantity: number | null;
   /** Short solar-system name the build's cost index applies to (UX-REVIEW #6/#8: makes the trade-hub <-> build-system coupling explicit in the label). */
   costIndexSystemName: string;
+  /** The inputs behind the numbers, quoted back by the calculation breakdown modal. */
+  breakdown: BreakdownContext;
 }
 
 /**
@@ -108,12 +113,14 @@ export function ResultsSummary({
   productUnitPrice,
   productQuantity,
   costIndexSystemName,
+  breakdown,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
   const [profitView, setProfitView] = useState<'net' | 'gross'>('net');
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
 
   const revenueColumns = useMemo<DataTableColumn<RevenueRow>[]>(
     () => [
@@ -168,6 +175,24 @@ export function ResultsSummary({
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          onClick={() => setBreakdownOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={breakdownOpen}
+        >
+          <Icon.Info size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          {t('industry.breakdownTrigger')}
+        </Button>
+      </div>
+      <CalculationBreakdown
+        open={breakdownOpen}
+        onClose={() => setBreakdownOpen(false)}
+        result={result}
+        context={breakdown}
+      />
+
       {result.unpriceable && (
         <p className="text-xs text-warning">
           {result.unpricedMaterials.length > 0 &&

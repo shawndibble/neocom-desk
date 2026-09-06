@@ -15,7 +15,7 @@ import {
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { FACILITY_PRESETS, industryActivityOf } from '@/engine/industry/types';
+import { FACILITY_PRESETS, SKILL_IDS, industryActivityOf } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type {
   FacilityKind,
@@ -1001,6 +1001,24 @@ export function BuildPlanDetail({
               blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null
             }
             costIndexSystemName={buildSystem?.name ?? hub.systemName}
+            breakdown={{
+              hubName: hub.systemName,
+              materialPriceBasis: materialPriceBasisOf(plan.materialPriceBasis),
+              me: plan.me,
+              isReaction: activity === 'reaction',
+              accountingLevel: skills[SKILL_IDS.accounting] ?? 0,
+              brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
+              systemCostIndex: snapshot?.systemCostIndex ?? null,
+              costIndexSystemName: buildSystem?.name ?? hub.systemName,
+              productName: entry.productName,
+              productQuantity: blueprint.products[0]
+                ? blueprint.products[0].quantity * plan.runs
+                : null,
+              productUnitPrice:
+                entry.productTypeID !== null
+                  ? (snapshot?.hubPrices[entry.productTypeID] ?? null)
+                  : null,
+            }}
           />
         </Panel>
       )}

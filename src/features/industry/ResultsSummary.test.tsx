@@ -1,10 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import '@/i18n';
 import type { BuildResult } from '@/engine/industry/types';
 import { ResultsSummary } from './ResultsSummary';
+import type { BreakdownContext } from './CalculationBreakdown';
+
+const BREAKDOWN: BreakdownContext = {
+  hubName: 'Jita',
+  materialPriceBasis: 'sell',
+  me: 10,
+  isReaction: false,
+  accountingLevel: 0,
+  brokerRelationsLevel: 0,
+  systemCostIndex: 0.023,
+  costIndexSystemName: 'Jita',
+  productName: 'Rifter',
+  productQuantity: 10,
+  productUnitPrice: 100000,
+};
 
 const RESULT: BuildResult = {
   materials: [],
@@ -46,6 +61,7 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
               productUnitPrice={100000}
               productQuantity={10}
               costIndexSystemName="Jita"
+              breakdown={BREAKDOWN}
               {...overrides}
             />
           }
@@ -390,5 +406,52 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       screen.queryByRole('button', { name: /Rifter has no hub sell price/ })
     ).not.toBeInTheDocument();
     expect(screen.getByText(/Rifter has no hub sell price/)).toBeInTheDocument();
+  });
+});
+
+describe('ResultsSummary: calculation breakdown (issue #531)', () => {
+  it('opens a modal from the results and explains where material and product prices come from', async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/lowest sell order/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Ore, ice and gas are priced the same way/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Units marked as owned cost 0 ISK/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Rifter is always valued at Jita's lowest sell/i)).toBeTruthy();
+  });
+
+  it("names the buy-order basis when that is the plan's basis", async () => {
+    renderSummary({ breakdown: { ...BREAKDOWN, materialPriceBasis: 'buy' } });
+    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/highest buy order/i)).toBeTruthy();
+    // The product never follows the materials onto the buy side.
+    expect(within(dialog).getByText(/Rifter is always valued at Jita's lowest sell/i)).toBeTruthy();
+  });
+
+  it("quotes the plan's own figures rather than a generic formula", async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+
+    const dialog = screen.getByRole('dialog');
+    // Total cost = materials 500 + job fee 65.
+    expect(within(dialog).getByText(/Total cost = materials .*500.*65.*565/)).toBeTruthy();
+    // Break-even at 0/0 skills: 7.5% sales tax + 3% broker fee = 10.5% of the listing price.
+    expect(within(dialog).getByText(/10\.5%/)).toBeTruthy();
+    // Revenue: 10 units at the product's own hub sell price.
+    expect(within(dialog).getByText(/10 units × .*100,000/)).toBeTruthy();
+    // Break-even divides the same total cost across those units.
+    expect(within(dialog).getByText(/Total cost .*565.* ÷ \(10 units/)).toBeTruthy();
+  });
+
+  it('drops the material-efficiency wording for a reaction, which has none', async () => {
+    renderSummary({ breakdown: { ...BREAKDOWN, isReaction: true } });
+    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/no material efficiency/i)).toBeTruthy();
+    expect(within(dialog).queryByText(/after ME 10/i)).toBeNull();
   });
 });
