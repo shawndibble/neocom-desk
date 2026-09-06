@@ -1018,6 +1018,7 @@ export function BuildPlanDetail({
             }
             costIndexSystemName={buildSystem?.name ?? hub.systemName}
             ownedSale={ownedSale}
+            nameFor={(typeID) => nameForType(catalog, typeID)}
             breakdown={{
               hubName: hub.systemName,
               materialPriceBasis: materialPriceBasisOf(plan.materialPriceBasis),

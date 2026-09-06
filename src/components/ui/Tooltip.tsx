@@ -117,7 +117,6 @@ interface InfoTooltipProps {
   onClick?: () => void;
   /** Set when the click opens a dialog, so the trigger announces what it opens. */
   'aria-haspopup'?: 'dialog';
-  'aria-expanded'?: boolean;
   className?: string;
 }
 
@@ -128,7 +127,6 @@ export function InfoTooltip({
   onClick,
   className = '',
   'aria-haspopup': ariaHasPopup,
-  'aria-expanded': ariaExpanded,
 }: InfoTooltipProps) {
   return (
     <Tooltip content={content}>
@@ -137,7 +135,6 @@ export function InfoTooltip({
         aria-label={label}
         onClick={onClick}
         aria-haspopup={ariaHasPopup}
-        aria-expanded={ariaExpanded}
         className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line text-[0.625rem] leading-none text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${className}`}
       >
         ?

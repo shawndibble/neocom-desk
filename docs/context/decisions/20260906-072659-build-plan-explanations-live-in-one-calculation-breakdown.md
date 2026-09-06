@@ -32,3 +32,11 @@ _Recorded 2026-09-06._
   are computed together from the snapshot already in hand, so the toggle
   re-renders rather than refetches — the same rule the material price basis
   follows.
+- **Two paths, not three.** The Use-or-Sell Check compares "build with the
+  stock you hold" against "sell that stock and build nothing". It deliberately
+  does not model the third path — sell the stock, buy replacement materials at
+  market, build anyway — which wins whenever the stock's sale proceeds beat its
+  replacement cost. That is a materials-arbitrage question with its own inputs
+  (spread, order wait, how much of the stock is even re-buyable at that price),
+  and folding it into a two-way verdict would make the answer less legible, not
+  more. Left out knowingly, not overlooked.

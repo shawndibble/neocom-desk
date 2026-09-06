@@ -84,6 +84,7 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
               costIndexSystemName="Jita"
               breakdown={BREAKDOWN}
               ownedSale={null}
+              nameFor={(typeID) => (typeID === 34 ? 'Tritanium' : `Type ${typeID}`)}
               {...overrides}
             />
           }
@@ -468,6 +469,15 @@ describe('ResultsSummary: calculation breakdown (issue #531)', () => {
     expect(within(dialog).getByText(/Total cost .*565.* ÷ \(10 units/)).toBeTruthy();
   });
 
+  it('explains the use-or-sell comparison and its two selling bases', async () => {
+    renderSummary();
+    await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/Sell now fills the standing buy orders/i)).toBeTruthy();
+    expect(within(dialog).getByText(/no order on the chosen side gets no verdict/i)).toBeTruthy();
+  });
+
   it('drops the material-efficiency wording for a reaction, which has none', async () => {
     renderSummary({ breakdown: { ...BREAKDOWN, isReaction: true } });
     await userEvent.click(screen.getByRole('button', { name: /how is this calculated/i }));
@@ -489,13 +499,22 @@ describe('ResultsSummary: use or sell the owned materials (issue #531)', () => {
 
     expect(screen.getByText(/use or sell your materials/i)).toBeTruthy();
     // Sell now: 100 x 1,000 gross, less 7.5% sales tax, no broker fee.
-    expect(screen.getByText('92,500')).toBeTruthy();
+    // Shown twice: the totals row and the collapsed per-material disclosure.
+    expect(screen.getAllByText('92,500').length).toBeGreaterThan(0);
     // The stock is worth far more than the 435 ISK the build nets.
     expect(screen.getByText(/SELL — selling your materials beats building/i)).toBeTruthy();
 
     await userEvent.click(screen.getByRole('button', { name: /sell order/i }));
     // Sell order: 100 x 1,200 gross, less 7.5% sales tax and 3% broker fee.
-    expect(screen.getByText('107,400')).toBeTruthy();
+    expect(screen.getAllByText('107,400').length).toBeGreaterThan(0);
+  });
+
+  it('breaks the sale down per material behind a disclosure', async () => {
+    renderSummary({ ownedSale: OWNED_SALE });
+    await userEvent.click(screen.getByRole('button', { name: /per material/i }));
+
+    expect(screen.getByRole('cell', { name: 'Tritanium' })).toBeTruthy();
+    expect(screen.getByRole('cell', { name: '100' })).toBeTruthy();
   });
 
   it('calls it for building when the build out-earns the stock', () => {

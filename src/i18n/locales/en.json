@@ -437,7 +437,7 @@
     "saleProfitabilityLoss": "Selling loses {{amount}} ISK",
     "saleProfitabilityUnknown": "Not enough price data to judge sale profitability.",
     "breakEvenPrice": "Break-even price",
-    "breakEvenPriceTooltip": "The price you must list one unit at for the sale to cover the whole job, once sales tax and broker fee are paid. Click for the full breakdown of every number here.",
+    "breakEvenPriceTooltip": "The price you must list one unit at for the sale to cover the whole job, once sales tax and broker fee are paid. Always net of fees, whatever the Gross/Net toggle above says. Click for the full breakdown of every number here.",
     "currentMarketPrice": "Current market price",
     "jobsTitle": "Active jobs",
     "jobsRefresh": "Refresh",
@@ -572,7 +572,11 @@
       "buildProfit": "Build and sell instead",
       "verdictBuild": "BUILD — using your materials beats selling them by {{amount}} ISK",
       "verdictSell": "SELL — selling your materials beats building by {{amount}} ISK",
-      "unknown": "Not enough price data to compare using your materials with selling them."
+      "unknown": "Not enough price data to compare using your materials with selling them.",
+      "buildProfitTooltip": "Always net of sales tax and broker fee, whatever the Gross/Net toggle above says: selling your materials pays those fees too, so both sides are compared after fees.",
+      "perMaterial": "Per material",
+      "ownedUnits": "Owned",
+      "netColumn": "Net if sold"
     }
   },
   "login": {
