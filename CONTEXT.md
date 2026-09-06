@@ -197,11 +197,13 @@ here — they go one per file in `docs/context/decisions/`.
   the most urgent entry that depends on it — the plan's banded view and the
   optimizer's "suggest full reorder" both key off this effective value, not
   each entry's own raw setting.
-- **Production Log**: The aggregate realized-profit view across a Build
-  Plan's own **Production Run**s (issue #525) — how much a plan's actual
-  builds actually cost and actually sold for, net of what's been linked so
-  far. Lives as a panel on the existing Build Plan detail, not a separate
-  route.
+- **Production Log**: The cross-plan, cross-item realized-profit rollup
+  (issue #525) — every **Production Run** the character has logged,
+  regardless of which Build Plan it came from, grouped by item. Distinct
+  from the per-Build-Plan "Production Runs" panel on a Build Plan's own
+  detail view, which is scoped to one plan's own runs; Production Log is the
+  account-wide picture. Lives as its own panel at the top of `/industry`, not
+  a separate route.
 - **Production Run**: A manual, pilot-entered snapshot of one production
   batch off a **Build Plan** — materials cost, job fee, and quantity as they
   stood at logging time, overridable at creation and never re-derived

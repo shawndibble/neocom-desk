@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type ProductionOrderWatchRecord, type ProductionRunRecord } from '@/db';
+import { db, type ProductionRunRecord } from '@/db';
 import {
   markProductionRunDeleted,
   removeProductionOrderWatch,
@@ -23,12 +23,12 @@ import {
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { realizedProfit, type RealizedProfitResult } from '@/engine/industry/realizedProfit';
-import { computeOrderFillQuantity } from '@/engine/industry/orderWatch';
-import { SKILL_IDS, type SkillLevels } from '@/engine/industry/types';
+import type { SkillLevels } from '@/engine/industry/types';
 import { loadWalletTransactions } from '@/features/character/wallet';
 import { loadOrders } from '@/features/character/orders';
 import { SourcingInput } from './MaterialsTable';
+import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
+import { ProductionRunStatusChip } from './ProductionRunStatusChip';
 import type { MarketOrder, WalletTransaction } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
@@ -49,14 +49,6 @@ interface RunForm {
   quantity: string;
   materialCost: string;
   jobFee: string;
-}
-
-interface RunRow {
-  run: ProductionRunRecord;
-  saleLinks: { id: string; quantity: number; unitPrice: number; transactionId?: number }[];
-  orderWatches: (ProductionOrderWatchRecord & { filled: number })[];
-  profit: RealizedProfitResult;
-  quantitySold: number;
 }
 
 const EMPTY_FORM: RunForm = { quantity: '', materialCost: '', jobFee: '' };
@@ -119,35 +111,9 @@ export function ProductionRunsPanel({
   );
   const watchedOrderIds = new Set(orderWatches.map((w) => w.orderId));
 
-  const rows: RunRow[] = runs.map((run) => {
-    const runSaleLinks = saleLinks.filter((l) => l.runId === run.id);
-    const runOrderWatches = orderWatches
-      .filter((w) => w.runId === run.id)
-      .map((w) => ({
-        ...w,
-        filled: computeOrderFillQuantity(w.initialVolumeRemain, w.lastKnownVolumeRemain),
-      }));
-    const linkedRevenue = runSaleLinks.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0);
-    const linkedQty = runSaleLinks.reduce((sum, l) => sum + l.quantity, 0);
-    const watchFilledQty = runOrderWatches.reduce((sum, w) => sum + w.filled, 0);
-    const watchRevenue = runOrderWatches.reduce((sum, w) => sum + w.filled * w.unitPrice, 0);
-    const profit = realizedProfit({
-      materialCost: run.materialCost,
-      jobFee: run.jobFee,
-      quantitySold: linkedQty + watchFilledQty,
-      grossRevenue: linkedRevenue + watchRevenue,
-      accountingLevel: skills[SKILL_IDS.accounting] ?? 0,
-      brokerFeeableRevenue: watchRevenue,
-      brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
-    });
-    return {
-      run,
-      saleLinks: runSaleLinks,
-      orderWatches: runOrderWatches,
-      profit,
-      quantitySold: linkedQty + watchFilledQty,
-    };
-  });
+  const rows: ProductionRunSummary[] = runs.map((run) =>
+    summarizeProductionRun(run, saleLinks, orderWatches, skills)
+  );
 
   const editingRow = editingRunId ? rows.find((r) => r.run.id === editingRunId) : undefined;
 
@@ -325,7 +291,7 @@ export function ProductionRunsPanel({
     }
   }
 
-  const columns: DataTableColumn<RunRow>[] = [
+  const columns: DataTableColumn<ProductionRunSummary>[] = [
     {
       id: 'loggedAt',
       header: t('industry.productionRunColumnLogged'),
@@ -374,6 +340,13 @@ export function ProductionRunsPanel({
       className: 'tabular-nums text-text-dim',
       sortValue: (r) => r.quantitySold,
       render: (r) => `${r.quantitySold.toLocaleString()} / ${r.run.quantity.toLocaleString()}`,
+    },
+    {
+      id: 'status',
+      header: t('industry.productionRunColumnStatus'),
+      align: 'right',
+      sortValue: (r) => r.status,
+      render: (r) => <ProductionRunStatusChip status={r.status} />,
     },
     {
       id: 'actions',

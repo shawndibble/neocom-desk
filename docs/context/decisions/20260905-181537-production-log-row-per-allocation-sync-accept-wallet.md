@@ -82,14 +82,31 @@ _Recorded 2026-09-05 · issue #525._
   100 ISK per-order broker-fee minimum against the combined total rather than
   per order) — acceptable for a first slice; a future ticket could snapshot
   the real fee paid at order-placement time instead of re-deriving it.
-- **The aggregate "Production Log" view is a panel on the existing
-  `/industry` route, not a new route or sub-nav tab.** `ProductionRunsPanel`
-  is appended as a fourth `<Panel>` sibling in `BuildPlanDetail.tsx`,
-  directly below the existing Results panel — matching how this app already
-  does per-plan master/detail (no new routes invented for this feature). A
-  true cross-plan, cross-item aggregate rollup (every run, every item, one
-  character) is out of scope for this slice; today's panel is scoped to one
-  Build Plan's own runs, queried by `buildPlanId`.
+- **Both the per-plan panel and the true cross-plan aggregate view live on
+  the existing `/industry` route, not a new route or sub-nav tab.**
+  `ProductionRunsPanel` is appended as a fourth `<Panel>` sibling in
+  `BuildPlanDetail.tsx`, directly below the existing Results panel, scoped to
+  one Build Plan's own runs (queried by `buildPlanId`) — matching how this
+  app already does per-plan master/detail. A separate, genuinely cross-plan,
+  cross-item rollup (every run, every item, one character) was originally
+  scoped out of the first slice, then added once requested: `ProductionLogPanel`
+  reads every `ProductionRunRecord` for the character (queried by
+  `characterId` alone, no `buildPlanId` filter) and renders it as its own
+  panel at the top of `/industry`, above the Build Plan list/detail grid —
+  the placement the original design mockup's own final step left undecided
+  between "its own panel under Industry" and "a dedicated route." Both
+  `ProductionRunsPanel` and `ProductionLogPanel` share one pure summary
+  function, `productionRunSummary.ts`'s `summarizeProductionRun`, so the two
+  views can never disagree about a run's realized profit or sale status.
+- **Every Production Run carries a sale-status badge — New (nothing sold),
+  Open (partially sold), Closed (fully sold) — matching the mockup's own
+  three-state chip.** `ProductionRunStatusChip` is the one place that renders
+  it, shared by both panels. There is no fourth "written off" state yet (the
+  mockup's "Write Off Remaining" — for units reprocessed, contracted,
+  gifted, or otherwise disposed of with no sale to link) was not built in
+  this pass; a run that will never fully sell just stays "Open" forever,
+  which is honest but not the mockup's full intent. Flagged as a follow-up,
+  not solved.
 - **Deleting a Production Run cascades to every sale link and order watch
   naming it.** `markProductionRunDeleted` (`src/sync/planSync.ts`) tombstones
   the run's own row plus every `ProductionSaleLinkRecord`/
