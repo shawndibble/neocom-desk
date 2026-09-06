@@ -338,7 +338,18 @@ export function ProductionLogPanel({
   ];
 
   return (
-    <Panel title={t('industry.productionLog')}>
+    <Panel
+      title={t('industry.productionLog')}
+      actions={
+        <FilterBar
+          value={filter}
+          onChange={setFilter}
+          activeCount={activeProductionLogFilterCount(filter)}
+        >
+          {(draft, setDraft) => <ProductionLogDateRange draft={draft} setDraft={setDraft} />}
+        </FilterBar>
+      }
+    >
       <div className="space-y-1">
         <p className="text-[0.6875rem] text-text-dim">{t('industry.productionLogSubtitle')}</p>
         <p className="text-[0.6875rem] text-text-faint">
@@ -346,16 +357,7 @@ export function ProductionLogPanel({
         </p>
       </div>
 
-      <FilterBar
-        value={filter}
-        onChange={setFilter}
-        activeCount={activeProductionLogFilterCount(filter)}
-        className="my-3"
-      >
-        {(draft, setDraft) => <ProductionLogDateRange draft={draft} setDraft={setDraft} />}
-      </FilterBar>
-
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="my-3 flex flex-wrap gap-2">
         <BigStat
           label={t('industry.totalRealizedProfit')}
           value={formatIsk(totalRealizedProfit)}
@@ -374,32 +376,29 @@ export function ProductionLogPanel({
         />
       ) : (
         <>
-          <div className="mb-4 rounded-xs border border-line">
-            <div className="border-b border-line px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.allProductionRuns')}
-            </div>
-            <DataTable
-              columns={runColumns}
-              rows={runRows}
-              rowKey={(r) => r.summary.run.id}
-              label={t('industry.allProductionRuns')}
-              density="compact"
-              onRowClick={onOpenRun ? (r) => onOpenRun(r.summary.run.buildPlanId) : undefined}
-            />
-          </div>
+          <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('industry.allProductionRuns')}
+          </h3>
+          <DataTable
+            columns={runColumns}
+            rows={runRows}
+            rowKey={(r) => r.summary.run.id}
+            label={t('industry.allProductionRuns')}
+            density="compact"
+            className="mb-5"
+            onRowClick={onOpenRun ? (r) => onOpenRun(r.summary.run.buildPlanId) : undefined}
+          />
 
-          <div className="rounded-xs border border-line">
-            <div className="border-b border-line px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.byItem')}
-            </div>
-            <DataTable
-              columns={columns}
-              rows={itemRows}
-              rowKey={(r) => r.productTypeID}
-              label={t('industry.byItem')}
-              density="compact"
-            />
-          </div>
+          <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('industry.byItem')}
+          </h3>
+          <DataTable
+            columns={columns}
+            rows={itemRows}
+            rowKey={(r) => r.productTypeID}
+            label={t('industry.byItem')}
+            density="compact"
+          />
         </>
       )}
     </Panel>
