@@ -51,6 +51,7 @@ export function NetworkPanel({
   assumesRemoval,
   planetNames,
   taxRate,
+  taxRateByPlanet,
 }: {
   plan: NetworkPlan;
   /** Whether the plan was allowed to buy inputs, which decides what to explain. */
@@ -59,12 +60,22 @@ export function NetworkPanel({
   assumesRemoval: boolean;
   planetNames: ReadonlyMap<number, string>;
   taxRate: number;
+  /** Each host's own rate, for a set spanning more than one system. */
+  taxRateByPlanet?: ReadonlyMap<number, number>;
 }) {
   const { t } = useTranslation();
   const blockers = plan.blocked.filter((line) => line.reason !== 'needs-buying');
   const nameOfPlanet = (planetId: number) =>
     planetNames.get(planetId) ?? t('piAdvisor.planetLabel', { id: planetId });
   const total = plan.opportunities.reduce((sum, line) => sum + line.marginPerHour, 0);
+  const hostRate = (planetId: number) => taxRateByPlanet?.get(planetId) ?? taxRate;
+  // The footer states one customs rate only when every host in the plan
+  // actually shares it — a cross-system plan is priced at each host's own
+  // office (decision 20260906-144358), and naming one rate for all of them
+  // would misattribute the tax on every line but the one it happens to match.
+  const oneRate = plan.opportunities.every(
+    (line) => hostRate(line.hostPlanetId) === hostRate(plan.opportunities[0].hostPlanetId)
+  );
 
   return (
     <Panel title={t('piAdvisor.networkTitle')}>
@@ -117,11 +128,16 @@ export function NetworkPanel({
 
       {plan.opportunities.length > 0 && (
         <p className="mt-2 border-t border-line pt-2 text-xs text-text-dim">
-          {t('piAdvisor.networkTotal', {
-            isk: formatIsk(total),
-            hub: DEFAULT_TRADE_HUB.systemName,
-            percent: customsRatePercent(taxRate),
-          })}{' '}
+          {oneRate
+            ? t('piAdvisor.networkTotal', {
+                isk: formatIsk(total),
+                hub: DEFAULT_TRADE_HUB.systemName,
+                percent: customsRatePercent(hostRate(plan.opportunities[0].hostPlanetId)),
+              })
+            : t('piAdvisor.networkTotalMixedRates', {
+                isk: formatIsk(total),
+                hub: DEFAULT_TRADE_HUB.systemName,
+              })}{' '}
           {plan.opportunities.length > 1 ? t('piAdvisor.networkGreedy') : ''}
         </p>
       )}

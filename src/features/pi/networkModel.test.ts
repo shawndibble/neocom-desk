@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
 import type { PlanetAdvice } from './advisorModel';
 import { colonyNetwork, networkColonies } from './networkModel';
+import { CUSTOMS_TAXABLE_VALUE, piTier } from '@/engine/pi/chain';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -239,6 +240,31 @@ describe('conversions', () => {
     const water = colonies.find((colony) => colony.planetId === 2);
     // 12,000/hr feeds two of the eight.
     expect(water?.convertible?.[0].count).toBe(2);
+  });
+
+  it('prices a fed factory’s margin at its own colony’s customs rate, not the on-screen fallback', () => {
+    // Decision 20260906-144358: "only the host's [rate] is ever used" —
+    // including for what a factory already there is worth, since an exchange
+    // is only honest if both halves are priced on one basis.
+    const colonies = networkColonies({
+      ...crampedInput,
+      taxRate: 0,
+      taxRateByPlanet: new Map([[2, 0.1]]),
+    });
+    const water = colonies.find((colony) => colony.planetId === 2);
+    const outputPerHour = 40;
+    const inputPerHour = 6_000;
+    const taxDelta =
+      0.1 *
+      (outputPerHour * CUSTOMS_TAXABLE_VALUE[piTier(WATER, pi)] -
+        inputPerHour * CUSTOMS_TAXABLE_VALUE[piTier(AQUEOUS_LIQUIDS, pi)]);
+    expect(water?.convertible?.[0].marginPerHour).toBeCloseTo(
+      outputPerHour * 513.9 - inputPerHour * 12 - taxDelta,
+      6
+    );
+    // Not the fallback's answer (taxRate 0 gives no tax delta at all) — proof
+    // the colony's own rate, not the global one, drove the number above.
+    expect(water?.convertible?.[0].marginPerHour).not.toBeCloseTo(40 * 513.9 - 6_000 * 12, 0);
   });
 
   it('says nothing about a colony with room to spare', () => {

@@ -48,6 +48,7 @@ const loadPlanetInfo = vi.fn();
 const loadSchematicName = vi.fn();
 const loadTypeNames = vi.fn();
 const loadSystemSecurity = vi.fn();
+const readCachedSystemSecurity = vi.fn();
 const loadCustomsCodeExpertise = vi.fn();
 const loadInterplanetaryConsolidation = vi.fn();
 
@@ -88,6 +89,7 @@ vi.mock('@/features/character/systemSecurity', () => ({
   loadSystemPlanetIds: (...args: unknown[]) => loadSystemPlanetIds(...args),
   loadSystemName: (...args: unknown[]) => loadSystemName(...args),
   loadSystemSecurity: (...args: unknown[]) => loadSystemSecurity(...args),
+  readCachedSystemSecurity: (...args: unknown[]) => readCachedSystemSecurity(...args),
 }));
 
 vi.mock('./customsRate', async (importOriginal) => ({
@@ -217,6 +219,7 @@ beforeEach(() => {
     loadSchematicName,
     loadTypeNames,
     loadSystemSecurity,
+    readCachedSystemSecurity,
     loadCustomsCodeExpertise,
     loadInterplanetaryConsolidation,
     loadPlanPrices,
@@ -236,6 +239,7 @@ beforeEach(() => {
   // Ashab is highsec, and the character has Customs Code Expertise IV — so
   // every chain below is costed at the 6% these two imply.
   loadSystemSecurity.mockResolvedValue(0.5);
+  readCachedSystemSecurity.mockResolvedValue(0.5);
   loadCustomsCodeExpertise.mockResolvedValue(4);
   loadCharacterPlanets.mockResolvedValue({
     cached: { data: [colony(40_000_001, 'temperate')], fetchedAt: new Date(), fromCache: false },
@@ -942,6 +946,10 @@ describe('AdvisorPanel', () => {
     await screen.findByText('Ashab III');
     expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
     expect(screen.getByText(/\(Alt Pilot\)/)).toBeInTheDocument();
+    // Cache-only for the alt's system: page open must not spend ESI just
+    // because an alt has a colony there, even when that system is also the
+    // active Character's own (as here) — the alt path always reads cache.
+    expect(readCachedSystemSecurity).toHaveBeenCalledWith(ASHAB);
   });
 
   it('says nothing about a network when there is only one colony to work with', async () => {

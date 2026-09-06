@@ -71,6 +71,7 @@ import {
   loadSystemName,
   loadSystemPlanetIds,
   loadSystemSecurity,
+  readCachedSystemSecurity,
 } from '@/features/character/systemSecurity';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterPlanets, loadAllColonyDetails } from './data';
@@ -434,8 +435,11 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
       altOwners.set(entry.planet.planet_id, entry.characterName);
     }
     const altSystemIds = [...altBySystem.keys()];
+    // Cache-only: this system is only known because an alt has a colony
+    // there, and looking up its security must not itself spend ESI the
+    // active Character's own page load never asked for.
     const altSecurities = await Promise.all(
-      altSystemIds.map((systemId) => loadSystemSecurity(systemId).catch(() => null))
+      altSystemIds.map((systemId) => readCachedSystemSecurity(systemId).catch(() => null))
     );
     const altDetails = new Map<number, CharacterPlanetDetail>();
     for (const entry of roster.colonies) {
@@ -1430,6 +1434,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
           assumesRemoval={network.assumesRemoval}
           planetNames={planetNames}
           taxRate={activeSystem.customsRate}
+          taxRateByPlanet={taxRateByPlanet}
         />
       )}
 

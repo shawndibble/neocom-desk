@@ -1284,6 +1284,7 @@
     "networkLeftover": "Still sold as it is: {{list}}",
     "networkLeftoverItem": "{{units}}/hr of {{name}}",
     "networkTotal": "+{{isk}} an hour over selling every P1 raw, at {{hub}} prices and this system’s {{percent}}% customs rate.",
+    "networkTotalMixedRates": "+{{isk}} an hour over selling every P1 raw, at {{hub}} prices — each priced at its own host's customs rate.",
     "networkGreedy": "Allocated best-paying first, which is a good split rather than a provably optimal one.",
     "networkAssumesRemoval": "This assumes the unfed factories named on the cards below come out first — the budget they are holding is where these go.",
     "networkNothing": "Nothing yet: no two of these colonies make a pair of inputs that combine.",

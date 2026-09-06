@@ -130,6 +130,7 @@ export function networkColonies(input: NetworkModelInput): NetworkColony[] {
     // so — a promise resting on an unstated precondition is the failure this
     // tab exists to avoid.
     const freed = surplusLoad(balance, input.pi);
+    const hostTaxRate = input.taxRateByPlanet?.get(entry.planetId) ?? input.taxRate;
     colonies.push({
       planetId: entry.planetId,
       outputPerHour: colonyOutputPerHour(balance, input.pi),
@@ -139,16 +140,17 @@ export function networkColonies(input: NetworkModelInput): NetworkColony[] {
           Math.max(0, colony.budget.powergrid - colony.pinLoad.load.powergrid) + freed.powergrid,
       },
       newLinkCost: colony.pinLoad.newLinkLoad,
-      ...(input.taxRateByPlanet?.has(entry.planetId)
-        ? { taxRate: input.taxRateByPlanet.get(entry.planetId) as number }
-        : {}),
+      ...(input.taxRateByPlanet?.has(entry.planetId) ? { taxRate: hostTaxRate } : {}),
       // What is already running here, and what it is worth — so the plan can
-      // weigh keeping it against what its budget would hold instead.
+      // weigh keeping it against what its budget would hold instead. Priced at
+      // this colony's own rate: only the host's customs office is ever
+      // charged (decision 20260906-144358), and a fed factory's margin is no
+      // exception.
       convertible: convertibleFacilities(
         balance,
         input.pi,
         input.revenuePrices ?? input.prices,
-        input.taxRate
+        hostTaxRate
       ),
     });
   }
