@@ -54,6 +54,7 @@ import { ResultsSummary } from './ResultsSummary';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
+import { buildLocationLabel } from './buildLocationLabel';
 import { buildLocationPatch } from './buildLocationPatch';
 import { useDerivedSecurityBand } from './useDerivedSecurityBand';
 
@@ -70,11 +71,24 @@ export type PlanPatch = Partial<
     | 'hubId'
     | 'buildSystemId'
     | 'buildSystemName'
+    | 'buildLocationId'
+    | 'buildLocationName'
     | 'facilityTaxPct'
     | 'ownedStockScope'
     | 'buildHere'
   >
 >;
+
+/**
+ * The half of a patch that drops the plan's remembered location. Spread by
+ * every control that can move the job away from the place the search picked:
+ * a Raitaru still named in the box while the plan says NPC station is a label
+ * lying about the plan.
+ */
+const clearedBuildLocation = {
+  buildLocationId: undefined,
+  buildLocationName: undefined,
+} satisfies PlanPatch;
 
 /** One material's sourcing edit, for the bulk "use all detected" action. */
 export interface SourcingPatchEntry {
@@ -204,6 +218,19 @@ export function BuildPlanDetail({
     plan.buildSystemId !== undefined && plan.buildSystemName !== undefined
       ? { id: plan.buildSystemId, name: plan.buildSystemName }
       : null;
+  // What the search box says the plan is pointed at — through the same helper
+  // the picker's result rows use, so the wording cannot change as a pick's
+  // write lands. Null for a plan that was never pointed at a place.
+  const buildLocationName =
+    plan.buildLocationId === undefined
+      ? null
+      : buildLocationLabel(
+          plan.buildLocationName ?? null,
+          plan.facility,
+          buildSystem?.name ?? hub.systemName,
+          t
+        );
+
   // The band is derived, not typed, so it is reconciled here rather than only
   // on edit — otherwise a plan saved before the Security field went away keeps
   // a band nothing can correct, and still drives the rig multiplier.
@@ -658,6 +685,7 @@ export function BuildPlanDetail({
                   system: buildSystem?.name ?? hub.systemName,
                   security: t(`industry.${plan.security}`),
                 })}
+                selectedLabel={buildLocationName}
                 onPick={(option) => update(buildLocationPatch(option))}
               >
                 <label className="flex flex-col gap-1 text-xs">
@@ -667,11 +695,11 @@ export function BuildPlanDetail({
                     onValueChange={(value) => {
                       const facility = value as FacilityKind;
                       const structure = FACILITY_PRESETS[facility].structure;
-                      update(
-                        structure
-                          ? { facility }
-                          : { facility, rigLevel: 'none', facilityTaxPct: undefined }
-                      );
+                      update({
+                        facility,
+                        ...clearedBuildLocation,
+                        ...(structure ? {} : { rigLevel: 'none', facilityTaxPct: undefined }),
+                      });
                     }}
                   >
                     <SelectTrigger aria-label={t('industry.facility')}>
@@ -700,6 +728,7 @@ export function BuildPlanDetail({
                     update({
                       buildSystemId: system?.id,
                       buildSystemName: system?.name,
+                      ...clearedBuildLocation,
                       // The band follows the system, so naming one settles the
                       // rig multiplier too. An unreachable ESI leaves the plan
                       // with the band it had rather than a guessed one.

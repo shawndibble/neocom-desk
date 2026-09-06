@@ -52,6 +52,11 @@ import {
   type SourcingPatchEntry,
 } from '@/features/industry/BuildPlanDetail';
 import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
+import {
+  lastOpenedPlanFor,
+  useLastOpenedPlan,
+  withLastOpenedPlan,
+} from '@/features/industry/lastOpenedPlan';
 
 /**
  * The historical hardcoded default per activity — a character with no prior
@@ -63,9 +68,9 @@ function fallbackFacility(activity: IndustryActivity): FacilityKind {
   return activity === 'reaction' ? 'athanor' : 'npcStation';
 }
 
-// Facility/rig/security/hub/tax default from the character's own most
-// recently updated plan (issue #456), so a second plan doesn't force
-// re-picking settings the pilot already set once. `defaultsFrom` is that
+// Facility/rig/security/hub/tax, build system and build location all default
+// from the character's own most recently updated plan (issue #456), so a
+// second plan doesn't force re-picking settings the pilot already set once. `defaultsFrom` is that
 // plan, or null/undefined for a character with no plans yet, in which case
 // the historical hardcoded defaults apply. Only carried when it hosts the
 // same activity as the new plan (issue #460) — otherwise it names a
@@ -103,6 +108,19 @@ function newBuildPlan(
     ...(defaultsFrom?.facilityTaxPct !== undefined
       ? { facilityTaxPct: defaultsFrom.facilityTaxPct }
       : {}),
+    // The picked place itself (#527), carried under the same activity check as
+    // `facility` rather than merely when the source plan has one: where the
+    // activity differs the new plan's facility is the hardcoded fallback, not
+    // the picked place's, so its name would label a job whose numbers came
+    // from somewhere else. The id and the name are independently optional —
+    // ESI withholds some structure names, and the id alone still drives the
+    // picker's stand-in label.
+    ...(defaultsMatchActivity && defaultsFrom.buildLocationId !== undefined
+      ? { buildLocationId: defaultsFrom.buildLocationId }
+      : {}),
+    ...(defaultsMatchActivity && defaultsFrom.buildLocationName !== undefined
+      ? { buildLocationName: defaultsFrom.buildLocationName }
+      : {}),
     updatedAt: Date.now(),
   };
 }
@@ -121,10 +139,22 @@ export function Industry() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<'plans' | 'records'>('plans');
 
-  const plans = useLiveQuery(async () => {
+  // Stamped with the Character it was read for, because `useLiveQuery` holds
+  // its previous result in a ref across a deps change: for one render after
+  // the active Character changes, the rows belong to the Character who just
+  // left. Unstamped, every consumer below has to re-derive that — and the one
+  // that mounts `BuildPlanDetail` would open a plan this pilot does not own
+  // and fetch market prices for its materials, only to remount a tick later.
+  const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
-    return db.buildPlans.where('characterId').equals(activeCharacterId).toArray();
+    return {
+      characterId: activeCharacterId,
+      rows: await db.buildPlans.where('characterId').equals(activeCharacterId).toArray(),
+    };
   }, [activeCharacterId]);
+  // `undefined` means "not read yet" for the incoming Character exactly as it
+  // does on a first load, so every consumer's existing loading path covers it.
+  const plans = plansQuery?.characterId === activeCharacterId ? plansQuery.rows : undefined;
 
   // The materials table's item context menu (CONTEXT.md round 26) writes the
   // same Quickbar record the Market Browser and Assets do, and opens the same
@@ -140,6 +170,17 @@ export function Industry() {
   const ownedStockSnapshot = useOwnedStockSnapshot();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Which plan this Character had open last time (device-local). Read only
+  // through `effectiveSelectedId` below, never written into `selectedId`
+  // itself: `selectedId` also decides which column a narrow screen shows, and
+  // reopening a plan must not stop a phone landing on the list.
+  const lastOpened = useLastOpenedPlan((state) => state.value);
+  const lastOpenedHydrated = useLastOpenedPlan((state) => state.hydrated);
+  const hydrateLastOpened = useLastOpenedPlan((state) => state.hydrate);
+  const setLastOpened = useLastOpenedPlan((state) => state.setValue);
+  useEffect(() => {
+    void hydrateLastOpened();
+  }, [hydrateLastOpened]);
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   // Planetary schematics, for the materials table's make-or-buy marker. Loaded
   // beside the catalog so both are in place before a plan first renders — a
@@ -283,18 +324,44 @@ export function Industry() {
     setSearchParams(next, { replace: true });
   }, [materialParam, plans, catalog, searchParams, setSearchParams]);
 
-  // Derived, not effect-synced: falls back to the first plan whenever the
-  // explicitly selected one is missing (first load, or it was just deleted).
+  // Derived, not effect-synced: the explicit selection, else the plan this
+  // Character had open last, else the first plan (first ever visit, or the
+  // remembered one was deleted — here or on another device).
   const effectiveSelectedId = useMemo(() => {
     if (!plans) return null;
     if (selectedId && plans.some((p) => p.id === selectedId)) return selectedId;
+    // Nothing until the memory has been read: the settings row and the Dexie
+    // plan query race, and taking the first-plan fallback before the answer
+    // arrives mounts the wrong plan, then swaps — a `key={plan.id}` remount
+    // and a second price fetch for a plan the pilot never asked for. A failed
+    // read still settles `hydrated`, so this cannot stall.
+    if (!lastOpenedHydrated) return null;
+    const remembered =
+      activeCharacterId === null ? null : lastOpenedPlanFor(lastOpened, activeCharacterId);
+    if (remembered && plans.some((p) => p.id === remembered)) return remembered;
     return plans[0]?.id ?? null;
-  }, [plans, selectedId]);
+  }, [plans, selectedId, lastOpened, lastOpenedHydrated, activeCharacterId]);
 
   const selectedPlan = useMemo(
     () => plans?.find((p) => p.id === effectiveSelectedId) ?? null,
     [plans, effectiveSelectedId]
   );
+
+  // Recorded from the effective selection rather than from each place that
+  // sets one: the `?product=`/`?material=` deep links and the first-plan
+  // fallback are openings too, and the narrow-screen back control — which
+  // clears `selectedId` to show the list again — is not a change of plan and
+  // must not erase the memory. Waits for hydration, so the stored map is the
+  // one being added to rather than an empty default overwriting it.
+  useEffect(() => {
+    if (!lastOpenedHydrated || activeCharacterId === null) return;
+    // Against the plan, not the id: filing one pilot's plan under another's
+    // name loses the memory this map exists to keep apart, so the ownership
+    // the stamped query already guarantees is worth restating cheaply here.
+    if (selectedPlan?.characterId !== activeCharacterId) return;
+    if (lastOpenedPlanFor(lastOpened, activeCharacterId) === selectedPlan.id) return;
+    void setLastOpened(withLastOpenedPlan(lastOpened, activeCharacterId, selectedPlan.id));
+  }, [lastOpenedHydrated, lastOpened, activeCharacterId, selectedPlan, setLastOpened]);
 
   const comparePlans = useMemo(
     () => plans?.filter((p) => compareSelectedIds.has(p.id)) ?? [],

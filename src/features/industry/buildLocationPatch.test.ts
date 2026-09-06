@@ -23,7 +23,25 @@ describe('buildLocationPatch', () => {
       security: 'highsec',
       buildSystemId: 30003888,
       buildSystemName: 'Badivefi',
+      buildLocationId: 1,
+      buildLocationName: 'K2-18 R&D',
     });
+  });
+
+  it('records which place was picked, so the search box can still say it later', () => {
+    const patch = buildLocationPatch(option({ structureId: 1035466617946, name: 'V-3 Citadel' }));
+
+    expect(patch.buildLocationId).toBe(1035466617946);
+    expect(patch.buildLocationName).toBe('V-3 Citadel');
+  });
+
+  it('keeps the id when ESI withheld the name, and stores no name', () => {
+    // The label that stands in for a withheld name is UI copy, so the record
+    // holds the id alone and the picker composes the rest.
+    const patch = buildLocationPatch(option({ name: null }));
+
+    expect(patch.buildLocationId).toBe(1);
+    expect(patch.buildLocationName).toBeUndefined();
   });
 
   it("leaves a structure's rig and tax alone — the pilot owns those", () => {

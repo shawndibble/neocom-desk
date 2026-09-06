@@ -492,7 +492,12 @@ describe('walletDomain threshold', () => {
       statusResult([journalEntry({ id: 5, amount: 250 })], false)
     );
     expect(await walletDomain.load(1)).toEqual([
-      { id: 5, amount: 250, thresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK },
+      {
+        id: 5,
+        amount: 250,
+        thresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+        dateMs: Date.parse('2026-01-01T00:00:00Z'),
+      },
     ]);
   });
 
@@ -509,7 +514,14 @@ describe('walletDomain threshold', () => {
     vi.mocked(loadWalletJournalWithStatus).mockResolvedValue(
       statusResult([journalEntry({ id: 5, amount: 250 })], false)
     );
-    expect(await walletDomain.load(1)).toEqual([{ id: 5, amount: 250, thresholdIsk: 10_500_000 }]);
+    expect(await walletDomain.load(1)).toEqual([
+      {
+        id: 5,
+        amount: 250,
+        thresholdIsk: 10_500_000,
+        dateMs: Date.parse('2026-01-01T00:00:00Z'),
+      },
+    ]);
   });
 });
 

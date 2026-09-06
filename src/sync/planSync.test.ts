@@ -630,6 +630,8 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     hubId: 'jita',
     buildSystemId: 30003888,
     buildSystemName: 'Badivefi',
+    buildLocationId: 1035466617946,
+    buildLocationName: 'K2-18 R&D',
     facilityTaxPct: 1.5,
     materialSourcing: { 34: { ownedQuantity: 500, overridePrice: 6.5 } },
     ownedStockScope: {
@@ -659,6 +661,8 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     expect(Object.keys(fullBuildPlan).sort()).toEqual([
       'blueprintTypeID',
       'buildHere',
+      'buildLocationId',
+      'buildLocationName',
       'buildSystemId',
       'buildSystemName',
       'characterId',
@@ -715,6 +719,17 @@ describe('triggerSync: build plans', () => {
     expect(remote).toBeDefined();
     expect(remote).not.toHaveProperty('buildSystemId');
     expect(remote).not.toHaveProperty('buildSystemName');
+  });
+
+  it("syncs a picked location's id even when ESI withheld its name", async () => {
+    // Unlike the build system pair, these two are independent: the id alone
+    // still lets the search box name the place through the same stand-in
+    // label the picker composes for an unnamed structure.
+    await db.buildPlans.put(buildPlan({ buildLocationId: 1035466617946 }));
+    await triggerSync(1);
+    const remote = remoteStore.get(BUILD_PLANS_PATH)?.get('b1');
+    expect(remote?.buildLocationId).toBe(1035466617946);
+    expect(remote).not.toHaveProperty('buildLocationName');
   });
 
   it('pushes a local-only build plan with ownerHash and deleted: false', async () => {

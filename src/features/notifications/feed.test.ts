@@ -6,6 +6,7 @@ import {
   recordFeedEntry,
   readFeed,
   dismissFeedEntry,
+  mergeFeedRecord,
   dismissFeedEntries,
   rowsWithinSyncWindow,
   FEED_SYNC_WINDOW_MAX_ROWS,
@@ -128,6 +129,125 @@ describe('recordFeedEntry / readFeed', () => {
     const feed = await readFeed();
     expect(feed).toHaveLength(1);
     expect(feed[0].title).toBe('Second observer');
+  });
+
+  it("keeps the first observer's firedAt, so a second observer cannot re-date the row to its own poll", async () => {
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'First observer',
+      body: 'b',
+      firedAt: 1000,
+    });
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'Second observer',
+      body: 'b',
+      firedAt: 1500,
+    });
+    expect((await readFeed())[0].firedAt).toBe(1000);
+  });
+
+  it("takes the earlier firedAt whichever observer arrives first, so a push stamping its own arrival cannot beat the poller's real occurrence time", async () => {
+    const entry = {
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'walletBalanceChanged',
+      title: 't',
+      body: 'b',
+    };
+    // The push lands first, stamping its own arrival; the poller follows with
+    // the journal entry's real date.
+    await recordFeedEntry({ ...entry, firedAt: 5000 });
+    await recordFeedEntry({ ...entry, firedAt: 1000 });
+    expect((await readFeed())[0].firedAt).toBe(1000);
+  });
+
+  it('keeps a back-dated row it just wrote, rather than trimming it away in the same call', async () => {
+    for (let i = 0; i < NOTIFICATION_FEED_LIMIT; i++) {
+      await recordFeedEntry({
+        id: `newer-${i}`,
+        characterId: 1,
+        eventId: 'newMail',
+        title: 't',
+        body: 'b',
+        firedAt: 10_000 + i,
+      });
+    }
+    // Older than every row already stored — the trim's own cut line.
+    await recordFeedEntry({
+      id: 'back-dated',
+      characterId: 1,
+      eventId: 'walletBalanceChanged',
+      title: 'Wallet balance changed',
+      body: 'b',
+      firedAt: 1,
+    });
+    expect(await db.notificationFeed.get('back-dated')).toBeDefined();
+  });
+
+  it('keeps a dismissal, so a second observer re-recording the occurrence cannot resurface it', async () => {
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'First observer',
+      body: 'b',
+      firedAt: 1000,
+    });
+    await dismissFeedEntry('same-occurrence');
+    await recordFeedEntry({
+      id: 'same-occurrence',
+      characterId: 1,
+      eventId: 'newMail',
+      title: 'Second observer',
+      body: 'b',
+      firedAt: 1500,
+    });
+    expect((await readFeed())[0].dismissedAt).toBeTypeOf('number');
+  });
+});
+
+describe('mergeFeedRecord', () => {
+  const incoming = {
+    id: 'k',
+    characterId: 1,
+    eventId: 'walletBalanceChanged',
+    title: 'Newer copy',
+    body: 'b',
+    firedAt: 5000,
+  };
+
+  it('is the incoming row when nothing is stored yet', () => {
+    expect(mergeFeedRecord(undefined, incoming)).toEqual(incoming);
+  });
+
+  it('takes the earlier firedAt and the newer copy, whichever side is older', () => {
+    const stored = { ...incoming, title: 'Older copy', firedAt: 1000 };
+    expect(mergeFeedRecord(stored, incoming)).toMatchObject({ firedAt: 1000, title: 'Newer copy' });
+    expect(mergeFeedRecord(incoming, { ...stored, title: 'Newer copy' })).toMatchObject({
+      firedAt: 1000,
+    });
+  });
+
+  it('takes the later dismissal from either side, so a re-record keeps one and a pull applies one', () => {
+    const dismissedLocally = { ...incoming, firedAt: 1000, dismissedAt: 9000 };
+    // A re-record carries no dismissal of its own; the stored one survives.
+    expect(mergeFeedRecord(dismissedLocally, incoming).dismissedAt).toBe(9000);
+    // A pull carrying a newer dismissal applies it.
+    expect(
+      mergeFeedRecord({ ...incoming, dismissedAt: 100 }, { ...incoming, dismissedAt: 9000 })
+        .dismissedAt
+    ).toBe(9000);
+  });
+
+  it('leaves dismissedAt off entirely when neither side has one', () => {
+    expect(mergeFeedRecord({ ...incoming, firedAt: 1 }, incoming)).not.toHaveProperty(
+      'dismissedAt'
+    );
   });
 });
 
