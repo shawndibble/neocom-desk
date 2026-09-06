@@ -262,6 +262,15 @@ export type AdjustedPrices = Record<number, number>;
 /** Trade-hub prices (lowest sell): typeID -> ISK. Missing = unpriceable. */
 export type HubPrices = Record<number, number>;
 
+/**
+ * Which side of a hub's order book a Build Plan buys its materials at:
+ * `'sell'` fills the lowest sell orders (pay now), `'buy'` places buy orders
+ * at the highest bid (wait, pay less). Named here beside the other stored plan
+ * vocabulary; the engine never branches on it — `buildVsBuy` takes the
+ * resolved map and stays ignorant of which side produced it.
+ */
+export type MaterialPriceBasis = 'sell' | 'buy';
+
 export interface IndustryInputs {
   blueprint: IndustryBlueprint;
   /** Number of runs in the job, >= 1. */
@@ -279,6 +288,11 @@ export interface IndustryInputs {
   systemCostIndex: number;
   adjustedPrices: AdjustedPrices;
   hubPrices: HubPrices;
+  /**
+   * Prices the job's materials are bought at, when that is not the hub's
+   * lowest sell. Absent = `hubPrices`. Materials only — see `buildVsBuy`.
+   */
+  materialPrices?: HubPrices;
   /** Per-material owned quantity / price override; absent = buy it all at the hub. */
   materialSourcing?: MaterialSourcingMap;
   skills: SkillLevels;

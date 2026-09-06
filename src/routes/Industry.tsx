@@ -99,6 +99,11 @@ function newBuildPlan(
     ...(defaultsFrom?.facilityTaxPct !== undefined
       ? { facilityTaxPct: defaultsFrom.facilityTaxPct }
       : {}),
+    // Carried like the hub it names a side of: a pilot who sources on buy
+    // orders sources their next plan that way too.
+    ...(defaultsFrom?.materialPriceBasis !== undefined
+      ? { materialPriceBasis: defaultsFrom.materialPriceBasis }
+      : {}),
     // The picked place itself (#527), carried under the same activity check as
     // `facility` rather than merely when the source plan has one: where the
     // activity differs the new plan's facility is the hardcoded fallback, not
@@ -431,7 +436,7 @@ export function Industry() {
   }
 
   /**
-   * "Use all detected" (issue #181), applied one row at a time through the very
+   * "Use all" (issue #181), applied one row at a time through the very
    * same write path a typed value takes. Awaited in sequence, not fired in
    * parallel: each `saveSourcingEdit` merges into the record it reads inside
    * its own transaction, so overlapping writes would drop all but the last.

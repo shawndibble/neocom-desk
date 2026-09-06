@@ -221,4 +221,31 @@ describe('useComparedBuildResults', () => {
     await waitFor(() => expect(result.current).toHaveLength(2));
     await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
   });
+
+  it("prices each row at its own plan's material price basis", async () => {
+    // Compare has to agree with the plan's own detail panel: a buy-basis plan
+    // shown beside a sell-basis one must not quietly quote both at sell.
+    mockedSnapshot.mockResolvedValue({
+      hubPrices: { 34: 5 },
+      hubBuyPrices: { 34: 4 },
+      adjustedPrices: {},
+      systemCostIndex: 0.01,
+    });
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    // Distinct run counts, because `computeBuildPlan` is handed a Pick of the
+    // record that carries no id — runs is what tells the two calls apart.
+    const plans = [
+      plan({ id: 'sell', name: 'Sell basis', runs: 5 }),
+      plan({ id: 'buy', name: 'Buy basis', runs: 9, materialPriceBasis: 'buy' }),
+    ];
+
+    const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
+    await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+
+    const byRuns = new Map(
+      mockedCompute.mock.calls.map(([args]) => [args.plan.runs, args.materialPrices])
+    );
+    expect(byRuns.get(5)).toEqual({ 34: 5 });
+    expect(byRuns.get(9)).toEqual({ 34: 4 });
+  });
 });

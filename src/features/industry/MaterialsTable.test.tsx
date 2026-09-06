@@ -95,9 +95,9 @@ const ownedInput = (material: string) =>
 const priceInput = (material: string) =>
   screen.getByRole('textbox', { name: `Price for ${material}` });
 const revertButton = (material: string) =>
-  screen.getByRole('button', { name: `Reset ${material} to the hub price` });
+  screen.getByRole('button', { name: `Reset ${material} to the market price` });
 const queryRevertButton = (material: string) =>
-  screen.queryByRole('button', { name: `Reset ${material} to the hub price` });
+  screen.queryByRole('button', { name: `Reset ${material} to the market price` });
 const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 
 async function setField(input: HTMLElement, value: string) {
@@ -185,7 +185,7 @@ describe('MaterialsTable sourcing', () => {
     expect(tritanium.getByText('Override')).toBeTruthy();
   });
 
-  it('clearing an override price reverts the row to the hub price', async () => {
+  it('clearing an override price reverts the row to the market price', async () => {
     const onChange = vi.fn();
     render(<Harness initial={{ 34: { overridePrice: 7 } }} onChange={onChange} />);
     expect(within(row('Tritanium')).getByText('7,000')).toBeTruthy();
@@ -408,7 +408,7 @@ describe('MaterialsTable number mask', () => {
 });
 
 describe('MaterialsTable price field', () => {
-  it('reverts to the hub price from the button, which is only there once a row is overridden', async () => {
+  it('reverts to the market price from the button, which is only there once a row is overridden', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);

@@ -140,6 +140,13 @@ here — they go one per file in `docs/context/decisions/`.
   qualifies — wormhole, Abyssal and the unreachable dev regions never do — and
   the test is not whether the region has an NPC station: 31 nullsec regions have
   none and still carry busy player-structure markets.
+- **Material Price Basis**: Which side of a Build Plan's **Trade Hub** order
+  book its materials are costed at — sell orders (what they cost to buy right
+  now) or buy orders (what they cost if you place orders and wait). Stored per
+  plan; absent reads as sell. Materials only: the product is always valued at
+  the hub's lowest sell, because an **Acquisition Verdict** asks what buying it
+  outright costs. A material the chosen side cannot price is unpriceable, never
+  quietly re-quoted at the other side.
 - **Notification Allow-List**: The closed set of EVE Notification `type`
   strings the app delivers. A type outside it is dropped at the poller — not
   toggled off, not rendered generically, not recorded. Replaces round 34's

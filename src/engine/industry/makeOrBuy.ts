@@ -59,8 +59,13 @@ export interface MakeOrBuyContext {
   facilityTaxPct?: number;
   systemCostIndex: number;
   adjustedPrices: AdjustedPrices;
-  /** Must already cover the recipe's inputs, not just the plan's own materials. */
-  hubPrices: HubPrices;
+  /**
+   * What the recipe's inputs cost to buy — the plan's own material price
+   * basis, so a verdict's "buy it instead" side is quoted at exactly the
+   * prices its table shows. Must already cover the recipe's inputs, not just
+   * the plan's own materials.
+   */
+  materialPrices: HubPrices;
   skills: SkillLevels;
 }
 
@@ -109,7 +114,7 @@ function jobUnitCost(
     facilityTaxPct: ctx.facilityTaxPct,
     systemCostIndex: ctx.systemCostIndex,
     adjustedPrices: ctx.adjustedPrices,
-    hubPrices: ctx.hubPrices,
+    hubPrices: ctx.materialPrices,
     skills: ctx.skills,
   });
   // Not `unpriceable`: that also trips when the *product* — the material we
@@ -155,12 +160,12 @@ function reactionUnitCost(
 function planetaryUnitCost(
   inputs: readonly QuantityEntry[],
   outputQuantity: number,
-  hubPrices: HubPrices
+  materialPrices: HubPrices
 ): number | null {
   if (inputs.length === 0 || outputQuantity <= 0) return null;
   let total = 0;
   for (const input of inputs) {
-    const price = hubPrices[input.typeID];
+    const price = materialPrices[input.typeID];
     if (price === undefined) return null;
     total += price * input.quantity;
   }
@@ -193,7 +198,7 @@ export function makeOrBuy(
         ? jobUnitCost(recipe.blueprint, recipe.me, needed, ctx)
         : recipe.method === 'reaction'
           ? reactionUnitCost(recipe.blueprint, needed, ctx)
-          : planetaryUnitCost(recipe.inputs, recipe.outputQuantity, ctx.hubPrices);
+          : planetaryUnitCost(recipe.inputs, recipe.outputQuantity, ctx.materialPrices);
   } catch {
     // The engine range-checks ME and runs. A blueprint or an owned-ME value
     // outside those bounds is bad data, not a reason to fail the whole table.

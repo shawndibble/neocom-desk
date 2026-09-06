@@ -33,6 +33,8 @@ export interface ComputeBuildPlanInput {
   systemCostIndex: number;
   adjustedPrices: AdjustedPrices;
   hubPrices: HubPrices;
+  /** The plan's material price basis, already resolved by `priceBasis.ts`. */
+  materialPrices?: HubPrices;
   skills: SkillLevels;
 }
 
@@ -52,6 +54,7 @@ export function computeBuildPlan({
   systemCostIndex,
   adjustedPrices,
   hubPrices,
+  materialPrices,
   skills,
 }: ComputeBuildPlanInput): ComputeBuildPlanResult {
   const facility = FACILITY_PRESETS[plan.facility];
@@ -79,6 +82,7 @@ export function computeBuildPlan({
       systemCostIndex,
       adjustedPrices,
       hubPrices,
+      materialPrices,
       materialSourcing: plan.materialSourcing,
       skills,
     });

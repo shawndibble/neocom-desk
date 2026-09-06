@@ -31,7 +31,8 @@ export interface ExpandBuildPlanInput {
   /** Material typeIDs the player chose to build rather than buy. */
   buildHere: readonly number[];
   recipeFor: (typeID: number) => MaterialRecipe | null;
-  hubPrices: HubPrices;
+  /** What a recipe input costs to buy — the plan's own material price basis. */
+  materialPrices: HubPrices;
   sourcing: MaterialSourcingMap | undefined;
   ctx: SubBuildContext;
 }
@@ -119,7 +120,7 @@ export function expandBuildPlan({
   materials,
   buildHere,
   recipeFor,
-  hubPrices,
+  materialPrices,
   sourcing,
   ctx,
 }: ExpandBuildPlanInput): ExpandedBuildPlan {
@@ -139,7 +140,7 @@ export function expandBuildPlan({
   // quantity applies the owned-stock clamp to the total the plan really needs.
   const merged = materialCostLines(
     mergeSubBuildMaterials(materials, subBuilds),
-    hubPrices,
+    materialPrices,
     sourcing
   );
 

@@ -835,3 +835,73 @@ describe('BuildPlanDetail reaction plans (issue #460)', () => {
     expect(screen.getByText('Results')).toBeInTheDocument();
   });
 });
+
+describe('BuildPlanDetail material price basis', () => {
+  /** Tritanium at 5 sell / 4 buy, so the two bases are told apart by the price cell. */
+  function pricedSnapshot() {
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: { 34: 5, 587: 100_000 },
+      hubBuyPrices: { 34: 4, 587: 90_000 },
+      adjustedPrices: { 34: 4.5 },
+      systemCostIndex: 0.05,
+    });
+  }
+
+  const basisSelect = () => screen.getByRole('combobox', { name: 'Material prices' });
+  const tritaniumPrice = () => screen.getByLabelText('Price for Tritanium') as HTMLInputElement;
+
+  it('opens on sell orders and offers both sides of the book', async () => {
+    const user = userEvent.setup();
+    pricedSnapshot();
+    render(<Harness />);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(basisSelect()).toHaveTextContent('Sell orders');
+
+    await user.click(basisSelect());
+    const options = await screen.findAllByRole('option');
+    expect(options.map((o) => o.textContent?.replace(/^\W+/, ''))).toEqual([
+      'Sell orders',
+      'Buy orders',
+    ]);
+  });
+
+  it('stores the picked basis on the plan', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    pricedSnapshot();
+    render(<Harness onUpdate={onUpdate} />);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    await user.click(basisSelect());
+    await user.click(await screen.findByRole('option', { name: /Buy orders/ }));
+
+    expect(onUpdate).toHaveBeenCalledWith({ materialPriceBasis: 'buy' });
+  });
+
+  it('re-prices the materials off the buy side once picked', async () => {
+    const user = userEvent.setup();
+    pricedSnapshot();
+    render(<Harness />);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(tritaniumPrice().value).toBe('5');
+    const fetchesBefore = loadMarketSnapshot.mock.calls.length;
+
+    await user.click(basisSelect());
+    await user.click(await screen.findByRole('option', { name: /Buy orders/ }));
+
+    await waitFor(() => expect(tritaniumPrice().value).toBe('4'));
+    // One snapshot, both sides: switching basis must never spend a request.
+    expect(loadMarketSnapshot.mock.calls.length).toBe(fetchesBefore);
+  });
+
+  it('prices a stored buy-basis plan off the buy side on first render', async () => {
+    pricedSnapshot();
+    render(<Harness plan={{ materialPriceBasis: 'buy' }} />);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(tritaniumPrice().value).toBe('4');
+    expect(basisSelect()).toHaveTextContent('Buy orders');
+  });
+});

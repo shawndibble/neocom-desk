@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from 'dexie';
 import type { Attributes, Implants, PlanEntry } from '@/engine/types';
 import type {
   FacilityKind,
+  MaterialPriceBasis,
   MaterialSourcing,
   OwnedStockScope,
   RigLevel,
@@ -230,6 +231,17 @@ export interface BuildPlanRecord {
   buildLocationName?: string;
   /** Facility tax, percent of EIV. Structures only — NPC station tax is fixed. */
   facilityTaxPct?: number;
+  /**
+   * Which side of the hub's order book this plan's materials are bought at:
+   * `'sell'` (fill the lowest sell orders, pay now) or `'buy'` (place buy
+   * orders and wait). Additive and unindexed, so no schema version bump —
+   * same as `materialSourcing` below. Absent means `'sell'`, which is how
+   * every plan priced materials before this existed.
+   *
+   * Materials only. The product is always valued at the hub's lowest sell,
+   * because an Acquisition Verdict asks what buying it outright costs.
+   */
+  materialPriceBasis?: MaterialPriceBasis;
   /**
    * Per-material sourcing overrides, keyed by material typeID: units already
    * owned (free) and/or a manual unit price for the rest. Additive and
