@@ -499,3 +499,68 @@ describe('planNetwork conversions', () => {
     expect(routed + stillListed + removed).toBeLessThanOrEqual(320 + 1e-6);
   });
 });
+
+describe('planNetwork across systems', () => {
+  /**
+   * The same four colonies, but two of them sit behind a customs office that
+   * takes 20% and two behind one that takes nothing. Before colonies carried
+   * their own rate, a set like this could only be planned one system at a time.
+   */
+  const SPLIT: NetworkColony[] = EFA.map((colony, i) => ({
+    ...colony,
+    taxRate: i < 2 ? 0.2 : 0,
+  }));
+
+  it('puts the factories behind the kinder customs office', () => {
+    // Room is equal everywhere here, so the only thing separating the hosts is
+    // what their own office takes. Capacity alone — the old rule — would have
+    // split them by tie-break order instead.
+    const plan = planNetwork({ ...options, colonies: SPLIT }, pi);
+    expect(plan.opportunities.length).toBeGreaterThan(0);
+    const cheap = SPLIT.filter((colony) => colony.taxRate === 0).map((c) => c.planetId);
+    for (const line of plan.opportunities) {
+      expect(cheap).toContain(line.hostPlanetId);
+    }
+  });
+
+  it('prices a line at its host’s rate, not the set’s best', () => {
+    // Every colony behind the same 20% office must earn strictly less than the
+    // same plan run tax-free — otherwise the screening figure, which is taken
+    // at the kindest rate in the set, has leaked into what a line reports.
+    const dear = EFA.map((colony) => ({ ...colony, taxRate: 0.2 }));
+    const free = EFA.map((colony) => ({ ...colony, taxRate: 0 }));
+    const taxed = planNetwork({ ...options, colonies: dear }, pi);
+    const untaxed = planNetwork({ ...options, colonies: free }, pi);
+    const best = (plan: typeof taxed) =>
+      plan.opportunities.find((line) => line.name === 'Superconductors');
+    expect(best(taxed)?.marginPerUnit).toBeLessThan(best(untaxed)?.marginPerUnit ?? 0);
+  });
+
+  it('falls back to the shared rate for a colony that carries none', () => {
+    // One rate for the whole set is still the common case, and every existing
+    // caller passes it that way.
+    const plan = planNetwork({ ...options, taxRate: 0.1 }, pi);
+    const withRates = planNetwork(
+      {
+        ...options,
+        taxRate: 0.9,
+        colonies: EFA.map((colony) => ({ ...colony, taxRate: 0.1 })),
+      },
+      pi
+    );
+    expect(plan.opportunities.map((line) => line.name)).toEqual(
+      withRates.opportunities.map((line) => line.name)
+    );
+  });
+
+  it('says a product is unprofitable rather than unhosted when there is room but no margin', () => {
+    // Two different facts. A pilot with spare Powergrid behind a 90% office is
+    // not short of room, and telling them so would send them to buy an upgrade
+    // that changes nothing.
+    const gouged = EFA.map((colony) => ({ ...colony, taxRate: 0.9 }));
+    const plan = planNetwork({ ...options, colonies: gouged }, pi);
+    expect(plan.opportunities).toEqual([]);
+    expect(plan.blocked.some((line) => line.reason === 'unprofitable')).toBe(true);
+    expect(plan.blocked.every((line) => line.reason !== 'no-host-budget')).toBe(true);
+  });
+});

@@ -814,6 +814,44 @@ describe('AdvisorPanel', () => {
     ).toBeInTheDocument();
   });
 
+  it('combines colonies that are not in the same system', async () => {
+    // "If a player has a bunch of alts, they may have like 20 colonies." The
+    // plan used to run one system at a time, so a pilot whose two refineries
+    // sat in different systems was told each planet could only sell raw — the
+    // exact blindness this surface exists to remove. Only the *host's* customs
+    // office enters a chain's cost, so spanning systems needs the rate per
+    // planet, not a second tax model.
+    const OTHER = 30_002_188;
+    twoRefineries({
+      [MICROORGANISMS]: 12,
+      [AQUEOUS_LIQUIDS]: 12,
+      [WATER]: 513.9,
+      [BACTERIA]: 490,
+      [TEST_CULTURES]: 10_000,
+    });
+    // Move the Water colony one system over, and give that system its own
+    // planet list so its card still resolves.
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [
+          colony(40_000_001, 'temperate'),
+          { ...colony(40_000_003, 'barren'), planet_id: 40_000_003, solar_system_id: OTHER },
+        ],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    loadSystemPlanetIds.mockImplementation(async (systemId: number) =>
+      systemId === OTHER ? [40_000_003] : [40_000_001]
+    );
+    renderPanel();
+
+    // Named in the "Together" panel even though the two planets are in
+    // different systems and only one of them has a card on screen.
+    expect((await screen.findAllByText(/making Test Cultures/)).length).toBeGreaterThan(0);
+  });
+
   it('says nothing about a network when there is only one colony to work with', async () => {
     // One colony is the per-planet question, and its own card already answers
     // it. A panel headed "Together" over a single planet is noise.

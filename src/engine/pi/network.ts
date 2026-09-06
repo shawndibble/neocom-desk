@@ -74,6 +74,19 @@ export interface NetworkColony {
   /** What a link this colony has not built would cost; null when unmeasurable. */
   newLinkCost: PinLoad | null;
   /**
+   * This colony's own customs rate, for a set that spans more than one system.
+   *
+   * Only the *host's* rate ever enters a chain's cost: `chain.ts` charges
+   * sourced material on exactly one boundary — the import onto the planet that
+   * consumes it — and the export off that same planet. A supplying colony's own
+   * export sits outside the chain's boundary set. So a plan can span systems
+   * without a second tax model; it just cannot use one rate for every colony,
+   * which is what `NetworkOptions.taxRate` alone forced.
+   *
+   * Falls back to `NetworkOptions.taxRate` when absent.
+   */
+  taxRate?: number;
+  /**
    * Factories running here that are *fed* — candidates for conversion, with
    * what each one earns an hour so the exchange can be priced.
    *
@@ -108,7 +121,10 @@ export interface NetworkOptions {
    * spread twice.
    */
   revenuePrices?: Readonly<Record<number, number>>;
-  /** The customs rate. Never derived here — see `chain.ts`. */
+  /**
+   * The customs rate to use for any colony that does not carry its own. Never
+   * derived here — see `chain.ts`.
+   */
   taxRate: number;
   /**
    * Let a candidate buy inputs no colony makes, at the hub's sell price.
@@ -246,6 +262,16 @@ interface Candidate {
   fullyBought: boolean;
   /** Units an hour one factory yields. */
   outputPerFactory: number;
+  /**
+   * What it pays at the best rate any colony in the set offers.
+   *
+   * Ranking needs one number per candidate and the margin now depends on which
+   * colony hosts it, so this is the optimistic bound: a candidate cannot earn
+   * more than this anywhere. Greedy ordering by an upper bound is still greedy
+   * — ADR 0012 already records that the allocation is a good split rather than
+   * a provably optimal one — and the figure a line actually reports is always
+   * recomputed at its real host's rate.
+   */
   marginPerUnit: number;
   marginPerFactory: number;
 }
@@ -259,12 +285,64 @@ interface Candidate {
  * its own card, and repeating it here would put one recommendation on the page
  * twice under two different framings.
  */
+/** Every distinct customs rate in the set, and the kindest of them. */
+function ratesOf(opts: NetworkOptions): { best: number; rateFor: (planetId: number) => number } {
+  const byPlanet = new Map<number, number>();
+  let best = Number.POSITIVE_INFINITY;
+  for (const colony of opts.colonies) {
+    const rate = colony.taxRate ?? opts.taxRate;
+    byPlanet.set(colony.planetId, rate);
+    best = Math.min(best, rate);
+  }
+  return {
+    best: Number.isFinite(best) ? best : opts.taxRate,
+    rateFor: (planetId) => byPlanet.get(planetId) ?? opts.taxRate,
+  };
+}
+
+/**
+ * What one factory of `candidate` earns an hour at a given customs rate.
+ *
+ * Memoised on (product, rate) rather than recomputed per host: a set spanning
+ * three systems has three rates, not one per colony, and `chainCost` walks the
+ * whole chain each time.
+ */
+function costerFor(opts: NetworkOptions, pi: PiData) {
+  const cache = new Map<string, { marginPerUnit: number; marginPerFactory: number } | null>();
+  return (typeId: number, outputPerFactory: number, taxRate: number) => {
+    const key = `${typeId}:${taxRate}`;
+    const hit = cache.get(key);
+    if (hit !== undefined) return hit;
+    const chain = singleFactoryChain(typeId, pi);
+    let value: { marginPerUnit: number; marginPerFactory: number } | null = null;
+    if (chain !== null) {
+      const cost = chainCost(chain, {
+        prices: opts.prices,
+        ...(opts.revenuePrices ? { revenuePrices: opts.revenuePrices } : {}),
+        sourcingFloor: 'P1',
+        layout: 'single-planet',
+        taxRate,
+      });
+      if (cost.status === 'costed' && cost.margin > 0) {
+        value = {
+          marginPerUnit: cost.margin,
+          marginPerFactory: cost.margin * outputPerFactory,
+        };
+      }
+    }
+    cache.set(key, value);
+    return value;
+  };
+}
+
 function candidates(
   opts: NetworkOptions,
   pi: PiData
 ): { ok: Candidate[]; blocked: NetworkPlan['blocked'] } {
   const ok: Candidate[] = [];
   const blocked: NetworkPlan['blocked'] = [];
+  const { best } = ratesOf(opts);
+  const cost0 = costerFor(opts, pi);
 
   for (const [key, schematic] of Object.entries(pi.schematics)) {
     const typeId = Number(key);
@@ -308,22 +386,15 @@ function candidates(
 
     const chain = singleFactoryChain(typeId, pi);
     if (chain === null) continue;
-    const cost = chainCost(chain, {
-      prices: opts.prices,
-      ...(opts.revenuePrices ? { revenuePrices: opts.revenuePrices } : {}),
-      sourcingFloor: 'P1',
-      // Every made tier of a P2 chain sourced at P1 is the P2 itself, and it
-      // sits on the host: one planet, so no boundary between made tiers.
-      layout: 'single-planet',
-      taxRate: opts.taxRate,
-    });
-    if (cost.status !== 'costed') continue;
-    if (cost.margin <= 0) {
+    const perHour = chain.targetPerHour;
+    // Screened at the kindest rate in the set: a product the customs office
+    // eats there is eaten everywhere, and one that clears it there may still
+    // fail at a worse office — which is checked again when a host is picked.
+    const cost = cost0(typeId, perHour, best);
+    if (cost === null) {
       blocked.push({ typeId, name, reason: 'unprofitable' });
       continue;
     }
-
-    const perHour = chain.targetPerHour;
     ok.push({
       typeId,
       name,
@@ -337,8 +408,8 @@ function candidates(
       })),
       fullyBought: bought.every(Boolean),
       outputPerFactory: perHour,
-      marginPerUnit: cost.margin,
-      marginPerFactory: cost.margin * perHour,
+      marginPerUnit: cost.marginPerUnit,
+      marginPerFactory: cost.marginPerFactory,
     });
   }
 
@@ -389,6 +460,8 @@ function factoryCost(colony: NetworkColony, candidate: Candidate, opts: NetworkO
 
 export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
   const { ok, blocked } = candidates(opts, pi);
+  const { rateFor } = ratesOf(opts);
+  const cost0 = costerFor(opts, pi);
 
   // Supply is tracked per colony, not as one pool.
   //
@@ -472,7 +545,8 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
   const place = (
     candidate: Candidate,
     colony: NetworkColony,
-    factories: number
+    factories: number,
+    margin: { marginPerUnit: number; marginPerFactory: number }
   ): NetworkOpportunity => {
     const cost = factoryCost(colony, candidate, opts);
     const left = remaining.get(colony.planetId) ?? colony.spare;
@@ -518,8 +592,8 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
       facility: candidate.facility,
       inputs,
       unitsPerHour: candidate.outputPerFactory * factories,
-      marginPerUnit: candidate.marginPerUnit,
-      marginPerHour: candidate.marginPerFactory * factories,
+      marginPerUnit: margin.marginPerUnit,
+      marginPerHour: margin.marginPerFactory * factories,
       buyCostPerHour: inputs
         .filter((input) => input.source === 'bought')
         .reduce((sum, input) => sum + input.costPerHour, 0),
@@ -547,36 +621,50 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
       continue;
     }
 
-    // The host is the colony that can take the most of it. Ties go to a
-    // colony that already makes one of the inputs, which is one fewer customs
-    // boundary and one fewer route to set up.
-    let host: { colony: NetworkColony; capacity: number; localInputs: number } | null = null;
+    // The host is the colony that earns the most from it — capacity times what
+    // a factory clears *there*. Capacity alone was the rule while every colony
+    // shared one customs rate; across systems it is not, and the roomiest
+    // planet can be the one whose office takes the difference. Ties go to a
+    // colony that already makes one of the inputs: one fewer customs boundary
+    // and one fewer route to set up.
+    let host: {
+      colony: NetworkColony;
+      factories: number;
+      value: number;
+      localInputs: number;
+      margin: { marginPerUnit: number; marginPerFactory: number };
+    } | null = null;
+    let anyCapacity = false;
     for (const colony of opts.colonies) {
       const left = remaining.get(colony.planetId) ?? colony.spare;
       const capacity = hostCapacity(left, colony, candidate, opts);
       if (capacity <= 0) continue;
+      anyCapacity = true;
+      // Re-costed here: a candidate screened profitable at the kindest office
+      // in the set can still be eaten by this one.
+      const margin = cost0(candidate.typeId, candidate.outputPerFactory, rateFor(colony.planetId));
+      if (margin === null) continue;
+      const factories = Math.min(capacity, Math.floor(bySupply + EPSILON));
+      if (factories < 1) continue;
+      const value = factories * margin.marginPerFactory;
       const localInputs = candidate.demandPerFactory.filter(
         (input) => (colony.outputPerHour.get(input.typeId) ?? 0) > 0
       ).length;
-      if (
-        !host ||
-        capacity > host.capacity ||
-        (capacity === host.capacity && localInputs > host.localInputs)
-      ) {
-        host = { colony, capacity, localInputs };
+      if (!host || value > host.value || (value === host.value && localInputs > host.localInputs)) {
+        host = { colony, factories, value, localInputs, margin };
       }
     }
     if (!host) {
       stillBlocked.push({
         typeId: candidate.typeId,
         name: candidate.name,
-        reason: 'no-host-budget',
+        // Room but no profit anywhere is a different fact from no room at all.
+        reason: anyCapacity ? 'unprofitable' : 'no-host-budget',
       });
       continue;
     }
 
-    const factories = Math.min(host.capacity, Math.floor(bySupply + EPSILON));
-    opportunities.push(place(candidate, host.colony, factories));
+    opportunities.push(place(candidate, host.colony, host.factories, host.margin));
   }
 
   // --- What to take down, and what to put up instead -----------------------
@@ -608,8 +696,17 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
 
       // Best exchange over how many come out and what goes up in their place.
       // Both matter: removing two frees enough for a pin that one does not.
-      let best: { remove: number; candidate: Candidate; factories: number; net: number } | null =
-        null;
+      let best: {
+        remove: number;
+        candidate: Candidate;
+        factories: number;
+        net: number;
+        margin: { marginPerUnit: number; marginPerFactory: number };
+      } | null = null;
+      // This colony's own office, not the set's best: an exchange is only ever
+      // made here, so what the replacement clears here is the only figure that
+      // decides whether it beats what is coming down.
+      const rate = rateFor(colony.planetId);
       const left = remaining.get(colony.planetId) ?? colony.spare;
       for (let remove = 1; remove <= spare; remove += 1) {
         const budget = {
@@ -634,8 +731,10 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
             : Number.POSITIVE_INFINITY;
           const factories = Math.min(byBudget, Math.floor(bySupply + EPSILON));
           if (factories < 1) continue;
-          const net = factories * candidate.marginPerFactory - remove * group.marginPerHour;
-          if (!best || net > best.net) best = { remove, candidate, factories, net };
+          const margin = cost0(candidate.typeId, candidate.outputPerFactory, rate);
+          if (margin === null) continue;
+          const net = factories * margin.marginPerFactory - remove * group.marginPerHour;
+          if (!best || net > best.net) best = { remove, candidate, factories, net, margin };
         }
       }
       if (!best || best.net <= 0) continue;
@@ -656,7 +755,7 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
         removeCount: best.remove,
         removeName: nameOf(group.outputTypeId, pi),
         removeMarginPerHour: group.marginPerHour * best.remove,
-        add: place(best.candidate, colony, best.factories),
+        add: place(best.candidate, colony, best.factories, best.margin),
         netPerHour: best.net,
       });
     }

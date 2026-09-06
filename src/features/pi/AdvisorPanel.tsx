@@ -1117,6 +1117,29 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     return <EmptyState title={t('piAdvisor.emptyTitle')} hint={t('piAdvisor.emptyHint')} />;
   }
 
+  // Every system the character has a colony in, because combining is exactly
+  // the thing one planet cannot do alone — and there is no reason the other
+  // planet has to be in the same system. Only the *host's* customs office
+  // enters a chain's cost (`chain.ts`), so spanning systems needs the rate per
+  // planet rather than a second tax model.
+  const networkAdvice = snapshot.systems.flatMap((system) =>
+    systemAdvice(
+      {
+        planets: snapshot.planetsBySystem.get(system.systemId) ?? [],
+        colonies: system.colonies,
+        details: snapshot.details,
+        planetRadiusKm: snapshot.planetRadiusKm,
+      },
+      snapshot.pi
+    )
+  );
+  const taxRateByPlanet = new Map<number, number>();
+  for (const system of snapshot.systems) {
+    for (const colony of system.colonies) {
+      taxRateByPlanet.set(colony.planet_id, system.customsRate);
+    }
+  }
+
   const builtCount = advice.filter((entry) => entry.kind === 'built').length;
   // What these colonies could do together — the answer no single card can
   // give, because each one is about its own planet.
@@ -1127,11 +1150,12 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   // than this walk is worth — it is one pass over the payload's schematics
   // against a handful of colonies.
   const network = colonyNetwork({
-    advice,
+    advice: networkAdvice,
     pi: snapshot.pi,
     prices: snapshot.prices,
     revenuePrices: snapshot.revenuePrices,
     allowMarketSourcing: buyInputs,
+    taxRateByPlanet,
     taxRate: activeSystem.customsRate,
   });
   // Grouped once rather than filtered per card: the plan is one pass over a
@@ -1151,7 +1175,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     else conversionsByHost.set(entry.planetId, [entry]);
   }
   const planetNames = new Map(
-    advice
+    networkAdvice
       .filter((entry) => entry.name !== null)
       .map((entry) => [entry.planetId, entry.name as string])
   );

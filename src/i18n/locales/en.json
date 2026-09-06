@@ -1276,7 +1276,7 @@
     "upgradeAvailable": "Command Center at level {{level}}, and your skill allows {{max}}: the next level adds {{cpu}} tf and {{powergrid}} MW.",
     "networkTitle": "Together",
     "planetLabel": "Planet #{{id}}",
-    "networkHint": "What these colonies could make between them. Each card below answers for its own planet alone, so a product needing two planets’ output can only be named here.",
+    "networkHint": "What all your colonies could make between them, across every system you have one in — not just the system shown below. Each card answers for its own planet alone, so a product needing two planets’ output can only be named here.",
     "networkOpportunity": "{{factories}}x {{facility}} on {{host}} making {{name}}",
     "networkValue": "+{{isk}} an hour",
     "networkRouteLocal": "{{name}} is already made there",

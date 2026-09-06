@@ -33,6 +33,15 @@ export interface NetworkModelInput {
    * the pilot's default is off — see `marketSourcingPref.ts`.
    */
   allowMarketSourcing?: boolean;
+  /**
+   * Each colony's own customs rate, by planetId, for a set spanning more than
+   * one system. Absent planets fall back to `taxRate`.
+   *
+   * Only the host's rate ever enters a chain's cost, so a cross-system plan
+   * needs no second tax model — just the right rate per candidate host. See
+   * `NetworkColony.taxRate`.
+   */
+  taxRateByPlanet?: ReadonlyMap<number, number>;
   taxRate: number;
 }
 
@@ -130,6 +139,9 @@ export function networkColonies(input: NetworkModelInput): NetworkColony[] {
           Math.max(0, colony.budget.powergrid - colony.pinLoad.load.powergrid) + freed.powergrid,
       },
       newLinkCost: colony.pinLoad.newLinkLoad,
+      ...(input.taxRateByPlanet?.has(entry.planetId)
+        ? { taxRate: input.taxRateByPlanet.get(entry.planetId) as number }
+        : {}),
       // What is already running here, and what it is worth — so the plan can
       // weigh keeping it against what its budget would hold instead.
       convertible: convertibleFacilities(
