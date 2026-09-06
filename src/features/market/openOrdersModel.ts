@@ -19,6 +19,15 @@
  * a stale station read, which is wrong in exactly the case that matters most
  * (the deep check just proved the order is fine).
  *
+ * Exception: a TRUNCATED deep result (the region book had more pages than
+ * were fetched) that found nothing is not proof of a clean order — it is
+ * only proof that nothing was found in the pages actually seen. In that one
+ * case a clean-but-truncated deep result must not suppress a real station
+ * rival the cheap tier already found, so `worstScope` falls back to
+ * `'station'` when `station.beatsMe` is true. A deep result that DID find a
+ * rival despite being truncated still stands unconditionally — a positive
+ * finding is trustworthy regardless of what the fetch missed.
+ *
  * A second non-obvious bit: `MyOrder.systemId` (required by `findUndercut`
  * for its 'system' scope) is not carried on ESI's own order shape — only
  * `location_id`/`region_id` are. It is recovered from the deep-competition
@@ -32,6 +41,7 @@
  */
 import type { OpenOrdersSnapshot, CharacterOpenOrders } from './openOrdersData';
 import type { OrderCostBasis } from './orderCostBasis';
+import { stationPriceKey } from './stationPriceKey';
 import type { HubAggregate } from '@/market/fuzzwork';
 import type { MarketOrder } from '@/esi/endpoints';
 import {
@@ -105,8 +115,15 @@ export interface BuildRowsInput {
   stationPrices: ReadonlyMap<string, HubAggregate>;
   /** Keyed orderId. */
   costBases: ReadonlyMap<number, OrderCostBasis>;
-  /** Keyed orderId; only for orders whose region book has been fetched. */
-  deepCompetition?: ReadonlyMap<number, readonly CompetingOrder[]>;
+  /**
+   * Keyed orderId; only for orders whose region book has been fetched.
+   * `truncated` rides alongside `competitors` (not a parallel map) so a
+   * caller can never read one without the other.
+   */
+  deepCompetition?: ReadonlyMap<
+    number,
+    { competitors: readonly CompetingOrder[]; truncated: boolean }
+  >;
   /** Keyed locationId; a missing entry renders as a player structure. */
   stationNames?: ReadonlyMap<number, string>;
   /** Per character, since skills differ. Keyed characterId. */
@@ -114,10 +131,6 @@ export interface BuildRowsInput {
   now: number;
   /** Days without a sale, keyed orderId, when known. */
   daysWithoutSale?: ReadonlyMap<number, number>;
-}
-
-function stationPriceKey(locationId: number, typeId: number): string {
-  return `${locationId}:${typeId}`;
 }
 
 /** The trap: my own order sits inside the aggregate, so a rival price EQUAL to mine is not beating me — only strictly better counts. */
@@ -196,16 +209,21 @@ function buildRow(
   const aggregate = stationPrices.get(stationPriceKey(order.location_id, order.type_id));
   const station = buildStationTier(order.price, isBuyOrder, aggregate);
 
-  const deepUndercut = deepCompetition?.has(order.order_id)
-    ? buildDeepUndercut(order, isBuyOrder, deepCompetition.get(order.order_id) ?? [])
+  const deepEntry = deepCompetition?.get(order.order_id) ?? null;
+  const deepUndercut = deepEntry
+    ? buildDeepUndercut(order, isBuyOrder, deepEntry.competitors)
     : null;
+  const deepTruncated = deepEntry?.truncated ?? false;
 
   // Deep check wins outright when it ran, even when it found nothing — it
   // saw the real order book, the station tier only saw one aggregated
-  // price. `??` would wrongly resurrect a stale station read here.
+  // price. `??` would wrongly resurrect a stale station read here. EXCEPT
+  // when the fetched book was truncated: a clean-but-truncated deep result
+  // is evidence of absence only for what it actually saw, so it must not
+  // suppress a real station rival the cheap tier already found.
   const worstScope: UndercutScope | null =
     deepUndercut !== null
-      ? (deepUndercut.worst?.scope ?? null)
+      ? (deepUndercut.worst?.scope ?? (deepTruncated && station.beatsMe ? 'station' : null))
       : station.beatsMe
         ? 'station'
         : null;

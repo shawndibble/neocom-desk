@@ -4,25 +4,12 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import i18n from '@/i18n';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
-import type { OrderBadgeKind } from './OrderProblemBadge';
-
-const ALL_KINDS: OrderBadgeKind[] = [
-  'belowFloor',
-  'undercutStation',
-  'undercutSystem',
-  'undercutRegion',
-  'expiring',
-  'stale',
-  'offHub',
-  'outbid',
-  'best',
-  'noCostBasis',
-];
+import { ORDER_BADGE_KINDS } from './orderBadgeKind';
 
 describe('OrderBadgeLegend', () => {
   it('renders every badge kind label when open', () => {
     render(<OrderBadgeLegend open onClose={vi.fn()} />);
-    for (const kind of ALL_KINDS) {
+    for (const kind of ORDER_BADGE_KINDS) {
       const label = i18n.t(`market.orders.badge.${kind}`);
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }

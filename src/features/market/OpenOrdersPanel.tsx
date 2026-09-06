@@ -46,6 +46,7 @@ import {
   loadJumpsBetween,
   type RegionCompetition,
 } from './orderCompetition';
+import { loadPriceHistory, type PriceHistoryResult } from './priceHistory';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import {
   buildOpenOrderRows,
@@ -66,6 +67,7 @@ import {
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
+import { stationPriceKey } from './stationPriceKey';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderDetailModal } from './OrderDetailModal';
 
@@ -106,10 +108,6 @@ interface Snapshot {
   costBases: Map<number, OrderCostBasis>;
   skillsByCharacter: Map<number, CharacterSkills>;
   now: number;
-}
-
-function stationPriceKey(locationId: number, typeId: number): string {
-  return `${locationId}:${typeId}`;
 }
 
 function itemKey(regionId: number, typeId: number): string {
@@ -228,14 +226,26 @@ export function OpenOrdersPanel() {
   const [deepByKey, setDeepByKey] = useState<Map<string, RegionCompetition>>(new Map());
   const [deepLoadingKeys, setDeepLoadingKeys] = useState<ReadonlySet<string>>(new Set());
   const [jumpsByPair, setJumpsByPair] = useState<Map<string, JumpsAwayResult>>(new Map());
+  const [historyByKey, setHistoryByKey] = useState<Map<string, PriceHistoryResult>>(new Map());
+  const [historyLoadingKeys, setHistoryLoadingKeys] = useState<ReadonlySet<string>>(new Set());
 
   const snapshot = data;
 
-  function ensureDeepChecked(regionId: number, typeId: number) {
+  /**
+   * The shared body behind both `ensureDeepChecked` (one row's "Details") and
+   * `checkGroupDeeper` (a whole group at once) — returning the underlying
+   * promise, rather than firing-and-forgetting like the old single-item
+   * helper did, is what lets `checkGroupDeeper` route every item in a group
+   * through `mapWithConcurrencyLimit`: a worker there only picks up its next
+   * item once the promise for the current one settles, which is exactly what
+   * caps the fan-out. In-flight de-duplication (`deepByKey`/`deepLoadingKeys`)
+   * and per-item failure isolation (the `.catch` below) both still apply.
+   */
+  function loadDeepIfNeeded(regionId: number, typeId: number): Promise<void> {
     const key = itemKey(regionId, typeId);
-    if (deepByKey.has(key) || deepLoadingKeys.has(key)) return;
+    if (deepByKey.has(key) || deepLoadingKeys.has(key)) return Promise.resolve();
     setDeepLoadingKeys((prev) => new Set(prev).add(key));
-    void loadRegionCompetition(regionId, typeId)
+    return loadRegionCompetition(regionId, typeId)
       .then((result) => {
         setDeepByKey((prev) => new Map(prev).set(key, result));
       })
@@ -251,13 +261,43 @@ export function OpenOrdersPanel() {
       });
   }
 
+  function ensureDeepChecked(regionId: number, typeId: number) {
+    void loadDeepIfNeeded(regionId, typeId);
+  }
+
+  /**
+   * Price history for the modal's "sells out in" chip — fetched on demand,
+   * the same on-open pattern as `ensureDeepChecked`, and left uncached on
+   * failure so the next open retries. Single-item, so no fan-out cap is
+   * needed here (unlike the deep check, this never runs for a whole group).
+   */
+  function ensureHistoryLoaded(regionId: number, typeId: number) {
+    const key = itemKey(regionId, typeId);
+    if (historyByKey.has(key) || historyLoadingKeys.has(key)) return;
+    setHistoryLoadingKeys((prev) => new Set(prev).add(key));
+    void loadPriceHistory(regionId, typeId)
+      .then((result) => {
+        setHistoryByKey((prev) => new Map(prev).set(key, result));
+      })
+      .catch(() => {
+        // Left uncached on failure so the next open retries.
+      })
+      .finally(() => {
+        setHistoryLoadingKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      });
+  }
+
   const deepCompetitionByOrderId = useMemo(() => {
-    const m = new Map<number, readonly CompetingOrder[]>();
+    const m = new Map<number, { competitors: readonly CompetingOrder[]; truncated: boolean }>();
     if (!snapshot) return m;
     for (const entry of snapshot.openOrders.entries) {
       for (const order of entry.orders) {
         const rc = deepByKey.get(itemKey(order.region_id, order.type_id));
-        if (rc) m.set(order.order_id, rc.competitors);
+        if (rc) m.set(order.order_id, { competitors: rc.competitors, truncated: rc.truncated });
       }
     }
     return m;
@@ -397,16 +437,28 @@ export function OpenOrdersPanel() {
   function openDetails(row: OpenOrderRow) {
     setDetailOrderId(row.orderId);
     ensureDeepChecked(row.regionId, row.typeId);
+    ensureHistoryLoaded(row.regionId, row.typeId);
   }
 
+  /**
+   * Fans out over the group's DISTINCT items (not rows — several characters
+   * can each hold an order on the same item) at most `ESI_FANOUT_CONCURRENCY`
+   * at a time, rather than firing every region-book fetch in the group at
+   * once: a large "expiring or stale" group can easily hold dozens of
+   * distinct items.
+   */
   function checkGroupDeeper(rows: readonly OpenOrderRow[]) {
     const seen = new Set<string>();
+    const uniqueRows: OpenOrderRow[] = [];
     for (const row of rows) {
       const key = itemKey(row.regionId, row.typeId);
       if (seen.has(key)) continue;
       seen.add(key);
-      ensureDeepChecked(row.regionId, row.typeId);
+      uniqueRows.push(row);
     }
+    void mapWithConcurrencyLimit(uniqueRows, ESI_FANOUT_CONCURRENCY, (row) =>
+      loadDeepIfNeeded(row.regionId, row.typeId)
+    );
   }
 
   const columns: DataTableColumn<OpenOrderRow>[] = [
@@ -797,6 +849,7 @@ export function OpenOrdersPanel() {
           skills={snapshot.skillsByCharacter.get(detailRow.characterId)}
           deep={deepByKey.get(itemKey(detailRow.regionId, detailRow.typeId)) ?? null}
           loadingDeep={deepLoadingKeys.has(itemKey(detailRow.regionId, detailRow.typeId))}
+          history={historyByKey.get(itemKey(detailRow.regionId, detailRow.typeId)) ?? null}
           stationChecked={snapshot.stationPrices.has(
             stationPriceKey(detailRow.locationId, detailRow.typeId)
           )}

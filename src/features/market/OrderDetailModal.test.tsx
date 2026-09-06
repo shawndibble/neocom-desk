@@ -6,7 +6,17 @@ import '@/i18n';
 import { OrderDetailModal } from './OrderDetailModal';
 import type { OpenOrderRow, CharacterSkills } from './openOrdersModel';
 import type { RegionCompetition } from './orderCompetition';
+import type { PriceHistoryResult } from './priceHistory';
 import { orderFloor } from '@/engine/market/orderFloor';
+
+/** Daily point `daysAgo` days before now, so it always lands inside a `30d` filter regardless of when the suite runs. */
+function historyPoint(daysAgo: number, volume: number) {
+  return {
+    date: new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10),
+    average: 100,
+    volume,
+  };
+}
 
 const SKILLS: CharacterSkills = { accountingLevel: 5, brokerRelationsLevel: 5 };
 
@@ -48,6 +58,7 @@ function renderModal(overrides: Partial<Parameters<typeof OrderDetailModal>[0]> 
         skills={undefined}
         deep={null}
         loadingDeep={false}
+        history={null}
         stationChecked={false}
         stationsLoaded
         regionJumps={undefined}
@@ -107,6 +118,7 @@ describe('OrderDetailModal', () => {
           skills={undefined}
           deep={null}
           loadingDeep={false}
+          history={null}
           stationChecked
           stationsLoaded
           regionJumps={undefined}
@@ -125,6 +137,7 @@ describe('OrderDetailModal', () => {
           skills={undefined}
           deep={null}
           loadingDeep
+          history={null}
           stationChecked
           stationsLoaded
           regionJumps={undefined}
@@ -249,7 +262,7 @@ describe('OrderDetailModal', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
-  it('renders the full cost-basis ledger, including the fill floor only inside the explanation', () => {
+  it('renders the full cost-basis ledger, with the fill floor only inside the tooltip explanation — never as a second visible number', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,
       floor: { relist: 724.45, fill: 620.96 },
@@ -271,8 +284,10 @@ describe('OrderDetailModal', () => {
     // Cost per unit reads straight off the cost basis, not re-derived.
     expect(screen.getByText('Cost per unit')).toBeInTheDocument();
     expect(screen.getByText('600.00 ISK')).toBeInTheDocument();
-    expect(screen.getByText('If you leave it and it sells')).toBeInTheDocument();
-    expect(screen.getByText('620.96 ISK')).toBeInTheDocument();
+    // ONE floor on screen: the fill floor's label and its number must not
+    // appear as a second visible ledger row.
+    expect(screen.queryByText('If you leave it and it sells')).not.toBeInTheDocument();
+    expect(screen.queryByText('620.96 ISK')).not.toBeInTheDocument();
   });
 
   it('sums cost per unit, sales tax and broker fee to exactly the relist floor shown', () => {
@@ -331,5 +346,179 @@ describe('OrderDetailModal', () => {
     expect(stationRow).toHaveTextContent('Not checked yet');
     expect(systemRow).toHaveTextContent('Not checked yet');
     expect(stationRow).not.toHaveTextContent('player structure');
+  });
+
+  describe('truncated region book', () => {
+    it('reads a clean region scope as "not checked" rather than clear, when the fetched book was truncated', () => {
+      const deep: RegionCompetition = { competitors: [], fetchedAt: Date.now(), truncated: true };
+      const row: OpenOrderRow = {
+        ...BASE_ROW,
+        deepUndercut: { worst: null, byScope: { system: null, region: null } },
+      };
+      renderModal({ row, deep, stationChecked: true });
+
+      const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+      const regionRow = within(whoSection).getByText('Region').closest('div');
+      expect(regionRow).toHaveTextContent('Not checked yet');
+    });
+
+    it('still trusts a rival the truncated book actually found', () => {
+      const deep: RegionCompetition = {
+        competitors: [
+          {
+            orderId: 999,
+            price: 450,
+            locationId: 60003469,
+            systemId: 30000144,
+            volumeRemain: 5,
+            isBuyOrder: false,
+          },
+        ],
+        fetchedAt: Date.now(),
+        truncated: true,
+      };
+      const row: OpenOrderRow = {
+        ...BASE_ROW,
+        deepUndercut: {
+          worst: {
+            scope: 'region',
+            price: 450,
+            gapIsk: 50,
+            gapPct: 10,
+            volumeRemain: 5,
+            locationId: 60003469,
+            systemId: 30000144,
+            ordersBeatingMe: 1,
+            unitsBeatingMe: 5,
+          },
+          byScope: {
+            region: {
+              scope: 'region',
+              price: 450,
+              gapIsk: 50,
+              gapPct: 10,
+              volumeRemain: 5,
+              locationId: 60003469,
+              systemId: 30000144,
+              ordersBeatingMe: 1,
+              unitsBeatingMe: 5,
+            },
+          },
+        },
+      };
+      renderModal({ row, deep, stationChecked: true });
+
+      const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+      const regionRow = within(whoSection).getByText('Region').closest('div');
+      expect(regionRow).toHaveTextContent('450.00 ISK');
+    });
+
+    it('explains the "not checked" reads with an incomplete-data line, so a truncated fetch does not look identical to never having checked at all', () => {
+      const deep: RegionCompetition = { competitors: [], fetchedAt: Date.now(), truncated: true };
+      const row: OpenOrderRow = {
+        ...BASE_ROW,
+        deepUndercut: { worst: null, byScope: { system: null, region: null } },
+      };
+      renderModal({ row, deep, stationChecked: true });
+
+      const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+      expect(
+        within(whoSection).getByText('Incomplete data — some pages could not be loaded')
+      ).toBeInTheDocument();
+      // And the "check deeper" button must not come back — this is a
+      // resolved (if partial) fetch, not the pre-fetch state.
+      expect(
+        within(whoSection).queryByRole('button', { name: 'Check system and region' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows no incomplete-data line once the fetched book was complete', () => {
+      const deep: RegionCompetition = { competitors: [], fetchedAt: Date.now(), truncated: false };
+      renderModal({ deep, stationChecked: true });
+
+      expect(
+        screen.queryByText('Incomplete data — some pages could not be loaded')
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('sells-out-in stat chip', () => {
+    it('shows a day count for a busy item', () => {
+      const history: PriceHistoryResult = {
+        points: [historyPoint(1, 100), historyPoint(2, 100), historyPoint(3, 100)],
+        fetchedAt: Date.now(),
+      };
+      // regionUnitsPerDay = 300/30 = 10/day; myShare defaults to 1 (deep not
+      // fetched); volumeRemain is BASE_ROW's 10 -> ceil(10/10) = 1 day.
+      renderModal({ history });
+
+      expect(screen.getByText('Sells out in')).toBeInTheDocument();
+      expect(screen.getByText('1d')).toBeInTheDocument();
+    });
+
+    it('shows "can\'t tell" (never a number) for an item with no sales in the last 30 days', () => {
+      const history: PriceHistoryResult = {
+        points: [historyPoint(45, 500)], // outside the 30-day window entirely
+        fetchedAt: Date.now(),
+      };
+      renderModal({ history });
+
+      // Scoped to the "Sells out in" chip itself — "60d" elsewhere on the
+      // modal (BASE_ROW's own expiresIn chip) is a different stat entirely.
+      const chip = screen
+        .getByText('Sells out in')
+        .closest('span[class*="inline-flex"]') as HTMLElement;
+      expect(within(chip).getByText('Nothing has sold in the last 30 days')).toBeInTheDocument();
+      expect(within(chip).queryByText(/^\d+d$/)).not.toBeInTheDocument();
+    });
+
+    it('says "can\'t tell yet" (never a number) when there is no price history at all', () => {
+      renderModal({ history: null });
+
+      expect(screen.getByText("Can't tell yet")).toBeInTheDocument();
+    });
+
+    it("adds the past-expiry line when the clear-out estimate runs past the order's own expiry", () => {
+      const history: PriceHistoryResult = {
+        points: [historyPoint(1, 30), historyPoint(2, 30), historyPoint(3, 30)],
+        fetchedAt: Date.now(),
+      };
+      // regionUnitsPerDay = 90/30 = 3/day; volumeRemain 1000 -> ceil(1000/3)
+      // = 334 days, far past BASE_ROW's 60-day expiry.
+      const row: OpenOrderRow = { ...BASE_ROW, volumeRemain: 1000, volumeTotal: 1000 };
+      renderModal({ row, history });
+
+      expect(screen.getByText('334d')).toBeInTheDocument();
+      expect(screen.getByText('Runs past the day this order expires')).toBeInTheDocument();
+    });
+
+    it('shrinks the estimate by my share of the same-side queue once the deep competitors are in hand', () => {
+      const history: PriceHistoryResult = {
+        points: [historyPoint(1, 300), historyPoint(2, 300), historyPoint(3, 300)],
+        fetchedAt: Date.now(),
+      };
+      // regionUnitsPerDay = 900/30 = 30/day. A same-side rival priced at or
+      // better than mine, holding the same remaining volume as my order,
+      // halves my share of that rate: myShare = 100/(100+100) = 0.5, so
+      // 15/day -> ceil(100/15) = 7 days, not the naive ceil(100/30) = 4.
+      const deep: RegionCompetition = {
+        competitors: [
+          {
+            orderId: 999,
+            price: 480,
+            locationId: 60003469,
+            systemId: 30000144,
+            volumeRemain: 100,
+            isBuyOrder: false,
+          },
+        ],
+        fetchedAt: Date.now(),
+        truncated: false,
+      };
+      const row: OpenOrderRow = { ...BASE_ROW, price: 500, volumeRemain: 100, volumeTotal: 100 };
+      renderModal({ row, history, deep });
+
+      expect(screen.getByText('7d')).toBeInTheDocument();
+    });
   });
 });

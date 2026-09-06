@@ -8,9 +8,11 @@ import { OpenOrdersPanel } from './OpenOrdersPanel';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
 import { loadOrderCostBases, type OrderCostBasis } from './orderCostBasis';
 import { loadStationBestPrices, loadRegionCompetition, loadJumpsBetween } from './orderCompetition';
+import { loadPriceHistory } from './priceHistory';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
+import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { MarketOrder } from '@/esi/endpoints';
 
 vi.mock('./openOrdersData', () => ({ loadAllCharactersOpenOrders: vi.fn() }));
@@ -20,6 +22,7 @@ vi.mock('./orderCompetition', () => ({
   loadRegionCompetition: vi.fn(),
   loadJumpsBetween: vi.fn(),
 }));
+vi.mock('./priceHistory', () => ({ loadPriceHistory: vi.fn() }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/sde/loadMarketSde', () => ({ loadNpcStations: vi.fn() }));
 vi.mock('@/features/skills/correctedSkills', () => ({ loadCorrectedSkills: vi.fn() }));
@@ -31,6 +34,7 @@ const mockedCostBases = vi.mocked(loadOrderCostBases);
 const mockedStationPrices = vi.mocked(loadStationBestPrices);
 const mockedRegionCompetition = vi.mocked(loadRegionCompetition);
 const mockedJumps = vi.mocked(loadJumpsBetween);
+const mockedPriceHistory = vi.mocked(loadPriceHistory);
 const mockedTypeNames = vi.mocked(loadTypeNames);
 const mockedNpcStations = vi.mocked(loadNpcStations);
 const mockedSkills = vi.mocked(loadCorrectedSkills);
@@ -136,9 +140,11 @@ beforeEach(() => {
       [3446, 5],
     ])
   );
-  // Deep checks are on-demand only — default to "never resolves" so a test
-  // that doesn't care about the deep tier never has to wait on it.
+  // Deep checks (and price history, for the "sells out in" chip) are
+  // on-demand only — default to "never resolves" so a test that doesn't
+  // care about either tier never has to wait on them.
   mockedRegionCompetition.mockImplementation(() => new Promise(() => {}));
+  mockedPriceHistory.mockImplementation(() => new Promise(() => {}));
   mockedJumps.mockResolvedValue({ kind: 'unknown', reason: 'noRoute' });
 });
 
@@ -315,6 +321,45 @@ describe('OpenOrdersPanel', () => {
     expect(screen.getByText('Quick answer')).toBeInTheDocument();
   });
 
+  it('fetches price history on opening a row\'s details and feeds it into the "sells out in" chip', async () => {
+    // This is the wiring `loadPriceHistory` exists for (issue #5): if
+    // `openDetails` stopped calling it, this test — not just the modal's own
+    // prop-level tests — is what would catch a promised feature silently
+    // regressing back to dead scaffolding.
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+    mockedPriceHistory.mockResolvedValue({
+      points: Array.from({ length: 3 }, (_, i) => ({
+        date: new Date(Date.now() - (i + 1) * 86_400_000).toISOString().slice(0, 10),
+        average: 100,
+        volume: 100,
+      })),
+      fetchedAt: Date.now(),
+    });
+
+    renderPanel();
+    const row = await screen.findByRole('row', { name: /Tritanium/ });
+    await user.click(within(row).getByRole('button', { name: 'Details' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Tritanium' });
+    expect(mockedPriceHistory).toHaveBeenCalledWith(REGION, 34);
+    // 300 units / 30 days = 10/day; BELOW_FLOOR_ORDER's volumeRemain is 10 ->
+    // 1 day, with no deep book fetched yet so myShare defaults to 1.
+    await waitFor(() => expect(within(dialog).getByText('1d')).toBeInTheDocument());
+  });
+
   it('shows an unchecked scope as unchecked rather than clean', async () => {
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(
@@ -447,6 +492,80 @@ describe('OpenOrdersPanel', () => {
       await user.click(screen.getByRole('combobox', { name: 'ISK tied up over' }));
       await user.click(screen.getByRole('option', { name: '10M ISK' }));
       expect(await screen.findByText('0 of 3 orders match')).toBeInTheDocument();
+    });
+  });
+
+  describe('"check system and region" for a whole group', () => {
+    it('caps the region-book fan-out at ESI_FANOUT_CONCURRENCY distinct items, never firing every item at once', async () => {
+      const user = userEvent.setup();
+      // More distinct items than the concurrency cap, all in one
+      // never-folded group (each expires in 5 days -> expiringOrStale).
+      const itemCount = ESI_FANOUT_CONCURRENCY + 4;
+      const orders = Array.from({ length: itemCount }, (_, i) =>
+        order({
+          order_id: 900 + i,
+          type_id: 900 + i,
+          price: 100,
+          issued: new Date().toISOString(),
+          duration: 5,
+          volume_remain: 1,
+          volume_total: 1,
+        })
+      );
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders,
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+      mockedCostBases.mockResolvedValue(new Map());
+      // Never resolves, so the in-flight call count is directly observable.
+      mockedRegionCompetition.mockImplementation(() => new Promise(() => {}));
+
+      renderPanel();
+      const group = await screen.findByTestId('order-group-expiringOrStale');
+      expect(group).toHaveTextContent(`· ${itemCount}`);
+
+      await user.click(within(group).getByRole('button', { name: 'Check system and region' }));
+
+      expect(mockedRegionCompetition).toHaveBeenCalledTimes(ESI_FANOUT_CONCURRENCY);
+    });
+
+    it('does not double-fetch an item already checked from its own row', async () => {
+      const user = userEvent.setup();
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [BELOW_FLOOR_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+      mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+      mockedRegionCompetition.mockImplementation(() => new Promise(() => {}));
+
+      renderPanel();
+      const row = await screen.findByRole('row', { name: /Tritanium/ });
+      await user.click(within(row).getByRole('button', { name: 'Details' }));
+      await screen.findByRole('dialog', { name: 'Tritanium' });
+      await user.click(screen.getByRole('button', { name: 'Close' }));
+      expect(mockedRegionCompetition).toHaveBeenCalledTimes(1);
+
+      const group = screen.getByTestId('order-group-belowFloor');
+      await user.click(within(group).getByRole('button', { name: 'Check system and region' }));
+      // Still in flight from opening the row's own detail view — the group
+      // check must not fire a second request for the same item.
+      expect(mockedRegionCompetition).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -181,6 +181,22 @@ here — they go one per file in `docs/context/decisions/`.
   from ESI. Rows, not a summary — each row is one order with its price,
   quantity, location, range and expiry. Replaces the single best bid/ask that a
   **Price Aggregate** gives.
+- **Order Floor**: The lowest price a sell order is worth taking, from
+  `src/engine/market/orderFloor.ts`. Two numbers: `relist` (sales tax plus a
+  broker fee charged again on the edit — the lowest price worth
+  RE-PRICING to) and `fill` (sales tax only, since the broker fee was
+  already paid at listing). Only `relist` is ever shown as a figure — the
+  row and the modal's quick answer both read it alone; `fill` surfaces only
+  inside the deeper breakdown, because the smaller number matters only when
+  deciding to leave an order alone rather than touch it. Null when nothing
+  is linked to the order — never a guessed floor, since a floor of zero
+  would make every rival look safe to follow.
+- **Order Problem**: The one thing wrong with an open order, from
+  `src/engine/market/orderProblems.ts`, and the Open Orders page's spine:
+  `belowFloor`, `undercutStation`, `undercutSystem`, `undercutRegion`,
+  `expiringOrStale`, `outbid`, `healthy`, in that precedence. Each order is
+  filed under exactly one — its worst — for grouping, while filters match
+  against every problem an order has, since those can overlap.
 - **Order Slots**: How many market orders a character may keep open at once —
   a base 5, plus 4 per level of Trade, 8 per Retail, 16 per Wholesale and 32
   per Tycoon, so 305 with all four at V. ESI reports the open orders but never
@@ -325,6 +341,15 @@ here — they go one per file in `docs/context/decisions/`.
   while `/skillqueue` carries `training_start_sp`, `level_end_sp` and the
   window the level trains across — enough to interpolate the true figure,
   which is what the in-game queue itself displays.
+- **Undercut Scope**: station, system or region, from
+  `src/engine/market/undercut.ts`. Nested, not independent: a cheaper order
+  at my station is also in my system and my region, so a row shows one
+  severity — the tightest scope containing a rival. A scope absent from
+  `byScope` was never checked; `null` means checked and clean —
+  collapsing those two would make a loading state indistinguishable from a
+  genuinely clean order. Station comes from batched aggregate prices on
+  every refresh; system and region come from one region order book per
+  item, fetched on demand.
 - **Use-or-Sell Check**: A Build Plan's third read, alongside the
   **Acquisition Verdict** and **Sale Profitability**: is the stock the player
   already owns worth more sold than consumed? Compares the plan's profit

@@ -9,20 +9,8 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
-import { OrderProblemBadge, type OrderBadgeKind } from './OrderProblemBadge';
-
-const ALL_KINDS: OrderBadgeKind[] = [
-  'belowFloor',
-  'undercutStation',
-  'undercutSystem',
-  'undercutRegion',
-  'expiring',
-  'stale',
-  'offHub',
-  'outbid',
-  'best',
-  'noCostBasis',
-];
+import { OrderProblemBadge } from './OrderProblemBadge';
+import { ORDER_BADGE_KINDS } from './orderBadgeKind';
 
 interface OrderBadgeLegendProps {
   open: boolean;
@@ -36,7 +24,7 @@ export function OrderBadgeLegend({ open, onClose }: OrderBadgeLegendProps) {
     <Modal open={open} onClose={onClose} title={t('market.orders.legendTitle')} placement="wide">
       <div className="space-y-3">
         <ul className="divide-y divide-line">
-          {ALL_KINDS.map((kind) => (
+          {ORDER_BADGE_KINDS.map((kind) => (
             <li
               key={kind}
               className="flex flex-col gap-1 py-2 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-3"

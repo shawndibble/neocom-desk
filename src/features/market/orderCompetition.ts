@@ -7,8 +7,11 @@
  *
  * - **Cheap tier — `loadStationBestPrices`.** A station's best sell/buy is
  *   one Fuzzwork aggregate lookup, batched across every station and item on
- *   the page in one go (`fetchAggregates` already chunks at 200 type ids).
- *   Cheap enough to run for every order on every refresh, so it always runs.
+ *   the page in one go (`fetchAggregates` already chunks at 200 type ids),
+ *   fanned out at most `ESI_FANOUT_CONCURRENCY` requests at a time — this
+ *   tier runs unprompted on every page load, so an unbounded `Promise.all`
+ *   over every station on the page is not theoretical. Cheap enough to run
+ *   for every order on every refresh, so it always runs.
  * - **Expensive tier — `loadRegionCompetition`.** Answering "who beats me in
  *   my SYSTEM" or "in my REGION" needs the whole region order book for that
  *   one item — there is no batched, per-station equivalent of that call.
@@ -26,17 +29,17 @@ import { getOrderBook } from './orderBook';
 import { getRoute } from '@/esi/endpoints';
 import { jumpsAwayFromRoute, type JumpsAwayResult } from '@/engine/jumpsAway';
 import type { CompetingOrder } from '@/engine/market/undercut';
-
-/** Cache key for `loadStationBestPrices`'s result map. */
-function stationPriceKey(stationId: number, typeId: number): string {
-  return `${stationId}:${typeId}`;
-}
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { stationPriceKey } from './stationPriceKey';
 
 /**
  * Cheap tier: best sell/buy at a given station, batched across every station
  * and item on the page. One `fetchAggregates` call per station — type ids are
  * deduplicated per station first, and a station with no ids is skipped
- * entirely (no empty-batch call).
+ * entirely (no empty-batch call). Requests fan out at most
+ * `ESI_FANOUT_CONCURRENCY` at a time (`mapWithConcurrencyLimit`) rather than
+ * an unbounded `Promise.all` — this tier runs on every page load, not behind
+ * a click, so a roster with many stations must not fire them all at once.
  *
  * One station's request failing (Fuzzwork down, a bad response) does not
  * drop the others: `fetchAggregates` throws on a non-ok response, so each
@@ -49,8 +52,10 @@ export async function loadStationBestPrices(
 ): Promise<Map<string, HubAggregate>> {
   const result = new Map<string, HubAggregate>();
 
-  await Promise.all(
-    requests.map(async ({ stationId, typeIds }) => {
+  await mapWithConcurrencyLimit(
+    requests,
+    ESI_FANOUT_CONCURRENCY,
+    async ({ stationId, typeIds }) => {
       const uniqueTypeIds = Array.from(new Set(typeIds));
       if (uniqueTypeIds.length === 0) return;
 
@@ -63,7 +68,7 @@ export async function loadStationBestPrices(
       } catch {
         // This station's prices are simply missing from the result.
       }
-    })
+    }
   );
 
   return result;

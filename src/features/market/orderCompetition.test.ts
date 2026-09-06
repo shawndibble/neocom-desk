@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
+import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { RegionOrder } from '@/esi/endpoints';
 import { clearOrderBookCache } from './orderBook';
 import {
@@ -89,6 +90,53 @@ describe('loadStationBestPrices', () => {
     const result = await loadStationBestPrices([
       { stationId: STATION_A, typeIds: [TYPE_A] },
       { stationId: STATION_B, typeIds: [] },
+    ]);
+
+    expect(result.has(`${STATION_A}:${TYPE_A}`)).toBe(true);
+    expect(result.has(`${STATION_B}:${TYPE_A}`)).toBe(false);
+  });
+
+  it('caps in-flight station requests at ESI_FANOUT_CONCURRENCY rather than firing every station at once', async () => {
+    const stationCount = ESI_FANOUT_CONCURRENCY + 5;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, async () => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 15));
+        inFlight -= 1;
+        return HttpResponse.json(aggregateBody(TYPE_A));
+      })
+    );
+
+    const requests = Array.from({ length: stationCount }, (_, i) => ({
+      stationId: STATION_A + i,
+      typeIds: [TYPE_A],
+    }));
+
+    const result = await loadStationBestPrices(requests);
+
+    expect(maxInFlight).toBeLessThanOrEqual(ESI_FANOUT_CONCURRENCY);
+    // Genuinely concurrent, not serialized down to one at a time.
+    expect(maxInFlight).toBeGreaterThan(1);
+    // Every station still gets fetched eventually, just fanned out in batches.
+    expect(result.size).toBe(stationCount);
+  });
+
+  it('does not let one failing station empty the result for the others', async () => {
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, ({ request }) => {
+        const station = new URL(request.url).searchParams.get('station');
+        if (station === String(STATION_B))
+          return HttpResponse.json({ error: 'gone' }, { status: 500 });
+        return HttpResponse.json(aggregateBody(TYPE_A));
+      })
+    );
+
+    const result = await loadStationBestPrices([
+      { stationId: STATION_A, typeIds: [TYPE_A] },
+      { stationId: STATION_B, typeIds: [TYPE_A] },
     ]);
 
     expect(result.has(`${STATION_A}:${TYPE_A}`)).toBe(true);

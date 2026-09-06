@@ -5,9 +5,9 @@
  * floor came from.
  *
  * Kept dumb on purpose: every prop is already-loaded data plus loading flags.
- * `OpenOrdersPanel` owns every fetch (`ensureDeepChecked`, jump lookups) —
- * this component only renders what it is handed and asks for more via
- * `onCheckDeeper`.
+ * `OpenOrdersPanel` owns every fetch (`ensureDeepChecked`, jump lookups,
+ * price history for the "sells out in" chip) — this component only renders
+ * what it is handed and asks for more via `onCheckDeeper`.
  *
  * The station/system/region three-way state a caller must not collapse:
  * - Station is always eager (`stationChecked` false only means the Fuzzwork
@@ -28,8 +28,11 @@ import { salesTax, brokerFee } from '@/engine/industry/fees';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import type { UndercutRival } from '@/engine/market/undercut';
+import { sellThrough, type SellThrough } from '@/engine/market/orderHealth';
+import { filterPriceHistoryRange } from '@/engine/market/priceHistory';
 import type { CharacterSkills, OpenOrderRow } from './openOrdersModel';
 import type { RegionCompetition } from './orderCompetition';
+import type { PriceHistoryResult } from './priceHistory';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 
@@ -41,6 +44,12 @@ export interface OrderDetailModalProps {
   /** Null: not fetched yet (or the fetch failed and hasn't been retried). */
   deep: RegionCompetition | null;
   loadingDeep: boolean;
+  /**
+   * Null: not fetched yet (or the fetch failed and hasn't been retried) —
+   * renders the same honest "can't tell yet" as no history at all, since
+   * neither case can support a number.
+   */
+  history: PriceHistoryResult | null;
   /** Whether the cheap station-price tier actually returned an aggregate for this row's station+item. */
   stationChecked: boolean;
   /**
@@ -110,7 +119,12 @@ function deepScopeState(
   const byScope = row.deepUndercut?.byScope ?? {};
   if (!(scope in byScope)) return { kind: 'notChecked' };
   const rival = byScope[scope];
-  return rival ? { kind: 'rival', rival } : { kind: 'clear' };
+  if (rival) return { kind: 'rival', rival };
+  // A rival was found here despite truncation, that finding stands. But a
+  // CLEAN read from a truncated book is only proof of absence for the pages
+  // it actually saw — honest is "not checked", not "clear".
+  if (deep.truncated) return { kind: 'notChecked' };
+  return { kind: 'clear' };
 }
 
 function ScopeRow({
@@ -152,12 +166,66 @@ function ScopeRow({
   );
 }
 
+/**
+ * "Sells out in": `sellThrough` fed with this order's remaining volume, the
+ * region's recent average daily units (last 30 days of price history — the
+ * same window `sellsOutNoSales`'s wording promises), and the player's share
+ * of the units listed at their price or better.
+ *
+ * No usable history at all (never fetched, fetch failed, or ESI genuinely
+ * has none) reads as `'noHistory'` — never a fabricated rate.
+ *
+ * `myShare` comes from the deep competitors already in hand: same side
+ * (a buy order only queues behind other buy orders), priced at-or-better
+ * than mine, my own remaining volume as a fraction of that whole pool. When
+ * the deep book has not been fetched yet there is no honest way to place
+ * myself in that queue, so this passes `1` (assume nothing ahead) rather
+ * than inventing a number — the only other input, region volume, still
+ * carries the interesting signal in that case. A TRUNCATED deep book is
+ * used as-is here too: it under-counts the queue ahead of me (rather than
+ * over-counting it), so `myShare` — and therefore the days-to-clear estimate
+ * — reads as a lower bound in that case, never a false alarm.
+ */
+function computeSellThrough(
+  row: OpenOrderRow,
+  deep: RegionCompetition | null,
+  history: PriceHistoryResult | null
+): SellThrough {
+  if (!history || history.points.length === 0) return { kind: 'unknown', reason: 'noHistory' };
+
+  const recentDays = 30;
+  const recent = filterPriceHistoryRange(history.points, '30d');
+  const regionUnitsPerDay = recent.reduce((sum, p) => sum + p.volume, 0) / recentDays;
+
+  let myShare = 1;
+  if (deep) {
+    const queueVolume = deep.competitors
+      .filter(
+        (c) =>
+          c.orderId !== row.orderId &&
+          c.isBuyOrder === row.isBuyOrder &&
+          (row.isBuyOrder ? c.price >= row.price : c.price <= row.price)
+      )
+      .reduce((sum, c) => sum + c.volumeRemain, 0);
+    const totalVolume = row.volumeRemain + queueVolume;
+    myShare = totalVolume > 0 ? row.volumeRemain / totalVolume : 1;
+  }
+
+  return sellThrough({
+    volumeRemain: row.volumeRemain,
+    regionUnitsPerDay,
+    myShare,
+    hasHistory: true,
+  });
+}
+
 export function OrderDetailModal({
   open,
   row,
   skills,
   deep,
   loadingDeep,
+  history,
   stationChecked,
   stationsLoaded,
   regionJumps,
@@ -175,6 +243,18 @@ export function OrderDetailModal({
   const station = stationScopeState(row, stationChecked, location);
   const system = deepScopeState('system', row, deep, location);
   const region = deepScopeState('region', row, deep, location);
+
+  const sell = computeSellThrough(row, deep, history);
+  const sellValue =
+    sell.kind === 'known'
+      ? `${sell.daysToClear}d`
+      : t(
+          sell.reason === 'noHistory'
+            ? 'market.orders.sellsOutUnknown'
+            : 'market.orders.sellsOutNoSales'
+        );
+  const sellPastExpiry =
+    sell.kind === 'known' && row.expiry !== null && sell.daysToClear > row.expiry.daysLeft;
 
   const showCheckDeeper = deep === null && !loadingDeep;
   const allClean =
@@ -220,7 +300,16 @@ export function OrderDetailModal({
             value={row.expiry ? `${row.expiry.daysLeft}d` : t('common.unknown')}
             tone={row.expiry && row.expiry.daysLeft <= 7 ? 'warning' : 'default'}
           />
+          <StatChip
+            label={t('market.orders.sellsOutIn')}
+            tooltip={t('market.orders.sellsOutHelp')}
+            value={sellValue}
+            tone={sellPastExpiry ? 'danger' : 'default'}
+          />
         </div>
+        {sellPastExpiry && (
+          <p className="text-xs text-danger">{t('market.orders.sellsOutPastExpiry')}</p>
+        )}
 
         <section className="space-y-1 border-t border-line pt-3">
           <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
@@ -234,6 +323,15 @@ export function OrderDetailModal({
             jumps={regionJumps}
           />
           {allClean && <p className="text-xs text-success">{t('market.orders.onlySeller')}</p>}
+          {deep?.truncated && (
+            // A truncated fetch isn't the pre-fetch state (the button above
+            // stays hidden, same as any other resolved `deep`) — say why
+            // system/region above read "not checked" instead of leaving the
+            // user to wonder where the "check deeper" button went. Same
+            // key/shape `OrderHistoryPanel.tsx` and `VariationsTable.tsx` use
+            // for their own truncated fetches.
+            <p className="text-[0.6875rem] text-warning uppercase">{t('common.incompleteTitle')}</p>
+          )}
           {showCheckDeeper && (
             <Button size="sm" onClick={onCheckDeeper}>
               {t('market.orders.checkDeeper')}
@@ -308,16 +406,15 @@ export function OrderDetailModal({
                 </>
               )}
               {row.floor && (
-                <>
-                  <LedgerRow
-                    label={t('market.orders.floorLabel')}
-                    value={`${formatIsk(row.floor.relist, 2)} ISK`}
-                  />
-                  <LedgerRow
-                    label={t('market.orders.floorFillLabel')}
-                    value={`${formatIsk(row.floor.fill, 2)} ISK`}
-                  />
-                </>
+                // Only ONE floor is ever shown on screen (design decision):
+                // `floor.fill` — what leaving the order alone would net once
+                // it sells — is explained inside the `floorHelp` tooltip on
+                // the headline stat chip above, never as a second visible
+                // number here.
+                <LedgerRow
+                  label={t('market.orders.floorLabel')}
+                  value={`${formatIsk(row.floor.relist, 2)} ISK`}
+                />
               )}
             </dl>
           )}

@@ -12,11 +12,6 @@
  * `expiry`, `worstScope`, `costBasis`). Formatting an ISK/percentage value
  * for i18n stays with the caller — this only decides *which* badge and what
  * short, already-formatted detail string (if any) goes beside it.
- *
- * `'stale'` and `'offHub'` are real `OrderBadgeKind`s (shown in
- * `OrderBadgeLegend`) but no `OrderProblem` ever maps to either one here —
- * neither `orderProblems.ts` nor this function can produce them today, so
- * their absence below is not missing coverage.
  */
 import type { OpenOrderRow } from './openOrdersModel';
 import type { OrderBadgeKind } from './OrderProblemBadge';
@@ -25,6 +20,24 @@ export interface OrderBadgeChoice {
   kind: OrderBadgeKind;
   detail?: string;
 }
+
+/**
+ * Every `OrderBadgeKind`, in the order the legend renders them — one owner,
+ * like `ORDER_PROBLEMS` in `orderProblems.ts`, so a kind added or removed
+ * from the type cannot silently drift out of sync with what the legend
+ * lists. Lives here rather than on `OrderProblemBadge.tsx` because that file
+ * exports a component; a value export there defeats fast refresh.
+ */
+export const ORDER_BADGE_KINDS: readonly OrderBadgeKind[] = [
+  'belowFloor',
+  'undercutStation',
+  'undercutSystem',
+  'undercutRegion',
+  'expiring',
+  'outbid',
+  'best',
+  'noCostBasis',
+];
 
 /** The one badge a row wears, and the short detail beside it. Null renders no badge — never a false "best"/"noCostBasis" claim the data can't back up. */
 export function orderBadgeFor(row: OpenOrderRow): OrderBadgeChoice | null {

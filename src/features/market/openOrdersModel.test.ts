@@ -70,6 +70,13 @@ function firstRow(input: BuildRowsInput): OpenOrderRow {
   return rows[0];
 }
 
+function deepEntry(
+  competitors: readonly CompetingOrder[],
+  truncated = false
+): { competitors: readonly CompetingOrder[]; truncated: boolean } {
+  return { competitors, truncated };
+}
+
 describe('buildOpenOrderRows — station tier', () => {
   it('is not beaten when the aggregate best price equals my own sell price (the trap)', () => {
     const row = firstRow(
@@ -191,10 +198,10 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
   });
 
   it('wins outright with a deep result even when the deep check found nothing and station.beatsMe is true (the second trap)', () => {
-    const deepCompetition = new Map<number, readonly CompetingOrder[]>([
+    const deepCompetition = new Map([
       [
         1,
-        [
+        deepEntry([
           // Only my own order in the fetched region book: deep check ran, found no rival.
           {
             orderId: 1,
@@ -204,7 +211,7 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
             volumeRemain: 5,
             isBuyOrder: false,
           },
-        ],
+        ]),
       ],
     ]);
     const row = firstRow(
@@ -221,11 +228,108 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
     expect(row.worstScope).toBeNull();
   });
 
-  it('reports the deep result worst scope when it beats me', () => {
-    const deepCompetition = new Map<number, readonly CompetingOrder[]>([
+  it('falls back to station when a clean deep result was TRUNCATED and station.beatsMe is true — a partial book is not proof of a clean order', () => {
+    const deepCompetition = new Map([
       [
         1,
-        [
+        deepEntry(
+          [
+            // Only my own order in the (partially) fetched region book.
+            {
+              orderId: 1,
+              price: 1000,
+              locationId: 60003760,
+              systemId: 30000142,
+              volumeRemain: 5,
+              isBuyOrder: false,
+            },
+          ],
+          true // truncated
+        ),
+      ],
+    ]);
+    const row = firstRow(
+      baseInput({
+        stationPrices: new Map([
+          ['60003760:100', { sellMin: 900, buyMax: null, sellVolume: 5, buyVolume: 0 }],
+        ]),
+        deepCompetition,
+      })
+    );
+    expect(row.station.beatsMe).toBe(true);
+    expect(row.deepUndercut?.worst).toBeNull();
+    expect(row.worstScope).toBe('station');
+  });
+
+  it('keeps worstScope null for the identical clean deep result when it was NOT truncated (control case)', () => {
+    const deepCompetition = new Map([
+      [
+        1,
+        deepEntry(
+          [
+            {
+              orderId: 1,
+              price: 1000,
+              locationId: 60003760,
+              systemId: 30000142,
+              volumeRemain: 5,
+              isBuyOrder: false,
+            },
+          ],
+          false // not truncated
+        ),
+      ],
+    ]);
+    const row = firstRow(
+      baseInput({
+        stationPrices: new Map([
+          ['60003760:100', { sellMin: 900, buyMax: null, sellVolume: 5, buyVolume: 0 }],
+        ]),
+        deepCompetition,
+      })
+    );
+    expect(row.station.beatsMe).toBe(true);
+    expect(row.deepUndercut?.worst).toBeNull();
+    expect(row.worstScope).toBeNull();
+  });
+
+  it('still trusts a rival a truncated deep result actually found, over the station tier', () => {
+    const deepCompetition = new Map([
+      [
+        1,
+        deepEntry(
+          [
+            {
+              orderId: 1,
+              price: 1000,
+              locationId: 60003760,
+              systemId: 30000142,
+              volumeRemain: 5,
+              isBuyOrder: false,
+            },
+            {
+              orderId: 2,
+              price: 950,
+              locationId: 60003760,
+              systemId: 30000142,
+              volumeRemain: 3,
+              isBuyOrder: false,
+            },
+          ],
+          true // truncated, but this rival was still actually seen
+        ),
+      ],
+    ]);
+    const row = firstRow(baseInput({ deepCompetition }));
+    expect(row.worstScope).toBe('station');
+    expect(row.deepUndercut?.worst?.price).toBe(950);
+  });
+
+  it('reports the deep result worst scope when it beats me', () => {
+    const deepCompetition = new Map([
+      [
+        1,
+        deepEntry([
           {
             orderId: 1,
             price: 1000,
@@ -242,7 +346,7 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
             volumeRemain: 3,
             isBuyOrder: false,
           },
-        ],
+        ]),
       ],
     ]);
     const row = firstRow(baseInput({ deepCompetition }));
@@ -251,10 +355,10 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
   });
 
   it('derives systemId via locationId match when my own orderId is absent from the fetched book', () => {
-    const deepCompetition = new Map<number, readonly CompetingOrder[]>([
+    const deepCompetition = new Map([
       [
         1,
-        [
+        deepEntry([
           // Same station as mine (60003760), different order id — establishes my systemId.
           {
             orderId: 99,
@@ -273,7 +377,7 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
             volumeRemain: 4,
             isBuyOrder: false,
           },
-        ],
+        ]),
       ],
     ]);
     const row = firstRow(baseInput({ deepCompetition }));
@@ -282,10 +386,10 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
   });
 
   it('leaves the system scope unchecked (absent, not null) when systemId cannot be derived at all', () => {
-    const deepCompetition = new Map<number, readonly CompetingOrder[]>([
+    const deepCompetition = new Map([
       [
         1,
-        [
+        deepEntry([
           // No entry at my station or my order id anywhere in the book.
           {
             orderId: 42,
@@ -295,7 +399,7 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
             volumeRemain: 4,
             isBuyOrder: false,
           },
-        ],
+        ]),
       ],
     ]);
     const row = firstRow(baseInput({ deepCompetition }));

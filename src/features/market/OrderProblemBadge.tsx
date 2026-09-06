@@ -20,8 +20,6 @@ export type OrderBadgeKind =
   | 'undercutSystem'
   | 'undercutRegion'
   | 'expiring'
-  | 'stale'
-  | 'offHub'
   | 'outbid'
   | 'best'
   | 'noCostBasis';
@@ -44,8 +42,6 @@ const KIND_TONE: Record<OrderBadgeKind, BadgeTone> = {
   undercutSystem: 'warning',
   undercutRegion: 'accent',
   expiring: 'neutral',
-  stale: 'neutral',
-  offHub: 'neutral',
   outbid: 'neutral',
   best: 'success',
   noCostBasis: 'neutral',
