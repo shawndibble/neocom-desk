@@ -184,7 +184,39 @@ export interface ChainCostOptions {
    * buys — a silently missing price would understate cost, so it throws.
    */
   prices: Readonly<Record<number, number>>;
+  /**
+   * ISK per unit you would actually *receive*, by typeId — the hub's highest
+   * buy, where `prices` is its lowest sell.
+   *
+   * Two different questions get two different sides of the book. What an input
+   * costs is the ask, because that is what you pay for it. What your output
+   * earns is the bid, because that is what someone pays you — quoting the ask
+   * on both sides credits you the whole spread on every unit, twice over on a
+   * chain that both buys and sells.
+   *
+   * It matters most where the spread is widest, which for planetary goods is
+   * raw P0: valuing 275,000 units an hour of ore at the ask made refining it
+   * look like a loss against selling it, and that comparison decides whether
+   * the Advisor tells a pilot to dismantle a working colony.
+   *
+   * Optional, and defaults to `prices` — every existing caller keeps the
+   * one-sided basis it had, including the tax tables `chain.test.ts` pins to
+   * the ISK.
+   */
+  revenuePrices?: Readonly<Record<number, number>>;
   sourcingFloor: SourcingFloor;
+  /**
+   * Whether material at or below the floor is **bought** on the market or
+   * **already yours**.
+   *
+   * `'buy'` charges it at `prices` (the ask), which is what a purchase costs.
+   * `'own'` charges it at `revenuePrices` (the bid), because the cost of
+   * consuming something you already have is the sale you give up — and you
+   * would have sold it into a buy order, not at your own ask.
+   *
+   * Defaults to `'buy'`.
+   */
+  sourcedBasis?: 'buy' | 'own';
   layout: ChainLayout;
   /** Defaults to the highsec NPC base rate. Never derived here. */
   taxRate?: number;

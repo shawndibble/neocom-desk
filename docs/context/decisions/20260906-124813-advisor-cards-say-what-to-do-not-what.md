@@ -31,13 +31,26 @@ _Recorded 2026-09-06._
   material stays a scarce pool; bought material constrains only the wallet, so it
   does not enter the supply bound.
 
-- **Prices are lowest hub sell on both sides, and the card says so.** The app has
-  one price path (`planPrices.ts` → `loadMarketSnapshot`), and it is the ask. That
-  is exactly right for an input you buy and optimistic for an output you sell,
-  since a real sale either waits on a sell order or takes the buy-side spread.
-  Adding a second, buy-side price path is ruled out for now — a Build Plan and a
-  planetary chain must agree about what a thing costs, and two paths is how they
-  stop agreeing. Stating the basis is the honest interim.
+- **Superseded — see the buy-side bullet below.** This entry originally read
+  "Prices are lowest hub sell on both sides, and the card says so", and ruled
+  out a buy-side basis on the grounds that "a Build Plan and a planetary chain
+  must agree about what a thing costs, and two paths is how they stop agreeing".
+  That rationale was wrong on the facts: `MarketSnapshot` already carries
+  `hubBuyPrices` out of the same `getHubPrices` aggregate, already read by Build
+  Plans' `'buy'` basis and the LP store. There was never a second path to build.
+
+- **Revenue is valued at the hub's highest buy; cost at its lowest sell.** What
+  an input costs is the ask, because that is what you pay. What an output earns
+  is the bid, because that is what someone pays you. Quoting the ask on both
+  sides credits the whole spread on every unit, twice over on a chain that both
+  buys and sells. Material you already made and route rather than sell is
+  charged at the bid too — the cost of consuming it is the sale forgone, and you
+  would have sold into a buy order, not at your own ask (`chainCost`'s
+  `sourcedBasis: 'own'`).
+
+  It is not a rounding difference. Water-Cooled CPU quotes 713 bid against 7,470
+  ask at Jita — a 90% spread on a market with no real buyers — and the one-sided
+  basis valued it at the ask, which is how it reached the candidate list at all.
 
 - **An idle facility is one decision, not two suggestions: remove it, or buy the
   extraction that feeds it.** The Advisor previously only offered removal, which

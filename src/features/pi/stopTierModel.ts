@@ -77,6 +77,8 @@ export interface ColonyStopTierInput {
   pi: PiData;
   /** Hub prices by typeID. A type the hub does not quote is absent, never zero. */
   prices: Readonly<Record<number, number>>;
+  /** What a sale fetches — highest hub buy, falling back to the ask. */
+  revenuePrices?: Readonly<Record<number, number>>;
   taxRate: number;
 }
 
@@ -128,7 +130,7 @@ export function currentProductTypeIds(colony: BuiltColonyAdvice, pi: PiData): nu
 }
 
 export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTierAdvice {
-  const { colony, planetType, pi, prices, taxRate } = input;
+  const { colony, planetType, pi, prices, revenuePrices, taxRate } = input;
 
   // Links first: without their cost the budget below is a fiction, and a
   // recommendation built on it would promise room this colony does not have.
@@ -161,6 +163,7 @@ export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTier
       ...(colony.pinLoad.newLinkLoad ? { newLinkCost: colony.pinLoad.newLinkLoad } : {}),
       extractionRatePerHour: rate,
       prices,
+      ...(revenuePrices ? { revenuePrices } : {}),
       taxRate,
       // Never guessed. A basic link moves 1,250 m3/hr and each upgrade level
       // doubles it, but whether that axis is the same skill as the budget

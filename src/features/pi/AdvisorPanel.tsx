@@ -255,6 +255,16 @@ interface Snapshot {
    * `recommendStopTier` refuse rather than pricing at nothing.
    */
   prices: Record<number, number>;
+  /**
+   * What a sale actually fetches, by typeId: the hub's highest buy where it has
+   * one, and its lowest sell where it does not.
+   *
+   * Merged rather than kept separate so a type with sell orders but no buy
+   * order stays priceable — it is not instantly sellable, which is a different
+   * thing from unpriceable, and refusing to cost a chain over it would lose
+   * every candidate that touches a thin market.
+   */
+  revenuePrices: Record<number, number>;
 }
 
 async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
@@ -295,8 +305,11 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   ])
     // Failure is not fatal: an unpriced candidate refuses with `needs-price`
     // rather than taking the whole panel down with it.
-    .then((result) => result.prices)
-    .catch(() => ({}) as Record<number, number>);
+    .then((result) => ({
+      prices: result.prices,
+      revenuePrices: { ...result.prices, ...result.buyPrices },
+    }))
+    .catch(() => ({ prices: {}, revenuePrices: {} }));
 
   const [details, systemNames, planetIdLists, securities] = await Promise.all([
     loadAllColonyDetails(
@@ -406,7 +419,8 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     schematicNames,
     typeNames,
     richness,
-    prices,
+    prices: prices.prices,
+    revenuePrices: prices.revenuePrices,
     planetRadiusKm: new Map(
       Object.entries(planetRadiusRaw).map(([planetId, km]) => [Number(planetId), km])
     ),
@@ -524,11 +538,14 @@ function StopTierLine({
   advice,
   pi,
   prices,
+  revenuePrices,
   taxRate,
 }: {
   advice: Extract<PlanetAdvice, { kind: 'built' }>;
   pi: PiData;
   prices: Readonly<Record<number, number>>;
+  /** What a sale fetches — highest hub buy, falling back to the ask. */
+  revenuePrices: Readonly<Record<number, number>>;
   taxRate: number;
 }) {
   const { t } = useTranslation();
@@ -539,9 +556,10 @@ function StopTierLine({
         planetType: advice.planetType,
         pi,
         prices,
+        revenuePrices,
         taxRate,
       }),
-    [advice.colony, advice.planetType, pi, prices, taxRate]
+    [advice.colony, advice.planetType, pi, prices, revenuePrices, taxRate]
   );
 
   const framed = (body: React.ReactNode) => <div className="border-t border-line pt-2">{body}</div>;
@@ -585,6 +603,7 @@ function BuiltCard({
   schematicNames,
   typeNames,
   prices,
+  revenuePrices,
   taxRate,
   ceiling,
   opportunities,
@@ -595,6 +614,8 @@ function BuiltCard({
   schematicNames: ReadonlyMap<number, string>;
   typeNames: ReadonlyMap<number, string>;
   prices: Readonly<Record<number, number>>;
+  /** What a sale fetches — highest hub buy, falling back to the ask. */
+  revenuePrices: Readonly<Record<number, number>>;
   taxRate: number;
   /** The pilot's Command Center Upgrades ceiling, for spotting a colony behind it. */
   ceiling: MaxColonyBudget;
@@ -795,7 +816,13 @@ function BuiltCard({
           )}
         </div>
 
-        <StopTierLine advice={advice} pi={pi} prices={prices} taxRate={taxRate} />
+        <StopTierLine
+          advice={advice}
+          pi={pi}
+          prices={prices}
+          revenuePrices={revenuePrices}
+          taxRate={taxRate}
+        />
       </>
     </PlanetCard>
   );
@@ -813,6 +840,7 @@ function UnbuiltCard({
   advice: Extract<PlanetAdvice, { kind: 'unbuilt' }>;
   order: readonly number[];
   rate: AssumedRate;
+  /** What a sale fetches — highest hub buy, falling back to the ask. */
   prices: Readonly<Record<number, number>>;
   onOrderChange: (planetId: number, order: number[]) => void;
   slots: PlanetSlots;
@@ -1072,6 +1100,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     advice,
     pi: snapshot.pi,
     prices: snapshot.prices,
+    revenuePrices: snapshot.revenuePrices,
     taxRate: activeSystem.customsRate,
   });
   // Grouped once rather than filtered per card: the plan is one pass over a
@@ -1216,6 +1245,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 schematicNames={snapshot.schematicNames}
                 typeNames={snapshot.typeNames}
                 prices={snapshot.prices}
+                revenuePrices={snapshot.revenuePrices}
                 taxRate={activeSystem.customsRate}
                 ceiling={snapshot.ceiling}
                 opportunities={opportunitiesByHost.get(entry.planetId) ?? EMPTY_OPPORTUNITIES}
@@ -1227,7 +1257,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 advice={entry}
                 order={richness.get(entry.planetId) ?? EMPTY_ORDER}
                 rate={assumedRate}
-                prices={snapshot.prices}
+                prices={snapshot.revenuePrices}
                 onOrderChange={handleOrderChange}
                 slots={snapshot.slots}
                 colonyCount={snapshot.colonyCount}

@@ -16,6 +16,8 @@ export interface NetworkModelInput {
   advice: readonly PlanetAdvice[];
   pi: PiData;
   prices: Readonly<Record<number, number>>;
+  /** What a sale fetches — highest hub buy, falling back to the ask. */
+  revenuePrices?: Readonly<Record<number, number>>;
   taxRate: number;
 }
 
@@ -86,6 +88,7 @@ export function colonyNetwork(input: NetworkModelInput): ColonyNetwork | null {
         colonies,
         infrastructure: input.pi.infrastructure,
         prices: input.prices,
+        ...(input.revenuePrices ? { revenuePrices: input.revenuePrices } : {}),
         // The pilot asked what to put in an Advanced Industry Facility and a
         // High-Tech Production Plant. Their colonies make no P2, so with
         // buying off the honest answer was silence — and silence is what

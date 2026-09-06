@@ -27,6 +27,16 @@ import type { TradeHub } from '@/market/hubs';
 export interface PlanPrices {
   /** ISK per unit by typeId. A type the hub does not quote is absent, not zero. */
   prices: Record<number, number>;
+  /**
+   * Highest hub buy for the same types — what a sale actually fetches.
+   *
+   * Out of the *same* `loadMarketSnapshot` aggregate as `prices`, not a second
+   * read: `MarketSnapshot` has carried both sides all along for Build Plans'
+   * `'buy'` basis and the LP store's instant-sell revenue. Planetary code was
+   * simply dropping one of them, and then valuing what a colony sells at the
+   * price it would pay to buy it back.
+   */
+  buyPrices: Record<number, number>;
   /** Requested types the hub had no sell order for. */
   unpriced: number[];
   /** True when the price fetch itself failed, as opposed to the hub simply not quoting a type. */
@@ -35,25 +45,32 @@ export interface PlanPrices {
   fetchedAt: Date;
 }
 
-/** Lowest hub sell for every type a chain can involve, in one call. */
+/** Both sides of the hub book for every type a chain can involve, in one call. */
 export async function loadPlanPrices(hub: TradeHub, typeIds: number[]): Promise<PlanPrices> {
   const wanted = [...new Set(typeIds)];
   if (wanted.length === 0)
-    return { prices: {}, unpriced: [], failed: false, fetchedAt: new Date() };
+    return { prices: {}, buyPrices: {}, unpriced: [], failed: false, fetchedAt: new Date() };
 
-  let hubPrices: Record<number, number>;
+  let snapshot: { hubPrices: Record<number, number>; hubBuyPrices: Record<number, number> };
   try {
-    hubPrices = (await loadMarketSnapshot(hub, wanted)).hubPrices;
+    const read = await loadMarketSnapshot(hub, wanted);
+    snapshot = { hubPrices: read.hubPrices, hubBuyPrices: read.hubBuyPrices ?? {} };
   } catch {
-    return { prices: {}, unpriced: wanted, failed: true, fetchedAt: new Date() };
+    return { prices: {}, buyPrices: {}, unpriced: wanted, failed: true, fetchedAt: new Date() };
   }
 
   const prices: Record<number, number> = {};
+  const buyPrices: Record<number, number> = {};
   const unpriced: number[] = [];
   for (const typeId of wanted) {
-    const price = hubPrices[typeId];
+    const price = snapshot.hubPrices[typeId];
     if (price != null && Number.isFinite(price)) prices[typeId] = price;
     else unpriced.push(typeId);
+    // A type with sell orders but no buy order is *not* unpriced — it is
+    // priceable, just not instantly sellable. Leaving it out here lets the
+    // engines fall back to the ask for it rather than refusing the chain.
+    const bid = snapshot.hubBuyPrices[typeId];
+    if (bid != null && Number.isFinite(bid)) buyPrices[typeId] = bid;
   }
-  return { prices, unpriced, failed: false, fetchedAt: new Date() };
+  return { prices, buyPrices, unpriced, failed: false, fetchedAt: new Date() };
 }

@@ -80,6 +80,14 @@ export interface NetworkOptions {
   infrastructure: PiInfrastructure;
   /** ISK per unit by typeID. A type the hub does not quote is absent, never zero. */
   prices: Readonly<Record<number, number>>;
+  /**
+   * What the hub pays, by typeID — its highest buy. Defaults to `prices`.
+   *
+   * A P2 factory here both buys (its bought inputs, at the ask) and sells (its
+   * output, at the bid). Running one book through both halves credits the
+   * spread twice.
+   */
+  revenuePrices?: Readonly<Record<number, number>>;
   /** The customs rate. Never derived here — see `chain.ts`. */
   taxRate: number;
   /**
@@ -225,9 +233,10 @@ function candidates(
     if (selfSufficient) continue;
 
     const name = schematic.name;
-    const unpriced = [typeId, ...schematic.inputs.map((input) => input.typeID)].some(
-      (id) => priceOf(id, opts.prices) === null
-    );
+    const unpriced =
+      [typeId, ...schematic.inputs.map((input) => input.typeID)].some(
+        (id) => priceOf(id, opts.prices) === null
+      ) || priceOf(typeId, opts.revenuePrices ?? opts.prices) === null;
     if (unpriced) {
       blocked.push({ typeId, name, reason: 'needs-price' });
       continue;
@@ -237,6 +246,7 @@ function candidates(
     if (chain === null) continue;
     const cost = chainCost(chain, {
       prices: opts.prices,
+      ...(opts.revenuePrices ? { revenuePrices: opts.revenuePrices } : {}),
       sourcingFloor: 'P1',
       // Every made tier of a P2 chain sourced at P1 is the P2 itself, and it
       // sits on the host: one planet, so no boundary between made tiers.
@@ -437,7 +447,11 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
     // Priced the same whether bought or grown: `chainCost` charges the hub
     // price for a sourced line either way, because routing your own P1 forgoes
     // selling it for exactly that.
-    const price = (typeId: number) => priceOf(typeId, opts.prices) ?? 0;
+    // Bought at the ask, routed at the bid: a purchase costs what the seller
+    // asks, while consuming your own P1 costs the sale you give up, which is
+    // what a buy order would have paid you.
+    const boughtPrice = (typeId: number) => priceOf(typeId, opts.prices) ?? 0;
+    const routedPrice = (typeId: number) => priceOf(typeId, opts.revenuePrices ?? opts.prices) ?? 0;
     const inputs: NetworkInput[] = [];
     for (const input of candidate.demandPerFactory) {
       const unitsPerHour = input.unitsPerHour * factories;
@@ -448,7 +462,7 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
           unitsPerHour,
           fromPlanetId: null,
           source: 'bought',
-          costPerHour: price(input.typeId) * unitsPerHour,
+          costPerHour: boughtPrice(input.typeId) * unitsPerHour,
         });
         continue;
       }
@@ -461,7 +475,7 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
           unitsPerHour: part.unitsPerHour,
           fromPlanetId: part.fromPlanetId,
           source: part.fromPlanetId === host.colony.planetId ? 'local' : 'routed',
-          costPerHour: price(input.typeId) * part.unitsPerHour,
+          costPerHour: routedPrice(input.typeId) * part.unitsPerHour,
         });
       }
     }
@@ -481,7 +495,9 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
         .filter((input) => input.source === 'bought')
         .reduce((sum, input) => sum + input.costPerHour, 0),
       revenuePerHour:
-        (priceOf(candidate.typeId, opts.prices) ?? 0) * candidate.outputPerFactory * factories,
+        (priceOf(candidate.typeId, opts.revenuePrices ?? opts.prices) ?? 0) *
+        candidate.outputPerFactory *
+        factories,
     });
   }
 

@@ -16,6 +16,7 @@ describe('loadPlanPrices', () => {
   it('asks the shared market path once, for every type the chain can involve', async () => {
     loadMarketSnapshot.mockResolvedValue({
       hubPrices: { 2867: 1_900_000, 2389: 760 },
+      hubBuyPrices: { 2867: 1_750_000, 2389: 600 },
       adjustedPrices: null,
       systemCostIndex: null,
     });
@@ -33,6 +34,7 @@ describe('loadPlanPrices', () => {
   it('leaves an unquoted type out of the map rather than pricing it at zero', async () => {
     loadMarketSnapshot.mockResolvedValue({
       hubPrices: { 2867: 1_900_000 },
+      hubBuyPrices: { 2867: 1_750_000 },
       adjustedPrices: null,
       systemCostIndex: null,
     });

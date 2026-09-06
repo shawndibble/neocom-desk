@@ -183,6 +183,7 @@ beforeEach(() => {
   loadInterplanetaryConsolidation.mockResolvedValue(4);
   loadPlanPrices.mockResolvedValue({
     prices: { [BASE_METALS]: 12 },
+    buyPrices: {},
     unpriced: [],
     failed: false,
     fetchedAt: new Date(),
@@ -715,6 +716,7 @@ describe('AdvisorPanel', () => {
     );
     loadPlanPrices.mockResolvedValue({
       prices,
+      buyPrices: {},
       unpriced: [],
       failed: false,
       fetchedAt: new Date(),
@@ -1070,6 +1072,7 @@ describe('AdvisorPanel build advice', () => {
         [WATER]: 1_000,
         ...overrides,
       },
+      buyPrices: {},
       unpriced: [],
       failed: false,
       fetchedAt: new Date(),
@@ -1104,6 +1107,7 @@ describe('AdvisorPanel build advice', () => {
   it('says the hub is the gap when nothing is quoted, not that the planet is poor', async () => {
     loadPlanPrices.mockResolvedValue({
       prices: {},
+      buyPrices: {},
       unpriced: [],
       failed: false,
       fetchedAt: new Date(),
