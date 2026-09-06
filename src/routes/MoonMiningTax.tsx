@@ -21,7 +21,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import type { PayeeRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import {
@@ -42,8 +42,9 @@ import {
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
-import { BulkPayConfirmDialog } from '@/features/miningTax/BulkPayConfirmDialog';
+import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
 import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
+import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
@@ -119,7 +120,10 @@ export function MoonMiningTax() {
     useState<ReadonlySet<MiningTaxRowStatus>>(DEFAULT_STATUSES);
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
   const [bulkPaySelection, setBulkPaySelection] = useState<ReadonlySet<string>>(new Set());
-  const [bulkPayOpen, setBulkPayOpen] = useState(false);
+  // What the Settle-up dialog is settling: a balance card's whole balance, or
+  // the table's checkbox selection. `null` keeps it closed.
+  const [settleUpRows, setSettleUpRows] = useState<SettleUpRow[] | null>(null);
+  const [showSettled, setShowSettled] = useState(false);
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
   const [joinTarget, setJoinTarget] = useState<DisplayRow | null>(null);
   const [splitTarget, setSplitTarget] = useState<DisplayRow | null>(null);
@@ -176,30 +180,22 @@ export function MoonMiningTax() {
     return counts;
   }, [payeeFiltered]);
 
-  // Across every status, deliberately unfiltered by the status chips below:
-  // "how much have I mined and what do I owe" shouldn't change just because
-  // Paid rows are currently hidden from the table.
-  const totals = useMemo(() => {
-    let estimatedMined = 0;
-    let taxOwed = 0;
-    let unpaidTaxOwed = 0;
-    let unpaidCount = 0;
-    for (const dr of payeeFiltered) {
-      const members = allMembers(dr);
-      estimatedMined += estimatedValueOf(dr);
-      taxOwed += members.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
-      // A joined group counts once here, not once per member — "how many
-      // things do I still need to pay" is asking about obligations, and a
-      // join collapses several into one.
-      const stillOwed = members.filter((m) => m.assignment.status === 'outstanding');
-      if (stillOwed.length > 0) {
-        unpaidCount += 1;
-        unpaidTaxOwed += stillOwed.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
-      }
-    }
-    return { estimatedMined, taxOwed, unpaidTaxOwed, unpaidCount };
+  // The Balances strip: per Payee, what is owed *now*. Follows the Character
+  // filter (an alt's debts are still debts) but deliberately not the Payee or
+  // Status filters — hiding Paid rows from the table must not change a balance.
+  const balances = useMemo(
+    () => computePayeeBalances(characterFiltered, allPayees),
+    [characterFiltered, allPayees]
+  );
+  const visibleBalances = showSettled ? balances : balances.filter((b) => b.owed > 0);
+  const settledCount = balances.length - balances.filter((b) => b.owed > 0).length;
+  const owedTotal = balances.reduce((sum, b) => sum + b.owed, 0);
+  const owedPayeeCount = balances.filter((b) => b.owed > 0).length;
+  const unassigned = useMemo(
+    () => summarizeUnassigned(characterFiltered, estimatedValueOf),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payeeFiltered, data]);
+    [characterFiltered, data]
+  );
 
   const visibleRows = useMemo(
     () => payeeFiltered.filter((dr) => statusFilter.has(dr.status)),
@@ -237,12 +233,34 @@ export function MoonMiningTax() {
     });
   }
 
-  /** "Pay them in one lump sum": select every currently-unpaid Assignment for the filtered Payee(s), ready for the existing bulk-pay flow. */
-  function selectOwedForBulkPay() {
-    const keys = payeeFiltered
-      .filter((dr) => dr.status === 'outstanding' && dr.assignment)
-      .map((dr) => dr.key);
-    setBulkPaySelection(new Set(keys));
+  /** A balance card's name doubles as "show me just this Payee's entries" — the filter the card's own figure came from. */
+  function filterToPayee(payeeId: string) {
+    setPayeeFilter((previous) =>
+      previous !== 'all' && previous.size === 1 && previous.has(payeeId)
+        ? 'all'
+        : new Set([payeeId])
+    );
+  }
+
+  /** "Pay them in one lump sum": every Outstanding Assignment behind one balance card, straight into Settle up. */
+  function settleUpBalance(
+    members: { row: MoonMiningTaxRow; assignment: MiningTaxAssignmentRecord }[]
+  ) {
+    setSettleUpRows(
+      members.map((m) => ({
+        assignment: m.assignment,
+        characterName: m.row.characterName,
+        payeeName: payeeName(m.row.characterId, m.assignment.payeeId),
+      }))
+    );
+  }
+
+  /** The "Assign next" shortcut: the newest still-unassigned entry, opened straight into its Assign form. */
+  function assignNext() {
+    const next = [...characterFiltered]
+      .filter((dr) => dr.status === 'unassigned')
+      .sort((a, b) => b.row.entry.date.localeCompare(a.row.entry.date))[0];
+    if (next) setDetailTarget(next);
   }
 
   async function handleTagAsMoonOre(typeId: number) {
@@ -423,7 +441,7 @@ export function MoonMiningTax() {
     }
   }
 
-  const bulkPayRows = useMemo(
+  const bulkPayRows: SettleUpRow[] = useMemo(
     () =>
       allDisplayRows
         .filter((dr) => bulkPaySelection.has(dr.key))
@@ -705,36 +723,120 @@ export function MoonMiningTax() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Panel>
+          {/* Balances strip (decision doc): who is owed what right now, and
+              the lump-sum "Settle up" on each card. Settled Payees hide
+              behind the toggle; unassigned ore gets its own card so a
+              balance is never silently short of it. */}
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.totalMinedLabel')}
+                {t('miningTax.balancesLabel')} ·{' '}
+                {owedPayeeCount > 0
+                  ? t('miningTax.balancesAcross', {
+                      amount: formatIsk(owedTotal, 2),
+                      count: owedPayeeCount,
+                    })
+                  : t('miningTax.balancesNothing')}
               </p>
-              <p className="text-lg font-medium tabular-nums">
-                {formatIsk(totals.estimatedMined, 2)} ISK
-              </p>
-            </Panel>
-            <Panel>
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.totalTaxOwedLabel')}
-              </p>
-              <p className="text-lg font-medium tabular-nums">{formatIsk(totals.taxOwed, 2)} ISK</p>
-            </Panel>
-            <Panel>
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.unpaidCountLabel')}
-              </p>
-              <p
-                className={cx(
-                  'text-lg font-medium tabular-nums',
-                  totals.unpaidCount > 0 && 'text-danger'
+              {settledCount > 0 && (
+                <label className="flex items-center gap-1.5 text-[0.6875rem] text-text-dim">
+                  <input
+                    type="checkbox"
+                    checked={showSettled}
+                    onChange={(e) => setShowSettled(e.target.checked)}
+                  />
+                  {t('miningTax.showSettledPayees', { count: settledCount })}
+                </label>
+              )}
+            </div>
+            {(visibleBalances.length > 0 || unassigned.entryCount > 0) && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {visibleBalances.map((balance) => (
+                  <Panel
+                    key={balance.payee.id}
+                    className={cx(
+                      'border-l-2',
+                      balance.owed > 0 ? 'border-l-danger' : 'border-l-success'
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => filterToPayee(balance.payee.id)}
+                        aria-label={t('miningTax.filterToPayee', { payee: balance.payee.name })}
+                        aria-pressed={
+                          payeeFilter !== 'all' &&
+                          payeeFilter.size === 1 &&
+                          payeeFilter.has(balance.payee.id)
+                        }
+                        className="min-w-0 truncate text-left text-sm font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent aria-pressed:text-accent"
+                      >
+                        {balance.payee.name}
+                      </button>
+                      <span className="shrink-0 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+                        {characters.length > 1
+                          ? (characters.find((c) => c.characterId === balance.payee.characterId)
+                              ?.characterName ?? '')
+                          : t('miningTax.balanceEntries', { count: balance.members.length })}
+                      </span>
+                    </div>
+                    <p className="mt-1 flex items-baseline gap-1.5">
+                      <span
+                        className={cx(
+                          'text-xl font-semibold tabular-nums',
+                          balance.owed > 0 ? 'text-danger' : 'text-success'
+                        )}
+                      >
+                        {formatIsk(balance.owed, 0)}
+                      </span>
+                      <span className="text-[0.6875rem] text-text-dim">ISK</span>
+                    </p>
+                    <div className="mt-2">
+                      {balance.owed > 0 ? (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          className="w-full"
+                          onClick={() => settleUpBalance(balance.members)}
+                        >
+                          {t('miningTax.settleUpAction')}
+                        </Button>
+                      ) : (
+                        <Button size="sm" className="w-full" disabled>
+                          {t('miningTax.nothingToSettle')}
+                        </Button>
+                      )}
+                    </div>
+                  </Panel>
+                ))}
+                {unassigned.entryCount > 0 && (
+                  <div className="rounded-xs border border-dashed border-warning/60 bg-warning/5 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-warning">
+                        {t('miningTax.unassignedCardTitle')}
+                      </span>
+                      <span className="shrink-0 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+                        {t('miningTax.balanceEntries', { count: unassigned.entryCount })}
+                      </span>
+                    </div>
+                    <p className="mt-1 flex items-baseline gap-1.5">
+                      <span className="text-xl font-semibold tabular-nums">
+                        {formatIsk(unassigned.estimatedValue, 0)}
+                      </span>
+                      <span className="text-[0.6875rem] text-text-dim">
+                        {t('miningTax.unassignedMined')}
+                      </span>
+                    </p>
+                    <div className="mt-2">
+                      <Button size="sm" className="w-full" onClick={assignNext}>
+                        {t('miningTax.assignNextAction')}
+                      </Button>
+                    </div>
+                  </div>
                 )}
-              >
-                {totals.unpaidCount}
-              </p>
-            </Panel>
+              </div>
+            )}
           </div>
-          <p className="-mt-2 text-[0.6875rem] text-text-dim">{t('miningTax.totalsHint')}</p>
 
           <div className="flex flex-wrap items-center gap-2">
             <DropdownMenu>
@@ -811,8 +913,8 @@ export function MoonMiningTax() {
             </DropdownMenu>
 
             {bulkPayRows.length > 0 && (
-              <Button size="sm" variant="primary" onClick={() => setBulkPayOpen(true)}>
-                {t('miningTax.bulkPayAction', { count: bulkPayRows.length })}
+              <Button size="sm" variant="primary" onClick={() => setSettleUpRows(bulkPayRows)}>
+                {t('miningTax.settleUpSelectedAction', { count: bulkPayRows.length })}
               </Button>
             )}
 
@@ -825,35 +927,6 @@ export function MoonMiningTax() {
               <p className="text-xs text-text-dim">{t('miningTax.joinIncompatibleHint')}</p>
             )}
           </div>
-
-          {payeeFilter !== 'all' && (
-            <Panel>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {payeeFilter.size === 1
-                      ? t('miningTax.owedToPayeeLabel', {
-                          payee: allPayees.find((p) => payeeFilter.has(p.id))?.name ?? '',
-                        })
-                      : t('miningTax.owedToPayeesLabel', { count: payeeFilter.size })}
-                  </p>
-                  <p
-                    className={cx(
-                      'text-lg font-medium tabular-nums',
-                      totals.unpaidTaxOwed > 0 && 'text-danger'
-                    )}
-                  >
-                    {formatIsk(totals.unpaidTaxOwed, 2)} ISK
-                  </p>
-                </div>
-                {totals.unpaidCount > 0 && (
-                  <Button size="sm" onClick={selectOwedForBulkPay}>
-                    {t('miningTax.selectOwedForBulkPay', { count: totals.unpaidCount })}
-                  </Button>
-                )}
-              </div>
-            </Panel>
-          )}
 
           {visibleRows.length === 0 ? (
             <EmptyState title={t('miningTax.emptyTitle')} hint={t('miningTax.emptyHint')} />
@@ -985,15 +1058,18 @@ export function MoonMiningTax() {
         />
       )}
 
-      <BulkPayConfirmDialog
-        open={bulkPayOpen}
-        onClose={() => setBulkPayOpen(false)}
-        rows={bulkPayRows}
-        onPaid={() => {
-          setBulkPaySelection(new Set());
-          refresh();
-        }}
-      />
+      {settleUpRows && data && (
+        <SettleUpDialog
+          open={settleUpRows !== null}
+          onClose={() => setSettleUpRows(null)}
+          rows={settleUpRows}
+          systemNames={data.systemNames}
+          onPaid={() => {
+            setBulkPaySelection(new Set());
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
