@@ -34,7 +34,7 @@ import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
 import { buildPlanTypeIds, materialRecipe } from './recipes';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
-import { MATERIAL_PRICE_BASES, materialPriceBasisOf, materialPricesFor } from './priceBasis';
+import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -92,7 +92,7 @@ const clearedBuildLocation = {
   buildLocationName: undefined,
 } satisfies PlanPatch;
 
-/** One material's sourcing edit, for the bulk "use all detected" action. */
+/** One material's sourcing edit, for the bulk "use all" action. */
 export interface SourcingPatchEntry {
   typeID: number;
   patch: MaterialSourcing;
@@ -415,9 +415,7 @@ export function BuildPlanDetail({
       ...facilityContext,
       systemCostIndex: snapshot.systemCostIndex,
       adjustedPrices: snapshot.adjustedPrices,
-      // The verdict's "buy it instead" side is a material purchase like any
-      // other on this plan, so it is quoted at the plan's basis.
-      hubPrices: materialPrices,
+      materialPrices,
       skills,
     };
   }, [facilityContext, snapshot, materialPrices, skills]);
@@ -447,7 +445,7 @@ export function BuildPlanDetail({
         materials: result?.materials ?? [],
         buildHere: plan.buildHere ?? [],
         recipeFor,
-        hubPrices: materialPrices,
+        materialPrices,
         sourcing: plan.materialSourcing,
         ctx: {
           ...facilityContext,
@@ -855,11 +853,8 @@ export function BuildPlanDetail({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {MATERIAL_PRICE_BASES.map((basis) => (
-                        <SelectItem key={basis} value={basis}>
-                          {t(`industry.materialPriceBasis_${basis}`)}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="sell">{t('industry.materialPriceBasisSell')}</SelectItem>
+                      <SelectItem value="buy">{t('industry.materialPriceBasisBuy')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

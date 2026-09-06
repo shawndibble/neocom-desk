@@ -14,9 +14,6 @@
 import type { HubPrices, MaterialPriceBasis } from '@/engine/industry/types';
 import type { MarketSnapshot } from './marketData';
 
-/** Every basis, in the order the picker offers them. Sell is the default. */
-export const MATERIAL_PRICE_BASES: readonly MaterialPriceBasis[] = ['sell', 'buy'];
-
 /** A stored value narrowed to a basis; anything unrecognised reads as 'sell'. */
 export function materialPriceBasisOf(stored: string | undefined): MaterialPriceBasis {
   return stored === 'buy' ? 'buy' : 'sell';

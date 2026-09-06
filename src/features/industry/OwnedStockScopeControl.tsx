@@ -36,16 +36,15 @@ interface OwnedStockScopeControlProps {
 }
 
 /**
- * Plan-level control for issue #454: which locations count toward this
- * plan's "use detected" owned-stock totals. "Everywhere" is the default and
- * matches every behavior before this control existed; "Selected locations"
+ * Plan-level control: which locations count toward this plan's "use all"
+ * owned-stock totals. "Everywhere" is the default; "Selected locations"
  * narrows the offer to a chosen subset, derived from the plan's already-
  * computed detected stock so there is nothing new to fetch.
  *
- * Rendered at the head of the Materials panel, above the table whose owned
- * column it governs. It sat in the Location & market settings for a while and
- * read there as a third thing about *where the job runs*, next to Facility and
- * Trade hub, when it is really about which of your hangars the table may count.
+ * Belongs at the head of the Materials panel, above the table whose owned
+ * column it governs — not in the plan's Location & market settings, where it
+ * reads as another thing about where the job runs rather than about which of
+ * your hangars the table may count.
  */
 export function OwnedStockScopeControl({
   scope,
@@ -82,34 +81,40 @@ export function OwnedStockScopeControl({
   // The label sits inline with the select from `sm` up and stacks above it
   // below that — the same breakpoint the plan's own settings grid folds at, so
   // a narrow screen never has to choose between a cramped label and a select
-  // too short to read an option in.
+  // too short to read an option in. The action stays welded to the select at
+  // both widths.
   return (
     <>
       <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:gap-2">
         <span className="whitespace-nowrap">{t('industry.ownedStockScopeLabel')}</span>
-        <Select
-          value={mode}
-          onValueChange={(value) => {
-            // Pre-selecting every currently known location when a player first
-            // switches to "Selected" leaves the count unchanged at the moment
-            // of the switch — flipping the toggle must not silently zero out
-            // "use detected" before the player has chosen anything to exclude.
-            onChange(
-              value === 'selected'
-                ? { mode: 'selected', locations: selected.length > 0 ? selected : locations }
-                : undefined
-            );
-          }}
-        >
-          <SelectTrigger aria-label={t('industry.ownedStockScopeLabel')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="everywhere">{t('industry.ownedStockScopeEverywhere')}</SelectItem>
-            <SelectItem value="selected">{t('industry.ownedStockScopeSelected')}</SelectItem>
-          </SelectContent>
-        </Select>
-        {action}
+        {/* Select and action share a row at every width: the bulk fill spends
+            exactly the stock this select scopes, and stacking them apart on a
+            narrow screen is what made the two read as unrelated. */}
+        <div className="flex items-center gap-2">
+          <Select
+            value={mode}
+            onValueChange={(value) => {
+              // Pre-selecting every currently known location when a player first
+              // switches to "Selected" leaves the count unchanged at the moment
+              // of the switch — flipping the toggle must not silently zero out
+              // "use all" before the player has chosen anything to exclude.
+              onChange(
+                value === 'selected'
+                  ? { mode: 'selected', locations: selected.length > 0 ? selected : locations }
+                  : undefined
+              );
+            }}
+          >
+            <SelectTrigger aria-label={t('industry.ownedStockScopeLabel')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="everywhere">{t('industry.ownedStockScopeEverywhere')}</SelectItem>
+              <SelectItem value="selected">{t('industry.ownedStockScopeSelected')}</SelectItem>
+            </SelectContent>
+          </Select>
+          {action}
+        </div>
       </div>
       {mode === 'selected' &&
         (locations.length === 0 ? (

@@ -99,6 +99,11 @@ function newBuildPlan(
     ...(defaultsFrom?.facilityTaxPct !== undefined
       ? { facilityTaxPct: defaultsFrom.facilityTaxPct }
       : {}),
+    // Carried like the hub it names a side of: a pilot who sources on buy
+    // orders sources their next plan that way too.
+    ...(defaultsFrom?.materialPriceBasis !== undefined
+      ? { materialPriceBasis: defaultsFrom.materialPriceBasis }
+      : {}),
     // The picked place itself (#527), carried under the same activity check as
     // `facility` rather than merely when the source plan has one: where the
     // activity differs the new plan's facility is the hardcoded fallback, not

@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  MATERIAL_PRICE_BASES,
-  materialPriceBasisOf,
-  materialPricesFor,
-} from '@/features/industry/priceBasis';
+import { materialPriceBasisOf, materialPricesFor } from '@/features/industry/priceBasis';
 
 const snapshot = {
   hubPrices: { 34: 5 },
@@ -33,11 +29,5 @@ describe('materialPricesFor', () => {
 
   it('yields an empty map before prices land', () => {
     expect(materialPricesFor(null, 'buy')).toEqual({});
-  });
-});
-
-describe('MATERIAL_PRICE_BASES', () => {
-  it('offers sell first, so the picker opens on the default', () => {
-    expect(MATERIAL_PRICE_BASES).toEqual(['sell', 'buy']);
   });
 });
