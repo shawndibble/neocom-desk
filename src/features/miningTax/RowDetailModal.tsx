@@ -29,6 +29,8 @@ interface RowDetailModalProps {
   onMarkPaid: () => void;
   onResolve: () => void;
   onUndo: () => void;
+  /** Opens `JoinAssignDialog` to fold another same-system entry into this one (issue #523) — offered only for Unassigned/Outstanding rows that aren't already part of a joined group. */
+  onJoin?: () => void;
 }
 
 /**
@@ -56,6 +58,7 @@ export function RowDetailModal({
   onMarkPaid,
   onResolve,
   onUndo,
+  onJoin,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
@@ -162,19 +165,28 @@ export function RowDetailModal({
             onAssigned={onAssigned}
             onCancel={onClose}
             extraActions={
-              status === 'unassigned' ? (
-                <Button size="sm" disabled={busy} onClick={onDismiss}>
-                  {t('miningTax.dismissAction')}
-                </Button>
-              ) : status === 'outstanding' ? (
-                <Button size="sm" disabled={busy} onClick={onMarkPaid}>
-                  {t('miningTax.markPaidAction')}
-                </Button>
-              ) : status === 'needs-review' ? (
-                <Button size="sm" disabled={busy} onClick={onResolve}>
-                  {t('miningTax.resolveConfirm')}
-                </Button>
-              ) : undefined
+              <>
+                {status === 'unassigned' && (
+                  <Button size="sm" disabled={busy} onClick={onDismiss}>
+                    {t('miningTax.dismissAction')}
+                  </Button>
+                )}
+                {status === 'outstanding' && (
+                  <Button size="sm" disabled={busy} onClick={onMarkPaid}>
+                    {t('miningTax.markPaidAction')}
+                  </Button>
+                )}
+                {status === 'needs-review' && (
+                  <Button size="sm" disabled={busy} onClick={onResolve}>
+                    {t('miningTax.resolveConfirm')}
+                  </Button>
+                )}
+                {onJoin && (status === 'unassigned' || status === 'outstanding') && (
+                  <Button size="sm" disabled={busy} onClick={onJoin}>
+                    {t('miningTax.joinAction')}
+                  </Button>
+                )}
+              </>
             }
           />
         )}

@@ -416,6 +416,18 @@ export interface MiningTaxAssignmentRecord {
   reviewDiff?: MiningTaxQuantityDiff[];
   /** Epoch ms the assignment was marked paid, absent while outstanding or needs-review. */
   paidAt?: number;
+  /**
+   * Shared by every Assignment joined into one combined ledger row (issue
+   * #523's "join entries" feature — a moon-mining session that spans
+   * midnight UTC, so ESI reports it as two Mining Ledger Entries the corp's
+   * own billing treats as one). Every member always shares `characterId` and
+   * `solarSystemId` (a Payee is scoped to one character, and a join is
+   * same-system-only) — never assume a group can span either. A `groupId`
+   * shared by only one surviving record (the other member deleted, or a sync
+   * race delivering one member before the other) renders as an ordinary
+   * ungrouped row rather than a broken group of one.
+   */
+  groupId?: string;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

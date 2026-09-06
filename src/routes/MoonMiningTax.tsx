@@ -21,7 +21,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import type { PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import {
@@ -29,6 +29,7 @@ import {
   type MoonMiningTaxRow,
   type TrackedCharacter,
 } from '@/features/miningTax/snapshot';
+import { allMembers, flatten, type DisplayRow } from '@/features/miningTax/groupRows';
 import { resolveRowNames } from '@/features/miningTax/names';
 import { loadJitaUnitPrices } from '@/features/miningTax/pricing';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -42,6 +43,8 @@ import {
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
 import { BulkPayConfirmDialog } from '@/features/miningTax/BulkPayConfirmDialog';
+import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
+import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 
@@ -95,34 +98,6 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
   return { ...result, entries: result.rows, systemNames, systemSecurity, typeNames, unitPrices };
 }
 
-/** One flattened table row: an entry's covering Assignment, or its still-unassigned residual. */
-interface DisplayRow {
-  key: string;
-  row: MoonMiningTaxRow;
-  assignment: MiningTaxAssignmentRecord | null;
-  status: MiningTaxRowStatus;
-}
-
-function flatten(rows: readonly MoonMiningTaxRow[]): DisplayRow[] {
-  return rows.flatMap((row) => {
-    const out: DisplayRow[] = row.assignments.map((assignment) => ({
-      key: assignment.id,
-      row,
-      assignment,
-      status: assignment.status,
-    }));
-    if (row.unassignedOreLines.length > 0) {
-      out.push({
-        key: `${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}:unassigned`,
-        row,
-        assignment: null,
-        status: 'unassigned',
-      });
-    }
-    return out;
-  });
-}
-
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): string {
   return t(`miningTax.status.${STATUS_LABEL_KEY[status]}`);
@@ -145,6 +120,7 @@ export function MoonMiningTax() {
   const [bulkPaySelection, setBulkPaySelection] = useState<ReadonlySet<string>>(new Set());
   const [bulkPayOpen, setBulkPayOpen] = useState(false);
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
+  const [joinTarget, setJoinTarget] = useState<DisplayRow | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Every tracked character, not just those with a Mining Ledger Entry this
@@ -202,11 +178,16 @@ export function MoonMiningTax() {
     let unpaidTaxOwed = 0;
     let unpaidCount = 0;
     for (const dr of payeeFiltered) {
+      const members = allMembers(dr);
       estimatedMined += estimatedValueOf(dr);
-      if (dr.assignment) taxOwed += dr.assignment.taxOwed;
-      if (dr.status === 'outstanding') {
+      taxOwed += members.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
+      // A joined group counts once here, not once per member — "how many
+      // things do I still need to pay" is asking about obligations, and a
+      // join collapses several into one.
+      const stillOwed = members.filter((m) => m.assignment.status === 'outstanding');
+      if (stillOwed.length > 0) {
         unpaidCount += 1;
-        unpaidTaxOwed += dr.assignment?.taxOwed ?? 0;
+        unpaidTaxOwed += stillOwed.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
       }
     }
     return { estimatedMined, taxOwed, unpaidTaxOwed, unpaidCount };
@@ -303,12 +284,74 @@ export function MoonMiningTax() {
     return data?.systemSecurity.get(dr.row.entry.solarSystemId);
   }
 
-  /** Both the table's Value column and the sole Assignment-less rows: an unassigned entry has no `estimatedValue` of its own, so it's priced live from its still-unclaimed ore lines instead. */
+  /** Both the table's Value column and the sole Assignment-less rows: an unassigned entry has no `estimatedValue` of its own, so it's priced live from its still-unclaimed ore lines instead. A joined row sums every member's own value — never a blended re-price across dates. */
   function estimatedValueOf(dr: DisplayRow): number {
     return dr.assignment
-      ? dr.assignment.estimatedValue
+      ? allMembers(dr).reduce((sum, m) => sum + m.assignment.estimatedValue, 0)
       : computeAssignmentValue(dr.row.unassignedOreLines, data?.unitPrices ?? new Map(), 0)
           .estimatedValue;
+  }
+
+  function taxOwedOf(dr: DisplayRow): number {
+    return allMembers(dr).reduce((sum, m) => sum + m.assignment.taxOwed, 0);
+  }
+
+  /** Every date this row covers, earliest first — one entry for an ordinary row, 2+ for a joined one. */
+  function dateRangeOf(dr: DisplayRow): string[] {
+    const members = allMembers(dr);
+    return (members.length > 0 ? members.map((m) => m.row.entry.date) : [dr.row.entry.date]).sort();
+  }
+
+  function dateLabel(dr: DisplayRow): string {
+    const dates = dateRangeOf(dr);
+    return dates.length > 1 ? `${dates[0]} – ${dates[dates.length - 1]}` : dates[0];
+  }
+
+  /**
+   * Other rows `joinTarget` may fold in (issue #523's "join entries"):
+   * same character, same solar system, not already part of a group (v1 is
+   * two-member joins only), and either Unassigned or Outstanding. When
+   * `joinTarget` already has an Assignment, a candidate Assignment must
+   * share its Payee and tax % (the decision doc's merge rule) — a candidate
+   * still unassigned always qualifies, since it simply adopts whichever
+   * side is already assigned.
+   */
+  function joinCandidatesFor(primary: DisplayRow) {
+    return allDisplayRows
+      .filter((dr) => dr.key !== primary.key)
+      .filter((dr) => !dr.groupMembers)
+      .filter((dr) => dr.status === 'unassigned' || dr.status === 'outstanding')
+      .filter((dr) => dr.row.characterId === primary.row.characterId)
+      .filter((dr) => dr.row.entry.solarSystemId === primary.row.entry.solarSystemId)
+      .filter((dr) => {
+        if (!primary.assignment || !dr.assignment) return true;
+        return (
+          dr.assignment.payeeId === primary.assignment.payeeId &&
+          dr.assignment.taxPct === primary.assignment.taxPct
+        );
+      })
+      .map((dr) => ({ row: dr.row, assignment: dr.assignment }));
+  }
+
+  function handleJoined() {
+    setJoinTarget(null);
+    refresh();
+  }
+
+  async function handleMarkGroupPaidFromDetail() {
+    if (!detailTarget) return;
+    const outstanding = allMembers(detailTarget)
+      .filter((m) => m.assignment.status === 'outstanding')
+      .map((m) => m.assignment);
+    if (outstanding.length === 0) return;
+    setBusy(true);
+    try {
+      await markAssignmentsPaid(outstanding);
+      setDetailTarget(null);
+      refresh();
+    } finally {
+      setBusy(false);
+    }
   }
 
   /** The Assign form's create-or-edit submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
@@ -371,14 +414,20 @@ export function MoonMiningTax() {
   const bulkPayRows = useMemo(
     () =>
       allDisplayRows
-        .filter(
-          (dr) => dr.status === 'outstanding' && dr.assignment && bulkPaySelection.has(dr.key)
-        )
-        .map((dr) => ({
-          assignment: dr.assignment as MiningTaxAssignmentRecord,
-          characterName: dr.row.characterName,
-          payeeName: payeeName(dr.row.characterId, dr.assignment?.payeeId),
-        })),
+        .filter((dr) => bulkPaySelection.has(dr.key))
+        // A selected joined row expands to every *actually*-outstanding
+        // member — a mixed-status group's already-paid member must not be
+        // billed a second time just because the group itself reads as
+        // Outstanding (worst-status-wins).
+        .flatMap((dr) =>
+          allMembers(dr)
+            .filter((m) => m.assignment.status === 'outstanding')
+            .map((m) => ({
+              assignment: m.assignment,
+              characterName: m.row.characterName,
+              payeeName: payeeName(m.row.characterId, m.assignment.payeeId),
+            }))
+        ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [allDisplayRows, bulkPaySelection, data]
   );
@@ -432,8 +481,8 @@ export function MoonMiningTax() {
     {
       id: 'date',
       header: t('miningTax.dateColumn'),
-      render: (dr) => dr.row.entry.date,
-      sortValue: (dr) => dr.row.entry.date,
+      render: (dr) => dateLabel(dr),
+      sortValue: (dr) => dateRangeOf(dr)[0],
       primary: true,
     },
     {
@@ -467,8 +516,8 @@ export function MoonMiningTax() {
       header: t('miningTax.taxOwedColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (dr) => (dr.assignment ? `${formatIsk(dr.assignment.taxOwed, 2)} ISK` : '—'),
-      sortValue: (dr) => dr.assignment?.taxOwed,
+      render: (dr) => (dr.assignment ? `${formatIsk(taxOwedOf(dr), 2)} ISK` : '—'),
+      sortValue: (dr) => (dr.assignment ? taxOwedOf(dr) : undefined),
     },
     {
       id: 'status',
@@ -772,7 +821,32 @@ export function MoonMiningTax() {
         />
       )}
 
-      {detailTarget && data && (
+      {detailTarget && data && detailTarget.groupMembers && (
+        <GroupSummaryModal
+          open={detailTarget !== null}
+          onClose={() => setDetailTarget(null)}
+          members={allMembers(detailTarget)}
+          systemName={
+            data.systemNames.get(detailTarget.row.entry.solarSystemId) ??
+            `#${detailTarget.row.entry.solarSystemId}`
+          }
+          systemSecurity={data.systemSecurity.get(detailTarget.row.entry.solarSystemId)}
+          typeNames={data.typeNames}
+          payeeDisplayName={payeeDisplayName(detailTarget)}
+          busy={busy}
+          onEditMember={(member) =>
+            setDetailTarget({
+              key: member.assignment.id,
+              row: member.row,
+              assignment: member.assignment,
+              status: member.assignment.status,
+            })
+          }
+          onMarkAllPaid={() => void handleMarkGroupPaidFromDetail()}
+        />
+      )}
+
+      {detailTarget && data && !detailTarget.groupMembers && (
         <RowDetailModal
           open={detailTarget !== null}
           onClose={() => setDetailTarget(null)}
@@ -793,6 +867,24 @@ export function MoonMiningTax() {
           onMarkPaid={() => void handleMarkPaidFromDetail()}
           onResolve={() => void handleResolveFromDetail()}
           onUndo={() => void handleUndoFromDetail()}
+          onJoin={() => {
+            setJoinTarget(detailTarget);
+            setDetailTarget(null);
+          }}
+        />
+      )}
+
+      {joinTarget && data && (
+        <JoinAssignDialog
+          open={joinTarget !== null}
+          onClose={() => setJoinTarget(null)}
+          primary={{ row: joinTarget.row, assignment: joinTarget.assignment }}
+          candidates={joinCandidatesFor(joinTarget)}
+          payees={data.payeesByCharacter.get(joinTarget.row.characterId) ?? []}
+          typeNames={data.typeNames}
+          unitPrices={data.unitPrices}
+          busy={busy}
+          onJoined={handleJoined}
         />
       )}
 

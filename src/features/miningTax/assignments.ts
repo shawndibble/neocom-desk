@@ -129,6 +129,65 @@ export async function updateAssignment(
   return updated;
 }
 
+export interface JoinMemberInput {
+  characterId: number;
+  date: string;
+  solarSystemId: number;
+  /** The member's existing Assignment, or `null` when this date was still unassigned and `joinAssignments` should create one. */
+  assignment: MiningTaxAssignmentRecord | null;
+  /** Required (and only meaningful) when `assignment` is `null`. */
+  oreLines?: MiningTaxOreLine[];
+}
+
+/**
+ * Joins 2+ Mining Ledger Entries into one combined obligation ("join
+ * entries", issue #523) — a moon-mining session spanning midnight UTC shows
+ * up as separate per-day entries in ESI's ledger even though a corp's own
+ * billing treats it as one. Every member ends up sharing one `groupId`, so
+ * `flatten()` (MoonMiningTax.tsx) renders them as a single row.
+ *
+ * An already-assigned member is only ever re-tagged with the shared
+ * `groupId` — its Payee, tax %, value, and status are left exactly as they
+ * are. The caller is responsible for having verified, before calling this,
+ * that every already-assigned member shares one Payee and tax % (the
+ * decision doc's merge rule) — this function does not re-check it. A
+ * still-unassigned member gets a brand new Assignment created against
+ * `payeeId`/`taxPct`, valued from its own `oreLines` at `unitPrices` — never
+ * a blended or split value across members.
+ */
+export async function joinAssignments(
+  members: readonly JoinMemberInput[],
+  payeeId: string,
+  taxPct: number,
+  unitPrices: ReadonlyMap<number, number>
+): Promise<MiningTaxAssignmentRecord[]> {
+  const groupId =
+    members.map((m) => m.assignment?.groupId).find((id) => id !== undefined) ?? crypto.randomUUID();
+  const now = Date.now();
+  const records: MiningTaxAssignmentRecord[] = members.map((m) => {
+    if (m.assignment) return { ...m.assignment, groupId, updatedAt: now };
+    const oreLines = m.oreLines ?? [];
+    const { estimatedValue, taxOwed } = computeAssignmentValue(oreLines, unitPrices, taxPct);
+    return {
+      id: crypto.randomUUID(),
+      characterId: m.characterId,
+      date: m.date,
+      solarSystemId: m.solarSystemId,
+      payeeId,
+      oreLines,
+      taxPct,
+      estimatedValue,
+      taxOwed,
+      status: 'outstanding',
+      groupId,
+      updatedAt: now,
+    };
+  });
+  await db.miningTaxAssignments.bulkPut(records);
+  for (const characterId of new Set(members.map((m) => m.characterId))) scheduleSync(characterId);
+  return records;
+}
+
 /**
  * Marks several Assignments paid at once — the itemized bulk-pay confirmation
  * commits through this. Never a single blind "mark all paid": the caller is

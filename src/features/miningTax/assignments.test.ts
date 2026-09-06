@@ -5,6 +5,7 @@ import {
   createAssignment,
   deleteAssignment,
   dismissEntry,
+  joinAssignments,
   markAssignmentsPaid,
   resolveNeedsReview,
   updateAssignment,
@@ -215,6 +216,166 @@ describe('deleteAssignment', () => {
     });
     await deleteAssignment(dismissed);
     expect(syncMock.markMiningTaxAssignmentDeleted).toHaveBeenCalledWith(CHAR_A, dismissed.id);
+  });
+});
+
+describe('joinAssignments', () => {
+  const prices = new Map([
+    [TYPE_A, 10],
+    [TYPE_B, 4],
+  ]);
+
+  it('creates one new Assignment per still-unassigned member, sharing a fresh groupId', async () => {
+    const [a, b] = await joinAssignments(
+      [
+        {
+          characterId: CHAR_A,
+          date: '2026-09-04',
+          solarSystemId: 1,
+          assignment: null,
+          oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+        },
+        {
+          characterId: CHAR_A,
+          date: '2026-09-05',
+          solarSystemId: 1,
+          assignment: null,
+          oreLines: [{ typeId: TYPE_B, quantity: 50 }],
+        },
+      ],
+      'payee-1',
+      10,
+      prices
+    );
+
+    expect(a.groupId).toBeDefined();
+    expect(a.groupId).toBe(b.groupId);
+    expect(a.payeeId).toBe('payee-1');
+    expect(a.taxPct).toBe(10);
+    expect(a.estimatedValue).toBe(1000); // 100 * 10
+    expect(a.taxOwed).toBe(100);
+    expect(b.estimatedValue).toBe(200); // 50 * 4
+    expect(b.taxOwed).toBe(20);
+    expect(await db.miningTaxAssignments.get(a.id)).toEqual(a);
+    expect(await db.miningTaxAssignments.get(b.id)).toEqual(b);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('tags an already-assigned member with the shared groupId, leaving its own fields untouched', async () => {
+    const existing = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    });
+
+    const [taggedExisting, created] = await joinAssignments(
+      [
+        { characterId: CHAR_A, date: '2026-09-04', solarSystemId: 1, assignment: existing },
+        {
+          characterId: CHAR_A,
+          date: '2026-09-05',
+          solarSystemId: 1,
+          assignment: null,
+          oreLines: [{ typeId: TYPE_B, quantity: 50 }],
+        },
+      ],
+      existing.payeeId as string,
+      existing.taxPct,
+      prices
+    );
+
+    expect(taggedExisting.groupId).toBeDefined();
+    expect(taggedExisting.groupId).toBe(created.groupId);
+    expect(taggedExisting.estimatedValue).toBe(1000);
+    expect(taggedExisting.taxOwed).toBe(100);
+    expect(taggedExisting.oreLines).toEqual(existing.oreLines);
+    expect(created.payeeId).toBe('payee-1');
+    expect(created.estimatedValue).toBe(200);
+  });
+
+  it('reuses an already-set groupId instead of minting a second one', async () => {
+    const existing = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    });
+    await db.miningTaxAssignments.put({ ...existing, groupId: 'existing-group' });
+
+    const [, created] = await joinAssignments(
+      [
+        {
+          characterId: CHAR_A,
+          date: '2026-09-04',
+          solarSystemId: 1,
+          assignment: { ...existing, groupId: 'existing-group' },
+        },
+        {
+          characterId: CHAR_A,
+          date: '2026-09-05',
+          solarSystemId: 1,
+          assignment: null,
+          oreLines: [{ typeId: TYPE_B, quantity: 50 }],
+        },
+      ],
+      'payee-1',
+      10,
+      prices
+    );
+
+    expect(created.groupId).toBe('existing-group');
+  });
+
+  it('merges two already-assigned members onto one shared groupId without recomputing their values', async () => {
+    const first = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    });
+    const second = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-05',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_B, quantity: 50 }],
+      taxPct: 10,
+      estimatedValue: 200,
+      taxOwed: 20,
+      markPaid: false,
+    });
+
+    const [a, b] = await joinAssignments(
+      [
+        { characterId: CHAR_A, date: first.date, solarSystemId: 1, assignment: first },
+        { characterId: CHAR_A, date: second.date, solarSystemId: 1, assignment: second },
+      ],
+      'payee-1',
+      10,
+      prices
+    );
+
+    expect(a.groupId).toBe(b.groupId);
+    expect(a.estimatedValue).toBe(1000);
+    expect(b.estimatedValue).toBe(200);
+    expect(a.status).toBe('outstanding');
+    expect(b.status).toBe('outstanding');
   });
 });
 
