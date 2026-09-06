@@ -19,7 +19,7 @@
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { diffAssignedOreLines } from '@/engine/miningTax/needsReview';
-import { linesOwnedByAssignment } from '@/engine/miningTax/rowStatus';
+import { computeOwnership } from '@/engine/miningTax/ownership';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
 
 function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityDiff[]): boolean {
@@ -42,13 +42,13 @@ export async function reconcileAssignments(
   const freshByKey = new Map(
     freshEntries.map((entry) => [`${entry.date}:${entry.solarSystemId}`, entry])
   );
-  // How many Assignments cover each entry — `linesOwnedByAssignment` needs
-  // this to tell "sole Payee, owns the whole entry" from "split entry, only
-  // claim what I already named" (see rowStatus.ts).
-  const siblingCountByKey = new Map<string, number>();
+  // Every Assignment covering each entry — `computeOwnership` needs the
+  // whole set to tell "sole Payee, owns the whole entry" from "split entry,
+  // only the collector grows" (see engine/miningTax/ownership.ts).
+  const siblingsByKey = new Map<string, MiningTaxAssignmentRecord[]>();
   for (const a of assignments) {
     const key = `${a.date}:${a.solarSystemId}`;
-    siblingCountByKey.set(key, (siblingCountByKey.get(key) ?? 0) + 1);
+    siblingsByKey.set(key, [...(siblingsByKey.get(key) ?? []), a]);
   }
   const now = Date.now();
   const updates: MiningTaxAssignmentRecord[] = [];
@@ -60,11 +60,10 @@ export async function reconcileAssignments(
     // (or a character's grant lapsed this refresh) — leave the assignment as
     // it stands rather than treat "no fresh data" as "nothing was mined".
     if (!entry) continue;
-    const relevantFresh = linesOwnedByAssignment(
-      assignment.oreLines,
-      entry.oreLines,
-      siblingCountByKey.get(key) ?? 1
-    );
+    const relevantFresh =
+      computeOwnership(entry.oreLines, siblingsByKey.get(key) ?? [assignment]).ownedLines.get(
+        assignment.id
+      ) ?? assignment.oreLines;
     const diffs = diffAssignedOreLines(assignment.oreLines, relevantFresh);
     if (diffs.length === 0) continue;
     if (assignment.status === 'needs-review' && sameDiffs(assignment.reviewDiff, diffs)) continue;

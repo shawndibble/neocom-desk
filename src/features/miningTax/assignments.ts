@@ -4,10 +4,15 @@
  * tax % and Jita-priced ISK value **at assignment time** (invoice semantics —
  * see `engine/miningTax/valuation.ts`).
  */
-import { db, type MiningTaxAssignmentRecord, type MiningTaxOreLine } from '@/db';
+import {
+  db,
+  type MiningTaxAssignmentRecord,
+  type MiningTaxOreLine,
+  type MiningTaxPaymentMethod,
+} from '@/db';
 import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { linesOwnedByAssignment } from '@/engine/miningTax/rowStatus';
+import { computeOwnership } from '@/engine/miningTax/ownership';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { loadJitaUnitPrices } from './pricing';
 
@@ -188,26 +193,137 @@ export async function joinAssignments(
   return records;
 }
 
+export interface PaymentInput {
+  /** Local calendar date the pilot paid, `YYYY-MM-DD`. */
+  paidOn: string;
+  method: MiningTaxPaymentMethod;
+  journalRefId?: number;
+  contractId?: number;
+}
+
 /**
- * Marks several Assignments paid at once — the itemized bulk-pay confirmation
+ * Marks several Assignments paid at once — the itemized Settle-up dialog
  * commits through this. Never a single blind "mark all paid": the caller is
  * responsible for having shown the itemized list (payee/character/date
  * range/total) before calling this.
+ *
+ * With `payment`, every Assignment additionally records how it was settled
+ * under one shared `paymentId` and the lump-sum `amount` (the sum of their
+ * `taxOwed`) — the Settle-up flow's "record it" step. Without it, only
+ * `status`/`paidAt` move, as before.
  */
 export async function markAssignmentsPaid(
-  assignments: readonly MiningTaxAssignmentRecord[]
+  assignments: readonly MiningTaxAssignmentRecord[],
+  payment?: PaymentInput
 ): Promise<void> {
   if (assignments.length === 0) return;
   const now = Date.now();
+  const paymentInfo = payment
+    ? {
+        paymentId: crypto.randomUUID(),
+        paidOn: payment.paidOn,
+        method: payment.method,
+        amount: assignments.reduce((sum, a) => sum + a.taxOwed, 0),
+        ...(payment.journalRefId !== undefined ? { journalRefId: payment.journalRefId } : {}),
+        ...(payment.contractId !== undefined ? { contractId: payment.contractId } : {}),
+      }
+    : undefined;
   const updated = assignments.map((a): MiningTaxAssignmentRecord => ({
     ...a,
     status: 'paid',
     paidAt: now,
+    ...(paymentInfo ? { payment: paymentInfo } : {}),
     updatedAt: now,
   }));
   await db.miningTaxAssignments.bulkPut(updated);
   for (const characterId of new Set(assignments.map((a) => a.characterId)))
     scheduleSync(characterId);
+}
+
+export interface SplitInput {
+  /** Units to move out of `original`, per ore type — each at most what `original` holds of that type; zero-quantity lines are ignored. */
+  moves: readonly MiningTaxOreLine[];
+  /** The second Payee, and the rate the moved ore is taxed at. */
+  payeeId: string;
+  taxPct: number;
+  /**
+   * Which side collects any further ore ESI reports for this day
+   * (`engine/miningTax/ownership.ts`). Omit to leave both unflagged — e.g.
+   * when a third Assignment on the same entry already collects.
+   */
+  collector?: 'original' | 'new';
+}
+
+/**
+ * Splits one assigned day by quantity between its Payee and a second one
+ * (issue #523: two local-time sessions at two corps' moons land in one
+ * EVE/UTC ledger entry). The moved units become a fresh Outstanding
+ * Assignment; the original keeps its status — a Paid day can be split after
+ * the fact, and the paid figure stays with the kept side — and its remaining
+ * units.
+ *
+ * Both sides are re-priced at `unitPrices` (the current Jita buy) rather
+ * than apportioning the original's possibly hand-edited value: two
+ * independently priced obligations is the same rule "join entries" chose.
+ */
+export async function splitAssignment(
+  original: MiningTaxAssignmentRecord,
+  input: SplitInput,
+  unitPrices: ReadonlyMap<number, number>
+): Promise<{ kept: MiningTaxAssignmentRecord; created: MiningTaxAssignmentRecord }> {
+  const moveByType = new Map<number, number>();
+  for (const move of input.moves) {
+    if (move.quantity <= 0) continue;
+    const held = original.oreLines.find((l) => l.typeId === move.typeId)?.quantity ?? 0;
+    if (move.quantity > held) {
+      throw new Error(`Cannot move ${move.quantity} of type ${move.typeId}: only ${held} held`);
+    }
+    moveByType.set(move.typeId, move.quantity);
+  }
+  if (moveByType.size === 0) throw new Error('Nothing to move');
+
+  const keptLines = original.oreLines
+    .map((line) => ({
+      typeId: line.typeId,
+      quantity: line.quantity - (moveByType.get(line.typeId) ?? 0),
+    }))
+    .filter((line) => line.quantity > 0);
+  if (keptLines.length === 0) throw new Error('Cannot move every unit — unassign instead');
+  const movedLines: MiningTaxOreLine[] = original.oreLines
+    .filter((line) => moveByType.has(line.typeId))
+    .map((line) => ({ typeId: line.typeId, quantity: moveByType.get(line.typeId)! }));
+
+  const now = Date.now();
+  const keptValue = computeAssignmentValue(keptLines, unitPrices, original.taxPct);
+  const kept: MiningTaxAssignmentRecord = {
+    ...original,
+    oreLines: keptLines,
+    estimatedValue: keptValue.estimatedValue,
+    taxOwed: keptValue.taxOwed,
+    updatedAt: now,
+  };
+  delete kept.collectsGrowth;
+  if (input.collector === 'original') kept.collectsGrowth = true;
+
+  const createdValue = computeAssignmentValue(movedLines, unitPrices, input.taxPct);
+  const created: MiningTaxAssignmentRecord = {
+    id: crypto.randomUUID(),
+    characterId: original.characterId,
+    date: original.date,
+    solarSystemId: original.solarSystemId,
+    payeeId: input.payeeId,
+    oreLines: movedLines,
+    taxPct: input.taxPct,
+    estimatedValue: createdValue.estimatedValue,
+    taxOwed: createdValue.taxOwed,
+    status: 'outstanding',
+    ...(input.collector === 'new' ? { collectsGrowth: true } : {}),
+    updatedAt: now,
+  };
+
+  await db.miningTaxAssignments.bulkPut([kept, created]);
+  scheduleSync(original.characterId);
+  return { kept, created };
 }
 
 export async function deleteAssignment(assignment: MiningTaxAssignmentRecord): Promise<void> {
@@ -227,22 +343,21 @@ export async function deleteAssignment(assignment: MiningTaxAssignmentRecord): P
  * Payee who genuinely already covered part of the new total is a one-click
  * "mark paid" away from being square again.
  *
- * `siblingAssignmentCount` (the total number of Assignments covering this
- * entry, this one included) decides how much of the fresh entry it
- * re-snapshots to: a sole Assignment claims the whole entry, including any
- * brand-new ore type; a split entry (2+) keeps only the types it already
- * named (`linesOwnedByAssignment`, rowStatus.ts).
+ * `siblings` (every Assignment covering this entry, this one included)
+ * decides how much of the fresh entry it re-snapshots to: a sole Assignment
+ * claims the whole entry, including any brand-new ore type; on a split entry
+ * only the growth collector grows (`engine/miningTax/ownership.ts`).
  */
 export async function resolveNeedsReview(
   assignment: MiningTaxAssignmentRecord,
   freshEntry: MiningLedgerEntry,
-  siblingAssignmentCount: number
+  siblings: readonly MiningTaxAssignmentRecord[]
 ): Promise<void> {
-  const relevantFresh = linesOwnedByAssignment(
-    assignment.oreLines,
-    freshEntry.oreLines,
-    siblingAssignmentCount
-  );
+  const relevantFresh =
+    computeOwnership(
+      freshEntry.oreLines,
+      siblings.some((s) => s.id === assignment.id) ? siblings : [...siblings, assignment]
+    ).ownedLines.get(assignment.id) ?? assignment.oreLines;
   const prices = await loadJitaUnitPrices(relevantFresh.map((line) => line.typeId));
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,

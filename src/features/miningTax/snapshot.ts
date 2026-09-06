@@ -8,7 +8,7 @@ import { loadAllCharacterLedgers } from './ledger';
 import { loadPayees } from './payees';
 import { loadAssignments } from './assignments';
 import { reconcileAssignments } from './reconcile';
-import { unassignedOreLines } from '@/engine/miningTax/rowStatus';
+import { computeOwnership } from '@/engine/miningTax/ownership';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 
 export interface MoonMiningTaxRow {
@@ -116,10 +116,7 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
         characterName: ledger.characterName,
         entry,
         assignments: covering,
-        unassignedOreLines: unassignedOreLines(
-          entry.oreLines,
-          covering.map((a) => a.oreLines)
-        ),
+        unassignedOreLines: computeOwnership(entry.oreLines, covering).unassigned,
       });
     }
   });

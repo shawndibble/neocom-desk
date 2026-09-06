@@ -397,7 +397,7 @@ export function MoonMiningTax() {
       await resolveNeedsReview(
         detailTarget.assignment,
         detailTarget.row.entry,
-        detailTarget.row.assignments.length
+        detailTarget.row.assignments
       );
       setDetailTarget(null);
       refresh();

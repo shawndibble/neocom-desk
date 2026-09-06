@@ -428,8 +428,40 @@ export interface MiningTaxAssignmentRecord {
    * ungrouped row rather than a broken group of one.
    */
   groupId?: string;
+  /**
+   * Which Assignment on a split entry (2+ covering one character/day/system)
+   * receives any ore ESI reports for that day *after* the split — one EVE/UTC
+   * day can hold two local-time sessions at two corps' moons in one system,
+   * so the later one's ore has to have exactly one owner
+   * (`engine/miningTax/ownership.ts`). Meaningless, and never set, on a sole
+   * Assignment: it always collects.
+   */
+  collectsGrowth?: boolean;
+  /**
+   * How this Assignment was settled, when it was marked paid through the
+   * Settle-up flow rather than a bare "mark paid". Every Assignment covered
+   * by one lump-sum payment shares a `paymentId`, so a per-Payee payment
+   * history is a group-by away without a separate synced table.
+   */
+  payment?: MiningTaxPaymentInfo;
   /** Epoch ms of the last edit. */
   updatedAt: number;
+}
+
+export type MiningTaxPaymentMethod = 'donation' | 'contract' | 'other';
+
+export interface MiningTaxPaymentInfo {
+  /** Shared by every Assignment settled in the same lump sum. */
+  paymentId: string;
+  /** Local calendar date the pilot says they paid, `YYYY-MM-DD` — a real-world date, not an EVE ledger date. */
+  paidOn: string;
+  method: MiningTaxPaymentMethod;
+  /** The whole lump sum, in ISK — the same figure on every Assignment it covered. */
+  amount: number;
+  /** Wallet journal entry id (`WalletJournalEntry.id`) the pilot linked this payment to, if any. */
+  journalRefId?: number;
+  /** Contract id the pilot typed or linked, if any. */
+  contractId?: number;
 }
 
 export const db = new Dexie('neocom') as Dexie & {

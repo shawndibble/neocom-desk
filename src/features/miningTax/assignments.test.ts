@@ -8,6 +8,7 @@ import {
   joinAssignments,
   markAssignmentsPaid,
   resolveNeedsReview,
+  splitAssignment,
   updateAssignment,
 } from './assignments';
 
@@ -407,7 +408,7 @@ describe('resolveNeedsReview', () => {
     };
     await db.miningTaxAssignments.put(assignment);
 
-    await resolveNeedsReview(assignment, freshEntry, 1);
+    await resolveNeedsReview(assignment, freshEntry, [assignment]);
 
     const updated = await db.miningTaxAssignments.get('a1');
     expect(updated?.oreLines).toEqual([
@@ -436,7 +437,13 @@ describe('resolveNeedsReview', () => {
     };
     await db.miningTaxAssignments.put(assignment);
 
-    await resolveNeedsReview(assignment, freshEntry, 2);
+    const sibling: MiningTaxAssignmentRecord = {
+      ...assignment,
+      id: 'a-sibling',
+      oreLines: [{ typeId: TYPE_B, quantity: 999 }],
+      status: 'outstanding',
+    };
+    await resolveNeedsReview(assignment, freshEntry, [assignment, sibling]);
 
     const updated = await db.miningTaxAssignments.get('a1');
     expect(updated?.oreLines).toEqual([{ typeId: TYPE_A, quantity: 150 }]);
@@ -462,10 +469,202 @@ describe('resolveNeedsReview', () => {
     };
     await db.miningTaxAssignments.put(assignment);
 
-    await resolveNeedsReview(assignment, freshEntry, 1);
+    await resolveNeedsReview(assignment, freshEntry, [assignment]);
 
     const updated = await db.miningTaxAssignments.get('a2');
     expect(updated?.status).toBe('outstanding');
     expect(updated?.paidAt).toBeUndefined();
+  });
+});
+
+describe('markAssignmentsPaid with a payment', () => {
+  it('stamps one shared paymentId and the lump-sum amount on every assignment', async () => {
+    const a = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    });
+    const b = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-05',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 50 }],
+      taxPct: 10,
+      estimatedValue: 500,
+      taxOwed: 50,
+      markPaid: false,
+    });
+
+    await markAssignmentsPaid([a, b], {
+      paidOn: '2026-09-06',
+      method: 'donation',
+      journalRefId: 987,
+    });
+
+    const [ua, ub] = await Promise.all([
+      db.miningTaxAssignments.get(a.id),
+      db.miningTaxAssignments.get(b.id),
+    ]);
+    expect(ua?.status).toBe('paid');
+    expect(ua?.payment?.amount).toBe(150);
+    expect(ua?.payment?.method).toBe('donation');
+    expect(ua?.payment?.paidOn).toBe('2026-09-06');
+    expect(ua?.payment?.journalRefId).toBe(987);
+    expect(ua?.payment?.contractId).toBeUndefined();
+    expect(ub?.payment?.paymentId).toBe(ua?.payment?.paymentId);
+  });
+
+  it('records nothing about a payment when none is given', async () => {
+    const a = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    });
+    await markAssignmentsPaid([a]);
+    const updated = await db.miningTaxAssignments.get(a.id);
+    expect(updated?.status).toBe('paid');
+    expect(updated?.payment).toBeUndefined();
+  });
+});
+
+describe('splitAssignment', () => {
+  const prices = new Map([
+    [TYPE_A, 10],
+    [TYPE_B, 4],
+  ]);
+
+  async function seedOriginal(
+    overrides: Partial<MiningTaxAssignmentRecord> = {}
+  ): Promise<MiningTaxAssignmentRecord> {
+    const record: MiningTaxAssignmentRecord = {
+      id: 'orig',
+      characterId: CHAR_A,
+      date: '2026-09-05',
+      solarSystemId: 1,
+      payeeId: 'payee-1',
+      oreLines: [
+        { typeId: TYPE_A, quantity: 100 },
+        { typeId: TYPE_B, quantity: 50 },
+      ],
+      taxPct: 10,
+      estimatedValue: 9999, // a hand-edited figure, deliberately not the Jita value
+      taxOwed: 999.9,
+      status: 'outstanding',
+      updatedAt: 1,
+      ...overrides,
+    };
+    await db.miningTaxAssignments.put(record);
+    return record;
+  }
+
+  it('moves part of one type to a new outstanding assignment and re-prices both sides', async () => {
+    const original = await seedOriginal();
+
+    const { kept, created } = await splitAssignment(
+      original,
+      {
+        moves: [{ typeId: TYPE_A, quantity: 40 }],
+        payeeId: 'payee-2',
+        taxPct: 8,
+        collector: 'original',
+      },
+      prices
+    );
+
+    expect(kept.oreLines).toEqual([
+      { typeId: TYPE_A, quantity: 60 },
+      { typeId: TYPE_B, quantity: 50 },
+    ]);
+    expect(kept.estimatedValue).toBe(60 * 10 + 50 * 4);
+    expect(kept.taxOwed).toBeCloseTo((60 * 10 + 50 * 4) * 0.1);
+    expect(kept.collectsGrowth).toBe(true);
+    expect(kept.payeeId).toBe('payee-1');
+
+    expect(created.oreLines).toEqual([{ typeId: TYPE_A, quantity: 40 }]);
+    expect(created.payeeId).toBe('payee-2');
+    expect(created.taxPct).toBe(8);
+    expect(created.estimatedValue).toBe(400);
+    expect(created.taxOwed).toBeCloseTo(32);
+    expect(created.status).toBe('outstanding');
+    expect(created.collectsGrowth).toBeUndefined();
+    expect(created.date).toBe(original.date);
+    expect(created.solarSystemId).toBe(original.solarSystemId);
+
+    expect(await db.miningTaxAssignments.get('orig')).toEqual(kept);
+    expect(await db.miningTaxAssignments.get(created.id)).toEqual(created);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('flags the new side as the collector when asked, and clears the flag on the original', async () => {
+    const original = await seedOriginal({ collectsGrowth: true });
+
+    const { kept, created } = await splitAssignment(
+      original,
+      {
+        moves: [{ typeId: TYPE_B, quantity: 50 }],
+        payeeId: 'payee-2',
+        taxPct: 8,
+        collector: 'new',
+      },
+      prices
+    );
+
+    expect(kept.collectsGrowth).toBeUndefined();
+    expect(created.collectsGrowth).toBe(true);
+    // Moving a whole line drops it from the kept side entirely.
+    expect(kept.oreLines).toEqual([{ typeId: TYPE_A, quantity: 100 }]);
+  });
+
+  it('keeps a paid original paid — the paid figure stays with the kept side', async () => {
+    const original = await seedOriginal({ status: 'paid', paidAt: 5 });
+    const { kept, created } = await splitAssignment(
+      original,
+      { moves: [{ typeId: TYPE_A, quantity: 10 }], payeeId: 'payee-2', taxPct: 8 },
+      prices
+    );
+    expect(kept.status).toBe('paid');
+    expect(kept.paidAt).toBe(5);
+    expect(created.status).toBe('outstanding');
+  });
+
+  it('refuses to move more than the original holds, or everything', async () => {
+    const original = await seedOriginal();
+    await expect(
+      splitAssignment(
+        original,
+        { moves: [{ typeId: TYPE_A, quantity: 101 }], payeeId: 'payee-2', taxPct: 8 },
+        prices
+      )
+    ).rejects.toThrow();
+    await expect(
+      splitAssignment(
+        original,
+        {
+          moves: [
+            { typeId: TYPE_A, quantity: 100 },
+            { typeId: TYPE_B, quantity: 50 },
+          ],
+          payeeId: 'payee-2',
+          taxPct: 8,
+        },
+        prices
+      )
+    ).rejects.toThrow();
+    await expect(
+      splitAssignment(original, { moves: [], payeeId: 'payee-2', taxPct: 8 }, prices)
+    ).rejects.toThrow();
   });
 });
