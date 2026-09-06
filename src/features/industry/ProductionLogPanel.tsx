@@ -1,11 +1,28 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
-import { DataTable, EmptyState, Panel } from '@/components/ui';
+import { db, type BuildPlanRecord } from '@/db';
+import {
+  DataTable,
+  EmptyState,
+  FilterBar,
+  Panel,
+  TextInput,
+  useFilterSurface,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
-import { summarizeProductionRun } from './productionRunSummary';
+import {
+  EMPTY_PRODUCTION_LOG_FILTER,
+  activeProductionLogFilterCount,
+  filterProductionRunsByDate,
+  type ProductionLogFilter,
+} from './productionLogFilter';
+import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
+import { ProductionRunStatusChip } from './ProductionRunStatusChip';
+import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { formatPercent } from './format';
 
@@ -13,6 +30,9 @@ interface ProductionLogPanelProps {
   characterId: number;
   catalog: BlueprintCatalog;
   skills: SkillLevels;
+  plans: BuildPlanRecord[];
+  /** Row click on the runs table: hands back the run's own Build Plan so the caller can jump to it. */
+  onOpenRun?: (buildPlanId: string) => void;
 }
 
 interface ItemRow {
@@ -24,10 +44,6 @@ interface ItemRow {
   realizedProfit: number;
   /** Null when nothing has sold for this item yet — a percentage of zero revenue is not a number. */
   avgMarginPct: number | null;
-}
-
-function toneClass(value: number): string {
-  return value >= 0 ? 'text-isk-pos' : 'text-isk-neg';
 }
 
 /** One label-over-value block, matching the design's larger dashboard stat (distinct from the compact `StatChip`). */
@@ -43,16 +59,80 @@ function BigStat({ label, value, tone }: { label: string; value: string; tone?: 
 }
 
 /**
+ * The Records tab's From/To pair — copies `Wallet.tsx`'s `JournalDateRange`
+ * layout exactly (a visible `<label>` rather than `FilterField`, so the
+ * caption shows inline as well as in the mobile sheet) since this is the same
+ * shape of control: two `date` inputs bounding one collection by a stored
+ * timestamp.
+ */
+function ProductionLogDateRange({
+  draft,
+  setDraft,
+}: {
+  draft: ProductionLogFilter;
+  setDraft: (next: ProductionLogFilter) => void;
+}) {
+  const { t } = useTranslation();
+  const sheet = useFilterSurface() === 'sheet';
+  const labelClassName = cx(
+    'flex items-center gap-1 text-xs text-text-dim',
+    sheet && 'min-w-0 flex-1'
+  );
+  const fieldClassName = sheet ? 'w-full min-w-0' : 'w-36';
+  return (
+    <div className={sheet ? 'flex w-full items-center gap-2' : 'contents'}>
+      <label className={labelClassName}>
+        {t('industry.dateFromLabel')}
+        <TextInput
+          type="date"
+          className={fieldClassName}
+          value={draft.startDate ?? ''}
+          onChange={(event) =>
+            setDraft({ ...draft, startDate: event.target.value === '' ? null : event.target.value })
+          }
+        />
+      </label>
+      <label className={labelClassName}>
+        {t('industry.dateToLabel')}
+        <TextInput
+          type="date"
+          className={fieldClassName}
+          value={draft.endDate ?? ''}
+          onChange={(event) =>
+            setDraft({ ...draft, endDate: event.target.value === '' ? null : event.target.value })
+          }
+        />
+      </label>
+    </div>
+  );
+}
+
+interface RunRow {
+  summary: ProductionRunSummary;
+  itemName: string;
+  planName: string;
+}
+
+/**
  * Cross-plan, cross-item realized-profit rollup (issue #525) — the aggregate
  * "Production Log" the original design mockup's final step showed. Distinct
  * from `ProductionRunsPanel`, which is scoped to one Build Plan's own runs:
  * this reads every Production Run the character has logged, grouped by
- * product, regardless of which plan it came from. Placed as its own panel on
- * `/industry` (the mockup's own undecided-at-the-time choice between that and
- * a dedicated route) rather than a new route.
+ * product, regardless of which plan it came from. Rendered as the Industry
+ * route's "Records" tab (a peer of the Build Plan list/detail grid, per
+ * `Tabs`' own "peer views within a page" contract) rather than the mockup's
+ * undecided-at-the-time "own panel vs. dedicated route" choice — a tab needed
+ * neither.
  */
-export function ProductionLogPanel({ characterId, catalog, skills }: ProductionLogPanelProps) {
+export function ProductionLogPanel({
+  characterId,
+  catalog,
+  skills,
+  plans,
+  onOpenRun,
+}: ProductionLogPanelProps) {
   const { t } = useTranslation();
+  const [filter, setFilter] = useState<ProductionLogFilter>(EMPTY_PRODUCTION_LOG_FILTER);
 
   const runs =
     useLiveQuery(
@@ -82,7 +162,11 @@ export function ProductionLogPanel({ characterId, catalog, skills }: ProductionL
     );
   }
 
-  const summaries = runs.map((run) => summarizeProductionRun(run, saleLinks, orderWatches, skills));
+  const planNameById = new Map(plans.map((p) => [p.id, p.name]));
+  const filteredRuns = filterProductionRunsByDate(runs, filter);
+  const summaries = filteredRuns.map((run) =>
+    summarizeProductionRun(run, saleLinks, orderWatches, skills)
+  );
 
   const totalRealizedProfit = summaries.reduce((sum, s) => sum + s.profit.profit, 0);
   const totalCostLogged = summaries.reduce((sum, s) => sum + s.run.totalCost, 0);
@@ -162,7 +246,7 @@ export function ProductionLogPanel({ characterId, catalog, skills }: ProductionL
       header: t('industry.realizedProfit'),
       align: 'right',
       className: 'tabular-nums font-semibold',
-      cellClassName: (r) => toneClass(r.realizedProfit),
+      cellClassName: (r) => iskToneClass(r.realizedProfit),
       sortValue: (r) => r.realizedProfit,
       render: (r) => formatIsk(r.realizedProfit),
     },
@@ -178,38 +262,146 @@ export function ProductionLogPanel({ characterId, catalog, skills }: ProductionL
 
   const itemCount = byItem.size;
 
+  const runRows: RunRow[] = summaries
+    .map((summary) => ({
+      summary,
+      itemName:
+        catalog.byProductTypeID.get(summary.run.productTypeID)?.productName ??
+        `#${summary.run.productTypeID}`,
+      planName: planNameById.get(summary.run.buildPlanId) ?? summary.run.buildPlanId,
+    }))
+    .sort((a, b) => b.summary.run.loggedAt - a.summary.run.loggedAt);
+
+  const runColumns: DataTableColumn<RunRow>[] = [
+    {
+      id: 'loggedAt',
+      header: t('industry.productionRunColumnLogged'),
+      primary: true,
+      className: 'whitespace-nowrap',
+      sortValue: (r) => r.summary.run.loggedAt,
+      render: (r) => new Date(r.summary.run.loggedAt).toLocaleDateString(),
+    },
+    {
+      id: 'item',
+      header: t('industry.productionRunColumnItem'),
+      sortValue: (r) => r.itemName,
+      render: (r) => r.itemName,
+    },
+    {
+      id: 'plan',
+      header: t('industry.productionRunColumnPlan'),
+      className: 'text-text-dim',
+      sortValue: (r) => r.planName,
+      render: (r) => r.planName,
+    },
+    {
+      id: 'quantity',
+      header: t('industry.quantity'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (r) => r.summary.run.quantity,
+      render: (r) => r.summary.run.quantity.toLocaleString(),
+    },
+    {
+      id: 'totalCost',
+      header: t('industry.totalCost'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (r) => r.summary.run.totalCost,
+      render: (r) => formatIsk(r.summary.run.totalCost),
+    },
+    {
+      id: 'quantitySold',
+      header: t('industry.productionRunColumnSold'),
+      align: 'right',
+      className: 'tabular-nums text-text-dim',
+      sortValue: (r) => r.summary.quantitySold,
+      render: (r) =>
+        `${r.summary.quantitySold.toLocaleString()} / ${r.summary.run.quantity.toLocaleString()}`,
+    },
+    {
+      id: 'realizedProfit',
+      header: t('industry.realizedProfit'),
+      align: 'right',
+      className: 'tabular-nums font-semibold',
+      cellClassName: (r) => iskToneClass(r.summary.profit.profit),
+      sortValue: (r) => r.summary.profit.profit,
+      render: (r) => formatIsk(r.summary.profit.profit),
+    },
+    {
+      id: 'status',
+      header: t('industry.productionRunColumnStatus'),
+      align: 'right',
+      sortValue: (r) => r.summary.status,
+      render: (r) => <ProductionRunStatusChip status={r.summary.status} />,
+    },
+  ];
+
   return (
     <Panel title={t('industry.productionLog')}>
       <div className="space-y-1">
         <p className="text-[0.6875rem] text-text-dim">{t('industry.productionLogSubtitle')}</p>
         <p className="text-[0.6875rem] text-text-faint">
-          {t('industry.productionLogCaveat', { runs: runs.length, items: itemCount })}
+          {t('industry.productionLogCaveat', { runs: filteredRuns.length, items: itemCount })}
         </p>
       </div>
 
-      <div className="my-3 flex flex-wrap gap-2">
+      <FilterBar
+        value={filter}
+        onChange={setFilter}
+        activeCount={activeProductionLogFilterCount(filter)}
+        className="my-3"
+      >
+        {(draft, setDraft) => <ProductionLogDateRange draft={draft} setDraft={setDraft} />}
+      </FilterBar>
+
+      <div className="mb-3 flex flex-wrap gap-2">
         <BigStat
           label={t('industry.totalRealizedProfit')}
           value={formatIsk(totalRealizedProfit)}
-          tone={toneClass(totalRealizedProfit)}
+          tone={iskToneClass(totalRealizedProfit)}
         />
         <BigStat label={t('industry.totalCostLogged')} value={formatIsk(totalCostLogged)} />
         <BigStat label={t('industry.totalRevenueLinked')} value={formatIsk(totalRevenueLinked)} />
         <BigStat label={t('industry.openInventoryValue')} value={formatIsk(openInventoryValue)} />
       </div>
 
-      <div className="rounded-xs border border-line">
-        <div className="border-b border-line px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('industry.byItem')}
-        </div>
-        <DataTable
-          columns={columns}
-          rows={itemRows}
-          rowKey={(r) => r.productTypeID}
-          label={t('industry.byItem')}
-          density="compact"
+      {runRows.length === 0 ? (
+        <EmptyState
+          title={t('industry.productionLogFilteredEmptyTitle')}
+          hint={t('industry.productionLogFilteredEmptyHint')}
+          className="py-6"
         />
-      </div>
+      ) : (
+        <>
+          <div className="mb-4 rounded-xs border border-line">
+            <div className="border-b border-line px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('industry.allProductionRuns')}
+            </div>
+            <DataTable
+              columns={runColumns}
+              rows={runRows}
+              rowKey={(r) => r.summary.run.id}
+              label={t('industry.allProductionRuns')}
+              density="compact"
+              onRowClick={onOpenRun ? (r) => onOpenRun(r.summary.run.buildPlanId) : undefined}
+            />
+          </div>
+
+          <div className="rounded-xs border border-line">
+            <div className="border-b border-line px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('industry.byItem')}
+            </div>
+            <DataTable
+              columns={columns}
+              rows={itemRows}
+              rowKey={(r) => r.productTypeID}
+              label={t('industry.byItem')}
+              density="compact"
+            />
+          </div>
+        </>
+      )}
     </Panel>
   );
 }

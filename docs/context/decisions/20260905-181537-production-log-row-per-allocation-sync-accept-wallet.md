@@ -83,21 +83,37 @@ _Recorded 2026-09-05 · issue #525._
   per order) — acceptable for a first slice; a future ticket could snapshot
   the real fee paid at order-placement time instead of re-deriving it.
 - **Both the per-plan panel and the true cross-plan aggregate view live on
-  the existing `/industry` route, not a new route or sub-nav tab.**
-  `ProductionRunsPanel` is appended as a fourth `<Panel>` sibling in
-  `BuildPlanDetail.tsx`, directly below the existing Results panel, scoped to
-  one Build Plan's own runs (queried by `buildPlanId`) — matching how this
-  app already does per-plan master/detail. A separate, genuinely cross-plan,
-  cross-item rollup (every run, every item, one character) was originally
-  scoped out of the first slice, then added once requested: `ProductionLogPanel`
-  reads every `ProductionRunRecord` for the character (queried by
-  `characterId` alone, no `buildPlanId` filter) and renders it as its own
-  panel at the top of `/industry`, above the Build Plan list/detail grid —
-  the placement the original design mockup's own final step left undecided
-  between "its own panel under Industry" and "a dedicated route." Both
+  the existing `/industry` route, not a new route.** `ProductionRunsPanel` is
+  appended as a fourth `<Panel>` sibling in `BuildPlanDetail.tsx`, directly
+  below the existing Results panel, scoped to one Build Plan's own runs
+  (queried by `buildPlanId`) — matching how this app already does per-plan
+  master/detail. A separate, genuinely cross-plan, cross-item rollup (every
+  run, every item, one character) was originally scoped out of the first
+  slice, then added once requested: `ProductionLogPanel` reads every
+  `ProductionRunRecord` for the character (queried by `characterId` alone, no
+  `buildPlanId` filter). It was first placed as an always-visible panel above
+  the Build Plan grid, then moved into its own "Records" tab
+  (`src/routes/Industry.tsx`'s local `Tabs`, a peer of a new "Build Plans"
+  tab wrapping the existing list/detail grid) once a second round of
+  requests asked for a dedicated place to browse every logged run's
+  sold/unsold status and filter by date — the original design mockup's own
+  final step had left "its own panel under Industry" vs. "a dedicated route"
+  undecided, and a same-route tab needed neither a new route nor an
+  always-on panel competing with the Build Plan grid for space. Both
   `ProductionRunsPanel` and `ProductionLogPanel` share one pure summary
   function, `productionRunSummary.ts`'s `summarizeProductionRun`, so the two
-  views can never disagree about a run's realized profit or sale status.
+  views can never disagree about a run's realized profit or sale status. The
+  Records tab also adds a per-run table (date, item, Build Plan, quantity,
+  cost, sold/total, realized profit, status — the same "N / total" pairing
+  `ProductionRunsPanel`'s own per-plan table already uses, rather than
+  showing remaining as a separate number) above the existing "By Item"
+  rollup — the rollup alone could not show which individual runs still
+  needed a sale linked — and a `From`/`To` date-range filter
+  (`productionLogFilter.ts`, mirroring `walletJournalFilter.ts`'s inclusive
+  `YYYY-MM-DD` string-range pattern and `Wallet.tsx`'s `JournalDateRange`
+  layout) that narrows both the totals and both tables together. Clicking a
+  run row switches back to the Build Plans tab and selects that run's own
+  plan (`Industry.tsx`'s `openRunFromRecords`).
 - **Every Production Run carries a sale-status badge — New (nothing sold),
   Open (partially sold), Closed (fully sold) — matching the mockup's own
   three-state chip.** `ProductionRunStatusChip` is the one place that renders
@@ -114,7 +130,12 @@ _Recorded 2026-09-05 · issue #525._
   run itself. An allocation left pointing at a run that no longer exists
   would be worse than a slightly noisier tombstone list — and would
   permanently corrupt "already linked" checks, since the deterministic id
-  would still exist there was nothing to clean it up.
+  would still exist there was nothing to clean it up. `markBuildPlanDeleted`
+  cascades the same way one level up (added after the Records tab review
+  caught the gap): deleting a Build Plan now tombstones every Production Run
+  logged against it via `markProductionRunDeleted`, so a deleted plan never
+  leaves an orphaned run rendering a raw `buildPlanId` in `ProductionLogPanel`
+  or sending a Records-tab row click to the wrong plan.
 - **A third linking mechanism, "Manual / Private Sale," was added after initial
   review feedback.** Not every disposal has an ESI record at all — a gift, a
   private out-of-market deal, an item reprocessed and sold as something else.

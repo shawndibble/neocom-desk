@@ -30,6 +30,7 @@ import { SourcingInput } from './MaterialsTable';
 import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
 import { ProductionRunStatusChip } from './ProductionRunStatusChip';
 import type { MarketOrder, WalletTransaction } from '@/esi/endpoints';
+import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 
@@ -329,7 +330,7 @@ export function ProductionRunsPanel({
       header: t('industry.realizedProfit'),
       align: 'right',
       className: 'tabular-nums font-semibold',
-      cellClassName: (r) => (r.profit.profit >= 0 ? 'text-isk-pos' : 'text-isk-neg'),
+      cellClassName: (r) => iskToneClass(r.profit.profit),
       sortValue: (r) => r.profit.profit,
       render: (r) => formatIsk(r.profit.profit),
     },

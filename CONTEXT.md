@@ -202,8 +202,11 @@ here — they go one per file in `docs/context/decisions/`.
   regardless of which Build Plan it came from, grouped by item. Distinct
   from the per-Build-Plan "Production Runs" panel on a Build Plan's own
   detail view, which is scoped to one plan's own runs; Production Log is the
-  account-wide picture. Lives as its own panel at the top of `/industry`, not
-  a separate route.
+  account-wide picture, including a per-run table (not just the by-item
+  rollup) so a pilot can see which individual runs still need a sale linked,
+  and a From/To date-range filter. Lives on `/industry`'s "Records" tab (a
+  peer of the "Build Plans" tab, not a separate route or an always-visible
+  panel); clicking a run jumps back to its own Build Plan.
 - **Production Run**: A manual, pilot-entered snapshot of one production
   batch off a **Build Plan** — materials cost, job fee, and quantity as they
   stood at logging time, overridable at creation and never re-derived

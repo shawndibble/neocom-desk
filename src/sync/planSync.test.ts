@@ -859,6 +859,17 @@ describe('triggerSync: build plans', () => {
     expect(tombstones?.value).toEqual([]);
   });
 
+  it('markBuildPlanDeleted cascades to every Production Run logged against the plan, and their own sale links', async () => {
+    await db.buildPlans.put(buildPlan());
+    await db.productionRuns.put(productionRun());
+    await db.productionSaleLinks.put(productionSaleLink());
+
+    await markBuildPlanDeleted(1, 'b1');
+
+    expect(await db.productionRuns.get('run-1')).toBeUndefined();
+    expect(await db.productionSaleLinks.get('1:txn:1001')).toBeUndefined();
+  });
+
   it('a remote tombstone deletes the local build plan', async () => {
     await db.buildPlans.put(buildPlan({ updatedAt: Date.now() - 5000 }));
     seedRemote(BUILD_PLANS_PATH, [remoteBuildDoc({ deleted: true, updatedAt: Date.now() - 100 })]);

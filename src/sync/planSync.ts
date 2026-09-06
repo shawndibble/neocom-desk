@@ -167,7 +167,19 @@ export async function markPlanDeleted(characterId: number, planId: string): Prom
 }
 
 /** Build Plan analogue of markPlanDeleted — same tombstone semantics. */
+/**
+ * Deleting a Build Plan cascades to every Production Run logged against it
+ * (and, via `markProductionRunDeleted`, each of those runs' own sale links
+ * and order watches) — the same reasoning one level up: a run left pointing
+ * at a Build Plan that no longer exists would render with a raw id instead
+ * of a name in `ProductionLogPanel`, and clicking it would silently land on
+ * whichever Build Plan the "first plan" fallback in `Industry.tsx` picks.
+ */
 export async function markBuildPlanDeleted(characterId: number, planId: string): Promise<void> {
+  const runs = await db.productionRuns.where('buildPlanId').equals(planId).toArray();
+  for (const run of runs) {
+    await markProductionRunDeleted(characterId, run.id);
+  }
   await recordDeletion(characterId, planId, buildPlanTombstonesKey(characterId), () =>
     db.buildPlans.delete(planId)
   );
