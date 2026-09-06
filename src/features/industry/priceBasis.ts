@@ -7,9 +7,7 @@
  * aggregate carries `sellMin` and `buyMax` together), so switching basis is
  * pure re-computation: it must never key a refetch or a loading state.
  *
- * The product is deliberately not routed through here. It stays on the hub's
- * lowest sell whatever the materials were sourced at, because an Acquisition
- * Verdict asks what buying the product outright costs.
+ * Materials only — the product is deliberately not routed through here.
  */
 import type { HubPrices, MaterialPriceBasis } from '@/engine/industry/types';
 import type { MarketSnapshot } from './marketData';

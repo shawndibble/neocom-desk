@@ -33,12 +33,7 @@ export interface ComputeBuildPlanInput {
   systemCostIndex: number;
   adjustedPrices: AdjustedPrices;
   hubPrices: HubPrices;
-  /**
-   * What the materials are bought at, when that is not `hubPrices` — the
-   * plan's material price basis, already resolved by `priceBasis.ts`. Omitted
-   * means the hub's sell side, which is what every caller passed before the
-   * basis existed.
-   */
+  /** The plan's material price basis, already resolved by `priceBasis.ts`. */
   materialPrices?: HubPrices;
   skills: SkillLevels;
 }
